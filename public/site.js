@@ -29,7 +29,11 @@ async function loadCurrentUser() {
 function markActiveNav() {
   document.querySelectorAll(".nav-link").forEach((link) => {
     const href = link.getAttribute("href");
-    if ((page === "home" && href === "/index.html") || href === `/${page}.html`) {
+    if (
+      (page === "home" && href === "/index.html") ||
+      href === `/${page}.html` ||
+      ((page === "agenda" || page === "cursos") && href === "/eventos.html")
+    ) {
       link.classList.add("active");
     }
   });
@@ -166,15 +170,20 @@ async function loadAlbums(siteConfig, user) {
       }
 
       items.forEach((album) => {
-        const card = document.createElement("article");
-        card.className = "album-card";
+        const card = document.createElement(album.href ? "a" : "article");
+        card.className = `album-card${album.href ? " album-card-link" : ""}`;
+
+        if (album.href) {
+          card.href = album.href;
+          card.setAttribute("aria-label", `Abrir detalhes do album ${album.name}`);
+        }
+
         card.innerHTML = `
           <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
           <div class="album-body">
             <h3>${album.name}</h3>
             <p>${album.tracks > 0 ? `${album.tracks} MP3 disponiveis` : "Album sem MP3 cadastrado"}</p>
             ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
-            ${page === "produtos" && album.href ? `<a class="primary-button buy-button icon-only-button" href="${album.href}" aria-label="Comprar album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h-2l-1 2H1v2h2l2.4 8.1A2 2 0 0 0 6.3 18H17a2 2 0 0 0 1.9-1.4L21 8H7.4l-.5-2zM9 20a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm8 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></a>` : ""}
           </div>
         `;
         grid.appendChild(card);
@@ -194,7 +203,7 @@ async function loadAlbums(siteConfig, user) {
 }
 
 function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
-  if (!user?.isAdmin || page !== "agenda") {
+  if (!user?.isAdmin || page !== "eventos") {
     return;
   }
 
@@ -207,7 +216,7 @@ function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
   panel.innerHTML = `
     <div class="admin-panel-head">
       <strong>Admin RoseMattos</strong>
-      <span>Agenda</span>
+      <span>Eventos</span>
     </div>
     <form id="admin-schedule-form" class="admin-form-grid">
       <label>Data
