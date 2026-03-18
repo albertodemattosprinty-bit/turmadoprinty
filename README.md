@@ -11,7 +11,7 @@ Base inicial em Node para subir no Render e evoluir em 3 partes:
 1. Copie `.env.example` para `.env`
 2. Preencha `OPENAI_API_KEY` se quiser testar a rota GPT
 3. Preencha `DATABASE_URL` quando quiser ativar login com Postgres
-4. Preencha `PAGBANK_TOKEN` para testar o checkout
+4. Preencha `STRIPE_SECRET_KEY` para testar o checkout
 5. Rode:
 
 ```bash
@@ -29,8 +29,9 @@ Depois abra `http://localhost:3000`.
 - `GET /api/store/products`
 - `POST /api/gpt/ask`
 - `POST /api/audio/transcribe`
-- `POST /api/payments/pagbank/checkout`
-- `POST /api/payments/pagbank/webhook`
+- `POST /api/payments/stripe/checkout`
+- `POST /api/payments/stripe/subscription-checkout`
+- `POST /api/payments/stripe/webhook`
 - `GET /api/db/health`
 - `POST /api/auth/register`
 - `POST /api/auth/verify-code`
@@ -58,15 +59,15 @@ Se `system` vier vazio, o backend usa um contexto cristao protestante amigavel e
   - `OPENAI_TRANSCRIBE_MODEL` se quiser trocar o modelo de voz
   - `DATABASE_URL` para ativar login
   - `DEFAULT_PRODUCT_PRICE_CENTS` para o preco padrao dos albuns
-  - `PAGBANK_ENVIRONMENT` com `sandbox` ou `production`
-  - `PAGBANK_TOKEN` com o token da API Checkout do PagBank
+  - `STRIPE_SECRET_KEY` com a chave secreta da Stripe
+  - `STRIPE_WEBHOOK_SECRET` com o segredo do endpoint de webhook da Stripe
 
-## Pagamentos com PagBank
+## Pagamentos com Stripe
 
-- A pagina [public/produtos.html](C:/Users/Lucas/Desktop/Turma%20do%20Printy%20Database/public/produtos.html) cria checkout redirecionado no PagBank
-- O backend chama `POST /checkouts` do PagBank e devolve a URL `PAY` para redirecionar o comprador
-- O webhook atual fica em `POST /api/payments/pagbank/webhook` e registra as notificacoes no log do servidor
-- Antes de producao, troque `PAGBANK_ENVIRONMENT` para `production`, atualize `PAGBANK_TOKEN` e finalize a homologacao no painel do PagBank
+- A pagina [public/produtos.html](C:/Users/Lucas/Desktop/Turma%20do%20Printy%20Database/public/produtos.html) abre o Stripe Checkout para compra avulsa
+- A pagina [public/planos.html](C:/Users/Lucas/Desktop/Turma%20do%20Printy%20Database/public/planos.html) abre o Stripe Checkout em modo assinatura
+- O webhook atual fica em `POST /api/payments/stripe/webhook`
+- Para desenvolvimento local, rode `stripe listen --forward-to localhost:3000/api/payments/stripe/webhook` e copie o segredo gerado para `STRIPE_WEBHOOK_SECRET`
 
 ## Inicializacao do banco
 

@@ -80,7 +80,7 @@ create index if not exists idx_user_plan_subscriptions_user_id on user_plan_subs
 create index if not exists idx_user_plan_subscriptions_plan_id on user_plan_subscriptions(plan_id);
 create index if not exists idx_user_plan_subscriptions_status on user_plan_subscriptions(status);
 
-create table if not exists pagbank_webhook_events (
+create table if not exists payment_webhook_events (
   id uuid primary key default gen_random_uuid(),
   event_type text,
   resource_id text,
@@ -89,5 +89,5 @@ create table if not exists pagbank_webhook_events (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_pagbank_webhook_events_reference_id on pagbank_webhook_events(reference_id);
-create index if not exists idx_pagbank_webhook_events_event_type on pagbank_webhook_events(event_type);
+create index if not exists idx_payment_webhook_events_reference_id on payment_webhook_events(reference_id);
+create index if not exists idx_payment_webhook_events_event_type on payment_webhook_events(event_type);

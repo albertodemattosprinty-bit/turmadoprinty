@@ -99,7 +99,7 @@ async function startRecurringCheckout(plan) {
     return;
   }
 
-  const response = await fetch("/api/payments/pagbank/subscription-checkout", {
+  const response = await fetch("/api/payments/stripe/subscription-checkout", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -135,7 +135,7 @@ function renderPlans() {
   if (!accessState.authenticated) {
     planStatus.textContent = "Faca login para ativar o plano Gratis e liberar downloads offline no navegador.";
   } else if (paymentReturned) {
-    planStatus.textContent = "Pagamento enviado ao PagBank. Aguarde a confirmacao da assinatura.";
+    planStatus.textContent = "Pagamento enviado ao Stripe. Aguarde a confirmacao da assinatura.";
   } else if (accessState.canDownloadAll) {
     planStatus.textContent = `Plano ${activePlan.name} ativo no servidor. Streaming e downloads offline liberados para todo o catalogo.`;
   } else {
@@ -154,7 +154,7 @@ function renderPlans() {
       <p>${plan.description}</p>
       <div class="plan-perks">${plan.perks.map((perk) => `<span class="status-pill">${perk}</span>`).join("")}</div>
       <button class="${isActive || plan.id === "gratis" ? "ghost-button" : "primary-button"} full-width" type="button">
-        ${isActive ? "Plano ativo" : plan.id === "gratis" ? "Plano padrao" : "Assinar no PagBank"}
+        ${isActive ? "Plano ativo" : plan.id === "gratis" ? "Plano padrao" : "Assinar no Stripe"}
       </button>
     `;
 
@@ -174,7 +174,7 @@ function renderPlans() {
       } catch (error) {
         planStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar assinatura.";
         button.disabled = false;
-        button.textContent = "Assinar no PagBank";
+        button.textContent = "Assinar no Stripe";
       }
     });
 

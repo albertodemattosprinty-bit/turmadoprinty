@@ -75,14 +75,30 @@ export async function createPlanSubscriptionRecord({ userId, planId, referenceId
   return result.rows[0];
 }
 
-export async function recordPagBankWebhookEvent({ eventType, resourceId, referenceId, payload }) {
-  await query(
-    `
-      insert into pagbank_webhook_events (event_type, resource_id, reference_id, payload)
-      values ($1, $2, $3, $4::jsonb)
-    `,
-    [eventType || null, resourceId || null, referenceId || null, JSON.stringify(payload || {})]
-  );
+export async function recordPaymentWebhookEvent({ eventType, resourceId, referenceId, payload }) {
+  const values = [eventType || null, resourceId || null, referenceId || null, JSON.stringify(payload || {})];
+
+  try {
+    await query(
+      `
+        insert into payment_webhook_events (event_type, resource_id, reference_id, payload)
+        values ($1, $2, $3, $4::jsonb)
+      `,
+      values
+    );
+  } catch (error) {
+    if (!String(error?.message || "").includes("payment_webhook_events")) {
+      throw error;
+    }
+
+    await query(
+      `
+        insert into pagbank_webhook_events (event_type, resource_id, reference_id, payload)
+        values ($1, $2, $3, $4::jsonb)
+      `,
+      values
+    );
+  }
 }
 
 export async function markAlbumPurchaseStatus({

@@ -36,7 +36,7 @@ async function loadHealth() {
     const items = [
       data.env.hasOpenAiKey ? "GPT ativo" : "GPT pendente",
       data.env.hasDatabaseUrl ? "Acesso ativo" : "Acesso pendente",
-      data.env.hasPagBankToken ? `PagBank ${data.env.pagbankEnvironment}` : "PagBank pendente"
+      data.env.hasStripeKey ? `Stripe ${data.env.stripeEnvironment}` : "Stripe pendente"
     ];
 
     pills.innerHTML = "";
@@ -58,7 +58,7 @@ async function startCheckout(productId, statusNode, button) {
   button.textContent = "Abrindo checkout...";
 
   try {
-    const response = await fetch("/api/payments/pagbank/checkout", {
+    const response = await fetch("/api/payments/stripe/checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -95,29 +95,50 @@ async function loadAlbums() {
     return;
   }
 
-  const response = await fetch(page === "produtos" ? "/api/store/products" : "/api/albums");
-  const data = await response.json();
-  count.textContent = `${data.items.length} albuns disponiveis`;
   grid.innerHTML = "";
 
-  if (storeStatus) {
-    storeStatus.textContent = "Abra um album para ouvir as faixas e comprar na pagina de detalhes.";
-  }
+  try {
+    const response = await fetch(page === "produtos" ? "/api/store/products" : "/api/albums");
+    const data = await response.json();
 
-  data.items.forEach((album) => {
-    const card = document.createElement("article");
-    card.className = "album-card";
-    card.innerHTML = `
-      <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
-      <div class="album-body">
-        <h3>${album.name}</h3>
-        <p>${album.tracks > 0 ? `${album.tracks} faixas` : "Sem faixas cadastradas"}</p>
-        ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
-        ${page === "produtos" && album.href ? `<a class="primary-button buy-button" href="${album.href}">Ver detalhes</a>` : ""}
-      </div>
-    `;
-    grid.appendChild(card);
-  });
+    if (!response.ok) {
+      throw new Error(data.error || "Falha ao carregar o catalogo.");
+    }
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    count.textContent = `${items.length} albuns disponiveis`;
+
+    if (storeStatus) {
+      storeStatus.textContent = "Abra um album para ouvir os MP3 e comprar na pagina de detalhes.";
+    }
+
+    if (!items.length) {
+      grid.innerHTML = "<p class=\"section-muted\">Nenhum album disponivel no momento.</p>";
+      return;
+    }
+
+    items.forEach((album) => {
+      const card = document.createElement("article");
+      card.className = "album-card";
+      card.innerHTML = `
+        <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
+        <div class="album-body">
+          <h3>${album.name}</h3>
+          <p>${album.tracks > 0 ? `${album.tracks} MP3 disponiveis` : "Album sem MP3 cadastrado"}</p>
+          ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
+          ${page === "produtos" && album.href ? `<a class="primary-button buy-button" href="${album.href}">Ouvir e comprar</a>` : ""}
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  } catch (error) {
+    count.textContent = "Falha ao carregar";
+    grid.innerHTML = `<p class="section-muted">${error instanceof Error ? error.message : "Erro ao carregar albuns."}</p>`;
+
+    if (storeStatus) {
+      storeStatus.textContent = "Nao foi possivel carregar a lista de albuns agora.";
+    }
+  }
 }
 
 function loadSchedule() {

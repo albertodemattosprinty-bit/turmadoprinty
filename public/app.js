@@ -93,7 +93,7 @@ function renderAlbums(items) {
       <img src="${album.coverUrl}" alt="Capa do album ${album.name}" class="album-cover">
       <div class="album-body">
         <h3>${album.name}</h3>
-        <p>${album.tracks > 0 ? `${album.tracks} faixas` : "Sem faixas cadastradas"}</p>
+        <p>${album.tracks > 0 ? `${album.tracks} MP3 disponiveis` : "Album sem MP3 cadastrado"}</p>
       </div>
     `;
     albumGrid.appendChild(card);

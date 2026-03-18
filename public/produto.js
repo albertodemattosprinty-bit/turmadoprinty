@@ -90,7 +90,7 @@ function setPurchaseStatus(albumId) {
   const params = new URLSearchParams(window.location.search);
 
   if (params.get("payment") === "return") {
-    purchaseStatus.textContent = "Pagamento enviado ao PagBank. O plano Gratis ja libera streaming e download offline no navegador.";
+    purchaseStatus.textContent = "Pagamento enviado ao Stripe. O plano Gratis ja libera streaming e download offline no navegador.";
     return;
   }
 
@@ -117,7 +117,7 @@ async function startCheckout(albumId) {
   buyAlbumButton.textContent = "Abrindo checkout...";
 
   try {
-    const response = await fetch("/api/payments/pagbank/checkout", {
+    const response = await fetch("/api/payments/stripe/checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -370,6 +370,19 @@ async function downloadTrackForOffline(card, albumId, track) {
 async function renderTracks(album) {
   trackList.innerHTML = "";
 
+  if (!Array.isArray(album.tracks) || !album.tracks.length) {
+    trackList.innerHTML = `
+      <article class="track-card">
+        <div class="track-copy">
+          <p class="track-number">MP3</p>
+          <h3>Nenhuma faixa cadastrada neste album</h3>
+          <p class="track-download-label">Quando os arquivos forem publicados, eles vao aparecer aqui.</p>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
   for (const track of album.tracks) {
     const downloaded = await isTrackDownloaded(album.id, track.number);
     const article = document.createElement("article");
@@ -463,13 +476,14 @@ async function loadAlbumDetail() {
     productTitle.textContent = album.name;
     productDescription.textContent = album.description;
     productPrice.textContent = album.priceLabel;
-    productTrackCount.textContent = `${album.tracks.length} faixas`;
+    productTrackCount.textContent = `${album.tracks.length} MP3`;
     manifestStatus.textContent = album.hasManifest
       ? "Titulos carregados do manifest do album."
       : "Manifest de faixas nao encontrado. Exibindo numeracao padrao.";
     setPurchaseStatus(album.id);
     await renderTracks(album);
 
+    buyAlbumButton.textContent = "Comprar no Stripe";
     buyAlbumButton.onclick = async () => {
       await startCheckout(album.id);
     };

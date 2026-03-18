@@ -6,11 +6,12 @@ import crypto from "node:crypto";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
-import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPagBankWebhookEvent } from "./src/payments.js";
+import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { findSubscriptionPlanById } from "./src/plans.js";
 import { findStoreProductById, formatPriceFromCents, slugifyAlbumName, storeProducts } from "./src/store.js";
 
@@ -21,9 +22,8 @@ const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
-const PAGBANK_ENVIRONMENT = String(process.env.PAGBANK_ENVIRONMENT || "sandbox").toLowerCase() === "production" ? "production" : "sandbox";
-const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN || "";
-const PAGBANK_API_BASE_URL = PAGBANK_ENVIRONMENT === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com";
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no evangelho protestante, em tom suave, amigavel, acolhedor, amavel e disposto a ajudar como um amigo. Fale com naturalidade e conviccao, tratando o evangelho como a realidade central da resposta, sem usar expressoes como 'segundo o evangelho' ou apresentar essa base como mera suposicao. Priorize proximidade, clareza, verdade biblica e cuidado pastoral.";
 
 const publicDir = path.join(__dirname, "public");
@@ -65,14 +65,32 @@ async function readApiResponse(response) {
   }
 }
 
-async function readTextBody(request) {
+async function readRawTextBody(request) {
   const chunks = [];
 
   for await (const chunk of request) {
     chunks.push(chunk);
   }
 
-  return Buffer.concat(chunks).toString("utf8").trim();
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function readTextBody(request) {
+  return (await readRawTextBody(request)).trim();
+}
+
+let stripeClient = null;
+
+function getStripeClient() {
+  if (!STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY nao configurada.");
+  }
+
+  if (!stripeClient) {
+    stripeClient = new Stripe(STRIPE_SECRET_KEY);
+  }
+
+  return stripeClient;
 }
 
 function buildCoverUrl(albumName) {
@@ -261,29 +279,54 @@ function getTrackDownloadUrl(productName, trackNumber) {
   return buildTrackUrl(productName, trackNumber);
 }
 
-function extractOrderPaymentDetails(payload) {
-  const charges = Array.isArray(payload?.charges) ? payload.charges : [];
-  const charge = charges[0] || null;
-
-  return {
-    referenceId: payload?.reference_id || charge?.reference_id || null,
-    orderId: payload?.id || null,
-    chargeId: charge?.id || null,
-    status: charge?.status || payload?.status || null,
-    paidAt: charge?.paid_at || null
-  };
+function getStripeEnvironment() {
+  return STRIPE_SECRET_KEY.startsWith("sk_live_") ? "production" : "test";
 }
 
-function extractSubscriptionWebhookDetails(payload) {
-  const resource = payload?.resource || {};
-  return {
-    eventType: typeof payload?.event === "string" ? payload.event : null,
-    referenceId: resource?.reference_id || null,
-    subscriptionId: resource?.id || null,
-    status: resource?.status || null,
-    activatedAt: resource?.updated_at || resource?.created_at || null,
-    canceledAt: resource?.updated_at || null
-  };
+function buildStripeSuccessUrl(baseUrl, pathname, queryKey, value) {
+  return `${baseUrl}${pathname}?${queryKey}=${encodeURIComponent(value)}&payment=return&session_id={CHECKOUT_SESSION_ID}`;
+}
+
+function normalizeStripeSubscriptionStatus(status) {
+  const normalized = String(status || "").trim().toLowerCase();
+
+  if (normalized === "active" || normalized === "trialing") {
+    return "ACTIVE";
+  }
+
+  if (normalized === "past_due" || normalized === "unpaid") {
+    return "OVERDUE";
+  }
+
+  if (normalized === "canceled") {
+    return "CANCELED";
+  }
+
+  if (normalized === "incomplete" || normalized === "incomplete_expired") {
+    return "DECLINED";
+  }
+
+  return normalized ? normalized.toUpperCase() : "PENDING";
+}
+
+function normalizeStripePaymentStatus(status) {
+  return String(status || "").trim().toLowerCase() === "paid" ? "PAID" : "PENDING";
+}
+
+function getEventObject(event) {
+  return event?.data?.object || {};
+}
+
+function getMetadataReferenceId(payload) {
+  return payload?.metadata?.referenceId || payload?.metadata?.reference_id || null;
+}
+
+function getStripeInvoiceReferenceId(invoice) {
+  return getMetadataReferenceId(invoice) || getMetadataReferenceId(invoice?.parent?.subscription_details) || null;
+}
+
+function toIsoDateFromUnix(value) {
+  return Number.isFinite(value) ? new Date(value * 1000).toISOString() : null;
 }
 
 async function handleGptRequest(request, response) {
@@ -462,77 +505,47 @@ async function handleAudioTranscription(request, response) {
   }
 }
 
-async function createPagBankCheckout({ request, product }) {
-  if (!PAGBANK_TOKEN) {
-    throw new Error("PAGBANK_TOKEN nao configurado.");
-  }
-
+async function createStripeCheckout({ request, user, product }) {
+  const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
   const referenceId = `printy-${product.id}-${crypto.randomUUID()}`;
-  const redirectUrl = `${baseUrl}/produto.html?album=${encodeURIComponent(product.id)}&payment=return`;
-  const webhookUrl = `${baseUrl}/api/payments/pagbank/webhook`;
-
-  const payload = {
-    reference_id: referenceId,
-    redirect_url: redirectUrl,
-    customer_modifiable: true,
-    items: [
-      {
-        name: product.name,
-        quantity: product.quantity,
-        unit_amount: product.unitAmount
-      }
-    ],
-    payment_methods: [
-      { type: "PIX" },
-      { type: "BOLETO" },
-      { type: "CREDIT_CARD" }
-    ],
-    notification_urls: [webhookUrl],
-    payment_notification_urls: [webhookUrl]
-  };
-
-  const pagBankResponse = await fetch(`${PAGBANK_API_BASE_URL}/checkouts`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${PAGBANK_TOKEN}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "x-idempotency-key": crypto.randomUUID()
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    success_url: buildStripeSuccessUrl(baseUrl, "/produto.html", "album", product.id),
+    cancel_url: `${baseUrl}/produto.html?album=${encodeURIComponent(product.id)}`,
+    locale: "pt-BR",
+    customer_email: user.email || undefined,
+    client_reference_id: referenceId,
+    metadata: {
+      kind: "album_purchase",
+      referenceId,
+      productId: product.id,
+      userId: user.id
     },
-    body: JSON.stringify(payload)
+    line_items: [
+      {
+        quantity: product.quantity,
+        price_data: {
+          currency: "brl",
+          unit_amount: product.unitAmount,
+          product_data: {
+            name: product.name,
+            description: product.description
+          }
+        }
+      }
+    ]
   });
 
-  const { data, text } = await readApiResponse(pagBankResponse);
-
-  if (!pagBankResponse.ok) {
-    throw new Error(
-      data?.error_messages?.[0]?.description ||
-      data?.message ||
-      text ||
-      "Falha ao criar checkout no PagBank."
-    );
-  }
-
-  if (!data) {
-    throw new Error("O PagBank devolveu resposta vazia ou invalida ao criar o checkout.");
-  }
-
-  const payLink = Array.isArray(data.links) ? data.links.find((link) => link?.rel === "PAY" && typeof link.href === "string") : null;
-
-  if (!payLink?.href) {
-    throw new Error("Checkout criado sem link de pagamento.");
-  }
-
   return {
-    checkoutId: data.id,
-    referenceId: data.reference_id,
-    payUrl: payLink.href,
-    raw: data
+    checkoutId: session.id,
+    referenceId,
+    payUrl: session.url,
+    raw: session
   };
 }
 
-async function handlePagBankCheckoutRequest(request, response) {
+async function handleStripeCheckoutRequest(request, response) {
   if (!ensurePaymentsReady(response)) {
     return;
   }
@@ -561,14 +574,14 @@ async function handlePagBankCheckoutRequest(request, response) {
   }
 
   try {
-    const checkout = await createPagBankCheckout({ request, product });
+    const checkout = await createStripeCheckout({ request, user, product });
     await createAlbumPurchaseRecord({
       userId: user.id,
       productId: product.id,
       referenceId: checkout.referenceId,
       checkoutId: checkout.checkoutId,
       amountCents: product.unitAmount,
-      environment: PAGBANK_ENVIRONMENT,
+      environment: getStripeEnvironment(),
       payload: checkout.raw
     });
     sendJson(response, 200, {
@@ -584,89 +597,67 @@ async function handlePagBankCheckoutRequest(request, response) {
     });
   } catch (error) {
     sendJson(response, 500, {
-      error: error instanceof Error ? error.message : "Erro ao criar checkout PagBank."
+      error: error instanceof Error ? error.message : "Erro ao criar checkout Stripe."
     });
   }
 }
 
-async function createPagBankSubscriptionCheckout({ request, plan }) {
-  if (!PAGBANK_TOKEN) {
-    throw new Error("PAGBANK_TOKEN nao configurado.");
-  }
-
+async function createStripeSubscriptionCheckout({ request, user, plan }) {
+  const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
   const referenceId = `printy-plan-${plan.id}-${crypto.randomUUID()}`;
-  const redirectUrl = `${baseUrl}/planos.html?plan=${encodeURIComponent(plan.id)}&payment=return`;
-  const webhookUrl = `${baseUrl}/api/payments/pagbank/webhook`;
-
-  const payload = {
-    reference_id: referenceId,
-    redirect_url: redirectUrl,
-    customer_modifiable: true,
-    items: [
-      {
-        name: `Plano ${plan.name}`,
-        quantity: 1,
-        unit_amount: plan.unitAmount
-      }
-    ],
-    payment_methods: [
-      { type: "CREDIT_CARD" }
-    ],
-    notification_urls: [webhookUrl],
-    payment_notification_urls: [webhookUrl],
-    recurrence_plan: {
-      name: `Turma do Printy ${plan.name}`,
-      interval: {
-        unit: plan.intervalUnit,
-        length: plan.intervalLength
-      },
-      billing_cycles: plan.billingCycles
-    }
-  };
-
-  const pagBankResponse = await fetch(`${PAGBANK_API_BASE_URL}/checkouts`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${PAGBANK_TOKEN}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "x-idempotency-key": crypto.randomUUID()
+  const intervalUnit = String(plan.intervalUnit || "MONTH").toLowerCase();
+  const recurringInterval = intervalUnit === "year" || intervalUnit === "month" ? intervalUnit : "month";
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    success_url: buildStripeSuccessUrl(baseUrl, "/planos.html", "plan", plan.id),
+    cancel_url: `${baseUrl}/planos.html?plan=${encodeURIComponent(plan.id)}`,
+    locale: "pt-BR",
+    customer_email: user.email || undefined,
+    client_reference_id: referenceId,
+    metadata: {
+      kind: "plan_subscription",
+      referenceId,
+      planId: plan.id,
+      userId: user.id
     },
-    body: JSON.stringify(payload)
+    subscription_data: {
+      metadata: {
+        kind: "plan_subscription",
+        referenceId,
+        planId: plan.id,
+        userId: user.id
+      }
+    },
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "brl",
+          recurring: {
+            interval: recurringInterval,
+            interval_count: Math.max(1, Number(plan.intervalLength) || 1)
+          },
+          unit_amount: plan.unitAmount,
+          product_data: {
+            name: `Plano ${plan.name}`,
+            description: `Assinatura ${plan.name} da Turma do Printy`
+          }
+        }
+      }
+    ]
   });
 
-  const { data, text } = await readApiResponse(pagBankResponse);
-
-  if (!pagBankResponse.ok) {
-    throw new Error(
-      data?.error_messages?.[0]?.description ||
-      data?.message ||
-      text ||
-      "Falha ao criar checkout recorrente no PagBank."
-    );
-  }
-
-  if (!data) {
-    throw new Error("O PagBank devolveu resposta vazia ou invalida ao criar o checkout recorrente.");
-  }
-
-  const payLink = Array.isArray(data.links) ? data.links.find((link) => link?.rel === "PAY" && typeof link.href === "string") : null;
-
-  if (!payLink?.href) {
-    throw new Error("Checkout recorrente criado sem link de pagamento.");
-  }
-
   return {
-    checkoutId: data.id,
-    referenceId: data.reference_id,
-    payUrl: payLink.href,
-    recurrencePlanId: data?.recurrence_plan?.id || null,
-    raw: data
+    checkoutId: session.id,
+    referenceId,
+    payUrl: session.url,
+    recurrencePlanId: session.subscription || null,
+    raw: session
   };
 }
 
-async function handlePagBankSubscriptionCheckoutRequest(request, response) {
+async function handleStripeSubscriptionCheckoutRequest(request, response) {
   if (!ensurePaymentsReady(response)) {
     return;
   }
@@ -695,14 +686,14 @@ async function handlePagBankSubscriptionCheckoutRequest(request, response) {
   }
 
   try {
-    const checkout = await createPagBankSubscriptionCheckout({ request, plan });
+    const checkout = await createStripeSubscriptionCheckout({ request, user, plan });
     await createPlanSubscriptionRecord({
       userId: user.id,
       planId: plan.id,
       referenceId: checkout.referenceId,
       checkoutId: checkout.checkoutId,
       amountCents: plan.unitAmount,
-      environment: PAGBANK_ENVIRONMENT,
+      environment: getStripeEnvironment(),
       payload: checkout.raw
     });
     sendJson(response, 200, {
@@ -719,85 +710,117 @@ async function handlePagBankSubscriptionCheckoutRequest(request, response) {
     });
   } catch (error) {
     sendJson(response, 500, {
-      error: error instanceof Error ? error.message : "Erro ao criar checkout recorrente PagBank."
+      error: error instanceof Error ? error.message : "Erro ao criar checkout recorrente Stripe."
     });
   }
 }
 
-async function handlePagBankWebhook(request, response) {
-  const rawBody = await readTextBody(request);
-  let body = {};
+async function handleStripeWebhook(request, response) {
+  const rawBody = await readRawTextBody(request);
+  let event = null;
 
-  if (rawBody) {
+  try {
+    const stripe = getStripeClient();
+    const signature = request.headers["stripe-signature"];
+
+    if (STRIPE_WEBHOOK_SECRET && typeof signature === "string" && rawBody) {
+      event = stripe.webhooks.constructEvent(rawBody, signature, STRIPE_WEBHOOK_SECRET);
+    } else if (rawBody) {
+      event = JSON.parse(rawBody);
+    }
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Webhook Stripe invalido."
+    });
+    return;
+  }
+
+  if (!event && rawBody) {
     try {
-      body = JSON.parse(rawBody);
+      event = JSON.parse(rawBody);
     } catch {
-      const params = new URLSearchParams(rawBody);
-      body = Object.fromEntries(params.entries());
+      event = null;
     }
   }
 
+  const payload = event || {};
+  const resource = getEventObject(payload);
+  const referenceId = getMetadataReferenceId(resource) || getStripeInvoiceReferenceId(resource);
+
   if (hasDatabase()) {
     try {
-      const subscriptionDetails = extractSubscriptionWebhookDetails(body);
-      const paymentDetails = extractOrderPaymentDetails(body);
-      const referenceId = subscriptionDetails.referenceId || paymentDetails.referenceId;
-
-      await recordPagBankWebhookEvent({
-        eventType: subscriptionDetails.eventType || body?.event || paymentDetails.status || "unknown",
-        resourceId: subscriptionDetails.subscriptionId || paymentDetails.orderId || null,
+      await recordPaymentWebhookEvent({
+        eventType: payload?.type || "unknown",
+        resourceId: resource?.id || null,
         referenceId,
-        payload: body
+        payload
       });
 
-      if (subscriptionDetails.referenceId) {
-        let nextStatus = subscriptionDetails.status;
+      if (referenceId) {
+        if (referenceId.startsWith("printy-plan-")) {
+          let nextStatus = "PENDING";
+          let activatedAt = null;
+          let canceledAt = null;
+          let subscriptionId = null;
 
-        if (subscriptionDetails.eventType === "subscription.activated") {
-          nextStatus = "ACTIVE";
-        } else if (subscriptionDetails.eventType === "subscription.canceled") {
-          nextStatus = "CANCELED";
-        } else if (subscriptionDetails.eventType === "subscription.suspended") {
-          nextStatus = "SUSPENDED";
-        }
+          if (payload?.type === "checkout.session.completed") {
+            nextStatus = resource?.mode === "subscription"
+              ? normalizeStripeSubscriptionStatus(resource?.payment_status === "paid" ? "active" : "incomplete")
+              : normalizeStripePaymentStatus(resource?.payment_status);
+            activatedAt = isActiveSubscriptionStatus(nextStatus) ? new Date().toISOString() : null;
+            subscriptionId = resource?.subscription || null;
+          } else if (payload?.type === "checkout.session.async_payment_succeeded") {
+            nextStatus = "ACTIVE";
+            activatedAt = new Date().toISOString();
+            subscriptionId = resource?.subscription || null;
+          } else if (payload?.type === "checkout.session.async_payment_failed") {
+            nextStatus = "DECLINED";
+            canceledAt = new Date().toISOString();
+            subscriptionId = resource?.subscription || null;
+          } else if (payload?.type === "invoice.paid") {
+            nextStatus = "ACTIVE";
+            activatedAt = toIsoDateFromUnix(resource?.status_transitions?.paid_at) || new Date().toISOString();
+            subscriptionId = resource?.subscription || null;
+          } else if (payload?.type === "invoice.payment_failed") {
+            nextStatus = "OVERDUE";
+            canceledAt = new Date().toISOString();
+            subscriptionId = resource?.subscription || null;
+          } else if (payload?.type === "customer.subscription.updated" || payload?.type === "customer.subscription.deleted") {
+            nextStatus = normalizeStripeSubscriptionStatus(resource?.status);
+            activatedAt = isActiveSubscriptionStatus(nextStatus) ? toIsoDateFromUnix(resource?.current_period_start) : null;
+            canceledAt = isInactiveSubscriptionStatus(nextStatus) ? toIsoDateFromUnix(resource?.canceled_at) || new Date().toISOString() : null;
+            subscriptionId = resource?.id || null;
+          }
 
-        await markPlanSubscriptionStatus({
-          referenceId: subscriptionDetails.referenceId,
-          status: nextStatus,
-          subscriptionId: subscriptionDetails.subscriptionId,
-          payload: body,
-          activatedAt: isActiveSubscriptionStatus(nextStatus) ? subscriptionDetails.activatedAt : null,
-          canceledAt: isInactiveSubscriptionStatus(nextStatus) ? subscriptionDetails.canceledAt : null
-        });
-      } else if (paymentDetails.referenceId) {
-        const targetIsPlan = paymentDetails.referenceId.startsWith("printy-plan-");
-
-        if (targetIsPlan) {
           await markPlanSubscriptionStatus({
-            referenceId: paymentDetails.referenceId,
-            status: paymentDetails.status,
-            subscriptionId: null,
-            payload: body,
-            activatedAt: isActiveSubscriptionStatus(paymentDetails.status) ? paymentDetails.paidAt : null,
-            canceledAt: isInactiveSubscriptionStatus(paymentDetails.status) ? paymentDetails.paidAt : null
+            referenceId,
+            status: nextStatus,
+            subscriptionId,
+            payload,
+            activatedAt,
+            canceledAt
           });
         } else {
+          const paymentStatus = payload?.type === "checkout.session.async_payment_failed"
+            ? "DECLINED"
+            : normalizeStripePaymentStatus(resource?.payment_status);
+
           await markAlbumPurchaseStatus({
-            referenceId: paymentDetails.referenceId,
-            status: paymentDetails.status,
-            orderId: paymentDetails.orderId,
-            chargeId: paymentDetails.chargeId,
-            payload: body,
-            paidAt: isActivePaymentStatus(paymentDetails.status) ? paymentDetails.paidAt : null
+            referenceId,
+            status: paymentStatus,
+            orderId: resource?.payment_intent || resource?.id || null,
+            chargeId: resource?.payment_intent || null,
+            payload,
+            paidAt: isActivePaymentStatus(paymentStatus) ? new Date().toISOString() : null
           });
         }
       }
     } catch (error) {
-      console.error("[PagBank webhook error]", error);
+      console.error("[Stripe webhook error]", error);
     }
   }
 
-  console.log("[PagBank webhook]", JSON.stringify(body));
+  console.log("[Stripe webhook]", JSON.stringify(payload));
   sendJson(response, 200, { ok: true });
 }
 
@@ -900,11 +923,12 @@ const server = http.createServer(async (request, response) => {
       env: {
         hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
         hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
-        hasPagBankToken: Boolean(PAGBANK_TOKEN),
+        hasStripeKey: Boolean(STRIPE_SECRET_KEY),
+        hasStripeWebhookSecret: Boolean(STRIPE_WEBHOOK_SECRET),
         contentBaseUrl: CONTENT_BASE_URL,
         model: OPENAI_MODEL,
         transcribeModel: OPENAI_TRANSCRIBE_MODEL,
-        pagbankEnvironment: PAGBANK_ENVIRONMENT
+        stripeEnvironment: getStripeEnvironment()
       }
     });
     return;
@@ -1034,18 +1058,18 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && pathname === "/api/payments/pagbank/checkout") {
-    await handlePagBankCheckoutRequest(request, response);
+  if (request.method === "POST" && (pathname === "/api/payments/stripe/checkout" || pathname === "/api/payments/pagbank/checkout")) {
+    await handleStripeCheckoutRequest(request, response);
     return;
   }
 
-  if (request.method === "POST" && pathname === "/api/payments/pagbank/subscription-checkout") {
-    await handlePagBankSubscriptionCheckoutRequest(request, response);
+  if (request.method === "POST" && (pathname === "/api/payments/stripe/subscription-checkout" || pathname === "/api/payments/pagbank/subscription-checkout")) {
+    await handleStripeSubscriptionCheckoutRequest(request, response);
     return;
   }
 
-  if (request.method === "POST" && pathname === "/api/payments/pagbank/webhook") {
-    await handlePagBankWebhook(request, response);
+  if (request.method === "POST" && (pathname === "/api/payments/stripe/webhook" || pathname === "/api/payments/pagbank/webhook")) {
+    await handleStripeWebhook(request, response);
     return;
   }
 
