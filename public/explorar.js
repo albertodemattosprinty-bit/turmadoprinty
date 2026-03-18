@@ -1,25 +1,25 @@
 const sessionStorageKey = "turma_do_printy_token";
-const historyStorageKey = "turma_do_printy_chat_history";
+const conversationStorageKey = "turma_do_printy_chat_conversations";
+const legacyHistoryStorageKey = "turma_do_printy_chat_history";
 
 const authStatus = document.getElementById("auth-status");
-const registerForm = document.getElementById("register-form");
-const loginForm = document.getElementById("login-form");
-const registerName = document.getElementById("register-name");
-const registerUsername = document.getElementById("register-username");
-const registerPassword = document.getElementById("register-password");
-const registerPasswordConfirm = document.getElementById("register-password-confirm");
-const loginUsername = document.getElementById("login-username");
-const loginPassword = document.getElementById("login-password");
-const meButton = document.getElementById("me-button");
-const authOutput = document.getElementById("auth-output");
+const historyList = document.getElementById("history-list");
+const newChatButton = document.getElementById("new-chat-button");
+const loginLink = document.getElementById("login-link");
+const logoutButton = document.getElementById("logout-button");
+const chatHint = document.getElementById("chat-hint");
 const chatThread = document.getElementById("chat-thread");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
 const stopButton = document.getElementById("stop-button");
+const conversationTitle = document.getElementById("conversation-title");
+const conversationMeta = document.getElementById("conversation-meta");
 
 let currentController = null;
 let stopRequested = false;
+let currentUser = null;
+let activeConversationId = null;
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -28,21 +28,59 @@ function getToken() {
 function setToken(token) {
   if (token) {
     window.localStorage.setItem(sessionStorageKey, token);
-  } else {
-    window.localStorage.removeItem(sessionStorageKey);
+    return;
+  }
+
+  window.localStorage.removeItem(sessionStorageKey);
+}
+
+function getConversationStore() {
+  try {
+    return JSON.parse(window.localStorage.getItem(conversationStorageKey) || "{}");
+  } catch {
+    return {};
   }
 }
 
-function getHistory() {
+function setConversationStore(store) {
+  window.localStorage.setItem(conversationStorageKey, JSON.stringify(store));
+}
+
+function getLegacyHistory() {
   try {
-    return JSON.parse(window.localStorage.getItem(historyStorageKey) || "[]");
+    return JSON.parse(window.localStorage.getItem(legacyHistoryStorageKey) || "[]");
   } catch {
     return [];
   }
 }
 
-function setHistory(history) {
-  window.localStorage.setItem(historyStorageKey, JSON.stringify(history));
+function getUserKey() {
+  return currentUser?.username || "guest";
+}
+
+function getConversations() {
+  const store = getConversationStore();
+  const items = Array.isArray(store[getUserKey()]) ? store[getUserKey()] : [];
+
+  return items
+    .slice()
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+}
+
+function saveConversations(conversations) {
+  const store = getConversationStore();
+  store[getUserKey()] = conversations;
+  setConversationStore(store);
+}
+
+function getActiveConversation() {
+  const conversations = getConversations();
+
+  if (!conversations.length) {
+    return null;
+  }
+
+  return conversations.find((item) => item.id === activeConversationId) || conversations[0];
 }
 
 function escapeHtml(value) {
@@ -52,21 +90,146 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
-function renderHistory() {
-  const history = getHistory();
+function formatRelativeDate(value) {
+  if (!value) {
+    return "agora";
+  }
+
+  const date = new Date(value);
+  const formatter = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
+  return formatter.format(date);
+}
+
+function createShortTitle(message) {
+  const sanitized = message.replace(/\s+/g, " ").trim();
+  if (!sanitized) {
+    return "Nova conversa";
+  }
+
+  const words = sanitized.split(" ").slice(0, 5).join(" ");
+  return words.length > 32 ? `${words.slice(0, 29).trimEnd()}...` : words;
+}
+
+function createConversation(firstMessage = "") {
+  const timestamp = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    title: createShortTitle(firstMessage),
+    messages: [],
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+
+function migrateLegacyHistory() {
+  const legacyHistory = getLegacyHistory();
+
+  if (!legacyHistory.length) {
+    return;
+  }
+
+  const store = getConversationStore();
+  const userKey = getUserKey();
+  const hasCurrentConversations = Array.isArray(store[userKey]) && store[userKey].length > 0;
+
+  if (hasCurrentConversations) {
+    window.localStorage.removeItem(legacyHistoryStorageKey);
+    return;
+  }
+
+  const firstUserMessage = legacyHistory.find((item) => item?.role === "user" && typeof item.content === "string")?.content || "";
+  store[userKey] = [
+    {
+      ...createConversation(firstUserMessage),
+      title: createShortTitle(firstUserMessage),
+      messages: legacyHistory
+        .filter((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string")
+        .map((item) => ({ role: item.role, content: item.content })),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+  setConversationStore(store);
+  window.localStorage.removeItem(legacyHistoryStorageKey);
+}
+
+function updateConversation(nextConversation) {
+  const conversations = getConversations();
+  const nextItems = conversations.filter((item) => item.id !== nextConversation.id);
+  nextItems.unshift(nextConversation);
+  saveConversations(nextItems);
+  activeConversationId = nextConversation.id;
+}
+
+function renderHistoryList() {
+  const conversations = getConversations();
+  historyList.innerHTML = "";
+
+  if (!currentUser) {
+    historyList.innerHTML = `
+      <div class="history-empty">
+        <strong>Entre para ver seu histórico.</strong>
+        <p>Suas conversas ficam organizadas aqui com um nome curto para cada chat.</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (!conversations.length) {
+    historyList.innerHTML = `
+      <div class="history-empty">
+        <strong>Nenhuma conversa ainda.</strong>
+        <p>Quando você mandar a primeira mensagem, o chat aparece aqui automaticamente.</p>
+      </div>
+    `;
+    return;
+  }
+
+  conversations.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `history-item${item.id === activeConversationId ? " active" : ""}`;
+    button.innerHTML = `
+      <strong>${escapeHtml(item.title)}</strong>
+      <span>${item.messages.length} mensagens</span>
+      <span>${formatRelativeDate(item.updatedAt)}</span>
+    `;
+    button.addEventListener("click", () => {
+      activeConversationId = item.id;
+      renderConversation();
+      renderHistoryList();
+    });
+    historyList.appendChild(button);
+  });
+}
+
+function renderConversation() {
+  const conversation = getActiveConversation();
   chatThread.innerHTML = "";
 
-  if (history.length === 0) {
+  if (!conversation || conversation.messages.length === 0) {
+    conversationTitle.textContent = "Nova conversa";
+    conversationMeta.textContent = currentUser
+      ? "Pronta para começar."
+      : "Faça login somente quando quiser iniciar o chat.";
     chatThread.innerHTML = `
       <article class="message-card assistant">
         <div class="message-role">Assistente</div>
-        <div class="message-text">Como posso ajudar hoje?</div>
+        <div class="message-text">Posso ajudar com ideias, roteiros, legendas e materiais para o ministério infantil.</div>
       </article>
     `;
     return;
   }
 
-  history.forEach((item) => {
+  conversationTitle.textContent = conversation.title;
+  conversationMeta.textContent = `Atualizada em ${formatRelativeDate(conversation.updatedAt)}`;
+
+  conversation.messages.forEach((item) => {
     const article = document.createElement("article");
     article.className = `message-card ${item.role === "user" ? "user" : "assistant"}`;
     article.innerHTML = `
@@ -79,22 +242,25 @@ function renderHistory() {
   chatThread.scrollTop = chatThread.scrollHeight;
 }
 
-function appendHistory(role, content) {
-  const history = getHistory();
-  history.push({ role, content });
-  setHistory(history);
-  renderHistory();
-}
-
-function setComposerEnabled(enabled) {
-  chatInput.disabled = !enabled;
-  sendButton.disabled = !enabled;
+function syncComposerState() {
+  const isLoggedIn = Boolean(currentUser);
+  logoutButton.hidden = !isLoggedIn;
+  loginLink.hidden = isLoggedIn;
+  chatInput.placeholder = isLoggedIn
+    ? "Digite sua mensagem aqui..."
+    : "Faça login quando quiser iniciar uma conversa com a IA.";
+  chatHint.textContent = isLoggedIn
+    ? `Histórico ativo para @${currentUser.username}.`
+    : "Você pode navegar livremente. O login só é exigido quando for iniciar uma conversa.";
 }
 
 async function loadSessionState() {
   if (!getToken()) {
-    authStatus.textContent = "Faça login para liberar o chat.";
-    setComposerEnabled(false);
+    currentUser = null;
+    authStatus.textContent = "Você está navegando sem login.";
+    syncComposerState();
+    renderHistoryList();
+    renderConversation();
     return;
   }
 
@@ -108,39 +274,52 @@ async function loadSessionState() {
 
     if (!response.ok) {
       setToken("");
+      currentUser = null;
       authStatus.textContent = data.error || "Sessão inválida.";
-      setComposerEnabled(false);
+      syncComposerState();
+      renderHistoryList();
+      renderConversation();
       return;
     }
 
+    currentUser = data.user;
+    migrateLegacyHistory();
     authStatus.textContent = `Logado como @${data.user.username}`;
-    setComposerEnabled(true);
+    const conversations = getConversations();
+    activeConversationId = activeConversationId || conversations[0]?.id || null;
+    syncComposerState();
+    renderHistoryList();
+    renderConversation();
   } catch (error) {
+    currentUser = null;
     authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
-    setComposerEnabled(false);
+    syncComposerState();
+    renderHistoryList();
+    renderConversation();
   }
 }
 
-async function runAuthRequest(url, payload) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
+function addMessageToConversation(role, content) {
+  let conversation = getActiveConversation();
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Falha na autenticação.");
+  if (!conversation) {
+    conversation = createConversation(role === "user" ? content : "");
   }
 
-  if (data.token) {
-    setToken(data.token);
+  if (!conversation.messages.length && role === "user") {
+    conversation.title = createShortTitle(content);
   }
 
-  return data;
+  const nextConversation = {
+    ...conversation,
+    updatedAt: new Date().toISOString(),
+    messages: [...conversation.messages, { role, content }]
+  };
+
+  updateConversation(nextConversation);
+  renderHistoryList();
+  renderConversation();
+  return nextConversation;
 }
 
 async function animateAssistantResponse(text) {
@@ -164,65 +343,42 @@ async function animateAssistantResponse(text) {
     currentText = currentText ? `${currentText} ${word}` : word;
     target.textContent = currentText;
     chatThread.scrollTop = chatThread.scrollHeight;
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 120));
   }
 
   return currentText;
 }
 
-registerForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  authOutput.textContent = "Criando conta...";
-
-  if (registerPassword.value !== registerPasswordConfirm.value) {
-    authOutput.textContent = "As senhas não conferem.";
-    return;
+function ensureLoggedInBeforeChat() {
+  if (currentUser) {
+    return true;
   }
 
-  try {
-    const data = await runAuthRequest("/api/auth/register", {
-      name: registerName.value,
-      username: registerUsername.value,
-      password: registerPassword.value
-    });
+  const next = encodeURIComponent("/explorar.html");
+  window.location.href = `/auth.html?next=${next}`;
+  return false;
+}
 
-    authOutput.textContent = JSON.stringify(data, null, 2);
-    await loadSessionState();
-  } catch (error) {
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
-  }
+newChatButton.addEventListener("click", () => {
+  activeConversationId = null;
+  renderHistoryList();
+  renderConversation();
+  chatInput.focus();
 });
 
-loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  authOutput.textContent = "Entrando...";
-
-  try {
-    const data = await runAuthRequest("/api/auth/login", {
-      username: loginUsername.value,
-      password: loginPassword.value
-    });
-
-    authOutput.textContent = JSON.stringify(data, null, 2);
-    await loadSessionState();
-  } catch (error) {
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
-  }
+logoutButton.addEventListener("click", () => {
+  setToken("");
+  currentUser = null;
+  activeConversationId = null;
+  authStatus.textContent = "Sessão encerrada.";
+  syncComposerState();
+  renderHistoryList();
+  renderConversation();
 });
 
-meButton.addEventListener("click", async () => {
-  authOutput.textContent = "Validando sessão...";
-
-  try {
-    const response = await fetch("/api/auth/me", {
-      headers: {
-        Authorization: `Bearer ${getToken()}`
-      }
-    });
-    const data = await response.json();
-    authOutput.textContent = JSON.stringify(data, null, 2);
-  } catch (error) {
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
+chatInput.addEventListener("focus", () => {
+  if (!currentUser) {
+    chatHint.textContent = "Para mandar a primeira mensagem, o acesso acontece na tela isolada de login.";
   }
 });
 
@@ -230,11 +386,18 @@ chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const message = chatInput.value.trim();
-  if (!message || !getToken()) {
+  if (!message) {
     return;
   }
 
-  appendHistory("user", message);
+  if (!ensureLoggedInBeforeChat()) {
+    return;
+  }
+
+  const baseConversation = getActiveConversation() || createConversation(message);
+  const history = baseConversation.messages.slice(-12);
+
+  addMessageToConversation("user", message);
   chatInput.value = "";
   chatInput.style.height = "auto";
   sendButton.disabled = true;
@@ -243,7 +406,6 @@ chatForm.addEventListener("submit", async (event) => {
   currentController = new AbortController();
 
   try {
-    const history = getHistory().slice(-12);
     const response = await fetch("/api/gpt/ask", {
       method: "POST",
       headers: {
@@ -266,13 +428,13 @@ chatForm.addEventListener("submit", async (event) => {
     const finalText = await animateAssistantResponse(data.outputText || "");
 
     if (finalText) {
-      appendHistory("assistant", finalText);
+      addMessageToConversation("assistant", finalText);
     } else {
-      renderHistory();
+      renderConversation();
     }
   } catch (error) {
-    renderHistory();
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
+    renderConversation();
+    authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
   } finally {
     currentController = null;
     stopRequested = false;
@@ -293,5 +455,7 @@ chatInput.addEventListener("input", () => {
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
 });
 
-renderHistory();
+renderHistoryList();
+renderConversation();
+syncComposerState();
 await loadSessionState();

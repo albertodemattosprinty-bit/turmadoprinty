@@ -26,28 +26,15 @@
     <section class="chat-layout">
       <aside class="chat-sidebar">
         <div class="sidebar-card">
-          <p class="eyebrow">Acesso</p>
-          <h2 class="section-title small">Login necessário para iniciar</h2>
-          <p class="section-muted" id="auth-status">Verificando acesso...</p>
-
-          <form id="register-form" class="auth-form">
-            <h3>Criar conta</h3>
-            <label>Nome<input id="register-name" type="text" placeholder="Seu nome"></label>
-            <label>Nome de usuário<input id="register-username" type="text" placeholder="ex.: printykids"></label>
-            <label>Senha<input id="register-password" type="password" placeholder="Mínimo 6 caracteres"></label>
-            <label>Confirmar senha<input id="register-password-confirm" type="password" placeholder="Repita a senha"></label>
-            <button type="submit" class="primary-button full-width">Cadastrar</button>
-          </form>
-
-          <form id="login-form" class="auth-form">
-            <h3>Entrar</h3>
-            <label>Nome de usuário<input id="login-username" type="text" placeholder="Seu nome de usuário"></label>
-            <label>Senha<input id="login-password" type="password" placeholder="Sua senha"></label>
-            <button type="submit" class="primary-button full-width">Entrar</button>
-            <button id="me-button" class="ghost-button full-width" type="button">Ver minha sessão</button>
-          </form>
-
-          <pre id="auth-output" class="output-panel small-output">Nenhum teste de login executado ainda.</pre>
+          <p class="eyebrow">Conversas</p>
+          <h2 class="section-title small">Seu histórico com a IA</h2>
+          <p class="section-muted" id="auth-status">Verificando sessão...</p>
+          <div class="chat-actions sidebar-actions">
+            <button id="new-chat-button" class="primary-button full-width" type="button">Nova conversa</button>
+            <a id="login-link" class="ghost-button full-width" href="/auth.html?next=%2Fexplorar.html">Entrar para conversar</a>
+            <button id="logout-button" class="ghost-button full-width" type="button">Sair da conta</button>
+          </div>
+          <div id="history-list" class="history-list"></div>
         </div>
       </aside>
 
@@ -56,14 +43,22 @@
           <p class="eyebrow">Explorar</p>
           <h1 class="section-title">Como posso ajudar hoje?</h1>
           <p class="section-muted">Converse com a IA da Turma do Printy para criar ideias, roteiros, legendas, programações e conteúdos.</p>
+          <p class="section-muted" id="chat-hint">Você pode navegar livremente. O login só é exigido quando for iniciar uma conversa.</p>
         </div>
 
         <div class="conversation-shell">
+          <div class="conversation-header">
+            <div>
+              <p class="eyebrow">Chat atual</p>
+              <h2 id="conversation-title" class="conversation-title">Nova conversa</h2>
+            </div>
+            <p id="conversation-meta" class="conversation-meta">Nenhuma mensagem enviada ainda.</p>
+          </div>
           <div id="chat-thread" class="chat-thread"></div>
           <form id="chat-form" class="chat-composer">
-            <textarea id="chat-input" placeholder="Digite sua mensagem aqui..." rows="1" disabled></textarea>
+            <textarea id="chat-input" placeholder="Digite sua mensagem aqui..." rows="1"></textarea>
             <div class="chat-actions">
-              <button id="send-button" type="submit" class="primary-button" disabled>Enviar</button>
+              <button id="send-button" type="submit" class="primary-button">Enviar</button>
               <button id="stop-button" type="button" class="ghost-button" disabled>Stop</button>
             </div>
           </form>
