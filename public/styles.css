@@ -1235,14 +1235,7 @@ body[data-page="planos"] .status-pill {
 }
 
 .history-scroll-shell::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 6px;
-  bottom: 0;
-  height: 64px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(27, 83, 187, 0) 0%, rgba(27, 83, 187, 0.92) 100%);
+  display: none;
 }
 
 .sidebar-icon-button {
@@ -1447,7 +1440,7 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
   min-height: 0;
   height: 100%;
   opacity: 1;
-  background: linear-gradient(180deg, rgba(18, 59, 134, 0.98) 0%, rgba(8, 31, 82, 0.99) 100%);
+  background: linear-gradient(180deg, rgba(50, 129, 255, 0.98) 0%, rgba(19, 80, 201, 0.99) 58%, rgba(8, 39, 126, 1) 100%);
   backdrop-filter: blur(18px);
   border-radius: 34px;
   box-shadow: 0 26px 54px rgba(19, 69, 155, 0.22);
@@ -1477,9 +1470,9 @@ body[data-page="explorar"].explore-authenticated .chat-sidebar .chat-search-fiel
 }
 
 body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item {
-  background: rgba(255, 255, 255, 0.7);
+  background: #123f97;
   color: #ffffff;
-  border-color: rgba(27, 83, 187, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item span {
@@ -1487,7 +1480,7 @@ body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item spa
 }
 
 body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item.active {
-  background: rgba(255, 255, 255, 0.78);
+  background: #1b53bb;
   border-color: rgba(255, 255, 255, 0.38);
 }
 

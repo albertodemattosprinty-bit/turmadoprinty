@@ -28,7 +28,7 @@ const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
-const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no evangelho protestante, em tom suave, amigavel, acolhedor, amavel e disposto a ajudar como um amigo. Fale com naturalidade e conviccao, tratando o evangelho como a realidade central da resposta, sem usar expressoes como 'segundo o evangelho' ou apresentar essa base como mera suposicao. Priorize proximidade, clareza, verdade biblica e cuidado pastoral.";
+const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom cristao protestante, leve, humano, claro e acolhedor. Seja pratico, caloroso e direto. Nao sugira oracoes, devocionais ou momentos de oracao por conta propria; so fale disso se a pessoa pedir claramente. Evite formular convites espirituais automaticos no fim da resposta. Priorize ajuda objetiva, sensibilidade e boa conversa.";
 const ADMIN_USERNAME = "rosemattos";
 
 const publicDir = path.join(__dirname, "public");
@@ -389,6 +389,42 @@ function isValidUsername(username) {
   return /^[a-zA-Z0-9._-]{3,24}$/.test(username);
 }
 
+function detectUserToneProfile(user) {
+  const firstName = String(user?.name || "")
+    .trim()
+    .split(/\s+/)[0]
+    .toLowerCase();
+
+  const femaleNames = new Set([
+    "ana", "maria", "julia", "juliana", "beatriz", "gabriela", "leticia", "patricia", "amanda", "camila",
+    "larissa", "luiza", "fernanda", "isabela", "isabella", "mariana", "heloisa", "helena", "sophia", "sofia",
+    "vitoria", "valentina", "bruna", "raquel", "priscila", "roberta", "rosa", "rose", "alice", "clara"
+  ]);
+  const maleNames = new Set([
+    "joao", "jose", "pedro", "lucas", "mateus", "matheus", "gabriel", "davi", "daniel", "rafael",
+    "samuel", "henrique", "guilherme", "vinicius", "leonardo", "thiago", "rodrigo", "marcos", "paulo", "miguel"
+  ]);
+
+  if (femaleNames.has(firstName)) {
+    return {
+      label: "amiga",
+      prompt: "Quando fizer sentido usar um vocativo curto, trate a pessoa no feminino, com naturalidade, como 'amiga'."
+    };
+  }
+
+  if (maleNames.has(firstName)) {
+    return {
+      label: "amigo",
+      prompt: "Quando fizer sentido usar um vocativo curto, trate a pessoa no masculino, com naturalidade, como 'amigo'."
+    };
+  }
+
+  return {
+    label: "pessoa",
+    prompt: "Se o genero nao estiver claro pelo nome, mantenha linguagem neutra e natural, sem forcar vocativos."
+  };
+}
+
 async function requireAuth(request, response) {
   if (!hasDatabase()) {
     sendJson(response, 503, {
@@ -507,7 +543,7 @@ function toIsoDateFromUnix(value) {
   return Number.isFinite(value) ? new Date(value * 1000).toISOString() : null;
 }
 
-async function handleGptRequest(request, response) {
+async function handleGptRequest(request, response, user = null) {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -533,9 +569,13 @@ async function handleGptRequest(request, response) {
   const responseStylePrompt = typeof body.responseStyle === "string" && body.responseStyle.trim()
     ? body.responseStyle.trim()
     : DEFAULT_RESPONSE_STYLE_PROMPT;
+  const userToneProfile = detectUserToneProfile(user);
+  const userPrompt = user?.name
+    ? `Nome da pessoa: ${user.name}.\n${userToneProfile.prompt}`
+    : userToneProfile.prompt;
   const system = contextPrompt
-    ? `${systemBase}\n\n${responseStylePrompt}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
-    : `${systemBase}\n\n${responseStylePrompt}`;
+    ? `${systemBase}\n\n${responseStylePrompt}\n\n${userPrompt}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
+    : `${systemBase}\n\n${responseStylePrompt}\n\n${userPrompt}`;
   const requestedFinalModel = getFinalModel(body);
   const instantModel = getInstantModel(body);
   const history = Array.isArray(body.history) ? body.history : [];
@@ -1756,7 +1796,7 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    await handleGptRequest(request, response);
+    await handleGptRequest(request, response, user);
     return;
   }
 

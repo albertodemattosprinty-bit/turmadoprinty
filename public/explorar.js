@@ -540,9 +540,7 @@ function syncSidebarState() {
   document.body.classList.toggle("explore-sidebar-open", !sidebarCollapsed);
   sidebarToggleButton.setAttribute("aria-label", sidebarCollapsed ? "Mostrar historico" : "Recolher historico");
   sidebarToggleButton.title = sidebarCollapsed ? "Mostrar historico" : "Recolher historico";
-  sidebarToggleButton.innerHTML = sidebarCollapsed
-    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5.5 7 6.5-7 6.5"/></svg>'
-    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5.5-7 6.5 7 6.5"/></svg>';
+  sidebarToggleButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>';
 }
 
 window.addEventListener("resize", () => {
