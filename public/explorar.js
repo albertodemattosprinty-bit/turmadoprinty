@@ -186,6 +186,25 @@ function createConversation(firstMessage = "") {
   };
 }
 
+function createWelcomeConversation() {
+  const conversation = createConversation("");
+  conversation.title = "Bem Vindo";
+  return conversation;
+}
+
+function ensureWelcomeConversation() {
+  const conversations = getConversations();
+
+  if (conversations.length) {
+    return conversations;
+  }
+
+  const welcomeConversation = createWelcomeConversation();
+  saveConversations([welcomeConversation]);
+  activeConversationId = welcomeConversation.id;
+  return [welcomeConversation];
+}
+
 function getEmptyConversationCopy() {
   const todaySeed = new Date().toISOString().slice(0, 10);
   const usernameSeed = getUserKey();
@@ -324,9 +343,11 @@ function syncSidebarState() {
   }
 
   exploreChatLayout.classList.toggle("sidebar-collapsed", sidebarCollapsed);
-  sidebarToggleButton.textContent = sidebarCollapsed ? ">" : "<";
   sidebarToggleButton.setAttribute("aria-label", sidebarCollapsed ? "Mostrar historico" : "Recolher historico");
   sidebarToggleButton.title = sidebarCollapsed ? "Mostrar historico" : "Recolher historico";
+  sidebarToggleButton.innerHTML = sidebarCollapsed
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5.5 7 6.5-7 6.5"/></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5.5-7 6.5 7 6.5"/></svg>';
 }
 
 function syncComposerState() {
@@ -381,7 +402,7 @@ async function loadSessionState() {
     migrateLegacyHistory();
     authStatus.textContent = `Logado como @${data.user.username}`;
     chatAuthStatus.textContent = `Logado como @${data.user.username}`;
-    const conversations = getConversations();
+    const conversations = ensureWelcomeConversation();
     activeConversationId = activeConversationId || conversations[0]?.id || null;
     syncComposerState();
     renderHistoryList();

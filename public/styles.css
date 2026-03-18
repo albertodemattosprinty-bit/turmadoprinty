@@ -49,7 +49,7 @@ a {
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  padding: 10px 24px;
+  padding: 6px 24px;
   background: rgba(27, 83, 187, 0.96);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
@@ -526,6 +526,46 @@ body[data-page="produtos"] {
   gap: 20px;
 }
 
+body[data-page="produto"] {
+  color: #ffffff;
+  background: linear-gradient(180deg, #2f7cff 0%, #1b53bb 52%, #0f2f73 100%);
+}
+
+body[data-page="produto"] .section-card,
+body[data-page="produto"] .product-overview,
+body[data-page="produto"] .track-card,
+body[data-page="produto"] .album-admin-panel,
+body[data-page="produto"] .track-editor-panel {
+  background: transparent;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+body[data-page="produto"] .section-title,
+body[data-page="produto"] .section-muted,
+body[data-page="produto"] .eyebrow,
+body[data-page="produto"] .inline-link,
+body[data-page="produto"] .track-number,
+body[data-page="produto"] .track-download-label,
+body[data-page="produto"] .track-copy h3,
+body[data-page="produto"] .status-pill,
+body[data-page="produto"] .ghost-button,
+body[data-page="produto"] .download-icon-button,
+body[data-page="produto"] .track-time,
+body[data-page="produto"] .track-editor-status,
+body[data-page="produto"] label {
+  color: #ffffff;
+}
+
+body[data-page="produto"] .ghost-button {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+body[data-page="produto"] .status-pill {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .product-hero {
   display: grid;
   grid-template-columns: minmax(220px, 320px) 1fr;
@@ -593,7 +633,7 @@ body[data-page="produtos"] {
 
 .track-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px) auto;
+  grid-template-columns: minmax(240px, 360px) minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   padding: 18px;
@@ -621,6 +661,12 @@ body[data-page="produtos"] {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.track-inline-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .track-title-display {
@@ -652,80 +698,15 @@ body[data-page="produtos"] {
 }
 
 .track-player-shell audio {
-  display: none;
+  width: 100%;
+  display: block;
+  filter: saturate(0.95);
 }
 
 .track-player-controls {
-  display: grid;
-  grid-template-columns: auto auto auto minmax(140px, 1fr) auto;
+  display: flex;
   gap: 10px;
   align-items: center;
-}
-
-.track-progress {
-  width: 100%;
-  height: 10px;
-  margin: 0;
-  appearance: none;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  overflow: hidden;
-}
-
-.track-progress::-webkit-slider-runnable-track {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.track-progress::-webkit-slider-thumb {
-  width: 14px;
-  height: 14px;
-  margin-top: -2px;
-  appearance: none;
-  border: 0;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16);
-}
-
-.track-progress::-moz-range-track {
-  height: 10px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.track-progress::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: 0;
-  border-radius: 999px;
-  background: #ffffff;
-}
-
-.track-progress.downloading::-webkit-slider-runnable-track {
-  background: rgba(255, 221, 107, 0.42);
-}
-
-.track-progress.downloading::-webkit-slider-thumb {
-  background: #ffe17a;
-  box-shadow: 0 0 0 4px rgba(255, 225, 122, 0.24);
-}
-
-.track-progress.downloading::-moz-range-track {
-  background: rgba(255, 221, 107, 0.42);
-}
-
-.track-progress.downloading::-moz-range-thumb {
-  background: #ffe17a;
-}
-
-.track-time {
-  min-width: 90px;
-  color: var(--text-muted);
-  text-align: right;
-  font-size: 0.84rem;
 }
 
 .track-actions {
@@ -744,6 +725,28 @@ body[data-page="produtos"] {
   width: 22px;
   height: 22px;
   fill: currentColor;
+}
+
+.floating-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 60;
+  transform: translateX(-50%) translateY(12px);
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--blue-dark);
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  box-shadow: 0 14px 32px rgba(16, 40, 86, 0.16);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.floating-notice.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .track-editor-panel {
@@ -837,9 +840,40 @@ body[data-page="planos"] .status-pill {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.schedule-card {
+  color: #ffffff;
+  border: 0;
+}
+
+.schedule-card p,
+.schedule-card h3,
+.schedule-card strong {
+  color: inherit;
+}
+
+.schedule-color-1 {
+  background: linear-gradient(135deg, #1b53bb 0%, #2f7cff 100%);
+}
+
+.schedule-color-2 {
+  background: linear-gradient(135deg, #ff8a1f 0%, #f15b2a 100%);
+}
+
+.schedule-color-3 {
+  background: linear-gradient(135deg, #f06292 0%, #d14b8f 100%);
+}
+
+.schedule-color-4 {
+  background: linear-gradient(135deg, #d4a017 0%, #f0b429 100%);
+}
+
+.schedule-color-5 {
+  background: linear-gradient(135deg, #d63d3d 0%, #b51f3f 100%);
+}
+
 .schedule-day {
   margin-bottom: 12px;
-  color: var(--yellow);
+  color: rgba(255, 255, 255, 0.88);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -935,11 +969,25 @@ body[data-page="planos"] .status-pill {
 }
 
 .sidebar-toggle-button {
-  min-width: 38px;
-  width: 38px;
-  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   font-size: 1.05rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--blue-dark);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(27, 83, 187, 0.2);
+}
+
+.sidebar-toggle-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 .history-list {
@@ -1104,7 +1152,9 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
 
 .message-card.user {
   justify-self: end;
-  background: rgba(47, 124, 255, 0.08);
+  background: linear-gradient(135deg, #2f7cff 0%, #1b53bb 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .message-card.assistant {
@@ -1125,6 +1175,11 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
   line-height: 1.8;
   color: var(--text);
   white-space: pre-wrap;
+}
+
+.message-card.user .message-role,
+.message-card.user .message-text {
+  color: #ffffff;
 }
 
 .chat-composer {
@@ -1290,9 +1345,12 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
     position: fixed;
     left: 0;
     right: 0;
+    top: auto;
     bottom: 0;
     z-index: 30;
     width: 100%;
+    flex-wrap: nowrap;
+    align-items: center;
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
     justify-content: space-between;
     gap: 8px;

@@ -182,7 +182,6 @@ async function loadAlbums(siteConfig, user) {
           <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
           <div class="album-body">
             <h3>${album.name}</h3>
-            <p>${album.tracks > 0 ? `${album.tracks} MP3 disponiveis` : "Album sem MP3 cadastrado"}</p>
             ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
           </div>
         `;
@@ -288,9 +287,9 @@ async function loadSchedule(siteConfig, user) {
 
     grid.innerHTML = "";
 
-    scheduleItems.forEach((item) => {
+    scheduleItems.forEach((item, index) => {
       const card = document.createElement("article");
-      card.className = "schedule-card";
+      card.className = `schedule-card schedule-color-${(index % 5) + 1}`;
       card.innerHTML = `
         <p class="schedule-day">${item.dateLabel}</p>
         <h3>${item.place}</h3>
