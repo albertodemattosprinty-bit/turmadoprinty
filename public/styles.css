@@ -993,6 +993,26 @@ body[data-page="planos"] .status-pill {
   padding-top: 18px;
 }
 
+.chat-search-field {
+  display: block;
+  margin-top: 12px;
+}
+
+.chat-search-field input {
+  width: 100%;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.72);
+  outline: none;
+}
+
+.chat-search-field input::placeholder {
+  color: var(--text-muted);
+}
+
 .sidebar-topbar {
   display: flex;
   justify-content: space-between;
@@ -1128,6 +1148,8 @@ body[data-page="explorar"].explore-authenticated {
 
 body[data-page="explorar"].explore-authenticated .page-shell {
   width: min(1280px, calc(100% - 28px));
+  padding-top: 10vh;
+  padding-bottom: 10vh;
 }
 
 body[data-page="explorar"].explore-authenticated .sidebar-card {
@@ -1246,6 +1268,11 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
   padding-top: 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 26%);
   align-items: end;
+}
+
+.stop-button {
+  background: var(--blue-dark);
+  color: #ffffff;
 }
 
 .composer-actions {
@@ -1544,5 +1571,18 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
   .track-time {
     grid-column: 1 / -1;
     text-align: left;
+  }
+}
+
+@media (min-width: 981px) {
+  body[data-page="explorar"].explore-authenticated .chat-layout {
+    min-height: 80vh;
+    align-items: stretch;
+  }
+
+  body[data-page="explorar"].explore-authenticated .chat-sidebar,
+  body[data-page="explorar"].explore-authenticated .chat-main,
+  body[data-page="explorar"].explore-authenticated .conversation-shell {
+    min-height: 80vh;
   }
 }

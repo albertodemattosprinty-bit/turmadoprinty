@@ -402,7 +402,7 @@ async function handleGptRequest(request, response) {
 
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim())
-    .slice(-12)
+    .slice(-8)
     .map((item) => ({
       role: item.role,
       content: item.content.trim()

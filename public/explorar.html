@@ -49,8 +49,11 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5.5-7 6.5 7 6.5"/></svg>
             </button>
           </div>
-          <h2 class="section-title small">Seus chats</h2>
+          <h2 class="section-title small">Chats</h2>
           <p class="section-muted" id="chat-auth-status">Verificando sessao...</p>
+          <label class="chat-search-field" aria-label="Pesquisar chats">
+            <input id="chat-search-input" type="search" placeholder="Pesquisar chats">
+          </label>
           <div class="chat-actions sidebar-actions">
             <button id="new-chat-button" class="sidebar-icon-button primary-button" type="button" aria-label="Nova conversa" title="Nova conversa">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zm-7 7h14v2H4z"/></svg>
@@ -85,7 +88,7 @@
                   <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/>
                 </svg>
               </button>
-              <button id="stop-button" type="button" class="icon-button ghost-button" aria-label="Parar geracao" title="Parar geracao" disabled>
+              <button id="stop-button" type="button" class="icon-button primary-button stop-button" aria-label="Parar geracao" title="Parar geracao" disabled hidden>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M7 7h10v10H7z"/>
                 </svg>

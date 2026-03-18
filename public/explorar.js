@@ -8,6 +8,7 @@ const exploreBanner = document.getElementById("explore-banner");
 const exploreAuthShell = document.getElementById("explore-auth-shell");
 const exploreChatLayout = document.getElementById("explore-chat-layout");
 const historyList = document.getElementById("history-list");
+const chatSearchInput = document.getElementById("chat-search-input");
 const sidebarToggleButton = document.getElementById("sidebar-toggle-button");
 const newChatButton = document.getElementById("new-chat-button");
 const logoutButton = document.getElementById("logout-button");
@@ -40,6 +41,7 @@ let mediaStream = null;
 let recordedChunks = [];
 let isRecording = false;
 let sidebarCollapsed = window.innerWidth <= 980;
+let chatSearchTerm = "";
 
 const emptyConversationVariants = [
   "Quando voce quiser",
@@ -128,6 +130,24 @@ function getConversations() {
   return items
     .slice()
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+}
+
+function getFilteredConversations() {
+  const conversations = getConversations();
+  const searchTerm = chatSearchTerm.trim().toLowerCase();
+
+  if (!searchTerm) {
+    return conversations;
+  }
+
+  return conversations.filter((item) => {
+    const title = String(item.title || "").toLowerCase();
+    const body = Array.isArray(item.messages)
+      ? item.messages.map((message) => String(message.content || "").toLowerCase()).join(" ")
+      : "";
+
+    return title.includes(searchTerm) || body.includes(searchTerm);
+  });
 }
 
 function saveConversations(conversations) {
@@ -276,7 +296,7 @@ function updateConversation(nextConversation) {
 }
 
 function renderHistoryList() {
-  const conversations = getConversations();
+  const conversations = getFilteredConversations();
   historyList.innerHTML = "";
 
   if (!currentUser) {
@@ -287,8 +307,8 @@ function renderHistoryList() {
   if (!conversations.length) {
     historyList.innerHTML = `
       <div class="history-empty">
-        <strong>Nenhuma conversa ainda.</strong>
-        <p>Clique em "Nova conversa" para abrir seu primeiro chat.</p>
+        <strong>${chatSearchTerm ? "Nenhum chat encontrado." : "Nenhuma conversa ainda."}</strong>
+        <p>${chatSearchTerm ? "Tente outro termo para localizar sua conversa." : "Clique em \"Nova conversa\" para abrir seu primeiro chat."}</p>
       </div>
     `;
     return;
@@ -390,6 +410,9 @@ function syncComposerState() {
   }
   logoutButton.hidden = !isLoggedIn;
   newChatButton.hidden = !isLoggedIn;
+  if (chatSearchInput) {
+    chatSearchInput.disabled = !isLoggedIn;
+  }
   chatShell.hidden = !isLoggedIn;
   micButton.disabled = !isLoggedIn;
   sendButton.disabled = !isLoggedIn;
@@ -500,10 +523,9 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
   };
 }
 
-async function consumeAssistantStream(response) {
+async function consumeAssistantStream(response, assistantMessage = createAssistantMessageElement()) {
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();
-  const assistantMessage = createAssistantMessageElement();
   let buffer = "";
   let finalText = "";
 
@@ -755,17 +777,20 @@ chatForm.addEventListener("submit", async (event) => {
   }
 
   const baseConversation = getActiveConversation() || createConversation(message);
-  const history = baseConversation.messages.slice(-12);
+  const history = baseConversation.messages.slice(-8);
 
   addMessageToConversation("user", message);
   chatInput.value = "";
   chatInput.style.height = "auto";
   sendButton.disabled = true;
+  sendButton.hidden = true;
   stopButton.disabled = false;
+  stopButton.hidden = false;
   micButton.disabled = true;
   stopRequested = false;
   currentController = new AbortController();
   setComposerStatus("Gerando resposta...");
+  const assistantMessage = createAssistantMessageElement("Pensando na melhor resposta...");
 
   try {
     const response = await fetch("/api/gpt/ask", {
@@ -789,9 +814,15 @@ chatForm.addEventListener("submit", async (event) => {
     }
 
     const isEventStream = (response.headers.get("content-type") || "").includes("text/event-stream");
-    const finalText = isEventStream
-      ? await consumeAssistantStream(response)
-      : renderAssistantResponseImmediately((await response.json()).outputText || "");
+    let finalText = "";
+
+    if (isEventStream) {
+      finalText = await consumeAssistantStream(response, assistantMessage);
+    } else {
+      const payload = await response.json();
+      finalText = (payload.outputText || "").trim();
+      assistantMessage.setText(finalText || "Nao veio resposta desta vez.");
+    }
 
     if (finalText) {
       addMessageToConversation("assistant", finalText);
@@ -809,7 +840,9 @@ chatForm.addEventListener("submit", async (event) => {
     currentController = null;
     stopRequested = false;
     sendButton.disabled = false;
+    sendButton.hidden = false;
     stopButton.disabled = true;
+    stopButton.hidden = true;
     micButton.disabled = !currentUser;
   }
 });
@@ -826,6 +859,13 @@ chatInput.addEventListener("input", () => {
   chatInput.style.height = "auto";
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
 });
+
+if (chatSearchInput) {
+  chatSearchInput.addEventListener("input", () => {
+    chatSearchTerm = chatSearchInput.value || "";
+    renderHistoryList();
+  });
+}
 
 function setActiveAuthTab(tabId) {
   document.querySelectorAll("[data-auth-tab]").forEach((button) => {
