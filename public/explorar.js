@@ -6,13 +6,14 @@ const chunkDelayMs = 35;
 const chunkFadeMs = 500;
 
 const authStatus = document.getElementById("auth-status");
+const chatAuthStatus = document.getElementById("chat-auth-status");
+const exploreAuthShell = document.getElementById("explore-auth-shell");
+const exploreChatLayout = document.getElementById("explore-chat-layout");
 const historyList = document.getElementById("history-list");
 const newChatButton = document.getElementById("new-chat-button");
-const loginLink = document.getElementById("login-link");
 const logoutButton = document.getElementById("logout-button");
 const chatHint = document.getElementById("chat-hint");
 const chatShell = document.getElementById("chat-shell");
-const loginGate = document.getElementById("login-gate");
 const chatThread = document.getElementById("chat-thread");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
@@ -22,6 +23,14 @@ const micButton = document.getElementById("mic-button");
 const composerStatus = document.getElementById("composer-status");
 const conversationTitle = document.getElementById("conversation-title");
 const conversationMeta = document.getElementById("conversation-meta");
+const loginForm = document.getElementById("login-form");
+const registerForm = document.getElementById("register-form");
+const loginUsername = document.getElementById("login-username");
+const loginPassword = document.getElementById("login-password");
+const registerName = document.getElementById("register-name");
+const registerUsername = document.getElementById("register-username");
+const registerPassword = document.getElementById("register-password");
+const registerPasswordConfirm = document.getElementById("register-password-confirm");
 
 let currentController = null;
 let stopRequested = false;
@@ -43,6 +52,28 @@ function setToken(token) {
   }
 
   window.localStorage.removeItem(sessionStorageKey);
+}
+
+async function runAuthRequest(url, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha na autenticacao.");
+  }
+
+  if (data.token) {
+    setToken(data.token);
+  }
+
+  return data;
 }
 
 function setComposerStatus(message = "") {
@@ -186,12 +217,7 @@ function renderHistoryList() {
   historyList.innerHTML = "";
 
   if (!currentUser) {
-    historyList.innerHTML = `
-      <div class="history-empty">
-        <strong>Entre para ver seu histórico.</strong>
-        <p>Suas conversas ficam organizadas aqui com um nome curto para cada chat.</p>
-      </div>
-    `;
+    historyList.innerHTML = "";
     return;
   }
 
@@ -199,7 +225,7 @@ function renderHistoryList() {
     historyList.innerHTML = `
       <div class="history-empty">
         <strong>Nenhuma conversa ainda.</strong>
-        <p>Quando você mandar a primeira mensagem, o chat aparece aqui automaticamente.</p>
+        <p>Clique em "Nova conversa" para abrir seu primeiro chat.</p>
       </div>
     `;
     return;
@@ -229,9 +255,7 @@ function renderConversation() {
 
   if (!conversation || conversation.messages.length === 0) {
     conversationTitle.textContent = "Nova conversa";
-    conversationMeta.textContent = currentUser
-      ? "Pronta para começar."
-      : "Faça login somente quando quiser iniciar o chat.";
+    conversationMeta.textContent = "Pronta para começar.";
     chatThread.innerHTML = `
       <article class="message-card assistant">
         <div class="message-role">Assistente</div>
@@ -266,26 +290,23 @@ function setRecordingState(recording) {
 
 function syncComposerState() {
   const isLoggedIn = Boolean(currentUser);
+  exploreAuthShell.hidden = isLoggedIn;
+  exploreChatLayout.hidden = !isLoggedIn;
   logoutButton.hidden = !isLoggedIn;
-  loginLink.hidden = isLoggedIn;
   newChatButton.hidden = !isLoggedIn;
   chatShell.hidden = !isLoggedIn;
-  loginGate.hidden = isLoggedIn;
   micButton.disabled = !isLoggedIn;
   sendButton.disabled = !isLoggedIn;
   chatInput.disabled = !isLoggedIn;
-  chatInput.placeholder = isLoggedIn
-    ? "Digite sua mensagem aqui..."
-    : "Faça login quando quiser iniciar uma conversa com a IA.";
-  chatHint.textContent = isLoggedIn
-    ? `Histórico ativo para @${currentUser.username}.`
-    : "Você pode navegar livremente. O login só é exigido quando for iniciar uma conversa.";
+  chatInput.placeholder = "Digite sua mensagem aqui...";
+  chatHint.textContent = isLoggedIn ? `Histórico ativo para @${currentUser.username}.` : "";
 }
 
 async function loadSessionState() {
   if (!getToken()) {
     currentUser = null;
-    authStatus.textContent = "Você está navegando sem login.";
+    authStatus.textContent = "Entre ou cadastre sua conta para abrir o chat.";
+    chatAuthStatus.textContent = "Sem login ativo.";
     syncComposerState();
     renderHistoryList();
     renderConversation();
@@ -304,6 +325,7 @@ async function loadSessionState() {
       setToken("");
       currentUser = null;
       authStatus.textContent = data.error || "Sessão inválida.";
+      chatAuthStatus.textContent = data.error || "Sessão inválida.";
       syncComposerState();
       renderHistoryList();
       renderConversation();
@@ -313,6 +335,7 @@ async function loadSessionState() {
     currentUser = data.user;
     migrateLegacyHistory();
     authStatus.textContent = `Logado como @${data.user.username}`;
+    chatAuthStatus.textContent = `Logado como @${data.user.username}`;
     const conversations = getConversations();
     activeConversationId = activeConversationId || conversations[0]?.id || null;
     syncComposerState();
@@ -321,6 +344,7 @@ async function loadSessionState() {
   } catch (error) {
     currentUser = null;
     authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
+    chatAuthStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
     syncComposerState();
     renderHistoryList();
     renderConversation();
@@ -397,8 +421,7 @@ function ensureLoggedInBeforeChat() {
     return true;
   }
 
-  const next = encodeURIComponent("/explorar.html");
-  window.location.href = `/auth.html?next=${next}`;
+  authStatus.textContent = "Entre para liberar a conversa.";
   return false;
 }
 
@@ -417,7 +440,7 @@ function blobToBase64(blob) {
       const base64 = result.includes(",") ? result.split(",")[1] : result;
       resolve(base64);
     };
-    reader.onerror = () => reject(reader.error || new Error("Falha ao ler o áudio."));
+    reader.onerror = () => reject(reader.error || new Error("Falha ao ler o audio."));
     reader.readAsDataURL(blob);
   });
 }
@@ -440,7 +463,7 @@ async function transcribeAudio(blob) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Falha ao transcrever o áudio.");
+    throw new Error(data.error || "Falha ao transcrever o audio.");
   }
 
   return data.text || "";
@@ -451,7 +474,7 @@ async function stopRecordingAndTranscribe() {
     return;
   }
 
-  setComposerStatus("Processando áudio...");
+  setComposerStatus("Processando audio...");
 
   const stopPromise = new Promise((resolve) => {
     mediaRecorder.addEventListener("stop", resolve, { once: true });
@@ -470,7 +493,7 @@ async function stopRecordingAndTranscribe() {
   stopMediaTracks();
 
   if (blob.size === 0) {
-    setComposerStatus("Nenhum áudio capturado.");
+    setComposerStatus("Nenhum audio capturado.");
     return;
   }
 
@@ -478,7 +501,7 @@ async function stopRecordingAndTranscribe() {
     const transcript = await transcribeAudio(blob);
 
     if (!transcript) {
-      setComposerStatus("Não consegui entender o áudio.");
+      setComposerStatus("Nao consegui entender o audio.");
       return;
     }
 
@@ -486,9 +509,9 @@ async function stopRecordingAndTranscribe() {
       ? `${chatInput.value.trim()} ${transcript}`.trim()
       : transcript;
     chatInput.dispatchEvent(new Event("input"));
-    setComposerStatus("Áudio transcrito.");
+    setComposerStatus("Audio transcrito.");
   } catch (error) {
-    setComposerStatus(error instanceof Error ? error.message : "Erro ao transcrever o áudio.");
+    setComposerStatus(error instanceof Error ? error.message : "Erro ao transcrever o audio.");
   }
 }
 
@@ -503,7 +526,7 @@ async function toggleRecording() {
   }
 
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-    setComposerStatus("Seu navegador não suporta gravação de áudio.");
+    setComposerStatus("Seu navegador nao suporta gravacao de audio.");
     return;
   }
 
@@ -524,7 +547,7 @@ async function toggleRecording() {
   } catch (error) {
     stopMediaTracks();
     setRecordingState(false);
-    setComposerStatus(error instanceof Error ? error.message : "Não foi possível acessar o microfone.");
+    setComposerStatus(error instanceof Error ? error.message : "Nao foi possivel acessar o microfone.");
   }
 }
 
@@ -534,7 +557,8 @@ newChatButton.addEventListener("click", () => {
     return;
   }
 
-  activeConversationId = null;
+  const freshConversation = createConversation("");
+  updateConversation(freshConversation);
   renderHistoryList();
   renderConversation();
   setComposerStatus("");
@@ -545,7 +569,9 @@ logoutButton.addEventListener("click", () => {
   setToken("");
   currentUser = null;
   activeConversationId = null;
-  authStatus.textContent = "Sessão encerrada.";
+  authStatus.textContent = "Sessao encerrada.";
+  chatAuthStatus.textContent = "Sessao encerrada.";
+  authStatus.textContent = "Entre ou crie sua conta para abrir o chat.";
   setComposerStatus("");
   syncComposerState();
   renderHistoryList();
@@ -554,12 +580,6 @@ logoutButton.addEventListener("click", () => {
 
 micButton.addEventListener("click", async () => {
   await toggleRecording();
-});
-
-chatInput.addEventListener("focus", () => {
-  if (!currentUser) {
-    chatHint.textContent = "Para mandar a primeira mensagem, o acesso acontece na tela isolada de login.";
-  }
 });
 
 chatForm.addEventListener("submit", async (event) => {
@@ -619,7 +639,7 @@ chatForm.addEventListener("submit", async (event) => {
   } catch (error) {
     renderConversation();
     const messageText = error instanceof Error ? error.message : "Erro desconhecido";
-    authStatus.textContent = messageText;
+    chatAuthStatus.textContent = messageText;
     setComposerStatus(messageText);
   } finally {
     currentController = null;
@@ -643,6 +663,66 @@ chatInput.addEventListener("input", () => {
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
 });
 
+function setActiveAuthTab(tabId) {
+  document.querySelectorAll("[data-auth-tab]").forEach((button) => {
+    const isActive = button.dataset.authTab === tabId;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  document.querySelectorAll("[data-auth-panel]").forEach((panel) => {
+    const isActive = panel.dataset.authPanel === tabId;
+    panel.classList.toggle("active", isActive);
+    panel.hidden = !isActive;
+  });
+}
+
+document.querySelectorAll("[data-auth-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setActiveAuthTab(button.dataset.authTab || "login");
+  });
+});
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  authStatus.textContent = "Entrando...";
+
+  try {
+    await runAuthRequest("/api/auth/login", {
+      username: loginUsername.value,
+      password: loginPassword.value
+    });
+
+    authStatus.textContent = "Login feito com sucesso.";
+    await loadSessionState();
+  } catch (error) {
+    authStatus.textContent = error instanceof Error ? error.message : "Erro ao entrar.";
+  }
+});
+
+registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  authStatus.textContent = "Criando conta...";
+
+  if (registerPassword.value !== registerPasswordConfirm.value) {
+    authStatus.textContent = "As senhas nao conferem.";
+    return;
+  }
+
+  try {
+    await runAuthRequest("/api/auth/register", {
+      name: registerName.value,
+      username: registerUsername.value,
+      password: registerPassword.value
+    });
+
+    authStatus.textContent = "Conta criada com sucesso.";
+    await loadSessionState();
+  } catch (error) {
+    authStatus.textContent = error instanceof Error ? error.message : "Erro ao cadastrar.";
+  }
+});
+
 window.addEventListener("beforeunload", () => {
   stopMediaTracks();
 });
@@ -651,4 +731,5 @@ renderHistoryList();
 renderConversation();
 syncComposerState();
 setComposerStatus("");
+setActiveAuthTab("login");
 await loadSessionState();

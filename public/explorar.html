@@ -22,15 +22,44 @@
   </header>
 
   <main class="page-shell">
-    <section class="chat-layout">
+    <section id="explore-auth-shell" class="explore-auth-shell section-card">
+      <div class="explore-auth-head">
+        <h1 class="section-title small">Entre para conversar com a IA</h1>
+        <p id="auth-status" class="section-muted">Verificando sessao...</p>
+      </div>
+
+      <div class="auth-tabs" role="tablist" aria-label="Acesso ao explorar">
+        <button class="auth-tab active" type="button" data-auth-tab="login" role="tab" aria-selected="true">Entrar</button>
+        <button class="auth-tab" type="button" data-auth-tab="register" role="tab" aria-selected="false">Cadastrar</button>
+      </div>
+
+      <div class="auth-panel active" data-auth-panel="login" role="tabpanel">
+        <form id="login-form" class="auth-form auth-form-compact">
+          <label>Nome de usuario<input id="login-username" type="text" placeholder="Seu nome de usuario"></label>
+          <label>Senha<input id="login-password" type="password" placeholder="Sua senha"></label>
+          <button type="submit" class="primary-button">Entrar</button>
+        </form>
+      </div>
+
+      <div class="auth-panel" data-auth-panel="register" role="tabpanel" hidden>
+        <form id="register-form" class="auth-form auth-form-compact">
+          <label>Nome<input id="register-name" type="text" placeholder="Seu nome"></label>
+          <label>Nome de usuario<input id="register-username" type="text" placeholder="ex.: printykids"></label>
+          <label>Senha<input id="register-password" type="password" placeholder="Minimo 6 caracteres"></label>
+          <label>Confirmar senha<input id="register-password-confirm" type="password" placeholder="Repita a senha"></label>
+          <button type="submit" class="primary-button">Cadastrar</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="explore-chat-layout" class="chat-layout" hidden>
       <aside class="chat-sidebar">
         <div class="sidebar-card">
           <p class="eyebrow">Conversas</p>
-          <h2 class="section-title small">Seu histórico com a IA</h2>
-          <p class="section-muted" id="auth-status">Verificando sessão...</p>
+          <h2 class="section-title small">Seu historico com a IA</h2>
+          <p class="section-muted" id="chat-auth-status">Verificando sessao...</p>
           <div class="chat-actions sidebar-actions">
             <button id="new-chat-button" class="primary-button full-width" type="button">Nova conversa</button>
-            <a id="login-link" class="ghost-button full-width" href="/auth.html?next=%2Fexplorar.html">Entrar para conversar</a>
             <button id="logout-button" class="ghost-button full-width" type="button">Sair da conta</button>
           </div>
           <div id="history-list" class="history-list"></div>
@@ -41,22 +70,8 @@
         <div class="chat-hero">
           <p class="eyebrow">Explorar</p>
           <h1 class="section-title">Como posso ajudar hoje?</h1>
-          <p class="section-muted">Converse com a IA da Turma do Printy para criar ideias, roteiros, legendas, programações e conteúdos.</p>
-          <p class="section-muted" id="chat-hint">Você pode navegar livremente. O login só é exigido quando for iniciar uma conversa.</p>
-        </div>
-
-        <div id="login-gate" class="conversation-shell">
-          <div class="conversation-header">
-            <div>
-              <p class="eyebrow">Acesso</p>
-              <h2 class="conversation-title">Entre para abrir o chat</h2>
-            </div>
-          </div>
-          <div class="history-empty chat-login-card">
-            <strong>O chat so aparece depois do login.</strong>
-            <p>Assim o acesso fica centralizado na area de explorar, sem formulario solto, e o historico fica amarrado na conta certa.</p>
-            <a class="primary-button" href="/auth.html?next=%2Fexplorar.html">Entrar para conversar</a>
-          </div>
+          <p class="section-muted">Converse com a IA da Turma do Printy para criar ideias, roteiros, legendas, programacoes e conteudos.</p>
+          <p class="section-muted" id="chat-hint"></p>
         </div>
 
         <div id="chat-shell" class="conversation-shell">
@@ -76,7 +91,7 @@
                   <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/>
                 </svg>
               </button>
-              <button id="stop-button" type="button" class="icon-button ghost-button" aria-label="Parar geração" title="Parar geração" disabled>
+              <button id="stop-button" type="button" class="icon-button ghost-button" aria-label="Parar geracao" title="Parar geracao" disabled>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M7 7h10v10H7z"/>
                 </svg>

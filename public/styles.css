@@ -62,14 +62,13 @@ a {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff, #dff1ff);
-  color: var(--blue-dark);
-  font-weight: 800;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: url("/logo.png") center/contain no-repeat;
+  color: transparent;
+  font-size: 0;
+  flex-shrink: 0;
 }
 
 .brand-text {
@@ -766,8 +765,11 @@ a {
 }
 
 .explore-auth-shell {
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: 460px;
+  margin: min(9vh, 80px) auto 0;
+  padding: 28px;
+  background: rgba(20, 62, 148, 0.5);
+  text-align: center;
 }
 
 .explore-auth-head {
@@ -804,7 +806,8 @@ a {
 }
 
 .auth-form-compact {
-  max-width: 420px;
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 .chat-main {
