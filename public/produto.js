@@ -1,4 +1,5 @@
-const sessionStorageKey = "turma_do_printy_token";
+import { getToken, initSiteHeader } from "./header.js";
+
 const offlineCacheName = "turma-do-printy-offline-v1";
 
 const productCover = document.getElementById("product-cover");
@@ -34,10 +35,6 @@ function getTrackModeLabel(track) {
 function getAlbumId() {
   const params = new URLSearchParams(window.location.search);
   return params.get("album") || "";
-}
-
-function getToken() {
-  return window.localStorage.getItem(sessionStorageKey) || "";
 }
 
 function getAuthRedirectUrl(albumId) {
@@ -851,4 +848,5 @@ albumSaveButton?.addEventListener("click", async () => {
   await saveAlbumAdminChanges();
 });
 
+await initSiteHeader().catch(() => null);
 await loadAlbumDetail();

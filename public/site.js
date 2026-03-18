@@ -1,30 +1,6 @@
+import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
+
 const page = document.body.dataset.page || "";
-const sessionStorageKey = "turma_do_printy_token";
-
-function getToken() {
-  return window.localStorage.getItem(sessionStorageKey) || "";
-}
-
-async function loadCurrentUser() {
-  const token = getToken();
-
-  if (!token) {
-    return null;
-  }
-
-  const response = await fetch("/api/auth/me", {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const data = await response.json();
-  return data.user || null;
-}
 
 function markActiveNav() {
   document.querySelectorAll(".nav-link").forEach((link) => {
@@ -305,10 +281,11 @@ async function loadSchedule(siteConfig, user) {
 }
 
 markActiveNav();
+const headerUser = await initSiteHeader().catch(() => null);
 
 const [siteConfig, currentUser] = await Promise.all([
   loadSiteConfig().catch(() => ({ pricing: { albumPriceCents: 4990, planPrices: {} }, schedule: [] })),
-  loadCurrentUser().catch(() => null)
+  Promise.resolve(headerUser || null)
 ]);
 
 await loadAlbums(siteConfig, currentUser);

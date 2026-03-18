@@ -1,10 +1,7 @@
-const sessionStorageKey = "turma_do_printy_token";
+import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
+
 const planStatus = document.getElementById("plan-status");
 const plansGrid = document.getElementById("plans-grid");
-
-function getToken() {
-  return window.localStorage.getItem(sessionStorageKey) || "";
-}
 
 function getAuthRedirectUrl() {
   return `/auth.html?next=${encodeURIComponent("/planos.html")}`;
@@ -12,27 +9,6 @@ function getAuthRedirectUrl() {
 
 function redirectToAuth() {
   window.location.href = getAuthRedirectUrl();
-}
-
-async function loadCurrentUser() {
-  const token = getToken();
-
-  if (!token) {
-    return null;
-  }
-
-  const response = await fetch("/api/auth/me", {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const data = await response.json();
-  return data.user || null;
 }
 
 async function loadSiteConfig() {
@@ -309,6 +285,8 @@ async function renderPage() {
   await loadAccessState();
   renderPlans(plans);
 }
+
+await initSiteHeader().catch(() => null);
 
 try {
   await renderPage();
