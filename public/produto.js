@@ -3,11 +3,8 @@ const offlineCacheName = "turma-do-printy-offline-v1";
 
 const productCover = document.getElementById("product-cover");
 const productTitle = document.getElementById("product-title");
-const productDescription = document.getElementById("product-description");
 const productPrice = document.getElementById("product-price");
-const productTrackCount = document.getElementById("product-track-count");
 const buyAlbumButton = document.getElementById("buy-album-button");
-const purchaseStatus = document.getElementById("purchase-status");
 const manifestStatus = document.getElementById("manifest-status");
 const trackList = document.getElementById("track-list");
 const albumAdminPanel = document.getElementById("album-admin-panel");
@@ -121,6 +118,12 @@ async function loadAccessState() {
 }
 
 function setPurchaseStatus(albumId) {
+  const purchaseStatus = document.getElementById("purchase-status");
+
+  if (!purchaseStatus) {
+    return;
+  }
+
   const params = new URLSearchParams(window.location.search);
 
   if (params.get("payment") === "return") {
@@ -135,7 +138,7 @@ function setPurchaseStatus(albumId) {
     return;
   }
 
-  purchaseStatus.textContent = "Streaming liberado. Para baixar, compre o album ou assine um plano pago.";
+  purchaseStatus.textContent = "";
 }
 
 async function startCheckout(albumId) {
@@ -178,7 +181,10 @@ async function startCheckout(albumId) {
 
     window.location.href = data.payUrl;
   } catch (error) {
-    purchaseStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar pagamento.";
+    const purchaseStatus = document.getElementById("purchase-status");
+    if (purchaseStatus) {
+      purchaseStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar pagamento.";
+    }
     buyAlbumButton.disabled = false;
     buyAlbumButton.textContent = originalText;
   }
@@ -345,7 +351,7 @@ async function downloadTrackForOffline(card, albumId, track) {
   }
 
   if (!canUseDownloads(albumId)) {
-    purchaseStatus.textContent = "Para baixar offline, compre este album ou assine um plano pago.";
+    manifestStatus.textContent = "Para baixar offline, compre este album ou assine um plano pago.";
     return;
   }
 
@@ -835,9 +841,7 @@ async function loadAlbumDetail() {
     productCover.src = album.coverUrl;
     productCover.alt = `Capa do album ${album.name}`;
     productTitle.textContent = album.name;
-    productDescription.textContent = album.description;
     productPrice.textContent = album.priceLabel;
-    productTrackCount.textContent = `${album.tracks.length} MP3`;
     manifestStatus.textContent = album.hasManifest
       ? "Titulos carregados do manifest do album."
       : "Manifest de faixas nao encontrado. Exibindo numeracao padrao.";
@@ -851,7 +855,10 @@ async function loadAlbumDetail() {
     };
   } catch (error) {
     productTitle.textContent = "Nao foi possivel abrir o album";
-    purchaseStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido.";
+    const purchaseStatus = document.getElementById("purchase-status");
+    if (purchaseStatus) {
+      purchaseStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido.";
+    }
     buyAlbumButton.disabled = true;
   }
 }

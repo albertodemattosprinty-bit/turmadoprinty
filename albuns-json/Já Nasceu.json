@@ -4,7 +4,7 @@
     {
       "number": 1,
       "code": "001",
-      "title": "Música 1",
+      "title": "Já Nasceu",
       "type": "full",
       "durationSeconds": 134.27,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/001.mp3",
@@ -14,7 +14,7 @@
     {
       "number": 2,
       "code": "002",
-      "title": "Música 2",
+      "title": "Encenação",
       "type": "full",
       "durationSeconds": 146.36,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/002.mp3"
@@ -22,7 +22,7 @@
     {
       "number": 3,
       "code": "003",
-      "title": "Música 3",
+      "title": "De Alberto de Mattos – Turma do",
       "type": "full",
       "durationSeconds": 54.49,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/003.mp3",
@@ -32,7 +32,7 @@
     {
       "number": 4,
       "code": "004",
-      "title": "Música 4",
+      "title": "Musica 4",
       "type": "full",
       "durationSeconds": 163.27,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/004.mp3"
@@ -40,7 +40,7 @@
     {
       "number": 5,
       "code": "005",
-      "title": "Música 5",
+      "title": "Musica 5",
       "type": "full",
       "durationSeconds": 69.43,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/005.mp3"
@@ -48,7 +48,7 @@
     {
       "number": 6,
       "code": "006",
-      "title": "Música 6",
+      "title": "Musica 6",
       "type": "full",
       "durationSeconds": 162.56,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/006.mp3",
@@ -58,7 +58,7 @@
     {
       "number": 7,
       "code": "007",
-      "title": "Música 7",
+      "title": "Musica 7",
       "type": "full",
       "durationSeconds": 40.86,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/007.mp3",
@@ -68,7 +68,7 @@
     {
       "number": 8,
       "code": "008",
-      "title": "Música 8",
+      "title": "Musica 8",
       "type": "full",
       "durationSeconds": 282.12,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/008.mp3",
@@ -78,7 +78,7 @@
     {
       "number": 9,
       "code": "009",
-      "title": "Música 9",
+      "title": "Musica 9",
       "type": "full",
       "durationSeconds": 48.85,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/009.mp3",
@@ -88,7 +88,7 @@
     {
       "number": 10,
       "code": "010",
-      "title": "Música 10",
+      "title": "Musica 10",
       "type": "full",
       "durationSeconds": 204.41,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/010.mp3",
@@ -98,7 +98,7 @@
     {
       "number": 11,
       "code": "011",
-      "title": "Música 11",
+      "title": "Musica 11",
       "type": "full",
       "durationSeconds": 42.14,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/011.mp3"
@@ -106,7 +106,7 @@
     {
       "number": 12,
       "code": "012",
-      "title": "Música 12",
+      "title": "Musica 12",
       "type": "full",
       "durationSeconds": 121.42,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/012.mp3"
@@ -114,7 +114,7 @@
     {
       "number": 13,
       "code": "013",
-      "title": "Música 13",
+      "title": "Musica 13",
       "type": "full",
       "durationSeconds": 34.64,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/013.mp3"
@@ -122,7 +122,7 @@
     {
       "number": 14,
       "code": "014",
-      "title": "Música 14",
+      "title": "Musica 14",
       "type": "full",
       "durationSeconds": 170.29,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/014.mp3"
@@ -130,7 +130,7 @@
     {
       "number": 15,
       "code": "015",
-      "title": "Música 15",
+      "title": "Musica 15",
       "type": "full",
       "durationSeconds": 54.05,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/015.mp3"
@@ -138,7 +138,7 @@
     {
       "number": 16,
       "code": "016",
-      "title": "Música 16",
+      "title": "Musica 16",
       "type": "playback",
       "durationSeconds": 134.24,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/016.mp3"
@@ -146,7 +146,7 @@
     {
       "number": 17,
       "code": "017",
-      "title": "Música 17",
+      "title": "Musica 17",
       "type": "full",
       "durationSeconds": 148.38,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/017.mp3"
@@ -154,7 +154,7 @@
     {
       "number": 18,
       "code": "018",
-      "title": "Música 18",
+      "title": "Musica 18",
       "type": "playback",
       "durationSeconds": 52.51,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/018.mp3"
@@ -162,7 +162,7 @@
     {
       "number": 19,
       "code": "019",
-      "title": "Música 19",
+      "title": "Musica 19",
       "type": "full",
       "durationSeconds": 168.49,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/019.mp3"
@@ -170,7 +170,7 @@
     {
       "number": 20,
       "code": "020",
-      "title": "Música 20",
+      "title": "Musica 20",
       "type": "full",
       "durationSeconds": 64.21,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/020.mp3"
@@ -178,7 +178,7 @@
     {
       "number": 21,
       "code": "021",
-      "title": "Música 21",
+      "title": "Musica 21",
       "type": "playback",
       "durationSeconds": 162.46,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/021.mp3"
@@ -186,7 +186,7 @@
     {
       "number": 22,
       "code": "022",
-      "title": "Música 22",
+      "title": "Musica 22",
       "type": "playback",
       "durationSeconds": 40.12,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/022.mp3"
@@ -194,7 +194,7 @@
     {
       "number": 23,
       "code": "023",
-      "title": "Música 23",
+      "title": "Musica 23",
       "type": "playback",
       "durationSeconds": 282.93,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/023.mp3"
@@ -202,7 +202,7 @@
     {
       "number": 24,
       "code": "024",
-      "title": "Música 24",
+      "title": "Musica 24",
       "type": "playback",
       "durationSeconds": 48.9,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/024.mp3"
@@ -210,7 +210,7 @@
     {
       "number": 25,
       "code": "025",
-      "title": "Música 25",
+      "title": "Musica 25",
       "type": "playback",
       "durationSeconds": 204.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/025.mp3"
@@ -218,7 +218,7 @@
     {
       "number": 26,
       "code": "026",
-      "title": "Música 26",
+      "title": "Musica 26",
       "type": "full",
       "durationSeconds": 204.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/026.mp3"
@@ -226,7 +226,7 @@
     {
       "number": 27,
       "code": "027",
-      "title": "Música 27",
+      "title": "Musica 27",
       "type": "full",
       "durationSeconds": 204.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/027.mp3"
@@ -234,7 +234,7 @@
     {
       "number": 28,
       "code": "028",
-      "title": "Música 28",
+      "title": "Musica 28",
       "type": "full",
       "durationSeconds": 204.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/028.mp3"
@@ -242,7 +242,7 @@
     {
       "number": 29,
       "code": "029",
-      "title": "Música 29",
+      "title": "Musica 29",
       "type": "full",
       "durationSeconds": 204.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/029.mp3"
@@ -250,7 +250,7 @@
     {
       "number": 30,
       "code": "030",
-      "title": "Música 30",
+      "title": "Musica 30",
       "type": "full",
       "durationSeconds": 204.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/J%C3%A1%20Nasceu/mp3/030.mp3"

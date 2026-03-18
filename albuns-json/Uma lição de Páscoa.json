@@ -4,7 +4,7 @@
     {
       "number": 1,
       "code": "001",
-      "title": "Música 1",
+      "title": "Uma lição de páscoa",
       "type": "full",
       "durationSeconds": 18.63,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/001.mp3"
@@ -12,7 +12,7 @@
     {
       "number": 2,
       "code": "002",
-      "title": "Música 2",
+      "title": "Cantata infantil",
       "type": "full",
       "durationSeconds": 142.08,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/002.mp3"
@@ -20,7 +20,7 @@
     {
       "number": 3,
       "code": "003",
-      "title": "Música 3",
+      "title": "Por Alberto de Mattos",
       "type": "full",
       "durationSeconds": 62.93,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/003.mp3"
@@ -28,7 +28,7 @@
     {
       "number": 4,
       "code": "004",
-      "title": "Música 4",
+      "title": "O coelho e o professor",
       "type": "full",
       "durationSeconds": 164.1,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/004.mp3"
@@ -36,7 +36,7 @@
     {
       "number": 5,
       "code": "005",
-      "title": "Música 5",
+      "title": "(Coelho)",
       "type": "full",
       "durationSeconds": 58.33,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/005.mp3"
@@ -44,7 +44,7 @@
     {
       "number": 6,
       "code": "006",
-      "title": "Música 6",
+      "title": "Música",
       "type": "full",
       "durationSeconds": 139.96,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/006.mp3"
@@ -52,7 +52,7 @@
     {
       "number": 7,
       "code": "007",
-      "title": "Música 7",
+      "title": "(Coelho) -",
       "type": "full",
       "durationSeconds": 68.68,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/007.mp3"
@@ -60,7 +60,7 @@
     {
       "number": 8,
       "code": "008",
-      "title": "Música 8",
+      "title": "Música -",
       "type": "full",
       "durationSeconds": 135.6,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/008.mp3"
@@ -68,7 +68,7 @@
     {
       "number": 9,
       "code": "009",
-      "title": "Música 9",
+      "title": "(Professor)",
       "type": "full",
       "durationSeconds": 54.44,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/009.mp3"
@@ -76,7 +76,7 @@
     {
       "number": 10,
       "code": "010",
-      "title": "Música 10",
+      "title": "Música - Posso adorar",
       "type": "full",
       "durationSeconds": 193.62,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/010.mp3"
@@ -84,7 +84,7 @@
     {
       "number": 11,
       "code": "011",
-      "title": "Música 11",
+      "title": "Musica 11",
       "type": "full",
       "durationSeconds": 32.13,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/011.mp3"
@@ -92,7 +92,7 @@
     {
       "number": 12,
       "code": "012",
-      "title": "Música 12",
+      "title": "Musica 12",
       "type": "full",
       "durationSeconds": 151.33,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/012.mp3"
@@ -100,7 +100,7 @@
     {
       "number": 13,
       "code": "013",
-      "title": "Música 13",
+      "title": "Musica 13",
       "type": "full",
       "durationSeconds": 142.32,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/013.mp3"
@@ -108,7 +108,7 @@
     {
       "number": 14,
       "code": "014",
-      "title": "Música 14",
+      "title": "Musica 14",
       "type": "full",
       "durationSeconds": 170.32,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/014.mp3"
@@ -116,7 +116,7 @@
     {
       "number": 15,
       "code": "015",
-      "title": "Música 15",
+      "title": "Musica 15",
       "type": "full",
       "durationSeconds": 145.29,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/015.mp3"
@@ -124,7 +124,7 @@
     {
       "number": 16,
       "code": "016",
-      "title": "Música 16",
+      "title": "Musica 16",
       "type": "full",
       "durationSeconds": 140.64,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/016.mp3"
@@ -132,7 +132,7 @@
     {
       "number": 17,
       "code": "017",
-      "title": "Música 17",
+      "title": "Musica 17",
       "type": "full",
       "durationSeconds": 197.69,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/017.mp3"
@@ -140,7 +140,7 @@
     {
       "number": 18,
       "code": "018",
-      "title": "Música 18",
+      "title": "Musica 18",
       "type": "full",
       "durationSeconds": 153.63,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Uma%20li%C3%A7%C3%A3o%20de%20P%C3%A1scoa/mp3/018.mp3"

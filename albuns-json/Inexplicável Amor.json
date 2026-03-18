@@ -4,7 +4,7 @@
     {
       "number": 1,
       "code": "001",
-      "title": "Música 1",
+      "title": "Não dá",
       "type": "full",
       "durationSeconds": 45.09,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/001.mp3"
@@ -12,7 +12,7 @@
     {
       "number": 2,
       "code": "002",
-      "title": "Música 2",
+      "title": "Letra e música",
       "type": "full",
       "durationSeconds": 132.15,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/002.mp3"
@@ -20,7 +20,7 @@
     {
       "number": 3,
       "code": "003",
-      "title": "Música 3",
+      "title": "F#m",
       "type": "full",
       "durationSeconds": 38.9,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/003.mp3"
@@ -28,7 +28,7 @@
     {
       "number": 4,
       "code": "004",
-      "title": "Música 4",
+      "title": "INEXPLICÁVEL AMOR",
       "type": "full",
       "durationSeconds": 129.65,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/004.mp3"
@@ -36,7 +36,7 @@
     {
       "number": 5,
       "code": "005",
-      "title": "Música 5",
+      "title": "Aninha",
       "type": "full",
       "durationSeconds": 33.93,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/005.mp3"
@@ -44,7 +44,7 @@
     {
       "number": 6,
       "code": "006",
-      "title": "Música 6",
+      "title": "Ta chegando a hora. Que legal! Ta chegando a hora.",
       "type": "full",
       "durationSeconds": 290.4,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/006.mp3",
@@ -54,7 +54,7 @@
     {
       "number": 7,
       "code": "007",
-      "title": "Música 7",
+      "title": "Musica 7",
       "type": "full",
       "durationSeconds": 34.82,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/007.mp3"
@@ -62,7 +62,7 @@
     {
       "number": 8,
       "code": "008",
-      "title": "Música 8",
+      "title": "Musica 8",
       "type": "full",
       "durationSeconds": 125.31,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/008.mp3"
@@ -70,7 +70,7 @@
     {
       "number": 9,
       "code": "009",
-      "title": "Música 9",
+      "title": "Musica 9",
       "type": "full",
       "durationSeconds": 36.57,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/009.mp3"
@@ -78,7 +78,7 @@
     {
       "number": 10,
       "code": "010",
-      "title": "Música 10",
+      "title": "Musica 10",
       "type": "full",
       "durationSeconds": 221.68,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/010.mp3"
@@ -86,7 +86,7 @@
     {
       "number": 11,
       "code": "011",
-      "title": "Música 11",
+      "title": "Musica 11",
       "type": "full",
       "durationSeconds": 11.7,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/011.mp3"
@@ -94,7 +94,7 @@
     {
       "number": 12,
       "code": "012",
-      "title": "Música 12",
+      "title": "Musica 12",
       "type": "full",
       "durationSeconds": 132.83,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/012.mp3"
@@ -102,7 +102,7 @@
     {
       "number": 13,
       "code": "013",
-      "title": "Música 13",
+      "title": "Musica 13",
       "type": "full",
       "durationSeconds": 130.01,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/013.mp3"
@@ -110,7 +110,7 @@
     {
       "number": 14,
       "code": "014",
-      "title": "Música 14",
+      "title": "Musica 14",
       "type": "playback",
       "durationSeconds": 290.48,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/014.mp3"
@@ -118,7 +118,7 @@
     {
       "number": 15,
       "code": "015",
-      "title": "Música 15",
+      "title": "Musica 15",
       "type": "full",
       "durationSeconds": 125.31,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/015.mp3"
@@ -126,7 +126,7 @@
     {
       "number": 16,
       "code": "016",
-      "title": "Música 16",
+      "title": "Musica 16",
       "type": "full",
       "durationSeconds": 223.71,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Inexplic%C3%A1vel%20Amor/mp3/016.mp3"

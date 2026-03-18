@@ -1,13 +1,34 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const rootDir = process.cwd();
-const contentDir = path.join(rootDir, "Conteúdo");
+const contentDir = path.join(rootDir, "Conte\u00fado");
 const outputDir = path.join(rootDir, "albuns-json");
 const publicBaseUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev";
-const MAX_PLAYBACK_VARIATION_SECONDS = 2;
+const maxPlaybackVariationSeconds = 2;
+const allowedSupportExtensions = new Set([".pdf", ".txt", ".docx", ".doc"]);
+const genericFileKeywords = [
+  "cifra",
+  "cifras",
+  "texto",
+  "textos",
+  "letras e musicas",
+  "letras",
+  "musicas",
+  "musicas e letras",
+  "partitura",
+  "partituras",
+  "trilhagem",
+  "sonoplastia",
+  "guia de producao",
+  "tom original",
+  "tom sugestao",
+  "thumbs",
+  "faixa"
+];
 
-const BITRATES = {
+const bitrates = {
   V1L1: [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 0],
   V1L2: [0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 0],
   V1L3: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0],
@@ -16,18 +37,266 @@ const BITRATES = {
   V2L3: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0]
 };
 
-const SAMPLE_RATES = {
+const sampleRates = {
   3: [44100, 48000, 32000, 0],
   2: [22050, 24000, 16000, 0],
   0: [11025, 12000, 8000, 0]
 };
 
 function normalizeName(value) {
-  return value
+  return String(value || "")
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .trim();
+}
+
+function isGenericName(value) {
+  const normalized = normalizeName(value);
+  return genericFileKeywords.some((keyword) => normalized.includes(keyword));
+}
+
+function cleanCandidateTitle(value) {
+  return String(value || "")
+    .replace(/\.[^.]+$/u, "")
+    .replace(/[_]/g, " ")
+    .replace(/\s*-\s*[^-]*(?:\d{3,4}|\(\d+\)).*$/u, "")
+    .replace(/\s+-\s+(?:a4|a5|final|ltr|cfr|prt|playback|pb|voz|instrumental).*$/iu, "")
+    .replace(/\(\d+\)$/u, "")
+    .replace(/\s+\d{3,4}$/u, "")
+    .replace(/\s+\(([^)]+)\)$/u, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\d.\-)\s]+/u, "")
+    .trim();
+}
+
+function isChordToken(token) {
+  return /^[A-G](?:#|b)?(?:m|maj|min|dim|aug|sus|add)?\d*(?:\/[A-G](?:#|b)?)?$/iu.test(token);
+}
+
+function isLikelyChordLine(value) {
+  const tokens = String(value || "")
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean);
+
+  return tokens.length >= 2 && tokens.every((token) => isChordToken(token));
+}
+
+function isTitleCandidate(value) {
+  const title = cleanCandidateTitle(value);
+  const normalized = normalizeName(title);
+
+  if (!title || title.length < 3 || title.length > 70) {
+    return false;
+  }
+
+  if (isGenericName(title)) {
+    return false;
+  }
+
+  if (/^faixa\s*\d+$/iu.test(title) || /^textos?$/iu.test(title)) {
+    return false;
+  }
+
+  if (/^\d+$/u.test(title) || /[?;:]$/u.test(title) || /^[A-Z]-\s/u.test(title)) {
+    return false;
+  }
+
+  if (/\b000\d\b/u.test(title) || normalized === "fim") {
+    return false;
+  }
+
+  if (/^[a-z]/u.test(title)) {
+    return false;
+  }
+
+  if (isLikelyChordLine(title)) {
+    return false;
+  }
+
+  return title.split(/\s+/u).length <= 10;
+}
+
+function pushUniqueTitle(target, seen, value) {
+  const title = cleanCandidateTitle(value);
+  const normalized = normalizeName(title);
+
+  if (!isTitleCandidate(title) || seen.has(normalized)) {
+    return;
+  }
+
+  seen.add(normalized);
+  target.push(title);
+}
+
+function extractTitlesFromTextContent(text) {
+  const titles = [];
+  const seen = new Set();
+  const lines = String(text || "")
+    .replace(/<[^>]+>/g, "\n")
+    .split(/\r?\n/u)
+    .map((line) => cleanCandidateTitle(line))
+    .filter(Boolean);
+
+  for (const line of lines) {
+    pushUniqueTitle(titles, seen, line);
+  }
+
+  return titles;
+}
+
+function extractSequentialTitlesFromTextContent(text) {
+  const lines = String(text || "")
+    .replace(/<[^>]+>/g, "\n")
+    .split(/\r?\n/u)
+    .map((line) => cleanCandidateTitle(line))
+    .filter(Boolean);
+  const titles = [];
+  const seen = new Set();
+
+  function pushIfValid(value) {
+    if (isTitleCandidate(value)) {
+      pushUniqueTitle(titles, seen, value);
+    }
+  }
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const current = lines[index];
+    const faixaMatch = current.match(/^faixa\s*(\d+)(?:\s*[-–.:]\s*(.+))?$/iu);
+
+    if (faixaMatch) {
+      if (faixaMatch[2]) {
+        pushIfValid(faixaMatch[2]);
+      } else {
+        for (let lookahead = index + 1; lookahead <= index + 3 && lookahead < lines.length; lookahead += 1) {
+          const candidate = lines[lookahead].replace(/^[\-–.:]+/u, "").trim();
+          if (isTitleCandidate(candidate)) {
+            pushIfValid(candidate);
+            break;
+          }
+        }
+      }
+
+      continue;
+    }
+
+    const numberedTitleMatch = current.match(/^(\d+)\s*[.)-]\s*(.+)$/u);
+    if (numberedTitleMatch) {
+      pushIfValid(numberedTitleMatch[2]);
+      continue;
+    }
+
+    if (/^\d+$/u.test(current)) {
+      const next = lines[index + 1] || "";
+      const secondNext = lines[index + 2] || "";
+      const candidate = /^[\-–.:]+$/u.test(next) ? secondNext : next;
+      pushIfValid(candidate);
+    }
+  }
+
+  return titles;
+}
+
+function extractLeadingTitlesFromTextContent(text) {
+  const lines = String(text || "")
+    .replace(/<[^>]+>/g, "\n")
+    .split(/\r?\n/u)
+    .map((line) => cleanCandidateTitle(line))
+    .filter(Boolean);
+  const titles = [];
+  const seen = new Set();
+
+  for (const line of lines) {
+    if (/^faixa\s*\d+/iu.test(line) || /^(\d+)\s*[.)-]?$/u.test(line)) {
+      break;
+    }
+
+    pushUniqueTitle(titles, seen, line);
+
+    if (titles.length >= 3) {
+      break;
+    }
+  }
+
+  return titles;
+}
+
+async function extractDocxText(filePath) {
+  const escapedPath = filePath.replace(/'/g, "''");
+  const script = `
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead('${escapedPath}')
+$entry = $zip.GetEntry('word/document.xml')
+if ($entry -eq $null) { $zip.Dispose(); exit 0 }
+$reader = New-Object System.IO.StreamReader($entry.Open())
+$xml = $reader.ReadToEnd()
+$reader.Dispose()
+$zip.Dispose()
+$xml
+`;
+
+  const result = spawnSync("powershell", ["-NoProfile", "-Command", script], {
+    cwd: rootDir,
+    encoding: "utf8",
+    maxBuffer: 8 * 1024 * 1024
+  });
+
+  return result.status === 0 ? result.stdout || "" : "";
+}
+
+async function extractTitlesFromSupportFiles(albumName, fullTrackCount) {
+  const outrosDir = path.join(contentDir, albumName, "outros");
+  const files = (await fs.readdir(outrosDir).catch(() => [])).filter((fileName) =>
+    allowedSupportExtensions.has(path.extname(fileName).toLowerCase())
+  );
+  const titles = [];
+  const seen = new Set();
+
+  for (const fileName of files) {
+    const extension = path.extname(fileName).toLowerCase();
+    const filePath = path.join(outrosDir, fileName);
+
+    if (extension === ".txt") {
+      const content = await fs.readFile(filePath, "utf8").catch(() => "");
+      const leadingTitles = extractLeadingTitlesFromTextContent(content);
+      const sequentialTitles = extractSequentialTitlesFromTextContent(content);
+
+      for (const title of [...leadingTitles, ...sequentialTitles]) {
+        pushUniqueTitle(titles, seen, title);
+      }
+
+      if (leadingTitles.length === 0 && sequentialTitles.length === 0) {
+        for (const title of extractTitlesFromTextContent(content)) {
+          pushUniqueTitle(titles, seen, title);
+        }
+      }
+    }
+
+    if (extension === ".docx") {
+      const xmlText = await extractDocxText(filePath);
+      const leadingTitles = extractLeadingTitlesFromTextContent(xmlText);
+      const sequentialTitles = extractSequentialTitlesFromTextContent(xmlText);
+
+      for (const title of [...leadingTitles, ...sequentialTitles]) {
+        pushUniqueTitle(titles, seen, title);
+      }
+
+      if (leadingTitles.length === 0 && sequentialTitles.length === 0) {
+        for (const title of extractTitlesFromTextContent(xmlText)) {
+          pushUniqueTitle(titles, seen, title);
+        }
+      }
+    }
+
+    pushUniqueTitle(titles, seen, fileName);
+
+    if (titles.length >= fullTrackCount) {
+      return titles.slice(0, fullTrackCount);
+    }
+  }
+
+  return titles.slice(0, fullTrackCount);
 }
 
 function getBitrateKey(versionBits, layerBits) {
@@ -100,8 +369,8 @@ async function getMp3DurationSeconds(filePath) {
     }
 
     const bitrateKey = getBitrateKey(versionBits, layerBits);
-    const bitrate = BITRATES[bitrateKey]?.[bitrateIndex] || 0;
-    const sampleRate = SAMPLE_RATES[versionBits]?.[sampleRateIndex] || 0;
+    const bitrate = bitrates[bitrateKey]?.[bitrateIndex] || 0;
+    const sampleRate = sampleRates[versionBits]?.[sampleRateIndex] || 0;
     const samplesPerFrame = getSamplesPerFrame(versionBits, layerBits);
     const frameLength = getFrameLength(versionBits, layerBits, bitrate, sampleRate, paddingBit);
 
@@ -128,7 +397,7 @@ function createTrackEntry(albumName, fileName, durationSeconds) {
   return {
     number,
     code,
-    title: `Música ${number}`,
+    title: `Musica ${number}`,
     type: "full",
     durationSeconds,
     publicUrl: buildPublicUrl(albumName, fileName)
@@ -136,9 +405,7 @@ function createTrackEntry(albumName, fileName, durationSeconds) {
 }
 
 function applyFixedLouvoresPattern(tracks) {
-  for (let index = 0; index < tracks.length; index += 1) {
-    const track = tracks[index];
-
+  for (const track of tracks) {
     if (track.number >= 11 && track.number <= 20) {
       track.type = "playback";
       continue;
@@ -155,9 +422,7 @@ function applyFixedLouvoresPattern(tracks) {
 }
 
 function applyFixedDatasPattern(tracks) {
-  for (let index = 0; index < tracks.length; index += 1) {
-    const track = tracks[index];
-
+  for (const track of tracks) {
     if (track.number >= 10 && track.number <= 18) {
       track.type = "playback";
       continue;
@@ -185,7 +450,7 @@ function applyDurationBasedPattern(tracks) {
     }
 
     const difference = Math.abs((fullTrack.durationSeconds || 0) - (playbackCandidate.durationSeconds || 0));
-    if (difference > MAX_PLAYBACK_VARIATION_SECONDS) {
+    if (difference > maxPlaybackVariationSeconds) {
       continue;
     }
 
@@ -211,6 +476,15 @@ function classifyTracks(albumName, tracks) {
   applyDurationBasedPattern(tracks);
 }
 
+async function applySupportFileTitles(albumName, tracks) {
+  const fullTracks = tracks.filter((track) => track.type === "full");
+  const titles = await extractTitlesFromSupportFiles(albumName, fullTracks.length);
+
+  for (let index = 0; index < Math.min(fullTracks.length, titles.length); index += 1) {
+    fullTracks[index].title = titles[index];
+  }
+}
+
 async function buildAlbumJson(albumName) {
   const albumDir = path.join(contentDir, albumName, "mp3");
   const fileNames = (await fs.readdir(albumDir))
@@ -226,6 +500,7 @@ async function buildAlbumJson(albumName) {
   }
 
   classifyTracks(albumName, tracks);
+  await applySupportFileTitles(albumName, tracks);
 
   return {
     album: albumName,

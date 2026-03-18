@@ -4,7 +4,7 @@
     {
       "number": 1,
       "code": "001",
-      "title": "Música 1",
+      "title": "A verdadeira história do Natal",
       "type": "full",
       "durationSeconds": 91.27,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/001.mp3",
@@ -14,7 +14,7 @@
     {
       "number": 2,
       "code": "002",
-      "title": "Música 2",
+      "title": "Turma do Printy",
       "type": "full",
       "durationSeconds": 106.06,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/002.mp3",
@@ -24,7 +24,7 @@
     {
       "number": 3,
       "code": "003",
-      "title": "Música 3",
+      "title": "Autor: Alberto de Mattos",
       "type": "full",
       "durationSeconds": 163.63,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/003.mp3",
@@ -34,7 +34,7 @@
     {
       "number": 4,
       "code": "004",
-      "title": "Música 4",
+      "title": "Mil Perguntas",
       "type": "full",
       "durationSeconds": 321.23,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/004.mp3",
@@ -44,7 +44,7 @@
     {
       "number": 5,
       "code": "005",
-      "title": "Música 5",
+      "title": "Oração de Simeão",
       "type": "full",
       "durationSeconds": 192.71,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/005.mp3",
@@ -54,7 +54,7 @@
     {
       "number": 6,
       "code": "006",
-      "title": "Música 6",
+      "title": "Pequena Belém",
       "type": "full",
       "durationSeconds": 252.45,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/006.mp3",
@@ -64,7 +64,7 @@
     {
       "number": 7,
       "code": "007",
-      "title": "Música 7",
+      "title": "Nasceu o Salvador",
       "type": "full",
       "durationSeconds": 40.7,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/007.mp3",
@@ -74,7 +74,7 @@
     {
       "number": 8,
       "code": "008",
-      "title": "Música 8",
+      "title": "Som de paz",
       "type": "full",
       "durationSeconds": 136.07,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/008.mp3",
@@ -84,7 +84,7 @@
     {
       "number": 9,
       "code": "009",
-      "title": "Música 9",
+      "title": "Feliz Natal",
       "type": "full",
       "durationSeconds": 43.52,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/009.mp3",
@@ -94,7 +94,7 @@
     {
       "number": 10,
       "code": "010",
-      "title": "Música 10",
+      "title": "Musica 10",
       "type": "full",
       "durationSeconds": 196.7,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/010.mp3",
@@ -104,7 +104,7 @@
     {
       "number": 11,
       "code": "011",
-      "title": "Música 11",
+      "title": "Musica 11",
       "type": "full",
       "durationSeconds": 64.34,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/011.mp3",
@@ -114,7 +114,7 @@
     {
       "number": 12,
       "code": "012",
-      "title": "Música 12",
+      "title": "Musica 12",
       "type": "playback",
       "durationSeconds": 91.27,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/012.mp3"
@@ -122,7 +122,7 @@
     {
       "number": 13,
       "code": "013",
-      "title": "Música 13",
+      "title": "Musica 13",
       "type": "playback",
       "durationSeconds": 106.53,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/013.mp3"
@@ -130,7 +130,7 @@
     {
       "number": 14,
       "code": "014",
-      "title": "Música 14",
+      "title": "Musica 14",
       "type": "playback",
       "durationSeconds": 162.98,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/014.mp3"
@@ -138,7 +138,7 @@
     {
       "number": 15,
       "code": "015",
-      "title": "Música 15",
+      "title": "Musica 15",
       "type": "playback",
       "durationSeconds": 320.71,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/015.mp3"
@@ -146,7 +146,7 @@
     {
       "number": 16,
       "code": "016",
-      "title": "Música 16",
+      "title": "Musica 16",
       "type": "playback",
       "durationSeconds": 193.18,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/016.mp3"
@@ -154,7 +154,7 @@
     {
       "number": 17,
       "code": "017",
-      "title": "Música 17",
+      "title": "Musica 17",
       "type": "playback",
       "durationSeconds": 252.53,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/017.mp3"
@@ -162,7 +162,7 @@
     {
       "number": 18,
       "code": "018",
-      "title": "Música 18",
+      "title": "Musica 18",
       "type": "playback",
       "durationSeconds": 40.67,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/018.mp3"
@@ -170,7 +170,7 @@
     {
       "number": 19,
       "code": "019",
-      "title": "Música 19",
+      "title": "Musica 19",
       "type": "playback",
       "durationSeconds": 137.87,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/019.mp3"
@@ -178,7 +178,7 @@
     {
       "number": 20,
       "code": "020",
-      "title": "Música 20",
+      "title": "Musica 20",
       "type": "playback",
       "durationSeconds": 41.77,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/020.mp3"
@@ -186,7 +186,7 @@
     {
       "number": 21,
       "code": "021",
-      "title": "Música 21",
+      "title": "Musica 21",
       "type": "playback",
       "durationSeconds": 196.62,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/021.mp3"
@@ -194,7 +194,7 @@
     {
       "number": 22,
       "code": "022",
-      "title": "Música 22",
+      "title": "Musica 22",
       "type": "playback",
       "durationSeconds": 64,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/A%20Verdadeira%20Historia%20do%20Natal/mp3/022.mp3"

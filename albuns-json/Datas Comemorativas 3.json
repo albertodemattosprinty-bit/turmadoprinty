@@ -4,7 +4,7 @@
     {
       "number": 1,
       "code": "001",
-      "title": "Música 1",
+      "title": "Musica 1",
       "type": "full",
       "durationSeconds": 154.88,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/001.mp3"
@@ -12,7 +12,7 @@
     {
       "number": 2,
       "code": "002",
-      "title": "Música 2",
+      "title": "Musica 2",
       "type": "full",
       "durationSeconds": 300.75,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/002.mp3",
@@ -22,7 +22,7 @@
     {
       "number": 3,
       "code": "003",
-      "title": "Música 3",
+      "title": "Musica 3",
       "type": "full",
       "durationSeconds": 262.09,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/003.mp3",
@@ -32,7 +32,7 @@
     {
       "number": 4,
       "code": "004",
-      "title": "Música 4",
+      "title": "Musica 4",
       "type": "full",
       "durationSeconds": 172.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/004.mp3",
@@ -42,7 +42,7 @@
     {
       "number": 5,
       "code": "005",
-      "title": "Música 5",
+      "title": "Musica 5",
       "type": "full",
       "durationSeconds": 243.07,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/005.mp3"
@@ -50,7 +50,7 @@
     {
       "number": 6,
       "code": "006",
-      "title": "Música 6",
+      "title": "Musica 6",
       "type": "full",
       "durationSeconds": 205.35,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/006.mp3",
@@ -60,7 +60,7 @@
     {
       "number": 7,
       "code": "007",
-      "title": "Música 7",
+      "title": "Musica 7",
       "type": "full",
       "durationSeconds": 233.04,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/007.mp3",
@@ -70,7 +70,7 @@
     {
       "number": 8,
       "code": "008",
-      "title": "Música 8",
+      "title": "Musica 8",
       "type": "full",
       "durationSeconds": 119.28,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/008.mp3"
@@ -78,7 +78,7 @@
     {
       "number": 9,
       "code": "009",
-      "title": "Música 9",
+      "title": "Musica 9",
       "type": "full",
       "durationSeconds": 150.52,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/009.mp3"
@@ -86,7 +86,7 @@
     {
       "number": 10,
       "code": "010",
-      "title": "Música 10",
+      "title": "Musica 10",
       "type": "full",
       "durationSeconds": 175.73,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/010.mp3"
@@ -94,7 +94,7 @@
     {
       "number": 11,
       "code": "011",
-      "title": "Música 11",
+      "title": "Musica 11",
       "type": "playback",
       "durationSeconds": 300.75,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/011.mp3"
@@ -102,7 +102,7 @@
     {
       "number": 12,
       "code": "012",
-      "title": "Música 12",
+      "title": "Musica 12",
       "type": "playback",
       "durationSeconds": 262.09,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/012.mp3"
@@ -110,7 +110,7 @@
     {
       "number": 13,
       "code": "013",
-      "title": "Música 13",
+      "title": "Musica 13",
       "type": "playback",
       "durationSeconds": 172.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/013.mp3"
@@ -118,7 +118,7 @@
     {
       "number": 14,
       "code": "014",
-      "title": "Música 14",
+      "title": "Musica 14",
       "type": "full",
       "durationSeconds": 222.43,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/014.mp3"
@@ -126,7 +126,7 @@
     {
       "number": 15,
       "code": "015",
-      "title": "Música 15",
+      "title": "Musica 15",
       "type": "playback",
       "durationSeconds": 205.35,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/015.mp3"
@@ -134,7 +134,7 @@
     {
       "number": 16,
       "code": "016",
-      "title": "Música 16",
+      "title": "Musica 16",
       "type": "playback",
       "durationSeconds": 233.06,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/016.mp3"
@@ -142,7 +142,7 @@
     {
       "number": 17,
       "code": "017",
-      "title": "Música 17",
+      "title": "Musica 17",
       "type": "full",
       "durationSeconds": 117.24,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Datas%20Comemorativas%203/mp3/017.mp3"
