@@ -31,6 +31,13 @@
             <p class="eyebrow">Detalhes do album</p>
             <h1 id="product-title" class="section-title">Carregando album...</h1>
             <p id="product-description" class="section-muted"></p>
+            <div id="album-admin-panel" class="album-admin-panel" hidden>
+              <label>Preco deste album (centavos)
+                <input id="album-price-input" type="number" min="0" step="1">
+              </label>
+              <button id="album-save-button" class="primary-button" type="button">Salvar album</button>
+              <p id="album-admin-status" class="section-muted"></p>
+            </div>
             <div class="product-meta">
               <span id="product-price" class="status-pill"></span>
               <span id="product-track-count" class="status-pill"></span>

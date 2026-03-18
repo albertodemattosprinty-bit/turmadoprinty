@@ -19,12 +19,12 @@ function buildDescription(album) {
   return "Conteudo digital da Turma do Printy";
 }
 
-export function buildStoreProducts(unitAmount = DEFAULT_PRICE_CENTS) {
+export function buildStoreProducts(unitAmount = DEFAULT_PRICE_CENTS, albumOverrides = {}) {
   return albums.map((album) => ({
     id: slugify(album.name),
     name: album.name,
     description: buildDescription(album),
-    unitAmount,
+    unitAmount: Number(albumOverrides?.[slugify(album.name)]) || unitAmount,
     quantity: 1,
     tracks: album.tracks
   }));
@@ -39,8 +39,8 @@ export function formatPriceFromCents(valueInCents) {
   }).format((Number(valueInCents) || 0) / 100);
 }
 
-export function findStoreProductById(productId, unitAmount = DEFAULT_PRICE_CENTS) {
-  return buildStoreProducts(unitAmount).find((item) => item.id === productId) || null;
+export function findStoreProductById(productId, unitAmount = DEFAULT_PRICE_CENTS, albumOverrides = {}) {
+  return buildStoreProducts(unitAmount, albumOverrides).find((item) => item.id === productId) || null;
 }
 
 export function slugifyAlbumName(value) {

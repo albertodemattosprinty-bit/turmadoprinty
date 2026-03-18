@@ -89,7 +89,7 @@ export async function ensureSiteConfigSchema() {
           values ('pricing', $1::jsonb)
           on conflict (key) do nothing
         `,
-        [JSON.stringify({ albumPriceCents: DEFAULT_ALBUM_PRICE_CENTS, planPrices: DEFAULT_PLAN_PRICES })]
+        [JSON.stringify({ albumPriceCents: DEFAULT_ALBUM_PRICE_CENTS, albumOverrides: {}, planPrices: DEFAULT_PLAN_PRICES })]
       );
 
       const existingAgenda = await query("select count(*)::int as total from agenda_events");
@@ -118,6 +118,7 @@ export async function getSitePricingSettings() {
   if (!hasDatabase()) {
     return {
       albumPriceCents: DEFAULT_ALBUM_PRICE_CENTS,
+      albumOverrides: {},
       planPrices: { ...DEFAULT_PLAN_PRICES }
     };
   }
@@ -128,6 +129,7 @@ export async function getSitePricingSettings() {
 
   return {
     albumPriceCents: Number(value.albumPriceCents) || DEFAULT_ALBUM_PRICE_CENTS,
+    albumOverrides: typeof value.albumOverrides === "object" && value.albumOverrides ? value.albumOverrides : {},
     planPrices: {
       ...DEFAULT_PLAN_PRICES,
       ...(value.planPrices || {})
@@ -135,10 +137,11 @@ export async function getSitePricingSettings() {
   };
 }
 
-export async function saveSitePricingSettings({ albumPriceCents, planPrices }) {
+export async function saveSitePricingSettings({ albumPriceCents, albumOverrides, planPrices }) {
   await ensureSiteConfigSchema();
   const payload = {
     albumPriceCents: Number(albumPriceCents) || DEFAULT_ALBUM_PRICE_CENTS,
+    albumOverrides: typeof albumOverrides === "object" && albumOverrides ? albumOverrides : {},
     planPrices: {
       ...DEFAULT_PLAN_PRICES,
       ...(planPrices || {})

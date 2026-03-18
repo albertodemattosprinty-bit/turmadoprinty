@@ -11,6 +11,7 @@ import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
+import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { hasDatabase, query } from "./src/db.js";
 import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -31,6 +32,7 @@ const ADMIN_USERNAME = "rosemattos";
 
 const publicDir = path.join(__dirname, "public");
 const contentDir = path.join(__dirname, "Conteúdo");
+const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -134,60 +136,42 @@ function getStorePayload() {
   }));
 }
 
-async function readOptionalJson(filePath) {
-  try {
-    await access(filePath);
-    const raw = await readFile(filePath, "utf8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+function getAlbumPriceCents(pricing, productId) {
+  return Number(pricing?.albumOverrides?.[productId]) || Number(pricing?.albumPriceCents) || 4990;
 }
 
-async function readAlbumManifest(albumName, trackCount) {
-  const albumFolder = path.join(contentDir, albumName);
-  const candidateFiles = [
-    path.join(albumFolder, "manifest.json"),
-    path.join(albumFolder, "tracks.json"),
-    path.join(albumFolder, "faixas.json"),
-    path.join(albumFolder, "album.json")
-  ];
+function serializeManifestTrack(track) {
+  return {
+    number: track.number,
+    code: track.code || String(track.number).padStart(3, "0"),
+    label: track.title || track.label || `Faixa ${String(track.number).padStart(3, "0")}`,
+    title: track.title || track.label || `Faixa ${String(track.number).padStart(3, "0")}`,
+    type: String(track.type || "full").trim().toLowerCase() === "playback" ? "playback" : "full",
+    durationSeconds: Number(track.durationSeconds) || 0,
+    publicUrl: track.publicUrl || "",
+    playbackTrackNumber: Number(track.playbackTrackNumber) || null,
+    playbackTrackCode: track.playbackTrackCode || null,
+    lyrics: typeof track.lyrics === "string" ? track.lyrics : ""
+  };
+}
 
-  for (const candidate of candidateFiles) {
-    const payload = await readOptionalJson(candidate);
+async function buildAlbumDetailResponse(product, pricing) {
+  const manifestTracks = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+  const unitAmount = getAlbumPriceCents(pricing, product.id);
 
-    if (!payload) {
-      continue;
-    }
-
-    const rawTracks = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload.tracks)
-        ? payload.tracks
-        : Array.isArray(payload.items)
-          ? payload.items
-          : [];
-
-    if (!rawTracks.length) {
-      continue;
-    }
-
-    return rawTracks.slice(0, trackCount).map((item, index) => ({
-      number: index + 1,
-      label: typeof item === "string"
-        ? item
-        : typeof item?.title === "string"
-          ? item.title
-          : typeof item?.name === "string"
-            ? item.name
-            : `Faixa ${String(index + 1).padStart(3, "0")}`
-    }));
-  }
-
-  return Array.from({ length: trackCount }, (_, index) => ({
-    number: index + 1,
-    label: `Faixa ${String(index + 1).padStart(3, "0")}`
-  }));
+  return {
+    ...product,
+    unitAmount,
+    priceLabel: formatPriceFromCents(unitAmount),
+    coverUrl: buildCoverUrl(product.name),
+    href: `/produto.html?album=${encodeURIComponent(product.id)}`,
+    tracks: manifestTracks.map((track) => ({
+      ...serializeManifestTrack(track),
+      streamUrl: buildTrackUrl(product.name, track.number),
+      downloadUrl: buildTrackUrl(product.name, track.number)
+    })),
+    hasManifest: manifestTracks.some((track) => String(track.title || "").trim())
+  };
 }
 
 function extractChatCompletionText(payload) {
@@ -603,7 +587,7 @@ async function handleStripeCheckoutRequest(request, response) {
 
   const productId = typeof body.productId === "string" ? body.productId.trim() : "";
   const pricing = await getSitePricingSettings();
-  const product = findStoreProductById(productId, pricing.albumPriceCents);
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
 
   if (!product) {
     sendJson(response, 404, { error: "Produto nao encontrado." });
@@ -945,7 +929,12 @@ async function handleAdminPricingUpdate(request, response) {
   }
 
   try {
-    const pricing = await saveSitePricingSettings({ albumPriceCents, planPrices });
+    const currentPricing = await getSitePricingSettings();
+    const pricing = await saveSitePricingSettings({
+      albumPriceCents,
+      albumOverrides: currentPricing.albumOverrides,
+      planPrices
+    });
     sendJson(response, 200, { ok: true, pricing });
   } catch (error) {
     sendJson(response, 500, {
@@ -995,6 +984,107 @@ async function handleAdminScheduleCreate(request, response) {
   }
 }
 
+async function handleAdminAlbumDetail(request, response, pathname) {
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  const productId = decodeURIComponent(pathname.replace("/api/admin/albums/", ""));
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  const detail = await buildAlbumDetailResponse(product, pricing);
+  sendJson(response, 200, { ok: true, album: detail });
+}
+
+async function handleAdminAlbumUpdate(request, response, pathname) {
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  const productId = decodeURIComponent(pathname.replace("/api/admin/albums/", ""));
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const tracks = Array.isArray(body.tracks) ? body.tracks : [];
+  const priceCents = Number(body.priceCents);
+
+  if (!Number.isInteger(priceCents) || priceCents < 0) {
+    sendJson(response, 400, { error: "Preco do album invalido." });
+    return;
+  }
+
+  if (tracks.length !== product.tracks) {
+    sendJson(response, 400, { error: "Quantidade de faixas invalida para este album." });
+    return;
+  }
+
+  const nextTracks = tracks.map((track, index) => {
+    const number = index + 1;
+    const type = String(track?.type || "full").trim().toLowerCase() === "playback" ? "playback" : "full";
+    const playbackTrackNumber = type === "full" ? Number(track?.playbackTrackNumber) || null : null;
+    const playbackTrackCode = playbackTrackNumber ? String(playbackTrackNumber).padStart(3, "0") : null;
+
+    return {
+      number,
+      code: String(track?.code || number).padStart(3, "0"),
+      title: typeof track?.title === "string" && track.title.trim() ? track.title.trim() : `Faixa ${String(number).padStart(3, "0")}`,
+      type,
+      durationSeconds: Number(track?.durationSeconds) || 0,
+      publicUrl: track?.publicUrl || buildTrackUrl(product.name, number),
+      playbackTrackNumber,
+      playbackTrackCode,
+      lyrics: typeof track?.lyrics === "string" ? track.lyrics : ""
+    };
+  });
+
+  try {
+    await albumManifestStore.writeAlbumManifest(product.name, nextTracks);
+
+    const albumOverrides = {
+      ...(pricing.albumOverrides || {}),
+      [product.id]: priceCents
+    };
+
+    await saveSitePricingSettings({
+      albumPriceCents: pricing.albumPriceCents,
+      albumOverrides,
+      planPrices: pricing.planPrices
+    });
+
+    const nextPricing = await getSitePricingSettings();
+    const detail = await buildAlbumDetailResponse(product, nextPricing);
+    sendJson(response, 200, { ok: true, album: detail });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao salvar album."
+    });
+  }
+}
+
 async function handleProtectedTrackDownload(request, response, pathname) {
   if (!await ensurePaymentsReady(response)) {
     return;
@@ -1016,7 +1106,7 @@ async function handleProtectedTrackDownload(request, response, pathname) {
   const productId = decodeURIComponent(match[1]);
   const trackNumber = Number(match[2]);
   const pricing = await getSitePricingSettings();
-  const product = findStoreProductById(productId, pricing.albumPriceCents);
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
 
   if (!product || !Number.isInteger(trackNumber) || trackNumber < 1 || trackNumber > product.tracks) {
     sendJson(response, 404, { error: "Faixa nao encontrada." });
@@ -1161,7 +1251,7 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/store/products") {
     const pricing = await getSitePricingSettings();
-    const storeProducts = buildStoreProducts(pricing.albumPriceCents);
+    const storeProducts = buildStoreProducts(pricing.albumPriceCents, pricing.albumOverrides);
     sendJson(response, 200, {
       items: storeProducts.map((product) => ({
         ...product,
@@ -1184,26 +1274,14 @@ const server = http.createServer(async (request, response) => {
 
     const productId = decodeURIComponent(pathname.replace("/api/store/products/", ""));
     const pricing = await getSitePricingSettings();
-    const product = findStoreProductById(productId, pricing.albumPriceCents);
+    const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
 
     if (!product) {
       sendJson(response, 404, { error: "Produto nao encontrado." });
       return;
     }
 
-    const manifestTracks = await readAlbumManifest(product.name, product.tracks);
-    sendJson(response, 200, {
-      ...product,
-      priceLabel: formatPriceFromCents(product.unitAmount),
-      coverUrl: buildCoverUrl(product.name),
-      href: `/produto.html?album=${encodeURIComponent(product.id)}`,
-      tracks: manifestTracks.map((track) => ({
-        ...track,
-        streamUrl: buildTrackUrl(product.name, track.number),
-        downloadUrl: buildTrackUrl(product.name, track.number)
-      })),
-      hasManifest: manifestTracks.some((track) => !track.label.startsWith("Faixa "))
-    });
+    sendJson(response, 200, await buildAlbumDetailResponse(product, pricing));
     return;
   }
 
@@ -1402,6 +1480,16 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/admin/schedule") {
     await handleAdminScheduleCreate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/api/admin/albums/")) {
+    await handleAdminAlbumDetail(request, response, pathname);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/admin/albums/")) {
+    await handleAdminAlbumUpdate(request, response, pathname);
     return;
   }
 
