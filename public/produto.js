@@ -27,6 +27,7 @@ let currentUser = null;
 let currentAlbum = null;
 let activeSpeechRecognition = null;
 let lyricsSilenceTimer = null;
+const adminUsername = "rosemattos";
 
 function getTrackModeLabel(track) {
   return track?.type === "playback" ? "Playback" : "Full";
@@ -58,7 +59,10 @@ function canUseDownloads(albumId) {
 }
 
 function isAdmin() {
-  return Boolean(currentUser?.isAdmin);
+  return Boolean(
+    currentUser?.isAdmin &&
+    String(currentUser?.username || "").trim().toLowerCase() === adminUsername
+  );
 }
 
 async function loadAccessState() {
