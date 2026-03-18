@@ -6,29 +6,29 @@ const plans = [
   {
     id: "gratis",
     name: "Gratis",
-    priceLabel: "R$ 0/mes",
+    priceLabel: "Gratis",
     description: "Streaming e download offline liberados no navegador para usuarios logados.",
     perks: ["Ouvir todas as faixas", "Downloads offline", "Navegar no catalogo"]
   },
   {
     id: "plus",
     name: "Plus",
-    priceLabel: "R$ 2/mes",
-    description: "Plano de teste com downloads de todas as musicas.",
+    priceLabel: "R$ 9,90/mes",
+    description: "Plano inicial com streaming completo e downloads em todo o catalogo.",
     perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
   },
   {
     id: "pro",
     name: "Pro",
-    priceLabel: "R$ 3/mes",
-    description: "Mesmo acesso de download total, com outro valor de teste.",
+    priceLabel: "R$ 19,90/mes",
+    description: "Plano intermediario com acesso completo para quem quer assinar mensalmente.",
     perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
   },
   {
     id: "life",
     name: "Life",
-    priceLabel: "R$ 4/mes",
-    description: "Plano maximo de teste com downloads liberados em todo o catalogo.",
+    priceLabel: "R$ 29,90/mes",
+    description: "Plano premium com o mesmo catalogo completo e a faixa de valor mais alta.",
     perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
   }
 ];

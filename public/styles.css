@@ -619,6 +619,12 @@ a {
   margin: 8px 0 0;
 }
 
+.chat-login-card {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+
 .conversation-header {
   display: flex;
   justify-content: space-between;

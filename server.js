@@ -5,6 +5,7 @@ import { access, readFile } from "node:fs/promises";
 import crypto from "node:crypto";
 import http from "node:http";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import Stripe from "stripe";
 
@@ -897,10 +898,26 @@ async function handleProtectedTrackDownload(request, response, pathname) {
       return;
     }
 
-    response.writeHead(302, {
-      Location: getTrackDownloadUrl(product.name, trackNumber)
+    const assetResponse = await fetch(getTrackDownloadUrl(product.name, trackNumber));
+
+    if (!assetResponse.ok || !assetResponse.body) {
+      sendJson(response, assetResponse.status || 502, {
+        error: "Nao foi possivel baixar a faixa agora."
+      });
+      return;
+    }
+
+    const contentType = assetResponse.headers.get("content-type") || "audio/mpeg";
+    const contentLength = assetResponse.headers.get("content-length");
+    const fileName = `${slugifyAlbumName(product.name)}-${String(trackNumber).padStart(3, "0")}.mp3`;
+
+    response.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename=\"${fileName}\"`,
+      ...(contentLength ? { "Content-Length": contentLength } : {})
     });
-    response.end();
+
+    Readable.fromWeb(assetResponse.body).pipe(response);
   } catch (error) {
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Erro ao validar download."

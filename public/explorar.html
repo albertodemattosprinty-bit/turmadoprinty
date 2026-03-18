@@ -47,7 +47,21 @@
           <p class="section-muted" id="chat-hint">Você pode navegar livremente. O login só é exigido quando for iniciar uma conversa.</p>
         </div>
 
-        <div class="conversation-shell">
+        <div id="login-gate" class="conversation-shell">
+          <div class="conversation-header">
+            <div>
+              <p class="eyebrow">Acesso</p>
+              <h2 class="conversation-title">Entre para abrir o chat</h2>
+            </div>
+          </div>
+          <div class="history-empty chat-login-card">
+            <strong>O chat so aparece depois do login.</strong>
+            <p>Assim o acesso fica centralizado na area de explorar, sem formulario solto, e o historico fica amarrado na conta certa.</p>
+            <a class="primary-button" href="/auth.html?next=%2Fexplorar.html">Entrar para conversar</a>
+          </div>
+        </div>
+
+        <div id="chat-shell" class="conversation-shell">
           <div class="conversation-header">
             <div>
               <p class="eyebrow">Chat atual</p>

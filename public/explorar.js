@@ -11,6 +11,8 @@ const newChatButton = document.getElementById("new-chat-button");
 const loginLink = document.getElementById("login-link");
 const logoutButton = document.getElementById("logout-button");
 const chatHint = document.getElementById("chat-hint");
+const chatShell = document.getElementById("chat-shell");
+const loginGate = document.getElementById("login-gate");
 const chatThread = document.getElementById("chat-thread");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
@@ -266,7 +268,12 @@ function syncComposerState() {
   const isLoggedIn = Boolean(currentUser);
   logoutButton.hidden = !isLoggedIn;
   loginLink.hidden = isLoggedIn;
+  newChatButton.hidden = !isLoggedIn;
+  chatShell.hidden = !isLoggedIn;
+  loginGate.hidden = isLoggedIn;
   micButton.disabled = !isLoggedIn;
+  sendButton.disabled = !isLoggedIn;
+  chatInput.disabled = !isLoggedIn;
   chatInput.placeholder = isLoggedIn
     ? "Digite sua mensagem aqui..."
     : "Faça login quando quiser iniciar uma conversa com a IA.";
@@ -522,6 +529,11 @@ async function toggleRecording() {
 }
 
 newChatButton.addEventListener("click", () => {
+  if (!currentUser) {
+    ensureLoggedInBeforeChat();
+    return;
+  }
+
   activeConversationId = null;
   renderHistoryList();
   renderConversation();

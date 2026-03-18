@@ -10,7 +10,7 @@ export const subscriptionPlans = [
   {
     id: "plus",
     name: "Plus",
-    unitAmount: 200,
+    unitAmount: 990,
     intervalUnit: "MONTH",
     intervalLength: 1,
     billingCycles: 12
@@ -18,7 +18,7 @@ export const subscriptionPlans = [
   {
     id: "pro",
     name: "Pro",
-    unitAmount: 300,
+    unitAmount: 1990,
     intervalUnit: "MONTH",
     intervalLength: 1,
     billingCycles: 12
@@ -26,7 +26,7 @@ export const subscriptionPlans = [
   {
     id: "life",
     name: "Life",
-    unitAmount: 400,
+    unitAmount: 2990,
     intervalUnit: "MONTH",
     intervalLength: 1,
     billingCycles: 12
