@@ -23,8 +23,8 @@ const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
-const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-5-nano";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -48,6 +48,8 @@ const mimeTypes = {
 };
 
 const DEFAULT_RESPONSE_STYLE_PROMPT = "Responda de forma direta e natural, preferencialmente em ate 500 caracteres. So ultrapasse esse limite quando isso for realmente necessario para manter clareza ou utilidade.";
+const DEFAULT_PREVIEW_MAX_COMPLETION_TOKENS = Number(process.env.OPENAI_INSTANT_MAX_COMPLETION_TOKENS || 120);
+const DEFAULT_FINAL_MAX_COMPLETION_TOKENS = Number(process.env.OPENAI_FINAL_MAX_COMPLETION_TOKENS || 220);
 
 function isAdminUser(user) {
   return String(user?.username || "").trim().toLowerCase() === ADMIN_USERNAME;
@@ -96,6 +98,16 @@ async function readTextBody(request) {
 function getInstantModel(body) {
   const requested = typeof body?.instantModel === "string" ? body.instantModel.trim() : "";
   return requested || OPENAI_INSTANT_MODEL || OPENAI_MODEL;
+}
+
+function getFinalModel(body) {
+  const requested = typeof body?.model === "string" ? body.model.trim() : "";
+  return requested || OPENAI_MODEL;
+}
+
+function getPositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function parseDataUrl(dataUrl) {
@@ -481,10 +493,12 @@ async function handleGptRequest(request, response) {
   const system = contextPrompt
     ? `${systemBase}\n\n${responseStylePrompt}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
     : `${systemBase}\n\n${responseStylePrompt}`;
-  const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : OPENAI_MODEL;
+  const model = getFinalModel(body);
   const instantModel = getInstantModel(body);
   const history = Array.isArray(body.history) ? body.history : [];
   const wantsStream = Boolean(body.stream) || String(request.headers.accept || "").includes("text/event-stream");
+  const previewMaxCompletionTokens = getPositiveInteger(body.previewMaxCompletionTokens, DEFAULT_PREVIEW_MAX_COMPLETION_TOKENS);
+  const finalMaxCompletionTokens = getPositiveInteger(body.maxCompletionTokens, DEFAULT_FINAL_MAX_COMPLETION_TOKENS);
 
   if (!message) {
     sendJson(response, 400, { error: "Envie um campo 'message' com texto." });
@@ -493,7 +507,7 @@ async function handleGptRequest(request, response) {
 
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim())
-    .slice(-8)
+    .slice(-4)
     .map((item) => ({
       role: item.role,
       content: item.content.trim()
@@ -505,7 +519,8 @@ async function handleGptRequest(request, response) {
       ...(system ? [{ role: "system", content: system }] : []),
       ...messages,
       { role: "user", content: message }
-    ]
+    ],
+    max_completion_tokens: finalMaxCompletionTokens
   };
 
   try {
@@ -520,38 +535,45 @@ async function handleGptRequest(request, response) {
         response.write(`data: ${JSON.stringify(payload)}\n\n`);
       };
 
+      let finalStarted = false;
+      let previewSent = false;
+
       sendEvent({ type: "status", stage: "preview", message: "Montando uma resposta imediata..." });
 
-      if (instantModel) {
-        try {
-          const previewPayload = await createChatCompletion(apiKey, {
-            model: instantModel,
-            messages: [
-              ...(system ? [{ role: "system", content: `${system}\n\nEntregue primeiro uma resposta imediata, curta e pratica em ate 500 caracteres.` }] : []),
-              ...messages,
-              { role: "user", content: message }
-            ],
-            max_completion_tokens: 140
-          });
-          const previewText = extractChatCompletionText(previewPayload);
+      const previewPromise = instantModel
+        ? createChatCompletion(apiKey, {
+          model: instantModel,
+          messages: [
+            ...(system ? [{ role: "system", content: `${system}\n\nEntregue primeiro uma resposta imediata, curta e pratica em ate 500 caracteres.` }] : []),
+            ...messages,
+            { role: "user", content: message }
+          ],
+          max_completion_tokens: previewMaxCompletionTokens
+        })
+          .then((previewPayload) => {
+            const previewText = extractChatCompletionText(previewPayload);
 
-          if (previewText) {
+            if (!previewText || finalStarted || previewSent) {
+              return;
+            }
+
+            previewSent = true;
             sendEvent({
               type: "preview",
               model: previewPayload.model || instantModel,
               text: previewText
             });
-          }
-        } catch (error) {
-          sendEvent({
-            type: "status",
-            stage: "preview",
-            message: error instanceof Error ? "Seguindo sem resposta instantanea." : "Seguindo com a resposta principal..."
-          });
-        }
-      }
-
-      sendEvent({ type: "status", stage: "final", message: "Aprofundando a resposta..." });
+          })
+          .catch(() => {
+            if (!finalStarted && !previewSent) {
+              sendEvent({
+                type: "status",
+                stage: "preview",
+                message: "Seguindo com a resposta principal..."
+              });
+            }
+          })
+        : Promise.resolve();
 
       const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -614,12 +636,17 @@ async function handleGptRequest(request, response) {
           const delta = payload?.choices?.[0]?.delta?.content;
 
           if (typeof delta === "string" && delta) {
+            if (!finalStarted) {
+              finalStarted = true;
+              sendEvent({ type: "status", stage: "final", message: "Respondendo..." });
+            }
             finalText += delta;
             sendEvent({ type: "delta", text: delta });
           }
         }
       }
 
+      await previewPromise;
       sendEvent({ type: "done", text: finalText });
       response.end();
       return;
