@@ -20,7 +20,9 @@ function normalizeTrack(item, index) {
     publicUrl: typeof item?.publicUrl === "string" ? item.publicUrl : "",
     playbackTrackNumber: Number.isInteger(Number(item?.playbackTrackNumber)) ? Number(item.playbackTrackNumber) : null,
     playbackTrackCode: typeof item?.playbackTrackCode === "string" && item.playbackTrackCode.trim() ? item.playbackTrackCode.trim() : null,
-    lyrics: typeof item?.lyrics === "string" ? item.lyrics : ""
+    lyrics: typeof item?.lyrics === "string" ? item.lyrics : typeof item?.textContent === "string" ? item.textContent : "",
+    textContent: typeof item?.textContent === "string" ? item.textContent : typeof item?.lyrics === "string" ? item.lyrics : "",
+    textJson: item?.textJson && typeof item.textJson === "object" ? item.textJson : null
   };
 }
 
@@ -76,6 +78,14 @@ export function createAlbumManifestStore({ rootDir }) {
 
         if (track.lyrics) {
           payload.lyrics = track.lyrics;
+        }
+
+        if (track.textContent) {
+          payload.textContent = track.textContent;
+        }
+
+        if (track.textJson) {
+          payload.textJson = track.textJson;
         }
 
         return payload;
