@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Explorar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="explorar">
+  <header class="site-header">
+    <a class="brand" href="/index.html"><span class="brand-mark">P</span><span class="brand-text">Turma do Printy</span></a>
+    <nav class="site-nav">
+      <a class="nav-link" href="/index.html"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+      <a class="nav-link" href="/produtos.html"><svg viewBox="0 0 24 24"><path d="M4 7h16v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm3-4h10l1 3H6z"/></svg><span>Produtos</span></a>
+      <a class="nav-link" href="/agenda.html"><svg viewBox="0 0 24 24"><path d="M7 2h2v3H7zm8 0h2v3h-2zM4 5h16a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1m0 5v9h16v-9z"/></svg><span>Agenda</span></a>
+      <a class="nav-link" href="/eventos.html"><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V6zm-1 6h2v5h-2zm0 7h2v2h-2z"/></svg><span>Eventos</span></a>
+      <a class="nav-link" href="/cursos.html"><svg viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9zm-7 9.18V16L12 20l7-4v-3.82l-7 3.82z"/></svg><span>Cursos</span></a>
+      <a class="nav-link" href="/explorar.html"><svg viewBox="0 0 24 24"><path d="M4 4h16v11H7l-3 3z"/></svg><span>Explorar</span></a>
+    </nav>
+  </header>
+
+  <main class="page-shell">
+    <section class="chat-layout">
+      <aside class="chat-sidebar">
+        <div class="sidebar-card">
+          <p class="eyebrow">Acesso</p>
+          <h2 class="section-title small">Login necessário para iniciar</h2>
+          <p class="section-muted" id="auth-status">Verificando acesso...</p>
+
+          <form id="register-form" class="auth-form">
+            <h3>Criar conta</h3>
+            <label>Nome<input id="register-name" type="text" placeholder="Seu nome"></label>
+            <label>Nome de usuário<input id="register-username" type="text" placeholder="ex.: printykids"></label>
+            <label>Senha<input id="register-password" type="password" placeholder="Mínimo 6 caracteres"></label>
+            <label>Confirmar senha<input id="register-password-confirm" type="password" placeholder="Repita a senha"></label>
+            <button type="submit" class="primary-button full-width">Cadastrar</button>
+          </form>
+
+          <form id="login-form" class="auth-form">
+            <h3>Entrar</h3>
+            <label>Nome de usuário<input id="login-username" type="text" placeholder="Seu nome de usuário"></label>
+            <label>Senha<input id="login-password" type="password" placeholder="Sua senha"></label>
+            <button type="submit" class="primary-button full-width">Entrar</button>
+            <button id="me-button" class="ghost-button full-width" type="button">Ver minha sessão</button>
+          </form>
+
+          <pre id="auth-output" class="output-panel small-output">Nenhum teste de login executado ainda.</pre>
+        </div>
+      </aside>
+
+      <section class="chat-main">
+        <div class="chat-hero">
+          <p class="eyebrow">Explorar</p>
+          <h1 class="section-title">Como posso ajudar hoje?</h1>
+          <p class="section-muted">Converse com a IA da Turma do Printy para criar ideias, roteiros, legendas, programações e conteúdos.</p>
+        </div>
+
+        <div class="conversation-shell">
+          <div id="chat-thread" class="chat-thread"></div>
+          <form id="chat-form" class="chat-composer">
+            <textarea id="chat-input" placeholder="Digite sua mensagem aqui..." rows="1" disabled></textarea>
+            <div class="chat-actions">
+              <button id="send-button" type="submit" class="primary-button" disabled>Enviar</button>
+              <button id="stop-button" type="button" class="ghost-button" disabled>Stop</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="/explorar.js"></script>
+</body>
+</html>

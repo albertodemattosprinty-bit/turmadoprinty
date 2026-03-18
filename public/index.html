@@ -3,175 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Turma do Printy</title>
+  <title>Turma do Printy | Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="#home">Turma do Printy</a>
-    <nav class="nav">
-      <a href="#home">Home</a>
-      <a href="#produtos">Produtos</a>
-      <a href="#agenda">Agenda</a>
-      <a href="#eventos">Eventos</a>
-      <a href="#cursos">Cursos</a>
-      <a href="#explorar">Explorar</a>
+<body data-page="home">
+  <header class="site-header">
+    <a class="brand" href="/index.html">
+      <span class="brand-mark">P</span>
+      <span class="brand-text">Turma do Printy</span>
+    </a>
+    <nav class="site-nav">
+      <a class="nav-link" href="/index.html"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+      <a class="nav-link" href="/produtos.html"><svg viewBox="0 0 24 24"><path d="M4 7h16v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm3-4h10l1 3H6z"/></svg><span>Produtos</span></a>
+      <a class="nav-link" href="/agenda.html"><svg viewBox="0 0 24 24"><path d="M7 2h2v3H7zm8 0h2v3h-2zM4 5h16a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1m0 5v9h16v-9z"/></svg><span>Agenda</span></a>
+      <a class="nav-link" href="/eventos.html"><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V6zm-1 6h2v5h-2zm0 7h2v2h-2z"/></svg><span>Eventos</span></a>
+      <a class="nav-link" href="/cursos.html"><svg viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9zm-7 9.18V16L12 20l7-4v-3.82l-7 3.82z"/></svg><span>Cursos</span></a>
+      <a class="nav-link" href="/explorar.html"><svg viewBox="0 0 24 24"><path d="M4 4h16v11H7l-3 3z"/></svg><span>Explorar</span></a>
     </nav>
   </header>
 
-  <main class="shell">
-    <section id="home" class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Musica, teatro e fe para criancas</p>
-        <h1>Um universo cristao infantil para cantar, aprender e viver a verdade com alegria.</h1>
-        <p class="lead">
-          A Turma do Printy apresenta conteudos infantis com linguagem afetuosa, clima de igreja e mensagens que aproximam
-          criancas, familias e ministerios do ensino biblico de forma leve, artistica e memoravel.
+  <main class="page-shell">
+    <section class="hero-card hero-home">
+      <div class="hero-text">
+        <p class="eyebrow">Infantil cristão com alegria</p>
+        <h1 class="hero-title">Música, teatro e conteúdo bíblico com linguagem leve, bonita e próxima das crianças.</h1>
+        <p class="hero-description">
+          A Turma do Printy reúne canções, apresentações e materiais voltados para famílias, igrejas e ministérios infantis
+          que desejam comunicar a verdade com sensibilidade, criatividade e um ambiente cheio de vida.
         </p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#explorar">Abrir o chat</a>
-          <a class="button button-secondary" href="#produtos">Ver albuns</a>
+          <a class="primary-button" href="/explorar.html">Abrir a IA</a>
+          <a class="ghost-button" href="/produtos.html">Ver produtos</a>
         </div>
       </div>
-      <aside class="hero-panel">
+      <aside class="status-card">
         <div class="status-line">
-          <span class="dot" id="health-dot"></span>
+          <span class="status-dot" id="health-dot"></span>
           <strong id="health-label">Verificando plataforma...</strong>
         </div>
-        <p id="health-copy" class="muted">Aguardando resposta de /api/health</p>
-        <div class="pill-row" id="env-pills"></div>
-        <p class="source-note">
-          Texto institucional inspirado em fontes publicas sobre os lancamentos musicais e apresentacoes infantis da Turma do Printy.
-        </p>
+        <p class="status-copy" id="health-copy">Aguardando resposta do servidor.</p>
+        <div class="status-pills" id="env-pills"></div>
       </aside>
     </section>
 
-    <section id="produtos" class="section">
-      <div class="section-head">
-        <div>
-          <p class="eyebrow">Produtos</p>
-          <h2>Todos os albuns</h2>
-        </div>
-        <p class="muted" id="album-count">Carregando catalogo...</p>
-      </div>
-      <div id="album-grid" class="album-grid"></div>
-    </section>
-
-    <section id="agenda" class="section">
-      <div class="section-head">
-        <div>
-          <p class="eyebrow">Agenda</p>
-          <h2>Apresentacoes do fim de semana</h2>
-        </div>
-      </div>
-      <div class="schedule-grid" id="schedule-grid"></div>
-    </section>
-
-    <section id="eventos" class="section two-col">
-      <div>
-        <p class="eyebrow">Eventos</p>
-        <h2>Experiencias pensadas para igrejas, congressos e ministerios infantis.</h2>
-      </div>
-      <div class="rich-copy">
-        <p>
-          Os eventos da Turma do Printy podem combinar apresentacoes musicais, momentos teatrais, interacao com as criancas,
-          participacao da igreja local e uma conducao acolhedora voltada para familias.
-        </p>
-        <p>
-          A proposta e criar encontros vivos, reverentes e alegres, com repertorio infantil cristao, cenarios simples de alto
-          impacto e mensagens que ajudam a igreja a discipular com beleza e proximidade.
-        </p>
-      </div>
-    </section>
-
-    <section id="cursos" class="section two-col">
-      <div>
-        <p class="eyebrow">Cursos</p>
-        <h2>Formacao criativa para quem serve criancas com amor e excelencia.</h2>
-      </div>
-      <div class="rich-copy">
-        <p>
-          Os cursos podem reunir conteudos para ministerio infantil, louvor, producao de eventos para criancas, recursos
-          pedagogicos, montagem de apresentacoes e direcao de experiencias em igrejas.
-        </p>
-        <p>
-          A ideia e fortalecer lideres, equipes e voluntarios com orientacao pratica, sensibilidade espiritual e repertorio
-          criativo para servir com mais organizacao e intencionalidade.
-        </p>
-      </div>
-    </section>
-
-    <section id="explorar" class="section explore-layout">
-      <div class="explore-copy">
+    <section class="info-grid">
+      <article class="info-card">
+        <p class="eyebrow">Produtos</p>
+        <h2>Álbuns para igrejas e famílias</h2>
+        <p>Catálogo com repertório infantil cristão para diferentes épocas, eventos especiais e apresentações temáticas.</p>
+        <a class="inline-link" href="/produtos.html">Abrir catálogo</a>
+      </article>
+      <article class="info-card">
+        <p class="eyebrow">Agenda</p>
+        <h2>Apresentações no fim de semana</h2>
+        <p>Compromissos fictícios de sábado e domingo para demonstrar uma agenda pública clara e bonita.</p>
+        <a class="inline-link" href="/agenda.html">Ver agenda</a>
+      </article>
+      <article class="info-card">
         <p class="eyebrow">Explorar</p>
-        <h2>Converse com o assistente da Turma do Printy.</h2>
-        <p class="muted">
-          Use o chat para tirar duvidas, pedir ideias de programacao, devocionais infantis, descricoes de eventos, apoio para
-          ministerio e conteudos em linguagem crista acolhedora.
-        </p>
-
-        <div class="auth-stack">
-          <div class="auth-head">
-            <h3>Acesso</h3>
-            <p class="muted" id="auth-status">Verificando acesso...</p>
-          </div>
-          <div class="auth-grid">
-            <form id="register-form" class="auth-card form-card">
-              <h3>Criar conta</h3>
-              <label>
-                Nome
-                <input id="register-name" type="text" placeholder="Seu nome">
-              </label>
-              <label>
-                Nome de usuario
-                <input id="register-username" type="text" placeholder="ex.: printyamigo">
-              </label>
-              <label>
-                Senha
-                <input id="register-password" type="password" placeholder="Minimo 6 caracteres">
-              </label>
-              <label>
-                Confirmar senha
-                <input id="register-password-confirm" type="password" placeholder="Repita a senha">
-              </label>
-              <button type="submit">Cadastrar</button>
-            </form>
-
-            <form id="login-form" class="auth-card form-card">
-              <h3>Entrar</h3>
-              <label>
-                Nome de usuario
-                <input id="login-username" type="text" placeholder="Seu nome de usuario">
-              </label>
-              <label>
-                Senha
-                <input id="login-password" type="password" placeholder="Sua senha">
-              </label>
-              <button type="submit">Entrar</button>
-              <button id="me-button" class="button-inline" type="button">Ver minha sessao</button>
-            </form>
-          </div>
-          <pre id="auth-output" class="output small-output">Nenhum teste de login executado ainda.</pre>
-        </div>
-      </div>
-
-      <div class="chat-panel">
-        <form id="gpt-form" class="gpt-form">
-          <label>
-            Pergunta
-            <textarea id="gpt-message" placeholder="Ex.: Monte uma chamada para evento infantil de domingo a noite."></textarea>
-          </label>
-          <label>
-            Instrucoes de sistema
-            <input id="gpt-system" type="text" placeholder="Base cristã protestante, tom suave, acolhedor e amigável.">
-          </label>
-          <button type="submit">Conversar</button>
-        </form>
-        <pre id="gpt-output" class="output">Nenhuma pergunta enviada ainda.</pre>
-      </div>
+        <h2>Assistente com IA</h2>
+        <p>Área protegida por login para conversar com a IA, tirar dúvidas e pedir conteúdos para ministério infantil.</p>
+        <a class="inline-link" href="/explorar.html">Entrar no chat</a>
+      </article>
     </section>
   </main>
 
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="/site.js"></script>
 </body>
 </html>

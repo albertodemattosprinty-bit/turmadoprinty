@@ -165,11 +165,20 @@ async function handleGptRequest(request, response) {
   const message = typeof body.message === "string" ? body.message.trim() : "";
   const system = typeof body.system === "string" && body.system.trim() ? body.system.trim() : DEFAULT_SYSTEM_PROMPT;
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : OPENAI_MODEL;
+  const history = Array.isArray(body.history) ? body.history : [];
 
   if (!message) {
     sendJson(response, 400, { error: "Envie um campo 'message' com texto." });
     return;
   }
+
+  const historyInput = history
+    .filter((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim())
+    .slice(-12)
+    .map((item) => ({
+      role: item.role,
+      content: [{ type: "input_text", text: item.content.trim() }]
+    }));
 
   try {
     const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
@@ -182,6 +191,7 @@ async function handleGptRequest(request, response) {
         model,
         input: [
           ...(system ? [{ role: "system", content: [{ type: "input_text", text: system }] }] : []),
+          ...historyInput,
           { role: "user", content: [{ type: "input_text", text: message }] }
         ]
       })
@@ -301,6 +311,12 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "POST" && pathname === "/api/gpt/ask") {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
     await handleGptRequest(request, response);
     return;
   }
