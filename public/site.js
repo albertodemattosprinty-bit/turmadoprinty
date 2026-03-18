@@ -35,43 +35,6 @@ function markActiveNav() {
   });
 }
 
-async function loadHealth() {
-  const dot = document.getElementById("health-dot");
-  const label = document.getElementById("health-label");
-  const copy = document.getElementById("health-copy");
-  const pills = document.getElementById("env-pills");
-
-  if (!dot || !label || !copy || !pills) {
-    return;
-  }
-
-  try {
-    const response = await fetch("/api/health");
-    const data = await response.json();
-
-    dot.classList.toggle("online", Boolean(data.ok));
-    label.textContent = data.ok ? "Plataforma online" : "Falha na plataforma";
-    copy.textContent = `Modelo padrao: ${data.env.model} | Conteudo em: ${data.env.contentBaseUrl}`;
-
-    const items = [
-      data.env.hasOpenAiKey ? "GPT ativo" : "GPT pendente",
-      data.env.hasDatabaseUrl ? "Acesso ativo" : "Acesso pendente",
-      data.env.hasStripeKey ? `Stripe ${data.env.stripeEnvironment}` : "Stripe pendente"
-    ];
-
-    pills.innerHTML = "";
-    items.forEach((item) => {
-      const pill = document.createElement("span");
-      pill.className = "status-pill";
-      pill.textContent = item;
-      pills.appendChild(pill);
-    });
-  } catch (error) {
-    label.textContent = "Servidor indisponivel";
-    copy.textContent = error instanceof Error ? error.message : "Erro desconhecido";
-  }
-}
-
 async function loadSiteConfig() {
   const response = await fetch("/api/site/config");
   const data = await response.json();
@@ -211,7 +174,7 @@ async function loadAlbums(siteConfig, user) {
             <h3>${album.name}</h3>
             <p>${album.tracks > 0 ? `${album.tracks} MP3 disponiveis` : "Album sem MP3 cadastrado"}</p>
             ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
-            ${page === "produtos" && album.href ? `<a class="primary-button buy-button" href="${album.href}">Ouvir e comprar</a>` : ""}
+            ${page === "produtos" && album.href ? `<a class="primary-button buy-button icon-only-button" href="${album.href}" aria-label="Comprar album"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h-2l-1 2H1v2h2l2.4 8.1A2 2 0 0 0 6.3 18H17a2 2 0 0 0 1.9-1.4L21 8H7.4l-.5-2zM9 20a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm8 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></a>` : ""}
           </div>
         `;
         grid.appendChild(card);
@@ -228,26 +191,6 @@ async function loadAlbums(siteConfig, user) {
 
   renderProductsAdminPanel(user, siteConfig, refreshAlbums);
   await refreshAlbums();
-}
-
-function groupScheduleByMonth(items) {
-  const groups = [];
-  const byMonth = new Map();
-
-  items.forEach((item) => {
-    if (!byMonth.has(item.monthLabel)) {
-      const group = {
-        monthLabel: item.monthLabel,
-        items: []
-      };
-      byMonth.set(item.monthLabel, group);
-      groups.push(group);
-    }
-
-    byMonth.get(item.monthLabel).items.push(item);
-  });
-
-  return groups;
 }
 
 function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
@@ -267,9 +210,6 @@ function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
       <span>Agenda</span>
     </div>
     <form id="admin-schedule-form" class="admin-form-grid">
-      <label>Mes
-        <input id="admin-schedule-month" type="text" placeholder="Setembro">
-      </label>
       <label>Data
         <input id="admin-schedule-date" type="text" placeholder="06/09">
       </label>
@@ -302,7 +242,7 @@ function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
           Authorization: `Bearer ${getToken()}`
         },
         body: JSON.stringify({
-          monthLabel: document.getElementById("admin-schedule-month").value,
+          monthLabel: "",
           dateLabel: document.getElementById("admin-schedule-date").value,
           place: document.getElementById("admin-schedule-place").value,
           city: document.getElementById("admin-schedule-city").value,
@@ -336,33 +276,19 @@ async function loadSchedule(siteConfig, user) {
     const response = await fetch("/api/site/config");
     const data = await response.json();
     const scheduleItems = Array.isArray(data.schedule) ? data.schedule : [];
-    const groups = groupScheduleByMonth(scheduleItems);
 
     grid.innerHTML = "";
 
-    groups.forEach((group) => {
-      const section = document.createElement("section");
-      section.className = "schedule-month";
-      section.innerHTML = `
-        <h2 class="schedule-month-title">${group.monthLabel}</h2>
-        <div class="schedule-grid"></div>
+    scheduleItems.forEach((item) => {
+      const card = document.createElement("article");
+      card.className = "schedule-card";
+      card.innerHTML = `
+        <p class="schedule-day">${item.dateLabel}</p>
+        <h3>${item.place}</h3>
+        <p>${item.city}</p>
+        <strong>${item.time}</strong>
       `;
-
-      const monthGrid = section.querySelector(".schedule-grid");
-
-      group.items.forEach((item) => {
-        const card = document.createElement("article");
-        card.className = "schedule-card";
-        card.innerHTML = `
-          <p class="schedule-day">${item.dateLabel}</p>
-          <h3>${item.place}</h3>
-          <p>${item.city}</p>
-          <strong>${item.time}</strong>
-        `;
-        monthGrid.appendChild(card);
-      });
-
-      grid.appendChild(section);
+      grid.appendChild(card);
     });
   };
 
@@ -374,8 +300,7 @@ markActiveNav();
 
 const [siteConfig, currentUser] = await Promise.all([
   loadSiteConfig().catch(() => ({ pricing: { albumPriceCents: 4990, planPrices: {} }, schedule: [] })),
-  loadCurrentUser().catch(() => null),
-  loadHealth()
+  loadCurrentUser().catch(() => null)
 ]);
 
 await loadAlbums(siteConfig, currentUser);

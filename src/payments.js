@@ -298,12 +298,12 @@ export async function getUserAccessState(userId) {
       : {
           id: "gratis",
           status: "FREE",
-          active: true,
+          active: false,
           activatedAt: null,
           canceledAt: null,
           updatedAt: null
         },
     purchasedAlbumIds,
-    canDownloadAll: true
+    canDownloadAll: Boolean(plan && plan.plan_id !== "gratis" && isActiveSubscriptionStatus(plan.status))
   };
 }

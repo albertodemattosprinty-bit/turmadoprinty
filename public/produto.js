@@ -90,18 +90,18 @@ function setPurchaseStatus(albumId) {
   const params = new URLSearchParams(window.location.search);
 
   if (params.get("payment") === "return") {
-    purchaseStatus.textContent = "Pagamento enviado ao Stripe. O plano Gratis ja libera streaming e download offline no navegador.";
+    purchaseStatus.textContent = "Pagamento enviado ao Stripe. Aguarde a confirmacao para liberar seus downloads.";
     return;
   }
 
   if (canUseDownloads(albumId)) {
     purchaseStatus.textContent = accessState.authenticated
-      ? "Plano Gratis ativo no servidor. Todas as faixas podem tocar e ser baixadas para uso offline neste navegador."
-      : "Faca login para usar o plano Gratis e baixar as faixas para uso offline neste navegador.";
+      ? "Download liberado para este album na sua conta."
+      : "Faca login para acessar seus downloads.";
     return;
   }
 
-  purchaseStatus.textContent = "Streaming liberado. Faca login para baixar as faixas para uso offline neste navegador.";
+  purchaseStatus.textContent = "Streaming liberado. Para baixar, compre o album ou assine um plano pago.";
 }
 
 async function startCheckout(albumId) {
@@ -301,7 +301,7 @@ async function downloadTrackForOffline(card, albumId, track) {
   }
 
   if (!canUseDownloads(albumId)) {
-    purchaseStatus.textContent = "O plano Gratis precisa estar ativo na sua conta para baixar offline.";
+    purchaseStatus.textContent = "Para baixar offline, compre este album ou assine um plano pago.";
     return;
   }
 
