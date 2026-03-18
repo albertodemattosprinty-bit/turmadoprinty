@@ -11,7 +11,7 @@ import Stripe from "stripe";
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
-import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
+import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { findSubscriptionPlanById } from "./src/plans.js";
 import { findStoreProductById, formatPriceFromCents, slugifyAlbumName, storeProducts } from "./src/store.js";
 
@@ -263,11 +263,21 @@ async function requireAuth(request, response) {
   return user;
 }
 
-function ensurePaymentsReady(response) {
+async function ensurePaymentsReady(response) {
   if (!hasDatabase()) {
     sendJson(response, 503, {
       error: "DATABASE_URL nao configurada.",
       hint: "Configure o Postgres e rode o SQL de inicializacao para liberar pagamentos."
+    });
+    return false;
+  }
+
+  try {
+    await ensurePaymentSchema();
+  } catch (error) {
+    sendJson(response, 503, {
+      error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
+      hint: "Confirme se o banco aceita criar tabelas e se a extensao pgcrypto esta habilitada."
     });
     return false;
   }
@@ -546,7 +556,7 @@ async function createStripeCheckout({ request, user, product }) {
 }
 
 async function handleStripeCheckoutRequest(request, response) {
-  if (!ensurePaymentsReady(response)) {
+  if (!await ensurePaymentsReady(response)) {
     return;
   }
 
@@ -658,7 +668,7 @@ async function createStripeSubscriptionCheckout({ request, user, plan }) {
 }
 
 async function handleStripeSubscriptionCheckoutRequest(request, response) {
-  if (!ensurePaymentsReady(response)) {
+  if (!await ensurePaymentsReady(response)) {
     return;
   }
 
@@ -825,7 +835,7 @@ async function handleStripeWebhook(request, response) {
 }
 
 async function handleAccessStateRequest(request, response) {
-  if (!ensurePaymentsReady(response)) {
+  if (!await ensurePaymentsReady(response)) {
     return;
   }
 
@@ -850,7 +860,7 @@ async function handleAccessStateRequest(request, response) {
 }
 
 async function handleProtectedTrackDownload(request, response, pathname) {
-  if (!ensurePaymentsReady(response)) {
+  if (!await ensurePaymentsReady(response)) {
     return;
   }
 
