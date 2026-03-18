@@ -413,8 +413,92 @@ a {
   font-size: 1rem;
 }
 
-.track-player {
+.track-download-label {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.track-player-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.track-player-shell audio {
+  display: none;
+}
+
+.track-player-controls {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(140px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.track-progress {
   width: 100%;
+  height: 10px;
+  margin: 0;
+  appearance: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.track-progress::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.track-progress::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -2px;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16);
+}
+
+.track-progress::-moz-range-track {
+  height: 10px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.track-progress::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.track-progress.downloading::-webkit-slider-runnable-track {
+  background: rgba(255, 221, 107, 0.42);
+}
+
+.track-progress.downloading::-webkit-slider-thumb {
+  background: #ffe17a;
+  box-shadow: 0 0 0 4px rgba(255, 225, 122, 0.24);
+}
+
+.track-progress.downloading::-moz-range-track {
+  background: rgba(255, 221, 107, 0.42);
+}
+
+.track-progress.downloading::-moz-range-thumb {
+  background: #ffe17a;
+}
+
+.track-time {
+  min-width: 90px;
+  color: var(--text-muted);
+  text-align: right;
+  font-size: 0.84rem;
 }
 
 .track-actions {
@@ -728,8 +812,11 @@ a {
   .auth-grid,
   .auth-hero,
   .product-hero,
-  .track-card,
   .plans-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .track-card {
     grid-template-columns: 1fr;
   }
 
@@ -741,6 +828,15 @@ a {
   }
 
   .conversation-meta {
+    text-align: left;
+  }
+
+  .track-player-controls {
+    grid-template-columns: auto auto auto 1fr;
+  }
+
+  .track-time {
+    grid-column: 1 / -1;
     text-align: left;
   }
 }

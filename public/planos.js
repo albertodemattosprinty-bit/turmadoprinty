@@ -7,8 +7,8 @@ const plans = [
     id: "gratis",
     name: "Gratis",
     priceLabel: "R$ 0/mes",
-    description: "Streaming liberado. Downloads seguem bloqueados.",
-    perks: ["Ouvir todas as faixas", "Navegar no catalogo"]
+    description: "Streaming e download offline liberados no navegador para usuarios logados.",
+    perks: ["Ouvir todas as faixas", "Downloads offline", "Navegar no catalogo"]
   },
   {
     id: "plus",
@@ -133,11 +133,11 @@ function renderPlans() {
   const activePlan = plans.find((plan) => plan.id === accessState.planId) || plans[0];
 
   if (!accessState.authenticated) {
-    planStatus.textContent = "Faca login para contratar um plano e liberar downloads.";
+    planStatus.textContent = "Faca login para ativar o plano Gratis e liberar downloads offline no navegador.";
   } else if (paymentReturned) {
     planStatus.textContent = "Pagamento enviado ao PagBank. Aguarde a confirmacao da assinatura.";
   } else if (accessState.canDownloadAll) {
-    planStatus.textContent = `Plano ${activePlan.name} ativo no servidor. Downloads liberados para todo o catalogo.`;
+    planStatus.textContent = `Plano ${activePlan.name} ativo no servidor. Streaming e downloads offline liberados para todo o catalogo.`;
   } else {
     planStatus.textContent = `Plano atual: ${activePlan.name}.`;
   }
