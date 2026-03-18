@@ -1,5 +1,4 @@
-const purchaseStorageKey = "turma_do_printy_purchased_albums";
-const planStorageKey = "turma_do_printy_plan";
+const sessionStorageKey = "turma_do_printy_token";
 
 const productCover = document.getElementById("product-cover");
 const productTitle = document.getElementById("product-title");
@@ -11,62 +10,110 @@ const purchaseStatus = document.getElementById("purchase-status");
 const manifestStatus = document.getElementById("manifest-status");
 const trackList = document.getElementById("track-list");
 
+let accessState = {
+  authenticated: false,
+  canDownloadAll: false,
+  purchasedAlbumIds: []
+};
+
 function getAlbumId() {
   const params = new URLSearchParams(window.location.search);
   return params.get("album") || "";
 }
 
-function getPurchases() {
-  try {
-    return JSON.parse(window.localStorage.getItem(purchaseStorageKey) || "{}");
-  } catch {
-    return {};
-  }
+function getToken() {
+  return window.localStorage.getItem(sessionStorageKey) || "";
 }
 
-function setPurchases(purchases) {
-  window.localStorage.setItem(purchaseStorageKey, JSON.stringify(purchases));
+function getAuthRedirectUrl(albumId) {
+  return `/auth.html?next=${encodeURIComponent(`/produto.html?album=${encodeURIComponent(albumId)}`)}`;
 }
 
-function markAlbumPurchased(albumId) {
-  const purchases = getPurchases();
-  purchases[albumId] = {
-    purchased: true,
-    updatedAt: new Date().toISOString()
-  };
-  setPurchases(purchases);
+function redirectToAuth(albumId) {
+  window.location.href = getAuthRedirectUrl(albumId);
 }
 
 function hasPurchasedAlbum(albumId) {
-  return Boolean(getPurchases()[albumId]?.purchased);
-}
-
-function getCurrentPlanId() {
-  try {
-    return JSON.parse(window.localStorage.getItem(planStorageKey) || "{\"id\":\"gratis\"}")?.id || "gratis";
-  } catch {
-    return "gratis";
-  }
+  return accessState.purchasedAlbumIds.includes(albumId);
 }
 
 function hasPaidPlan() {
-  return getCurrentPlanId() !== "gratis";
+  return accessState.canDownloadAll;
+}
+
+async function loadAccessState() {
+  const token = getToken();
+
+  if (!token) {
+    accessState = {
+      authenticated: false,
+      canDownloadAll: false,
+      purchasedAlbumIds: []
+    };
+    return;
+  }
+
+  const response = await fetch("/api/account/access", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+
+  if (response.status === 401) {
+    window.localStorage.removeItem(sessionStorageKey);
+    accessState = {
+      authenticated: false,
+      canDownloadAll: false,
+      purchasedAlbumIds: []
+    };
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao carregar acesso do usuario.");
+  }
+
+  accessState = {
+    authenticated: true,
+    canDownloadAll: Boolean(data.access.canDownloadAll),
+    purchasedAlbumIds: Array.isArray(data.access.purchasedAlbumIds) ? data.access.purchasedAlbumIds : []
+  };
 }
 
 function updatePurchaseState(albumId) {
   const purchased = hasPurchasedAlbum(albumId);
+  const params = new URLSearchParams(window.location.search);
 
-  if (hasPaidPlan()) {
-    purchaseStatus.textContent = `Plano ${getCurrentPlanId().toUpperCase()} ativo neste navegador. Downloads liberados para todas as musicas.`;
+  if (params.get("payment") === "return") {
+    purchaseStatus.textContent = "Pagamento enviado ao PagBank. Aguarde a confirmacao para liberar os downloads.";
     return;
   }
 
-  purchaseStatus.textContent = purchased
-    ? "Compra registrada neste navegador. Downloads liberados por faixa."
-    : "Streaming liberado. O download por faixa aparece depois da compra ou com um plano pago.";
+  if (hasPaidPlan()) {
+    purchaseStatus.textContent = "Plano pago ativo no servidor. Downloads liberados para todas as musicas.";
+    return;
+  }
+
+  if (purchased) {
+    purchaseStatus.textContent = "Compra confirmada no servidor. Downloads liberados por faixa.";
+    return;
+  }
+
+  purchaseStatus.textContent = accessState.authenticated
+    ? "Streaming liberado. Compre este album ou assine um plano pago para baixar."
+    : "Streaming liberado. Faca login para comprar este album ou assinar um plano pago.";
 }
 
 async function startCheckout(albumId) {
+  const token = getToken();
+
+  if (!token) {
+    redirectToAuth(albumId);
+    return;
+  }
+
   const originalText = buyAlbumButton.textContent;
   buyAlbumButton.disabled = true;
   buyAlbumButton.textContent = "Abrindo checkout...";
@@ -75,13 +122,19 @@ async function startCheckout(albumId) {
     const response = await fetch("/api/payments/pagbank/checkout", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({ productId: albumId })
     });
 
     const rawText = await response.text();
     const data = rawText ? JSON.parse(rawText) : {};
+
+    if (response.status === 401) {
+      redirectToAuth(albumId);
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(data.error || "Falha ao criar checkout.");
@@ -104,6 +157,7 @@ function renderTracks(album) {
   trackList.innerHTML = "";
 
   album.tracks.forEach((track) => {
+    const downloadHref = `/api/store/products/${encodeURIComponent(album.id)}/tracks/${track.number}/download`;
     const article = document.createElement("article");
     article.className = "track-card";
     article.innerHTML = `
@@ -113,7 +167,9 @@ function renderTracks(album) {
       </div>
       <audio controls preload="none" class="track-player" src="${track.streamUrl}"></audio>
       <div class="track-actions">
-        ${purchased ? `<a class="ghost-button" href="${track.downloadUrl}" download>Baixar faixa</a>` : `<button class="ghost-button" type="button" disabled>Comprar para baixar</button>`}
+        ${purchased
+          ? `<a class="ghost-button" href="${downloadHref}">Baixar faixa</a>`
+          : `<button class="ghost-button" type="button" disabled>${accessState.authenticated ? "Compre para baixar" : "Faca login para comprar"}</button>`}
       </div>
     `;
     trackList.appendChild(article);
@@ -130,12 +186,9 @@ async function loadAlbumDetail() {
     return;
   }
 
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("payment") === "return") {
-    markAlbumPurchased(albumId);
-  }
-
   try {
+    await loadAccessState();
+
     const response = await fetch(`/api/store/products/${encodeURIComponent(albumId)}`);
     const album = await response.json();
 
@@ -156,9 +209,9 @@ async function loadAlbumDetail() {
     updatePurchaseState(album.id);
     renderTracks(album);
 
-    buyAlbumButton.addEventListener("click", async () => {
+    buyAlbumButton.onclick = async () => {
       await startCheckout(album.id);
-    }, { once: true });
+    };
   } catch (error) {
     productTitle.textContent = "Nao foi possivel abrir o album";
     purchaseStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido.";

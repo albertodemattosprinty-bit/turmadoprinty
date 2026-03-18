@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
+import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPagBankWebhookEvent } from "./src/payments.js";
 import { findSubscriptionPlanById } from "./src/plans.js";
 import { findStoreProductById, formatPriceFromCents, slugifyAlbumName, storeProducts } from "./src/store.js";
 
@@ -62,6 +63,16 @@ async function readApiResponse(response) {
       text
     };
   }
+}
+
+async function readTextBody(request) {
+  const chunks = [];
+
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+
+  return Buffer.concat(chunks).toString("utf8").trim();
 }
 
 function buildCoverUrl(albumName) {
@@ -175,13 +186,7 @@ function extractChatCompletionText(payload) {
 }
 
 async function readJsonBody(request) {
-  const chunks = [];
-
-  for await (const chunk of request) {
-    chunks.push(chunk);
-  }
-
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  const raw = await readTextBody(request);
 
   if (!raw) {
     return {};
@@ -238,6 +243,47 @@ async function requireAuth(request, response) {
   }
 
   return user;
+}
+
+function ensurePaymentsReady(response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, {
+      error: "DATABASE_URL nao configurada.",
+      hint: "Configure o Postgres e rode o SQL de inicializacao para liberar pagamentos."
+    });
+    return false;
+  }
+
+  return true;
+}
+
+function getTrackDownloadUrl(productName, trackNumber) {
+  return buildTrackUrl(productName, trackNumber);
+}
+
+function extractOrderPaymentDetails(payload) {
+  const charges = Array.isArray(payload?.charges) ? payload.charges : [];
+  const charge = charges[0] || null;
+
+  return {
+    referenceId: payload?.reference_id || charge?.reference_id || null,
+    orderId: payload?.id || null,
+    chargeId: charge?.id || null,
+    status: charge?.status || payload?.status || null,
+    paidAt: charge?.paid_at || null
+  };
+}
+
+function extractSubscriptionWebhookDetails(payload) {
+  const resource = payload?.resource || {};
+  return {
+    eventType: typeof payload?.event === "string" ? payload.event : null,
+    referenceId: resource?.reference_id || null,
+    subscriptionId: resource?.id || null,
+    status: resource?.status || null,
+    activatedAt: resource?.updated_at || resource?.created_at || null,
+    canceledAt: resource?.updated_at || null
+  };
 }
 
 async function handleGptRequest(request, response) {
@@ -481,11 +527,22 @@ async function createPagBankCheckout({ request, product }) {
   return {
     checkoutId: data.id,
     referenceId: data.reference_id,
-    payUrl: payLink.href
+    payUrl: payLink.href,
+    raw: data
   };
 }
 
 async function handlePagBankCheckoutRequest(request, response) {
+  if (!ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
   let body;
 
   try {
@@ -505,6 +562,15 @@ async function handlePagBankCheckoutRequest(request, response) {
 
   try {
     const checkout = await createPagBankCheckout({ request, product });
+    await createAlbumPurchaseRecord({
+      userId: user.id,
+      productId: product.id,
+      referenceId: checkout.referenceId,
+      checkoutId: checkout.checkoutId,
+      amountCents: product.unitAmount,
+      environment: PAGBANK_ENVIRONMENT,
+      payload: checkout.raw
+    });
     sendJson(response, 200, {
       ok: true,
       product: {
@@ -595,11 +661,22 @@ async function createPagBankSubscriptionCheckout({ request, plan }) {
     checkoutId: data.id,
     referenceId: data.reference_id,
     payUrl: payLink.href,
-    recurrencePlanId: data?.recurrence_plan?.id || null
+    recurrencePlanId: data?.recurrence_plan?.id || null,
+    raw: data
   };
 }
 
 async function handlePagBankSubscriptionCheckoutRequest(request, response) {
+  if (!ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
   let body;
 
   try {
@@ -619,6 +696,15 @@ async function handlePagBankSubscriptionCheckoutRequest(request, response) {
 
   try {
     const checkout = await createPagBankSubscriptionCheckout({ request, plan });
+    await createPlanSubscriptionRecord({
+      userId: user.id,
+      planId: plan.id,
+      referenceId: checkout.referenceId,
+      checkoutId: checkout.checkoutId,
+      amountCents: plan.unitAmount,
+      environment: PAGBANK_ENVIRONMENT,
+      payload: checkout.raw
+    });
     sendJson(response, 200, {
       ok: true,
       plan: {
@@ -639,16 +725,154 @@ async function handlePagBankSubscriptionCheckoutRequest(request, response) {
 }
 
 async function handlePagBankWebhook(request, response) {
+  const rawBody = await readTextBody(request);
   let body = {};
 
-  try {
-    body = await readJsonBody(request);
-  } catch {
-    body = {};
+  if (rawBody) {
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      const params = new URLSearchParams(rawBody);
+      body = Object.fromEntries(params.entries());
+    }
+  }
+
+  if (hasDatabase()) {
+    try {
+      const subscriptionDetails = extractSubscriptionWebhookDetails(body);
+      const paymentDetails = extractOrderPaymentDetails(body);
+      const referenceId = subscriptionDetails.referenceId || paymentDetails.referenceId;
+
+      await recordPagBankWebhookEvent({
+        eventType: subscriptionDetails.eventType || body?.event || paymentDetails.status || "unknown",
+        resourceId: subscriptionDetails.subscriptionId || paymentDetails.orderId || null,
+        referenceId,
+        payload: body
+      });
+
+      if (subscriptionDetails.referenceId) {
+        let nextStatus = subscriptionDetails.status;
+
+        if (subscriptionDetails.eventType === "subscription.activated") {
+          nextStatus = "ACTIVE";
+        } else if (subscriptionDetails.eventType === "subscription.canceled") {
+          nextStatus = "CANCELED";
+        } else if (subscriptionDetails.eventType === "subscription.suspended") {
+          nextStatus = "SUSPENDED";
+        }
+
+        await markPlanSubscriptionStatus({
+          referenceId: subscriptionDetails.referenceId,
+          status: nextStatus,
+          subscriptionId: subscriptionDetails.subscriptionId,
+          payload: body,
+          activatedAt: isActiveSubscriptionStatus(nextStatus) ? subscriptionDetails.activatedAt : null,
+          canceledAt: isInactiveSubscriptionStatus(nextStatus) ? subscriptionDetails.canceledAt : null
+        });
+      } else if (paymentDetails.referenceId) {
+        const targetIsPlan = paymentDetails.referenceId.startsWith("printy-plan-");
+
+        if (targetIsPlan) {
+          await markPlanSubscriptionStatus({
+            referenceId: paymentDetails.referenceId,
+            status: paymentDetails.status,
+            subscriptionId: null,
+            payload: body,
+            activatedAt: isActiveSubscriptionStatus(paymentDetails.status) ? paymentDetails.paidAt : null,
+            canceledAt: isInactiveSubscriptionStatus(paymentDetails.status) ? paymentDetails.paidAt : null
+          });
+        } else {
+          await markAlbumPurchaseStatus({
+            referenceId: paymentDetails.referenceId,
+            status: paymentDetails.status,
+            orderId: paymentDetails.orderId,
+            chargeId: paymentDetails.chargeId,
+            payload: body,
+            paidAt: isActivePaymentStatus(paymentDetails.status) ? paymentDetails.paidAt : null
+          });
+        }
+      }
+    } catch (error) {
+      console.error("[PagBank webhook error]", error);
+    }
   }
 
   console.log("[PagBank webhook]", JSON.stringify(body));
   sendJson(response, 200, { ok: true });
+}
+
+async function handleAccessStateRequest(request, response) {
+  if (!ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  try {
+    const accessState = await getUserAccessState(user.id);
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(user),
+      access: accessState
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao carregar acessos do usuario."
+    });
+  }
+}
+
+async function handleProtectedTrackDownload(request, response, pathname) {
+  if (!ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  const match = pathname.match(/^\/api\/store\/products\/([^/]+)\/tracks\/(\d+)\/download$/);
+
+  if (!match) {
+    sendJson(response, 404, { error: "Download nao encontrado." });
+    return;
+  }
+
+  const productId = decodeURIComponent(match[1]);
+  const trackNumber = Number(match[2]);
+  const product = findStoreProductById(productId);
+
+  if (!product || !Number.isInteger(trackNumber) || trackNumber < 1 || trackNumber > product.tracks) {
+    sendJson(response, 404, { error: "Faixa nao encontrada." });
+    return;
+  }
+
+  try {
+    const accessState = await getUserAccessState(user.id);
+    const hasAlbumPurchase = accessState.purchasedAlbumIds.includes(product.id);
+
+    if (!accessState.canDownloadAll && !hasAlbumPurchase) {
+      sendJson(response, 403, {
+        error: "Compra ou plano pago necessario para baixar esta faixa."
+      });
+      return;
+    }
+
+    response.writeHead(302, {
+      Location: getTrackDownloadUrl(product.name, trackNumber)
+    });
+    response.end();
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao validar download."
+    });
+  }
 }
 
 async function serveStatic(response, filePath) {
@@ -752,6 +976,13 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && pathname.startsWith("/api/store/products/")) {
+    const trackDownloadMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/tracks\/(\d+)\/download$/);
+
+    if (trackDownloadMatch) {
+      await handleProtectedTrackDownload(request, response, pathname);
+      return;
+    }
+
     const productId = decodeURIComponent(pathname.replace("/api/store/products/", ""));
     const product = findStoreProductById(productId);
 
@@ -795,6 +1026,11 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleAudioTranscription(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/account/access") {
+    await handleAccessStateRequest(request, response);
     return;
   }
 
