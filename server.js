@@ -373,6 +373,7 @@ async function handleGptRequest(request, response) {
   const system = typeof body.system === "string" && body.system.trim() ? body.system.trim() : DEFAULT_SYSTEM_PROMPT;
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : OPENAI_MODEL;
   const history = Array.isArray(body.history) ? body.history : [];
+  const wantsStream = Boolean(body.stream) || String(request.headers.accept || "").includes("text/event-stream");
 
   if (!message) {
     sendJson(response, 400, { error: "Envie um campo 'message' com texto." });
@@ -387,21 +388,108 @@ async function handleGptRequest(request, response) {
       content: item.content.trim()
     }));
 
+  const requestPayload = {
+    model,
+    messages: [
+      ...(system ? [{ role: "system", content: system }] : []),
+      ...messages,
+      { role: "user", content: message }
+    ]
+  };
+
   try {
+    if (wantsStream) {
+      response.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive"
+      });
+
+      const sendEvent = (payload) => {
+        response.write(`data: ${JSON.stringify(payload)}\n\n`);
+      };
+
+      sendEvent({ type: "status", message: "Pensando na melhor resposta..." });
+
+      const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          ...requestPayload,
+          stream: true
+        })
+      });
+
+      if (!openAiResponse.ok) {
+        const { data: payload, text } = await readApiResponse(openAiResponse);
+        sendEvent({
+          type: "error",
+          message: payload?.error?.message || text || "Falha ao chamar a API da OpenAI."
+        });
+        response.end();
+        return;
+      }
+
+      const reader = openAiResponse.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalText = "";
+
+      if (!reader) {
+        sendEvent({ type: "error", message: "A OpenAI nao devolveu stream de resposta." });
+        response.end();
+        return;
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+
+          if (!trimmedLine.startsWith("data:")) {
+            continue;
+          }
+
+          const payloadText = trimmedLine.slice(5).trim();
+
+          if (!payloadText || payloadText === "[DONE]") {
+            continue;
+          }
+
+          const payload = JSON.parse(payloadText);
+          const delta = payload?.choices?.[0]?.delta?.content;
+
+          if (typeof delta === "string" && delta) {
+            finalText += delta;
+            sendEvent({ type: "delta", text: delta });
+          }
+        }
+      }
+
+      sendEvent({ type: "done", text: finalText });
+      response.end();
+      return;
+    }
+
     const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          ...(system ? [{ role: "system", content: system }] : []),
-          ...messages,
-          { role: "user", content: message }
-        ]
-      })
+      body: JSON.stringify(requestPayload)
     });
 
     const { data: payload, text } = await readApiResponse(openAiResponse);

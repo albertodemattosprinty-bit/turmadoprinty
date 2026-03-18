@@ -31,6 +31,10 @@ body {
   background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
 }
 
+[hidden] {
+  display: none !important;
+}
+
 a {
   color: inherit;
 }
@@ -44,7 +48,7 @@ a {
   align-items: center;
   gap: 24px;
   padding: 18px 24px;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(27, 83, 187, 0.96);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
@@ -55,12 +59,12 @@ a {
   gap: 12px;
   text-decoration: none;
   font-weight: 800;
-  color: var(--text);
+  color: #ffffff;
 }
 
 .brand-mark {
-  width: 64px;
-  height: 64px;
+  width: 84px;
+  height: 84px;
   border-radius: 18px;
   background: url("/logo.png") center/contain no-repeat;
   color: transparent;
@@ -86,7 +90,7 @@ a {
   border-radius: 0;
   text-decoration: none;
   background: transparent;
-  color: var(--text);
+  color: #ffffff;
   font-size: 0.95rem;
   font-weight: 700;
   border: 0;
@@ -930,7 +934,6 @@ a {
   max-height: none;
   overflow: auto;
   padding-right: 6px;
-  flex: 1;
 }
 
 .message-card {
@@ -942,12 +945,12 @@ a {
 
 .message-card.user {
   justify-self: end;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(47, 124, 255, 0.08);
 }
 
 .message-card.assistant {
   justify-self: start;
-  background: rgba(7, 30, 84, 0.52);
+  background: rgba(27, 83, 187, 0.08);
 }
 
 .message-role {

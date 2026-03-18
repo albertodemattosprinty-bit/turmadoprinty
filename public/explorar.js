@@ -1,9 +1,6 @@
 const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
-const chunkWordSize = 5;
-const chunkDelayMs = 35;
-const chunkFadeMs = 500;
 
 const authStatus = document.getElementById("auth-status");
 const chatAuthStatus = document.getElementById("chat-auth-status");
@@ -374,46 +371,103 @@ function addMessageToConversation(role, content) {
   return nextConversation;
 }
 
-function chunkWords(text) {
-  const words = text.split(/\s+/).filter(Boolean);
-  const chunks = [];
-
-  for (let index = 0; index < words.length; index += chunkWordSize) {
-    chunks.push(words.slice(index, index + chunkWordSize).join(" "));
-  }
-
-  return chunks;
-}
-
-async function animateAssistantResponse(text) {
+function createAssistantMessageElement(initialText = "Preparando resposta...") {
   const article = document.createElement("article");
   article.className = "message-card assistant";
   article.innerHTML = `
     <div class="message-role">Assistente</div>
-    <div class="message-text"></div>
+    <div class="message-text">${escapeHtml(initialText)}</div>
   `;
   chatThread.appendChild(article);
+  chatThread.scrollTop = chatThread.scrollHeight;
 
-  const target = article.querySelector(".message-text");
-  const chunks = chunkWords(text);
-  let currentText = "";
+  return {
+    article,
+    target: article.querySelector(".message-text"),
+    text: initialText,
+    setText(nextText) {
+      this.text = nextText;
+      this.target.textContent = nextText;
+      chatThread.scrollTop = chatThread.scrollHeight;
+    },
+    appendText(extraText) {
+      if (!extraText) {
+        return;
+      }
 
-  for (const chunk of chunks) {
-    if (stopRequested) {
+      const nextText = this.text === "Preparando resposta..." ? extraText : `${this.text}${extraText}`;
+      this.setText(nextText);
+    }
+  };
+}
+
+async function consumeAssistantStream(response) {
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  const assistantMessage = createAssistantMessageElement();
+  let buffer = "";
+  let finalText = "";
+
+  if (!reader) {
+    return "";
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
       break;
     }
 
-    currentText = currentText ? `${currentText} ${chunk}` : chunk;
-    const span = document.createElement("span");
-    span.className = "message-chunk";
-    span.style.animationDuration = `${chunkFadeMs}ms`;
-    span.textContent = `${chunk} `;
-    target.appendChild(span);
-    chatThread.scrollTop = chatThread.scrollHeight;
-    await new Promise((resolve) => setTimeout(resolve, chunkDelayMs));
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+
+    for (const eventChunk of events) {
+      const dataLines = eventChunk
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trim())
+        .filter(Boolean);
+
+      for (const dataLine of dataLines) {
+        const event = JSON.parse(dataLine);
+
+        if (event.type === "status") {
+          assistantMessage.setText(event.message || "Preparando resposta...");
+          continue;
+        }
+
+        if (event.type === "delta" && event.text) {
+          assistantMessage.appendText(event.text);
+          finalText = assistantMessage.text;
+          continue;
+        }
+
+        if (event.type === "done") {
+          return (event.text || finalText || "").trim();
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.message || "Falha ao consultar a IA.");
+        }
+      }
+    }
   }
 
-  return currentText.trim();
+  return finalText.trim();
+}
+
+function renderAssistantResponseImmediately(text) {
+  const article = document.createElement("article");
+  article.className = "message-card assistant";
+  article.innerHTML = `
+    <div class="message-role">Assistente</div>
+    <div class="message-text">${escapeHtml(text)}</div>
+  `;
+  chatThread.appendChild(article);
+  chatThread.scrollTop = chatThread.scrollHeight;
+  return text.trim();
 }
 
 function ensureLoggedInBeforeChat() {
@@ -612,22 +666,26 @@ chatForm.addEventListener("submit", async (event) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
+        Authorization: `Bearer ${getToken()}`,
+        Accept: "text/event-stream"
       },
       body: JSON.stringify({
         message,
-        history
+        history,
+        stream: true
       }),
       signal: currentController.signal
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
       throw new Error(data.error || "Falha ao consultar a IA.");
     }
 
-    const finalText = await animateAssistantResponse(data.outputText || "");
+    const isEventStream = (response.headers.get("content-type") || "").includes("text/event-stream");
+    const finalText = isEventStream
+      ? await consumeAssistantStream(response)
+      : renderAssistantResponseImmediately((await response.json()).outputText || "");
 
     if (finalText) {
       addMessageToConversation("assistant", finalText);
