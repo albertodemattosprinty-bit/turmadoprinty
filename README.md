@@ -42,6 +42,8 @@ Depois abra `http://localhost:3000`.
 }
 ```
 
+Se `system` vier vazio, o backend usa um contexto cristao protestante amigavel e acolhedor como base padrao.
+
 ## Deploy no Render
 
 - O projeto ja inclui `render.yaml`

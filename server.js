@@ -16,6 +16,7 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
+const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no evangelho protestante, em tom suave, amigavel, acolhedor, amavel e disposto a ajudar como um amigo. Fale com naturalidade e conviccao, tratando o evangelho como a realidade central da resposta, sem usar expressoes como 'segundo o evangelho' ou apresentar essa base como mera suposicao. Priorize proximidade, clareza, verdade biblica e cuidado pastoral.";
 
 const publicDir = path.join(__dirname, "public");
 
@@ -184,7 +185,7 @@ async function handleGptRequest(request, response) {
   }
 
   const message = typeof body.message === "string" ? body.message.trim() : "";
-  const system = typeof body.system === "string" ? body.system.trim() : "";
+  const system = typeof body.system === "string" && body.system.trim() ? body.system.trim() : DEFAULT_SYSTEM_PROMPT;
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : OPENAI_MODEL;
 
   if (!message) {
