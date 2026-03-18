@@ -19,6 +19,7 @@ const sendButton = document.getElementById("send-button");
 const stopButton = document.getElementById("stop-button");
 const micButton = document.getElementById("mic-button");
 const composerStatus = document.getElementById("composer-status");
+const conversationHeader = document.getElementById("conversation-header");
 const conversationTitle = document.getElementById("conversation-title");
 const conversationMeta = document.getElementById("conversation-meta");
 const loginForm = document.getElementById("login-form");
@@ -39,6 +40,19 @@ let mediaStream = null;
 let recordedChunks = [];
 let isRecording = false;
 let sidebarCollapsed = false;
+
+const emptyConversationVariants = [
+  "Quando voce quiser",
+  "Pode começar daqui",
+  "Estou por aqui",
+  "Sua proxima ideia pode nascer agora",
+  "Vamos montar algo bonito juntos",
+  "Tem espaco para uma nova conversa",
+  "Quando fizer sentido para voce",
+  "Pronto para criar com calma",
+  "Um novo chat pode comecar agora",
+  "Vamos dar forma a uma boa ideia"
+];
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -172,6 +186,13 @@ function createConversation(firstMessage = "") {
   };
 }
 
+function getEmptyConversationCopy() {
+  const todaySeed = new Date().toISOString().slice(0, 10);
+  const usernameSeed = getUserKey();
+  const seedValue = `${todaySeed}:${usernameSeed}`.split("").reduce((total, char) => total + char.charCodeAt(0), 0);
+  return emptyConversationVariants[seedValue % emptyConversationVariants.length];
+}
+
 function migrateLegacyHistory() {
   const legacyHistory = getLegacyHistory();
 
@@ -253,17 +274,27 @@ function renderConversation() {
   chatThread.innerHTML = "";
 
   if (!conversation || conversation.messages.length === 0) {
-    conversationTitle.textContent = "Nova conversa";
-    conversationMeta.textContent = "Pronta para começar.";
+    chatShell.classList.add("conversation-shell-empty");
+    chatThread.classList.add("chat-thread-empty");
+    if (conversationHeader) {
+      conversationHeader.hidden = true;
+    }
+    conversationTitle.textContent = "";
+    conversationMeta.textContent = "";
     chatThread.innerHTML = `
-      <article class="message-card assistant">
-        <div class="message-role">Assistente</div>
-        <div class="message-text">Posso ajudar com ideias, roteiros, legendas e materiais para o ministério infantil.</div>
-      </article>
+      <section class="empty-conversation-state">
+        <h2>${escapeHtml(getEmptyConversationCopy())}</h2>
+        <p>Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.</p>
+      </section>
     `;
     return;
   }
 
+  chatShell.classList.remove("conversation-shell-empty");
+  chatThread.classList.remove("chat-thread-empty");
+  if (conversationHeader) {
+    conversationHeader.hidden = false;
+  }
   conversationTitle.textContent = conversation.title;
   conversationMeta.textContent = `Atualizada em ${formatRelativeDate(conversation.updatedAt)}`;
 

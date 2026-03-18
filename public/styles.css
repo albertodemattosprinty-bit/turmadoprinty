@@ -65,8 +65,8 @@ a {
 }
 
 .brand-mark {
-  width: 84px;
-  height: 84px;
+  width: 152px;
+  height: 152px;
   border-radius: 18px;
   background: url("/logo.png") center/contain no-repeat;
   color: transparent;
@@ -162,9 +162,13 @@ a {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  min-height: 190px;
-  padding: 18px 24px;
+  min-height: 220px;
+  padding: 28px 30px;
   align-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 28%),
+    linear-gradient(135deg, #ff9e43 0%, #ff7a18 55%, #f15b2a 100%);
+  color: #ffffff;
 }
 
 .hero-title,
@@ -209,10 +213,17 @@ a {
 
 .hero-inline-copy {
   margin: 0;
-  color: var(--text);
-  font-size: clamp(1.15rem, 2.2vw, 1.8rem);
+  color: #ffffff;
+  font-size: clamp(1.3rem, 2.4vw, 1.95rem);
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.22;
+}
+
+.hero-home .section-muted {
+  max-width: 60ch;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 1rem;
 }
 
 .page-banner {
@@ -927,8 +938,9 @@ a {
 .history-empty {
   padding: 18px;
   border-radius: 22px;
-  background: rgba(6, 21, 58, 0.28);
+  background: #ffffff;
   color: var(--text-soft);
+  border: 1px solid rgba(27, 83, 187, 0.12);
   line-height: 1.7;
 }
 
@@ -1010,6 +1022,36 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
   max-height: none;
   overflow: auto;
   padding-right: 6px;
+}
+
+.chat-thread-empty {
+  display: grid;
+  place-items: center;
+  min-height: 480px;
+  padding: 20px;
+}
+
+.conversation-shell-empty {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.empty-conversation-state {
+  max-width: 560px;
+  text-align: center;
+}
+
+.empty-conversation-state h2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.75rem, 3vw, 2.6rem);
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.empty-conversation-state p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text-soft);
 }
 
 .message-card {
@@ -1207,6 +1249,11 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
     width: 100%;
     justify-content: space-between;
     gap: 8px;
+  }
+
+  .brand-mark {
+    width: 108px;
+    height: 108px;
   }
 
   .nav-link {

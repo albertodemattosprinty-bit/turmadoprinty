@@ -31,8 +31,10 @@ const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no ev
 const ADMIN_USERNAME = "rosemattos";
 
 const publicDir = path.join(__dirname, "public");
+const contextFilePath = path.join(__dirname, "contexto.txt");
 const contentDir = path.join(__dirname, "Conteúdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
+let cachedContextPrompt = "";
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -86,6 +88,20 @@ async function readRawTextBody(request) {
 
 async function readTextBody(request) {
   return (await readRawTextBody(request)).trim();
+}
+
+async function getContextPrompt() {
+  if (cachedContextPrompt) {
+    return cachedContextPrompt;
+  }
+
+  try {
+    const contextText = (await readFile(contextFilePath, "utf8")).trim();
+    cachedContextPrompt = contextText;
+    return contextText;
+  } catch {
+    return "";
+  }
 }
 
 let stripeClient = null;
@@ -370,7 +386,11 @@ async function handleGptRequest(request, response) {
   }
 
   const message = typeof body.message === "string" ? body.message.trim() : "";
-  const system = typeof body.system === "string" && body.system.trim() ? body.system.trim() : DEFAULT_SYSTEM_PROMPT;
+  const contextPrompt = await getContextPrompt();
+  const systemBase = typeof body.system === "string" && body.system.trim() ? body.system.trim() : DEFAULT_SYSTEM_PROMPT;
+  const system = contextPrompt
+    ? `${systemBase}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
+    : systemBase;
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : OPENAI_MODEL;
   const history = Array.isArray(body.history) ? body.history : [];
   const wantsStream = Boolean(body.stream) || String(request.headers.accept || "").includes("text/event-stream");
