@@ -1189,6 +1189,20 @@ body[data-page="planos"] .status-pill {
   outline: none;
 }
 
+.chat-search-field input[type="search"] {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.chat-search-field input[type="search"]::-webkit-search-decoration,
+.chat-search-field input[type="search"]::-webkit-search-cancel-button,
+.chat-search-field input[type="search"]::-webkit-search-results-button,
+.chat-search-field input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 .chat-search-field input::placeholder {
   color: var(--text-muted);
 }
@@ -1295,6 +1309,8 @@ body[data-page="planos"] .status-pill {
   display: block;
   width: 100%;
   padding: 10px 14px;
+  min-height: 64px;
+  max-height: 64px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: linear-gradient(135deg, #18479f 0%, #0f3478 100%);
@@ -1524,6 +1540,28 @@ body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions 
 body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-toggle-button svg,
 body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions .sidebar-icon-button.primary-button svg {
   fill: currentColor;
+}
+
+body[data-page="explorar"] #sidebar-toggle-button,
+body[data-page="explorar"] #new-chat-button {
+  color: #1b53bb !important;
+}
+
+body[data-page="explorar"] #sidebar-toggle-button svg,
+body[data-page="explorar"] #new-chat-button svg,
+body[data-page="explorar"] #sidebar-toggle-button path,
+body[data-page="explorar"] #new-chat-button path {
+  fill: #1b53bb !important;
+}
+
+body[data-page="explorar"] #sidebar-toggle-button {
+  background: #1b53bb !important;
+  color: #ffffff !important;
+}
+
+body[data-page="explorar"] #sidebar-toggle-button svg,
+body[data-page="explorar"] #sidebar-toggle-button path {
+  fill: #ffffff !important;
 }
 
 .chat-thread {
@@ -1797,6 +1835,9 @@ body[data-page="explorar"] .chat-search-field input {
   min-height: 52px;
   border-radius: 18px;
   padding: 14px 16px;
+  border: 0;
+  background: rgba(120, 186, 255, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 body[data-page="explorar"] .sidebar-actions {
@@ -1819,6 +1860,8 @@ body[data-page="explorar"] .history-list {
 
 body[data-page="explorar"] .history-item {
   padding: 10px 14px;
+  min-height: 52px;
+  max-height: 52px;
   border-radius: 22px;
   box-shadow: 0 14px 24px rgba(16, 47, 112, 0.12);
 }
