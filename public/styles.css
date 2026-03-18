@@ -1145,7 +1145,6 @@ body[data-page="planos"] .status-pill {
 .chat-sidebar {
   position: relative;
   display: flex;
-  min-height: calc(100vh - 180px);
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -1206,32 +1205,47 @@ body[data-page="planos"] .status-pill {
 }
 
 .sidebar-scroll-content {
-  display: grid;
-  grid-template-rows: auto auto auto auto auto auto;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 0;
   min-height: 0;
-  overflow: auto;
-  scroll-behavior: smooth;
+  height: 100%;
+}
+
+.sidebar-header {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.history-scroll-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 6px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.42) transparent;
 }
 
-.sidebar-scroll-content::-webkit-scrollbar {
+.history-list::-webkit-scrollbar {
   width: 8px;
 }
 
-.sidebar-scroll-content::-webkit-scrollbar-thumb {
+.history-list::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.34);
-}
-
-.history-scroll-shell {
-  position: relative;
-  min-height: 0;
-  margin-top: 18px;
-  overflow: hidden;
 }
 
 .history-scroll-shell::after {
@@ -1275,12 +1289,6 @@ body[data-page="planos"] .status-pill {
   width: 18px;
   height: 18px;
   fill: currentColor;
-}
-
-.history-list {
-  display: grid;
-  gap: 10px;
-  min-height: 0;
 }
 
 .history-item {
@@ -1501,6 +1509,21 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
+}
+
+body[data-page="explorar"].explore-authenticated .chat-sidebar {
+  height: 100vh;
+}
+
+body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-toggle-button,
+body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions .sidebar-icon-button.primary-button {
+  background: #ffffff;
+  color: #1b53bb;
+}
+
+body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-toggle-button svg,
+body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions .sidebar-icon-button.primary-button svg {
+  fill: currentColor;
 }
 
 .chat-thread {
@@ -1759,6 +1782,10 @@ body[data-page="explorar"] .conversation-shell {
 }
 
 body[data-page="explorar"] .sidebar-scroll-content {
+  padding-right: 0;
+}
+
+body[data-page="explorar"] .sidebar-header {
   padding-right: 8px;
 }
 
@@ -1779,6 +1806,7 @@ body[data-page="explorar"] .sidebar-actions {
 body[data-page="explorar"] .sidebar-actions-bottom {
   margin-top: 20px;
   padding-top: 20px;
+  flex-shrink: 0;
 }
 
 body[data-page="explorar"] .history-scroll-shell {
@@ -2099,11 +2127,13 @@ body[data-page="explorar"] #chat-auth-status {
 
   body[data-page="explorar"] .chat-sidebar .sidebar-card {
     position: relative;
-    min-height: calc(100vh - 36px);
+    height: calc(100vh - 36px);
+    min-height: 0;
     padding-right: 16px;
   }
 
-  body[data-page="explorar"] .sidebar-scroll-content {
+  body[data-page="explorar"] .sidebar-header,
+  body[data-page="explorar"] .history-list {
     padding-right: 2px;
   }
 
@@ -2252,6 +2282,7 @@ body[data-page="explorar"] #chat-auth-status {
     transition: transform 0.5s ease;
     transform: translateX(0);
     z-index: 3;
+    height: 100vh;
   }
 
   body[data-page="explorar"].explore-authenticated .sidebar-topbar {

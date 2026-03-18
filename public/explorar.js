@@ -80,6 +80,7 @@ const emptyConversationVariants = [
 ];
 
 const conversationTitleMaxLength = 22;
+const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -540,7 +541,7 @@ function syncSidebarState() {
   document.body.classList.toggle("explore-sidebar-open", !sidebarCollapsed);
   sidebarToggleButton.setAttribute("aria-label", sidebarCollapsed ? "Mostrar historico" : "Recolher historico");
   sidebarToggleButton.title = sidebarCollapsed ? "Mostrar historico" : "Recolher historico";
-  sidebarToggleButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>';
+  sidebarToggleButton.innerHTML = sidebarMenuIcon;
 }
 
 window.addEventListener("resize", () => {
