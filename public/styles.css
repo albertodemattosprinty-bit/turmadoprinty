@@ -1212,6 +1212,7 @@ body[data-page="planos"] .status-pill {
   gap: 0;
   min-height: 0;
   overflow: auto;
+  scroll-behavior: smooth;
   padding-right: 6px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.42) transparent;
@@ -1273,7 +1274,7 @@ body[data-page="planos"] .status-pill {
   border: 0;
   border-radius: 999px;
   background: #ffffff;
-  color: var(--blue-dark);
+  color: #1b53bb;
   box-shadow: 0 12px 24px rgba(27, 83, 187, 0.2);
 }
 
@@ -1295,7 +1296,7 @@ body[data-page="planos"] .status-pill {
   padding: 10px 14px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(135deg, #2f7cff 0%, #1b53bb 100%);
+  background: linear-gradient(135deg, #18479f 0%, #0f3478 100%);
   color: #ffffff;
   text-align: left;
   font: inherit;
@@ -1331,7 +1332,7 @@ body[data-page="planos"] .status-pill {
 }
 
 .history-item.active {
-  background: linear-gradient(135deg, #2f7cff 0%, #123f97 100%);
+  background: linear-gradient(135deg, #215bc3 0%, #123f97 100%);
   border-color: rgba(255, 255, 255, 0.26);
 }
 
@@ -1350,7 +1351,7 @@ body[data-page="planos"] .status-pill {
 
 body[data-page="explorar"] .sidebar-actions .sidebar-icon-button.primary-button {
   background: #ffffff;
-  color: var(--blue-dark);
+  color: #1b53bb;
 }
 
 .chat-login-card {
@@ -1446,7 +1447,7 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
   min-height: 0;
   height: 100%;
   opacity: 1;
-  background: linear-gradient(180deg, rgba(47, 124, 255, 0.96) 0%, rgba(27, 83, 187, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(18, 59, 134, 0.98) 0%, rgba(8, 31, 82, 0.99) 100%);
   backdrop-filter: blur(18px);
   border-radius: 34px;
   box-shadow: 0 26px 54px rgba(19, 69, 155, 0.22);
@@ -1559,7 +1560,7 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
 
 .message-card.user {
   justify-self: end;
-  background: linear-gradient(135deg, #2f7cff 0%, #1b53bb 100%);
+  background: linear-gradient(135deg, #18479f 0%, #0f3478 100%);
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.18);
 }
@@ -1630,8 +1631,8 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
 
 .chat-composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
   position: sticky;
   bottom: 0;
   padding-top: 14px;
@@ -1644,10 +1645,18 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
   color: #ffffff;
 }
 
+.composer-input-shell {
+  position: relative;
+}
+
 .composer-actions {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
   justify-content: flex-end;
   flex-wrap: nowrap;
   align-items: center;
+  gap: 8px;
 }
 
 .composer-status {
@@ -1689,7 +1698,8 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
 }
 
 .chat-composer textarea {
-  min-height: 52px;
+  min-height: 118px;
+  padding: 16px 16px 64px;
   resize: none;
 }
 
@@ -1706,8 +1716,9 @@ body[data-page="explorar"] .conversation-title,
 body[data-page="explorar"] .empty-conversation-state h2,
 body[data-page="explorar"] .history-item strong,
 body[data-page="explorar"] .message-role {
-  font-family: var(--explore-heading-font);
+  font-family: "Open Sans", sans-serif;
   letter-spacing: 0.01em;
+  font-weight: 800;
 }
 
 body[data-page="explorar"] .section-title {
@@ -1759,7 +1770,7 @@ body[data-page="explorar"] .sidebar-scroll-content {
 }
 
 body[data-page="explorar"] .chat-search-field {
-  margin-top: 14px;
+  margin-top: 6px;
 }
 
 body[data-page="explorar"] .chat-search-field input {
@@ -1769,7 +1780,7 @@ body[data-page="explorar"] .chat-search-field input {
 }
 
 body[data-page="explorar"] .sidebar-actions {
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 body[data-page="explorar"] .sidebar-actions-bottom {
@@ -1861,9 +1872,9 @@ body[data-page="explorar"] .chat-composer {
 }
 
 body[data-page="explorar"] .chat-composer textarea {
-  min-height: 58px;
+  min-height: 118px;
   border-radius: 22px;
-  padding: 16px 18px;
+  padding: 16px 16px 64px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
@@ -1877,6 +1888,37 @@ body[data-page="explorar"] .sidebar-toggle-button:hover,
 body[data-page="explorar"] .sidebar-icon-button:hover,
 body[data-page="explorar"] .icon-button:hover {
   transform: translateY(-1px);
+}
+
+body[data-page="explorar"] #mic-button,
+body[data-page="explorar"] #send-button,
+body[data-page="explorar"] #stop-button {
+  min-width: 46px;
+  width: 46px;
+  height: 46px;
+}
+
+body[data-page="explorar"] #mic-button svg,
+body[data-page="explorar"] #send-button svg,
+body[data-page="explorar"] #stop-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+body[data-page="explorar"] #mic-button,
+body[data-page="explorar"] #send-button {
+  color: #1b53bb;
+  border-color: rgba(27, 83, 187, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+body[data-page="explorar"] #stop-button {
+  background: #1b53bb;
+}
+
+body[data-page="explorar"] #chat-auth-status {
+  margin-top: -6px;
+  margin-bottom: 0;
 }
 
 .icon-button {
@@ -2097,7 +2139,7 @@ body[data-page="explorar"] .icon-button:hover {
     right: 12px;
     bottom: 12px;
     z-index: 35;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     padding: 10px 12px;
     border-radius: 22px;
@@ -2142,8 +2184,8 @@ body[data-page="explorar"] .icon-button:hover {
   }
 
   body[data-page="explorar"] .chat-composer textarea {
-    min-height: 42px;
-    padding: 10px 14px;
+    min-height: 104px;
+    padding: 12px 14px 60px;
   }
 
   body[data-page="explorar"] .icon-button {
@@ -2159,6 +2201,21 @@ body[data-page="explorar"] .icon-button:hover {
 
   body[data-page="explorar"] .composer-actions {
     gap: 8px;
+  }
+
+  body[data-page="explorar"] #mic-button,
+  body[data-page="explorar"] #send-button,
+  body[data-page="explorar"] #stop-button {
+    min-width: 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  body[data-page="explorar"] #mic-button svg,
+  body[data-page="explorar"] #send-button svg,
+  body[data-page="explorar"] #stop-button svg {
+    width: 17px;
+    height: 17px;
   }
 
   .conversation-meta {
