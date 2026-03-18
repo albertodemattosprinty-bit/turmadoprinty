@@ -42,6 +42,7 @@ let recordedChunks = [];
 let isRecording = false;
 let sidebarCollapsed = window.innerWidth <= 980;
 let chatSearchTerm = "";
+let speakingButton = null;
 
 const emptyConversationVariants = [
   "Quando voce quiser",
@@ -171,6 +172,79 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function stopBrowserSpeech() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  if (speakingButton) {
+    speakingButton.classList.remove("playing");
+    speakingButton.setAttribute("aria-label", "Ouvir resposta");
+    speakingButton.title = "Ouvir resposta";
+    speakingButton = null;
+  }
+}
+
+function pickSpeechVoice() {
+  if (!("speechSynthesis" in window)) {
+    return null;
+  }
+
+  const voices = window.speechSynthesis.getVoices();
+  const ptBrVoices = voices.filter((voice) => /^pt-BR/i.test(voice.lang));
+  const maleHint = ptBrVoices.find((voice) => /male|masc|ricardo|antonio|brasil/i.test(`${voice.name} ${voice.voiceURI}`));
+  return maleHint || ptBrVoices[0] || voices.find((voice) => /^pt/i.test(voice.lang)) || voices[0] || null;
+}
+
+function attachAssistantAudioButton(article, text) {
+  if (!article || !text || !("speechSynthesis" in window)) {
+    return;
+  }
+
+  const controls = document.createElement("div");
+  controls.className = "assistant-audio-actions";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "assistant-audio-button";
+  button.setAttribute("aria-label", "Ouvir resposta");
+  button.title = "Ouvir resposta";
+  button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 9.8 9H6a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3.8L14 19a1 1 0 0 0 1.7-.72V5.72A1 1 0 0 0 14 5m4.2 2.3a1 1 0 0 1 1.4 0 6.5 6.5 0 0 1 0 9.2 1 1 0 0 1-1.4-1.42 4.5 4.5 0 0 0 0-6.36 1 1 0 0 1 0-1.42m-2.6 2.1a1 1 0 0 1 1.4.1 3 3 0 0 1 0 4 1 1 0 1 1-1.5-1.32 1 1 0 0 0 0-1.36 1 1 0 0 1 .1-1.42"/></svg>';
+  controls.appendChild(button);
+  article.appendChild(controls);
+
+  button.addEventListener("click", () => {
+    if (!("speechSynthesis" in window)) {
+      return;
+    }
+
+    if (speakingButton === button) {
+      stopBrowserSpeech();
+      return;
+    }
+
+    stopBrowserSpeech();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "pt-BR";
+    utterance.rate = 1;
+    utterance.pitch = 0.92;
+    const voice = pickSpeechVoice();
+
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    utterance.onend = () => stopBrowserSpeech();
+    utterance.onerror = () => stopBrowserSpeech();
+
+    speakingButton = button;
+    button.classList.add("playing");
+    button.setAttribute("aria-label", "Parar audio");
+    button.title = "Parar audio";
+    window.speechSynthesis.speak(utterance);
+  });
 }
 
 function formatRelativeDate(value) {
@@ -519,6 +593,11 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
 
       const nextText = this.text === "Preparando resposta..." ? extraText : `${this.text}${extraText}`;
       this.setText(nextText);
+    },
+    finalizeAudio() {
+      const cleanText = (this.text || "").trim();
+      article.querySelector(".assistant-audio-actions")?.remove();
+      attachAssistantAudioButton(article, cleanText);
     }
   };
 }
@@ -566,6 +645,7 @@ async function consumeAssistantStream(response, assistantMessage = createAssista
         }
 
         if (event.type === "done") {
+          assistantMessage.finalizeAudio();
           return (event.text || finalText || "").trim();
         }
 
@@ -822,6 +902,7 @@ chatForm.addEventListener("submit", async (event) => {
       const payload = await response.json();
       finalText = (payload.outputText || "").trim();
       assistantMessage.setText(finalText || "Nao veio resposta desta vez.");
+      assistantMessage.finalizeAudio();
     }
 
     if (finalText) {
@@ -928,8 +1009,15 @@ registerForm.addEventListener("submit", async (event) => {
 });
 
 window.addEventListener("beforeunload", () => {
+  stopBrowserSpeech();
   stopMediaTracks();
 });
+
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    pickSpeechVoice();
+  };
+}
 
 renderHistoryList();
 renderConversation();

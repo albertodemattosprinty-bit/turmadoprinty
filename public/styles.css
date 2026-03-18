@@ -1237,6 +1237,7 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
 .message-card.assistant {
   justify-self: start;
   background: rgba(27, 83, 187, 0.08);
+  position: relative;
 }
 
 .message-role {
@@ -1257,6 +1258,43 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
 .message-card.user .message-role,
 .message-card.user .message-text {
   color: #ffffff;
+}
+
+.assistant-audio-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.assistant-audio-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(27, 83, 187, 0.08);
+  color: var(--blue-dark);
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.assistant-audio-button:hover {
+  transform: translateY(-1px);
+  background: rgba(27, 83, 187, 0.14);
+}
+
+.assistant-audio-button.playing {
+  background: var(--blue-dark);
+  color: #ffffff;
+}
+
+.assistant-audio-button svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
 }
 
 .chat-composer {

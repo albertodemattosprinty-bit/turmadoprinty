@@ -24,3 +24,7 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: GOOGLE_TTS_API_KEY
+        sync: false
+      - key: GOOGLE_TTS_VOICE_NAME
+        sync: false
