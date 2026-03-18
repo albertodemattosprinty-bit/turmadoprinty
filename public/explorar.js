@@ -39,7 +39,7 @@ let mediaRecorder = null;
 let mediaStream = null;
 let recordedChunks = [];
 let isRecording = false;
-let sidebarCollapsed = false;
+let sidebarCollapsed = window.innerWidth <= 980;
 
 const emptyConversationVariants = [
   "Quando voce quiser",
@@ -343,12 +343,19 @@ function syncSidebarState() {
   }
 
   exploreChatLayout.classList.toggle("sidebar-collapsed", sidebarCollapsed);
+  document.body.classList.toggle("explore-sidebar-open", !sidebarCollapsed);
   sidebarToggleButton.setAttribute("aria-label", sidebarCollapsed ? "Mostrar historico" : "Recolher historico");
   sidebarToggleButton.title = sidebarCollapsed ? "Mostrar historico" : "Recolher historico";
   sidebarToggleButton.innerHTML = sidebarCollapsed
     ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5.5 7 6.5-7 6.5"/></svg>'
     : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5.5-7 6.5 7 6.5"/></svg>';
 }
+
+window.addEventListener("resize", () => {
+  const mobileView = window.innerWidth <= 980;
+  sidebarCollapsed = mobileView ? sidebarCollapsed : false;
+  syncSidebarState();
+});
 
 function syncComposerState() {
   const isLoggedIn = Boolean(currentUser);
