@@ -1,6 +1,9 @@
 const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
+const chunkWordSize = 5;
+const chunkDelayMs = 35;
+const chunkFadeMs = 500;
 
 const authStatus = document.getElementById("auth-status");
 const historyList = document.getElementById("history-list");
@@ -13,6 +16,8 @@ const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
 const stopButton = document.getElementById("stop-button");
+const micButton = document.getElementById("mic-button");
+const composerStatus = document.getElementById("composer-status");
 const conversationTitle = document.getElementById("conversation-title");
 const conversationMeta = document.getElementById("conversation-meta");
 
@@ -20,6 +25,10 @@ let currentController = null;
 let stopRequested = false;
 let currentUser = null;
 let activeConversationId = null;
+let mediaRecorder = null;
+let mediaStream = null;
+let recordedChunks = [];
+let isRecording = false;
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -32,6 +41,10 @@ function setToken(token) {
   }
 
   window.localStorage.removeItem(sessionStorageKey);
+}
+
+function setComposerStatus(message = "") {
+  composerStatus.textContent = message;
 }
 
 function getConversationStore() {
@@ -242,10 +255,18 @@ function renderConversation() {
   chatThread.scrollTop = chatThread.scrollHeight;
 }
 
+function setRecordingState(recording) {
+  isRecording = recording;
+  micButton.classList.toggle("recording", recording);
+  micButton.setAttribute("aria-label", recording ? "Parar gravação" : "Gravar mensagem de voz");
+  micButton.title = recording ? "Parar gravação" : "Gravar mensagem de voz";
+}
+
 function syncComposerState() {
   const isLoggedIn = Boolean(currentUser);
   logoutButton.hidden = !isLoggedIn;
   loginLink.hidden = isLoggedIn;
+  micButton.disabled = !isLoggedIn;
   chatInput.placeholder = isLoggedIn
     ? "Digite sua mensagem aqui..."
     : "Faça login quando quiser iniciar uma conversa com a IA.";
@@ -322,6 +343,17 @@ function addMessageToConversation(role, content) {
   return nextConversation;
 }
 
+function chunkWords(text) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const chunks = [];
+
+  for (let index = 0; index < words.length; index += chunkWordSize) {
+    chunks.push(words.slice(index, index + chunkWordSize).join(" "));
+  }
+
+  return chunks;
+}
+
 async function animateAssistantResponse(text) {
   const article = document.createElement("article");
   article.className = "message-card assistant";
@@ -332,21 +364,25 @@ async function animateAssistantResponse(text) {
   chatThread.appendChild(article);
 
   const target = article.querySelector(".message-text");
-  const words = text.split(/\s+/).filter(Boolean);
+  const chunks = chunkWords(text);
   let currentText = "";
 
-  for (const word of words) {
+  for (const chunk of chunks) {
     if (stopRequested) {
       break;
     }
 
-    currentText = currentText ? `${currentText} ${word}` : word;
-    target.textContent = currentText;
+    currentText = currentText ? `${currentText} ${chunk}` : chunk;
+    const span = document.createElement("span");
+    span.className = "message-chunk";
+    span.style.animationDuration = `${chunkFadeMs}ms`;
+    span.textContent = `${chunk} `;
+    target.appendChild(span);
     chatThread.scrollTop = chatThread.scrollHeight;
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await new Promise((resolve) => setTimeout(resolve, chunkDelayMs));
   }
 
-  return currentText;
+  return currentText.trim();
 }
 
 function ensureLoggedInBeforeChat() {
@@ -359,10 +395,137 @@ function ensureLoggedInBeforeChat() {
   return false;
 }
 
+function stopMediaTracks() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const base64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(reader.error || new Error("Falha ao ler o áudio."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function transcribeAudio(blob) {
+  const audioBase64 = await blobToBase64(blob);
+  const response = await fetch("/api/audio/transcribe", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({
+      audioBase64,
+      mimeType: blob.type || "audio/webm",
+      fileName: blob.type.includes("mp4") ? "speech.mp4" : "speech.webm"
+    })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao transcrever o áudio.");
+  }
+
+  return data.text || "";
+}
+
+async function stopRecordingAndTranscribe() {
+  if (!mediaRecorder) {
+    return;
+  }
+
+  setComposerStatus("Processando áudio...");
+
+  const stopPromise = new Promise((resolve) => {
+    mediaRecorder.addEventListener("stop", resolve, { once: true });
+  });
+
+  mediaRecorder.stop();
+  await stopPromise;
+
+  const blob = new Blob(recordedChunks, {
+    type: mediaRecorder.mimeType || "audio/webm"
+  });
+
+  mediaRecorder = null;
+  recordedChunks = [];
+  setRecordingState(false);
+  stopMediaTracks();
+
+  if (blob.size === 0) {
+    setComposerStatus("Nenhum áudio capturado.");
+    return;
+  }
+
+  try {
+    const transcript = await transcribeAudio(blob);
+
+    if (!transcript) {
+      setComposerStatus("Não consegui entender o áudio.");
+      return;
+    }
+
+    chatInput.value = chatInput.value
+      ? `${chatInput.value.trim()} ${transcript}`.trim()
+      : transcript;
+    chatInput.dispatchEvent(new Event("input"));
+    setComposerStatus("Áudio transcrito.");
+  } catch (error) {
+    setComposerStatus(error instanceof Error ? error.message : "Erro ao transcrever o áudio.");
+  }
+}
+
+async function toggleRecording() {
+  if (!ensureLoggedInBeforeChat()) {
+    return;
+  }
+
+  if (isRecording) {
+    await stopRecordingAndTranscribe();
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    setComposerStatus("Seu navegador não suporta gravação de áudio.");
+    return;
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(mediaStream);
+
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data && event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+    });
+
+    mediaRecorder.start();
+    setRecordingState(true);
+    setComposerStatus("Ouvindo...");
+  } catch (error) {
+    stopMediaTracks();
+    setRecordingState(false);
+    setComposerStatus(error instanceof Error ? error.message : "Não foi possível acessar o microfone.");
+  }
+}
+
 newChatButton.addEventListener("click", () => {
   activeConversationId = null;
   renderHistoryList();
   renderConversation();
+  setComposerStatus("");
   chatInput.focus();
 });
 
@@ -371,9 +534,14 @@ logoutButton.addEventListener("click", () => {
   currentUser = null;
   activeConversationId = null;
   authStatus.textContent = "Sessão encerrada.";
+  setComposerStatus("");
   syncComposerState();
   renderHistoryList();
   renderConversation();
+});
+
+micButton.addEventListener("click", async () => {
+  await toggleRecording();
 });
 
 chatInput.addEventListener("focus", () => {
@@ -402,8 +570,10 @@ chatForm.addEventListener("submit", async (event) => {
   chatInput.style.height = "auto";
   sendButton.disabled = true;
   stopButton.disabled = false;
+  micButton.disabled = true;
   stopRequested = false;
   currentController = new AbortController();
+  setComposerStatus("Gerando resposta...");
 
   try {
     const response = await fetch("/api/gpt/ask", {
@@ -432,14 +602,19 @@ chatForm.addEventListener("submit", async (event) => {
     } else {
       renderConversation();
     }
+
+    setComposerStatus("");
   } catch (error) {
     renderConversation();
-    authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
+    const messageText = error instanceof Error ? error.message : "Erro desconhecido";
+    authStatus.textContent = messageText;
+    setComposerStatus(messageText);
   } finally {
     currentController = null;
     stopRequested = false;
     sendButton.disabled = false;
     stopButton.disabled = true;
+    micButton.disabled = !currentUser;
   }
 });
 
@@ -448,6 +623,7 @@ stopButton.addEventListener("click", () => {
   if (currentController) {
     currentController.abort();
   }
+  setComposerStatus("Resposta interrompida.");
 });
 
 chatInput.addEventListener("input", () => {
@@ -455,7 +631,12 @@ chatInput.addEventListener("input", () => {
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
 });
 
+window.addEventListener("beforeunload", () => {
+  stopMediaTracks();
+});
+
 renderHistoryList();
 renderConversation();
 syncComposerState();
+setComposerStatus("");
 await loadSessionState();

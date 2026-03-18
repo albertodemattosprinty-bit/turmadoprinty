@@ -16,6 +16,7 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
+const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no evangelho protestante, em tom suave, amigavel, acolhedor, amavel e disposto a ajudar como um amigo. Fale com naturalidade e conviccao, tratando o evangelho como a realidade central da resposta, sem usar expressoes como 'segundo o evangelho' ou apresentar essa base como mera suposicao. Priorize proximidade, clareza, verdade biblica e cuidado pastoral.";
 
 const publicDir = path.join(__dirname, "public");
@@ -50,26 +51,22 @@ function getAlbumPayload() {
   }));
 }
 
-function extractOutputText(payload) {
-  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
-    return payload.output_text.trim();
+function extractChatCompletionText(payload) {
+  const content = payload?.choices?.[0]?.message?.content;
+
+  if (typeof content === "string" && content.trim()) {
+    return content.trim();
   }
 
-  if (!Array.isArray(payload.output)) {
+  if (!Array.isArray(content)) {
     return "";
   }
 
   const texts = [];
 
-  for (const item of payload.output) {
-    if (!Array.isArray(item.content)) {
-      continue;
-    }
-
-    for (const contentItem of item.content) {
-      if (contentItem?.type === "output_text" && typeof contentItem.text === "string") {
-        texts.push(contentItem.text);
-      }
+  for (const item of content) {
+    if (item?.type === "text" && typeof item.text === "string") {
+      texts.push(item.text);
     }
   }
 
@@ -172,16 +169,16 @@ async function handleGptRequest(request, response) {
     return;
   }
 
-  const historyInput = history
+  const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim())
     .slice(-12)
     .map((item) => ({
       role: item.role,
-      content: [{ type: "input_text", text: item.content.trim() }]
+      content: item.content.trim()
     }));
 
   try {
-    const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -189,10 +186,10 @@ async function handleGptRequest(request, response) {
       },
       body: JSON.stringify({
         model,
-        input: [
-          ...(system ? [{ role: "system", content: [{ type: "input_text", text: system }] }] : []),
-          ...historyInput,
-          { role: "user", content: [{ type: "input_text", text: message }] }
+        messages: [
+          ...(system ? [{ role: "system", content: system }] : []),
+          ...messages,
+          { role: "user", content: message }
         ]
       })
     });
@@ -210,12 +207,95 @@ async function handleGptRequest(request, response) {
     sendJson(response, 200, {
       ok: true,
       model: payload.model,
-      outputText: extractOutputText(payload),
+      outputText: extractChatCompletionText(payload),
       raw: payload
     });
   } catch (error) {
     sendJson(response, 500, {
       error: "Erro interno ao chamar a OpenAI.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
+function decodeBase64Audio(base64Audio) {
+  if (typeof base64Audio !== "string" || !base64Audio.trim()) {
+    throw new Error("Audio ausente.");
+  }
+
+  return Buffer.from(base64Audio, "base64");
+}
+
+async function handleAudioTranscription(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const audioBase64 = typeof body.audioBase64 === "string" ? body.audioBase64.trim() : "";
+  const mimeType = typeof body.mimeType === "string" && body.mimeType.trim() ? body.mimeType.trim() : "audio/webm";
+  const fileName = typeof body.fileName === "string" && body.fileName.trim() ? body.fileName.trim() : "speech.webm";
+
+  let audioBuffer;
+
+  try {
+    audioBuffer = decodeBase64Audio(audioBase64);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  if (audioBuffer.length === 0) {
+    sendJson(response, 400, { error: "Audio vazio." });
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("model", OPENAI_TRANSCRIBE_MODEL);
+    formData.append("language", "pt");
+    formData.append("file", new Blob([audioBuffer], { type: mimeType }), fileName);
+
+    const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: formData
+    });
+
+    const payload = await transcriptionResponse.json();
+
+    if (!transcriptionResponse.ok) {
+      sendJson(response, transcriptionResponse.status, {
+        error: "Falha ao transcrever o audio.",
+        details: payload
+      });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      text: typeof payload.text === "string" ? payload.text.trim() : "",
+      model: OPENAI_TRANSCRIBE_MODEL
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Erro interno ao transcrever o audio.",
       details: error instanceof Error ? error.message : "Erro desconhecido."
     });
   }
@@ -247,7 +327,8 @@ const server = http.createServer(async (request, response) => {
         hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
         hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
         contentBaseUrl: CONTENT_BASE_URL,
-        model: OPENAI_MODEL
+        model: OPENAI_MODEL,
+        transcribeModel: OPENAI_TRANSCRIBE_MODEL
       }
     });
     return;
@@ -318,6 +399,17 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleGptRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/audio/transcribe") {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    await handleAudioTranscription(request, response);
     return;
   }
 
