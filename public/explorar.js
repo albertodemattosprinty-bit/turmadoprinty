@@ -79,6 +79,8 @@ const emptyConversationVariants = [
   "Vamos dar forma a uma boa ideia"
 ];
 
+const conversationTitleMaxLength = 22;
+
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
 }
@@ -333,14 +335,32 @@ function formatRelativeDate(value) {
   }).format(date).replace(".", "");
 }
 
+function clampConversationTitle(value) {
+  const sanitized = String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/[.!?:"'`]+$/g, "")
+    .trim();
+
+  if (!sanitized) {
+    return "Novo chat";
+  }
+
+  if (sanitized.length <= conversationTitleMaxLength) {
+    return sanitized;
+  }
+
+  const slice = sanitized.slice(0, conversationTitleMaxLength - 1).trimEnd();
+  return `${slice}…`;
+}
+
 function createShortTitle(message) {
   const sanitized = message.replace(/\s+/g, " ").trim();
   if (!sanitized) {
-    return "Nova conversa";
+    return "Novo chat";
   }
 
-  const words = sanitized.split(" ").slice(0, 5).join(" ");
-  return words.length > 32 ? `${words.slice(0, 29).trimEnd()}...` : words;
+  const words = sanitized.split(" ").slice(0, 4).join(" ");
+  return clampConversationTitle(words);
 }
 
 function createConversation(firstMessage = "") {
@@ -443,8 +463,10 @@ function renderHistoryList() {
     button.type = "button";
     button.className = `history-item${item.id === activeConversationId ? " active" : ""}`;
     button.innerHTML = `
-      <strong>${escapeHtml(item.title)}</strong>
-      <span class="history-time">${formatRelativeDate(item.updatedAt)}</span>
+      <span class="history-item-row">
+        <strong title="${escapeHtml(item.title)}">${escapeHtml(clampConversationTitle(item.title))}</strong>
+        <span class="history-time">${formatRelativeDate(item.updatedAt)}</span>
+      </span>
     `;
     button.addEventListener("click", () => {
       activeConversationId = item.id;
@@ -635,6 +657,59 @@ function addMessageToConversation(role, content) {
   renderHistoryList();
   renderConversation();
   return nextConversation;
+}
+
+async function generateConversationTitle(conversationId, firstMessage) {
+  const prompt = String(firstMessage || "").trim();
+
+  if (!conversationId || !prompt || !currentUser) {
+    return;
+  }
+
+  try {
+    const selectedMode = chatModes.fast;
+    const response = await fetch("/api/gpt/ask", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        message: `Crie um titulo curtissimo para esta conversa: "${prompt}"`,
+        system: `Responda somente com um titulo em portugues, com no maximo ${conversationTitleMaxLength} caracteres, sem aspas, sem ponto final e sem explicacoes.`,
+        stream: false,
+        model: selectedMode.model,
+        instantModel: selectedMode.instantModel
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Falha ao gerar titulo.");
+    }
+
+    const nextTitle = clampConversationTitle(payload.outputText || payload.answer || "");
+    const conversations = getConversations();
+    const targetConversation = conversations.find((item) => item.id === conversationId);
+
+    if (!targetConversation || !nextTitle || targetConversation.messages.length === 0) {
+      return;
+    }
+
+    if (targetConversation.title !== createShortTitle(prompt) && targetConversation.title !== "Novo chat") {
+      return;
+    }
+
+    updateConversation({
+      ...targetConversation,
+      title: nextTitle
+    });
+    renderHistoryList();
+    renderConversation();
+  } catch {
+    // Mantem o titulo curto local se a geracao falhar.
+  }
 }
 
 function createAssistantMessageElement(initialText = "Preparando resposta...") {
@@ -952,7 +1027,10 @@ chatForm.addEventListener("submit", async (event) => {
   const baseConversation = getActiveConversation() || createConversation(message);
   const history = baseConversation.messages.slice(-8);
 
-  addMessageToConversation("user", message);
+  const userConversation = addMessageToConversation("user", message);
+  if (userConversation.messages.length === 1) {
+    void generateConversationTitle(userConversation.id, message);
+  }
   chatInput.value = "";
   chatInput.style.height = "auto";
   sendButton.disabled = true;
