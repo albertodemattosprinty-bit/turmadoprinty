@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Base Node</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Turma do Printy</p>
+        <h1>Base Node simples para Render, GPT, login e pagamentos.</h1>
+        <p class="hero-copy">
+          Primeira etapa pronta: frontend simples, API Node no ar e uma rota para testar o GPT no servidor.
+        </p>
+      </div>
+      <div class="hero-card">
+        <div class="status-line">
+          <span class="dot" id="health-dot"></span>
+          <strong id="health-label">Verificando backend...</strong>
+        </div>
+        <p id="health-copy" class="muted">Aguardando resposta de /api/health</p>
+        <div class="pill-row" id="env-pills"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Roadmap</p>
+          <h2>Etapas do sistema</h2>
+        </div>
+      </div>
+      <div class="roadmap-grid" id="roadmap-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">GPT API</p>
+          <h2>Sandbox do backend</h2>
+        </div>
+      </div>
+      <form id="gpt-form" class="gpt-form">
+        <label>
+          Pergunta
+          <textarea id="gpt-message" placeholder="Ex.: Crie uma descricao curta para a plataforma Turma do Printy."></textarea>
+        </label>
+        <label>
+          Instrucoes de sistema
+          <input id="gpt-system" type="text" placeholder="Ex.: Responda em portugues, objetivo e amigavel.">
+        </label>
+        <button type="submit">Testar /api/gpt/ask</button>
+      </form>
+      <pre id="gpt-output" class="output">Nenhum teste executado ainda.</pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Login</p>
+          <h2>Base com Postgres</h2>
+        </div>
+        <p class="muted" id="auth-status">Aguardando configuracao do banco</p>
+      </div>
+      <div class="auth-grid">
+        <form id="register-form" class="gpt-form auth-card">
+          <h3>Cadastrar</h3>
+          <label>
+            Nome
+            <input id="register-name" type="text" placeholder="Seu nome">
+          </label>
+          <label>
+            Email
+            <input id="register-email" type="email" placeholder="voce@email.com">
+          </label>
+          <label>
+            Senha
+            <input id="register-password" type="password" placeholder="Minimo 6 caracteres">
+          </label>
+          <label>
+            Confirmar senha
+            <input id="register-password-confirm" type="password" placeholder="Repita a senha">
+          </label>
+          <button type="submit">Enviar codigo</button>
+        </form>
+
+        <form id="verify-form" class="gpt-form auth-card">
+          <h3>Confirmar email</h3>
+          <label>
+            Email
+            <input id="verify-email" type="email" placeholder="voce@email.com">
+          </label>
+          <label>
+            Codigo de 4 digitos
+            <input id="verify-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234">
+          </label>
+          <button type="submit">Confirmar codigo</button>
+        </form>
+
+        <form id="login-form" class="gpt-form auth-card">
+          <h3>Entrar</h3>
+          <label>
+            Email
+            <input id="login-email" type="email" placeholder="voce@email.com">
+          </label>
+          <label>
+            Senha
+            <input id="login-password" type="password" placeholder="Sua senha">
+          </label>
+          <button type="submit">Fazer login</button>
+        </form>
+      </div>
+      <div class="auth-actions">
+        <button id="me-button" type="button">Testar /api/auth/me</button>
+      </div>
+      <pre id="auth-output" class="output">Nenhum teste de login executado ainda.</pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Catalogo</p>
+          <h2>Albuns carregados da API</h2>
+        </div>
+        <p class="muted" id="album-count">Carregando...</p>
+      </div>
+      <div id="album-grid" class="album-grid"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

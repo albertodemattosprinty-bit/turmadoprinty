@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: turma-do-printy-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 24.13.1
+      - key: CONTENT_BASE_URL
+        value: https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev
+      - key: OPENAI_MODEL
+        value: gpt-5
