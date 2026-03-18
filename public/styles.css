@@ -1,18 +1,18 @@
 :root {
-  --bg-top: #52a8ff;
-  --bg-bottom: #1d64d7;
-  --panel: rgba(25, 74, 168, 0.56);
-  --panel-strong: rgba(17, 58, 140, 0.82);
-  --panel-soft: rgba(255, 255, 255, 0.12);
-  --line: rgba(255, 255, 255, 0.14);
-  --text: #ffffff;
-  --text-soft: rgba(255, 255, 255, 0.82);
-  --text-muted: rgba(255, 255, 255, 0.68);
+  --bg-top: #ffffff;
+  --bg-bottom: #ffffff;
+  --panel: #ffffff;
+  --panel-strong: #ffffff;
+  --panel-soft: rgba(47, 124, 255, 0.08);
+  --line: rgba(27, 83, 187, 0.12);
+  --text: #1b53bb;
+  --text-soft: rgba(27, 83, 187, 0.86);
+  --text-muted: rgba(27, 83, 187, 0.62);
   --blue-dark: #1b53bb;
   --blue-mid: #2f7cff;
   --blue-light: #8cd0ff;
-  --yellow: #ffd95a;
-  --shadow: 0 24px 60px rgba(9, 34, 87, 0.28);
+  --yellow: #2f7cff;
+  --shadow: 0 18px 40px rgba(32, 73, 152, 0.08);
 }
 
 * {
@@ -28,10 +28,7 @@ body {
   min-height: 100vh;
   font-family: "Open Sans", sans-serif;
   color: var(--text);
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 22%),
-    radial-gradient(circle at bottom right, rgba(140, 208, 255, 0.22), transparent 24%),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
 }
 
 a {
@@ -47,8 +44,8 @@ a {
   align-items: center;
   gap: 24px;
   padding: 18px 24px;
-  background: rgba(22, 74, 170, 0.78);
-  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
 
@@ -123,6 +120,20 @@ a {
 }
 
 .home-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.page-image-banner {
+  margin-bottom: 22px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.page-image-banner img {
   display: block;
   width: 100%;
   height: auto;
@@ -256,13 +267,13 @@ a {
 
 .primary-button {
   border: 0;
-  background: #ffffff;
-  color: var(--blue-dark);
+  background: var(--blue-dark);
+  color: #ffffff;
 }
 
 .ghost-button {
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(27, 83, 187, 0.18);
+  background: #ffffff;
   color: var(--text);
 }
 
@@ -778,7 +789,7 @@ a {
   max-width: 460px;
   margin: min(9vh, 80px) auto 0;
   padding: 28px;
-  background: rgba(20, 62, 148, 0.5);
+  background: #ffffff;
   text-align: center;
 }
 
@@ -791,8 +802,8 @@ a {
   gap: 8px;
   padding: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(47, 124, 255, 0.08);
+  border: 1px solid rgba(27, 83, 187, 0.12);
 }
 
 .auth-tab {
@@ -807,8 +818,8 @@ a {
 }
 
 .auth-tab.active {
-  background: #ffffff;
-  color: var(--blue-dark);
+  background: var(--blue-dark);
+  color: #ffffff;
 }
 
 .auth-panel {
@@ -823,6 +834,13 @@ a {
 .chat-main {
   display: grid;
   gap: 16px;
+  min-height: calc(100vh - 220px);
+}
+
+.conversation-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: calc(100vh - 260px);
 }
 
 .chat-hero {
@@ -909,9 +927,10 @@ a {
   display: grid;
   gap: 14px;
   min-height: 360px;
-  max-height: 62vh;
+  max-height: none;
   overflow: auto;
   padding-right: 6px;
+  flex: 1;
 }
 
 .message-card {
@@ -947,9 +966,12 @@ a {
 }
 
 .chat-composer {
-  margin-top: 18px;
   display: grid;
   gap: 12px;
+  position: sticky;
+  bottom: 0;
+  padding-top: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 26%);
 }
 
 .composer-actions {
@@ -979,12 +1001,12 @@ a {
 .auth-form input,
 .chat-composer textarea {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(27, 83, 187, 0.16);
   border-radius: 18px;
   padding: 14px 16px;
   font: inherit;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
+  background: #ffffff;
   outline: none;
 }
 
