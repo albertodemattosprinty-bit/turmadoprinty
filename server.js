@@ -13,8 +13,9 @@ import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
 import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
-import { findSubscriptionPlanById } from "./src/plans.js";
-import { findStoreProductById, formatPriceFromCents, slugifyAlbumName, storeProducts } from "./src/store.js";
+import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
+import { createScheduleEntry, ensureSiteConfigSchema, getScheduleEntries, getSitePricingSettings, saveSitePricingSettings } from "./src/site-config.js";
+import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +27,7 @@ const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-m
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no evangelho protestante, em tom suave, amigavel, acolhedor, amavel e disposto a ajudar como um amigo. Fale com naturalidade e conviccao, tratando o evangelho como a realidade central da resposta, sem usar expressoes como 'segundo o evangelho' ou apresentar essa base como mera suposicao. Priorize proximidade, clareza, verdade biblica e cuidado pastoral.";
+const ADMIN_USERNAME = "rosemattos";
 
 const publicDir = path.join(__dirname, "public");
 const contentDir = path.join(__dirname, "Conteúdo");
@@ -39,6 +41,10 @@ const mimeTypes = {
   ".svg": "image/svg+xml",
   ".txt": "text/plain; charset=utf-8"
 };
+
+function isAdminUser(user) {
+  return String(user?.username || "").trim().toLowerCase() === ADMIN_USERNAME;
+}
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
@@ -118,7 +124,9 @@ function getAlbumPayload() {
 }
 
 function getStorePayload() {
-  return storeProducts.map((product) => ({
+  const products = buildStoreProducts();
+
+  return products.map((product) => ({
     ...product,
     priceLabel: formatPriceFromCents(product.unitAmount),
     coverUrl: buildCoverUrl(product.name),
@@ -227,6 +235,7 @@ function sanitizeUser(user) {
     id: user.id,
     name: user.name,
     username: user.username || null,
+    isAdmin: isAdminUser(user),
     email: user.email,
     emailVerified: Boolean(user.email_verified),
     createdAt: user.created_at,
@@ -264,6 +273,21 @@ async function requireAuth(request, response) {
   return user;
 }
 
+async function requireAdmin(request, response) {
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return null;
+  }
+
+  if (!isAdminUser(user)) {
+    sendJson(response, 403, { error: "Acesso restrito ao administrador." });
+    return null;
+  }
+
+  return user;
+}
+
 async function ensurePaymentsReady(response) {
   if (!hasDatabase()) {
     sendJson(response, 503, {
@@ -275,6 +299,7 @@ async function ensurePaymentsReady(response) {
 
   try {
     await ensurePaymentSchema();
+    await ensureSiteConfigSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -577,7 +602,8 @@ async function handleStripeCheckoutRequest(request, response) {
   }
 
   const productId = typeof body.productId === "string" ? body.productId.trim() : "";
-  const product = findStoreProductById(productId);
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents);
 
   if (!product) {
     sendJson(response, 404, { error: "Produto nao encontrado." });
@@ -689,7 +715,8 @@ async function handleStripeSubscriptionCheckoutRequest(request, response) {
   }
 
   const planId = typeof body.planId === "string" ? body.planId.trim() : "";
-  const plan = findSubscriptionPlanById(planId);
+  const pricing = await getSitePricingSettings();
+  const plan = buildSubscriptionPlans(pricing.planPrices).find((item) => item.id === planId) || findSubscriptionPlanById(planId);
 
   if (!plan || plan.id === "gratis") {
     sendJson(response, 404, { error: "Plano recorrente nao encontrado." });
@@ -860,6 +887,114 @@ async function handleAccessStateRequest(request, response) {
   }
 }
 
+async function handleSiteConfigRequest(response) {
+  try {
+    const [pricing, schedule] = await Promise.all([
+      getSitePricingSettings(),
+      getScheduleEntries()
+    ]);
+
+    sendJson(response, 200, {
+      ok: true,
+      pricing,
+      schedule
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao carregar configuracoes do site."
+    });
+  }
+}
+
+async function handleAdminPricingUpdate(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const albumPriceCents = Number(body.albumPriceCents);
+  const planPrices = {
+    gratis: 0,
+    plus: Number(body?.planPrices?.plus),
+    pro: Number(body?.planPrices?.pro),
+    life: Number(body?.planPrices?.life)
+  };
+
+  if (!Number.isInteger(albumPriceCents) || albumPriceCents < 0) {
+    sendJson(response, 400, { error: "Preco dos albuns invalido." });
+    return;
+  }
+
+  if (!Number.isInteger(planPrices.plus) || !Number.isInteger(planPrices.pro) || !Number.isInteger(planPrices.life)) {
+    sendJson(response, 400, { error: "Precos dos planos invalidos." });
+    return;
+  }
+
+  try {
+    const pricing = await saveSitePricingSettings({ albumPriceCents, planPrices });
+    sendJson(response, 200, { ok: true, pricing });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao salvar precos."
+    });
+  }
+}
+
+async function handleAdminScheduleCreate(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const monthLabel = typeof body.monthLabel === "string" ? body.monthLabel.trim() : "";
+  const dateLabel = typeof body.dateLabel === "string" ? body.dateLabel.trim() : "";
+  const place = typeof body.place === "string" ? body.place.trim() : "";
+  const city = typeof body.city === "string" ? body.city.trim() : "";
+  const time = typeof body.time === "string" ? body.time.trim() : "";
+
+  if (!monthLabel || !dateLabel || !place || !city || !time) {
+    sendJson(response, 400, { error: "Preencha mes, data, igreja, cidade e horario." });
+    return;
+  }
+
+  try {
+    const entry = await createScheduleEntry({ monthLabel, dateLabel, place, city, time });
+    sendJson(response, 200, { ok: true, entry });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao salvar agenda."
+    });
+  }
+}
+
 async function handleProtectedTrackDownload(request, response, pathname) {
   if (!await ensurePaymentsReady(response)) {
     return;
@@ -880,7 +1015,8 @@ async function handleProtectedTrackDownload(request, response, pathname) {
 
   const productId = decodeURIComponent(match[1]);
   const trackNumber = Number(match[2]);
-  const product = findStoreProductById(productId);
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents);
 
   if (!product || !Number.isInteger(trackNumber) || trackNumber < 1 || trackNumber > product.tracks) {
     sendJson(response, 404, { error: "Faixa nao encontrada." });
@@ -1018,9 +1154,21 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/site/config") {
+    await handleSiteConfigRequest(response);
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/store/products") {
+    const pricing = await getSitePricingSettings();
+    const storeProducts = buildStoreProducts(pricing.albumPriceCents);
     sendJson(response, 200, {
-      items: getStorePayload(),
+      items: storeProducts.map((product) => ({
+        ...product,
+        priceLabel: formatPriceFromCents(product.unitAmount),
+        coverUrl: buildCoverUrl(product.name),
+        href: `/produto.html?album=${encodeURIComponent(product.id)}`
+      })),
       total: storeProducts.length
     });
     return;
@@ -1035,7 +1183,8 @@ const server = http.createServer(async (request, response) => {
     }
 
     const productId = decodeURIComponent(pathname.replace("/api/store/products/", ""));
-    const product = findStoreProductById(productId);
+    const pricing = await getSitePricingSettings();
+    const product = findStoreProductById(productId, pricing.albumPriceCents);
 
     if (!product) {
       sendJson(response, 404, { error: "Produto nao encontrado." });
@@ -1243,6 +1392,16 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Erro ao validar sessao."
       });
     }
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/admin/pricing") {
+    await handleAdminPricingUpdate(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/admin/schedule") {
+    await handleAdminScheduleCreate(request, response);
     return;
   }
 

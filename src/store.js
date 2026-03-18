@@ -1,6 +1,6 @@
 import { albums } from "./albums.js";
 
-const DEFAULT_PRICE_CENTS = Number(process.env.DEFAULT_PRODUCT_PRICE_CENTS || 100);
+const DEFAULT_PRICE_CENTS = Number(process.env.DEFAULT_PRODUCT_PRICE_CENTS || 4990);
 
 function slugify(value) {
   return String(value || "")
@@ -19,14 +19,18 @@ function buildDescription(album) {
   return "Conteudo digital da Turma do Printy";
 }
 
-export const storeProducts = albums.map((album) => ({
-  id: slugify(album.name),
-  name: album.name,
-  description: buildDescription(album),
-  unitAmount: DEFAULT_PRICE_CENTS,
-  quantity: 1,
-  tracks: album.tracks
-}));
+export function buildStoreProducts(unitAmount = DEFAULT_PRICE_CENTS) {
+  return albums.map((album) => ({
+    id: slugify(album.name),
+    name: album.name,
+    description: buildDescription(album),
+    unitAmount,
+    quantity: 1,
+    tracks: album.tracks
+  }));
+}
+
+export const storeProducts = buildStoreProducts();
 
 export function formatPriceFromCents(valueInCents) {
   return new Intl.NumberFormat("pt-BR", {
@@ -35,8 +39,8 @@ export function formatPriceFromCents(valueInCents) {
   }).format((Number(valueInCents) || 0) / 100);
 }
 
-export function findStoreProductById(productId) {
-  return storeProducts.find((item) => item.id === productId) || null;
+export function findStoreProductById(productId, unitAmount = DEFAULT_PRICE_CENTS) {
+  return buildStoreProducts(unitAmount).find((item) => item.id === productId) || null;
 }
 
 export function slugifyAlbumName(value) {

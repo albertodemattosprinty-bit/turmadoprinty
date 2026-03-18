@@ -2,44 +2,6 @@ const sessionStorageKey = "turma_do_printy_token";
 const planStatus = document.getElementById("plan-status");
 const plansGrid = document.getElementById("plans-grid");
 
-const plans = [
-  {
-    id: "gratis",
-    name: "Gratis",
-    priceLabel: "Gratis",
-    description: "Streaming e download offline liberados no navegador para usuarios logados.",
-    perks: ["Ouvir todas as faixas", "Downloads offline", "Navegar no catalogo"]
-  },
-  {
-    id: "plus",
-    name: "Plus",
-    priceLabel: "R$ 9,90/mes",
-    description: "Plano inicial com streaming completo e downloads em todo o catalogo.",
-    perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    priceLabel: "R$ 19,90/mes",
-    description: "Plano intermediario com acesso completo para quem quer assinar mensalmente.",
-    perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
-  },
-  {
-    id: "life",
-    name: "Life",
-    priceLabel: "R$ 29,90/mes",
-    description: "Plano premium com o mesmo catalogo completo e a faixa de valor mais alta.",
-    perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
-  }
-];
-
-let accessState = {
-  authenticated: false,
-  planId: "gratis",
-  planStatusValue: "FREE",
-  canDownloadAll: false
-};
-
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
 }
@@ -52,6 +14,86 @@ function redirectToAuth() {
   window.location.href = getAuthRedirectUrl();
 }
 
+async function loadCurrentUser() {
+  const token = getToken();
+
+  if (!token) {
+    return null;
+  }
+
+  const response = await fetch("/api/auth/me", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  return data.user || null;
+}
+
+async function loadSiteConfig() {
+  const response = await fetch("/api/site/config");
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao carregar configuracoes.");
+  }
+
+  return data;
+}
+
+function formatCurrency(valueInCents) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format((Number(valueInCents) || 0) / 100);
+}
+
+function buildPlans(siteConfig) {
+  const prices = siteConfig.pricing.planPrices || {};
+
+  return [
+    {
+      id: "gratis",
+      name: "Gratis",
+      priceLabel: "Gratis",
+      description: "Streaming e download offline liberados no navegador para usuarios logados.",
+      perks: ["Ouvir todas as faixas", "Downloads offline", "Navegar no catalogo"]
+    },
+    {
+      id: "plus",
+      name: "Plus",
+      priceLabel: `${formatCurrency(prices.plus)}/mes`,
+      description: "Plano inicial com streaming completo e downloads em todo o catalogo.",
+      perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      priceLabel: `${formatCurrency(prices.pro)}/mes`,
+      description: "Plano intermediario com acesso completo para quem quer assinar mensalmente.",
+      perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
+    },
+    {
+      id: "life",
+      name: "Life",
+      priceLabel: `${formatCurrency(prices.life)}/mes`,
+      description: "Plano premium com o mesmo catalogo completo e a faixa de valor mais alta.",
+      perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
+    }
+  ];
+}
+
+let accessState = {
+  authenticated: false,
+  planId: "gratis",
+  canDownloadAll: false
+};
+
 async function loadAccessState() {
   const token = getToken();
 
@@ -59,7 +101,6 @@ async function loadAccessState() {
     accessState = {
       authenticated: false,
       planId: "gratis",
-      planStatusValue: "FREE",
       canDownloadAll: false
     };
     return;
@@ -86,7 +127,6 @@ async function loadAccessState() {
   accessState = {
     authenticated: true,
     planId: data.access.plan.id || "gratis",
-    planStatusValue: data.access.plan.status || "FREE",
     canDownloadAll: Boolean(data.access.canDownloadAll)
   };
 }
@@ -127,7 +167,87 @@ async function startRecurringCheckout(plan) {
   window.location.href = data.payUrl;
 }
 
-function renderPlans() {
+function ensureAdminPanel() {
+  let panel = document.getElementById("admin-panel");
+
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "admin-panel";
+    panel.className = "admin-panel";
+    document.querySelector(".page-shell")?.prepend(panel);
+  }
+
+  return panel;
+}
+
+function renderAdminPanel(user, siteConfig, refreshPage) {
+  if (!user?.isAdmin) {
+    return;
+  }
+
+  const panel = ensureAdminPanel();
+  const prices = siteConfig.pricing.planPrices || {};
+
+  panel.innerHTML = `
+    <div class="admin-panel-head">
+      <strong>Admin RoseMattos</strong>
+      <span>Planos</span>
+    </div>
+    <form id="admin-plan-form" class="admin-form-grid">
+      <label>Plus (centavos)
+        <input id="admin-plan-plus" type="number" min="0" step="1" value="${prices.plus || 990}">
+      </label>
+      <label>Pro (centavos)
+        <input id="admin-plan-pro" type="number" min="0" step="1" value="${prices.pro || 1990}">
+      </label>
+      <label>Life (centavos)
+        <input id="admin-plan-life" type="number" min="0" step="1" value="${prices.life || 2990}">
+      </label>
+      <button class="primary-button" type="submit">Salvar planos</button>
+      <p id="admin-plan-status" class="section-muted"></p>
+    </form>
+  `;
+
+  const form = document.getElementById("admin-plan-form");
+  const status = document.getElementById("admin-plan-status");
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.textContent = "Salvando...";
+
+    try {
+      const response = await fetch("/api/admin/pricing", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+          albumPriceCents: siteConfig.pricing.albumPriceCents,
+          planPrices: {
+            gratis: 0,
+            plus: Number(document.getElementById("admin-plan-plus").value || 0),
+            pro: Number(document.getElementById("admin-plan-pro").value || 0),
+            life: Number(document.getElementById("admin-plan-life").value || 0)
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Falha ao salvar planos.");
+      }
+
+      status.textContent = "Planos atualizados no servidor.";
+      await refreshPage();
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Erro ao salvar planos.";
+    }
+  });
+}
+
+function renderPlans(plans) {
   const params = new URLSearchParams(window.location.search);
   const paymentReturned = params.get("payment") === "return";
   const activePlan = plans.find((plan) => plan.id === accessState.planId) || plans[0];
@@ -182,10 +302,16 @@ function renderPlans() {
   });
 }
 
-try {
+async function renderPage() {
+  const [siteConfig, user] = await Promise.all([loadSiteConfig(), loadCurrentUser()]);
+  const plans = buildPlans(siteConfig);
+  renderAdminPanel(user, siteConfig, renderPage);
   await loadAccessState();
-  renderPlans();
+  renderPlans(plans);
+}
+
+try {
+  await renderPage();
 } catch (error) {
   planStatus.textContent = error instanceof Error ? error.message : "Erro ao carregar planos.";
-  renderPlans();
 }

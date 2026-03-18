@@ -311,6 +311,61 @@ a {
   margin-bottom: 20px;
 }
 
+.admin-panel {
+  margin-bottom: 18px;
+  padding: 18px 22px;
+  border-radius: 24px;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: var(--shadow);
+}
+
+.admin-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.admin-form-inline,
+.admin-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-form-inline {
+  grid-template-columns: minmax(240px, 320px) auto 1fr;
+  align-items: end;
+}
+
+.admin-form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.admin-form-inline label,
+.admin-form-grid label {
+  display: grid;
+  gap: 8px;
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.admin-form-inline input,
+.admin-form-grid input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .album-grid {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
@@ -539,6 +594,20 @@ a {
 
 .schedule-grid {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.schedule-month {
+  display: grid;
+  gap: 16px;
+}
+
+.schedule-month-title {
+  margin: 0;
+  color: var(--yellow);
+  font-size: 1.35rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .schedule-day {
@@ -823,6 +892,11 @@ a {
   }
 
   .track-card {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-inline,
+  .admin-form-grid {
     grid-template-columns: 1fr;
   }
 

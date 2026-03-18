@@ -36,3 +36,10 @@ export const subscriptionPlans = [
 export function findSubscriptionPlanById(planId) {
   return subscriptionPlans.find((plan) => plan.id === planId) || null;
 }
+
+export function buildSubscriptionPlans(planPrices = {}) {
+  return subscriptionPlans.map((plan) => ({
+    ...plan,
+    unitAmount: Number(planPrices[plan.id]) >= 0 ? Number(planPrices[plan.id]) : plan.unitAmount
+  }));
+}
