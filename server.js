@@ -383,15 +383,6 @@ async function createPagBankCheckout({ request, product }) {
       { type: "BOLETO" },
       { type: "CREDIT_CARD" }
     ],
-    payment_methods_configs: [
-      {
-        type: "CREDIT_CARD",
-        config_options: [
-          { option: "INSTALLMENTS_LIMIT", value: "12" },
-          { option: "INTEREST_FREE_INSTALLMENTS", value: "1" }
-        ]
-      }
-    ],
     notification_urls: [webhookUrl],
     payment_notification_urls: [webhookUrl]
   };
