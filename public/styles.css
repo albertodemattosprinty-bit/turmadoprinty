@@ -2267,7 +2267,7 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"].explore-authenticated .chat-layout.sidebar-collapsed .chat-sidebar {
-    transform: translateX(calc(-100% + 72px));
+    transform: translateX(-100%);
   }
 
   body[data-page="explorar"].explore-authenticated .chat-layout.sidebar-collapsed .chat-main {
