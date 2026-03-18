@@ -1,4 +1,5 @@
 const purchaseStorageKey = "turma_do_printy_purchased_albums";
+const planStorageKey = "turma_do_printy_plan";
 
 const productCover = document.getElementById("product-cover");
 const productTitle = document.getElementById("product-title");
@@ -40,11 +41,29 @@ function hasPurchasedAlbum(albumId) {
   return Boolean(getPurchases()[albumId]?.purchased);
 }
 
+function getCurrentPlanId() {
+  try {
+    return JSON.parse(window.localStorage.getItem(planStorageKey) || "{\"id\":\"gratis\"}")?.id || "gratis";
+  } catch {
+    return "gratis";
+  }
+}
+
+function hasPaidPlan() {
+  return getCurrentPlanId() !== "gratis";
+}
+
 function updatePurchaseState(albumId) {
   const purchased = hasPurchasedAlbum(albumId);
+
+  if (hasPaidPlan()) {
+    purchaseStatus.textContent = `Plano ${getCurrentPlanId().toUpperCase()} ativo neste navegador. Downloads liberados para todas as musicas.`;
+    return;
+  }
+
   purchaseStatus.textContent = purchased
     ? "Compra registrada neste navegador. Downloads liberados por faixa."
-    : "Streaming liberado. O download por faixa aparece depois da compra.";
+    : "Streaming liberado. O download por faixa aparece depois da compra ou com um plano pago.";
 }
 
 async function startCheckout(albumId) {
@@ -81,7 +100,7 @@ async function startCheckout(albumId) {
 }
 
 function renderTracks(album) {
-  const purchased = hasPurchasedAlbum(album.id);
+  const purchased = hasPurchasedAlbum(album.id) || hasPaidPlan();
   trackList.innerHTML = "";
 
   album.tracks.forEach((track) => {

@@ -422,6 +422,37 @@ a {
   justify-content: flex-end;
 }
 
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.plan-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.plan-card.active {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.plan-card h2,
+.plan-card p {
+  margin: 0;
+}
+
+.plan-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .schedule-grid {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
@@ -697,7 +728,8 @@ a {
   .auth-grid,
   .auth-hero,
   .product-hero,
-  .track-card {
+  .track-card,
+  .plans-grid {
     grid-template-columns: 1fr;
   }
 

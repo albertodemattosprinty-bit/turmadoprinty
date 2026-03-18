@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Turma do Printy | Eventos</title>
+  <title>Turma do Printy | Planos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-page="eventos">
+<body data-page="planos">
   <header class="site-header">
     <a class="brand" href="/index.html"><span class="brand-mark">P</span><span class="brand-text">Turma do Printy</span></a>
     <nav class="site-nav">
@@ -24,22 +24,18 @@
   </header>
 
   <main class="page-shell">
-    <section class="section-card text-page">
-      <p class="eyebrow">Eventos</p>
-      <h1 class="section-title">Apresentações que unem música, teatro, participação e mensagem bíblica.</h1>
-      <p class="page-copy">
-        Os eventos da Turma do Printy podem ser organizados para igrejas, congressos, encontros especiais, finais de semana
-        temáticos e programações infantis com forte senso de acolhimento. A proposta é levar a criança a cantar, sorrir,
-        memorizar a verdade e participar com a família e a igreja local.
-      </p>
-      <p class="page-copy">
-        Cada apresentação pode reunir repertório infantil cristão, momentos teatrais, comunicação leve, cenário colorido e
-        uma atmosfera de reverência alegre. O objetivo é transformar o encontro em uma experiência bonita, edificante e fácil
-        de guardar no coração.
-      </p>
+    <section class="section-card">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Planos</p>
+          <h1 class="section-title">Escolha um plano para testar</h1>
+        </div>
+        <p id="plan-status" class="section-muted">Carregando plano atual...</p>
+      </div>
+      <div id="plans-grid" class="plans-grid"></div>
     </section>
   </main>
 
-  <script type="module" src="/site.js"></script>
+  <script type="module" src="/planos.js"></script>
 </body>
 </html>
