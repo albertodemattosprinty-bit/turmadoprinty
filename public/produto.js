@@ -756,10 +756,12 @@ async function renderTracks(album) {
 function syncAdminPanel(album) {
   if (!isAdmin()) {
     albumAdminPanel.hidden = true;
+    albumAdminPanel.style.display = "none";
     return;
   }
 
   albumAdminPanel.hidden = false;
+  albumAdminPanel.style.display = "grid";
   albumPriceInput.value = String(album.unitAmount || 0);
 }
 
