@@ -21,6 +21,6 @@ services:
       - key: DEFAULT_PRODUCT_PRICE_CENTS
         value: 5000
       - key: PAGBANK_ENVIRONMENT
-        value: production
+        value: sandbox
       - key: PAGBANK_TOKEN
         sync: false
