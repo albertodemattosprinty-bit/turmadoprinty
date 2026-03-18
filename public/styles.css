@@ -49,7 +49,7 @@ a {
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  padding: 18px 24px;
+  padding: 10px 24px;
   background: rgba(27, 83, 187, 0.96);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
@@ -117,8 +117,12 @@ a {
   padding: 0 0 54px;
 }
 
+body[data-page="produtos"] {
+  background: #ffffff;
+}
+
 .home-banner {
-  margin: 0 calc(50% - 50vw) 22px;
+  margin: 0 calc(50% - 50vw) 0;
   overflow: hidden;
   border-radius: 0;
   border: 0;
@@ -162,13 +166,17 @@ a {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  min-height: 220px;
-  padding: 28px 30px;
+  min-height: 320px;
+  margin: 0 calc(50% - 50vw);
+  padding: 34px clamp(24px, 7vw, 108px);
   align-items: center;
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 28%),
     linear-gradient(135deg, #ff9e43 0%, #ff7a18 55%, #f15b2a 100%);
   color: #ffffff;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
 }
 
 .hero-title,
@@ -214,16 +222,16 @@ a {
 .hero-inline-copy {
   margin: 0;
   color: #ffffff;
-  font-size: clamp(1.3rem, 2.4vw, 1.95rem);
+  font-size: clamp(1.8rem, 3vw, 3rem);
   font-weight: 800;
   line-height: 1.22;
 }
 
 .hero-home .section-muted {
-  max-width: 60ch;
-  margin: 0;
+  max-width: 94ch;
+  margin: 0 0 14px;
   color: rgba(255, 255, 255, 0.94);
-  font-size: 1rem;
+  font-size: 1.02rem;
 }
 
 .page-banner {
@@ -786,6 +794,39 @@ a {
   margin: 0;
 }
 
+body[data-page="planos"] .section-card {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+
+body[data-page="planos"] .section-title,
+body[data-page="planos"] .section-muted,
+body[data-page="planos"] .eyebrow,
+body[data-page="planos"] #plan-status,
+body[data-page="planos"] .plan-card,
+body[data-page="planos"] .plan-card h2,
+body[data-page="planos"] .plan-card p,
+body[data-page="planos"] .pill,
+body[data-page="planos"] .status-pill {
+  color: #ffffff;
+}
+
+body[data-page="planos"] .plan-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+body[data-page="planos"] .plan-card.active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+body[data-page="planos"] .pill,
+body[data-page="planos"] .status-pill {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .plan-perks {
   display: flex;
   flex-wrap: wrap;
@@ -1234,7 +1275,6 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
     grid-template-columns: 1fr;
   }
 
-  .site-header,
   .section-head,
   .conversation-header {
     flex-direction: column;
@@ -1242,13 +1282,23 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
   }
 
   .site-header {
-    gap: 14px;
+    justify-content: center;
+    padding: 8px 18px;
   }
 
   .site-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
     width: 100%;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
     justify-content: space-between;
     gap: 8px;
+    background: rgba(27, 83, 187, 0.98);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(14px);
   }
 
   .brand-mark {
@@ -1256,13 +1306,28 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
     height: 108px;
   }
 
+  .brand {
+    width: 100%;
+    justify-content: center;
+  }
+
   .nav-link {
     min-width: 46px;
     padding: 10px 12px;
+    justify-content: center;
   }
 
   .nav-link span {
     display: none;
+  }
+
+  body {
+    padding-bottom: 92px;
+  }
+
+  .hero-home {
+    min-height: 0;
+    padding: 28px 20px;
   }
 
   .conversation-meta {
