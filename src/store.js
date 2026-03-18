@@ -1,6 +1,6 @@
 import { albums } from "./albums.js";
 
-const DEFAULT_PRICE_CENTS = Number(process.env.DEFAULT_PRODUCT_PRICE_CENTS || 4990);
+const DEFAULT_PRICE_CENTS = Number(process.env.DEFAULT_PRODUCT_PRICE_CENTS || 100);
 
 function slugify(value) {
   return String(value || "")

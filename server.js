@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
+import { findSubscriptionPlanById } from "./src/plans.js";
 import { findStoreProductById, formatPriceFromCents, slugifyAlbumName, storeProducts } from "./src/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -522,6 +523,121 @@ async function handlePagBankCheckoutRequest(request, response) {
   }
 }
 
+async function createPagBankSubscriptionCheckout({ request, plan }) {
+  if (!PAGBANK_TOKEN) {
+    throw new Error("PAGBANK_TOKEN nao configurado.");
+  }
+
+  const baseUrl = getBaseUrl(request);
+  const referenceId = `printy-plan-${plan.id}-${crypto.randomUUID()}`;
+  const redirectUrl = `${baseUrl}/planos.html?plan=${encodeURIComponent(plan.id)}&payment=return`;
+  const webhookUrl = `${baseUrl}/api/payments/pagbank/webhook`;
+
+  const payload = {
+    reference_id: referenceId,
+    redirect_url: redirectUrl,
+    customer_modifiable: true,
+    items: [
+      {
+        name: `Plano ${plan.name}`,
+        quantity: 1,
+        unit_amount: plan.unitAmount
+      }
+    ],
+    payment_methods: [
+      { type: "CREDIT_CARD" }
+    ],
+    notification_urls: [webhookUrl],
+    payment_notification_urls: [webhookUrl],
+    recurrence_plan: {
+      name: `Turma do Printy ${plan.name}`,
+      interval: {
+        unit: plan.intervalUnit,
+        length: plan.intervalLength
+      },
+      billing_cycles: plan.billingCycles
+    }
+  };
+
+  const pagBankResponse = await fetch(`${PAGBANK_API_BASE_URL}/checkouts`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${PAGBANK_TOKEN}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-idempotency-key": crypto.randomUUID()
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const { data, text } = await readApiResponse(pagBankResponse);
+
+  if (!pagBankResponse.ok) {
+    throw new Error(
+      data?.error_messages?.[0]?.description ||
+      data?.message ||
+      text ||
+      "Falha ao criar checkout recorrente no PagBank."
+    );
+  }
+
+  if (!data) {
+    throw new Error("O PagBank devolveu resposta vazia ou invalida ao criar o checkout recorrente.");
+  }
+
+  const payLink = Array.isArray(data.links) ? data.links.find((link) => link?.rel === "PAY" && typeof link.href === "string") : null;
+
+  if (!payLink?.href) {
+    throw new Error("Checkout recorrente criado sem link de pagamento.");
+  }
+
+  return {
+    checkoutId: data.id,
+    referenceId: data.reference_id,
+    payUrl: payLink.href,
+    recurrencePlanId: data?.recurrence_plan?.id || null
+  };
+}
+
+async function handlePagBankSubscriptionCheckoutRequest(request, response) {
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const planId = typeof body.planId === "string" ? body.planId.trim() : "";
+  const plan = findSubscriptionPlanById(planId);
+
+  if (!plan || plan.id === "gratis") {
+    sendJson(response, 404, { error: "Plano recorrente nao encontrado." });
+    return;
+  }
+
+  try {
+    const checkout = await createPagBankSubscriptionCheckout({ request, plan });
+    sendJson(response, 200, {
+      ok: true,
+      plan: {
+        id: plan.id,
+        name: plan.name,
+        priceLabel: formatPriceFromCents(plan.unitAmount)
+      },
+      checkoutId: checkout.checkoutId,
+      referenceId: checkout.referenceId,
+      recurrencePlanId: checkout.recurrencePlanId,
+      payUrl: checkout.payUrl
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao criar checkout recorrente PagBank."
+    });
+  }
+}
+
 async function handlePagBankWebhook(request, response) {
   let body = {};
 
@@ -684,6 +800,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/payments/pagbank/checkout") {
     await handlePagBankCheckoutRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/payments/pagbank/subscription-checkout") {
+    await handlePagBankSubscriptionCheckoutRequest(request, response);
     return;
   }
 
