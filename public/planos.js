@@ -1,4 +1,5 @@
 import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
+import { applyTextOverrides, getTextOverride, initContentAdmin } from "./content-admin.js";
 
 const planStatus = document.getElementById("plan-status");
 const plansGrid = document.getElementById("plans-grid");
@@ -35,30 +36,30 @@ function buildPlans(siteConfig) {
   return [
     {
       id: "gratis",
-      name: "Gratis",
-      priceLabel: "Gratis",
-      description: "Streaming e download offline liberados no navegador para usuarios logados.",
+      name: getTextOverride("plans.free.name", "Gratis"),
+      priceLabel: getTextOverride("plans.free.price", "Gratis"),
+      description: getTextOverride("plans.free.description", "Streaming e download offline liberados no navegador para usuarios logados."),
       perks: ["Ouvir todas as faixas", "Downloads offline", "Navegar no catalogo"]
     },
     {
       id: "plus",
-      name: "Plus",
+      name: getTextOverride("plans.plus.name", "Plus"),
       priceLabel: `${formatCurrency(prices.plus)}/mes`,
-      description: "9,90 musicas e playbacks.",
+      description: getTextOverride("plans.plus.description", "9,90 musicas e playbacks."),
       perks: ["Musicas e playbacks", "Streaming completo", "Pagamento mensal recorrente"]
     },
     {
       id: "pro",
-      name: "Pro",
+      name: getTextOverride("plans.pro.name", "Pro"),
       priceLabel: `${formatCurrency(prices.pro)}/mes`,
-      description: "19,90 cantatas.",
+      description: getTextOverride("plans.pro.description", "19,90 cantatas."),
       perks: ["Cantatas", "Streaming completo", "Pagamento mensal recorrente"]
     },
     {
       id: "life",
-      name: "Life",
+      name: getTextOverride("plans.life.name", "Life"),
       priceLabel: `${formatCurrency(prices.life)}/mes`,
-      description: "29,90 IA Ilimitada Pro.",
+      description: getTextOverride("plans.life.description", "29,90 IA Ilimitada Pro."),
       perks: ["IA Ilimitada Pro", "Streaming completo", "Pagamento mensal recorrente"]
     }
   ];
@@ -183,6 +184,7 @@ function renderAdminPanel(user, siteConfig, refreshPage) {
       <p id="admin-plan-status" class="section-muted"></p>
     </form>
   `;
+  applyTextOverrides(panel);
 
   const form = document.getElementById("admin-plan-form");
   const status = document.getElementById("admin-plan-status");
@@ -276,10 +278,17 @@ function renderPlans(plans) {
 
     plansGrid.appendChild(article);
   });
+
+  applyTextOverrides(plansGrid);
 }
 
 async function renderPage() {
   const [siteConfig, user] = await Promise.all([loadSiteConfig(), loadCurrentUser()]);
+  initContentAdmin({
+    user,
+    getToken,
+    config: siteConfig
+  });
   const plans = buildPlans(siteConfig);
   renderAdminPanel(user, siteConfig, renderPage);
   await loadAccessState();

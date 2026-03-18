@@ -264,6 +264,68 @@ body[data-page="produtos"] {
   height: auto;
 }
 
+.banner-admin-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px 0;
+}
+
+.banner-upload-button,
+.banner-target-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+}
+
+.banner-upload-button {
+  padding: 12px 18px;
+  background: rgba(27, 83, 187, 0.92);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 14px 30px rgba(27, 83, 187, 0.18);
+}
+
+.banner-upload-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.banner-target-field {
+  padding: 8px 10px 8px 16px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--blue-dark);
+  border: 1px solid rgba(27, 83, 187, 0.12);
+}
+
+.banner-target-field select {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  outline: none;
+}
+
+.banner-admin-tools.is-uploading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.content-editable {
+  cursor: text;
+}
+
+.content-editable:hover {
+  text-decoration: underline dotted rgba(27, 83, 187, 0.45);
+  text-underline-offset: 0.18em;
+}
+
 .hero-card,
 .section-card,
 .info-card,

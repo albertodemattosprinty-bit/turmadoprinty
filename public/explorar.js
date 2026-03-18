@@ -1,3 +1,5 @@
+import { initContentAdmin } from "./content-admin.js";
+
 const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
@@ -43,6 +45,10 @@ let isRecording = false;
 let sidebarCollapsed = window.innerWidth <= 980;
 let chatSearchTerm = "";
 let speakingButton = null;
+let siteConfig = {
+  banners: {},
+  textOverrides: {}
+};
 
 const emptyConversationVariants = [
   "Quando voce quiser",
@@ -68,6 +74,17 @@ function setToken(token) {
   }
 
   window.localStorage.removeItem(sessionStorageKey);
+}
+
+async function loadSiteConfig() {
+  const response = await fetch("/api/site/config");
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao carregar configuracoes do site.");
+  }
+
+  return data;
 }
 
 async function runAuthRequest(url, payload) {
@@ -503,6 +520,11 @@ function syncComposerState() {
 async function loadSessionState() {
   if (!getToken()) {
     currentUser = null;
+    initContentAdmin({
+      user: null,
+      getToken,
+      config: siteConfig
+    });
     authStatus.textContent = "Entre ou cadastre sua conta para abrir o chat.";
     chatAuthStatus.textContent = "Sem login ativo.";
     syncComposerState();
@@ -531,6 +553,11 @@ async function loadSessionState() {
     }
 
     currentUser = data.user;
+    initContentAdmin({
+      user: currentUser,
+      getToken,
+      config: siteConfig
+    });
     migrateLegacyHistory();
     authStatus.textContent = `Logado como @${data.user.username}`;
     chatAuthStatus.textContent = getUserDisplayName();
@@ -541,6 +568,11 @@ async function loadSessionState() {
     renderConversation();
   } catch (error) {
     currentUser = null;
+    initContentAdmin({
+      user: null,
+      getToken,
+      config: siteConfig
+    });
     authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
     chatAuthStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
     syncComposerState();
@@ -586,6 +618,8 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
     article,
     target: article.querySelector(".message-text"),
     text: initialText,
+    hasPreview: false,
+    finalStarted: false,
     setText(nextText) {
       this.text = nextText;
       this.target.textContent = nextText;
@@ -598,6 +632,19 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
 
       const nextText = this.text === "Preparando resposta..." ? extraText : `${this.text}${extraText}`;
       this.setText(nextText);
+    },
+    setPreview(previewText) {
+      this.hasPreview = Boolean(previewText);
+      this.finalStarted = false;
+      this.setText(previewText || "Preparando resposta...");
+    },
+    startFinalBlock() {
+      if (!this.hasPreview || this.finalStarted) {
+        return;
+      }
+
+      this.finalStarted = true;
+      this.setText(`${this.text}\n\nAprofundando melhor:\n`);
     },
     finalizeAudio() {
       const cleanText = (this.text || "").trim();
@@ -639,7 +686,18 @@ async function consumeAssistantStream(response, assistantMessage = createAssista
         const event = JSON.parse(dataLine);
 
         if (event.type === "status") {
-          assistantMessage.setText(event.message || "Preparando resposta...");
+          if (!assistantMessage.hasPreview) {
+            assistantMessage.setText(event.message || "Preparando resposta...");
+          }
+
+          if (event.stage === "final") {
+            assistantMessage.startFinalBlock();
+          }
+          continue;
+        }
+
+        if (event.type === "preview" && event.text) {
+          assistantMessage.setPreview(event.text);
           continue;
         }
 
@@ -1029,4 +1087,10 @@ renderConversation();
 syncComposerState();
 setComposerStatus("");
 setActiveAuthTab("login");
+siteConfig = await loadSiteConfig().catch(() => siteConfig);
+initContentAdmin({
+  user: null,
+  getToken,
+  config: siteConfig
+});
 await loadSessionState();

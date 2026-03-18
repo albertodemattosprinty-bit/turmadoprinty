@@ -1,7 +1,7 @@
 import "./src/load-env.js";
 
 import { createReadStream, existsSync } from "node:fs";
-import { access, readFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import crypto from "node:crypto";
 import http from "node:http";
 import path from "node:path";
@@ -15,7 +15,7 @@ import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { hasDatabase, query } from "./src/db.js";
 import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
-import { createScheduleEntry, ensureSiteConfigSchema, getScheduleEntries, getSitePricingSettings, saveSitePricingSettings } from "./src/site-config.js";
+import { createScheduleEntry, ensureSiteConfigSchema, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveSiteContentSettings, saveSitePricingSettings } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +24,7 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
+const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-5.1-codex-mini";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -88,6 +89,90 @@ async function readRawTextBody(request) {
 
 async function readTextBody(request) {
   return (await readRawTextBody(request)).trim();
+}
+
+function getInstantModel(body) {
+  const requested = typeof body?.instantModel === "string" ? body.instantModel.trim() : "";
+  return requested || OPENAI_INSTANT_MODEL || OPENAI_MODEL;
+}
+
+function parseDataUrl(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+
+  if (!match) {
+    throw new Error("Envie a imagem em data URL base64.");
+  }
+
+  return {
+    mimeType: match[1].trim().toLowerCase(),
+    buffer: Buffer.from(match[2], "base64")
+  };
+}
+
+function getUploadExtension(mimeType) {
+  switch (mimeType) {
+    case "image/png":
+      return ".png";
+    case "image/jpeg":
+      return ".jpg";
+    case "image/webp":
+      return ".webp";
+    case "image/svg+xml":
+      return ".svg";
+    default:
+      return "";
+  }
+}
+
+async function saveBannerAsset(dataUrl, bannerKey) {
+  const { mimeType, buffer } = parseDataUrl(dataUrl);
+  const extension = getUploadExtension(mimeType);
+
+  if (!extension) {
+    throw new Error("Formato de banner nao suportado. Use PNG, JPG, WEBP ou SVG.");
+  }
+
+  if (!buffer.length) {
+    throw new Error("Banner vazio.");
+  }
+
+  if (buffer.length > 5 * 1024 * 1024) {
+    throw new Error("Banner muito grande. Limite de 5 MB.");
+  }
+
+  const safeKey = String(bannerKey || "banner").replace(/[^a-z0-9_-]/gi, "-").toLowerCase();
+  const relativeDir = path.join("uploads", "banners");
+  const fileName = `${safeKey}-${Date.now()}-${crypto.randomUUID()}${extension}`;
+  const absoluteDir = path.join(publicDir, relativeDir);
+  const absolutePath = path.join(absoluteDir, fileName);
+
+  await mkdir(absoluteDir, { recursive: true });
+  await writeFile(absolutePath, buffer);
+
+  return `/${relativeDir.replaceAll("\\", "/")}/${fileName}`;
+}
+
+async function createChatCompletion(apiKey, payload) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const { data, text } = await readApiResponse(response);
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || text || "Falha ao chamar a API da OpenAI.");
+  }
+
+  if (!data) {
+    throw new Error("A OpenAI devolveu uma resposta vazia ou invalida.");
+  }
+
+  return data;
 }
 
 async function getContextPrompt() {
@@ -392,6 +477,7 @@ async function handleGptRequest(request, response) {
     ? `${systemBase}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
     : systemBase;
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : OPENAI_MODEL;
+  const instantModel = getInstantModel(body);
   const history = Array.isArray(body.history) ? body.history : [];
   const wantsStream = Boolean(body.stream) || String(request.headers.accept || "").includes("text/event-stream");
 
@@ -429,7 +515,37 @@ async function handleGptRequest(request, response) {
         response.write(`data: ${JSON.stringify(payload)}\n\n`);
       };
 
-      sendEvent({ type: "status", message: "Pensando na melhor resposta..." });
+      sendEvent({ type: "status", stage: "preview", message: "Montando uma resposta imediata..." });
+
+      if (instantModel) {
+        try {
+          const previewPayload = await createChatCompletion(apiKey, {
+            model: instantModel,
+            messages: [
+              ...(system ? [{ role: "system", content: `${system}\n\nEntregue primeiro uma resposta imediata, curta e pratica em ate 3 frases.` }] : []),
+              ...messages,
+              { role: "user", content: message }
+            ]
+          });
+          const previewText = extractChatCompletionText(previewPayload);
+
+          if (previewText) {
+            sendEvent({
+              type: "preview",
+              model: previewPayload.model || instantModel,
+              text: previewText
+            });
+          }
+        } catch (error) {
+          sendEvent({
+            type: "status",
+            stage: "preview",
+            message: error instanceof Error ? "Seguindo sem resposta instantanea." : "Seguindo com a resposta principal..."
+          });
+        }
+      }
+
+      sendEvent({ type: "status", stage: "final", message: "Aprofundando a resposta..." });
 
       const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -503,31 +619,7 @@ async function handleGptRequest(request, response) {
       return;
     }
 
-    const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(requestPayload)
-    });
-
-    const { data: payload, text } = await readApiResponse(openAiResponse);
-
-    if (!openAiResponse.ok) {
-      sendJson(response, openAiResponse.status, {
-        error: "Falha ao chamar a API da OpenAI.",
-        details: payload || text || "Resposta vazia da OpenAI."
-      });
-      return;
-    }
-
-    if (!payload) {
-      sendJson(response, 502, {
-        error: "A OpenAI devolveu uma resposta vazia ou invalida."
-      });
-      return;
-    }
+    const payload = await createChatCompletion(apiKey, requestPayload);
 
     sendJson(response, 200, {
       ok: true,
@@ -981,19 +1073,179 @@ async function handleAccessStateRequest(request, response) {
 
 async function handleSiteConfigRequest(response) {
   try {
-    const [pricing, schedule] = await Promise.all([
+    const [pricing, schedule, content] = await Promise.all([
       getSitePricingSettings(),
-      getScheduleEntries()
+      getScheduleEntries(),
+      getSiteContentSettings()
     ]);
 
     sendJson(response, 200, {
       ok: true,
       pricing,
-      schedule
+      schedule,
+      banners: content.banners,
+      textOverrides: content.textOverrides
     });
   } catch (error) {
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Erro ao carregar configuracoes do site."
+    });
+  }
+}
+
+async function handleAdminBannerUpdate(request, response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, {
+      error: "DATABASE_URL nao configurada.",
+      hint: "Configure o Postgres para salvar banners."
+    });
+    return;
+  }
+
+  try {
+    await ensureSiteConfigSchema();
+  } catch (error) {
+    sendJson(response, 503, {
+      error: error instanceof Error ? error.message : "Falha ao preparar configuracoes do site."
+    });
+    return;
+  }
+
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const bannerKey = typeof body.bannerKey === "string" ? body.bannerKey.trim() : "";
+  const target = typeof body.target === "string" ? body.target.trim().toLowerCase() : "";
+  const imageDataUrl = typeof body.imageDataUrl === "string" ? body.imageDataUrl.trim() : "";
+
+  if (!bannerKey) {
+    sendJson(response, 400, { error: "Informe o banner que deseja trocar." });
+    return;
+  }
+
+  if (!["mobile", "desktop", "both"].includes(target)) {
+    sendJson(response, 400, { error: "Escolha mobile, desktop ou ambos." });
+    return;
+  }
+
+  if (!imageDataUrl) {
+    sendJson(response, 400, { error: "Envie a imagem do banner." });
+    return;
+  }
+
+  try {
+    const imageUrl = await saveBannerAsset(imageDataUrl, bannerKey);
+    const currentContent = await getSiteContentSettings();
+    const nextBanners = {
+      ...currentContent.banners,
+      [bannerKey]: {
+        ...(currentContent.banners?.[bannerKey] || {})
+      }
+    };
+
+    if (target === "desktop" || target === "both") {
+      nextBanners[bannerKey].desktop = imageUrl;
+    }
+
+    if (target === "mobile" || target === "both") {
+      nextBanners[bannerKey].mobile = imageUrl;
+    }
+
+    const content = await saveSiteContentSettings({
+      banners: nextBanners,
+      textOverrides: currentContent.textOverrides
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      banners: content.banners,
+      bannerKey,
+      imageUrl
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao salvar banner."
+    });
+  }
+}
+
+async function handleAdminTextOverrideUpdate(request, response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, {
+      error: "DATABASE_URL nao configurada.",
+      hint: "Configure o Postgres para salvar textos globais."
+    });
+    return;
+  }
+
+  try {
+    await ensureSiteConfigSchema();
+  } catch (error) {
+    sendJson(response, 503, {
+      error: error instanceof Error ? error.message : "Falha ao preparar configuracoes do site."
+    });
+    return;
+  }
+
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const key = typeof body.key === "string" ? body.key.trim() : "";
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+
+  if (!key) {
+    sendJson(response, 400, { error: "Informe a chave do texto." });
+    return;
+  }
+
+  if (!text) {
+    sendJson(response, 400, { error: "Informe o novo texto." });
+    return;
+  }
+
+  try {
+    const currentContent = await getSiteContentSettings();
+    const content = await saveSiteContentSettings({
+      banners: currentContent.banners,
+      textOverrides: {
+        ...currentContent.textOverrides,
+        [key]: text
+      }
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      textOverrides: content.textOverrides,
+      key,
+      text
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao salvar texto."
     });
   }
 }
@@ -1288,6 +1540,7 @@ const server = http.createServer(async (request, response) => {
         hasStripeWebhookSecret: Boolean(STRIPE_WEBHOOK_SECRET),
         contentBaseUrl: CONTENT_BASE_URL,
         model: OPENAI_MODEL,
+        instantModel: OPENAI_INSTANT_MODEL,
         transcribeModel: OPENAI_TRANSCRIBE_MODEL,
         stripeEnvironment: getStripeEnvironment()
       }
@@ -1588,6 +1841,16 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/admin/schedule") {
     await handleAdminScheduleCreate(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/admin/site/banner") {
+    await handleAdminBannerUpdate(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/admin/site/text") {
+    await handleAdminTextOverrideUpdate(request, response);
     return;
   }
 

@@ -1,4 +1,5 @@
 import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
+import { applyTextOverrides, initContentAdmin } from "./content-admin.js";
 
 const page = document.body.dataset.page || "";
 
@@ -92,6 +93,7 @@ function renderProductsAdminPanel(user, siteConfig, refreshAlbums) {
       <p id="admin-product-status" class="section-muted"></p>
     </form>
   `;
+  applyTextOverrides(panel);
 
   const form = document.getElementById("admin-product-form");
   const status = document.getElementById("admin-product-status");
@@ -163,6 +165,8 @@ async function loadAlbums(siteConfig, user) {
         `;
         grid.appendChild(card);
       });
+
+      applyTextOverrides(grid);
     } catch (error) {
       count.textContent = "Falha ao carregar";
       grid.innerHTML = `<p class="section-muted">${error instanceof Error ? error.message : "Erro ao carregar albuns."}</p>`;
@@ -210,6 +214,7 @@ function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
       <p id="admin-schedule-status" class="section-muted"></p>
     </form>
   `;
+  applyTextOverrides(panel);
 
   const form = document.getElementById("admin-schedule-form");
   const status = document.getElementById("admin-schedule-status");
@@ -274,6 +279,8 @@ async function loadSchedule(siteConfig, user) {
       `;
       grid.appendChild(card);
     });
+
+    applyTextOverrides(grid);
   };
 
   renderAgendaAdminPanel(user, siteConfig, refreshSchedule);
@@ -284,9 +291,15 @@ markActiveNav();
 const headerUser = await initSiteHeader().catch(() => null);
 
 const [siteConfig, currentUser] = await Promise.all([
-  loadSiteConfig().catch(() => ({ pricing: { albumPriceCents: 4990, planPrices: {} }, schedule: [] })),
+  loadSiteConfig().catch(() => ({ pricing: { albumPriceCents: 4990, planPrices: {} }, schedule: [], banners: {}, textOverrides: {} })),
   Promise.resolve(headerUser || null)
 ]);
+
+initContentAdmin({
+  user: currentUser,
+  getToken,
+  config: siteConfig
+});
 
 await loadAlbums(siteConfig, currentUser);
 await loadSchedule(siteConfig, currentUser);

@@ -8,6 +8,23 @@ export const DEFAULT_PLAN_PRICES = {
   life: 2990
 };
 
+export const DEFAULT_BANNERS = {
+  home: {
+    desktop: "/homesite.png",
+    mobile: "/homesite.png"
+  },
+  produtos: {
+    desktop: "/cantata.png",
+    mobile: "/cantata.png"
+  },
+  eventos: {
+    desktop: "/eventos.png",
+    mobile: "/eventos.png"
+  }
+};
+
+export const DEFAULT_TEXT_OVERRIDES = {};
+
 export const DEFAULT_SCHEDULE = [
   { monthLabel: "Setembro", dateLabel: "06/09", place: "Igreja Assembleia de Deus Belem", city: "Pinheiros - SP", time: "10:00" },
   { monthLabel: "Setembro", dateLabel: "13/09", place: "Assembleia de Deus Madureira", city: "Barra do Garcas", time: "18:00" },
@@ -53,6 +70,48 @@ function normalizeTime(value) {
   return String(value || "").trim();
 }
 
+function normalizeBannerUrl(value) {
+  return String(value || "").trim();
+}
+
+function normalizeBannerMap(value, fallback) {
+  const source = typeof value === "object" && value ? value : {};
+
+  return {
+    desktop: normalizeBannerUrl(source.desktop || fallback.desktop),
+    mobile: normalizeBannerUrl(source.mobile || fallback.mobile || source.desktop || fallback.desktop)
+  };
+}
+
+function normalizeBanners(value) {
+  const source = typeof value === "object" && value ? value : {};
+  const entries = {};
+
+  for (const [key, fallback] of Object.entries(DEFAULT_BANNERS)) {
+    entries[key] = normalizeBannerMap(source[key], fallback);
+  }
+
+  for (const [key, banner] of Object.entries(source)) {
+    if (!entries[key]) {
+      entries[key] = normalizeBannerMap(banner, { desktop: "", mobile: "" });
+    }
+  }
+
+  return entries;
+}
+
+function normalizeTextOverrides(value) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, text]) => [String(key || "").trim(), String(text || "").trim()])
+      .filter(([key, text]) => key && text)
+  );
+}
+
 export async function ensureSiteConfigSchema() {
   if (!hasDatabase()) {
     return;
@@ -90,6 +149,15 @@ export async function ensureSiteConfigSchema() {
           on conflict (key) do nothing
         `,
         [JSON.stringify({ albumPriceCents: DEFAULT_ALBUM_PRICE_CENTS, albumOverrides: {}, planPrices: DEFAULT_PLAN_PRICES })]
+      );
+
+      await query(
+        `
+          insert into app_settings (key, value)
+          values ('site_content', $1::jsonb)
+          on conflict (key) do nothing
+        `,
+        [JSON.stringify({ banners: DEFAULT_BANNERS, textOverrides: DEFAULT_TEXT_OVERRIDES })]
       );
 
       const existingAgenda = await query("select count(*)::int as total from agenda_events");
@@ -152,6 +220,45 @@ export async function saveSitePricingSettings({ albumPriceCents, albumOverrides,
     `
       insert into app_settings (key, value, updated_at)
       values ('pricing', $1::jsonb, now())
+      on conflict (key) do update
+        set value = excluded.value,
+            updated_at = now()
+    `,
+    [JSON.stringify(payload)]
+  );
+
+  return payload;
+}
+
+export async function getSiteContentSettings() {
+  if (!hasDatabase()) {
+    return {
+      banners: normalizeBanners(DEFAULT_BANNERS),
+      textOverrides: { ...DEFAULT_TEXT_OVERRIDES }
+    };
+  }
+
+  await ensureSiteConfigSchema();
+  const result = await query("select value from app_settings where key = 'site_content' limit 1");
+  const value = result.rows[0]?.value || {};
+
+  return {
+    banners: normalizeBanners(value.banners),
+    textOverrides: normalizeTextOverrides(value.textOverrides)
+  };
+}
+
+export async function saveSiteContentSettings({ banners, textOverrides }) {
+  await ensureSiteConfigSchema();
+  const payload = {
+    banners: normalizeBanners(banners),
+    textOverrides: normalizeTextOverrides(textOverrides)
+  };
+
+  await query(
+    `
+      insert into app_settings (key, value, updated_at)
+      values ('site_content', $1::jsonb, now())
       on conflict (key) do update
         set value = excluded.value,
             updated_at = now()
