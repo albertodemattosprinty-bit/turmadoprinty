@@ -274,7 +274,7 @@ function renderPlans(plans) {
       <p>${plan.description}</p>
       <div class="plan-perks">${plan.perks.map((perk) => `<span class="status-pill">${perk}</span>`).join("")}</div>
       <button class="${isActive || plan.id === "gratis" ? "ghost-button" : "primary-button"} full-width" type="button">
-        ${isActive ? "Plano ativo" : plan.id === "gratis" ? "Plano padrao" : "Assinar no Stripe"}
+        ${isActive ? "Plano ativo" : plan.id === "gratis" ? "Plano padrao" : "Assinar"}
       </button>
     `;
 
@@ -294,7 +294,7 @@ function renderPlans(plans) {
       } catch (error) {
         planStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar assinatura.";
         button.disabled = false;
-        button.textContent = "Assinar no Stripe";
+        button.textContent = "Assinar";
       }
     });
 

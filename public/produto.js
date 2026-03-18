@@ -609,7 +609,7 @@ function bindAdminTrackEditor(card, album, track) {
     playbackSelect.disabled = nextType !== "full";
   });
 
-  editorToggle.addEventListener("click", () => {
+  editorToggle?.addEventListener("click", () => {
     editorPanel.hidden = !editorPanel.hidden;
   });
 
@@ -679,7 +679,7 @@ async function renderTracks(album) {
           ${isAdmin() ? `<button class="ghost-button track-type-toggle" type="button" data-track-type="${track.type}">${getTrackModeLabel(track)}</button>` : ""}
         </div>
         <p class="track-download-label">${downloaded ? "Disponivel offline neste navegador" : getTrackModeLabel(track)}</p>
-        ${isAdmin() ? `<button class="inline-link track-editor-toggle" type="button">Editar faixa</button>` : ""}
+          ${isAdmin() ? `<button class="ghost-button track-editor-toggle track-editor-plus" type="button" aria-label="Editar faixa">+</button>` : ""}
       </div>
       <div class="track-player-shell">
         <audio preload="none"></audio>
