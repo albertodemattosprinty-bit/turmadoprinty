@@ -114,6 +114,20 @@ a {
   padding: 28px 0 54px;
 }
 
+.home-banner {
+  margin-bottom: 22px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.home-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .hero-card,
 .section-card,
 .info-card,
