@@ -8,6 +8,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 24.13.1
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
       - key: CONTENT_BASE_URL
         value: https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev
       - key: OPENAI_MODEL
@@ -17,4 +21,6 @@ services:
       - key: DEFAULT_PRODUCT_PRICE_CENTS
         value: 5000
       - key: PAGBANK_ENVIRONMENT
-        value: sandbox
+        value: production
+      - key: PAGBANK_TOKEN
+        sync: false
