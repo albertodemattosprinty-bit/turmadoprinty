@@ -155,14 +155,34 @@ function formatRelativeDate(value) {
   }
 
   const date = new Date(value);
-  const formatter = new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const isSameDay = now.toDateString() === date.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
 
-  return formatter.format(date);
+  if (diffMinutes < 1) {
+    return "agora";
+  }
+
+  if (diffMinutes < 60) {
+    return `ha ${diffMinutes}m`;
+  }
+
+  if (isSameDay && diffHours < 12) {
+    return `ha ${diffHours}h`;
+  }
+
+  if (yesterday.toDateString() === date.toDateString()) {
+    return "ontem";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short"
+  }).format(date).replace(".", "");
 }
 
 function createShortTitle(message) {
@@ -276,8 +296,7 @@ function renderHistoryList() {
     button.className = `history-item${item.id === activeConversationId ? " active" : ""}`;
     button.innerHTML = `
       <strong>${escapeHtml(item.title)}</strong>
-      <span>${item.messages.length} mensagens</span>
-      <span>${formatRelativeDate(item.updatedAt)}</span>
+      <span class="history-time">${formatRelativeDate(item.updatedAt)}</span>
     `;
     button.addEventListener("click", () => {
       activeConversationId = item.id;
