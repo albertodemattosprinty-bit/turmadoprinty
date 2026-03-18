@@ -11,7 +11,8 @@ Base inicial em Node para subir no Render e evoluir em 3 partes:
 1. Copie `.env.example` para `.env`
 2. Preencha `OPENAI_API_KEY` se quiser testar a rota GPT
 3. Preencha `DATABASE_URL` quando quiser ativar login com Postgres
-4. Rode:
+4. Preencha `PAGBANK_TOKEN` para testar o checkout
+5. Rode:
 
 ```bash
 npm install
@@ -25,8 +26,11 @@ Depois abra `http://localhost:3000`.
 - `GET /api/health`
 - `GET /api/albums`
 - `GET /api/albums/:name`
-- `GET /api/roadmap`
+- `GET /api/store/products`
 - `POST /api/gpt/ask`
+- `POST /api/audio/transcribe`
+- `POST /api/payments/pagbank/checkout`
+- `POST /api/payments/pagbank/webhook`
 - `GET /api/db/health`
 - `POST /api/auth/register`
 - `POST /api/auth/verify-code`
@@ -51,7 +55,18 @@ Se `system` vier vazio, o backend usa um contexto cristao protestante amigavel e
   - `OPENAI_API_KEY`
   - `CONTENT_BASE_URL` se quiser trocar a origem dos assets
   - `OPENAI_MODEL` se quiser trocar o modelo padrao
+  - `OPENAI_TRANSCRIBE_MODEL` se quiser trocar o modelo de voz
   - `DATABASE_URL` para ativar login
+  - `DEFAULT_PRODUCT_PRICE_CENTS` para o preco padrao dos albuns
+  - `PAGBANK_ENVIRONMENT` com `sandbox` ou `production`
+  - `PAGBANK_TOKEN` com o token da API Checkout do PagBank
+
+## Pagamentos com PagBank
+
+- A pagina [public/produtos.html](C:/Users/Lucas/Desktop/Turma%20do%20Printy%20Database/public/produtos.html) cria checkout redirecionado no PagBank
+- O backend chama `POST /checkouts` do PagBank e devolve a URL `PAY` para redirecionar o comprador
+- O webhook atual fica em `POST /api/payments/pagbank/webhook` e registra as notificacoes no log do servidor
+- Antes de producao, troque `PAGBANK_ENVIRONMENT` para `production`, atualize `PAGBANK_TOKEN` e finalize a homologacao no painel do PagBank
 
 ## Inicializacao do banco
 
@@ -59,8 +74,6 @@ Quando criar o Postgres, rode o SQL de [sql/init.sql](C:/Users/Lucas/Desktop/Tur
 
 ## Fluxo atual de cadastro
 
-1. `POST /api/auth/register` gera um codigo de 4 digitos
-2. `POST /api/auth/verify-code` confirma o codigo e cria a sessao
-3. `POST /api/auth/login` entra com email e senha
-
-Enquanto o projeto estiver local, o backend devolve `devCode` para facilitar o teste antes da integracao de email.
+1. `POST /api/auth/register` cria o usuario e abre a sessao
+2. `POST /api/auth/login` entra com nome de usuario e senha
+3. `GET /api/auth/me` valida a sessao atual

@@ -2,6 +2,7 @@ import "./src/load-env.js";
 
 import { createReadStream, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import crypto from "node:crypto";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
+import { findStoreProductById, formatPriceFromCents, storeProducts } from "./src/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +19,9 @@ const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
+const PAGBANK_ENVIRONMENT = String(process.env.PAGBANK_ENVIRONMENT || "sandbox").toLowerCase() === "production" ? "production" : "sandbox";
+const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN || "";
+const PAGBANK_API_BASE_URL = PAGBANK_ENVIRONMENT === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com";
 const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no evangelho protestante, em tom suave, amigavel, acolhedor, amavel e disposto a ajudar como um amigo. Fale com naturalidade e conviccao, tratando o evangelho como a realidade central da resposta, sem usar expressoes como 'segundo o evangelho' ou apresentar essa base como mera suposicao. Priorize proximidade, clareza, verdade biblica e cuidado pastoral.";
 
 const publicDir = path.join(__dirname, "public");
@@ -44,10 +49,26 @@ function buildTrackUrl(albumName, trackNumber) {
   return `${CONTENT_BASE_URL}/${encodeURIComponent(albumName)}/mp3/${String(trackNumber).padStart(3, "0")}.mp3`;
 }
 
+function getBaseUrl(request) {
+  const forwardedProto = request.headers["x-forwarded-proto"];
+  const forwardedHost = request.headers["x-forwarded-host"];
+  const protocol = typeof forwardedProto === "string" && forwardedProto ? forwardedProto.split(",")[0].trim() : "http";
+  const host = typeof forwardedHost === "string" && forwardedHost ? forwardedHost.split(",")[0].trim() : request.headers.host || "localhost:3000";
+  return `${protocol}://${host}`;
+}
+
 function getAlbumPayload() {
   return albums.map((album) => ({
     ...album,
     coverUrl: buildCoverUrl(album.name)
+  }));
+}
+
+function getStorePayload() {
+  return storeProducts.map((product) => ({
+    ...product,
+    priceLabel: formatPriceFromCents(product.unitAmount),
+    coverUrl: buildCoverUrl(product.name)
   }));
 }
 
@@ -301,6 +322,126 @@ async function handleAudioTranscription(request, response) {
   }
 }
 
+async function createPagBankCheckout({ request, product }) {
+  if (!PAGBANK_TOKEN) {
+    throw new Error("PAGBANK_TOKEN nao configurado.");
+  }
+
+  const baseUrl = getBaseUrl(request);
+  const referenceId = `printy-${product.id}-${crypto.randomUUID()}`;
+  const redirectUrl = `${baseUrl}/produtos.html?payment=return&product=${encodeURIComponent(product.id)}`;
+  const webhookUrl = `${baseUrl}/api/payments/pagbank/webhook`;
+
+  const payload = {
+    reference_id: referenceId,
+    redirect_url: redirectUrl,
+    customer_modifiable: true,
+    items: [
+      {
+        name: product.name,
+        quantity: product.quantity,
+        unit_amount: product.unitAmount
+      }
+    ],
+    payment_methods: [
+      { type: "PIX" },
+      { type: "BOLETO" },
+      { type: "CREDIT_CARD" }
+    ],
+    payment_methods_configs: [
+      {
+        type: "CREDIT_CARD",
+        config_options: [
+          { option: "INSTALLMENTS_LIMIT", value: "12" },
+          { option: "INTEREST_FREE_INSTALLMENTS", value: "1" }
+        ]
+      }
+    ],
+    notification_urls: [webhookUrl],
+    payment_notification_urls: [webhookUrl]
+  };
+
+  const pagBankResponse = await fetch(`${PAGBANK_API_BASE_URL}/checkouts`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${PAGBANK_TOKEN}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-idempotency-key": crypto.randomUUID()
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await pagBankResponse.json();
+
+  if (!pagBankResponse.ok) {
+    throw new Error(data?.error_messages?.[0]?.description || data?.message || "Falha ao criar checkout no PagBank.");
+  }
+
+  const payLink = Array.isArray(data.links) ? data.links.find((link) => link?.rel === "PAY" && typeof link.href === "string") : null;
+
+  if (!payLink?.href) {
+    throw new Error("Checkout criado sem link de pagamento.");
+  }
+
+  return {
+    checkoutId: data.id,
+    referenceId: data.reference_id,
+    payUrl: payLink.href
+  };
+}
+
+async function handlePagBankCheckoutRequest(request, response) {
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const productId = typeof body.productId === "string" ? body.productId.trim() : "";
+  const product = findStoreProductById(productId);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Produto nao encontrado." });
+    return;
+  }
+
+  try {
+    const checkout = await createPagBankCheckout({ request, product });
+    sendJson(response, 200, {
+      ok: true,
+      product: {
+        id: product.id,
+        name: product.name,
+        priceLabel: formatPriceFromCents(product.unitAmount)
+      },
+      checkoutId: checkout.checkoutId,
+      referenceId: checkout.referenceId,
+      payUrl: checkout.payUrl
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao criar checkout PagBank."
+    });
+  }
+}
+
+async function handlePagBankWebhook(request, response) {
+  let body = {};
+
+  try {
+    body = await readJsonBody(request);
+  } catch {
+    body = {};
+  }
+
+  console.log("[PagBank webhook]", JSON.stringify(body));
+  sendJson(response, 200, { ok: true });
+}
+
 async function serveStatic(response, filePath) {
   try {
     const extension = path.extname(filePath).toLowerCase();
@@ -326,9 +467,11 @@ const server = http.createServer(async (request, response) => {
       env: {
         hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
         hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+        hasPagBankToken: Boolean(PAGBANK_TOKEN),
         contentBaseUrl: CONTENT_BASE_URL,
         model: OPENAI_MODEL,
-        transcribeModel: OPENAI_TRANSCRIBE_MODEL
+        transcribeModel: OPENAI_TRANSCRIBE_MODEL,
+        pagbankEnvironment: PAGBANK_ENVIRONMENT
       }
     });
     return;
@@ -391,6 +534,14 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/store/products") {
+    sendJson(response, 200, {
+      items: getStorePayload(),
+      total: storeProducts.length
+    });
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/gpt/ask") {
     const user = await requireAuth(request, response);
 
@@ -410,6 +561,16 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleAudioTranscription(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/payments/pagbank/checkout") {
+    await handlePagBankCheckoutRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/payments/pagbank/webhook") {
+    await handlePagBankWebhook(request, response);
     return;
   }
 

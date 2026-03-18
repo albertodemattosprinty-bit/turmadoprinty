@@ -12,3 +12,9 @@ services:
         value: https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev
       - key: OPENAI_MODEL
         value: gpt-5
+      - key: OPENAI_TRANSCRIBE_MODEL
+        value: gpt-4o-mini-transcribe
+      - key: DEFAULT_PRODUCT_PRICE_CENTS
+        value: 5000
+      - key: PAGBANK_ENVIRONMENT
+        value: sandbox

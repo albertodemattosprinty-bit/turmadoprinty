@@ -340,6 +340,18 @@ a {
   color: var(--text-soft);
 }
 
+.album-price {
+  margin-top: 10px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--yellow);
+}
+
+.buy-button {
+  margin-top: 14px;
+  width: 100%;
+}
+
 .schedule-grid {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
