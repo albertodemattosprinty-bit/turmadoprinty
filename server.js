@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5";
-const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-5.1-codex-mini";
+const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-5-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -46,6 +46,8 @@ const mimeTypes = {
   ".svg": "image/svg+xml",
   ".txt": "text/plain; charset=utf-8"
 };
+
+const DEFAULT_RESPONSE_STYLE_PROMPT = "Responda de forma direta e natural, preferencialmente em ate 500 caracteres. So ultrapasse esse limite quando isso for realmente necessario para manter clareza ou utilidade.";
 
 function isAdminUser(user) {
   return String(user?.username || "").trim().toLowerCase() === ADMIN_USERNAME;
@@ -473,9 +475,12 @@ async function handleGptRequest(request, response) {
   const message = typeof body.message === "string" ? body.message.trim() : "";
   const contextPrompt = await getContextPrompt();
   const systemBase = typeof body.system === "string" && body.system.trim() ? body.system.trim() : DEFAULT_SYSTEM_PROMPT;
+  const responseStylePrompt = typeof body.responseStyle === "string" && body.responseStyle.trim()
+    ? body.responseStyle.trim()
+    : DEFAULT_RESPONSE_STYLE_PROMPT;
   const system = contextPrompt
-    ? `${systemBase}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
-    : systemBase;
+    ? `${systemBase}\n\n${responseStylePrompt}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
+    : `${systemBase}\n\n${responseStylePrompt}`;
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : OPENAI_MODEL;
   const instantModel = getInstantModel(body);
   const history = Array.isArray(body.history) ? body.history : [];
@@ -522,10 +527,11 @@ async function handleGptRequest(request, response) {
           const previewPayload = await createChatCompletion(apiKey, {
             model: instantModel,
             messages: [
-              ...(system ? [{ role: "system", content: `${system}\n\nEntregue primeiro uma resposta imediata, curta e pratica em ate 3 frases.` }] : []),
+              ...(system ? [{ role: "system", content: `${system}\n\nEntregue primeiro uma resposta imediata, curta e pratica em ate 500 caracteres.` }] : []),
               ...messages,
               { role: "user", content: message }
-            ]
+            ],
+            max_completion_tokens: 140
           });
           const previewText = extractChatCompletionText(previewPayload);
 
