@@ -3,6 +3,7 @@ import { initContentAdmin } from "./content-admin.js";
 const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
+const chatModeStorageKey = "turma_do_printy_chat_mode";
 
 const authStatus = document.getElementById("auth-status");
 const chatAuthStatus = document.getElementById("chat-auth-status");
@@ -25,6 +26,8 @@ const composerStatus = document.getElementById("composer-status");
 const conversationHeader = document.getElementById("conversation-header");
 const conversationTitle = document.getElementById("conversation-title");
 const conversationMeta = document.getElementById("conversation-meta");
+const chatModeSelect = document.getElementById("chat-mode-select");
+const chatModeIcon = document.getElementById("chat-mode-icon");
 const loginForm = document.getElementById("login-form");
 const registerForm = document.getElementById("register-form");
 const loginUsername = document.getElementById("login-username");
@@ -48,6 +51,19 @@ let speakingButton = null;
 let siteConfig = {
   banners: {},
   textOverrides: {}
+};
+
+const chatModes = {
+  fast: {
+    model: "gpt-4.1-nano",
+    instantModel: "gpt-4.1-nano",
+    icon: '<svg viewBox="0 0 24 24"><path d="M13 2 5 14h5l-1 8 8-12h-5z"/></svg>'
+  },
+  think: {
+    model: "gpt-4.1-mini",
+    instantModel: "gpt-4.1-nano",
+    icon: '<svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-4.66 12.22c.4.35.66.84.66 1.37V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-.41c0-.53.26-1.02.66-1.37A7 7 0 0 0 12 3m-2 17h4a2 2 0 0 1-4 0"/></svg>'
+  }
 };
 
 const emptyConversationVariants = [
@@ -111,6 +127,23 @@ async function runAuthRequest(url, payload) {
 
 function setComposerStatus(message = "") {
   composerStatus.textContent = message;
+}
+
+function getChatMode() {
+  const stored = window.localStorage.getItem(chatModeStorageKey);
+  return chatModes[stored] ? stored : "fast";
+}
+
+function syncChatModeUi() {
+  const mode = getChatMode();
+
+  if (chatModeSelect) {
+    chatModeSelect.value = mode;
+  }
+
+  if (chatModeIcon) {
+    chatModeIcon.innerHTML = chatModes[mode].icon;
+  }
 }
 
 function getConversationStore() {
@@ -607,6 +640,7 @@ function addMessageToConversation(role, content) {
 function createAssistantMessageElement(initialText = "Preparando resposta...") {
   const article = document.createElement("article");
   article.className = "message-card assistant";
+  article.hidden = true;
   article.innerHTML = `
     <div class="message-role">Assistente</div>
     <div class="message-text">${escapeHtml(initialText)}</div>
@@ -623,6 +657,7 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
     setText(nextText) {
       this.text = nextText;
       this.target.textContent = nextText;
+      article.hidden = !nextText;
       chatThread.scrollTop = chatThread.scrollHeight;
     },
     appendText(extraText) {
@@ -635,8 +670,7 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
     },
     setPreview(previewText) {
       this.hasPreview = Boolean(previewText);
-      this.finalStarted = false;
-      this.setText(previewText || "Preparando resposta...");
+      this.setText(previewText || "");
     },
     startFinalBlock() {
       if (!this.hasPreview || this.finalStarted) {
@@ -644,7 +678,7 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
       }
 
       this.finalStarted = true;
-      this.setText(`${this.text}\n\nAprofundando melhor:\n`);
+      this.setText(`${this.text}\n\n`);
     },
     finalizeAudio() {
       const cleanText = (this.text || "").trim();
@@ -686,10 +720,6 @@ async function consumeAssistantStream(response, assistantMessage = createAssista
         const event = JSON.parse(dataLine);
 
         if (event.type === "status") {
-          if (!assistantMessage.hasPreview) {
-            assistantMessage.setText(event.message || "Preparando resposta...");
-          }
-
           if (event.stage === "final") {
             assistantMessage.startFinalBlock();
           }
@@ -932,8 +962,8 @@ chatForm.addEventListener("submit", async (event) => {
   micButton.disabled = true;
   stopRequested = false;
   currentController = new AbortController();
-  setComposerStatus("Gerando resposta...");
-  const assistantMessage = createAssistantMessageElement("Pensando na melhor resposta...");
+  const assistantMessage = createAssistantMessageElement("");
+  const selectedMode = chatModes[getChatMode()] || chatModes.fast;
 
   try {
     const response = await fetch("/api/gpt/ask", {
@@ -946,7 +976,9 @@ chatForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         message,
         history,
-        stream: true
+        stream: true,
+        model: selectedMode.model,
+        instantModel: selectedMode.instantModel
       }),
       signal: currentController.signal
     });
@@ -996,7 +1028,7 @@ stopButton.addEventListener("click", () => {
   if (currentController) {
     currentController.abort();
   }
-  setComposerStatus("Resposta interrompida.");
+  setComposerStatus("");
 });
 
 chatInput.addEventListener("input", () => {
@@ -1008,6 +1040,13 @@ if (chatSearchInput) {
   chatSearchInput.addEventListener("input", () => {
     chatSearchTerm = chatSearchInput.value || "";
     renderHistoryList();
+  });
+}
+
+if (chatModeSelect) {
+  chatModeSelect.addEventListener("change", () => {
+    window.localStorage.setItem(chatModeStorageKey, chatModeSelect.value);
+    syncChatModeUi();
   });
 }
 
@@ -1086,6 +1125,7 @@ renderHistoryList();
 renderConversation();
 syncComposerState();
 setComposerStatus("");
+syncChatModeUi();
 setActiveAuthTab("login");
 siteConfig = await loadSiteConfig().catch(() => siteConfig);
 initContentAdmin({

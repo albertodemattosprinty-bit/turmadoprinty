@@ -59,7 +59,9 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zm-7 7h14v2H4z"/></svg>
             </button>
           </div>
-          <div id="history-list" class="history-list"></div>
+          <div class="history-scroll-shell">
+            <div id="history-list" class="history-list"></div>
+          </div>
           <div class="chat-actions sidebar-actions sidebar-actions-bottom">
             <a href="/index.html" id="sidebar-home-link" class="sidebar-icon-button ghost-button" aria-label="Ir para home" title="Ir para home">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
@@ -77,7 +79,18 @@
             <div>
               <h2 id="conversation-title" class="conversation-title"></h2>
             </div>
-            <p id="conversation-meta" class="conversation-meta"></p>
+            <div class="conversation-tools">
+              <label class="chat-mode-picker" for="chat-mode-select">
+                <span id="chat-mode-icon" class="chat-mode-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M13 2 5 14h5l-1 8 8-12h-5z"/></svg>
+                </span>
+                <select id="chat-mode-select" aria-label="Escolher modelo">
+                  <option value="fast">Raio</option>
+                  <option value="think">Ideia</option>
+                </select>
+              </label>
+              <p id="conversation-meta" class="conversation-meta"></p>
+            </div>
           </div>
           <div id="chat-thread" class="chat-thread"></div>
           <form id="chat-form" class="chat-composer">
