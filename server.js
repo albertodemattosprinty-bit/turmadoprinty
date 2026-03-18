@@ -1,7 +1,7 @@
 import "./src/load-env.js";
 
 import { createReadStream, existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import crypto from "node:crypto";
 import http from "node:http";
 import path from "node:path";
@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
-import { findStoreProductById, formatPriceFromCents, storeProducts } from "./src/store.js";
+import { findStoreProductById, formatPriceFromCents, slugifyAlbumName, storeProducts } from "./src/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +25,7 @@ const PAGBANK_API_BASE_URL = PAGBANK_ENVIRONMENT === "production" ? "https://api
 const DEFAULT_SYSTEM_PROMPT = "Responda como um cristao com fe consolidada no evangelho protestante, em tom suave, amigavel, acolhedor, amavel e disposto a ajudar como um amigo. Fale com naturalidade e conviccao, tratando o evangelho como a realidade central da resposta, sem usar expressoes como 'segundo o evangelho' ou apresentar essa base como mera suposicao. Priorize proximidade, clareza, verdade biblica e cuidado pastoral.";
 
 const publicDir = path.join(__dirname, "public");
+const contentDir = path.join(__dirname, "Conteúdo");
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -89,7 +90,64 @@ function getStorePayload() {
   return storeProducts.map((product) => ({
     ...product,
     priceLabel: formatPriceFromCents(product.unitAmount),
-    coverUrl: buildCoverUrl(product.name)
+    coverUrl: buildCoverUrl(product.name),
+    href: `/produto.html?album=${encodeURIComponent(product.id)}`
+  }));
+}
+
+async function readOptionalJson(filePath) {
+  try {
+    await access(filePath);
+    const raw = await readFile(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function readAlbumManifest(albumName, trackCount) {
+  const albumFolder = path.join(contentDir, albumName);
+  const candidateFiles = [
+    path.join(albumFolder, "manifest.json"),
+    path.join(albumFolder, "tracks.json"),
+    path.join(albumFolder, "faixas.json"),
+    path.join(albumFolder, "album.json")
+  ];
+
+  for (const candidate of candidateFiles) {
+    const payload = await readOptionalJson(candidate);
+
+    if (!payload) {
+      continue;
+    }
+
+    const rawTracks = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload.tracks)
+        ? payload.tracks
+        : Array.isArray(payload.items)
+          ? payload.items
+          : [];
+
+    if (!rawTracks.length) {
+      continue;
+    }
+
+    return rawTracks.slice(0, trackCount).map((item, index) => ({
+      number: index + 1,
+      label: typeof item === "string"
+        ? item
+        : typeof item?.title === "string"
+          ? item.title
+          : typeof item?.name === "string"
+            ? item.name
+            : `Faixa ${String(index + 1).padStart(3, "0")}`
+    }));
+  }
+
+  return Array.from({ length: trackCount }, (_, index) => ({
+    number: index + 1,
+    label: `Faixa ${String(index + 1).padStart(3, "0")}`
   }));
 }
 
@@ -364,7 +422,7 @@ async function createPagBankCheckout({ request, product }) {
 
   const baseUrl = getBaseUrl(request);
   const referenceId = `printy-${product.id}-${crypto.randomUUID()}`;
-  const redirectUrl = `${baseUrl}/produtos.html?payment=return&product=${encodeURIComponent(product.id)}`;
+  const redirectUrl = `${baseUrl}/produto.html?album=${encodeURIComponent(product.id)}&payment=return`;
   const webhookUrl = `${baseUrl}/api/payments/pagbank/webhook`;
 
   const payload = {
@@ -573,6 +631,31 @@ const server = http.createServer(async (request, response) => {
     sendJson(response, 200, {
       items: getStorePayload(),
       total: storeProducts.length
+    });
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/api/store/products/")) {
+    const productId = decodeURIComponent(pathname.replace("/api/store/products/", ""));
+    const product = findStoreProductById(productId);
+
+    if (!product) {
+      sendJson(response, 404, { error: "Produto nao encontrado." });
+      return;
+    }
+
+    const manifestTracks = await readAlbumManifest(product.name, product.tracks);
+    sendJson(response, 200, {
+      ...product,
+      priceLabel: formatPriceFromCents(product.unitAmount),
+      coverUrl: buildCoverUrl(product.name),
+      href: `/produto.html?album=${encodeURIComponent(product.id)}`,
+      tracks: manifestTracks.map((track) => ({
+        ...track,
+        streamUrl: buildTrackUrl(product.name, track.number),
+        downloadUrl: buildTrackUrl(product.name, track.number)
+      })),
+      hasManifest: manifestTracks.some((track) => !track.label.startsWith("Faixa "))
     });
     return;
   }

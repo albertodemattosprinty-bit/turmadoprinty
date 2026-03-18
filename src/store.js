@@ -38,3 +38,7 @@ export function formatPriceFromCents(valueInCents) {
 export function findStoreProductById(productId) {
   return storeProducts.find((item) => item.id === productId) || null;
 }
+
+export function slugifyAlbumName(value) {
+  return slugify(value);
+}

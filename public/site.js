@@ -101,14 +101,7 @@ async function loadAlbums() {
   grid.innerHTML = "";
 
   if (storeStatus) {
-    const params = new URLSearchParams(window.location.search);
-    const paymentState = params.get("payment");
-
-    if (paymentState === "return") {
-      storeStatus.textContent = "Voce voltou do PagBank. Confira o status final do pagamento no painel e no webhook.";
-    } else {
-      storeStatus.textContent = "Pagamento com PagBank: Pix, boleto e cartao em checkout seguro.";
-    }
+    storeStatus.textContent = "Abra um album para ouvir as faixas e comprar na pagina de detalhes.";
   }
 
   data.items.forEach((album) => {
@@ -120,19 +113,11 @@ async function loadAlbums() {
         <h3>${album.name}</h3>
         <p>${album.tracks > 0 ? `${album.tracks} faixas` : "Sem faixas cadastradas"}</p>
         ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
-        ${page === "produtos" && album.id ? `<button class="primary-button buy-button" data-product-id="${album.id}" type="button">Comprar com PagBank</button>` : ""}
+        ${page === "produtos" && album.href ? `<a class="primary-button buy-button" href="${album.href}">Ver detalhes</a>` : ""}
       </div>
     `;
     grid.appendChild(card);
   });
-
-  if (page === "produtos") {
-    grid.querySelectorAll(".buy-button").forEach((button) => {
-      button.addEventListener("click", async () => {
-        await startCheckout(button.dataset.productId, storeStatus, button);
-      });
-    });
-  }
 }
 
 function loadSchedule() {
