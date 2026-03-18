@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
 const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev").replace(/\/+$/, "");
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-nano";
 const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
@@ -108,6 +108,49 @@ function getFinalModel(body) {
 function getPositiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function normalizeMessageForHeuristics(message) {
+  return String(message || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isLikelyGibberishMessage(message) {
+  const normalized = normalizeMessageForHeuristics(message);
+  const compact = normalized.replace(/\s+/g, "");
+
+  if (!compact) {
+    return false;
+  }
+
+  if (compact.length <= 3 && /[^a-z0-9]/.test(compact) === false) {
+    return true;
+  }
+
+  if (/^(.)\1{4,}$/.test(compact)) {
+    return true;
+  }
+
+  if (/^[a-z]{4,12}$/.test(compact) && !/[aeiou]/.test(compact)) {
+    return true;
+  }
+
+  if (/^[a-z0-9]{6,18}$/.test(compact) && !/[aeiou]/.test(compact) && !/\d/.test(compact.slice(0, 2))) {
+    return true;
+  }
+
+  return false;
+}
+
+function buildFastFallbackReply(message) {
+  if (isLikelyGibberishMessage(message)) {
+    return "Acho que sua mensagem veio truncada ou aleatoria. Me envie de novo em uma frase curta e eu respondo bem mais rapido.";
+  }
+
+  return "";
 }
 
 function parseDataUrl(dataUrl) {
@@ -493,7 +536,7 @@ async function handleGptRequest(request, response) {
   const system = contextPrompt
     ? `${systemBase}\n\n${responseStylePrompt}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
     : `${systemBase}\n\n${responseStylePrompt}`;
-  const model = getFinalModel(body);
+  const requestedFinalModel = getFinalModel(body);
   const instantModel = getInstantModel(body);
   const history = Array.isArray(body.history) ? body.history : [];
   const wantsStream = Boolean(body.stream) || String(request.headers.accept || "").includes("text/event-stream");
@@ -504,6 +547,32 @@ async function handleGptRequest(request, response) {
     sendJson(response, 400, { error: "Envie um campo 'message' com texto." });
     return;
   }
+
+  const fallbackReply = buildFastFallbackReply(message);
+
+  if (fallbackReply) {
+    if (wantsStream) {
+      response.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive"
+      });
+      response.write(`data: ${JSON.stringify({ type: "preview", model: "local-fast-path", text: fallbackReply })}\n\n`);
+      response.write(`data: ${JSON.stringify({ type: "done", text: fallbackReply })}\n\n`);
+      response.end();
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      model: "local-fast-path",
+      outputText: fallbackReply,
+      raw: null
+    });
+    return;
+  }
+
+  const model = requestedFinalModel;
 
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "assistant") && typeof item.content === "string" && item.content.trim())
@@ -540,7 +609,8 @@ async function handleGptRequest(request, response) {
 
       sendEvent({ type: "status", stage: "preview", message: "Montando uma resposta imediata..." });
 
-      const previewPromise = instantModel
+      const shouldRunPreview = instantModel && instantModel !== model;
+      const previewPromise = shouldRunPreview
         ? createChatCompletion(apiKey, {
           model: instantModel,
           messages: [
