@@ -66,10 +66,15 @@ async function startCheckout(productId, statusNode, button) {
       body: JSON.stringify({ productId })
     });
 
-    const data = await response.json();
+    const rawText = await response.text();
+    const data = rawText ? JSON.parse(rawText) : {};
 
     if (!response.ok) {
       throw new Error(data.error || "Falha ao criar checkout.");
+    }
+
+    if (!data.payUrl) {
+      throw new Error("Checkout criado sem link de pagamento.");
     }
 
     window.location.href = data.payUrl;

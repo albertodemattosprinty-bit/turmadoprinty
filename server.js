@@ -41,6 +41,27 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload, null, 2));
 }
 
+async function readApiResponse(response) {
+  const rawText = await response.text();
+  const text = rawText.trim();
+
+  if (!text) {
+    return { data: null, text: "" };
+  }
+
+  try {
+    return {
+      data: JSON.parse(text),
+      text
+    };
+  } catch {
+    return {
+      data: null,
+      text
+    };
+  }
+}
+
 function buildCoverUrl(albumName) {
   return `${CONTENT_BASE_URL}/Capas/${encodeURIComponent(albumName)}.avif`;
 }
@@ -215,12 +236,19 @@ async function handleGptRequest(request, response) {
       })
     });
 
-    const payload = await openAiResponse.json();
+    const { data: payload, text } = await readApiResponse(openAiResponse);
 
     if (!openAiResponse.ok) {
       sendJson(response, openAiResponse.status, {
         error: "Falha ao chamar a API da OpenAI.",
-        details: payload
+        details: payload || text || "Resposta vazia da OpenAI."
+      });
+      return;
+    }
+
+    if (!payload) {
+      sendJson(response, 502, {
+        error: "A OpenAI devolveu uma resposta vazia ou invalida."
       });
       return;
     }
@@ -299,12 +327,19 @@ async function handleAudioTranscription(request, response) {
       body: formData
     });
 
-    const payload = await transcriptionResponse.json();
+    const { data: payload, text } = await readApiResponse(transcriptionResponse);
 
     if (!transcriptionResponse.ok) {
       sendJson(response, transcriptionResponse.status, {
         error: "Falha ao transcrever o audio.",
-        details: payload
+        details: payload || text || "Resposta vazia da OpenAI."
+      });
+      return;
+    }
+
+    if (!payload) {
+      sendJson(response, 502, {
+        error: "A OpenAI devolveu uma resposta vazia ou invalida na transcricao."
       });
       return;
     }
@@ -372,10 +407,19 @@ async function createPagBankCheckout({ request, product }) {
     body: JSON.stringify(payload)
   });
 
-  const data = await pagBankResponse.json();
+  const { data, text } = await readApiResponse(pagBankResponse);
 
   if (!pagBankResponse.ok) {
-    throw new Error(data?.error_messages?.[0]?.description || data?.message || "Falha ao criar checkout no PagBank.");
+    throw new Error(
+      data?.error_messages?.[0]?.description ||
+      data?.message ||
+      text ||
+      "Falha ao criar checkout no PagBank."
+    );
+  }
+
+  if (!data) {
+    throw new Error("O PagBank devolveu resposta vazia ou invalida ao criar o checkout.");
   }
 
   const payLink = Array.isArray(data.links) ? data.links.find((link) => link?.rel === "PAY" && typeof link.href === "string") : null;
