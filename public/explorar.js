@@ -441,6 +441,11 @@ function renderConversation() {
       <div class="message-role">${item.role === "user" ? "Você" : "Assistente"}</div>
       <div class="message-text">${escapeHtml(item.content)}</div>
     `;
+
+    if (item.role === "assistant") {
+      attachAssistantAudioButton(article, item.content);
+    }
+
     chatThread.appendChild(article);
   });
 

@@ -1238,6 +1238,7 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
   justify-self: start;
   background: rgba(27, 83, 187, 0.08);
   position: relative;
+  padding-right: 58px;
 }
 
 .message-role {
@@ -1262,8 +1263,8 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
 
 .assistant-audio-actions {
   position: absolute;
-  top: 12px;
   right: 12px;
+  bottom: 12px;
 }
 
 .assistant-audio-button {
