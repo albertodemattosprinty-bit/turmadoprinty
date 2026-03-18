@@ -28,7 +28,9 @@ body {
   min-height: 100vh;
   font-family: "Open Sans", sans-serif;
   color: var(--text);
-  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  background:
+    url("/skydesktop.png") center top / cover no-repeat fixed,
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
 }
 
 [hidden] {
@@ -112,15 +114,15 @@ a {
 .page-shell {
   width: min(1200px, calc(100% - 28px));
   margin: 0 auto;
-  padding: 28px 0 54px;
+  padding: 0 0 54px;
 }
 
 .home-banner {
-  margin-bottom: 22px;
+  margin: 0 calc(50% - 50vw) 22px;
   overflow: hidden;
-  border-radius: 28px;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
 }
 
 .home-banner img {
@@ -130,11 +132,11 @@ a {
 }
 
 .page-image-banner {
-  margin-bottom: 22px;
+  margin: 0 calc(50% - 50vw) 22px;
   overflow: hidden;
-  border-radius: 28px;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
 }
 
 .page-image-banner img {
@@ -710,6 +712,19 @@ a {
 .track-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.download-icon-button {
+  min-width: 52px;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+}
+
+.download-icon-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
 }
 
 .track-editor-panel {

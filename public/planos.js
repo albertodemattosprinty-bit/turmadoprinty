@@ -68,22 +68,22 @@ function buildPlans(siteConfig) {
       id: "plus",
       name: "Plus",
       priceLabel: `${formatCurrency(prices.plus)}/mes`,
-      description: "Plano inicial com streaming completo e downloads em todo o catalogo.",
-      perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
+      description: "9,90 musicas e playbacks.",
+      perks: ["Musicas e playbacks", "Streaming completo", "Pagamento mensal recorrente"]
     },
     {
       id: "pro",
       name: "Pro",
       priceLabel: `${formatCurrency(prices.pro)}/mes`,
-      description: "Plano intermediario com acesso completo para quem quer assinar mensalmente.",
-      perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
+      description: "19,90 cantatas.",
+      perks: ["Cantatas", "Streaming completo", "Pagamento mensal recorrente"]
     },
     {
       id: "life",
       name: "Life",
       priceLabel: `${formatCurrency(prices.life)}/mes`,
-      description: "Plano premium com o mesmo catalogo completo e a faixa de valor mais alta.",
-      perks: ["Streaming completo", "Downloads globais", "Pagamento mensal recorrente"]
+      description: "29,90 IA Ilimitada Pro.",
+      perks: ["IA Ilimitada Pro", "Streaming completo", "Pagamento mensal recorrente"]
     }
   ];
 }

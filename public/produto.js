@@ -698,8 +698,8 @@ async function renderTracks(album) {
         </div>
       </div>
       <div class="track-actions">
-        <button class="ghost-button" type="button" data-role="download">
-          ${accessState.authenticated ? "Baixar offline" : "Faca login para baixar"}
+        <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="${accessState.authenticated ? "Baixar offline" : "Faca login para baixar"}" title="${accessState.authenticated ? "Baixar offline" : "Faca login para baixar"}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v9.17l2.59-2.58L17 11l-5 5-5-5 1.41-1.41L11 12.17zM5 19h14v2H5z"/></svg>
         </button>
       </div>
       ${isAdmin() ? `
