@@ -11,10 +11,6 @@ const albumAdminPanel = document.getElementById("album-admin-panel");
 const albumPriceInput = document.getElementById("album-price-input");
 const albumSaveButton = document.getElementById("album-save-button");
 const albumAdminStatus = document.getElementById("album-admin-status");
-const trackTextOverlay = document.getElementById("track-text-overlay");
-const trackTextTitle = document.getElementById("track-text-title");
-const trackTextBody = document.getElementById("track-text-body");
-const trackTextClose = document.getElementById("track-text-close");
 
 let accessState = {
   authenticated: false,
@@ -29,131 +25,9 @@ let currentAlbum = null;
 let activeSpeechRecognition = null;
 let lyricsSilenceTimer = null;
 const adminUsername = "rosemattos";
-const trackTextSpeakerPalette = [
-  "#ffe17a",
-  "#9fd4ff",
-  "#9ff0bf",
-  "#88b8ff"
-];
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 function getTrackModeLabel(track) {
   return track?.type === "playback" ? "Playback" : "Full";
-}
-
-function getTrackTextContent(track) {
-  return String(track?.textContent || track?.lyrics || "").trim();
-}
-
-function buildTrackTextJson(textContent) {
-  const lines = String(textContent || "")
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const dialogueMatch = line.match(/^\[([^\]]+)\]~\s*(.+)$/u);
-
-      if (dialogueMatch) {
-        const speaker = dialogueMatch[1].trim();
-        const text = dialogueMatch[2].trim();
-
-        if (speaker.toLowerCase() === "faixa") {
-          return { type: "faixa", text };
-        }
-
-        return { type: "dialogo", speaker, text };
-      }
-
-      const lyricMatch = line.match(/^(?:\.?\s*faixa\.?|\[faixa\])\s*~?\s*(.+)$/iu);
-      if (lyricMatch) {
-        return { type: "faixa", text: lyricMatch[1].trim() };
-      }
-
-      return { type: "faixa", text: line };
-    })
-    .filter((item) => item.text);
-
-  return lines.length ? { lines } : null;
-}
-
-function getTrackTextEntries(track) {
-  const manifestLines = Array.isArray(track?.textJson?.lines) ? track.textJson.lines : [];
-
-  if (manifestLines.length) {
-    return manifestLines
-      .map((item) => ({
-        type: String(item?.type || "faixa").toLowerCase() === "dialogo" ? "dialogo" : "faixa",
-        speaker: String(item?.speaker || "").trim(),
-        text: String(item?.text || "").trim()
-      }))
-      .filter((item) => item.text);
-  }
-
-  return buildTrackTextJson(getTrackTextContent(track))?.lines || [];
-}
-
-function hasTrackText(track) {
-  return getTrackTextEntries(track).length > 0;
-}
-
-function openTrackTextOverlay(track) {
-  if (!trackTextOverlay || !trackTextTitle || !trackTextBody) {
-    return;
-  }
-
-  const lines = getTrackTextEntries(track);
-  if (!lines.length) {
-    return;
-  }
-
-  const speakerColors = new Map();
-  let colorIndex = 0;
-  trackTextTitle.textContent = track.label || track.title || `Faixa ${String(track.number).padStart(3, "0")}`;
-  trackTextBody.innerHTML = "";
-
-  for (const line of lines) {
-    const item = document.createElement("div");
-    item.className = line.type === "dialogo" ? "track-text-line dialogue" : "track-text-line lyric";
-
-    if (line.type === "dialogo" && line.speaker) {
-      const speakerKey = line.speaker.trim().toLowerCase();
-      if (!speakerColors.has(speakerKey)) {
-        speakerColors.set(speakerKey, trackTextSpeakerPalette[colorIndex % trackTextSpeakerPalette.length]);
-        colorIndex += 1;
-      }
-
-      const speaker = document.createElement("span");
-      speaker.className = "track-text-speaker";
-      speaker.textContent = line.speaker;
-      speaker.style.background = speakerColors.get(speakerKey);
-      item.appendChild(speaker);
-    }
-
-    const text = document.createElement("p");
-    text.className = "track-text-copy";
-    text.textContent = line.text;
-    item.appendChild(text);
-    trackTextBody.appendChild(item);
-  }
-
-  trackTextOverlay.hidden = false;
-  document.body.classList.add("overlay-open");
-}
-
-function closeTrackTextOverlay() {
-  if (!trackTextOverlay) {
-    return;
-  }
-
-  trackTextOverlay.hidden = true;
-  document.body.classList.remove("overlay-open");
 }
 
 function getAlbumId() {
@@ -347,17 +221,17 @@ async function isTrackDownloaded(albumId, trackNumber) {
 function updatePlayerButtons() {
   document.querySelectorAll(".track-card").forEach((card) => {
     const trackNumber = Number(card.dataset.trackNumber);
-    const playButton = card.querySelector("[data-role='play-toggle']");
-    const playIcon = playButton?.querySelector("path");
+    const playButton = card.querySelector("[data-role='play']");
+    const pauseButton = card.querySelector("[data-role='pause']");
 
-    if (!playButton || !playIcon) {
+    if (!playButton || !pauseButton) {
       return;
     }
 
     const isCurrent = currentTrackNumber === trackNumber && currentAudio;
     const isPlaying = isCurrent && !currentAudio.paused;
-    playButton.setAttribute("aria-label", isPlaying ? "Pausar" : "Tocar");
-    playIcon.setAttribute("d", isPlaying ? "M7 5h4v14H7zm6 0h4v14h-4z" : "M8 5v14l11-7z");
+    playButton.hidden = isPlaying;
+    pauseButton.hidden = !isPlaying;
   });
 }
 
@@ -676,10 +550,9 @@ function collectEditableTracks() {
     const number = Number(card.dataset.trackNumber);
     const titleInput = card.querySelector(".track-title-input");
     const typeButton = card.querySelector(".track-type-toggle");
-    const textInput = card.querySelector(".track-text-input");
+    const lyricsInput = card.querySelector(".track-lyrics-input");
     const playbackSelect = card.querySelector(".track-playback-select");
     const track = currentAlbum.tracks.find((item) => item.number === number);
-    const textContent = textInput ? textInput.value : track.textContent || track.lyrics || "";
 
     return {
       ...track,
@@ -687,9 +560,7 @@ function collectEditableTracks() {
       label: titleInput ? titleInput.value.trim() || track.title : track.title,
       type: typeButton?.dataset.trackType || track.type,
       playbackTrackNumber: playbackSelect && playbackSelect.value ? Number(playbackSelect.value) : null,
-      lyrics: textContent,
-      textContent,
-      textJson: buildTrackTextJson(textContent)
+      lyrics: lyricsInput ? lyricsInput.value : track.lyrics || ""
     };
   });
 }
@@ -702,10 +573,10 @@ function bindAdminTrackEditor(card, album, track) {
   const titleDisplay = card.querySelector(".track-title-display");
   const titleInput = card.querySelector(".track-title-input");
   const typeButton = card.querySelector(".track-type-toggle");
-  const editorToggle = card.querySelector(".track-admin-plus");
+  const editorToggle = card.querySelector(".track-editor-toggle");
   const editorPanel = card.querySelector(".track-editor-panel");
   const playbackSelect = card.querySelector(".track-playback-select");
-  const textInput = card.querySelector(".track-text-input");
+  const lyricsInput = card.querySelector(".track-lyrics-input");
   const playLyricsButton = card.querySelector(".track-editor-play");
   const backLyricsButton = card.querySelector(".track-editor-back");
   const forwardLyricsButton = card.querySelector(".track-editor-forward");
@@ -738,7 +609,7 @@ function bindAdminTrackEditor(card, album, track) {
     playbackSelect.disabled = nextType !== "full";
   });
 
-  editorToggle?.addEventListener("click", () => {
+  editorToggle.addEventListener("click", () => {
     editorPanel.hidden = !editorPanel.hidden;
   });
 
@@ -767,7 +638,7 @@ function bindAdminTrackEditor(card, album, track) {
     seekTrack(card, 3);
   });
 
-  attachLyricsVoiceShortcut(card, textInput);
+  attachLyricsVoiceShortcut(card, lyricsInput);
   enableTitleVoiceShortcut(card, titleInput);
 }
 
@@ -803,21 +674,21 @@ async function renderTracks(album) {
       <div class="track-copy">
         <p class="track-number">Faixa ${String(track.number).padStart(3, "0")}</p>
         <div class="track-title-row">
-          <h3 class="track-title-display">${escapeHtml(track.label)}</h3>
-          <input class="track-title-input" type="text" value="${escapeHtml(track.label)}" hidden>
+          <h3 class="track-title-display">${track.label}</h3>
+          <input class="track-title-input" type="text" value="${track.label}" hidden>
           ${isAdmin() ? `<button class="ghost-button track-type-toggle" type="button" data-track-type="${track.type}">${getTrackModeLabel(track)}</button>` : ""}
-          ${isAdmin() ? `<button class="ghost-button track-admin-plus" type="button" aria-label="Abrir editor da faixa">+</button>` : ""}
         </div>
         <p class="track-download-label">${downloaded ? "Disponivel offline neste navegador" : getTrackModeLabel(track)}</p>
+        ${isAdmin() ? `<button class="inline-link track-editor-toggle" type="button">Editar faixa</button>` : ""}
       </div>
       <div class="track-player-shell">
         <audio preload="none"></audio>
         <div class="track-player-controls">
-          <button class="icon-button ghost-button" type="button" data-role="play-toggle" aria-label="Tocar">
+          <button class="icon-button ghost-button" type="button" data-role="play" aria-label="Tocar">
             <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           </button>
-          <button class="icon-button ghost-button track-text-button ${hasTrackText(track) ? "has-text" : "no-text"}" type="button" data-role="text" aria-label="Abrir texto da faixa">
-            <svg viewBox="0 0 24 24"><path d="M5 4h14v2H5zm0 5h14v2H5zm0 5h10v2H5zm0 5h10v2H5z"/></svg>
+          <button class="icon-button ghost-button" type="button" data-role="pause" aria-label="Pausar" hidden>
+            <svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
           </button>
           <button class="icon-button ghost-button" type="button" data-role="restart" aria-label="Voltar ao inicio">
             <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
@@ -841,8 +712,8 @@ async function renderTracks(album) {
               </select>
             </label>
           </div>
-          <label>Texto da faixa
-            <textarea class="track-text-input" placeholder="Use [Nome]~ fala para dialogo e [faixa]~ para musica. Se quiser ditar, escreva miki.">${escapeHtml(track.textContent || track.lyrics || "")}</textarea>
+          <label>Letra
+            <textarea class="track-lyrics-input" placeholder="Digite a letra aqui. Se quiser ditar, escreva miki.">${track.lyrics || ""}</textarea>
           </label>
           <div class="track-editor-player">
             <button class="ghost-button track-editor-back" type="button">-3s</button>
@@ -857,22 +728,17 @@ async function renderTracks(album) {
     const audio = article.querySelector("audio");
     bindAudioToCard(article, audio);
 
-    article.querySelector("[data-role='play-toggle']").addEventListener("click", async () => {
-      if (currentAudio === audio && !audio.paused) {
-        audio.pause();
-        updatePlayerButtons();
-        return;
-      }
-
+    article.querySelector("[data-role='play']").addEventListener("click", async () => {
       await playTrack(article, album.id, track);
+    });
+
+    article.querySelector("[data-role='pause']").addEventListener("click", () => {
+      audio.pause();
+      updatePlayerButtons();
     });
 
     article.querySelector("[data-role='restart']").addEventListener("click", () => {
       restartTrack(article);
-    });
-
-    article.querySelector("[data-role='text']").addEventListener("click", () => {
-      openTrackTextOverlay(track);
     });
 
     article.querySelector("[data-role='download']").addEventListener("click", async () => {
@@ -948,7 +814,7 @@ async function loadAlbumDetail() {
 
   if (!albumId) {
     productTitle.textContent = "Album nao encontrado";
-    manifestStatus.textContent = "Escolha um album pela pagina de produtos.";
+    purchaseStatus.textContent = "Escolha um album pela pagina de produtos.";
     buyAlbumButton.disabled = true;
     return;
   }
@@ -999,22 +865,6 @@ async function loadAlbumDetail() {
 
 albumSaveButton?.addEventListener("click", async () => {
   await saveAlbumAdminChanges();
-});
-
-trackTextClose?.addEventListener("click", () => {
-  closeTrackTextOverlay();
-});
-
-trackTextOverlay?.addEventListener("click", (event) => {
-  if (event.target === trackTextOverlay) {
-    closeTrackTextOverlay();
-  }
-});
-
-window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && trackTextOverlay && !trackTextOverlay.hidden) {
-    closeTrackTextOverlay();
-  }
 });
 
 await loadAlbumDetail();

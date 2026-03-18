@@ -151,9 +151,7 @@ function serializeManifestTrack(track) {
     publicUrl: track.publicUrl || "",
     playbackTrackNumber: Number(track.playbackTrackNumber) || null,
     playbackTrackCode: track.playbackTrackCode || null,
-    lyrics: typeof track.lyrics === "string" ? track.lyrics : "",
-    textContent: typeof track.textContent === "string" ? track.textContent : typeof track.lyrics === "string" ? track.lyrics : "",
-    textJson: track.textJson && typeof track.textJson === "object" ? track.textJson : null
+    lyrics: typeof track.lyrics === "string" ? track.lyrics : ""
   };
 }
 
@@ -1059,9 +1057,7 @@ async function handleAdminAlbumUpdate(request, response, pathname) {
       publicUrl: track?.publicUrl || buildTrackUrl(product.name, number),
       playbackTrackNumber,
       playbackTrackCode,
-      lyrics: typeof track?.lyrics === "string" ? track.lyrics : "",
-      textContent: typeof track?.textContent === "string" ? track.textContent : typeof track?.lyrics === "string" ? track.lyrics : "",
-      textJson: track?.textJson && typeof track.textJson === "object" ? track.textJson : null
+      lyrics: typeof track?.lyrics === "string" ? track.lyrics : ""
     };
   });
 
