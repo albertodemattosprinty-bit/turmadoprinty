@@ -4,12 +4,13 @@ const legacyHistoryStorageKey = "turma_do_printy_chat_history";
 
 const authStatus = document.getElementById("auth-status");
 const chatAuthStatus = document.getElementById("chat-auth-status");
+const exploreBanner = document.getElementById("explore-banner");
 const exploreAuthShell = document.getElementById("explore-auth-shell");
 const exploreChatLayout = document.getElementById("explore-chat-layout");
 const historyList = document.getElementById("history-list");
+const sidebarToggleButton = document.getElementById("sidebar-toggle-button");
 const newChatButton = document.getElementById("new-chat-button");
 const logoutButton = document.getElementById("logout-button");
-const chatHint = document.getElementById("chat-hint");
 const chatShell = document.getElementById("chat-shell");
 const chatThread = document.getElementById("chat-thread");
 const chatForm = document.getElementById("chat-form");
@@ -37,6 +38,7 @@ let mediaRecorder = null;
 let mediaStream = null;
 let recordedChunks = [];
 let isRecording = false;
+let sidebarCollapsed = false;
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -285,10 +287,25 @@ function setRecordingState(recording) {
   micButton.title = recording ? "Parar gravação" : "Gravar mensagem de voz";
 }
 
+function syncSidebarState() {
+  if (!exploreChatLayout || !sidebarToggleButton) {
+    return;
+  }
+
+  exploreChatLayout.classList.toggle("sidebar-collapsed", sidebarCollapsed);
+  sidebarToggleButton.textContent = sidebarCollapsed ? ">" : "<";
+  sidebarToggleButton.setAttribute("aria-label", sidebarCollapsed ? "Mostrar historico" : "Recolher historico");
+  sidebarToggleButton.title = sidebarCollapsed ? "Mostrar historico" : "Recolher historico";
+}
+
 function syncComposerState() {
   const isLoggedIn = Boolean(currentUser);
+  document.body.classList.toggle("explore-authenticated", isLoggedIn);
   exploreAuthShell.hidden = isLoggedIn;
   exploreChatLayout.hidden = !isLoggedIn;
+  if (exploreBanner) {
+    exploreBanner.hidden = isLoggedIn;
+  }
   logoutButton.hidden = !isLoggedIn;
   newChatButton.hidden = !isLoggedIn;
   chatShell.hidden = !isLoggedIn;
@@ -296,7 +313,7 @@ function syncComposerState() {
   sendButton.disabled = !isLoggedIn;
   chatInput.disabled = !isLoggedIn;
   chatInput.placeholder = "Digite sua mensagem aqui...";
-  chatHint.textContent = isLoggedIn ? `Histórico ativo para @${currentUser.username}.` : "";
+  syncSidebarState();
 }
 
 async function loadSessionState() {
@@ -635,6 +652,13 @@ logoutButton.addEventListener("click", () => {
 micButton.addEventListener("click", async () => {
   await toggleRecording();
 });
+
+if (sidebarToggleButton) {
+  sidebarToggleButton.addEventListener("click", () => {
+    sidebarCollapsed = !sidebarCollapsed;
+    syncSidebarState();
+  });
+}
 
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
