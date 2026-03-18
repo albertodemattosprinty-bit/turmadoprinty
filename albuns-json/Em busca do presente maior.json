@@ -3,74 +3,98 @@
   "tracks": [
     {
       "number": 1,
-      "title": "M?sica 1",
+      "code": "001",
+      "title": "Música 1",
       "type": "full",
+      "durationSeconds": 102.43,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/001.mp3"
     },
     {
       "number": 2,
-      "title": "M?sica 2",
+      "code": "002",
+      "title": "Música 2",
       "type": "full",
+      "durationSeconds": 128.44,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/002.mp3"
     },
     {
       "number": 3,
-      "title": "M?sica 3",
+      "code": "003",
+      "title": "Música 3",
       "type": "full",
+      "durationSeconds": 213.29,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/003.mp3"
     },
     {
       "number": 4,
-      "title": "M?sica 4",
+      "code": "004",
+      "title": "Música 4",
       "type": "full",
+      "durationSeconds": 212.11,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/004.mp3"
     },
     {
       "number": 5,
-      "title": "M?sica 5",
+      "code": "005",
+      "title": "Música 5",
       "type": "full",
+      "durationSeconds": 238.89,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/005.mp3"
     },
     {
       "number": 6,
-      "title": "M?sica 6",
+      "code": "006",
+      "title": "Música 6",
       "type": "full",
+      "durationSeconds": 194.95,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/006.mp3"
     },
     {
       "number": 7,
-      "title": "M?sica 7",
+      "code": "007",
+      "title": "Música 7",
       "type": "full",
+      "durationSeconds": 64.39,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/007.mp3"
     },
     {
       "number": 8,
-      "title": "M?sica 8",
+      "code": "008",
+      "title": "Música 8",
       "type": "full",
+      "durationSeconds": 94.15,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/008.mp3"
     },
     {
       "number": 9,
-      "title": "M?sica 9",
+      "code": "009",
+      "title": "Música 9",
       "type": "full",
+      "durationSeconds": 139.55,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/009.mp3"
     },
     {
       "number": 10,
-      "title": "M?sica 10",
+      "code": "010",
+      "title": "Música 10",
       "type": "full",
+      "durationSeconds": 185.6,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/010.mp3"
     },
     {
       "number": 11,
-      "title": "M?sica 11",
+      "code": "011",
+      "title": "Música 11",
       "type": "full",
+      "durationSeconds": 228.39,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/011.mp3"
     },
     {
       "number": 12,
-      "title": "M?sica 12",
+      "code": "012",
+      "title": "Música 12",
       "type": "full",
+      "durationSeconds": 191.71,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Em%20busca%20do%20presente%20maior/mp3/012.mp3"
     }
   ]

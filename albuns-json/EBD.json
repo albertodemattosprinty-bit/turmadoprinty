@@ -3,122 +3,176 @@
   "tracks": [
     {
       "number": 1,
-      "title": "M?sica 1",
+      "code": "001",
+      "title": "Música 1",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/001.mp3"
+      "durationSeconds": 157.73,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/001.mp3",
+      "playbackTrackNumber": 11,
+      "playbackTrackCode": "011"
     },
     {
       "number": 2,
-      "title": "M?sica 2",
+      "code": "002",
+      "title": "Música 2",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/002.mp3"
+      "durationSeconds": 201.53,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/002.mp3",
+      "playbackTrackNumber": 12,
+      "playbackTrackCode": "012"
     },
     {
       "number": 3,
-      "title": "M?sica 3",
+      "code": "003",
+      "title": "Música 3",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/003.mp3"
+      "durationSeconds": 203.52,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/003.mp3",
+      "playbackTrackNumber": 13,
+      "playbackTrackCode": "013"
     },
     {
       "number": 4,
-      "title": "M?sica 4",
+      "code": "004",
+      "title": "Música 4",
       "type": "full",
+      "durationSeconds": 250.12,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/004.mp3"
     },
     {
       "number": 5,
-      "title": "M?sica 5",
+      "code": "005",
+      "title": "Música 5",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/005.mp3"
+      "durationSeconds": 207.46,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/005.mp3",
+      "playbackTrackNumber": 15,
+      "playbackTrackCode": "015"
     },
     {
       "number": 6,
-      "title": "M?sica 6",
+      "code": "006",
+      "title": "Música 6",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/006.mp3"
+      "durationSeconds": 121.7,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/006.mp3",
+      "playbackTrackNumber": 16,
+      "playbackTrackCode": "016"
     },
     {
       "number": 7,
-      "title": "M?sica 7",
+      "code": "007",
+      "title": "Música 7",
       "type": "full",
+      "durationSeconds": 196.88,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/007.mp3"
     },
     {
       "number": 8,
-      "title": "M?sica 8",
+      "code": "008",
+      "title": "Música 8",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/008.mp3"
+      "durationSeconds": 201.12,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/008.mp3",
+      "playbackTrackNumber": 18,
+      "playbackTrackCode": "018"
     },
     {
       "number": 9,
-      "title": "M?sica 9",
+      "code": "009",
+      "title": "Música 9",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/009.mp3"
+      "durationSeconds": 252.68,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/009.mp3",
+      "playbackTrackNumber": 19,
+      "playbackTrackCode": "019"
     },
     {
       "number": 10,
-      "title": "M?sica 10",
+      "code": "010",
+      "title": "Música 10",
       "type": "full",
+      "durationSeconds": 315.85,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/010.mp3"
     },
     {
       "number": 11,
-      "title": "M?sica 11",
-      "type": "full",
+      "code": "011",
+      "title": "Música 11",
+      "type": "playback",
+      "durationSeconds": 157.73,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/011.mp3"
     },
     {
       "number": 12,
-      "title": "M?sica 12",
-      "type": "full",
+      "code": "012",
+      "title": "Música 12",
+      "type": "playback",
+      "durationSeconds": 202.71,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/012.mp3"
     },
     {
       "number": 13,
-      "title": "M?sica 13",
-      "type": "full",
+      "code": "013",
+      "title": "Música 13",
+      "type": "playback",
+      "durationSeconds": 201.53,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/013.mp3"
     },
     {
       "number": 14,
-      "title": "M?sica 14",
+      "code": "014",
+      "title": "Música 14",
       "type": "full",
+      "durationSeconds": 225.31,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/014.mp3"
     },
     {
       "number": 15,
-      "title": "M?sica 15",
-      "type": "full",
+      "code": "015",
+      "title": "Música 15",
+      "type": "playback",
+      "durationSeconds": 207.46,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/015.mp3"
     },
     {
       "number": 16,
-      "title": "M?sica 16",
-      "type": "full",
+      "code": "016",
+      "title": "Música 16",
+      "type": "playback",
+      "durationSeconds": 121.78,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/016.mp3"
     },
     {
       "number": 17,
-      "title": "M?sica 17",
+      "code": "017",
+      "title": "Música 17",
       "type": "full",
+      "durationSeconds": 189.44,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/017.mp3"
     },
     {
       "number": 18,
-      "title": "M?sica 18",
-      "type": "full",
+      "code": "018",
+      "title": "Música 18",
+      "type": "playback",
+      "durationSeconds": 201.12,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/018.mp3"
     },
     {
       "number": 19,
-      "title": "M?sica 19",
-      "type": "full",
+      "code": "019",
+      "title": "Música 19",
+      "type": "playback",
+      "durationSeconds": 252.68,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/019.mp3"
     },
     {
       "number": 20,
-      "title": "M?sica 20",
+      "code": "020",
+      "title": "Música 20",
       "type": "full",
+      "durationSeconds": 225.2,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/EBD/mp3/020.mp3"
     }
   ]

@@ -3,170 +3,252 @@
   "tracks": [
     {
       "number": 1,
-      "title": "M?sica 1",
+      "code": "001",
+      "title": "Música 1",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/001.mp3"
+      "durationSeconds": 78.18,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/001.mp3",
+      "playbackTrackNumber": 15,
+      "playbackTrackCode": "015"
     },
     {
       "number": 2,
-      "title": "M?sica 2",
+      "code": "002",
+      "title": "Música 2",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/002.mp3"
+      "durationSeconds": 192.52,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/002.mp3",
+      "playbackTrackNumber": 16,
+      "playbackTrackCode": "016"
     },
     {
       "number": 3,
-      "title": "M?sica 3",
+      "code": "003",
+      "title": "Música 3",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/003.mp3"
+      "durationSeconds": 24.74,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/003.mp3",
+      "playbackTrackNumber": 17,
+      "playbackTrackCode": "017"
     },
     {
       "number": 4,
-      "title": "M?sica 4",
+      "code": "004",
+      "title": "Música 4",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/004.mp3"
+      "durationSeconds": 54.47,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/004.mp3",
+      "playbackTrackNumber": 18,
+      "playbackTrackCode": "018"
     },
     {
       "number": 5,
-      "title": "M?sica 5",
+      "code": "005",
+      "title": "Música 5",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/005.mp3"
+      "durationSeconds": 50.44,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/005.mp3",
+      "playbackTrackNumber": 19,
+      "playbackTrackCode": "019"
     },
     {
       "number": 6,
-      "title": "M?sica 6",
+      "code": "006",
+      "title": "Música 6",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/006.mp3"
+      "durationSeconds": 233.33,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/006.mp3",
+      "playbackTrackNumber": 20,
+      "playbackTrackCode": "020"
     },
     {
       "number": 7,
-      "title": "M?sica 7",
+      "code": "007",
+      "title": "Música 7",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/007.mp3"
+      "durationSeconds": 42.21,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/007.mp3",
+      "playbackTrackNumber": 21,
+      "playbackTrackCode": "021"
     },
     {
       "number": 8,
-      "title": "M?sica 8",
+      "code": "008",
+      "title": "Música 8",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/008.mp3"
+      "durationSeconds": 236.7,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/008.mp3",
+      "playbackTrackNumber": 22,
+      "playbackTrackCode": "022"
     },
     {
       "number": 9,
-      "title": "M?sica 9",
+      "code": "009",
+      "title": "Música 9",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/009.mp3"
+      "durationSeconds": 203.52,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/009.mp3",
+      "playbackTrackNumber": 23,
+      "playbackTrackCode": "023"
     },
     {
       "number": 10,
-      "title": "M?sica 10",
+      "code": "010",
+      "title": "Música 10",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/010.mp3"
+      "durationSeconds": 153.86,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/010.mp3",
+      "playbackTrackNumber": 24,
+      "playbackTrackCode": "024"
     },
     {
       "number": 11,
-      "title": "M?sica 11",
+      "code": "011",
+      "title": "Música 11",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/011.mp3"
+      "durationSeconds": 47.41,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/011.mp3",
+      "playbackTrackNumber": 25,
+      "playbackTrackCode": "025"
     },
     {
       "number": 12,
-      "title": "M?sica 12",
+      "code": "012",
+      "title": "Música 12",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/012.mp3"
+      "durationSeconds": 196.1,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/012.mp3",
+      "playbackTrackNumber": 26,
+      "playbackTrackCode": "026"
     },
     {
       "number": 13,
-      "title": "M?sica 13",
+      "code": "013",
+      "title": "Música 13",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/013.mp3"
+      "durationSeconds": 25.05,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/013.mp3",
+      "playbackTrackNumber": 27,
+      "playbackTrackCode": "027"
     },
     {
       "number": 14,
-      "title": "M?sica 14",
+      "code": "014",
+      "title": "Música 14",
       "type": "full",
+      "durationSeconds": 204.62,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/014.mp3"
     },
     {
       "number": 15,
-      "title": "M?sica 15",
-      "type": "full",
+      "code": "015",
+      "title": "Música 15",
+      "type": "playback",
+      "durationSeconds": 78.18,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/015.mp3"
     },
     {
       "number": 16,
-      "title": "M?sica 16",
-      "type": "full",
+      "code": "016",
+      "title": "Música 16",
+      "type": "playback",
+      "durationSeconds": 192.52,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/016.mp3"
     },
     {
       "number": 17,
-      "title": "M?sica 17",
-      "type": "full",
+      "code": "017",
+      "title": "Música 17",
+      "type": "playback",
+      "durationSeconds": 24.74,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/017.mp3"
     },
     {
       "number": 18,
-      "title": "M?sica 18",
-      "type": "full",
+      "code": "018",
+      "title": "Música 18",
+      "type": "playback",
+      "durationSeconds": 54.47,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/018.mp3"
     },
     {
       "number": 19,
-      "title": "M?sica 19",
-      "type": "full",
+      "code": "019",
+      "title": "Música 19",
+      "type": "playback",
+      "durationSeconds": 50.44,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/019.mp3"
     },
     {
       "number": 20,
-      "title": "M?sica 20",
-      "type": "full",
+      "code": "020",
+      "title": "Música 20",
+      "type": "playback",
+      "durationSeconds": 233.33,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/020.mp3"
     },
     {
       "number": 21,
-      "title": "M?sica 21",
-      "type": "full",
+      "code": "021",
+      "title": "Música 21",
+      "type": "playback",
+      "durationSeconds": 42.21,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/021.mp3"
     },
     {
       "number": 22,
-      "title": "M?sica 22",
-      "type": "full",
+      "code": "022",
+      "title": "Música 22",
+      "type": "playback",
+      "durationSeconds": 236.7,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/022.mp3"
     },
     {
       "number": 23,
-      "title": "M?sica 23",
-      "type": "full",
+      "code": "023",
+      "title": "Música 23",
+      "type": "playback",
+      "durationSeconds": 203.52,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/023.mp3"
     },
     {
       "number": 24,
-      "title": "M?sica 24",
-      "type": "full",
+      "code": "024",
+      "title": "Música 24",
+      "type": "playback",
+      "durationSeconds": 153.86,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/024.mp3"
     },
     {
       "number": 25,
-      "title": "M?sica 25",
-      "type": "full",
+      "code": "025",
+      "title": "Música 25",
+      "type": "playback",
+      "durationSeconds": 47.41,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/025.mp3"
     },
     {
       "number": 26,
-      "title": "M?sica 26",
-      "type": "full",
+      "code": "026",
+      "title": "Música 26",
+      "type": "playback",
+      "durationSeconds": 196.1,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/026.mp3"
     },
     {
       "number": 27,
-      "title": "M?sica 27",
-      "type": "full",
+      "code": "027",
+      "title": "Música 27",
+      "type": "playback",
+      "durationSeconds": 25.05,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/027.mp3"
     },
     {
       "number": 28,
-      "title": "M?sica 28",
+      "code": "028",
+      "title": "Música 28",
       "type": "full",
+      "durationSeconds": 202.48,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%89%20Natal/mp3/028.mp3"
     }
   ]

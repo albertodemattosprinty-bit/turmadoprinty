@@ -3,92 +3,124 @@
   "tracks": [
     {
       "number": 1,
-      "title": "M?sica 1",
+      "code": "001",
+      "title": "Música 1",
       "type": "full",
+      "durationSeconds": 74.66,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/001.mp3"
     },
     {
       "number": 2,
-      "title": "M?sica 2",
+      "code": "002",
+      "title": "Música 2",
       "type": "full",
+      "durationSeconds": 150.41,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/002.mp3"
     },
     {
       "number": 3,
-      "title": "M?sica 3",
+      "code": "003",
+      "title": "Música 3",
       "type": "full",
+      "durationSeconds": 41.27,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/003.mp3"
     },
     {
       "number": 4,
-      "title": "M?sica 4",
+      "code": "004",
+      "title": "Música 4",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/004.mp3"
+      "durationSeconds": 201.72,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/004.mp3",
+      "playbackTrackNumber": 12,
+      "playbackTrackCode": "012"
     },
     {
       "number": 5,
-      "title": "M?sica 5",
+      "code": "005",
+      "title": "Música 5",
       "type": "full",
+      "durationSeconds": 28.58,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/005.mp3"
     },
     {
       "number": 6,
-      "title": "M?sica 6",
+      "code": "006",
+      "title": "Música 6",
       "type": "full",
+      "durationSeconds": 143.39,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/006.mp3"
     },
     {
       "number": 7,
-      "title": "M?sica 7",
+      "code": "007",
+      "title": "Música 7",
       "type": "full",
+      "durationSeconds": 26.96,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/007.mp3"
     },
     {
       "number": 8,
-      "title": "M?sica 8",
+      "code": "008",
+      "title": "Música 8",
       "type": "full",
+      "durationSeconds": 230.27,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/008.mp3"
     },
     {
       "number": 9,
-      "title": "M?sica 9",
+      "code": "009",
+      "title": "Música 9",
       "type": "full",
+      "durationSeconds": 17.03,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/009.mp3"
     },
     {
       "number": 10,
-      "title": "M?sica 10",
+      "code": "010",
+      "title": "Música 10",
       "type": "full",
+      "durationSeconds": 144.59,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/010.mp3"
     },
     {
       "number": 11,
-      "title": "M?sica 11",
+      "code": "011",
+      "title": "Música 11",
       "type": "full",
+      "durationSeconds": 151.51,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/011.mp3"
     },
     {
       "number": 12,
-      "title": "M?sica 12",
-      "type": "full",
+      "code": "012",
+      "title": "Música 12",
+      "type": "playback",
+      "durationSeconds": 203.55,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/012.mp3"
     },
     {
       "number": 13,
-      "title": "M?sica 13",
+      "code": "013",
+      "title": "Música 13",
       "type": "full",
+      "durationSeconds": 143.99,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/013.mp3"
     },
     {
       "number": 14,
-      "title": "M?sica 14",
+      "code": "014",
+      "title": "Música 14",
       "type": "full",
+      "durationSeconds": 259.94,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/014.mp3"
     },
     {
       "number": 15,
-      "title": "M?sica 15",
+      "code": "015",
+      "title": "Música 15",
       "type": "full",
+      "durationSeconds": 142.92,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Aprendi%20com%20meu%20Pai/mp3/015.mp3"
     }
   ]

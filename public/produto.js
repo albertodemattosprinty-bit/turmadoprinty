@@ -20,6 +20,10 @@ let accessState = {
 let currentAudio = null;
 let currentTrackNumber = null;
 
+function getTrackModeLabel(track) {
+  return track?.type === "playback" ? "Playback" : "Full";
+}
+
 function getAlbumId() {
   const params = new URLSearchParams(window.location.search);
   return params.get("album") || "";
@@ -290,7 +294,7 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
 
   delete progressBar.dataset.downloading;
   progressBar.classList.remove("downloading");
-  actionLabel.textContent = downloaded ? "Disponivel offline neste navegador" : label || "Streaming online";
+  actionLabel.textContent = downloaded ? "Disponivel offline neste navegador" : label || card.dataset.trackMode || "Full";
   downloadButton.disabled = false;
 }
 
@@ -388,11 +392,12 @@ async function renderTracks(album) {
     const article = document.createElement("article");
     article.className = "track-card";
     article.dataset.trackNumber = String(track.number);
+    article.dataset.trackMode = getTrackModeLabel(track);
     article.innerHTML = `
       <div class="track-copy">
         <p class="track-number">Faixa ${String(track.number).padStart(3, "0")}</p>
         <h3>${track.label}</h3>
-        <p class="track-download-label">${downloaded ? "Disponivel offline neste navegador" : "Streaming online"}</p>
+        <p class="track-download-label">${downloaded ? "Disponivel offline neste navegador" : getTrackModeLabel(track)}</p>
       </div>
       <div class="track-player-shell">
         <audio preload="none"></audio>

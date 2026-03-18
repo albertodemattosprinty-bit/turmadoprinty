@@ -3,146 +3,210 @@
   "tracks": [
     {
       "number": 1,
-      "title": "M?sica 1",
+      "code": "001",
+      "title": "Música 1",
       "type": "full",
+      "durationSeconds": 90.8,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/001.mp3"
     },
     {
       "number": 2,
-      "title": "M?sica 2",
+      "code": "002",
+      "title": "Música 2",
       "type": "full",
+      "durationSeconds": 194.38,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/002.mp3"
     },
     {
       "number": 3,
-      "title": "M?sica 3",
+      "code": "003",
+      "title": "Música 3",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/003.mp3"
+      "durationSeconds": 231.97,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/003.mp3",
+      "playbackTrackNumber": 15,
+      "playbackTrackCode": "015"
     },
     {
       "number": 4,
-      "title": "M?sica 4",
+      "code": "004",
+      "title": "Música 4",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/004.mp3"
+      "durationSeconds": 42.76,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/004.mp3",
+      "playbackTrackNumber": 16,
+      "playbackTrackCode": "016"
     },
     {
       "number": 5,
-      "title": "M?sica 5",
+      "code": "005",
+      "title": "Música 5",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/005.mp3"
+      "durationSeconds": 141.51,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/005.mp3",
+      "playbackTrackNumber": 17,
+      "playbackTrackCode": "017"
     },
     {
       "number": 6,
-      "title": "M?sica 6",
+      "code": "006",
+      "title": "Música 6",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/006.mp3"
+      "durationSeconds": 24.84,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/006.mp3",
+      "playbackTrackNumber": 18,
+      "playbackTrackCode": "018"
     },
     {
       "number": 7,
-      "title": "M?sica 7",
+      "code": "007",
+      "title": "Música 7",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/007.mp3"
+      "durationSeconds": 169.17,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/007.mp3",
+      "playbackTrackNumber": 19,
+      "playbackTrackCode": "019"
     },
     {
       "number": 8,
-      "title": "M?sica 8",
+      "code": "008",
+      "title": "Música 8",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/008.mp3"
+      "durationSeconds": 33.88,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/008.mp3",
+      "playbackTrackNumber": 20,
+      "playbackTrackCode": "020"
     },
     {
       "number": 9,
-      "title": "M?sica 9",
+      "code": "009",
+      "title": "Música 9",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/009.mp3"
+      "durationSeconds": 167.97,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/009.mp3",
+      "playbackTrackNumber": 21,
+      "playbackTrackCode": "021"
     },
     {
       "number": 10,
-      "title": "M?sica 10",
+      "code": "010",
+      "title": "Música 10",
       "type": "full",
+      "durationSeconds": 39.13,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/010.mp3"
     },
     {
       "number": 11,
-      "title": "M?sica 11",
+      "code": "011",
+      "title": "Música 11",
       "type": "full",
-      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/011.mp3"
+      "durationSeconds": 234.45,
+      "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/011.mp3",
+      "playbackTrackNumber": 23,
+      "playbackTrackCode": "023"
     },
     {
       "number": 12,
-      "title": "M?sica 12",
+      "code": "012",
+      "title": "Música 12",
       "type": "full",
+      "durationSeconds": 13.58,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/012.mp3"
     },
     {
       "number": 13,
-      "title": "M?sica 13",
+      "code": "013",
+      "title": "Música 13",
       "type": "full",
+      "durationSeconds": 73.59,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/013.mp3"
     },
     {
       "number": 14,
-      "title": "M?sica 14",
+      "code": "014",
+      "title": "Música 14",
       "type": "full",
+      "durationSeconds": 210.73,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/014.mp3"
     },
     {
       "number": 15,
-      "title": "M?sica 15",
-      "type": "full",
+      "code": "015",
+      "title": "Música 15",
+      "type": "playback",
+      "durationSeconds": 231.68,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/015.mp3"
     },
     {
       "number": 16,
-      "title": "M?sica 16",
-      "type": "full",
+      "code": "016",
+      "title": "Música 16",
+      "type": "playback",
+      "durationSeconds": 42.06,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/016.mp3"
     },
     {
       "number": 17,
-      "title": "M?sica 17",
-      "type": "full",
+      "code": "017",
+      "title": "Música 17",
+      "type": "playback",
+      "durationSeconds": 142.11,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/017.mp3"
     },
     {
       "number": 18,
-      "title": "M?sica 18",
-      "type": "full",
+      "code": "018",
+      "title": "Música 18",
+      "type": "playback",
+      "durationSeconds": 24.14,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/018.mp3"
     },
     {
       "number": 19,
-      "title": "M?sica 19",
-      "type": "full",
+      "code": "019",
+      "title": "Música 19",
+      "type": "playback",
+      "durationSeconds": 168.75,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/019.mp3"
     },
     {
       "number": 20,
-      "title": "M?sica 20",
-      "type": "full",
+      "code": "020",
+      "title": "Música 20",
+      "type": "playback",
+      "durationSeconds": 34.22,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/020.mp3"
     },
     {
       "number": 21,
-      "title": "M?sica 21",
-      "type": "full",
+      "code": "021",
+      "title": "Música 21",
+      "type": "playback",
+      "durationSeconds": 169.04,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/021.mp3"
     },
     {
       "number": 22,
-      "title": "M?sica 22",
+      "code": "022",
+      "title": "Música 22",
       "type": "full",
+      "durationSeconds": 41.33,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/022.mp3"
     },
     {
       "number": 23,
-      "title": "M?sica 23",
-      "type": "full",
+      "code": "023",
+      "title": "Música 23",
+      "type": "playback",
+      "durationSeconds": 234.89,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/023.mp3"
     },
     {
       "number": 24,
-      "title": "M?sica 24",
+      "code": "024",
+      "title": "Música 24",
       "type": "full",
+      "durationSeconds": 11.44,
       "publicUrl": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Um%20presente%20para%20todos/mp3/024.mp3"
     }
   ]
