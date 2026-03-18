@@ -958,6 +958,10 @@ body[data-page="planos"] .status-pill {
   margin: 0 auto;
 }
 
+.auth-form-compact label {
+  gap: 0;
+}
+
 .chat-main {
   display: grid;
   gap: 16px;
@@ -1440,9 +1444,9 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
 
   body[data-page="explorar"] .chat-sidebar {
     position: fixed;
-    top: 118px;
+    top: 30px;
     left: 0;
-    bottom: 0;
+    bottom: 30px;
     z-index: 36;
     width: 80vw;
     max-width: 360px;
@@ -1454,7 +1458,7 @@ body[data-page="explorar"].explore-authenticated .conversation-shell {
 
   body[data-page="explorar"] .chat-sidebar .sidebar-card {
     position: relative;
-    min-height: calc(100vh - 132px);
+    min-height: calc(100vh - 60px);
     padding-right: 18px;
     display: flex;
     flex-direction: column;

@@ -11,10 +11,6 @@
 </head>
 <body data-page="explorar">
   <main class="page-shell">
-    <section id="explore-banner" class="page-image-banner">
-      <img src="/ia.png" alt="Cabecalho da area de IA">
-    </section>
-
     <section id="explore-auth-shell" class="explore-auth-shell section-card">
       <div class="explore-auth-head">
         <h1 class="section-title small">Entre para conversar com a IA</h1>
@@ -28,18 +24,18 @@
 
       <div class="auth-panel active" data-auth-panel="login" role="tabpanel">
         <form id="login-form" class="auth-form auth-form-compact">
-          <label>Nome de usuario<input id="login-username" type="text" placeholder="Seu nome de usuario"></label>
-          <label>Senha<input id="login-password" type="password" placeholder="Sua senha"></label>
+          <label><input id="login-username" type="text" placeholder="Nome de usuario" aria-label="Nome de usuario"></label>
+          <label><input id="login-password" type="password" placeholder="Senha" aria-label="Senha"></label>
           <button type="submit" class="primary-button">Entrar</button>
         </form>
       </div>
 
       <div class="auth-panel" data-auth-panel="register" role="tabpanel" hidden>
         <form id="register-form" class="auth-form auth-form-compact">
-          <label>Nome<input id="register-name" type="text" placeholder="Seu nome"></label>
-          <label>Nome de usuario<input id="register-username" type="text" placeholder="ex.: printykids"></label>
-          <label>Senha<input id="register-password" type="password" placeholder="Minimo 6 caracteres"></label>
-          <label>Confirmar senha<input id="register-password-confirm" type="password" placeholder="Repita a senha"></label>
+          <label><input id="register-name" type="text" placeholder="Nome" aria-label="Nome"></label>
+          <label><input id="register-username" type="text" placeholder="Nome de usuario" aria-label="Nome de usuario"></label>
+          <label><input id="register-password" type="password" placeholder="Senha" aria-label="Senha"></label>
+          <label><input id="register-password-confirm" type="password" placeholder="Confirmar senha" aria-label="Confirmar senha"></label>
           <button type="submit" class="primary-button">Cadastrar</button>
         </form>
       </div>
@@ -49,15 +45,17 @@
       <aside class="chat-sidebar">
         <div class="sidebar-card">
           <div class="sidebar-topbar">
-            <button id="new-chat-button" class="sidebar-icon-button primary-button" type="button" aria-label="Nova conversa" title="Nova conversa">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zm-7 7h14v2H4z"/></svg>
-            </button>
             <button id="sidebar-toggle-button" class="sidebar-toggle-button" type="button" aria-label="Recolher historico" title="Recolher historico">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5.5-7 6.5 7 6.5"/></svg>
             </button>
           </div>
           <h2 class="section-title small">Seus chats</h2>
           <p class="section-muted" id="chat-auth-status">Verificando sessao...</p>
+          <div class="chat-actions sidebar-actions">
+            <button id="new-chat-button" class="sidebar-icon-button primary-button" type="button" aria-label="Nova conversa" title="Nova conversa">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zm-7 7h14v2H4z"/></svg>
+            </button>
+          </div>
           <div id="history-list" class="history-list"></div>
           <div class="chat-actions sidebar-actions sidebar-actions-bottom">
             <a href="/index.html" id="sidebar-home-link" class="sidebar-icon-button ghost-button" aria-label="Ir para home" title="Ir para home">

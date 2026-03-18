@@ -117,6 +117,10 @@ function getUserKey() {
   return currentUser?.username || "guest";
 }
 
+function getUserDisplayName() {
+  return currentUser?.name || currentUser?.username || "";
+}
+
 function getConversations() {
   const store = getConversationStore();
   const items = Array.isArray(store[getUserKey()]) ? store[getUserKey()] : [];
@@ -427,7 +431,7 @@ async function loadSessionState() {
     currentUser = data.user;
     migrateLegacyHistory();
     authStatus.textContent = `Logado como @${data.user.username}`;
-    chatAuthStatus.textContent = `Logado como @${data.user.username}`;
+    chatAuthStatus.textContent = getUserDisplayName();
     const conversations = ensureWelcomeConversation();
     activeConversationId = activeConversationId || conversations[0]?.id || null;
     syncComposerState();
