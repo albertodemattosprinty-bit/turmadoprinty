@@ -2,29 +2,56 @@ const healthDot = document.getElementById("health-dot");
 const healthLabel = document.getElementById("health-label");
 const healthCopy = document.getElementById("health-copy");
 const envPills = document.getElementById("env-pills");
-const roadmapGrid = document.getElementById("roadmap-grid");
 const albumGrid = document.getElementById("album-grid");
 const albumCount = document.getElementById("album-count");
+const scheduleGrid = document.getElementById("schedule-grid");
 const gptForm = document.getElementById("gpt-form");
 const gptMessage = document.getElementById("gpt-message");
 const gptSystem = document.getElementById("gpt-system");
 const gptOutput = document.getElementById("gpt-output");
 const authStatus = document.getElementById("auth-status");
 const registerForm = document.getElementById("register-form");
-const verifyForm = document.getElementById("verify-form");
 const loginForm = document.getElementById("login-form");
 const registerName = document.getElementById("register-name");
-const registerEmail = document.getElementById("register-email");
+const registerUsername = document.getElementById("register-username");
 const registerPassword = document.getElementById("register-password");
 const registerPasswordConfirm = document.getElementById("register-password-confirm");
-const verifyEmail = document.getElementById("verify-email");
-const verifyCode = document.getElementById("verify-code");
-const loginEmail = document.getElementById("login-email");
+const loginUsername = document.getElementById("login-username");
 const loginPassword = document.getElementById("login-password");
 const meButton = document.getElementById("me-button");
 const authOutput = document.getElementById("auth-output");
 
 const sessionStorageKey = "turma_do_printy_token";
+const weekendSchedule = [
+  {
+    day: "Sabado",
+    city: "Goiania, GO",
+    place: "Igreja Batista da Esperanca",
+    time: "16h00",
+    title: "Tarde infantil com louvor, teatro e participacao das familias"
+  },
+  {
+    day: "Sabado",
+    city: "Brasilia, DF",
+    place: "Assembleia de Deus Vida Plena",
+    time: "19h30",
+    title: "Noite especial para criancas no congresso da igreja"
+  },
+  {
+    day: "Domingo",
+    city: "Uberlandia, MG",
+    place: "Igreja Presbiteriana do Caminho",
+    time: "09h30",
+    title: "Manha de celebracao com musica, ensino e acolhimento"
+  },
+  {
+    day: "Domingo",
+    city: "Campinas, SP",
+    place: "Comunidade Crista Fonte de Vida",
+    time: "18h00",
+    title: "Culto infantil com repertorio tematico e interacao com a igreja"
+  }
+];
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -55,24 +82,9 @@ function renderPills(items) {
   });
 }
 
-function renderRoadmap(items) {
-  roadmapGrid.innerHTML = "";
-
-  items.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "roadmap-card";
-    card.innerHTML = `
-      <p class="roadmap-status">${item.status}</p>
-      <h3>${item.title}</h3>
-      <p>${item.summary}</p>
-    `;
-    roadmapGrid.appendChild(card);
-  });
-}
-
 function renderAlbums(items) {
   albumGrid.innerHTML = "";
-  albumCount.textContent = `${items.length} albuns encontrados`;
+  albumCount.textContent = `${items.length} albuns disponiveis`;
 
   items.forEach((album) => {
     const card = document.createElement("article");
@@ -88,36 +100,48 @@ function renderAlbums(items) {
   });
 }
 
+function renderSchedule() {
+  scheduleGrid.innerHTML = "";
+
+  weekendSchedule.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "schedule-card";
+    card.innerHTML = `
+      <p class="schedule-day">${item.day}</p>
+      <h3>${item.title}</h3>
+      <p>${item.place}</p>
+      <p>${item.city}</p>
+      <strong>${item.time}</strong>
+    `;
+    scheduleGrid.appendChild(card);
+  });
+}
+
 async function loadHealth() {
   try {
     const response = await fetch("/api/health");
     const data = await response.json();
 
     setHealthState(Boolean(data.ok));
-    healthLabel.textContent = data.ok ? "Backend online" : "Backend com problema";
-    healthCopy.textContent = `Modelo padrao: ${data.env.model} | Base de conteudo: ${data.env.contentBaseUrl}`;
+    healthLabel.textContent = data.ok ? "Plataforma online" : "Falha na plataforma";
+    healthCopy.textContent = `Modelo padrao: ${data.env.model} | Conteudo em: ${data.env.contentBaseUrl}`;
 
     renderPills([
-      data.env.hasOpenAiKey ? "OPENAI_API_KEY configurada" : "OPENAI_API_KEY pendente",
-      data.env.hasDatabaseUrl ? "DATABASE_URL configurada" : "DATABASE_URL pendente",
+      data.env.hasOpenAiKey ? "GPT ativo" : "GPT pendente",
+      data.env.hasDatabaseUrl ? "Acesso ativo" : "Acesso pendente",
       `Modelo ${data.env.model}`
     ]);
 
     authStatus.textContent = data.env.hasDatabaseUrl
-      ? "Banco configurado, falta validar conexao e rodar o SQL"
-      : "Cole a DATABASE_URL no .env para liberar login";
+      ? "Cadastro por nome de usuario e senha liberado"
+      : "Configure DATABASE_URL para liberar o acesso";
   } catch (error) {
     setHealthState(false);
     healthLabel.textContent = "Falha ao conectar";
     healthCopy.textContent = error instanceof Error ? error.message : "Erro desconhecido";
     renderPills(["Servidor indisponivel"]);
+    authStatus.textContent = "Servidor indisponivel";
   }
-}
-
-async function loadRoadmap() {
-  const response = await fetch("/api/roadmap");
-  const data = await response.json();
-  renderRoadmap(data.items);
 }
 
 async function loadAlbums() {
@@ -150,7 +174,7 @@ async function runAuthRequest(url, payload) {
 
 gptForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  gptOutput.textContent = "Consultando backend...";
+  gptOutput.textContent = "Consultando o assistente...";
 
   try {
     const response = await fetch("/api/gpt/ask", {
@@ -179,7 +203,7 @@ gptForm.addEventListener("submit", async (event) => {
 
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  authOutput.textContent = "Gerando codigo...";
+  authOutput.textContent = "Criando conta...";
 
   if (registerPassword.value !== registerPasswordConfirm.value) {
     authOutput.textContent = "As senhas nao conferem.";
@@ -189,25 +213,8 @@ registerForm.addEventListener("submit", async (event) => {
   try {
     const data = await runAuthRequest("/api/auth/register", {
       name: registerName.value,
-      email: registerEmail.value,
+      username: registerUsername.value,
       password: registerPassword.value
-    });
-
-    verifyEmail.value = registerEmail.value;
-    authOutput.textContent = JSON.stringify(data, null, 2);
-  } catch (error) {
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
-  }
-});
-
-verifyForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  authOutput.textContent = "Confirmando codigo...";
-
-  try {
-    const data = await runAuthRequest("/api/auth/verify-code", {
-      email: verifyEmail.value,
-      code: verifyCode.value
     });
 
     authOutput.textContent = JSON.stringify(data, null, 2);
@@ -218,11 +225,11 @@ verifyForm.addEventListener("submit", async (event) => {
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  authOutput.textContent = "Fazendo login...";
+  authOutput.textContent = "Entrando...";
 
   try {
     const data = await runAuthRequest("/api/auth/login", {
-      email: loginEmail.value,
+      username: loginUsername.value,
       password: loginPassword.value
     });
 
@@ -248,4 +255,5 @@ meButton.addEventListener("click", async () => {
   }
 });
 
-await Promise.all([loadHealth(), loadRoadmap(), loadAlbums()]);
+renderSchedule();
+await Promise.all([loadHealth(), loadAlbums()]);

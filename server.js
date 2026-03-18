@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { albums } from "./src/albums.js";
-import { createRegistrationCode, createSession, findUserByEmail, findUserBySessionToken, findVerifiedUserByEmail, parseBearerToken, verifyPassword, verifyRegistrationCode } from "./src/auth.js";
+import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { hasDatabase, query } from "./src/db.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,29 +48,6 @@ function getAlbumPayload() {
     ...album,
     coverUrl: buildCoverUrl(album.name)
   }));
-}
-
-function getRoadmapStatus() {
-  return [
-    {
-      id: "node-parte-1",
-      title: "APIs GPT",
-      status: "pronto para testar",
-      summary: "Servidor Node no ar, endpoint de health e rota para chamadas ao OpenAI."
-    },
-    {
-      id: "login-parte-2",
-      title: "Login com Postgres",
-      status: "proxima etapa",
-      summary: "Entrar com banco, usuarios, hash de senha e sessao/token."
-    },
-    {
-      id: "pagamentos-parte-3",
-      title: "Pagamentos",
-      status: "proxima etapa",
-      summary: "Integrar checkout, webhooks e controle de acesso por plano."
-    }
-  ];
 }
 
 function extractOutputText(payload) {
@@ -127,6 +104,7 @@ function sanitizeUser(user) {
   return {
     id: user.id,
     name: user.name,
+    username: user.username || null,
     email: user.email,
     emailVerified: Boolean(user.email_verified),
     createdAt: user.created_at,
@@ -134,8 +112,8 @@ function sanitizeUser(user) {
   };
 }
 
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+function isValidUsername(username) {
+  return /^[a-zA-Z0-9._-]{3,24}$/.test(username);
 }
 
 async function requireAuth(request, response) {
@@ -322,11 +300,6 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "GET" && pathname === "/api/roadmap") {
-    sendJson(response, 200, { items: getRoadmapStatus() });
-    return;
-  }
-
   if (request.method === "POST" && pathname === "/api/gpt/ask") {
     await handleGptRequest(request, response);
     return;
@@ -351,7 +324,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
-    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
 
     if (name.length < 2) {
@@ -359,8 +332,8 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    if (!isValidEmail(email)) {
-      sendJson(response, 400, { error: "Email invalido." });
+    if (!isValidUsername(username)) {
+      sendJson(response, 400, { error: "Use um nome de usuario com 3 a 24 caracteres, letras, numeros, ponto, tracinho ou underline." });
       return;
     }
 
@@ -370,75 +343,34 @@ const server = http.createServer(async (request, response) => {
     }
 
     try {
-      const existingUser = await findUserByEmail(email);
+      const existingUser = await findUserByUsername(username);
 
-      if (existingUser?.email_verified) {
-        sendJson(response, 409, { error: "Esse email ja esta cadastrado." });
+      if (existingUser) {
+        sendJson(response, 409, { error: "Esse nome de usuario ja esta em uso." });
         return;
       }
 
-      const verification = await createRegistrationCode({ name, email, password });
-
-      sendJson(response, 201, {
-        ok: true,
-        message: "Codigo de confirmacao gerado.",
-        expiresAt: verification.expiresAt.toISOString(),
-        devCode: process.env.NODE_ENV === "production" ? undefined : verification.code
-      });
-    } catch (error) {
-      sendJson(response, 500, {
-        error: error instanceof Error ? error.message : "Erro ao gerar codigo."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/auth/verify-code") {
-    if (!hasDatabase()) {
-      sendJson(response, 503, {
-        error: "DATABASE_URL nao configurada.",
-        hint: "Configure o Postgres e rode o SQL de inicializacao."
-      });
-      return;
-    }
-
-    let body;
-
-    try {
-      body = await readJsonBody(request);
-    } catch (error) {
-      sendJson(response, 400, { error: error.message });
-      return;
-    }
-
-    const email = typeof body.email === "string" ? body.email.trim() : "";
-    const code = typeof body.code === "string" ? body.code.trim() : "";
-
-    if (!isValidEmail(email)) {
-      sendJson(response, 400, { error: "Email invalido." });
-      return;
-    }
-
-    if (!/^\d{4}$/.test(code)) {
-      sendJson(response, 400, { error: "Informe um codigo de 4 digitos." });
-      return;
-    }
-
-    try {
-      const user = await verifyRegistrationCode({ email, code });
+      const user = await createUser({ name, username, password });
       const session = await createSession(user.id);
 
-      sendJson(response, 200, {
+      sendJson(response, 201, {
         ok: true,
         token: session.token,
         expiresAt: session.expiresAt.toISOString(),
         user: sanitizeUser(user)
       });
     } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Erro ao validar codigo."
+      sendJson(response, 500, {
+        error: error instanceof Error ? error.message : "Erro ao criar usuario."
       });
     }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/auth/verify-code") {
+    sendJson(response, 410, {
+      error: "A confirmacao por email esta pausada nesta versao."
+    });
     return;
   }
 
@@ -460,16 +392,16 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
 
-    if (!isValidEmail(email) || !password) {
-      sendJson(response, 400, { error: "Email e senha sao obrigatorios." });
+    if (!isValidUsername(username) || !password) {
+      sendJson(response, 400, { error: "Nome de usuario e senha sao obrigatorios." });
       return;
     }
 
     try {
-      const user = await findVerifiedUserByEmail(email);
+      const user = await findUserByUsername(username);
 
       if (!user) {
         sendJson(response, 401, { error: "Credenciais invalidas." });
