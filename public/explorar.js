@@ -322,7 +322,7 @@ function syncChatModeUi() {
   chatModeOptions.forEach((option) => {
     option.setAttribute("aria-checked", option.dataset.chatMode === mode ? "true" : "false");
     option.classList.toggle("is-active", option.dataset.chatMode === mode);
-  }
+  });
 }
 
 function syncModeAvailability() {
@@ -1439,9 +1439,6 @@ function renderConversation() {
 
 function setRecordingState(recording) {
   updateRecordingUi(recording);
-  return;
-  isRecording = recording;
-  micButton.classList.toggle("recording", recording);
   micButton.setAttribute("aria-label", recording ? "Parar gravação" : "Gravar mensagem de voz");
   micButton.title = recording ? "Parar gravação" : "Gravar mensagem de voz";
 }
