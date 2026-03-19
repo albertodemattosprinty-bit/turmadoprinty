@@ -26,6 +26,8 @@ let currentAlbum = null;
 let activeSpeechRecognition = null;
 let lyricsSilenceTimer = null;
 let floatingNoticeTimer = null;
+let albumShortcutBuffer = "";
+let albumShortcutTimer = null;
 const adminUsername = "rosemattos";
 
 function getTrackModeLabel(track) {
@@ -80,6 +82,225 @@ function isAdmin() {
     currentUser?.isAdmin &&
     String(currentUser?.username || "").trim().toLowerCase() === adminUsername
   );
+}
+
+function clearAlbumShortcutBuffer() {
+  albumShortcutBuffer = "";
+  if (albumShortcutTimer) {
+    clearTimeout(albumShortcutTimer);
+    albumShortcutTimer = null;
+  }
+}
+
+function refreshTrackTitleUi(card, nextTitle) {
+  if (!card) {
+    return;
+  }
+
+  const titleDisplay = card.querySelector(".track-title-display");
+  const titleInput = card.querySelector(".track-title-input");
+  const trackTitle = card.querySelector(".track-title");
+  const safeTitle = String(nextTitle || "").trim();
+
+  if (titleInput) {
+    titleInput.value = safeTitle;
+  }
+
+  if (titleDisplay) {
+    titleDisplay.textContent = safeTitle;
+  }
+
+  if (trackTitle) {
+    trackTitle.textContent = safeTitle;
+  }
+}
+
+function getEditableTrackCards() {
+  return Array.from(document.querySelectorAll(".track-card"));
+}
+
+function ensureBulkTitleModal() {
+  let modal = document.getElementById("bulk-track-title-modal");
+
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("div");
+  modal.id = "bulk-track-title-modal";
+  modal.className = "bulk-track-title-modal";
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="bulk-track-title-backdrop" data-role="close-modal"></div>
+    <div class="bulk-track-title-dialog" role="dialog" aria-modal="true" aria-labelledby="bulk-track-title-heading">
+      <h2 id="bulk-track-title-heading">Colar nomes das músicas</h2>
+      <p>Cole uma lista com um nome por linha. Os nomes vazios serão preenchidos em ordem.</p>
+      <textarea id="bulk-track-title-input" placeholder="Exemplo&#10;Primeira música&#10;Segunda música&#10;Terceira música"></textarea>
+      <div class="bulk-track-title-actions">
+        <button id="bulk-track-title-cancel" class="ghost-button" type="button">Cancelar</button>
+        <button id="bulk-track-title-apply" class="primary-button" type="button">Preencher</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-role='close-modal']").forEach((element) => {
+    element.addEventListener("click", () => {
+      modal.hidden = true;
+    });
+  });
+
+  modal.querySelector("#bulk-track-title-cancel")?.addEventListener("click", () => {
+    modal.hidden = true;
+  });
+
+  modal.querySelector("#bulk-track-title-apply")?.addEventListener("click", () => {
+    const input = modal.querySelector("#bulk-track-title-input");
+    const pastedLines = String(input?.value || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (!pastedLines.length) {
+      albumAdminStatus.textContent = "Cole pelo menos um nome para preencher.";
+      return;
+    }
+
+    const emptyCards = getEditableTrackCards().filter((card) => {
+      const titleInput = card.querySelector(".track-title-input");
+      const titleText = titleInput?.value?.trim() || "";
+      return !titleText;
+    });
+
+    if (!emptyCards.length) {
+      albumAdminStatus.textContent = "Nao encontrei nomes vazios para preencher.";
+      modal.hidden = true;
+      return;
+    }
+
+    let appliedCount = 0;
+
+    emptyCards.forEach((card, index) => {
+      const nextTitle = pastedLines[index];
+      if (!nextTitle) {
+        return;
+      }
+
+      refreshTrackTitleUi(card, nextTitle);
+      appliedCount += 1;
+    });
+
+    albumAdminStatus.textContent = appliedCount
+      ? `${appliedCount} nome(s) preenchido(s). Clique em "Salvar album" para gravar.`
+      : "Os nomes colados foram menores do que a quantidade de slots vazios.";
+
+    if (input) {
+      input.value = "";
+    }
+
+    modal.hidden = true;
+  });
+
+  return modal;
+}
+
+function openBulkTitleModal() {
+  if (!isAdmin()) {
+    return;
+  }
+
+  const modal = ensureBulkTitleModal();
+  modal.hidden = false;
+  const input = modal.querySelector("#bulk-track-title-input");
+  if (input instanceof HTMLTextAreaElement) {
+    input.focus();
+    input.select();
+  }
+}
+
+function syncPlaybackTitlesFromLinkedSongs() {
+  if (!isAdmin()) {
+    return;
+  }
+
+  const cards = getEditableTrackCards();
+  if (!cards.length) {
+    return;
+  }
+
+  const cardsByTrackNumber = new Map(
+    cards.map((card) => [Number(card.dataset.trackNumber), card])
+  );
+
+  let updatedCount = 0;
+
+  cards.forEach((card) => {
+    const playbackSelect = card.querySelector(".track-playback-select");
+    const sourceTitleInput = card.querySelector(".track-title-input");
+    const sourceTitle = String(sourceTitleInput?.value || "").trim();
+    const linkedPlaybackNumber = Number(playbackSelect?.value || 0);
+
+    if (!linkedPlaybackNumber || !sourceTitle) {
+      return;
+    }
+
+    const playbackCard = cardsByTrackNumber.get(linkedPlaybackNumber);
+    if (!playbackCard) {
+      return;
+    }
+
+    refreshTrackTitleUi(playbackCard, sourceTitle);
+    updatedCount += 1;
+  });
+
+  albumAdminStatus.textContent = updatedCount
+    ? `${updatedCount} playback(s) herdaram o nome da musica vinculada. Clique em "Salvar album" para gravar.`
+    : "Nenhum playback vinculado encontrou um nome de musica para herdar.";
+}
+
+function handleAlbumAdminShortcuts(event) {
+  if (!isAdmin() || !currentAlbum) {
+    return;
+  }
+
+  const target = event.target;
+  if (target instanceof HTMLElement) {
+    const tagName = target.tagName;
+    const isTypingField = target.isContentEditable || tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+    if (isTypingField) {
+      return;
+    }
+  }
+
+  const key = String(event.key || "").toLowerCase();
+  if (key !== "t" && key !== "y") {
+    clearAlbumShortcutBuffer();
+    return;
+  }
+
+  albumShortcutBuffer = `${albumShortcutBuffer}${key}`.slice(-2);
+
+  if (albumShortcutTimer) {
+    clearTimeout(albumShortcutTimer);
+  }
+
+  albumShortcutTimer = window.setTimeout(() => {
+    clearAlbumShortcutBuffer();
+  }, 700);
+
+  if (albumShortcutBuffer === "tt") {
+    event.preventDefault();
+    clearAlbumShortcutBuffer();
+    openBulkTitleModal();
+    return;
+  }
+
+  if (albumShortcutBuffer === "yy") {
+    event.preventDefault();
+    clearAlbumShortcutBuffer();
+    syncPlaybackTitlesFromLinkedSongs();
+  }
 }
 
 async function loadAccessState() {
@@ -848,6 +1069,8 @@ async function loadAlbumDetail() {
 albumSaveButton?.addEventListener("click", async () => {
   await saveAlbumAdminChanges();
 });
+
+document.addEventListener("keydown", handleAlbumAdminShortcuts);
 
 await initSiteHeader().catch(() => null);
 await loadAlbumDetail();
