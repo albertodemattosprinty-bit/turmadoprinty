@@ -66,6 +66,11 @@ let editingConversationId = null;
 let speakingButton = null;
 let speakingAudio = null;
 let speakingAudioUrl = "";
+let speechRecognition = null;
+let speechRecognitionSilenceTimer = null;
+let speechRecognitionBaseText = "";
+let speechRecognitionFinalTranscript = "";
+let narrationState = null;
 let pendingSearchFocus = null;
 let searchHighlightResetId = null;
 let siteConfig = {
@@ -120,8 +125,14 @@ const conversationTitleMaxLength = 22;
 const searchPreviewMaxLength = 45;
 const searchPreviewBaseMaxLength = 15;
 const searchTextHighlightDurationMs = 5000;
+const chatRevealCharsPerSecond = 100;
+const chatRevealTickMs = 50;
+const speechSilenceTimeoutMs = 2000;
+const speechChunkWordCount = 20;
 const emptyConversationSupportText = "Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.";
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
+const micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/></svg>';
+const squareStopIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>';
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -170,7 +181,7 @@ async function runAuthRequest(url, payload) {
 }
 
 function setComposerStatus(message = "") {
-  composerStatus.textContent = message;
+  composerStatus.textContent = "";
 }
 
 function createDefaultChatSettings() {
@@ -695,11 +706,34 @@ function finalizePendingSearchFocus() {
     }
 
     clearPendingSearchHighlight();
-    renderConversation();
   }, searchTextHighlightDurationMs);
 }
 
+function setAssistantThinkingState(active) {
+  stopButton.classList.toggle("thinking", Boolean(active));
+}
+
+function syncMicButtonUi() {
+  const isNarrating = Boolean(narrationState);
+  const isListening = isRecording && !isNarrating;
+  micButton.classList.toggle("recording", isListening);
+  micButton.classList.toggle("audio-stop", isNarrating);
+  micButton.innerHTML = isNarrating ? squareStopIcon : micIcon;
+  micButton.setAttribute("aria-label", isNarrating ? "Parar audio" : isListening ? "Parar gravacao" : "Gravar mensagem de voz");
+  micButton.title = isNarrating ? "Parar audio" : isListening ? "Parar gravacao" : "Gravar mensagem de voz";
+}
+
 function stopAssistantSpeech() {
+  if (narrationState?.fetchControllers?.length) {
+    narrationState.fetchControllers.forEach((controller) => {
+      try {
+        controller.abort();
+      } catch {
+        // noop
+      }
+    });
+  }
+
   if (speakingAudio) {
     speakingAudio.pause();
     speakingAudio.src = "";
@@ -717,6 +751,9 @@ function stopAssistantSpeech() {
     speakingButton.title = "Ouvir resposta";
     speakingButton = null;
   }
+
+  narrationState = null;
+  syncMicButtonUi();
 }
 
 function buildResponseStylePrompt(modeKey) {
@@ -754,7 +791,18 @@ function buildResponseStylePrompt(modeKey) {
   return parts.join(" ");
 }
 
-async function speakAssistantText(text, button) {
+function splitTextIntoSpeechChunks(text) {
+  const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+  const chunks = [];
+
+  for (let index = 0; index < words.length; index += speechChunkWordCount) {
+    chunks.push(words.slice(index, index + speechChunkWordCount).join(" "));
+  }
+
+  return chunks;
+}
+
+async function fetchSpeechChunk(text, voice, controller) {
   const response = await fetch("/api/audio/speak", {
     method: "POST",
     headers: {
@@ -763,8 +811,9 @@ async function speakAssistantText(text, button) {
     },
     body: JSON.stringify({
       text,
-      voice: getUserChatSettings().voice || defaultOpenAiVoice
-    })
+      voice
+    }),
+    signal: controller.signal
   });
 
   if (!response.ok) {
@@ -772,21 +821,103 @@ async function speakAssistantText(text, button) {
     throw new Error(data.error || "Nao consegui gerar o audio da resposta.");
   }
 
-  const blob = await response.blob();
+  return response.blob();
+}
+
+function ensureNarrationBuffer(state, index) {
+  if (!state || index >= state.chunks.length || state.chunkRequests[index]) {
+    return;
+  }
+
+  const controller = new AbortController();
+  state.fetchControllers.push(controller);
+  state.chunkRequests[index] = fetchSpeechChunk(state.chunks[index], state.voice, controller)
+    .then((blob) => {
+      state.chunkBlobs[index] = blob;
+      return blob;
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") {
+        return null;
+      }
+      throw error;
+    })
+    .finally(() => {
+      state.fetchControllers = state.fetchControllers.filter((item) => item !== controller);
+    });
+}
+
+async function playNarrationChunk(state, index) {
+  if (!state || state.stopped || index >= state.chunks.length) {
+    stopAssistantSpeech();
+    return;
+  }
+
+  ensureNarrationBuffer(state, index);
+  ensureNarrationBuffer(state, index + 1);
+  const blob = state.chunkBlobs[index] || await state.chunkRequests[index];
+
+  if (!blob || state.stopped || narrationState !== state) {
+    return;
+  }
+
+  if (speakingAudioUrl) {
+    URL.revokeObjectURL(speakingAudioUrl);
+    speakingAudioUrl = "";
+  }
+
   const audioUrl = URL.createObjectURL(blob);
   const audio = new Audio(audioUrl);
-
   speakingAudio = audio;
   speakingAudioUrl = audioUrl;
-  speakingButton = button;
-  button.classList.add("playing");
-  button.setAttribute("aria-label", "Parar audio");
-  button.title = "Parar audio";
+  speakingButton = state.button;
+  state.button.classList.add("playing");
+  state.button.setAttribute("aria-label", "Parar audio");
+  state.button.title = "Parar audio";
+  syncMicButtonUi();
 
-  audio.addEventListener("ended", () => stopAssistantSpeech(), { once: true });
+  audio.addEventListener("ended", async () => {
+    if (narrationState !== state || state.stopped) {
+      return;
+    }
+
+    const nextIndex = index + 1;
+    ensureNarrationBuffer(state, nextIndex + 1);
+
+    if (nextIndex >= state.chunks.length) {
+      stopAssistantSpeech();
+      return;
+    }
+
+    await playNarrationChunk(state, nextIndex);
+  }, { once: true });
+
   audio.addEventListener("error", () => stopAssistantSpeech(), { once: true });
-
   await audio.play();
+}
+
+async function speakAssistantText(text, button) {
+  const chunks = splitTextIntoSpeechChunks(text);
+
+  if (!chunks.length) {
+    return;
+  }
+
+  const state = {
+    button,
+    chunks,
+    voice: getUserChatSettings().voice || defaultOpenAiVoice,
+    chunkRequests: [],
+    chunkBlobs: [],
+    fetchControllers: [],
+    stopped: false
+  };
+
+  narrationState = state;
+  syncMicButtonUi();
+  ensureNarrationBuffer(state, 0);
+  ensureNarrationBuffer(state, 1);
+  await playNarrationChunk(state, 0);
 }
 
 function attachAssistantAudioButton(article, text) {
@@ -1312,6 +1443,7 @@ function syncComposerState() {
   chatInput.placeholder = "Digite sua mensagem aqui...";
   syncSidebarState();
   syncComposerLayout();
+  syncMicButtonUi();
 }
 
 async function loadSessionState() {
@@ -1467,50 +1599,101 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
   article.className = "message-card assistant";
   article.hidden = true;
   article.innerHTML = `
-    <div class="message-role">Assistente</div>
     <div class="message-text">${escapeHtml(initialText)}</div>
   `;
   chatThread.appendChild(article);
   chatThread.scrollTop = chatThread.scrollHeight;
 
-  return {
+  const state = {
+    previewText: initialText || "",
+    finalText: "",
+    finalStarted: false,
+    renderedLength: 0,
+    typingTimerId: null
+  };
+
+  const api = {
     article,
     target: article.querySelector(".message-text"),
-    text: initialText,
     hasPreview: false,
-    finalStarted: false,
+    getFullText() {
+      if (state.finalText && (!state.previewText || state.finalStarted)) {
+        return state.previewText
+          ? `${state.previewText}\n\n${state.finalText}`
+          : state.finalText;
+      }
+
+      return state.previewText || "";
+    },
+    ensureTypingLoop() {
+      if (state.typingTimerId) {
+        return;
+      }
+
+      const charsPerTick = Math.max(1, Math.round((chatRevealCharsPerSecond * chatRevealTickMs) / 1000));
+      const renderStep = () => {
+        const fullText = api.getFullText();
+
+        if (state.renderedLength >= fullText.length) {
+          window.clearInterval(state.typingTimerId);
+          state.typingTimerId = null;
+          return;
+        }
+
+        state.renderedLength = Math.min(fullText.length, state.renderedLength + charsPerTick);
+        api.target.textContent = fullText.slice(0, state.renderedLength);
+        article.hidden = state.renderedLength === 0;
+        if (state.renderedLength > 0) {
+          setAssistantThinkingState(false);
+        }
+        chatThread.scrollTop = chatThread.scrollHeight;
+      };
+
+      state.typingTimerId = window.setInterval(renderStep, chatRevealTickMs);
+      renderStep();
+    },
+    syncText() {
+      const fullText = api.getFullText();
+      if (state.renderedLength > fullText.length) {
+        state.renderedLength = fullText.length;
+      }
+      api.ensureTypingLoop();
+    },
     setText(nextText) {
-      this.text = nextText;
-      this.target.textContent = nextText;
-      article.hidden = !nextText;
-      chatThread.scrollTop = chatThread.scrollHeight;
+      state.previewText = nextText || "";
+      state.finalText = "";
+      state.finalStarted = false;
+      api.syncText();
     },
     appendText(extraText) {
       if (!extraText) {
         return;
       }
 
-      const nextText = this.text === "Preparando resposta..." ? extraText : `${this.text}${extraText}`;
-      this.setText(nextText);
+      state.finalText += extraText;
+      api.syncText();
     },
     setPreview(previewText) {
-      this.hasPreview = Boolean(previewText);
-      this.setText(previewText || "");
+      api.hasPreview = Boolean(previewText);
+      state.previewText = previewText || "";
+      api.syncText();
     },
     startFinalBlock() {
-      if (!this.hasPreview || this.finalStarted) {
+      if (state.finalStarted) {
         return;
       }
 
-      this.finalStarted = true;
-      this.setText(`${this.text}\n\n`);
+      state.finalStarted = true;
+      api.syncText();
     },
     finalizeAudio() {
-      const cleanText = (this.text || "").trim();
+      const cleanText = (state.finalText || state.previewText || "").trim();
       article.querySelector(".assistant-audio-actions")?.remove();
       attachAssistantAudioButton(article, cleanText);
     }
   };
+
+  return api;
 }
 
 async function consumeAssistantStream(response, assistantMessage = createAssistantMessageElement()) {
@@ -1558,7 +1741,7 @@ async function consumeAssistantStream(response, assistantMessage = createAssista
 
         if (event.type === "delta" && event.text) {
           assistantMessage.appendText(event.text);
-          finalText = assistantMessage.text;
+          finalText = `${finalText}${event.text}`;
           continue;
         }
 
@@ -1581,7 +1764,6 @@ function renderAssistantResponseImmediately(text) {
   const article = document.createElement("article");
   article.className = "message-card assistant";
   article.innerHTML = `
-    <div class="message-role">Assistente</div>
     <div class="message-text">${escapeHtml(text)}</div>
   `;
   chatThread.appendChild(article);
@@ -1663,6 +1845,7 @@ async function stopRecordingAndTranscribe() {
   mediaRecorder = null;
   recordedChunks = [];
   setRecordingState(false);
+  syncMicButtonUi();
   stopMediaTracks();
 
   if (blob.size === 0) {
@@ -1688,13 +1871,139 @@ async function stopRecordingAndTranscribe() {
   }
 }
 
+function clearSpeechRecognitionSilenceTimer() {
+  if (speechRecognitionSilenceTimer) {
+    window.clearTimeout(speechRecognitionSilenceTimer);
+    speechRecognitionSilenceTimer = null;
+  }
+}
+
+function armSpeechRecognitionSilenceTimer() {
+  clearSpeechRecognitionSilenceTimer();
+  speechRecognitionSilenceTimer = window.setTimeout(() => {
+    void stopSpeechRecognitionSession();
+  }, speechSilenceTimeoutMs);
+}
+
+function updateLiveTranscript(finalTranscript = "", interimTranscript = "") {
+  const nextValue = [speechRecognitionBaseText, speechRecognitionFinalTranscript, finalTranscript, interimTranscript]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  chatInput.value = nextValue;
+  chatInput.dispatchEvent(new Event("input"));
+}
+
+function stopSpeechRecognitionSession() {
+  clearSpeechRecognitionSilenceTimer();
+
+  if (!speechRecognition) {
+    setRecordingState(false);
+    syncMicButtonUi();
+    speechRecognitionFinalTranscript = "";
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const recognition = speechRecognition;
+    speechRecognition = null;
+    recognition.onend = () => {
+      setRecordingState(false);
+      syncMicButtonUi();
+      speechRecognitionFinalTranscript = "";
+      resolve();
+    };
+    try {
+      recognition.stop();
+    } catch {
+      setRecordingState(false);
+      syncMicButtonUi();
+      speechRecognitionFinalTranscript = "";
+      resolve();
+    }
+  });
+}
+
+async function startSpeechRecognitionSession() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!Recognition) {
+    return false;
+  }
+
+  const recognition = new Recognition();
+  speechRecognitionBaseText = chatInput.value.trim();
+  speechRecognitionFinalTranscript = "";
+  recognition.lang = "pt-BR";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (event) => {
+    let finalTranscript = "";
+    let interimTranscript = "";
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const result = event.results[index];
+      const transcript = String(result[0]?.transcript || "").trim();
+
+      if (!transcript) {
+        continue;
+      }
+
+      if (result.isFinal) {
+        speechRecognitionFinalTranscript = `${speechRecognitionFinalTranscript} ${transcript}`.trim();
+      } else {
+        interimTranscript = `${interimTranscript} ${transcript}`.trim();
+      }
+    }
+
+    updateLiveTranscript("", interimTranscript);
+
+    if (speechRecognitionFinalTranscript || interimTranscript) {
+      armSpeechRecognitionSilenceTimer();
+    }
+  };
+
+  recognition.onspeechend = () => {
+    armSpeechRecognitionSilenceTimer();
+  };
+
+  recognition.onerror = () => {
+    void stopSpeechRecognitionSession();
+  };
+
+  speechRecognition = recognition;
+  recognition.start();
+  setRecordingState(true);
+  syncMicButtonUi();
+  armSpeechRecognitionSilenceTimer();
+  return true;
+}
+
 async function toggleRecording() {
   if (!ensureLoggedInBeforeChat()) {
     return;
   }
 
+  if (narrationState) {
+    narrationState.stopped = true;
+    stopAssistantSpeech();
+    return;
+  }
+
   if (isRecording) {
+    if (speechRecognition) {
+      await stopSpeechRecognitionSession();
+      return;
+    }
+
     await stopRecordingAndTranscribe();
+    return;
+  }
+
+  if (await startSpeechRecognitionSession()) {
     return;
   }
 
@@ -1716,10 +2025,12 @@ async function toggleRecording() {
 
     mediaRecorder.start();
     setRecordingState(true);
+    syncMicButtonUi();
     setComposerStatus("Ouvindo...");
   } catch (error) {
     stopMediaTracks();
     setRecordingState(false);
+    syncMicButtonUi();
     setComposerStatus(error instanceof Error ? error.message : "Nao foi possivel acessar o microfone.");
   }
 }
@@ -1813,6 +2124,7 @@ chatForm.addEventListener("submit", async (event) => {
   micButton.disabled = true;
   stopRequested = false;
   currentController = new AbortController();
+  setAssistantThinkingState(true);
   const assistantMessage = createAssistantMessageElement("");
   const selectedMode = chatModes[getChatMode()] || chatModes.fast;
   const responseStyle = buildResponseStylePrompt(getChatMode());
@@ -1868,6 +2180,7 @@ chatForm.addEventListener("submit", async (event) => {
     chatAuthStatus.textContent = messageText;
     setComposerStatus(messageText);
   } finally {
+    setAssistantThinkingState(false);
     currentController = null;
     stopRequested = false;
     sendButton.disabled = false;
@@ -1883,6 +2196,7 @@ stopButton.addEventListener("click", () => {
   if (currentController) {
     currentController.abort();
   }
+  setAssistantThinkingState(false);
   setComposerStatus("");
 });
 
@@ -2010,6 +2324,15 @@ registerForm.addEventListener("submit", async (event) => {
 
 window.addEventListener("beforeunload", () => {
   stopAssistantSpeech();
+  clearSpeechRecognitionSilenceTimer();
+  if (speechRecognition) {
+    try {
+      speechRecognition.stop();
+    } catch {
+      // noop
+    }
+    speechRecognition = null;
+  }
   stopMediaTracks();
 });
 
@@ -2017,6 +2340,7 @@ renderHistoryList();
 renderConversation();
 syncComposerState();
 setComposerStatus("");
+syncMicButtonUi();
 populateVoiceOptions();
 syncChatModeUi();
 setActiveAuthTab("login");

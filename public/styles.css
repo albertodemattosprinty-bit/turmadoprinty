@@ -2341,6 +2341,7 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--yellow);
+  display: none;
 }
 
 .message-text {
@@ -2429,6 +2430,7 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   margin: 0;
   color: var(--text-muted);
   font-size: 0.92rem;
+  display: none;
 }
 
 .auth-form {
@@ -2646,16 +2648,17 @@ body[data-page="explorar"] .message-role {
   margin-bottom: 8px;
   font-size: 0.98rem;
   font-weight: 800;
+  display: none;
 }
 
 body[data-page="explorar"] .message-text {
-  font-size: 1rem;
+  font-size: 1.1rem;
   line-height: 1.85;
   scroll-margin-top: 120px;
 }
 
 .search-highlight-pulse {
-  animation: searchTargetPulse 2s ease;
+  animation: searchTargetPulse 5s ease;
 }
 
 .search-highlight-target {
@@ -2663,7 +2666,7 @@ body[data-page="explorar"] .message-text {
 }
 
 .search-highlight-text {
-  animation: searchTextGlow 900ms ease-in-out 6 alternate;
+  animation: searchTextGlow 5s ease-in-out 1;
 }
 
 @keyframes searchTargetPulse {
@@ -2754,6 +2757,38 @@ body[data-page="explorar"] #send-button {
 
 body[data-page="explorar"] #stop-button {
   background: #1b53bb;
+}
+
+body[data-page="explorar"] #mic-button.recording {
+  background: #dc3e4b;
+  color: #ffffff;
+  border-color: rgba(220, 62, 75, 0.28);
+}
+
+body[data-page="explorar"] #mic-button.audio-stop {
+  background: #ffffff;
+  color: #1b53bb;
+  border-color: rgba(27, 83, 187, 0.2);
+}
+
+body[data-page="explorar"] #stop-button.thinking::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-top-color: rgba(255, 255, 255, 0.92);
+  animation: assistantThinkingLoop 1.05s linear infinite;
+}
+
+@keyframes assistantThinkingLoop {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .settings-modal {
@@ -2857,6 +2892,7 @@ body[data-page="explorar"] #chat-auth-status {
   width: 52px;
   height: 52px;
   padding: 0;
+  position: relative;
 }
 
 .icon-button svg {
@@ -3119,7 +3155,7 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .message-text {
-    font-size: 0.98rem;
+    font-size: 1.08rem;
     line-height: 1.78;
   }
 
