@@ -34,10 +34,30 @@ const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom cristao 
 const ADMIN_USERNAME = "rosemattos";
 
 const publicDir = path.join(__dirname, "public");
+const eduSongsDir = path.join(__dirname, "musicas Edu");
 const contextFilePath = path.join(__dirname, "contexto.txt");
 const contentDir = path.join(__dirname, "Conteúdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
+
+const eduDownloadFiles = {
+  "abandona-no-lixao": {
+    downloadName: "Abandona no lixao.mp3",
+    fileName: "Abandona no lix\u00E3o.mp3"
+  },
+  "playback-abandona-no-lixao": {
+    downloadName: "Playback abandona no lixao.mp3",
+    fileName: "Playback abandona no lix\u00F5a.mp3"
+  },
+  "lindo-cachorrinho": {
+    downloadName: "Lindo Cachorrinho.mp3",
+    fileName: "Lindo Cachorrinho.mp3"
+  },
+  "playback-lindo-cachorrinho": {
+    downloadName: "PlayBack Lindo Cachorrinho.mp3",
+    fileName: "PlayBack Lindo Cachorrinho.mp3"
+  }
+};
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -60,6 +80,12 @@ function isAdminUser(user) {
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload, null, 2));
+}
+
+function buildContentDisposition(filename) {
+  const safeName = String(filename || "download.mp3");
+  const fallback = safeName.replace(/[^\x20-\x7E]/g, "") || "download.mp3";
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(safeName)}`;
 }
 
 async function readApiResponse(response) {
@@ -1737,6 +1763,36 @@ async function serveStatic(response, filePath) {
   }
 }
 
+async function handleEduDownload(response, pathname) {
+  const match = pathname.match(/^\/downloads\/edu\/([^/]+)$/);
+  const slug = match?.[1] || "";
+  const fileConfig = eduDownloadFiles[slug];
+
+  if (!fileConfig) {
+    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Download nao encontrado.");
+    return;
+  }
+
+  const filePath = path.join(eduSongsDir, fileConfig.fileName);
+
+  try {
+    await access(filePath);
+  } catch {
+    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Arquivo nao encontrado.");
+    return;
+  }
+
+  response.writeHead(200, {
+    "Content-Type": "audio/mpeg",
+    "Content-Disposition": buildContentDisposition(fileConfig.downloadName),
+    "Cache-Control": "public, max-age=3600"
+  });
+
+  createReadStream(filePath).pipe(response);
+}
+
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   const { pathname } = requestUrl;
@@ -1820,6 +1876,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/site/config") {
     await handleSiteConfigRequest(response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/downloads/edu/")) {
+    await handleEduDownload(response, pathname);
     return;
   }
 

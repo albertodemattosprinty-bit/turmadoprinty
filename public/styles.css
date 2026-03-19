@@ -25,6 +25,7 @@
   --blue-light: #8cd0ff;
   --yellow: #2f7cff;
   --shadow: 0 18px 40px rgba(32, 73, 152, 0.08);
+  --explore-composer-height: 132px;
 }
 
 * {
@@ -244,6 +245,71 @@ body[data-page="explorar"] {
   width: min(1200px, calc(100% - 28px));
   margin: 0 auto;
   padding: 0 0 54px;
+}
+
+.edu-downloads-section {
+  display: grid;
+  gap: 26px;
+}
+
+.edu-download-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.edu-download-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 96px;
+  padding: 18px 20px;
+  border-radius: 28px;
+  text-decoration: none;
+  color: var(--blue-dark);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(140, 208, 255, 0.24) 100%);
+  border: 1px solid rgba(27, 83, 187, 0.14);
+  box-shadow: 0 18px 34px rgba(18, 54, 122, 0.1);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.edu-download-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(47, 124, 255, 0.36);
+  box-shadow: 0 24px 40px rgba(18, 54, 122, 0.16);
+}
+
+.edu-download-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--blue-dark), var(--blue-mid));
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.edu-download-icon svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.edu-download-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.edu-download-copy strong {
+  font-size: 1rem;
+}
+
+.edu-download-copy span {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  font-weight: 700;
 }
 
 body[data-page="produtos"] {
@@ -2776,7 +2842,7 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .chat-main {
-    padding-bottom: 110px;
+    padding-bottom: 18px;
   }
 
   body[data-page="explorar"] .section-title {
@@ -2795,8 +2861,8 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .chat-thread {
-    min-height: calc(100vh - 270px);
-    padding: 4px 0 18px;
+    min-height: calc(100dvh - var(--explore-composer-height) - 162px);
+    padding: 4px 0 calc(var(--explore-composer-height) + 18px);
   }
 
   body[data-page="explorar"] .message-card {
@@ -2813,13 +2879,13 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .chat-thread-empty {
-    min-height: calc(100vh - 270px);
-    padding: 20px 16px 132px;
+    min-height: calc(100dvh - var(--explore-composer-height) - 162px);
+    padding: 20px 16px calc(var(--explore-composer-height) + 24px);
   }
 
   body[data-page="explorar"] .empty-conversation-state {
     min-height: 100%;
-    max-width: 290px;
+    max-width: min(60ch, 100%);
   }
 
   body[data-page="explorar"] .empty-conversation-state h2 {
@@ -2830,6 +2896,10 @@ body[data-page="explorar"] #chat-auth-status {
   body[data-page="explorar"] .empty-conversation-state p {
     line-height: 1.35;
     font-size: 0.98rem;
+  }
+
+  body[data-page="explorar"] .conversation-shell-empty {
+    min-height: calc(100dvh - 34px);
   }
 
   body[data-page="explorar"] .chat-composer textarea {

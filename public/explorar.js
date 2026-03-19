@@ -935,10 +935,16 @@ function syncSidebarState() {
   sidebarToggleButton.innerHTML = sidebarMenuIcon;
 }
 
+function syncComposerLayout() {
+  const composerHeight = chatForm?.offsetHeight || 0;
+  document.documentElement.style.setProperty("--explore-composer-height", `${composerHeight}px`);
+}
+
 window.addEventListener("resize", () => {
   const mobileView = window.innerWidth <= 980;
   sidebarCollapsed = mobileView ? sidebarCollapsed : false;
   syncSidebarState();
+  syncComposerLayout();
 });
 
 function syncComposerState() {
@@ -967,6 +973,7 @@ function syncComposerState() {
   chatInput.disabled = !isLoggedIn;
   chatInput.placeholder = "Digite sua mensagem aqui...";
   syncSidebarState();
+  syncComposerLayout();
 }
 
 async function loadSessionState() {
@@ -1544,6 +1551,7 @@ stopButton.addEventListener("click", () => {
 chatInput.addEventListener("input", () => {
   chatInput.style.height = "auto";
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
+  syncComposerLayout();
 });
 
 if (chatSearchInput) {
@@ -1673,6 +1681,7 @@ setComposerStatus("");
 populateVoiceOptions();
 syncChatModeUi();
 setActiveAuthTab("login");
+syncComposerLayout();
 siteConfig = await loadSiteConfig().catch(() => siteConfig);
 initContentAdmin({
   user: null,
