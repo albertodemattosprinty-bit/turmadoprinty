@@ -31,7 +31,11 @@ const composerStatus = document.getElementById("composer-status");
 const conversationHeader = document.getElementById("conversation-header");
 const conversationTitle = document.getElementById("conversation-title");
 const conversationMeta = document.getElementById("conversation-meta");
-const chatModeSelect = document.getElementById("chat-mode-select");
+const chatModeButton = document.getElementById("chat-mode-button");
+const chatModeButtonIcon = document.getElementById("chat-mode-button-icon");
+const chatModeButtonLabel = document.getElementById("chat-mode-button-label");
+const chatModeMenu = document.getElementById("chat-mode-menu");
+const chatModeOptions = Array.from(document.querySelectorAll("[data-chat-mode]"));
 const loginForm = document.getElementById("login-form");
 const registerForm = document.getElementById("register-form");
 const loginUsername = document.getElementById("login-username");
@@ -127,12 +131,26 @@ const searchPreviewBaseMaxLength = 15;
 const searchTextHighlightDurationMs = 5000;
 const chatRevealCharsPerSecond = 100;
 const chatRevealTickMs = 50;
-const speechSilenceTimeoutMs = 2000;
+const speechSilenceTimeoutMs = 3000;
 const speechChunkWordCount = 20;
 const emptyConversationSupportText = "Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.";
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
 const micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/></svg>';
 const squareStopIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>';
+const chatModeMeta = {
+  fast: {
+    label: "Pratico",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>'
+  },
+  think: {
+    label: "Pensativo",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4.37 12.47c.3.24.47.61.47.99V18a2 2 0 0 0 2 2h1v1a1 1 0 1 0 2 0v-1h1a2 2 0 0 0 2-2v-1.54c0-.38.17-.75.47-.99A7 7 0 0 0 12 3m-2 6a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1m4 0a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1m-4 7h4v2h-4z"/></svg>'
+  },
+  project: {
+    label: "Projeto",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3c2.8.2 4.88 1.14 6.5 2.77-1.63 1.62-2.57 3.7-2.77 6.5l-3.41 3.4-1.92-1.92-3.95 3.95 1.07 1.07-1.42 1.42-4.24-4.24 1.42-1.42 1.07 1.07 3.95-3.95-1.92-1.92zm-7.9 13.56 1.84 1.84-3.89 1.06z"/></svg>'
+  }
+};
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -272,22 +290,50 @@ function getChatMode() {
   return chatModes[stored] ? stored : "fast";
 }
 
+function closeChatModeMenu() {
+  if (!chatModeButton || !chatModeMenu) {
+    return;
+  }
+
+  chatModeMenu.hidden = true;
+  chatModeButton.setAttribute("aria-expanded", "false");
+}
+
+function openChatModeMenu() {
+  if (!chatModeButton || !chatModeMenu) {
+    return;
+  }
+
+  chatModeMenu.hidden = false;
+  chatModeButton.setAttribute("aria-expanded", "true");
+}
+
 function syncChatModeUi() {
   const mode = getChatMode();
 
-  if (chatModeSelect) {
-    chatModeSelect.value = mode;
+  if (chatModeButtonLabel) {
+    chatModeButtonLabel.textContent = chatModeMeta[mode]?.label || "Pratico";
+  }
+
+  if (chatModeButtonIcon) {
+    chatModeButtonIcon.innerHTML = chatModeMeta[mode]?.icon || chatModeMeta.fast.icon;
+  }
+
+  chatModeOptions.forEach((option) => {
+    option.setAttribute("aria-checked", option.dataset.chatMode === mode ? "true" : "false");
+    option.classList.toggle("is-active", option.dataset.chatMode === mode);
   }
 }
 
 function syncModeAvailability() {
-  if (!chatModeSelect) {
+  if (!chatModeOptions.length) {
     return;
   }
 
-  const projectOption = chatModeSelect.querySelector('option[value="project"]');
-  if (projectOption) {
-    projectOption.textContent = accessState.planId === "life" ? "Projeto" : "Projeto (Life)";
+  const projectOption = chatModeOptions.find((option) => option.dataset.chatMode === "project");
+  const projectText = projectOption?.querySelector(".chat-mode-option-text");
+  if (projectText) {
+    projectText.textContent = accessState.planId === "life" ? "Projeto" : "Projeto (Life)";
   }
 
   const currentMode = getChatMode();
@@ -723,6 +769,11 @@ function syncMicButtonUi() {
   micButton.title = isNarrating ? "Parar audio" : isListening ? "Parar gravacao" : "Gravar mensagem de voz";
 }
 
+function updateRecordingUi(recording) {
+  isRecording = recording;
+  syncMicButtonUi();
+}
+
 function stopAssistantSpeech() {
   if (narrationState?.fetchControllers?.length) {
     narrationState.fetchControllers.forEach((controller) => {
@@ -753,6 +804,7 @@ function stopAssistantSpeech() {
   }
 
   narrationState = null;
+  updateRecordingUi(false);
   syncMicButtonUi();
 }
 
@@ -1386,6 +1438,8 @@ function renderConversation() {
 }
 
 function setRecordingState(recording) {
+  updateRecordingUi(recording);
+  return;
   isRecording = recording;
   micButton.classList.toggle("recording", recording);
   micButton.setAttribute("aria-label", recording ? "Parar gravação" : "Gravar mensagem de voz");
@@ -1966,10 +2020,6 @@ async function startSpeechRecognitionSession() {
     }
   };
 
-  recognition.onspeechend = () => {
-    armSpeechRecognitionSilenceTimer();
-  };
-
   recognition.onerror = () => {
     void stopSpeechRecognitionSession();
   };
@@ -2214,17 +2264,42 @@ if (chatSearchInput) {
   });
 }
 
-if (chatModeSelect) {
-  chatModeSelect.addEventListener("change", () => {
-    if (chatModeSelect.value === "project" && accessState.planId !== "life") {
-      window.localStorage.setItem(chatModeStorageKey, "think");
+if (chatModeButton && chatModeMenu) {
+  chatModeButton.addEventListener("click", () => {
+    if (chatModeMenu.hidden) {
+      openChatModeMenu();
+    } else {
+      closeChatModeMenu();
+    }
+  });
+
+  chatModeOptions.forEach((option) => {
+    option.addEventListener("click", () => {
+      const nextMode = option.dataset.chatMode || "fast";
+
+      if (nextMode === "project" && accessState.planId !== "life") {
+        window.localStorage.setItem(chatModeStorageKey, "think");
+        syncChatModeUi();
+        closeChatModeMenu();
+        window.location.href = "/planos.html?from=project-mode";
+        return;
+      }
+
+      window.localStorage.setItem(chatModeStorageKey, nextMode);
       syncChatModeUi();
-      window.location.href = "/planos.html?from=project-mode";
+      closeChatModeMenu();
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Node)) {
       return;
     }
 
-    window.localStorage.setItem(chatModeStorageKey, chatModeSelect.value);
-    syncChatModeUi();
+    if (!chatModeButton.contains(target) && !chatModeMenu.contains(target)) {
+      closeChatModeMenu();
+    }
   });
 }
 

@@ -86,17 +86,39 @@
       <section class="chat-main">
         <div id="chat-shell" class="conversation-shell">
           <div id="conversation-header" class="conversation-header">
-            <div>
+            <div class="conversation-title-wrap">
               <h2 id="conversation-title" class="conversation-title"></h2>
             </div>
             <div class="conversation-tools">
-              <label class="chat-mode-picker" for="chat-mode-select">
-                <select id="chat-mode-select" aria-label="Escolher modelo">
-                  <option value="fast">Prático</option>
-                  <option value="think">Pensativo</option>
-                  <option value="project">Projeto</option>
-                </select>
-              </label>
+              <div class="chat-mode-picker">
+                <button id="chat-mode-button" class="chat-mode-button" type="button" aria-label="Escolher modelo" aria-expanded="false" aria-haspopup="menu">
+                  <span id="chat-mode-button-icon" class="chat-mode-button-icon" aria-hidden="true"></span>
+                  <span id="chat-mode-button-label" class="chat-mode-button-label">Pratico</span>
+                  <span class="chat-mode-button-caret" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m7 10 5 5 5-5z"/></svg>
+                  </span>
+                </button>
+                <div id="chat-mode-menu" class="chat-mode-menu" role="menu" hidden>
+                  <button class="chat-mode-option" type="button" role="menuitemradio" data-chat-mode="think" aria-checked="false">
+                    <span class="chat-mode-option-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-4.37 12.47c.3.24.47.61.47.99V18a2 2 0 0 0 2 2h1v1a1 1 0 1 0 2 0v-1h1a2 2 0 0 0 2-2v-1.54c0-.38.17-.75.47-.99A7 7 0 0 0 12 3m-2 6a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1m4 0a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1m-4 7h4v2h-4z"/></svg>
+                    </span>
+                    <span class="chat-mode-option-text">Pensativo</span>
+                  </button>
+                  <button class="chat-mode-option" type="button" role="menuitemradio" data-chat-mode="fast" aria-checked="true">
+                    <span class="chat-mode-option-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+                    </span>
+                    <span class="chat-mode-option-text">Pratico</span>
+                  </button>
+                  <button class="chat-mode-option" type="button" role="menuitemradio" data-chat-mode="project" aria-checked="false">
+                    <span class="chat-mode-option-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M14.5 3c2.8.2 4.88 1.14 6.5 2.77-1.63 1.62-2.57 3.7-2.77 6.5l-3.41 3.4-1.92-1.92-3.95 3.95 1.07 1.07-1.42 1.42-4.24-4.24 1.42-1.42 1.07 1.07 3.95-3.95-1.92-1.92zm-7.9 13.56 1.84 1.84-3.89 1.06z"/></svg>
+                    </span>
+                    <span class="chat-mode-option-text">Projeto</span>
+                  </button>
+                </div>
+              </div>
               <p id="conversation-meta" class="conversation-meta"></p>
             </div>
           </div>
