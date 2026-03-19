@@ -1520,16 +1520,16 @@ body[data-page="explorar"] .sidebar-actions .sidebar-icon-button.primary-button 
 .chat-mode-picker {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 0;
+  padding: 8px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(27, 83, 187, 0.12);
-  background: rgba(27, 83, 187, 0.06);
+  border: 1px solid rgba(27, 83, 187, 0.08);
+  background: rgba(27, 83, 187, 0.04);
   color: var(--blue-dark);
 }
 
 .chat-mode-icon {
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   width: 18px;
@@ -1550,6 +1550,7 @@ body[data-page="explorar"] .sidebar-actions .sidebar-icon-button.primary-button 
   font-weight: 700;
   outline: none;
   cursor: pointer;
+  padding-right: 12px;
 }
 
 .conversation-title {
@@ -1973,6 +1974,7 @@ body[data-page="explorar"] .sidebar-actions-bottom {
   margin-top: 20px;
   padding-top: 20px;
   flex-shrink: 0;
+  justify-content: space-between;
 }
 
 body[data-page="explorar"] .history-scroll-shell {
@@ -2009,9 +2011,9 @@ body[data-page="explorar"] .conversation-title {
 
 body[data-page="explorar"] .chat-mode-picker {
   min-height: 48px;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(27, 83, 187, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(27, 83, 187, 0.03);
 }
 
 body[data-page="explorar"] .chat-thread {
@@ -2101,8 +2103,105 @@ body[data-page="explorar"] #send-button {
   background: rgba(255, 255, 255, 0.92);
 }
 
+body[data-page="explorar"] #send-button {
+  color: #ffffff;
+  border-color: rgba(27, 83, 187, 0.16);
+  background: #1b53bb;
+}
+
 body[data-page="explorar"] #stop-button {
   background: #1b53bb;
+}
+
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.settings-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 76, 189, 0.54);
+  backdrop-filter: blur(10px);
+}
+
+.settings-panel {
+  position: relative;
+  z-index: 1;
+  width: min(620px, calc(100% - 28px));
+  margin: min(7vh, 44px) auto 0;
+  padding: 24px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(30, 97, 226, 0.9);
+  box-shadow: 0 28px 54px rgba(11, 50, 133, 0.28);
+  color: #ffffff;
+}
+
+.settings-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.settings-head .section-title,
+.settings-head .eyebrow {
+  color: #ffffff;
+}
+
+.settings-form {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-form label {
+  display: grid;
+  gap: 8px;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.settings-form input,
+.settings-form textarea,
+.settings-form select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  padding: 14px 16px;
+  font: inherit;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.settings-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.settings-form input::placeholder,
+.settings-form textarea::placeholder {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+body[data-page="explorar"] .settings-form .ghost-button {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+}
+
+body[data-page="explorar"] .settings-form .section-muted {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 body[data-page="explorar"] #chat-auth-status {

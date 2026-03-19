@@ -4,6 +4,9 @@ const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
 const chatModeStorageKey = "turma_do_printy_chat_mode";
+const chatSettingsStorageKey = "turma_do_printy_chat_settings";
+const defaultOpenAiVoice = "alloy";
+const openAiVoiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"];
 
 const authStatus = document.getElementById("auth-status");
 const chatAuthStatus = document.getElementById("chat-auth-status");
@@ -14,6 +17,7 @@ const historyList = document.getElementById("history-list");
 const chatSearchInput = document.getElementById("chat-search-input");
 const sidebarToggleButton = document.getElementById("sidebar-toggle-button");
 const newChatButton = document.getElementById("new-chat-button");
+const settingsButton = document.getElementById("settings-button");
 const logoutButton = document.getElementById("logout-button");
 const chatShell = document.getElementById("chat-shell");
 const chatThread = document.getElementById("chat-thread");
@@ -27,7 +31,6 @@ const conversationHeader = document.getElementById("conversation-header");
 const conversationTitle = document.getElementById("conversation-title");
 const conversationMeta = document.getElementById("conversation-meta");
 const chatModeSelect = document.getElementById("chat-mode-select");
-const chatModeIcon = document.getElementById("chat-mode-icon");
 const loginForm = document.getElementById("login-form");
 const registerForm = document.getElementById("register-form");
 const loginUsername = document.getElementById("login-username");
@@ -36,6 +39,16 @@ const registerName = document.getElementById("register-name");
 const registerUsername = document.getElementById("register-username");
 const registerPassword = document.getElementById("register-password");
 const registerPasswordConfirm = document.getElementById("register-password-confirm");
+const settingsModal = document.getElementById("settings-modal");
+const settingsForm = document.getElementById("settings-form");
+const settingsCloseButton = document.getElementById("settings-close-button");
+const settingsCancelButton = document.getElementById("settings-cancel-button");
+const settingsVoiceSelect = document.getElementById("settings-voice-select");
+const settingsResponseStyle = document.getElementById("settings-response-style");
+const settingsCallName = document.getElementById("settings-call-name");
+const settingsMinistryDream = document.getElementById("settings-ministry-dream");
+const settingsRoleSelect = document.getElementById("settings-role-select");
+const settingsStatus = document.getElementById("settings-status");
 
 let currentController = null;
 let stopRequested = false;
@@ -48,21 +61,40 @@ let isRecording = false;
 let sidebarCollapsed = window.innerWidth <= 980;
 let chatSearchTerm = "";
 let speakingButton = null;
+let speakingAudio = null;
+let speakingAudioUrl = "";
 let siteConfig = {
   banners: {},
   textOverrides: {}
 };
+let accessState = {
+  authenticated: false,
+  planId: "gratis",
+  canDownloadAll: false
+};
 
 const chatModes = {
   fast: {
+    label: "Pratico",
     model: "gpt-4.1-nano",
     instantModel: "gpt-4.1-nano",
-    icon: '<svg viewBox="0 0 24 24"><path d="M13 2 5 14h5l-1 8 8-12h-5z"/></svg>'
+    maxCompletionTokens: 260,
+    previewMaxCompletionTokens: 120
   },
   think: {
+    label: "Pensativo",
     model: "gpt-4.1-mini",
     instantModel: "gpt-4.1-nano",
-    icon: '<svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-4.66 12.22c.4.35.66.84.66 1.37V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-.41c0-.53.26-1.02.66-1.37A7 7 0 0 0 12 3m-2 17h4a2 2 0 0 1-4 0"/></svg>'
+    maxCompletionTokens: 700,
+    previewMaxCompletionTokens: 160
+  },
+  project: {
+    label: "Projeto",
+    model: "gpt-5-mini",
+    instantModel: "gpt-4.1-mini",
+    maxCompletionTokens: 2600,
+    previewMaxCompletionTokens: 220,
+    planRequired: "life"
   }
 };
 
@@ -132,8 +164,91 @@ function setComposerStatus(message = "") {
   composerStatus.textContent = message;
 }
 
+function createDefaultChatSettings() {
+  return {
+    voice: defaultOpenAiVoice,
+    responseStyle: "",
+    callName: "",
+    ministryDream: "",
+    ministryRole: "Lider"
+  };
+}
+
+function getChatSettingsStore() {
+  try {
+    return JSON.parse(window.localStorage.getItem(chatSettingsStorageKey) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function getUserChatSettings() {
+  const store = getChatSettingsStore();
+  return {
+    ...createDefaultChatSettings(),
+    ...(store[getUserKey()] || {})
+  };
+}
+
+function saveUserChatSettings(nextSettings) {
+  const store = getChatSettingsStore();
+  store[getUserKey()] = {
+    ...createDefaultChatSettings(),
+    ...nextSettings
+  };
+  window.localStorage.setItem(chatSettingsStorageKey, JSON.stringify(store));
+}
+
+function populateVoiceOptions() {
+  if (!settingsVoiceSelect || settingsVoiceSelect.options.length) {
+    return;
+  }
+
+  settingsVoiceSelect.innerHTML = openAiVoiceOptions
+    .map((voice) => `<option value="${voice}">${voice}</option>`)
+    .join("");
+}
+
+function fillSettingsForm() {
+  if (!settingsForm) {
+    return;
+  }
+
+  populateVoiceOptions();
+  const settings = getUserChatSettings();
+  settingsVoiceSelect.value = settings.voice || defaultOpenAiVoice;
+  settingsResponseStyle.value = settings.responseStyle || "";
+  settingsCallName.value = settings.callName || "";
+  settingsMinistryDream.value = settings.ministryDream || "";
+  settingsRoleSelect.value = settings.ministryRole || "Lider";
+  settingsStatus.textContent = "";
+}
+
+function openSettingsModal() {
+  if (!currentUser || !settingsModal) {
+    return;
+  }
+
+  fillSettingsForm();
+  settingsModal.hidden = false;
+}
+
+function closeSettingsModal() {
+  if (!settingsModal) {
+    return;
+  }
+
+  settingsModal.hidden = true;
+}
+
 function getChatMode() {
   const stored = window.localStorage.getItem(chatModeStorageKey);
+  if (stored === "practical") {
+    return "fast";
+  }
+  if (stored === "pensativo") {
+    return "think";
+  }
   return chatModes[stored] ? stored : "fast";
 }
 
@@ -143,10 +258,24 @@ function syncChatModeUi() {
   if (chatModeSelect) {
     chatModeSelect.value = mode;
   }
+}
 
-  if (chatModeIcon) {
-    chatModeIcon.innerHTML = chatModes[mode].icon;
+function syncModeAvailability() {
+  if (!chatModeSelect) {
+    return;
   }
+
+  const projectOption = chatModeSelect.querySelector('option[value="project"]');
+  if (projectOption) {
+    projectOption.textContent = accessState.planId === "life" ? "Projeto" : "Projeto (Life)";
+  }
+
+  const currentMode = getChatMode();
+  if (currentMode === "project" && accessState.planId !== "life") {
+    window.localStorage.setItem(chatModeStorageKey, "think");
+  }
+
+  syncChatModeUi();
 }
 
 function getConversationStore() {
@@ -175,6 +304,42 @@ function getUserKey() {
 
 function getUserDisplayName() {
   return currentUser?.name || currentUser?.username || "";
+}
+
+async function loadAccessState() {
+  const token = getToken();
+
+  if (!token) {
+    accessState = {
+      authenticated: false,
+      planId: "gratis",
+      canDownloadAll: false
+    };
+    return;
+  }
+
+  const response = await fetch("/api/account/access", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    accessState = {
+      authenticated: Boolean(currentUser),
+      planId: "gratis",
+      canDownloadAll: false
+    };
+    return;
+  }
+
+  accessState = {
+    authenticated: true,
+    planId: data?.access?.plan?.id || "gratis",
+    canDownloadAll: Boolean(data?.access?.canDownloadAll)
+  };
 }
 
 function getConversations() {
@@ -227,9 +392,16 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
-function stopBrowserSpeech() {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
+function stopAssistantSpeech() {
+  if (speakingAudio) {
+    speakingAudio.pause();
+    speakingAudio.src = "";
+    speakingAudio = null;
+  }
+
+  if (speakingAudioUrl) {
+    URL.revokeObjectURL(speakingAudioUrl);
+    speakingAudioUrl = "";
   }
 
   if (speakingButton) {
@@ -240,19 +412,78 @@ function stopBrowserSpeech() {
   }
 }
 
-function pickSpeechVoice() {
-  if (!("speechSynthesis" in window)) {
-    return null;
+function buildResponseStylePrompt(modeKey) {
+  const settings = getUserChatSettings();
+  const parts = [];
+
+  if (settings.callName) {
+    parts.push(`Chame a pessoa de ${settings.callName}.`);
   }
 
-  const voices = window.speechSynthesis.getVoices();
-  const ptBrVoices = voices.filter((voice) => /^pt-BR/i.test(voice.lang));
-  const maleHint = ptBrVoices.find((voice) => /male|masc|ricardo|antonio|brasil/i.test(`${voice.name} ${voice.voiceURI}`));
-  return maleHint || ptBrVoices[0] || voices.find((voice) => /^pt/i.test(voice.lang)) || voices[0] || null;
+  if (settings.ministryRole) {
+    parts.push(`Considere que o papel dela no ministerio infantil e ${settings.ministryRole}.`);
+  }
+
+  if (settings.ministryDream) {
+    parts.push(`Sonho no ministerio infantil: ${settings.ministryDream}.`);
+  }
+
+  if (settings.responseStyle) {
+    parts.push(`Estilo de resposta desejado: ${settings.responseStyle}.`);
+  }
+
+  if (modeKey === "fast") {
+    parts.push("Seja extremamente pratico, util e rapido.");
+  }
+
+  if (modeKey === "think") {
+    parts.push("Pense melhor antes de responder e entregue mais contexto, mas sem enrolar.");
+  }
+
+  if (modeKey === "project") {
+    parts.push("Responda em formato de projeto bem desenvolvido, normalmente entre 6.000 e 8.000 caracteres, com estrutura clara, blocos bem organizados e ideias aplicaveis.");
+  }
+
+  return parts.join(" ");
+}
+
+async function speakAssistantText(text, button) {
+  const response = await fetch("/api/audio/speak", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({
+      text,
+      voice: getUserChatSettings().voice || defaultOpenAiVoice
+    })
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Nao consegui gerar o audio da resposta.");
+  }
+
+  const blob = await response.blob();
+  const audioUrl = URL.createObjectURL(blob);
+  const audio = new Audio(audioUrl);
+
+  speakingAudio = audio;
+  speakingAudioUrl = audioUrl;
+  speakingButton = button;
+  button.classList.add("playing");
+  button.setAttribute("aria-label", "Parar audio");
+  button.title = "Parar audio";
+
+  audio.addEventListener("ended", () => stopAssistantSpeech(), { once: true });
+  audio.addEventListener("error", () => stopAssistantSpeech(), { once: true });
+
+  await audio.play();
 }
 
 function attachAssistantAudioButton(article, text) {
-  if (!article || !text || !("speechSynthesis" in window)) {
+  if (!article || !text) {
     return;
   }
 
@@ -267,36 +498,20 @@ function attachAssistantAudioButton(article, text) {
   controls.appendChild(button);
   article.appendChild(controls);
 
-  button.addEventListener("click", () => {
-    if (!("speechSynthesis" in window)) {
-      return;
-    }
-
+  button.addEventListener("click", async () => {
     if (speakingButton === button) {
-      stopBrowserSpeech();
+      stopAssistantSpeech();
       return;
     }
 
-    stopBrowserSpeech();
+    stopAssistantSpeech();
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "pt-BR";
-    utterance.rate = 1;
-    utterance.pitch = 0.92;
-    const voice = pickSpeechVoice();
-
-    if (voice) {
-      utterance.voice = voice;
+    try {
+      await speakAssistantText(text, button);
+    } catch (error) {
+      stopAssistantSpeech();
+      setComposerStatus(error instanceof Error ? error.message : "Nao consegui tocar o audio.");
     }
-
-    utterance.onend = () => stopBrowserSpeech();
-    utterance.onerror = () => stopBrowserSpeech();
-
-    speakingButton = button;
-    button.classList.add("playing");
-    button.setAttribute("aria-label", "Parar audio");
-    button.title = "Parar audio";
-    window.speechSynthesis.speak(utterance);
   });
 }
 
@@ -560,6 +775,9 @@ function syncComposerState() {
   }
   logoutButton.hidden = !isLoggedIn;
   newChatButton.hidden = !isLoggedIn;
+  if (settingsButton) {
+    settingsButton.hidden = !isLoggedIn;
+  }
   if (chatSearchInput) {
     chatSearchInput.disabled = !isLoggedIn;
   }
@@ -574,6 +792,7 @@ function syncComposerState() {
 async function loadSessionState() {
   if (!getToken()) {
     currentUser = null;
+    await loadAccessState();
     initContentAdmin({
       user: null,
       getToken,
@@ -582,6 +801,7 @@ async function loadSessionState() {
     authStatus.textContent = "Entre ou cadastre sua conta para abrir o chat.";
     chatAuthStatus.textContent = "Sem login ativo.";
     syncComposerState();
+    syncModeAvailability();
     renderHistoryList();
     renderConversation();
     return;
@@ -598,15 +818,18 @@ async function loadSessionState() {
     if (!response.ok) {
       setToken("");
       currentUser = null;
+      await loadAccessState();
       authStatus.textContent = data.error || "Sessão inválida.";
       chatAuthStatus.textContent = data.error || "Sessão inválida.";
       syncComposerState();
+      syncModeAvailability();
       renderHistoryList();
       renderConversation();
       return;
     }
 
     currentUser = data.user;
+    await loadAccessState();
     initContentAdmin({
       user: currentUser,
       getToken,
@@ -618,10 +841,12 @@ async function loadSessionState() {
     const conversations = ensureWelcomeConversation();
     activeConversationId = activeConversationId || conversations[0]?.id || null;
     syncComposerState();
+    syncModeAvailability();
     renderHistoryList();
     renderConversation();
   } catch (error) {
     currentUser = null;
+    await loadAccessState();
     initContentAdmin({
       user: null,
       getToken,
@@ -630,6 +855,7 @@ async function loadSessionState() {
     authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
     chatAuthStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
     syncComposerState();
+    syncModeAvailability();
     renderHistoryList();
     renderConversation();
   }
@@ -991,11 +1217,18 @@ logoutButton.addEventListener("click", () => {
   setToken("");
   currentUser = null;
   activeConversationId = null;
+  accessState = {
+    authenticated: false,
+    planId: "gratis",
+    canDownloadAll: false
+  };
   authStatus.textContent = "Sessao encerrada.";
   chatAuthStatus.textContent = "Sessao encerrada.";
   authStatus.textContent = "Entre ou crie sua conta para abrir o chat.";
   setComposerStatus("");
+  closeSettingsModal();
   syncComposerState();
+  syncModeAvailability();
   renderHistoryList();
   renderConversation();
 });
@@ -1041,6 +1274,7 @@ chatForm.addEventListener("submit", async (event) => {
   currentController = new AbortController();
   const assistantMessage = createAssistantMessageElement("");
   const selectedMode = chatModes[getChatMode()] || chatModes.fast;
+  const responseStyle = buildResponseStylePrompt(getChatMode());
 
   try {
     const response = await fetch("/api/gpt/ask", {
@@ -1054,8 +1288,11 @@ chatForm.addEventListener("submit", async (event) => {
         message,
         history,
         stream: true,
+        responseStyle,
         model: selectedMode.model,
-        instantModel: selectedMode.instantModel
+        instantModel: selectedMode.instantModel,
+        maxCompletionTokens: selectedMode.maxCompletionTokens,
+        previewMaxCompletionTokens: selectedMode.previewMaxCompletionTokens
       }),
       signal: currentController.signal
     });
@@ -1122,10 +1359,51 @@ if (chatSearchInput) {
 
 if (chatModeSelect) {
   chatModeSelect.addEventListener("change", () => {
+    if (chatModeSelect.value === "project" && accessState.planId !== "life") {
+      window.localStorage.setItem(chatModeStorageKey, "think");
+      syncChatModeUi();
+      window.location.href = "/planos.html?from=project-mode";
+      return;
+    }
+
     window.localStorage.setItem(chatModeStorageKey, chatModeSelect.value);
     syncChatModeUi();
   });
 }
+
+settingsButton?.addEventListener("click", () => {
+  openSettingsModal();
+});
+
+settingsCloseButton?.addEventListener("click", () => {
+  closeSettingsModal();
+});
+
+settingsCancelButton?.addEventListener("click", () => {
+  closeSettingsModal();
+});
+
+settingsModal?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLElement && target.dataset.settingsClose === "true") {
+    closeSettingsModal();
+  }
+});
+
+settingsForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveUserChatSettings({
+    voice: settingsVoiceSelect.value || defaultOpenAiVoice,
+    responseStyle: settingsResponseStyle.value.trim(),
+    callName: settingsCallName.value.trim(),
+    ministryDream: settingsMinistryDream.value.trim(),
+    ministryRole: settingsRoleSelect.value || "Lider"
+  });
+  settingsStatus.textContent = "Preferencias salvas.";
+  window.setTimeout(() => {
+    closeSettingsModal();
+  }, 300);
+});
 
 function setActiveAuthTab(tabId) {
   document.querySelectorAll("[data-auth-tab]").forEach((button) => {
@@ -1188,20 +1466,15 @@ registerForm.addEventListener("submit", async (event) => {
 });
 
 window.addEventListener("beforeunload", () => {
-  stopBrowserSpeech();
+  stopAssistantSpeech();
   stopMediaTracks();
 });
-
-if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    pickSpeechVoice();
-  };
-}
 
 renderHistoryList();
 renderConversation();
 syncComposerState();
 setComposerStatus("");
+populateVoiceOptions();
 syncChatModeUi();
 setActiveAuthTab("login");
 siteConfig = await loadSiteConfig().catch(() => siteConfig);

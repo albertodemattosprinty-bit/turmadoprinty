@@ -26,6 +26,8 @@ const CONTENT_BASE_URL = (process.env.CONTENT_BASE_URL || "https://pub-3f5e3a744
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-nano";
 const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
+const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
+const OPENAI_TTS_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom cristao protestante, leve, humano, claro e acolhedor. Seja pratico, caloroso e direto. Nao sugira oracoes, devocionais ou momentos de oracao por conta propria; so fale disso se a pessoa pedir claramente. Evite formular convites espirituais automaticos no fim da resposta. Priorize ajuda objetiva, sensibilidade e boa conversa.";
@@ -863,6 +865,74 @@ async function handleAudioTranscription(request, response) {
   } catch (error) {
     sendJson(response, 500, {
       error: "Erro interno ao transcrever o audio.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
+async function handleAudioSpeech(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  const safeText = text.slice(0, 3900);
+  const voice = typeof body.voice === "string" && OPENAI_TTS_VOICES.has(body.voice.trim()) ? body.voice.trim() : "alloy";
+
+  if (!safeText) {
+    sendJson(response, 400, { error: "Texto ausente para sintetizar audio." });
+    return;
+  }
+
+  try {
+    const speechResponse = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: OPENAI_TTS_MODEL,
+        voice,
+        response_format: "mp3",
+        input: safeText
+      })
+    });
+
+    if (!speechResponse.ok) {
+      const { data: payload, text: rawText } = await readApiResponse(speechResponse);
+      sendJson(response, speechResponse.status, {
+        error: "Falha ao gerar o audio da OpenAI.",
+        details: payload || rawText || "Resposta vazia da OpenAI."
+      });
+      return;
+    }
+
+    const audioBuffer = Buffer.from(await speechResponse.arrayBuffer());
+    response.writeHead(200, {
+      "Content-Type": "audio/mpeg",
+      "Content-Length": audioBuffer.length,
+      "Cache-Control": "no-store"
+    });
+    response.end(audioBuffer);
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Erro interno ao gerar audio.",
       details: error instanceof Error ? error.message : "Erro desconhecido."
     });
   }
@@ -1808,6 +1878,17 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleAudioTranscription(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/audio/speak") {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    await handleAudioSpeech(request, response);
     return;
   }
 

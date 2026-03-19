@@ -45,22 +45,22 @@ function buildPlans(siteConfig) {
       id: "plus",
       name: getTextOverride("plans.plus.name", "Plus"),
       priceLabel: `${formatCurrency(prices.plus)}/mes`,
-      description: getTextOverride("plans.plus.description", "9,90 musicas e playbacks."),
-      perks: ["Musicas e playbacks", "Streaming completo", "Pagamento mensal recorrente"]
+      description: getTextOverride("plans.plus.description", "9,90 · Músicas + IA Ministério Infantil."),
+      perks: ["Músicas", "IA Ministério Infantil", "Respostas rápidas para o dia a dia"]
     },
     {
       id: "pro",
       name: getTextOverride("plans.pro.name", "Pro"),
       priceLabel: `${formatCurrency(prices.pro)}/mes`,
-      description: getTextOverride("plans.pro.description", "19,90 cantatas."),
-      perks: ["Cantatas", "Streaming completo", "Pagamento mensal recorrente"]
+      description: getTextOverride("plans.pro.description", "19,90 · Modelo pensador."),
+      perks: ["Modelo pensador", "Mais profundidade nas respostas", "Apoio criativo para ministério"]
     },
     {
       id: "life",
       name: getTextOverride("plans.life.name", "Life"),
       priceLabel: `${formatCurrency(prices.life)}/mes`,
-      description: getTextOverride("plans.life.description", "29,90 IA Ilimitada Pro."),
-      perks: ["IA Ilimitada Pro", "Streaming completo", "Pagamento mensal recorrente"]
+      description: getTextOverride("plans.life.description", "29,90 · Modelo projeto + cantatas + downloads."),
+      perks: ["Modelo Projeto", "Cantatas", "Downloads", "Plano mais completo"]
     }
   ];
 }
@@ -232,6 +232,8 @@ function renderPlans(plans) {
 
   if (!accessState.authenticated) {
     planStatus.textContent = "Faca login para ativar o plano Gratis e liberar downloads offline no navegador.";
+  } else if (params.get("from") === "project-mode") {
+    planStatus.textContent = "O modo Projeto faz parte do plano Life.";
   } else if (paymentReturned) {
     planStatus.textContent = "Pagamento enviado ao Stripe. Aguarde a confirmacao da assinatura.";
   } else if (accessState.canDownloadAll) {
