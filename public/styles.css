@@ -2527,6 +2527,7 @@ body[data-page="explorar"] #chat-auth-status {
     height: calc(100vh - 36px);
     min-height: 0;
     padding-right: 16px;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
     border-radius: 0 28px 28px 0;
   }
 
@@ -2540,6 +2541,10 @@ body[data-page="explorar"] #chat-auth-status {
     top: 18px;
     right: -58px;
     margin: 0;
+  }
+
+  body[data-page="explorar"].explore-sidebar-open .sidebar-topbar {
+    right: -13px;
   }
 
   body[data-page="explorar"] .sidebar-toggle-button {
