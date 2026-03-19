@@ -17,6 +17,7 @@ const historyList = document.getElementById("history-list");
 const chatSearchInput = document.getElementById("chat-search-input");
 const sidebarToggleButton = document.getElementById("sidebar-toggle-button");
 const newChatButton = document.getElementById("new-chat-button");
+const editChatsButton = document.getElementById("edit-chats-button");
 const settingsButton = document.getElementById("settings-button");
 const logoutButton = document.getElementById("logout-button");
 const chatShell = document.getElementById("chat-shell");
@@ -60,6 +61,8 @@ let recordedChunks = [];
 let isRecording = false;
 let sidebarCollapsed = window.innerWidth <= 980;
 let chatSearchTerm = "";
+let historyEditMode = false;
+let editingConversationId = null;
 let speakingButton = null;
 let speakingAudio = null;
 let speakingAudioUrl = "";
@@ -389,7 +392,9 @@ function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function stopAssistantSpeech() {
@@ -569,6 +574,11 @@ function clampConversationTitle(value) {
   return `${slice}…`;
 }
 
+function sanitizeConversationTitle(value) {
+  const trimmed = String(value || "").replace(/\s+/g, " ").trim();
+  return clampConversationTitle(trimmed || "Novo chat");
+}
+
 function createShortTitle(message) {
   const sanitized = message.replace(/\s+/g, " ").trim();
   if (!sanitized) {
@@ -655,6 +665,61 @@ function updateConversation(nextConversation) {
   activeConversationId = nextConversation.id;
 }
 
+function renameConversation(conversationId, nextTitle) {
+  const conversations = getConversations();
+  const targetConversation = conversations.find((item) => item.id === conversationId);
+
+  if (!targetConversation) {
+    return false;
+  }
+
+  updateConversation({
+    ...targetConversation,
+    title: sanitizeConversationTitle(nextTitle),
+    updatedAt: new Date().toISOString()
+  });
+  return true;
+}
+
+function deleteConversation(conversationId) {
+  const conversations = getConversations();
+  const nextItems = conversations.filter((item) => item.id !== conversationId);
+
+  if (!nextItems.length) {
+    const welcomeConversation = createWelcomeConversation();
+    saveConversations([welcomeConversation]);
+    activeConversationId = welcomeConversation.id;
+    return;
+  }
+
+  saveConversations(nextItems);
+
+  if (activeConversationId === conversationId) {
+    activeConversationId = nextItems[0]?.id || null;
+  }
+}
+
+function startConversationRename(conversationId) {
+  editingConversationId = conversationId;
+  renderHistoryList();
+  const input = historyList.querySelector(`[data-history-title-input="${conversationId}"]`);
+
+  if (input instanceof HTMLInputElement) {
+    input.focus();
+    input.select();
+  }
+}
+
+function commitConversationRename(conversationId, nextTitle) {
+  const renamed = renameConversation(conversationId, nextTitle);
+  editingConversationId = null;
+
+  if (renamed) {
+    renderHistoryList();
+    renderConversation();
+  }
+}
+
 function renderHistoryList() {
   const conversations = getFilteredConversations();
   historyList.innerHTML = "";
@@ -675,21 +740,128 @@ function renderHistoryList() {
   }
 
   conversations.forEach((item) => {
-    const button = document.createElement("button");
-    button.type = "button";
+    const itemShell = document.createElement("div");
+    itemShell.className = `history-item-shell${historyEditMode ? " is-editing" : ""}`;
+
+    const button = document.createElement("div");
     button.className = `history-item${item.id === activeConversationId ? " active" : ""}`;
-    button.innerHTML = `
-      <span class="history-item-row">
-        <strong title="${escapeHtml(item.title)}">${escapeHtml(clampConversationTitle(item.title))}</strong>
-        <span class="history-time">${formatRelativeDate(item.updatedAt)}</span>
-      </span>
-    `;
+    button.setAttribute("role", "button");
+    button.tabIndex = 0;
+
+    if (editingConversationId === item.id) {
+      button.innerHTML = `
+        <span class="history-item-row history-item-row-editing">
+          <input
+            class="history-title-input"
+            type="text"
+            value="${escapeHtml(item.title || "Novo chat")}"
+            data-history-title-input="${item.id}"
+            maxlength="22"
+            aria-label="Editar nome do chat"
+          >
+          <span class="history-item-actions">
+            <button class="history-action-button" type="button" data-history-save="${item.id}" aria-label="Salvar nome" title="Salvar nome">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.55 18.2-4.7-4.7 1.4-1.4 3.3 3.3 8.2-8.2 1.4 1.4z"/></svg>
+            </button>
+          </span>
+        </span>
+      `;
+    } else {
+      button.innerHTML = `
+        <span class="history-item-row">
+          <strong title="${escapeHtml(item.title)}">${escapeHtml(clampConversationTitle(item.title))}</strong>
+          ${
+            historyEditMode
+              ? `
+                <span class="history-item-actions">
+                  <button class="history-action-button" type="button" data-history-rename="${item.id}" aria-label="Editar nome do chat" title="Editar nome do chat">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.2V20h2.8l9.86-9.87-2.8-2.8zM18.71 8.04a1 1 0 0 0 0-1.41l-1.34-1.34a1 1 0 0 0-1.41 0l-1.17 1.17 2.8 2.8z"/></svg>
+                  </button>
+                  <button class="history-action-button danger" type="button" data-history-delete="${item.id}" aria-label="Excluir chat" title="Excluir chat">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l1 2h4v2H4V6h4zm1 6h2v8h-2zm4 0h2v8h-2zM7 10h2v8H7zm1 10h8a2 2 0 0 0 2-2V9H6v9a2 2 0 0 0 2 2"/></svg>
+                  </button>
+                </span>
+              `
+              : `<span class="history-time">${formatRelativeDate(item.updatedAt)}</span>`
+          }
+        </span>
+      `;
+    }
+
     button.addEventListener("click", () => {
+      if (editingConversationId === item.id) {
+        return;
+      }
+
       activeConversationId = item.id;
       renderConversation();
       renderHistoryList();
     });
-    historyList.appendChild(button);
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+
+      event.preventDefault();
+      if (editingConversationId === item.id) {
+        return;
+      }
+
+      activeConversationId = item.id;
+      renderConversation();
+      renderHistoryList();
+    });
+
+    itemShell.appendChild(button);
+    historyList.appendChild(itemShell);
+
+    const renameAction = itemShell.querySelector(`[data-history-rename="${item.id}"]`);
+    renameAction?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      startConversationRename(item.id);
+    });
+
+    const deleteAction = itemShell.querySelector(`[data-history-delete="${item.id}"]`);
+    deleteAction?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteConversation(item.id);
+      editingConversationId = null;
+      renderHistoryList();
+      renderConversation();
+    });
+
+    const titleInput = itemShell.querySelector(`[data-history-title-input="${item.id}"]`);
+    if (titleInput instanceof HTMLInputElement) {
+      titleInput.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+
+      titleInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commitConversationRename(item.id, titleInput.value);
+        } else if (event.key === "Escape") {
+          editingConversationId = null;
+          renderHistoryList();
+        }
+      });
+
+      titleInput.addEventListener("blur", () => {
+        commitConversationRename(item.id, titleInput.value);
+      });
+    }
+
+    const saveAction = itemShell.querySelector(`[data-history-save="${item.id}"]`);
+    saveAction?.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    saveAction?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const input = itemShell.querySelector(`[data-history-title-input="${item.id}"]`);
+      if (input instanceof HTMLInputElement) {
+        commitConversationRename(item.id, input.value);
+      }
+    });
   });
 }
 
@@ -775,6 +947,10 @@ function syncComposerState() {
   }
   logoutButton.hidden = !isLoggedIn;
   newChatButton.hidden = !isLoggedIn;
+  if (editChatsButton) {
+    editChatsButton.hidden = !isLoggedIn;
+    editChatsButton.classList.toggle("is-active", historyEditMode && isLoggedIn);
+  }
   if (settingsButton) {
     settingsButton.hidden = !isLoggedIn;
   }
@@ -1213,10 +1389,26 @@ newChatButton.addEventListener("click", () => {
   chatInput.focus();
 });
 
+editChatsButton?.addEventListener("click", () => {
+  if (!currentUser) {
+    ensureLoggedInBeforeChat();
+    return;
+  }
+
+  historyEditMode = !historyEditMode;
+  editingConversationId = null;
+  editChatsButton.classList.toggle("is-active", historyEditMode);
+  editChatsButton.setAttribute("aria-label", historyEditMode ? "Fechar edicao de chats" : "Editar chats");
+  editChatsButton.title = historyEditMode ? "Fechar edicao de chats" : "Editar chats";
+  renderHistoryList();
+});
+
 logoutButton.addEventListener("click", () => {
   setToken("");
   currentUser = null;
   activeConversationId = null;
+  historyEditMode = false;
+  editingConversationId = null;
   accessState = {
     authenticated: false,
     planId: "gratis",
