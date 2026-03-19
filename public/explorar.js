@@ -120,6 +120,7 @@ const conversationTitleMaxLength = 22;
 const searchPreviewMaxLength = 45;
 const searchPreviewBaseMaxLength = 15;
 const searchTextHighlightDurationMs = 5000;
+const emptyConversationSupportText = "Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.";
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
 
 function getToken() {
@@ -479,6 +480,38 @@ function buildSearchPreviewMarkup(preview) {
 
     return `<${tagName} class="${className}">${escapeHtml(char)}</${tagName}>`;
   }).join("");
+}
+
+function splitBalancedLine(text) {
+  const safeText = String(text || "").replace(/\s+/g, " ").trim();
+
+  if (!safeText) {
+    return ["", ""];
+  }
+
+  const words = safeText.split(" ");
+  if (words.length <= 1) {
+    return [safeText, ""];
+  }
+
+  let bestIndex = 1;
+  let bestDelta = Number.POSITIVE_INFINITY;
+
+  for (let index = 1; index < words.length; index += 1) {
+    const left = words.slice(0, index).join(" ");
+    const right = words.slice(index).join(" ");
+    const delta = Math.abs(left.length - right.length);
+
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      bestIndex = index;
+    }
+  }
+
+  return [
+    words.slice(0, bestIndex).join(" "),
+    words.slice(bestIndex).join(" ")
+  ];
 }
 
 function getConversationSearchResults(conversation, searchTerm) {
@@ -1158,6 +1191,7 @@ function renderConversation() {
   chatThread.innerHTML = "";
 
   if (!conversation || conversation.messages.length === 0) {
+    const [emptyLineOne, emptyLineTwo] = splitBalancedLine(emptyConversationSupportText);
     chatShell.classList.add("conversation-shell-empty");
     chatThread.classList.add("chat-thread-empty");
     if (conversationHeader) {
@@ -1169,9 +1203,8 @@ function renderConversation() {
       <section class="empty-conversation-state">
         <h2>${escapeHtml(getEmptyConversationCopy())}</h2>
         <p>
-          <span>Posso ajudar com roteiros, programacoes,</span>
-          <span>legendas, devocionais, cantatas</span>
-          <span>e ideias para o ministerio infantil.</span>
+          <span>${escapeHtml(emptyLineOne)}</span>
+          <span>${escapeHtml(emptyLineTwo)}</span>
         </p>
       </section>
     `;

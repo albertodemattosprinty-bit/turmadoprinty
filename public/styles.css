@@ -1003,6 +1003,17 @@ body[data-page="eventos-pagamento"] {
   }
 }
 
+@media (max-width: 880px) {
+  .users-table-head {
+    display: none;
+  }
+
+  .users-table-row,
+  .user-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .product-hero {
   display: grid;
   grid-template-columns: minmax(220px, 320px) 1fr;
@@ -1392,6 +1403,113 @@ body[data-page="planos"] .status-pill {
   background: rgba(255, 255, 255, 0.12);
 }
 
+body[data-page="users"] .users-admin-shell {
+  display: grid;
+  gap: 20px;
+}
+
+.users-table-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.users-table-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) 1fr 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.users-table-head {
+  padding: 0 16px;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.users-table-body {
+  display: grid;
+  gap: 12px;
+}
+
+.users-table-card {
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: 24px;
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(16, 47, 112, 0.12);
+}
+
+.users-table-card.is-online {
+  background: linear-gradient(135deg, #24a76d 0%, #1f8d5d 100%);
+}
+
+.users-table-card.is-offline {
+  background: linear-gradient(135deg, #18479f 0%, #0f3478 100%);
+}
+
+.users-table-card.is-selected {
+  outline: 3px solid rgba(255, 255, 255, 0.32);
+}
+
+.users-table-card span {
+  display: block;
+}
+
+.users-table-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.users-table-card small {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.user-detail-panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(27, 83, 187, 0.06), rgba(27, 83, 187, 0.02));
+  border: 1px solid rgba(27, 83, 187, 0.1);
+}
+
+.user-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.user-detail-grid label {
+  display: grid;
+  gap: 8px;
+  color: var(--text-soft);
+}
+
+.user-detail-grid select,
+.user-detail-grid input {
+  min-height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  padding: 10px 14px;
+  font: inherit;
+}
+
+.user-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.danger-outline {
+  border-color: rgba(208, 69, 69, 0.22);
+  color: #ab2d2d;
+}
+
 .plan-perks {
   display: flex;
   flex-wrap: wrap;
@@ -1411,6 +1529,42 @@ body[data-page="planos"] .status-pill {
 .schedule-card h3,
 .schedule-card strong {
   color: inherit;
+}
+
+.schedule-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-edit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--blue-dark);
+  cursor: pointer;
+}
+
+.schedule-edit-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.schedule-card [contenteditable="true"] {
+  outline: none;
+}
+
+.schedule-card .is-editing {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.46);
+  padding: 2px 6px;
 }
 
 .schedule-color-1 {
@@ -1728,6 +1882,7 @@ body[data-page="planos"] .status-pill {
 
 .history-search-preview {
   display: block;
+  width: 100%;
   margin-top: 6px;
   color: rgba(255, 255, 255, 0.78);
   font-size: 0.776rem;
@@ -1737,12 +1892,15 @@ body[data-page="planos"] .status-pill {
   text-overflow: clip;
 }
 
-.history-search-char,
-.history-search-base {
+body[data-page="explorar"] .history-item .history-search-char,
+body[data-page="explorar"] .history-item .history-search-base {
   display: inline;
+  font-size: 0.776rem;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
-.history-search-base {
+body[data-page="explorar"] .history-item .history-search-base {
   font-weight: 800;
   color: #ffffff;
 }
@@ -2123,9 +2281,11 @@ body[data-page="explorar"] #edit-chats-button.is-active {
 
 .empty-conversation-state {
   display: grid;
+  gap: 10px;
   align-content: center;
   justify-items: center;
   max-width: 560px;
+  min-height: 100%;
   margin: auto;
   text-align: center;
 }
@@ -2139,6 +2299,9 @@ body[data-page="explorar"] #edit-chats-button.is-active {
 
 .empty-conversation-state p {
   margin: 0;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
   font-size: 1rem;
   line-height: 1.8;
   color: var(--text-soft);

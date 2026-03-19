@@ -11,11 +11,12 @@ import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
+import { deleteUserById, ensureAdminUsersSchema, listUsersWithAdminData, recordNarrationUsage, recordTextTokenUsage, removeUserPlanOverride, setUserContractorStatus, setUserPlanOverride, touchUserPresence } from "./src/admin-users.js";
 import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { hasDatabase, query } from "./src/db.js";
 import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
-import { createScheduleEntry, ensureSiteConfigSchema, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveSiteContentSettings, saveSitePricingSettings } from "./src/site-config.js";
+import { createScheduleEntry, ensureSiteConfigSchema, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -476,6 +477,12 @@ async function requireAuth(request, response) {
     return null;
   }
 
+  try {
+    await touchUserPresence(user.id);
+  } catch {
+    // Presenca nao deve bloquear requests autenticadas.
+  }
+
   return user;
 }
 
@@ -506,6 +513,7 @@ async function ensurePaymentsReady(response) {
   try {
     await ensurePaymentSchema();
     await ensureSiteConfigSchema();
+    await ensureAdminUsersSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -569,6 +577,27 @@ function getStripeInvoiceReferenceId(invoice) {
 
 function toIsoDateFromUnix(value) {
   return Number.isFinite(value) ? new Date(value * 1000).toISOString() : null;
+}
+
+function extractChatUsageTokens(payload) {
+  const usage = payload?.usage || {};
+  const totalTokens = Number(usage.total_tokens);
+  return Number.isFinite(totalTokens) && totalTokens > 0 ? totalTokens : 0;
+}
+
+function estimateNarrationDurationSeconds(text) {
+  const safeText = String(text || "").trim();
+
+  if (!safeText) {
+    return 0;
+  }
+
+  const words = safeText.split(/\s+/).filter(Boolean).length;
+  if (!words) {
+    return 0;
+  }
+
+  return Math.max(1, Math.round(words / 2.6));
 }
 
 async function handleGptRequest(request, response, user = null) {
@@ -690,6 +719,7 @@ async function handleGptRequest(request, response, user = null) {
         })
           .then((previewPayload) => {
             const previewText = extractChatCompletionText(previewPayload);
+            void recordTextTokenUsage(user?.id, extractChatUsageTokens(previewPayload));
 
             if (!previewText || finalStarted || previewSent) {
               return;
@@ -721,7 +751,10 @@ async function handleGptRequest(request, response, user = null) {
         },
         body: JSON.stringify({
           ...requestPayload,
-          stream: true
+          stream: true,
+          stream_options: {
+            include_usage: true
+          }
         })
       });
 
@@ -739,6 +772,7 @@ async function handleGptRequest(request, response, user = null) {
       const decoder = new TextDecoder();
       let buffer = "";
       let finalText = "";
+      let streamedUsageTokens = 0;
 
       if (!reader) {
         sendEvent({ type: "error", message: "A OpenAI nao devolveu stream de resposta." });
@@ -772,6 +806,11 @@ async function handleGptRequest(request, response, user = null) {
 
           const payload = JSON.parse(payloadText);
           const delta = payload?.choices?.[0]?.delta?.content;
+          const usageTokens = extractChatUsageTokens(payload);
+
+          if (usageTokens > 0) {
+            streamedUsageTokens = usageTokens;
+          }
 
           if (typeof delta === "string" && delta) {
             if (!finalStarted) {
@@ -785,12 +824,14 @@ async function handleGptRequest(request, response, user = null) {
       }
 
       await previewPromise;
+      void recordTextTokenUsage(user?.id, streamedUsageTokens);
       sendEvent({ type: "done", text: finalText });
       response.end();
       return;
     }
 
     const payload = await createChatCompletion(apiKey, requestPayload);
+    void recordTextTokenUsage(user?.id, extractChatUsageTokens(payload));
 
     sendJson(response, 200, {
       ok: true,
@@ -896,7 +937,7 @@ async function handleAudioTranscription(request, response) {
   }
 }
 
-async function handleAudioSpeech(request, response) {
+async function handleAudioSpeech(request, response, user = null) {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -950,6 +991,7 @@ async function handleAudioSpeech(request, response) {
     }
 
     const audioBuffer = Buffer.from(await speechResponse.arrayBuffer());
+    void recordNarrationUsage(user?.id, estimateNarrationDurationSeconds(safeText));
     response.writeHead(200, {
       "Content-Type": "audio/mpeg",
       "Content-Length": audioBuffer.length,
@@ -1763,6 +1805,192 @@ async function serveStatic(response, filePath) {
   }
 }
 
+async function handleAdminUsersList(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const adminUser = await requireAdmin(request, response);
+
+  if (!adminUser) {
+    return;
+  }
+
+  try {
+    const pricing = await getSitePricingSettings();
+    const [users, schedule] = await Promise.all([
+      listUsersWithAdminData(pricing.planPrices),
+      getScheduleEntries()
+    ]);
+
+    sendJson(response, 200, {
+      ok: true,
+      users,
+      plans: buildSubscriptionPlans(pricing.planPrices),
+      schedule
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao carregar usuarios."
+    });
+  }
+}
+
+async function handleAdminUserPlanUpdate(request, response, userId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const adminUser = await requireAdmin(request, response);
+
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const planId = typeof body.planId === "string" ? body.planId.trim() : "";
+
+  try {
+    if (!planId || planId === "gratis") {
+      await removeUserPlanOverride(userId);
+    } else {
+      await setUserPlanOverride({
+        userId,
+        planId,
+        assignedByUserId: adminUser.id
+      });
+    }
+
+    sendJson(response, 200, { ok: true });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Erro ao atualizar plano do usuario."
+    });
+  }
+}
+
+async function handleAdminUserContractorUpdate(request, response, userId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const adminUser = await requireAdmin(request, response);
+
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    await setUserContractorStatus({
+      userId,
+      isContractor: Boolean(body.isContractor),
+      contractorEventId: typeof body.contractorEventId === "string" ? body.contractorEventId.trim() : ""
+    });
+
+    sendJson(response, 200, { ok: true });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Erro ao atualizar contratante."
+    });
+  }
+}
+
+async function handleAdminUserDelete(request, response, userId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const adminUser = await requireAdmin(request, response);
+
+  if (!adminUser) {
+    return;
+  }
+
+  if (userId === adminUser.id) {
+    sendJson(response, 400, { error: "A conta administradora nao pode ser excluida por aqui." });
+    return;
+  }
+
+  try {
+    await deleteUserById(userId);
+    sendJson(response, 200, { ok: true });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao excluir usuario."
+    });
+  }
+}
+
+async function handleContractorEventUpdate(request, response, eventId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const schedule = await getScheduleEntries();
+    const event = schedule.find((item) => item.id === eventId);
+
+    if (!event) {
+      sendJson(response, 404, { error: "Evento nao encontrado." });
+      return;
+    }
+
+    if (!isAdminUser(user) && event.contractorUserId !== user.id) {
+      sendJson(response, 403, { error: "Esse evento nao esta vinculado a sua conta." });
+      return;
+    }
+
+    const updatedEvent = await updateScheduleEntry({
+      eventId,
+      dateLabel: typeof body.dateLabel === "string" ? body.dateLabel.trim() : event.dateLabel,
+      place: typeof body.place === "string" ? body.place.trim() : event.place,
+      city: typeof body.city === "string" ? body.city.trim() : event.city,
+      time: typeof body.time === "string" ? body.time.trim() : event.time
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      event: updatedEvent
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao atualizar evento."
+    });
+  }
+}
+
 async function handleEduDownload(response, pathname) {
   const match = pathname.match(/^\/downloads\/edu\/([^/]+)$/);
   const slug = match?.[1] || "";
@@ -1949,7 +2177,7 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    await handleAudioSpeech(request, response);
+    await handleAudioSpeech(request, response, user);
     return;
   }
 
@@ -2116,6 +2344,35 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Erro ao validar sessao."
       });
     }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/admin/users") {
+    await handleAdminUsersList(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/admin\/users\/[^/]+\/plan$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/users\/([^/]+)\/plan$/, "$1"));
+    await handleAdminUserPlanUpdate(request, response, userId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/admin\/users\/[^/]+\/contractor$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/users\/([^/]+)\/contractor$/, "$1"));
+    await handleAdminUserContractorUpdate(request, response, userId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/admin\/users\/[^/]+$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/users\/([^/]+)$/, "$1"));
+    await handleAdminUserDelete(request, response, userId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/events\/[^/]+\/contractor$/)) {
+    const eventId = decodeURIComponent(pathname.replace(/^\/api\/events\/([^/]+)\/contractor$/, "$1"));
+    await handleContractorEventUpdate(request, response, eventId);
     return;
   }
 

@@ -73,6 +73,17 @@ export async function ensurePaymentSchema() {
 
       await query("create index if not exists idx_payment_webhook_events_reference_id on payment_webhook_events(reference_id);");
       await query("create index if not exists idx_payment_webhook_events_event_type on payment_webhook_events(event_type);");
+
+      await query(`
+        create table if not exists user_plan_overrides (
+          user_id uuid primary key references users(id) on delete cascade,
+          plan_id text not null,
+          assigned_by_user_id uuid references users(id) on delete set null,
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now()
+        );
+      `);
+      await query("create index if not exists idx_user_plan_overrides_plan_id on user_plan_overrides(plan_id);");
     })().catch((error) => {
       paymentSchemaReadyPromise = null;
       throw error;
@@ -258,7 +269,7 @@ export async function markPlanSubscriptionStatus({
 }
 
 export async function getUserAccessState(userId) {
-  const [subscriptionResult, purchasesResult] = await Promise.all([
+  const [subscriptionResult, purchasesResult, overrideResult] = await Promise.all([
     query(
       `
         select plan_id, status, activated_at, canceled_at, updated_at
@@ -279,14 +290,31 @@ export async function getUserAccessState(userId) {
           and status in ('PAID', 'AUTHORIZED')
       `,
       [userId]
+    ),
+    query(
+      `
+        select plan_id, updated_at
+        from user_plan_overrides
+        where user_id = $1
+        limit 1
+      `,
+      [userId]
     )
   ]);
 
   const plan = subscriptionResult.rows[0] || null;
+  const override = overrideResult.rows[0] || null;
   const purchasedAlbumIds = purchasesResult.rows.map((row) => row.product_id);
-
-  return {
-    plan: plan
+  const effectivePlan = override
+    ? {
+        id: override.plan_id,
+        status: "ADMIN_ASSIGNED",
+        active: override.plan_id !== "gratis",
+        activatedAt: override.updated_at,
+        canceledAt: null,
+        updatedAt: override.updated_at
+      }
+    : plan
       ? {
           id: plan.plan_id,
           status: normalizeStatus(plan.status),
@@ -302,8 +330,11 @@ export async function getUserAccessState(userId) {
           activatedAt: null,
           canceledAt: null,
           updatedAt: null
-        },
+        };
+
+  return {
+    plan: effectivePlan,
     purchasedAlbumIds,
-    canDownloadAll: Boolean(plan && plan.plan_id !== "gratis" && isActiveSubscriptionStatus(plan.status))
+    canDownloadAll: Boolean(effectivePlan && effectivePlan.id !== "gratis" && effectivePlan.active)
   };
 }

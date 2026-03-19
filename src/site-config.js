@@ -141,6 +141,8 @@ export async function ensureSiteConfigSchema() {
       `);
 
       await query("create index if not exists idx_agenda_events_sort_order on agenda_events(sort_order);");
+      await query("alter table agenda_events add column if not exists contractor_user_id uuid references users(id) on delete set null;");
+      await query("create index if not exists idx_agenda_events_contractor_user_id on agenda_events(contractor_user_id);");
 
       await query(
         `
@@ -278,6 +280,7 @@ export async function getScheduleEntries() {
   const result = await query(
     `
       select id, month_label, date_label, place, city, time_label, sort_order
+      , contractor_user_id
       from agenda_events
       order by sort_order asc, created_at asc
     `
@@ -290,7 +293,8 @@ export async function getScheduleEntries() {
     place: row.place,
     city: row.city,
     time: row.time_label,
-    sortOrder: row.sort_order
+    sortOrder: row.sort_order,
+    contractorUserId: row.contractor_user_id || null
   }));
 }
 
@@ -323,6 +327,47 @@ export async function createScheduleEntry({ monthLabel, dateLabel, place, city, 
     place: row.place,
     city: row.city,
     time: row.time_label,
-    sortOrder: row.sort_order
+    sortOrder: row.sort_order,
+    contractorUserId: null
+  };
+}
+
+export async function updateScheduleEntry({ eventId, dateLabel, place, city, time }) {
+  await ensureSiteConfigSchema();
+
+  const result = await query(
+    `
+      update agenda_events
+      set date_label = $2,
+          place = $3,
+          city = $4,
+          time_label = $5
+      where id = $1
+      returning id, month_label, date_label, place, city, time_label, sort_order, contractor_user_id
+    `,
+    [
+      eventId,
+      normalizeDateLabel(dateLabel),
+      normalizePlace(place),
+      normalizeCity(city),
+      normalizeTime(time)
+    ]
+  );
+
+  const row = result.rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    monthLabel: row.month_label,
+    dateLabel: row.date_label,
+    place: row.place,
+    city: row.city,
+    time: row.time_label,
+    sortOrder: row.sort_order,
+    contractorUserId: row.contractor_user_id || null
   };
 }

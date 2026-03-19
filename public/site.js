@@ -271,12 +271,85 @@ async function loadSchedule(siteConfig, user) {
     scheduleItems.forEach((item, index) => {
       const card = document.createElement("article");
       card.className = `schedule-card schedule-color-${(index % 5) + 1}`;
+      const canEditEvent = Boolean(user && item.contractorUserId === user.id);
       card.innerHTML = `
-        <p class="schedule-day">${item.dateLabel}</p>
-        <h3>${item.place}</h3>
-        <p>${item.city}</p>
-        <strong>${item.time}</strong>
+        <div class="schedule-card-head">
+          <p class="schedule-day" data-field="dateLabel">${item.dateLabel}</p>
+          ${
+            canEditEvent
+              ? `<button class="schedule-edit-button" type="button" aria-label="Editar evento" title="Editar evento">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.2V20h2.8l9.86-9.87-2.8-2.8zM18.71 8.04a1 1 0 0 0 0-1.41l-1.34-1.34a1 1 0 0 0-1.41 0l-1.17 1.17 2.8 2.8z"/></svg>
+                </button>`
+              : ""
+          }
+        </div>
+        <h3 data-field="place">${item.place}</h3>
+        <p data-field="city">${item.city}</p>
+        <strong data-field="time">${item.time}</strong>
       `;
+
+      if (canEditEvent) {
+        const button = card.querySelector(".schedule-edit-button");
+        let editing = false;
+
+        const setEditing = (nextEditing) => {
+          editing = nextEditing;
+          button.innerHTML = nextEditing
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.55 18.2-4.7-4.7 1.4-1.4 3.3 3.3 8.2-8.2 1.4 1.4z"/></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.2V20h2.8l9.86-9.87-2.8-2.8zM18.71 8.04a1 1 0 0 0 0-1.41l-1.34-1.34a1 1 0 0 0-1.41 0l-1.17 1.17 2.8 2.8z"/></svg>';
+          button.setAttribute("aria-label", nextEditing ? "Salvar evento" : "Editar evento");
+          button.title = nextEditing ? "Salvar evento" : "Editar evento";
+
+          card.querySelectorAll("[data-field]").forEach((fieldNode) => {
+            if (nextEditing) {
+              fieldNode.setAttribute("contenteditable", "true");
+              fieldNode.classList.add("is-editing");
+            } else {
+              fieldNode.removeAttribute("contenteditable");
+              fieldNode.classList.remove("is-editing");
+            }
+          });
+        };
+
+        button.addEventListener("click", async () => {
+          if (!editing) {
+            setEditing(true);
+            return;
+          }
+
+          button.disabled = true;
+
+          try {
+            const response = await fetch(`/api/events/${encodeURIComponent(item.id)}/contractor`, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getToken()}`
+              },
+              body: JSON.stringify({
+                dateLabel: card.querySelector('[data-field="dateLabel"]')?.textContent?.trim() || item.dateLabel,
+                place: card.querySelector('[data-field="place"]')?.textContent?.trim() || item.place,
+                city: card.querySelector('[data-field="city"]')?.textContent?.trim() || item.city,
+                time: card.querySelector('[data-field="time"]')?.textContent?.trim() || item.time
+              })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+              throw new Error(data.error || "Falha ao salvar evento.");
+            }
+
+            setEditing(false);
+            await refreshSchedule();
+          } catch (error) {
+            alert(error instanceof Error ? error.message : "Erro ao salvar evento.");
+          } finally {
+            button.disabled = false;
+          }
+        });
+      }
+
       grid.appendChild(card);
     });
 
