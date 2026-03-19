@@ -2090,6 +2090,7 @@ const server = http.createServer(async (request, response) => {
 
   const requestedPath = pathname === "/" ? "index.html" : pathname.slice(1);
   const resolvedPath = path.join(publicDir, requestedPath);
+  const htmlResolvedPath = path.join(publicDir, `${requestedPath}.html`);
 
   if (!resolvedPath.startsWith(publicDir)) {
     response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
@@ -2099,6 +2100,11 @@ const server = http.createServer(async (request, response) => {
 
   if (existsSync(resolvedPath)) {
     await serveStatic(response, resolvedPath);
+    return;
+  }
+
+  if (existsSync(htmlResolvedPath) && htmlResolvedPath.startsWith(publicDir)) {
+    await serveStatic(response, htmlResolvedPath);
     return;
   }
 
