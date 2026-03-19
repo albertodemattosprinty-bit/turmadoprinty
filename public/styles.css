@@ -819,32 +819,16 @@ body[data-page="produto"] .status-pill {
 
 .track-list {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .track-card {
   display: grid;
-  grid-template-columns: minmax(240px, 360px) minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  padding: 18px;
+  gap: 12px;
+  padding: 18px 20px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.track-number {
-  margin: 0 0 6px;
-  color: var(--yellow);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.track-copy h3 {
-  margin: 0;
-  font-size: 1rem;
 }
 
 .track-title-row {
@@ -864,6 +848,12 @@ body[data-page="produto"] .status-pill {
   cursor: pointer;
 }
 
+.track-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
 .track-type-toggle {
   min-width: 96px;
 }
@@ -877,45 +867,123 @@ body[data-page="produto"] .status-pill {
   line-height: 1;
 }
 
-.track-download-label {
-  margin: 8px 0 0;
-  color: var(--text-muted);
-  font-size: 0.92rem;
-}
-
 .track-player-shell {
   display: grid;
-  gap: 10px;
-}
-
-.track-player-shell audio {
-  width: 100%;
-  display: block;
-  filter: saturate(0.95);
-}
-
-.track-player-controls {
-  display: flex;
-  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
   align-items: center;
 }
 
-.track-actions {
-  display: flex;
-  justify-content: flex-end;
+.track-player-shell audio {
+  display: none;
 }
 
-.download-icon-button {
-  min-width: 52px;
+.track-play-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 52px;
   height: 52px;
   padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease;
 }
 
-.download-icon-button svg {
-  width: 22px;
-  height: 22px;
+.track-play-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.track-play-button svg {
+  width: 20px;
+  height: 20px;
   fill: currentColor;
+}
+
+.track-progress-shell {
+  display: grid;
+  gap: 8px;
+}
+
+.track-progress-input {
+  --track-progress: 0%;
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  border-radius: 999px;
+  outline: none;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.92) var(--track-progress), rgba(255, 255, 255, 0.18) var(--track-progress), rgba(255, 255, 255, 0.18) 100%);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.track-progress-input::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.track-progress-input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -3px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.track-progress-input::-moz-range-track {
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.track-progress-input::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.track-progress-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.track-time-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.track-admin-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.track-copy {
+  min-width: 0;
+}
+
+.track-copy h3 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .floating-notice {

@@ -242,8 +242,12 @@ function updatePlayerButtons() {
   document.querySelectorAll(".track-card").forEach((card) => {
     const trackNumber = Number(card.dataset.trackNumber);
     const playButton = card.querySelector("[data-role='play']");
+    const progressBar = card.querySelector("[data-role='progress']");
+    const currentTimeLabel = card.querySelector("[data-role='current-time']");
+    const durationLabel = card.querySelector("[data-role='duration']");
+    const audio = card.querySelector("audio");
 
-    if (!playButton) {
+    if (!playButton || !audio) {
       return;
     }
 
@@ -252,6 +256,24 @@ function updatePlayerButtons() {
     playButton.innerHTML = isPlaying
       ? '<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>'
       : '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    playButton.setAttribute("aria-label", isPlaying ? "Pausar faixa" : "Tocar faixa");
+
+    const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+    const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+    if (progressBar) {
+      progressBar.value = String(progress);
+      progressBar.style.setProperty("--track-progress", `${progress}%`);
+    }
+
+    if (currentTimeLabel) {
+      currentTimeLabel.textContent = formatTime(currentTime);
+    }
+
+    if (durationLabel) {
+      durationLabel.textContent = formatTime(duration);
+    }
   });
 }
 
@@ -268,6 +290,16 @@ function bindAudioToCard(card, audio) {
   });
   audio.addEventListener("pause", updatePlayerButtons);
   audio.addEventListener("play", updatePlayerButtons);
+
+  const progressBar = card.querySelector("[data-role='progress']");
+  if (progressBar) {
+    progressBar.addEventListener("input", () => {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      const nextTime = duration > 0 ? (Number(progressBar.value) / 100) * duration : 0;
+      audio.currentTime = nextTime;
+      updatePlayerButtons();
+    });
+  }
 }
 
 async function playTrack(card, albumId, track) {
@@ -291,18 +323,6 @@ async function playTrack(card, albumId, track) {
   currentAudio = audio;
   currentTrackNumber = track.number;
   await audio.play();
-  updatePlayerButtons();
-}
-
-function restartTrack(card) {
-  const audio = card.querySelector("audio");
-
-  if (!audio) {
-    return;
-  }
-
-  audio.pause();
-  audio.currentTime = 0;
   updatePlayerButtons();
 }
 
@@ -634,18 +654,13 @@ async function renderTracks(album) {
   if (!Array.isArray(album.tracks) || !album.tracks.length) {
     trackList.innerHTML = `
       <article class="track-card">
-        <div class="track-copy">
-          <p class="track-number">MP3</p>
-          <h3>Nenhuma faixa cadastrada neste album</h3>
-          <p class="track-download-label">Quando os arquivos forem publicados, eles vao aparecer aqui.</p>
-        </div>
+        <h3 class="track-title">Nenhuma faixa cadastrada neste album</h3>
       </article>
     `;
     return;
   }
 
   for (const track of album.tracks) {
-    const downloaded = await isTrackDownloaded(album.id, track.number);
     const article = document.createElement("article");
     article.className = "track-card";
     article.dataset.trackNumber = String(track.number);
@@ -657,32 +672,32 @@ async function renderTracks(album) {
       .join("");
 
     article.innerHTML = `
+      <h3 class="track-title">${track.label}</h3>
       <div class="track-player-shell">
-        <audio class="track-native-audio" controls preload="none"></audio>
-      </div>
-      <div class="track-copy">
-        <p class="track-number">Faixa ${String(track.number).padStart(3, "0")}</p>
-        <div class="track-title-row">
-          <h3 class="track-title-display">${track.label}</h3>
-          <input class="track-title-input" type="text" value="${track.label}" hidden>
-          <div class="track-inline-actions">
-            <button class="icon-button ghost-button" type="button" data-role="play" aria-label="Tocar">
-              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-            <button class="icon-button ghost-button" type="button" data-role="restart" aria-label="Voltar ao inicio">
-              <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
-            </button>
-          </div>
-          ${isAdmin() ? `<button class="ghost-button track-type-toggle" type="button" data-track-type="${track.type}">${getTrackModeLabel(track)}</button>` : ""}
-        </div>
-        <p class="track-download-label">${downloaded ? "Disponivel offline neste navegador" : getTrackModeLabel(track)}</p>
-          ${isAdmin() ? `<button class="ghost-button track-editor-toggle track-editor-plus" type="button" aria-label="Editar faixa">+</button>` : ""}
-      </div>
-      <div class="track-actions">
-        <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="${accessState.authenticated ? "Baixar offline" : "Faca login para baixar"}" title="${accessState.authenticated ? "Baixar offline" : "Faca login para baixar"}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v9.17l2.59-2.58L17 11l-5 5-5-5 1.41-1.41L11 12.17zM5 19h14v2H5z"/></svg>
+        <audio class="track-native-audio" preload="none"></audio>
+        <button class="track-play-button" type="button" data-role="play" aria-label="Tocar faixa">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         </button>
+        <div class="track-progress-shell">
+          <input class="track-progress-input" type="range" min="0" max="100" value="0" step="0.1" data-role="progress" aria-label="Progresso da faixa">
+          <div class="track-time-row">
+            <span data-role="current-time">00:00</span>
+            <span data-role="duration">00:00</span>
+          </div>
+        </div>
       </div>
+      ${isAdmin() ? `
+        <div class="track-admin-tools">
+          <div class="track-copy">
+            <h3 class="track-title-display">${track.label}</h3>
+            <input class="track-title-input" type="text" value="${track.label}" hidden>
+          </div>
+          <div class="track-inline-actions">
+            <button class="ghost-button track-type-toggle" type="button" data-track-type="${track.type}">${getTrackModeLabel(track)}</button>
+            <button class="ghost-button track-editor-toggle track-editor-plus" type="button" aria-label="Editar faixa">+</button>
+          </div>
+        </div>
+      ` : ""}
       ${isAdmin() ? `
         <div class="track-editor-panel" hidden>
           <div class="track-editor-row">
@@ -719,25 +734,11 @@ async function renderTracks(album) {
       await playTrack(article, album.id, track);
     });
 
-    article.querySelector("[data-role='restart']").addEventListener("click", () => {
-      restartTrack(article);
-    });
-
-    article.querySelector("[data-role='download']").addEventListener("click", async () => {
-      try {
-        await downloadTrackForOffline(article, album.id, track);
-      } catch (error) {
-        showFloatingNotice(error instanceof Error ? error.message : "Erro ao baixar para offline.");
-      }
-    });
-
-    if (downloaded) {
-      setDownloadUi(article, { downloaded: true });
-    }
-
     bindAdminTrackEditor(article, album, track);
     trackList.appendChild(article);
   }
+
+  updatePlayerButtons();
 }
 
 function syncAdminPanel(album) {
