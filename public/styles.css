@@ -1733,12 +1733,35 @@ body[data-page="planos"] .status-pill {
   font-size: 0.776rem;
   line-height: 1.35;
   overflow: hidden;
-  word-break: break-word;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+
+.history-search-char,
+.history-search-base {
+  display: inline;
 }
 
 .history-search-base {
   font-weight: 800;
   color: #ffffff;
+}
+
+.history-search-char-fade-41 {
+  opacity: 0.8;
+}
+
+.history-search-char-fade-42,
+.history-search-char-fade-43 {
+  opacity: 0.6;
+}
+
+.history-search-char-fade-44 {
+  opacity: 0.2;
+}
+
+.history-search-char-fade-45 {
+  opacity: 0;
 }
 
 .history-item-row {

@@ -118,6 +118,7 @@ const emptyConversationVariants = [
 
 const conversationTitleMaxLength = 22;
 const searchPreviewMaxLength = 45;
+const searchPreviewBaseMaxLength = 15;
 const searchTextHighlightDurationMs = 5000;
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
 
@@ -419,18 +420,11 @@ function buildSearchPreview(source, matchIndex, matchLength) {
   const safeSource = String(source || "").replace(/\s+/g, " ").trim();
   const safeMatchIndex = Math.max(0, Math.min(matchIndex, safeSource.length));
   const safeMatchLength = Math.max(0, Math.min(matchLength, safeSource.length - safeMatchIndex));
-  const base = safeSource.slice(safeMatchIndex, safeMatchIndex + safeMatchLength);
+  const previewBaseLength = Math.min(safeMatchLength, searchPreviewBaseMaxLength);
+  const base = safeSource.slice(safeMatchIndex, safeMatchIndex + previewBaseLength);
 
   if (!base) {
     return null;
-  }
-
-  if (base.length >= searchPreviewMaxLength) {
-    return {
-      before: "",
-      base: base.slice(0, searchPreviewMaxLength),
-      after: ""
-    };
   }
 
   const remaining = searchPreviewMaxLength - base.length;
@@ -466,7 +460,25 @@ function buildSearchPreviewMarkup(preview) {
     return "";
   }
 
-  return `${escapeHtml(preview.before)}<strong class="history-search-base">${escapeHtml(preview.base)}</strong>${escapeHtml(preview.after)}`;
+  const fullText = `${preview.before}${preview.base}${preview.after}`.slice(0, searchPreviewMaxLength);
+  const baseStart = preview.before.length;
+  const baseEnd = baseStart + preview.base.length;
+
+  return Array.from(fullText).map((char, index) => {
+    const charPosition = index + 1;
+    const opacityClassName =
+      charPosition === 41 ? " history-search-char-fade-41"
+      : charPosition === 42 ? " history-search-char-fade-42"
+      : charPosition === 43 ? " history-search-char-fade-43"
+      : charPosition === 44 ? " history-search-char-fade-44"
+      : charPosition === 45 ? " history-search-char-fade-45"
+      : "";
+    const isBaseChar = index >= baseStart && index < baseEnd;
+    const tagName = isBaseChar ? "strong" : "span";
+    const className = `${isBaseChar ? "history-search-base" : "history-search-char"}${opacityClassName}`;
+
+    return `<${tagName} class="${className}">${escapeHtml(char)}</${tagName}>`;
+  }).join("");
 }
 
 function getConversationSearchResults(conversation, searchTerm) {
