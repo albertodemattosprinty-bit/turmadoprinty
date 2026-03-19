@@ -1693,6 +1693,7 @@ body[data-page="explorar"] #sidebar-toggle-button path {
 .chat-thread {
   display: grid;
   gap: 14px;
+  align-content: start;
   min-height: 360px;
   max-height: none;
   overflow: auto;
