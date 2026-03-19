@@ -880,7 +880,11 @@ function renderConversation() {
     chatThread.innerHTML = `
       <section class="empty-conversation-state">
         <h2>${escapeHtml(getEmptyConversationCopy())}</h2>
-        <p>Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.</p>
+        <p>
+          <span>Posso ajudar com roteiros, programacoes,</span>
+          <span>legendas, devocionais, cantatas</span>
+          <span>e ideias para o ministerio infantil.</span>
+        </p>
       </section>
     `;
     return;

@@ -1829,7 +1829,11 @@ body[data-page="explorar"] #edit-chats-button.is-active {
 }
 
 .empty-conversation-state {
+  display: grid;
+  align-content: center;
+  justify-items: center;
   max-width: 560px;
+  margin: auto;
   text-align: center;
 }
 
@@ -1845,6 +1849,10 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   font-size: 1rem;
   line-height: 1.8;
   color: var(--text-soft);
+}
+
+.empty-conversation-state p span {
+  display: block;
 }
 
 .message-card {
@@ -1883,6 +1891,8 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   line-height: 1.8;
   color: var(--text);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .message-card.user .message-role,
@@ -2583,7 +2593,7 @@ body[data-page="explorar"] #chat-auth-status {
 
   body[data-page="explorar"] .section-title.small,
   body[data-page="explorar"] .conversation-title {
-    font-size: clamp(1.45rem, 6vw, 2rem);
+    font-size: clamp(0.88rem, 3.6vw, 1.2rem);
   }
 
   body[data-page="explorar"] .sidebar-card,
@@ -2593,11 +2603,12 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .chat-thread {
-    padding-right: 2px;
+    min-height: calc(100vh - 270px);
+    padding: 4px 0 18px;
   }
 
   body[data-page="explorar"] .message-card {
-    max-width: 100%;
+    max-width: calc(100% - 2px);
   }
 
   body[data-page="explorar"] .message-role {
@@ -2607,6 +2618,26 @@ body[data-page="explorar"] #chat-auth-status {
   body[data-page="explorar"] .message-text {
     font-size: 0.98rem;
     line-height: 1.78;
+  }
+
+  body[data-page="explorar"] .chat-thread-empty {
+    min-height: calc(100vh - 270px);
+    padding: 20px 16px 132px;
+  }
+
+  body[data-page="explorar"] .empty-conversation-state {
+    min-height: 100%;
+    max-width: 290px;
+  }
+
+  body[data-page="explorar"] .empty-conversation-state h2 {
+    margin-bottom: 10px;
+    line-height: 1.02;
+  }
+
+  body[data-page="explorar"] .empty-conversation-state p {
+    line-height: 1.35;
+    font-size: 0.98rem;
   }
 
   body[data-page="explorar"] .chat-composer textarea {
