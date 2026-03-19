@@ -66,6 +66,8 @@ let editingConversationId = null;
 let speakingButton = null;
 let speakingAudio = null;
 let speakingAudioUrl = "";
+let pendingSearchFocus = null;
+let searchHighlightResetId = null;
 let siteConfig = {
   banners: {},
   textOverrides: {}
@@ -115,6 +117,8 @@ const emptyConversationVariants = [
 ];
 
 const conversationTitleMaxLength = 22;
+const searchPreviewMaxLength = 45;
+const searchTextHighlightDurationMs = 5000;
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
 
 function getToken() {
@@ -372,6 +376,169 @@ function getFilteredConversations() {
   });
 }
 
+function escapeAttribute(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function normalizeSearchTerm(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function findMatchIndexes(source, searchTerm) {
+  const safeSource = String(source || "");
+  const safeSearchTerm = normalizeSearchTerm(searchTerm);
+
+  if (!safeSource || !safeSearchTerm) {
+    return [];
+  }
+
+  const sourceLower = safeSource.toLocaleLowerCase("pt-BR");
+  const searchLower = safeSearchTerm.toLocaleLowerCase("pt-BR");
+  const indexes = [];
+  let fromIndex = 0;
+
+  while (fromIndex < sourceLower.length) {
+    const matchIndex = sourceLower.indexOf(searchLower, fromIndex);
+
+    if (matchIndex === -1) {
+      break;
+    }
+
+    indexes.push(matchIndex);
+    fromIndex = matchIndex + Math.max(searchLower.length, 1);
+  }
+
+  return indexes;
+}
+
+function buildSearchPreview(source, matchIndex, matchLength) {
+  const safeSource = String(source || "").replace(/\s+/g, " ").trim();
+  const safeMatchIndex = Math.max(0, Math.min(matchIndex, safeSource.length));
+  const safeMatchLength = Math.max(0, Math.min(matchLength, safeSource.length - safeMatchIndex));
+  const base = safeSource.slice(safeMatchIndex, safeMatchIndex + safeMatchLength);
+
+  if (!base) {
+    return null;
+  }
+
+  if (base.length >= searchPreviewMaxLength) {
+    return {
+      before: "",
+      base: base.slice(0, searchPreviewMaxLength),
+      after: ""
+    };
+  }
+
+  const remaining = searchPreviewMaxLength - base.length;
+  const beforeBudget = Math.floor(remaining / 2);
+  const afterBudget = remaining - beforeBudget;
+  let beforeStart = Math.max(0, safeMatchIndex - beforeBudget);
+  let before = safeSource.slice(beforeStart, safeMatchIndex);
+  let after = safeSource.slice(safeMatchIndex + safeMatchLength, safeMatchIndex + safeMatchLength + afterBudget);
+
+  const missingBefore = beforeBudget - before.length;
+  if (missingBefore > 0) {
+    after = safeSource.slice(
+      safeMatchIndex + safeMatchLength,
+      safeMatchIndex + safeMatchLength + afterBudget + missingBefore
+    );
+  }
+
+  const missingAfter = afterBudget - after.length;
+  if (missingAfter > 0) {
+    beforeStart = Math.max(0, beforeStart - missingAfter);
+    before = safeSource.slice(beforeStart, safeMatchIndex);
+  }
+
+  return {
+    before,
+    base,
+    after
+  };
+}
+
+function buildSearchPreviewMarkup(preview) {
+  if (!preview) {
+    return "";
+  }
+
+  return `${escapeHtml(preview.before)}<strong class="history-search-base">${escapeHtml(preview.base)}</strong>${escapeHtml(preview.after)}`;
+}
+
+function getConversationSearchResults(conversation, searchTerm) {
+  const safeSearchTerm = normalizeSearchTerm(searchTerm);
+
+  if (!safeSearchTerm) {
+    return [];
+  }
+
+  const results = [];
+  const titleMatches = findMatchIndexes(conversation.title || "", safeSearchTerm);
+
+  titleMatches.forEach((matchIndex, occurrenceIndex) => {
+    const preview = buildSearchPreview(conversation.title || "", matchIndex, safeSearchTerm.length);
+
+    if (!preview) {
+      return;
+    }
+
+    results.push({
+      conversationId: conversation.id,
+      title: conversation.title,
+      targetType: "title",
+      occurrenceIndex,
+      preview
+    });
+  });
+
+  (conversation.messages || []).forEach((message, messageIndex) => {
+    const messageMatches = findMatchIndexes(message.content || "", safeSearchTerm);
+
+    messageMatches.forEach((matchIndex, occurrenceIndex) => {
+      const preview = buildSearchPreview(message.content || "", matchIndex, safeSearchTerm.length);
+
+      if (!preview) {
+        return;
+      }
+
+      results.push({
+        conversationId: conversation.id,
+        title: conversation.title,
+        targetType: "message",
+        messageIndex,
+        occurrenceIndex,
+        preview
+      });
+    });
+  });
+
+  return results;
+}
+
+function getHistoryEntries() {
+  const conversations = getConversations();
+  const safeSearchTerm = normalizeSearchTerm(chatSearchTerm);
+
+  if (!safeSearchTerm) {
+    return conversations.map((conversation) => ({
+      type: "conversation",
+      conversation
+    }));
+  }
+
+  return conversations.flatMap((conversation) =>
+    getConversationSearchResults(conversation, safeSearchTerm).map((result) => ({
+      type: "search-result",
+      conversation,
+      result
+    }))
+  );
+}
+
 function saveConversations(conversations) {
   const store = getConversationStore();
   store[getUserKey()] = conversations;
@@ -395,6 +562,96 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getHighlightedMarkup(text, searchTerm, occurrenceIndex, highlightClassName) {
+  const source = String(text || "");
+  const safeSearchTerm = normalizeSearchTerm(searchTerm);
+
+  if (!source || !safeSearchTerm) {
+    return escapeHtml(source);
+  }
+
+  const matches = findMatchIndexes(source, safeSearchTerm);
+
+  if (!matches.length || occurrenceIndex >= matches.length) {
+    return escapeHtml(source);
+  }
+
+  const matchIndex = matches[occurrenceIndex];
+  const before = source.slice(0, matchIndex);
+  const base = source.slice(matchIndex, matchIndex + safeSearchTerm.length);
+  const after = source.slice(matchIndex + safeSearchTerm.length);
+
+  return `${escapeHtml(before)}<span class="${highlightClassName}">${escapeHtml(base)}</span>${escapeHtml(after)}`;
+}
+
+function clearPendingSearchHighlight(resetOnly = false) {
+  if (searchHighlightResetId) {
+    window.clearTimeout(searchHighlightResetId);
+    searchHighlightResetId = null;
+  }
+
+  document.querySelectorAll(".search-highlight-pulse").forEach((element) => {
+    element.classList.remove("search-highlight-pulse");
+  });
+
+  document.querySelectorAll(".search-highlight-text").forEach((element) => {
+    element.classList.remove("search-highlight-text");
+  });
+
+  if (!resetOnly) {
+    pendingSearchFocus = null;
+  }
+}
+
+function activateSearchResult(result) {
+  pendingSearchFocus = {
+    conversationId: result.conversationId,
+    targetType: result.targetType,
+    messageIndex: typeof result.messageIndex === "number" ? result.messageIndex : null,
+    occurrenceIndex: result.occurrenceIndex,
+    searchTerm: normalizeSearchTerm(chatSearchTerm)
+  };
+  activeConversationId = result.conversationId;
+  renderConversation();
+  renderHistoryList();
+}
+
+function finalizePendingSearchFocus() {
+  if (!pendingSearchFocus || pendingSearchFocus.conversationId !== activeConversationId) {
+    return;
+  }
+
+  const target = pendingSearchFocus.targetType === "title"
+    ? conversationHeader?.querySelector('[data-search-target="title"]')
+    : chatThread.querySelector(`[data-search-target="message"][data-message-index="${pendingSearchFocus.messageIndex}"]`);
+
+  if (!(target instanceof HTMLElement)) {
+    pendingSearchFocus = null;
+    return;
+  }
+
+  clearPendingSearchHighlight(true);
+  target.classList.add("search-highlight-pulse");
+  target.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+  target.querySelectorAll(".search-highlight-target").forEach((element) => {
+    element.classList.add("search-highlight-text");
+  });
+
+  const activeFocus = pendingSearchFocus;
+  searchHighlightResetId = window.setTimeout(() => {
+    if (pendingSearchFocus !== activeFocus) {
+      return;
+    }
+
+    clearPendingSearchHighlight();
+    renderConversation();
+  }, searchTextHighlightDurationMs);
 }
 
 function stopAssistantSpeech() {
@@ -721,7 +978,7 @@ function commitConversationRename(conversationId, nextTitle) {
 }
 
 function renderHistoryList() {
-  const conversations = getFilteredConversations();
+  const entries = getHistoryEntries();
   historyList.innerHTML = "";
 
   if (!currentUser) {
@@ -729,7 +986,7 @@ function renderHistoryList() {
     return;
   }
 
-  if (!conversations.length) {
+  if (!entries.length) {
     historyList.innerHTML = `
       <div class="history-empty">
         <strong>${chatSearchTerm ? "Nenhum chat encontrado." : "Nenhuma conversa ainda."}</strong>
@@ -739,12 +996,14 @@ function renderHistoryList() {
     return;
   }
 
-  conversations.forEach((item) => {
+  entries.forEach((entry) => {
+    const item = entry.conversation;
+    const searchResult = entry.type === "search-result" ? entry.result : null;
     const itemShell = document.createElement("div");
     itemShell.className = `history-item-shell${historyEditMode ? " is-editing" : ""}`;
 
     const button = document.createElement("div");
-    button.className = `history-item${item.id === activeConversationId ? " active" : ""}`;
+    button.className = `history-item${item.id === activeConversationId ? " active" : ""}${searchResult ? " has-search-preview" : ""}`;
     button.setAttribute("role", "button");
     button.tabIndex = 0;
 
@@ -782,9 +1041,14 @@ function renderHistoryList() {
                   </button>
                 </span>
               `
-              : `<span class="history-time">${formatRelativeDate(item.updatedAt)}</span>`
+              : ""
           }
         </span>
+        ${
+          searchResult
+            ? `<span class="history-search-preview" title="${escapeAttribute(`${searchResult.preview.before}${searchResult.preview.base}${searchResult.preview.after}`)}">${buildSearchPreviewMarkup(searchResult.preview)}</span>`
+            : ""
+        }
       `;
     }
 
@@ -793,6 +1057,12 @@ function renderHistoryList() {
         return;
       }
 
+      if (searchResult) {
+        activateSearchResult(searchResult);
+        return;
+      }
+
+      clearPendingSearchHighlight();
       activeConversationId = item.id;
       renderConversation();
       renderHistoryList();
@@ -807,6 +1077,12 @@ function renderHistoryList() {
         return;
       }
 
+      if (searchResult) {
+        activateSearchResult(searchResult);
+        return;
+      }
+
+      clearPendingSearchHighlight();
       activeConversationId = item.id;
       renderConversation();
       renderHistoryList();
@@ -895,15 +1171,29 @@ function renderConversation() {
   if (conversationHeader) {
     conversationHeader.hidden = false;
   }
-  conversationTitle.textContent = conversation.title;
-  conversationMeta.textContent = `Atualizada em ${formatRelativeDate(conversation.updatedAt)}`;
+  const titleSearchActive = pendingSearchFocus
+    && pendingSearchFocus.conversationId === conversation.id
+    && pendingSearchFocus.targetType === "title";
+  conversationTitle.dataset.searchTarget = "title";
+  conversationTitle.innerHTML = titleSearchActive
+    ? getHighlightedMarkup(conversation.title, pendingSearchFocus.searchTerm, pendingSearchFocus.occurrenceIndex, "search-highlight-target")
+    : escapeHtml(conversation.title);
+  conversationMeta.textContent = "";
 
-  conversation.messages.forEach((item) => {
+  conversation.messages.forEach((item, messageIndex) => {
     const article = document.createElement("article");
     article.className = `message-card ${item.role === "user" ? "user" : "assistant"}`;
+    const messageSearchActive = pendingSearchFocus
+      && pendingSearchFocus.conversationId === conversation.id
+      && pendingSearchFocus.targetType === "message"
+      && pendingSearchFocus.messageIndex === messageIndex;
     article.innerHTML = `
       <div class="message-role">${item.role === "user" ? "Você" : "Assistente"}</div>
-      <div class="message-text">${escapeHtml(item.content)}</div>
+      <div class="message-text" data-search-target="message" data-message-index="${messageIndex}">${
+        messageSearchActive
+          ? getHighlightedMarkup(item.content, pendingSearchFocus.searchTerm, pendingSearchFocus.occurrenceIndex, "search-highlight-target")
+          : escapeHtml(item.content)
+      }</div>
     `;
 
     if (item.role === "assistant") {
@@ -914,6 +1204,9 @@ function renderConversation() {
   });
 
   chatThread.scrollTop = chatThread.scrollHeight;
+  window.requestAnimationFrame(() => {
+    finalizePendingSearchFocus();
+  });
 }
 
 function setRecordingState(recording) {
@@ -1557,6 +1850,7 @@ chatInput.addEventListener("input", () => {
 if (chatSearchInput) {
   chatSearchInput.addEventListener("input", () => {
     chatSearchTerm = chatSearchInput.value || "";
+    clearPendingSearchHighlight();
     renderHistoryList();
   });
 }
