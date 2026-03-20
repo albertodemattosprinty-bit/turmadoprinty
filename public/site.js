@@ -3,6 +3,33 @@ import { applyTextOverrides, initContentAdmin } from "./content-admin.js";
 import { getApiUrl } from "./api.js";
 
 const page = document.body.dataset.page || "";
+const bannerConfigByPage = {
+  home: {
+    label: "Destaques da Turma do Printy",
+    rotationMs: 5000,
+    slides: [
+      { mobile: "/images/home.png", desktop: "/images/homed.png", alt: "Banner principal da Home" },
+      { mobile: "/images/promo1.png", desktop: "/images/promo1d.png", alt: "Banner promocional 1" },
+      { mobile: "/images/promo4.png", desktop: "/images/promo4d.png", alt: "Banner promocional 4" },
+      { mobile: "/images/promo2.png", desktop: "/images/promod2.png", alt: "Banner promocional 2" },
+      { mobile: "/images/promo3.png", desktop: "/images/promo3d.png", alt: "Banner promocional 3" }
+    ]
+  },
+  produtos: {
+    label: "Destaques de produtos",
+    rotationMs: 5000,
+    slides: [
+      { mobile: "/images/cantata.png", desktop: "/images/cantatad.png", alt: "Banner da cantata" },
+      { mobile: "/images/promo3.png", desktop: "/images/promo3d.png", alt: "Banner promocional 3" }
+    ]
+  },
+  eventos: {
+    label: "Agenda de eventos",
+    slides: [
+      { mobile: "/images/agenda.png", desktop: "/images/agendad.png", alt: "Banner da agenda de eventos" }
+    ]
+  }
+};
 
 function markActiveNav() {
   document.querySelectorAll(".nav-link").forEach((link) => {
@@ -180,6 +207,75 @@ async function loadAlbums(siteConfig, user) {
 
   renderProductsAdminPanel(user, siteConfig, refreshAlbums);
   await refreshAlbums();
+}
+
+function createBannerPicture(slide, index, total) {
+  const picture = document.createElement("picture");
+  picture.className = "page-banner-slide";
+  picture.setAttribute("role", "group");
+  picture.setAttribute("aria-roledescription", "slide");
+  picture.setAttribute("aria-label", `${index + 1} de ${total}`);
+  picture.innerHTML = `
+    <source media="(min-width: 981px)" srcset="${slide.desktop}">
+    <img src="${slide.mobile}" alt="${slide.alt}" loading="${index === 0 ? "eager" : "lazy"}" decoding="async">
+  `;
+  return picture;
+}
+
+function initPageBanner() {
+  const config = bannerConfigByPage[page];
+
+  if (!config) {
+    return;
+  }
+
+  const header = document.querySelector(".site-header");
+
+  if (!header || document.querySelector(".page-top-banner")) {
+    return;
+  }
+
+  const banner = document.createElement("section");
+  banner.className = "page-top-banner";
+  banner.setAttribute("aria-label", config.label);
+
+  const viewport = document.createElement("div");
+  viewport.className = "page-banner-viewport";
+  banner.appendChild(viewport);
+
+  const slides = config.slides.map((slide, index) => {
+    const node = createBannerPicture(slide, index, config.slides.length);
+    node.classList.toggle("is-active", index === 0);
+    viewport.appendChild(node);
+    return node;
+  });
+
+  if (slides.length > 1) {
+    const dots = document.createElement("div");
+    dots.className = "page-banner-dots";
+    dots.setAttribute("aria-hidden", "true");
+
+    const indicators = slides.map((_, index) => {
+      const dot = document.createElement("span");
+      dot.className = "page-banner-dot";
+      dot.classList.toggle("is-active", index === 0);
+      dots.appendChild(dot);
+      return dot;
+    });
+
+    banner.appendChild(dots);
+
+    let activeIndex = 0;
+    window.setInterval(() => {
+      slides[activeIndex].classList.remove("is-active");
+      indicators[activeIndex].classList.remove("is-active");
+      activeIndex = (activeIndex + 1) % slides.length;
+      slides[activeIndex].classList.add("is-active");
+      indicators[activeIndex].classList.add("is-active");
+    }, config.rotationMs || 5000);
+  }
+
+  header.insertAdjacentElement("afterend", banner);
 }
 
 function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
@@ -362,6 +458,7 @@ async function loadSchedule(siteConfig, user) {
 }
 
 markActiveNav();
+initPageBanner();
 const headerUser = await initSiteHeader().catch(() => null);
 
 const [siteConfig, currentUser] = await Promise.all([
