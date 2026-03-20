@@ -592,8 +592,8 @@ body[data-page="produtos"] {
   padding: 34px clamp(24px, 7vw, 108px);
   align-items: center;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 28%),
-    linear-gradient(135deg, #ff9e43 0%, #ff7a18 55%, #f15b2a 100%);
+    radial-gradient(circle at top left, rgba(146, 198, 255, 0.18), transparent 30%),
+    linear-gradient(135deg, #0c2f7a 0%, #12449f 48%, #1a5cc5 100%);
   color: #ffffff;
   border-radius: 0;
   border: 0;
@@ -653,6 +653,13 @@ body[data-page="produtos"] {
   margin: 0 0 14px;
   color: rgba(255, 255, 255, 0.94);
   font-size: 1.02rem;
+}
+
+.hero-home .section-muted strong {
+  display: inline-block;
+  margin-right: 0.35ch;
+  color: #ffffff;
+  white-space: nowrap;
 }
 
 .page-banner {
@@ -4003,6 +4010,29 @@ body[data-page="explorar"] #chat-auth-status {
   .page-banner-slide img {
     width: 100vw;
     max-width: 100vw;
+  }
+
+  body[data-page="home"] .page-top-banner {
+    margin-bottom: 0;
+  }
+
+  body[data-page="home"] .page-banner-viewport {
+    aspect-ratio: 1536 / 477;
+  }
+
+  body[data-page="home"] .page-banner-slide img {
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  body[data-page="home"] .page-banner-dots {
+    bottom: 8px;
+  }
+
+  body[data-page="home"] .hero-home {
+    margin-top: 0;
+    padding-top: 28px;
   }
 
   body[data-page="explorar"].explore-authenticated .chat-layout {
