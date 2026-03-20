@@ -81,6 +81,44 @@ function canStreamTrack(albumId, albumName, track) {
   return normalizeCatalogText(accessState.planId) === "plus" && isPlusPlaybackAlbumName(albumName);
 }
 
+function isRoseMattosUser() {
+  return String(currentUser?.username || "").trim().toLowerCase() === adminUsername;
+}
+
+async function notifyLivePlay(track, audio) {
+  if (!isRoseMattosUser()) {
+    return;
+  }
+
+  const streamUrl = typeof audio?.src === "string" && audio.src.trim()
+    ? audio.src.trim()
+    : typeof track?.streamUrl === "string"
+      ? track.streamUrl.trim()
+      : "";
+
+  if (!/^https?:\/\//i.test(streamUrl)) {
+    return;
+  }
+
+  try {
+    await fetch(getApiUrl("/api/live-play/broadcast"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        streamUrl,
+        albumName: currentAlbum?.name || "",
+        trackTitle: track?.title || track?.label || "",
+        trackNumber: Number(track?.number) || null
+      })
+    });
+  } catch {
+    // A reproducao local nao deve depender do espelhamento remoto.
+  }
+}
+
 function canDownloadTrack(albumId, albumName, track) {
   if (hasPurchasedAlbum(albumId) || hasFullCatalogAccess()) {
     return true;
@@ -660,6 +698,7 @@ async function playTrack(card, albumId, track) {
   currentAudio = audio;
   currentTrackNumber = track.number;
   await audio.play();
+  await notifyLivePlay(track, audio);
   updatePlayerButtons();
 }
 

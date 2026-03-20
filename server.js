@@ -34,6 +34,8 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ADMIN_USERNAME = "rosemattos";
+const livePlayClients = new Set();
+let livePlayState = null;
 
 const publicDir = path.join(__dirname, "public");
 const eduSongsDir = path.join(__dirname, "musicas Edu");
@@ -116,6 +118,23 @@ function applyCorsHeaders(request, response) {
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload, null, 2));
+}
+
+function sendSseEvent(response, eventName, payload) {
+  response.write(`event: ${eventName}\n`);
+  response.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+function publishLivePlay(payload) {
+  livePlayState = payload;
+
+  for (const client of livePlayClients) {
+    try {
+      sendSseEvent(client, "playback", payload);
+    } catch {
+      livePlayClients.delete(client);
+    }
+  }
 }
 
 function buildContentDisposition(filename) {
@@ -519,6 +538,77 @@ async function requireAuth(request, response) {
   }
 
   return user;
+}
+
+function handleLivePlayStream(request, response) {
+  response.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive"
+  });
+
+  response.write(": connected\n\n");
+  livePlayClients.add(response);
+
+  if (livePlayState) {
+    sendSseEvent(response, "playback", livePlayState);
+  }
+
+  const heartbeat = setInterval(() => {
+    try {
+      response.write(": heartbeat\n\n");
+    } catch {
+      clearInterval(heartbeat);
+      livePlayClients.delete(response);
+    }
+  }, 25000);
+
+  request.on("close", () => {
+    clearInterval(heartbeat);
+    livePlayClients.delete(response);
+  });
+}
+
+async function handleLivePlayBroadcast(request, response) {
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  if (!isAdminUser(user)) {
+    sendJson(response, 403, { error: "Apenas RoseMattos pode transmitir para /play." });
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const streamUrl = typeof body.streamUrl === "string" ? body.streamUrl.trim() : "";
+
+  if (!/^https?:\/\//i.test(streamUrl)) {
+    sendJson(response, 400, { error: "streamUrl invalida." });
+    return;
+  }
+
+  const payload = {
+    id: crypto.randomUUID(),
+    streamUrl,
+    albumName: typeof body.albumName === "string" ? body.albumName.trim() : "",
+    trackTitle: typeof body.trackTitle === "string" ? body.trackTitle.trim() : "",
+    trackNumber: Number.isInteger(Number(body.trackNumber)) ? Number(body.trackNumber) : null,
+    username: user.username || "",
+    triggeredAt: new Date().toISOString()
+  };
+
+  publishLivePlay(payload);
+  sendJson(response, 200, { ok: true, playback: payload });
 }
 
 async function requireAdmin(request, response) {
@@ -2238,6 +2328,16 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/account/access") {
     await handleAccessStateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/live-play/stream") {
+    handleLivePlayStream(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/live-play/broadcast") {
+    await handleLivePlayBroadcast(request, response);
     return;
   }
 
