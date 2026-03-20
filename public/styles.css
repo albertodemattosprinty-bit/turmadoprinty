@@ -2134,10 +2134,9 @@ body[data-page="explorar"] .sidebar-actions .sidebar-icon-button.primary-button 
   margin: 0;
   font-size: clamp(1.3rem, 3vw, 2rem);
   font-weight: 800;
-}
-
-.conversation-title-line {
-  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .conversation-meta {

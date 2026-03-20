@@ -1600,7 +1600,7 @@ function renderConversation() {
   conversationTitle.dataset.searchTarget = "title";
   conversationTitle.innerHTML = titleSearchActive
     ? getHighlightedMarkup(conversation.title, pendingSearchFocus.searchTerm, pendingSearchFocus.occurrenceIndex, "search-highlight-target")
-    : getBalancedTitleMarkup(conversation.title);
+    : escapeHtml(conversation.title);
   conversationMeta.textContent = "";
 
   conversation.messages.forEach((item, messageIndex) => {
