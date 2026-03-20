@@ -1421,7 +1421,7 @@ function renderConversation() {
     chatShell.classList.add("conversation-shell-empty");
     chatThread.classList.add("chat-thread-empty");
     if (conversationHeader) {
-      conversationHeader.hidden = true;
+      conversationHeader.hidden = false;
     }
     conversationTitle.textContent = "";
     conversationMeta.textContent = "";

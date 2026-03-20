@@ -2604,6 +2604,7 @@ body[data-page="explorar"] .conversation-header {
 
 body[data-page="explorar"] .conversation-title-wrap {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 body[data-page="explorar"] .conversation-title {
@@ -2614,6 +2615,7 @@ body[data-page="explorar"] .conversation-title {
 
 body[data-page="explorar"] .chat-mode-picker {
   position: relative;
+  flex: 0 0 auto;
 }
 
 body[data-page="explorar"] .chat-mode-button {
