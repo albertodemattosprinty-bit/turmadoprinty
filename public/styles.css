@@ -3283,10 +3283,14 @@ body[data-page="explorar"] #chat-auth-status {
   body[data-page="explorar"] .conversation-shell {
     width: 100%;
     border-radius: 0;
-    padding: 16px 0 0;
+    margin: 0;
+    padding: 16px 20px 0;
   }
 
   body[data-page="explorar"] .ia-ambience {
+    width: 100vw;
+    max-width: 100vw;
+    justify-self: stretch;
     border-inline: 2px solid #1b53bb;
   }
 
