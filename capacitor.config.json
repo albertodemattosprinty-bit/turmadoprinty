@@ -3,7 +3,7 @@
   "appName": "Turma do Printy",
   "webDir": "public",
   "server": {
-    "url": "https://www.turmadoprinty.com.br",
+    "url": "https://www.turmadoprinty.com.br/explorar.html",
     "allowNavigation": [
       "www.turmadoprinty.com.br",
       "turmadoprinty.com.br"

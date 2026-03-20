@@ -38,6 +38,7 @@ const livePlayClients = new Set();
 let livePlayState = null;
 
 const publicDir = path.join(__dirname, "public");
+const imagesDir = path.join(__dirname, "images");
 const eduSongsDir = path.join(__dirname, "musicas Edu");
 const contextFilePath = path.join(__dirname, "contexto.txt");
 const contentDir = path.join(__dirname, "Conteúdo");
@@ -2559,6 +2560,22 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PUT" && pathname.startsWith("/api/admin/albums/")) {
     await handleAdminAlbumUpdate(request, response, pathname);
     return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/images/")) {
+    const imageRelativePath = pathname.slice(1);
+    const resolvedImagePath = path.join(__dirname, imageRelativePath);
+
+    if (!resolvedImagePath.startsWith(imagesDir)) {
+      response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end("Acesso negado.");
+      return;
+    }
+
+    if (existsSync(resolvedImagePath)) {
+      await serveStatic(response, resolvedImagePath);
+      return;
+    }
   }
 
   const requestedPath = pathname === "/" ? "index.html" : pathname.slice(1);
