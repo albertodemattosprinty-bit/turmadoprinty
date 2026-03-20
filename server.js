@@ -34,7 +34,6 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ADMIN_USERNAME = "rosemattos";
-const albumSyncClients = new Set();
 
 const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
@@ -528,139 +527,6 @@ async function requireAuth(request, response) {
   }
 
   return user;
-}
-
-async function findUserByStreamToken(token) {
-  if (!token) {
-    return null;
-  }
-
-  const user = await findUserBySessionToken(token);
-
-  if (!user) {
-    return null;
-  }
-
-  try {
-    await touchUserPresence(user.id);
-  } catch {
-    // Presenca nao deve bloquear a conexao.
-  }
-
-  return user;
-}
-
-async function handleAlbumSyncStream(request, response, requestUrl) {
-  const token = typeof requestUrl.searchParams.get("token") === "string"
-    ? requestUrl.searchParams.get("token").trim()
-    : "";
-  const albumId = typeof requestUrl.searchParams.get("albumId") === "string"
-    ? requestUrl.searchParams.get("albumId").trim()
-    : "";
-
-  const user = await findUserByStreamToken(token);
-
-  if (!user) {
-    sendJson(response, 401, { error: "Sessao invalida ou expirada." });
-    return;
-  }
-
-  if (!albumId) {
-    sendJson(response, 400, { error: "albumId obrigatorio." });
-    return;
-  }
-
-  const contractorState = await getUserContractorState(user.id);
-  const client = {
-    response,
-    userId: user.id,
-    username: String(user.username || "").trim().toLowerCase(),
-    albumId,
-    isContractor: contractorState.isContractor
-  };
-
-  response.writeHead(200, {
-    "Content-Type": "text/event-stream; charset=utf-8",
-    "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive"
-  });
-
-  response.write(": connected\n\n");
-  albumSyncClients.add(client);
-
-  const heartbeat = setInterval(() => {
-    try {
-      response.write(": heartbeat\n\n");
-    } catch {
-      clearInterval(heartbeat);
-      albumSyncClients.delete(client);
-    }
-  }, 25000);
-
-  request.on("close", () => {
-    clearInterval(heartbeat);
-    albumSyncClients.delete(client);
-  });
-}
-
-function publishAlbumSync(payload) {
-  for (const client of albumSyncClients) {
-    if (!client.isContractor || client.albumId !== payload.albumId) {
-      continue;
-    }
-
-    try {
-      sendSseEvent(client.response, "trigger", payload);
-    } catch {
-      albumSyncClients.delete(client);
-    }
-  }
-}
-
-async function handleAlbumSyncTrigger(request, response) {
-  const user = await requireAuth(request, response);
-
-  if (!user) {
-    return;
-  }
-
-  if (!isAdminUser(user)) {
-    sendJson(response, 403, { error: "Apenas RoseMattos pode disparar a faixa remota." });
-    return;
-  }
-
-  let body;
-
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, { error: error.message });
-    return;
-  }
-
-  const albumId = typeof body.albumId === "string" ? body.albumId.trim() : "";
-  const trackNumber = Number(body.trackNumber);
-
-  if (!albumId) {
-    sendJson(response, 400, { error: "albumId obrigatorio." });
-    return;
-  }
-
-  if (!Number.isInteger(trackNumber) || trackNumber < 1) {
-    sendJson(response, 400, { error: "trackNumber invalido." });
-    return;
-  }
-
-  const payload = {
-    id: crypto.randomUUID(),
-    albumId,
-    trackNumber,
-    username: user.username || "",
-    triggeredAt: new Date().toISOString()
-  };
-
-  publishAlbumSync(payload);
-  sendJson(response, 200, { ok: true, trigger: payload });
 }
 
 async function requireAdmin(request, response) {
@@ -2380,16 +2246,6 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/account/access") {
     await handleAccessStateRequest(request, response);
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/album-sync/stream") {
-    await handleAlbumSyncStream(request, response, requestUrl);
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/album-sync/trigger") {
-    await handleAlbumSyncTrigger(request, response);
     return;
   }
 
