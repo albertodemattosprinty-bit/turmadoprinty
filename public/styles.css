@@ -321,7 +321,7 @@ body[data-page="produtos"] {
 
 .page-top-banner {
   position: relative;
-  margin: 0 calc(50% - 50vw) 24px;
+  margin: 0 calc(50% - 50vw);
   overflow: hidden;
   background: #ffffff;
 }
@@ -3546,7 +3546,7 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   .page-top-banner {
-    margin-bottom: 18px;
+    margin-bottom: 0;
   }
 
   .page-banner-viewport {
