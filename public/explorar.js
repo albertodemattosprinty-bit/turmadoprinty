@@ -2,6 +2,7 @@ import { initContentAdmin } from "./content-admin.js";
 
 const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
+const folderStorageKey = "turma_do_printy_chat_folders";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
 const chatModeStorageKey = "turma_do_printy_chat_mode";
 const chatSettingsStorageKey = "turma_do_printy_chat_settings";
@@ -18,6 +19,7 @@ const chatSearchInput = document.getElementById("chat-search-input");
 const sidebarToggleButton = document.getElementById("sidebar-toggle-button");
 const newChatButton = document.getElementById("new-chat-button");
 const editChatsButton = document.getElementById("edit-chats-button");
+const newFolderButton = document.getElementById("new-folder-button");
 const settingsButton = document.getElementById("settings-button");
 const logoutButton = document.getElementById("logout-button");
 const chatShell = document.getElementById("chat-shell");
@@ -67,6 +69,7 @@ let sidebarCollapsed = window.innerWidth <= 980;
 let chatSearchTerm = "";
 let historyEditMode = false;
 let editingConversationId = null;
+let activeFolderId = null;
 let speakingButton = null;
 let speakingAudio = null;
 let speakingAudioUrl = "";
@@ -138,6 +141,8 @@ const emptyConversationSupportText = "Posso ajudar com roteiros, programacoes, l
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
 const micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/></svg>';
 const squareStopIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>';
+const playAudioIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11a1 1 0 0 0 1.53.85l8.6-5.5a1 1 0 0 0 0-1.7l-8.6-5.5A1 1 0 0 0 8 6.5"/></svg>';
+const folderIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4.2a2 2 0 0 1 1.4.58L12 7h7a2 2 0 0 1 2 2v1H3zm0 3h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 const chatModeMeta = {
   fast: {
     label: "Pratico",
@@ -357,6 +362,18 @@ function setConversationStore(store) {
   window.localStorage.setItem(conversationStorageKey, JSON.stringify(store));
 }
 
+function getFolderStore() {
+  try {
+    return JSON.parse(window.localStorage.getItem(folderStorageKey) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function setFolderStore(store) {
+  window.localStorage.setItem(folderStorageKey, JSON.stringify(store));
+}
+
 function getLegacyHistory() {
   try {
     return JSON.parse(window.localStorage.getItem(legacyHistoryStorageKey) || "[]");
@@ -418,8 +435,33 @@ function getConversations() {
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 }
 
-function getFilteredConversations() {
+function getFolders() {
+  const store = getFolderStore();
+  const items = Array.isArray(store[getUserKey()]) ? store[getUserKey()] : [];
+
+  return items
+    .slice()
+    .sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime());
+}
+
+function saveFolders(folders) {
+  const store = getFolderStore();
+  store[getUserKey()] = folders;
+  setFolderStore(store);
+}
+
+function getVisibleConversations() {
   const conversations = getConversations();
+
+  if (!activeFolderId) {
+    return conversations;
+  }
+
+  return conversations.filter((item) => item.folderId === activeFolderId);
+}
+
+function getFilteredConversations() {
+  const conversations = getVisibleConversations();
   const searchTerm = chatSearchTerm.trim().toLowerCase();
 
   if (!searchTerm) {
@@ -623,7 +665,7 @@ function getConversationSearchResults(conversation, searchTerm) {
 }
 
 function getHistoryEntries() {
-  const conversations = getConversations();
+  const conversations = getVisibleConversations();
   const safeSearchTerm = normalizeSearchTerm(chatSearchTerm);
 
   if (!safeSearchTerm) {
@@ -653,7 +695,7 @@ function getActiveConversation() {
     return null;
   }
 
-  const conversations = getConversations();
+  const conversations = getVisibleConversations();
 
   if (!conversations.length) {
     return null;
@@ -779,7 +821,51 @@ function updateRecordingUi(recording) {
   syncMicButtonUi();
 }
 
+function setAssistantAudioButtonState(button, state = "idle") {
+  if (!button) {
+    return;
+  }
+
+  const isLoading = state === "loading";
+  const isPlaying = state === "playing";
+  button.classList.toggle("loading", isLoading);
+  button.classList.toggle("loading-complete", state === "playing");
+  button.classList.toggle("playing", isPlaying);
+  button.setAttribute("aria-label", isLoading || isPlaying ? "Parar audio" : "Ouvir resposta");
+  button.title = isLoading || isPlaying ? "Parar audio" : "Ouvir resposta";
+  const icon = button.querySelector(".assistant-audio-icon");
+  if (icon) {
+    icon.innerHTML = isLoading || isPlaying ? squareStopIcon : playAudioIcon;
+  }
+
+  if (isPlaying) {
+    window.setTimeout(() => {
+      if (button.classList.contains("playing")) {
+        button.classList.remove("loading-complete");
+      }
+    }, 500);
+  }
+}
+
+function syncAssistantAudioLayout(article) {
+  if (!(article instanceof HTMLElement)) {
+    return;
+  }
+
+  const messageText = article.querySelector(".message-text");
+  if (!(messageText instanceof HTMLElement)) {
+    return;
+  }
+
+  const computedStyle = window.getComputedStyle(messageText);
+  const lineHeight = Number.parseFloat(computedStyle.lineHeight) || Number.parseFloat(computedStyle.fontSize) * 1.8 || 0;
+  const isSingleLine = lineHeight > 0 && messageText.scrollHeight <= lineHeight * 1.45;
+  article.classList.toggle("assistant-single-line", isSingleLine);
+}
+
 function stopAssistantSpeech() {
+  const pendingButton = speakingButton || narrationState?.button || null;
+
   if (narrationState?.fetchControllers?.length) {
     narrationState.fetchControllers.forEach((controller) => {
       try {
@@ -801,13 +887,11 @@ function stopAssistantSpeech() {
     speakingAudioUrl = "";
   }
 
-  if (speakingButton) {
-    speakingButton.classList.remove("playing");
-    speakingButton.setAttribute("aria-label", "Ouvir resposta");
-    speakingButton.title = "Ouvir resposta";
-    speakingButton = null;
+  if (pendingButton) {
+    setAssistantAudioButtonState(pendingButton, "idle");
   }
 
+  speakingButton = null;
   narrationState = null;
   updateRecordingUi(false);
   syncMicButtonUi();
@@ -963,9 +1047,7 @@ async function playNarrationChunk(state, index) {
   speakingAudio = audio;
   speakingAudioUrl = audioUrl;
   speakingButton = state.button;
-  state.button.classList.add("playing");
-  state.button.setAttribute("aria-label", "Parar audio");
-  state.button.title = "Parar audio";
+  setAssistantAudioButtonState(state.button, "playing");
   syncMicButtonUi();
 
   audio.addEventListener("ended", async () => {
@@ -1006,6 +1088,7 @@ async function speakAssistantText(text, button) {
   };
 
   narrationState = state;
+  setAssistantAudioButtonState(button, "loading");
   syncMicButtonUi();
   ensureNarrationBuffer(state, 0);
   ensureNarrationBuffer(state, 1);
@@ -1022,11 +1105,16 @@ function attachAssistantAudioButton(article, text) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "assistant-audio-button";
-  button.setAttribute("aria-label", "Ouvir resposta");
-  button.title = "Ouvir resposta";
-  button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 9.8 9H6a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3.8L14 19a1 1 0 0 0 1.7-.72V5.72A1 1 0 0 0 14 5m4.2 2.3a1 1 0 0 1 1.4 0 6.5 6.5 0 0 1 0 9.2 1 1 0 0 1-1.4-1.42 4.5 4.5 0 0 0 0-6.36 1 1 0 0 1 0-1.42m-2.6 2.1a1 1 0 0 1 1.4.1 3 3 0 0 1 0 4 1 1 0 1 1-1.5-1.32 1 1 0 0 0 0-1.36 1 1 0 0 1 .1-1.42"/></svg>';
+  button.innerHTML = `
+    <span class="assistant-audio-spinner" aria-hidden="true"></span>
+    <span class="assistant-audio-icon" aria-hidden="true">${playAudioIcon}</span>
+  `;
+  setAssistantAudioButtonState(button, "idle");
   controls.appendChild(button);
   article.appendChild(controls);
+  window.requestAnimationFrame(() => {
+    syncAssistantAudioLayout(article);
+  });
 
   button.addEventListener("click", async () => {
     if (speakingButton === button) {
@@ -1119,6 +1207,7 @@ function createConversation(firstMessage = "") {
   return {
     id: crypto.randomUUID(),
     title: createShortTitle(firstMessage),
+    folderId: activeFolderId || null,
     messages: [],
     createdAt: timestamp,
     updatedAt: timestamp
@@ -1246,6 +1335,47 @@ function commitConversationRename(conversationId, nextTitle) {
   }
 }
 
+function createFolder(title) {
+  const timestamp = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    title: sanitizeConversationTitle(title || "Nova pasta"),
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+
+function renderFolderList() {
+  const folders = getFolders();
+
+  folders.forEach((folder) => {
+    const itemShell = document.createElement("div");
+    itemShell.className = "history-item-shell";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `history-item history-folder-item${folder.id === activeFolderId ? " active" : ""}`;
+    button.innerHTML = `
+      <span class="history-item-row">
+        <strong title="${escapeAttribute(folder.title)}">
+          <span class="history-folder-icon" aria-hidden="true">${folderIcon}</span>
+          <span class="history-folder-title">${escapeHtml(clampConversationTitle(folder.title))}</span>
+        </strong>
+        <span class="history-folder-count">${getConversations().filter((item) => item.folderId === folder.id).length}</span>
+      </span>
+    `;
+    button.addEventListener("click", () => {
+      clearPendingSearchHighlight();
+      activeFolderId = activeFolderId === folder.id ? null : folder.id;
+      activeConversationId = getVisibleConversations()[0]?.id || null;
+      showEmptyDraftConversation = false;
+      renderHistoryList();
+      renderConversation();
+    });
+    itemShell.appendChild(button);
+    historyList.appendChild(itemShell);
+  });
+}
+
 function renderHistoryList() {
   const entries = getHistoryEntries();
   historyList.innerHTML = "";
@@ -1255,13 +1385,16 @@ function renderHistoryList() {
     return;
   }
 
+  renderFolderList();
+
   if (!entries.length) {
-    historyList.innerHTML = `
-      <div class="history-empty">
-        <strong>${chatSearchTerm ? "Nenhum chat encontrado." : "Nenhuma conversa ainda."}</strong>
-        <p>${chatSearchTerm ? "Tente outro termo para localizar sua conversa." : "Clique em \"Nova conversa\" para abrir seu primeiro chat."}</p>
-      </div>
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.innerHTML = `
+      <strong>${chatSearchTerm ? "Nenhum chat encontrado." : activeFolderId ? "Nenhum chat nesta pasta ainda." : "Nenhuma conversa ainda."}</strong>
+      <p>${chatSearchTerm ? "Tente outro termo para localizar sua conversa." : activeFolderId ? "Abra uma nova conversa com essa pasta selecionada para guardar o chat aqui." : "Clique em \"Nova conversa\" para abrir seu primeiro chat."}</p>
     `;
+    historyList.appendChild(empty);
     return;
   }
 
@@ -1472,6 +1605,11 @@ function renderConversation() {
     }
 
     chatThread.appendChild(article);
+    if (item.role === "assistant") {
+      window.requestAnimationFrame(() => {
+        syncAssistantAudioLayout(article);
+      });
+    }
   });
 
   chatThread.scrollTop = chatThread.scrollHeight;
@@ -1530,6 +1668,9 @@ function syncComposerState() {
   }
   logoutButton.hidden = !isLoggedIn;
   newChatButton.hidden = !isLoggedIn;
+  if (newFolderButton) {
+    newFolderButton.hidden = !isLoggedIn;
+  }
   if (editChatsButton) {
     editChatsButton.hidden = !isLoggedIn;
     editChatsButton.classList.toggle("is-active", historyEditMode && isLoggedIn);
@@ -1554,6 +1695,7 @@ function syncComposerState() {
 async function loadSessionState() {
   if (!getToken()) {
     currentUser = null;
+    activeFolderId = null;
     showEmptyDraftConversation = false;
     await loadAccessState();
     initContentAdmin({
@@ -1581,6 +1723,7 @@ async function loadSessionState() {
     if (!response.ok) {
       setToken("");
       currentUser = null;
+      activeFolderId = null;
       showEmptyDraftConversation = false;
       await loadAccessState();
       authStatus.textContent = data.error || "Sessão inválida.";
@@ -1604,6 +1747,9 @@ async function loadSessionState() {
     authStatus.textContent = `Logado como @${data.user.username}`;
     chatAuthStatus.textContent = getUserDisplayName();
     const conversations = ensureWelcomeConversation();
+    if (activeFolderId && !getFolders().some((folder) => folder.id === activeFolderId)) {
+      activeFolderId = null;
+    }
     activeConversationId = activeConversationId || conversations[0]?.id || null;
     syncComposerState();
     syncModeAvailability();
@@ -1611,6 +1757,7 @@ async function loadSessionState() {
     renderConversation();
   } catch (error) {
     currentUser = null;
+    activeFolderId = null;
     showEmptyDraftConversation = false;
     await loadAccessState();
     initContentAdmin({
@@ -1755,6 +1902,7 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
         if (state.renderedLength > 0) {
           setAssistantThinkingState(false);
         }
+        syncAssistantAudioLayout(article);
         chatThread.scrollTop = chatThread.scrollHeight;
       };
 
@@ -1799,6 +1947,7 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
       const cleanText = (state.finalText || state.previewText || "").trim();
       article.querySelector(".assistant-audio-actions")?.remove();
       attachAssistantAudioButton(article, cleanText);
+      syncAssistantAudioLayout(article);
     }
   };
 
@@ -2167,6 +2316,31 @@ newChatButton.addEventListener("click", () => {
   chatInput.focus();
 });
 
+newFolderButton?.addEventListener("click", () => {
+  if (!currentUser) {
+    ensureLoggedInBeforeChat();
+    return;
+  }
+
+  const rawTitle = window.prompt("Nome da pasta:");
+  if (rawTitle === null) {
+    return;
+  }
+
+  const title = rawTitle.trim();
+  if (!title) {
+    return;
+  }
+
+  const nextFolder = createFolder(title);
+  saveFolders([nextFolder, ...getFolders().filter((item) => item.id !== nextFolder.id)]);
+  activeFolderId = nextFolder.id;
+  activeConversationId = null;
+  showEmptyDraftConversation = false;
+  renderHistoryList();
+  renderConversation();
+});
+
 editChatsButton?.addEventListener("click", () => {
   if (!currentUser) {
     ensureLoggedInBeforeChat();
@@ -2185,6 +2359,7 @@ logoutButton.addEventListener("click", () => {
   setToken("");
   currentUser = null;
   activeConversationId = null;
+  activeFolderId = null;
   showEmptyDraftConversation = false;
   historyEditMode = false;
   editingConversationId = null;

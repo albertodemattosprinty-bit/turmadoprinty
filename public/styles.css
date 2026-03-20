@@ -1899,6 +1899,39 @@ body[data-page="users"] .users-admin-shell {
   font-size: 0.97rem;
 }
 
+.history-folder-item strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-folder-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  flex: 0 0 auto;
+}
+
+.history-folder-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.history-folder-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-folder-count {
+  min-width: 22px;
+  text-align: center;
+  font-weight: 700;
+}
+
 .history-item span {
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.84rem;
@@ -2222,16 +2255,19 @@ body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions 
 
 body[data-page="explorar"] #sidebar-toggle-button,
 body[data-page="explorar"] #new-chat-button,
-body[data-page="explorar"] #edit-chats-button {
+body[data-page="explorar"] #edit-chats-button,
+body[data-page="explorar"] #new-folder-button {
   color: #1b53bb !important;
 }
 
 body[data-page="explorar"] #sidebar-toggle-button svg,
 body[data-page="explorar"] #new-chat-button svg,
 body[data-page="explorar"] #edit-chats-button svg,
+body[data-page="explorar"] #new-folder-button svg,
 body[data-page="explorar"] #sidebar-toggle-button path,
 body[data-page="explorar"] #new-chat-button path,
-body[data-page="explorar"] #edit-chats-button path {
+body[data-page="explorar"] #edit-chats-button path,
+body[data-page="explorar"] #new-folder-button path {
   fill: #1b53bb !important;
 }
 
@@ -2252,6 +2288,7 @@ body[data-page="explorar"] #edit-chats-button.is-active {
 
 body[data-page="explorar"] #new-chat-button,
 body[data-page="explorar"] #edit-chats-button,
+body[data-page="explorar"] #new-folder-button,
 body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions .sidebar-icon-button.primary-button {
   min-width: auto;
   width: auto;
@@ -2266,13 +2303,16 @@ body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions 
 
 body[data-page="explorar"] #new-chat-button svg,
 body[data-page="explorar"] #edit-chats-button svg,
+body[data-page="explorar"] #new-folder-button svg,
 body[data-page="explorar"] #new-chat-button path,
-body[data-page="explorar"] #edit-chats-button path {
+body[data-page="explorar"] #edit-chats-button path,
+body[data-page="explorar"] #new-folder-button path {
   fill: #ffffff !important;
 }
 
 body[data-page="explorar"] #new-chat-button:hover,
-body[data-page="explorar"] #edit-chats-button:hover {
+body[data-page="explorar"] #edit-chats-button:hover,
+body[data-page="explorar"] #new-folder-button:hover {
   opacity: 0.82;
 }
 
@@ -2358,6 +2398,13 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   padding-right: 58px;
 }
 
+.message-card.assistant.assistant-single-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 18px;
+}
+
 .message-role {
   margin-bottom: 6px;
   font-size: 12px;
@@ -2376,6 +2423,10 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   word-break: break-word;
 }
 
+.message-card.assistant.assistant-single-line .message-text {
+  flex: 0 1 auto;
+}
+
 .message-card.user .message-role,
 .message-card.user .message-text {
   color: #ffffff;
@@ -2387,7 +2438,13 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   bottom: 12px;
 }
 
+.assistant-single-line .assistant-audio-actions {
+  position: static;
+  flex: 0 0 auto;
+}
+
 .assistant-audio-button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2407,15 +2464,56 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   background: rgba(27, 83, 187, 0.14);
 }
 
+.assistant-audio-button.loading,
 .assistant-audio-button.playing {
-  background: var(--blue-dark);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--blue-dark);
+  box-shadow: inset 0 0 0 1px rgba(27, 83, 187, 0.14);
+}
+
+.assistant-audio-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .assistant-audio-button svg {
   width: 17px;
   height: 17px;
   fill: currentColor;
+}
+
+.assistant-audio-spinner {
+  position: absolute;
+  inset: 4px;
+  border-radius: 999px;
+  border: 2px solid rgba(27, 83, 187, 0.18);
+  border-top-color: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.88);
+}
+
+.assistant-audio-button.loading .assistant-audio-spinner {
+  opacity: 1;
+  animation: assistant-audio-spin 0.9s linear infinite;
+}
+
+.assistant-audio-button.loading-complete .assistant-audio-spinner {
+  opacity: 0;
+  transform: scale(0.68);
+  animation: assistant-audio-spin 0.9s linear infinite;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+@keyframes assistant-audio-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-composer {
