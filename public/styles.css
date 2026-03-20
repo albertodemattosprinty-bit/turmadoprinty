@@ -3371,11 +3371,13 @@ body[data-page="explorar"] #chat-auth-status {
   body[data-page="explorar"] .conversation-tools {
     position: absolute;
     top: 12px;
-    right: 20px;
+    left: 50%;
+    right: auto;
     width: auto;
-    justify-content: flex-end;
+    justify-content: center;
     margin-left: 0;
     align-items: center;
+    transform: translateX(-50%);
   }
 
   body[data-page="explorar"] .chat-mode-picker {
@@ -3423,7 +3425,7 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .conversation-title {
-    margin-top: 12px;
+    margin-top: 52px;
     line-height: 1.04;
   }
 
@@ -3461,6 +3463,10 @@ body[data-page="explorar"] #chat-auth-status {
   body[data-page="explorar"] .message-card {
     max-width: min(100%, 40ch);
     border-radius: 24px;
+  }
+
+  body[data-page="explorar"] .message-card.assistant {
+    max-width: min(100%, 30ch);
   }
 
   body[data-page="explorar"] .message-role {
