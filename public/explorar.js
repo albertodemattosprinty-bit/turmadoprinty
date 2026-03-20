@@ -2308,6 +2308,11 @@ newChatButton.addEventListener("click", () => {
     return;
   }
 
+  if (window.innerWidth <= 980) {
+    sidebarCollapsed = true;
+    syncSidebarState();
+  }
+
   activeConversationId = null;
   showEmptyDraftConversation = true;
   renderHistoryList();

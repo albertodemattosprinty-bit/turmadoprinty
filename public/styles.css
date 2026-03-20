@@ -3495,12 +3495,14 @@ body[data-page="explorar"] #chat-auth-status {
 
   body[data-page="explorar"] .chat-composer textarea {
     min-height: 104px;
-    padding: 12px 14px 60px;
+    padding: 12px 112px 12px 14px;
     border-radius: 0;
   }
 
   body[data-page="explorar"] .chat-composer.is-compact textarea {
-    min-height: 62px;
+    min-height: 42px;
+    padding-top: 9px;
+    padding-bottom: 9px;
   }
 
   body[data-page="explorar"] .icon-button {
@@ -3515,6 +3517,9 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .composer-actions {
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
     gap: 8px;
   }
 
