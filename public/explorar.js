@@ -77,6 +77,7 @@ let speechRecognitionFinalTranscript = "";
 let narrationState = null;
 let pendingSearchFocus = null;
 let searchHighlightResetId = null;
+let showEmptyDraftConversation = false;
 let siteConfig = {
   banners: {},
   textOverrides: {}
@@ -125,7 +126,7 @@ const emptyConversationVariants = [
   "Vamos dar forma a uma boa ideia"
 ];
 
-const conversationTitleMaxLength = 22;
+const conversationTitleMaxLength = 30;
 const searchPreviewMaxLength = 45;
 const searchPreviewBaseMaxLength = 15;
 const searchTextHighlightDurationMs = 5000;
@@ -648,6 +649,10 @@ function saveConversations(conversations) {
 }
 
 function getActiveConversation() {
+  if (showEmptyDraftConversation) {
+    return null;
+  }
+
   const conversations = getConversations();
 
   if (!conversations.length) {
@@ -810,7 +815,12 @@ function stopAssistantSpeech() {
 
 function buildResponseStylePrompt(modeKey) {
   const settings = getUserChatSettings();
-  const parts = [];
+  const parts = [
+    "Se a pessoa nao trouxer elemento religioso, responda de modo respeitoso, aberto e neutro, sem inserir religiao por conta propria.",
+    "Entregue somente o que foi pedido, sem oferecer proximos passos, extras ou sugestoes nao solicitadas.",
+    "Mantenha etica, respeito e amizade.",
+    "Se a pergunta for minima ou basica, responda no mesmo tom e na mesma proporcao."
+  ];
 
   if (settings.callName) {
     parts.push(`Chame a pessoa de ${settings.callName}.`);
@@ -1148,6 +1158,7 @@ function updateConversation(nextConversation) {
   nextItems.unshift(nextConversation);
   saveConversations(nextItems);
   activeConversationId = nextConversation.id;
+  showEmptyDraftConversation = false;
 }
 
 function renameConversation(conversationId, nextTitle) {
@@ -1243,7 +1254,7 @@ function renderHistoryList() {
             type="text"
             value="${escapeHtml(item.title || "Novo chat")}"
             data-history-title-input="${item.id}"
-            maxlength="22"
+            maxlength="30"
             aria-label="Editar nome do chat"
           >
           <span class="history-item-actions">
@@ -1292,6 +1303,7 @@ function renderHistoryList() {
 
       clearPendingSearchHighlight();
       activeConversationId = item.id;
+      showEmptyDraftConversation = false;
       renderConversation();
       renderHistoryList();
     });
@@ -1312,6 +1324,7 @@ function renderHistoryList() {
 
       clearPendingSearchHighlight();
       activeConversationId = item.id;
+      showEmptyDraftConversation = false;
       renderConversation();
       renderHistoryList();
     });
@@ -1460,6 +1473,14 @@ function syncComposerLayout() {
   document.documentElement.style.setProperty("--explore-composer-height", `${composerHeight}px`);
 }
 
+function syncComposerEmptyState() {
+  if (!chatForm || !chatInput) {
+    return;
+  }
+
+  chatForm.classList.toggle("is-empty", !chatInput.value.trim());
+}
+
 window.addEventListener("resize", () => {
   const mobileView = window.innerWidth <= 980;
   sidebarCollapsed = mobileView ? sidebarCollapsed : false;
@@ -1493,6 +1514,7 @@ function syncComposerState() {
   chatInput.disabled = !isLoggedIn;
   chatInput.placeholder = "Digite sua mensagem aqui...";
   syncSidebarState();
+  syncComposerEmptyState();
   syncComposerLayout();
   syncMicButtonUi();
 }
@@ -1500,6 +1522,7 @@ function syncComposerState() {
 async function loadSessionState() {
   if (!getToken()) {
     currentUser = null;
+    showEmptyDraftConversation = false;
     await loadAccessState();
     initContentAdmin({
       user: null,
@@ -1526,6 +1549,7 @@ async function loadSessionState() {
     if (!response.ok) {
       setToken("");
       currentUser = null;
+      showEmptyDraftConversation = false;
       await loadAccessState();
       authStatus.textContent = data.error || "Sessão inválida.";
       chatAuthStatus.textContent = data.error || "Sessão inválida.";
@@ -1537,6 +1561,7 @@ async function loadSessionState() {
     }
 
     currentUser = data.user;
+    showEmptyDraftConversation = false;
     await loadAccessState();
     initContentAdmin({
       user: currentUser,
@@ -1554,6 +1579,7 @@ async function loadSessionState() {
     renderConversation();
   } catch (error) {
     currentUser = null;
+    showEmptyDraftConversation = false;
     await loadAccessState();
     initContentAdmin({
       user: null,
@@ -1946,6 +1972,34 @@ function updateLiveTranscript(finalTranscript = "", interimTranscript = "") {
   chatInput.dispatchEvent(new Event("input"));
 }
 
+function collectSpeechRecognitionTranscript(results, onlyFinal = false) {
+  if (!results?.length) {
+    return "";
+  }
+
+  const parts = [];
+
+  for (let index = 0; index < results.length; index += 1) {
+    const result = results[index];
+    const isFinal = Boolean(result?.isFinal);
+
+    if (onlyFinal && !isFinal) {
+      continue;
+    }
+
+    if (!onlyFinal && isFinal) {
+      continue;
+    }
+
+    const transcript = String(result?.[0]?.transcript || "").trim();
+    if (transcript) {
+      parts.push(transcript);
+    }
+  }
+
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
 function stopSpeechRecognitionSession() {
   clearSpeechRecognitionSilenceTimer();
 
@@ -1992,23 +2046,8 @@ async function startSpeechRecognitionSession() {
   recognition.maxAlternatives = 1;
 
   recognition.onresult = (event) => {
-    let finalTranscript = "";
-    let interimTranscript = "";
-
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      const result = event.results[index];
-      const transcript = String(result[0]?.transcript || "").trim();
-
-      if (!transcript) {
-        continue;
-      }
-
-      if (result.isFinal) {
-        speechRecognitionFinalTranscript = `${speechRecognitionFinalTranscript} ${transcript}`.trim();
-      } else {
-        interimTranscript = `${interimTranscript} ${transcript}`.trim();
-      }
-    }
+    speechRecognitionFinalTranscript = collectSpeechRecognitionTranscript(event.results, true);
+    const interimTranscript = collectSpeechRecognitionTranscript(event.results, false);
 
     updateLiveTranscript("", interimTranscript);
 
@@ -2088,8 +2127,8 @@ newChatButton.addEventListener("click", () => {
     return;
   }
 
-  const freshConversation = createConversation("");
-  updateConversation(freshConversation);
+  activeConversationId = null;
+  showEmptyDraftConversation = true;
   renderHistoryList();
   renderConversation();
   setComposerStatus("");
@@ -2114,6 +2153,7 @@ logoutButton.addEventListener("click", () => {
   setToken("");
   currentUser = null;
   activeConversationId = null;
+  showEmptyDraftConversation = false;
   historyEditMode = false;
   editingConversationId = null;
   accessState = {
@@ -2157,6 +2197,7 @@ chatForm.addEventListener("submit", async (event) => {
 
   const baseConversation = getActiveConversation() || createConversation(message);
   const history = baseConversation.messages.slice(-8);
+  showEmptyDraftConversation = false;
 
   const userConversation = addMessageToConversation("user", message);
   if (userConversation.messages.length === 1) {
@@ -2250,6 +2291,7 @@ stopButton.addEventListener("click", () => {
 chatInput.addEventListener("input", () => {
   chatInput.style.height = "auto";
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
+  syncComposerEmptyState();
   syncComposerLayout();
 });
 
@@ -2416,6 +2458,7 @@ syncMicButtonUi();
 populateVoiceOptions();
 syncChatModeUi();
 setActiveAuthTab("login");
+syncComposerEmptyState();
 syncComposerLayout();
 siteConfig = await loadSiteConfig().catch(() => siteConfig);
 initContentAdmin({
