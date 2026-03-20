@@ -30,10 +30,10 @@ let lyricsSilenceTimer = null;
 let floatingNoticeTimer = null;
 let albumShortcutBuffer = "";
 let albumShortcutTimer = null;
+let albumSyncEventSource = null;
 const adminUsername = "rosemattos";
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
-const livePlayLeadMs = 900;
 
 function normalizeCatalogText(value) {
   return String(value || "")
@@ -71,6 +71,10 @@ function isPlusPlaybackAlbumName(albumName) {
 }
 
 function canStreamTrack(albumId, albumName, track) {
+  if (currentUser?.isContractor) {
+    return true;
+  }
+
   if (hasPurchasedAlbum(albumId) || hasFullCatalogAccess()) {
     return true;
   }
@@ -86,39 +90,75 @@ function isRoseMattosUser() {
   return String(currentUser?.username || "").trim().toLowerCase() === adminUsername;
 }
 
-async function notifyLivePlay(track, audio) {
+function closeAlbumSyncStream() {
+  albumSyncEventSource?.close();
+  albumSyncEventSource = null;
+}
+
+async function notifyAlbumSync(track) {
   if (!isRoseMattosUser()) {
     return;
   }
 
-  const streamUrl = typeof audio?.src === "string" && audio.src.trim()
-    ? audio.src.trim()
-    : typeof track?.streamUrl === "string"
-      ? track.streamUrl.trim()
-      : "";
-
-  if (!/^https?:\/\//i.test(streamUrl)) {
+  if (!currentAlbum?.id || !Number(track?.number)) {
     return;
   }
 
   try {
-    await fetch(getApiUrl("/api/live-play/broadcast"), {
+    await fetch(getApiUrl("/api/album-sync/trigger"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${getToken()}`
       },
       body: JSON.stringify({
-        streamUrl,
-        albumName: currentAlbum?.name || "",
-        trackTitle: track?.title || track?.label || "",
-        trackNumber: Number(track?.number) || null,
-        leadMs: livePlayLeadMs
+        albumId: currentAlbum.id,
+        trackNumber: Number(track.number)
       })
     });
   } catch {
-    // A reproducao local nao deve depender do espelhamento remoto.
+    // O comando remoto nao deve bloquear a reproducao local.
   }
+}
+
+function connectAlbumSyncStream() {
+  closeAlbumSyncStream();
+
+  if (!currentUser?.isContractor || !currentAlbum?.id || !getToken()) {
+    return;
+  }
+
+  const streamUrl = `${getApiUrl("/api/album-sync/stream")}?token=${encodeURIComponent(getToken())}&albumId=${encodeURIComponent(currentAlbum.id)}`;
+  albumSyncEventSource = new EventSource(streamUrl);
+
+  albumSyncEventSource.addEventListener("trigger", async (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+
+      if (payload?.albumId !== currentAlbum?.id) {
+        return;
+      }
+
+      const trackNumber = Number(payload?.trackNumber);
+      const track = currentAlbum?.tracks?.find((item) => Number(item.number) === trackNumber);
+      const card = trackList.querySelector(`.track-card[data-track-number="${trackNumber}"]`);
+
+      if (!track || !card) {
+        return;
+      }
+
+      await playTrack(card, currentAlbum.id, track, { source: "remote" });
+    } catch {
+      // Ignora eventos invalidos.
+    }
+  });
+
+  albumSyncEventSource.onerror = () => {
+    closeAlbumSyncStream();
+    window.setTimeout(() => {
+      connectAlbumSyncStream();
+    }, 1500);
+  };
 }
 
 function canDownloadTrack(albumId, albumName, track) {
@@ -427,6 +467,7 @@ async function loadAccessState() {
       purchasedAlbumIds: []
     };
     currentUser = null;
+    closeAlbumSyncStream();
     return;
   }
 
@@ -454,6 +495,7 @@ async function loadAccessState() {
       purchasedAlbumIds: []
     };
     currentUser = null;
+    closeAlbumSyncStream();
     return;
   }
 
@@ -492,6 +534,11 @@ function setPurchaseStatus(albumId) {
     purchaseStatus.textContent = accessState.authenticated
       ? "Download liberado para este album na sua conta."
       : "Faca login para acessar seus downloads.";
+    return;
+  }
+
+  if (currentUser?.isContractor) {
+    purchaseStatus.textContent = "Contratante ativo: este album pode ser usado no disparo ao vivo.";
     return;
   }
 
@@ -669,7 +716,7 @@ function bindAudioToCard(card, audio) {
   }
 }
 
-async function playTrack(card, albumId, track) {
+async function playTrack(card, albumId, track, { source = "local" } = {}) {
   const audio = card.querySelector("audio");
 
   if (!audio) {
@@ -700,7 +747,11 @@ async function playTrack(card, albumId, track) {
   currentAudio = audio;
   currentTrackNumber = track.number;
   await audio.play();
-  await notifyLivePlay(track, audio);
+
+  if (source === "local") {
+    await notifyAlbumSync(track);
+  }
+
   updatePlayerButtons();
 }
 
@@ -1244,6 +1295,14 @@ async function loadAlbumDetail() {
     setPurchaseStatus(album.id);
     syncAdminPanel(album);
     await renderTracks(album);
+    connectAlbumSyncStream();
+
+    if (currentUser?.isContractor) {
+      buyAlbumButton.textContent = "Modo contratante";
+      buyAlbumButton.disabled = true;
+      buyAlbumButton.onclick = null;
+      return;
+    }
 
     buyAlbumButton.textContent = "Comprar";
     buyAlbumButton.onclick = async () => {

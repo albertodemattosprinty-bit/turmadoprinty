@@ -293,3 +293,31 @@ export async function setUserContractorStatus({ userId, isContractor, contractor
     );
   }
 }
+
+export async function getUserContractorState(userId) {
+  if (!userId) {
+    return {
+      isContractor: false,
+      contractorEventId: null
+    };
+  }
+
+  await ensureAdminUsersSchema();
+
+  const result = await query(
+    `
+      select is_contractor, contractor_event_id
+      from admin_user_notes
+      where user_id = $1
+      limit 1
+    `,
+    [userId]
+  );
+
+  const row = result.rows[0] || null;
+
+  return {
+    isContractor: Boolean(row?.is_contractor),
+    contractorEventId: row?.contractor_event_id || null
+  };
+}
