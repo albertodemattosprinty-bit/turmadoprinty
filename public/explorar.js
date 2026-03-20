@@ -1,6 +1,29 @@
 import { initContentAdmin } from "./content-admin.js";
 import { getApiUrl } from "./api.js";
 
+const capacitor = window.Capacitor;
+const nativePlatform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
+const isNativePlatform = typeof capacitor?.isNativePlatform === "function"
+  ? capacitor.isNativePlatform()
+  : nativePlatform === "android" || nativePlatform === "ios";
+const isAndroidApp = isNativePlatform && nativePlatform === "android";
+
+if (isAndroidApp) {
+  document.documentElement.classList.add("native-android-app");
+}
+
+function getExploreAuthPrompt() {
+  return isAndroidApp
+    ? "MINI a IA do Ministerio Infantil ...."
+    : "Entre ou cadastre sua conta para abrir o chat.";
+}
+
+function getExploreAuthLockMessage() {
+  return isAndroidApp
+    ? "Entre para acessar sua MINI."
+    : "Entre para liberar a conversa.";
+}
+
 const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
 const folderStorageKey = "turma_do_printy_chat_folders";
@@ -1737,7 +1760,7 @@ async function loadSessionState() {
       getToken,
       config: siteConfig
     });
-    authStatus.textContent = "Entre ou cadastre sua conta para abrir o chat.";
+    authStatus.textContent = getExploreAuthPrompt();
     chatAuthStatus.textContent = "Sem login ativo.";
     syncComposerState();
     syncModeAvailability();
@@ -2069,7 +2092,7 @@ function ensureLoggedInBeforeChat() {
     return true;
   }
 
-  authStatus.textContent = "Entre para liberar a conversa.";
+  authStatus.textContent = getExploreAuthLockMessage();
   return false;
 }
 
@@ -2410,7 +2433,7 @@ logoutButton.addEventListener("click", () => {
   };
   authStatus.textContent = "Sessao encerrada.";
   chatAuthStatus.textContent = "Sessao encerrada.";
-  authStatus.textContent = "Entre ou crie sua conta para abrir o chat.";
+  authStatus.textContent = getExploreAuthPrompt();
   setComposerStatus("");
   closeSettingsModal();
   syncComposerState();

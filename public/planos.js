@@ -2,6 +2,17 @@ import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
 import { applyTextOverrides, getTextOverride, initContentAdmin } from "./content-admin.js";
 import { getApiUrl } from "./api.js";
 
+const capacitor = window.Capacitor;
+const nativePlatform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
+const isNativePlatform = typeof capacitor?.isNativePlatform === "function"
+  ? capacitor.isNativePlatform()
+  : nativePlatform === "android" || nativePlatform === "ios";
+const isAndroidApp = isNativePlatform && nativePlatform === "android";
+
+if (isAndroidApp) {
+  document.documentElement.classList.add("native-android-app");
+}
+
 const planStatus = document.getElementById("plan-status");
 const plansGrid = document.getElementById("plans-grid");
 

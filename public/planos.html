@@ -8,6 +8,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <script>
+    (function () {
+      var capacitor = window.Capacitor;
+      var platform = capacitor && typeof capacitor.getPlatform === "function"
+        ? capacitor.getPlatform()
+        : "web";
+      var isNative = capacitor && typeof capacitor.isNativePlatform === "function"
+        ? capacitor.isNativePlatform()
+        : platform === "android" || platform === "ios";
+
+      if (isNative && platform === "android") {
+        document.documentElement.classList.add("native-android-app");
+      }
+    }());
+  </script>
 </head>
 <body data-page="planos">
   <header class="site-header">
@@ -25,6 +40,9 @@
       </div>
       <div id="plans-grid" class="plans-grid"></div>
     </section>
+    <div class="app-native-planos-brand" aria-hidden="true">
+      <img class="app-native-mini-logo" src="/images/mini.png" alt="MINI">
+    </div>
   </main>
 
   <nav class="site-footer-nav site-nav" aria-label="Navegacao principal">
