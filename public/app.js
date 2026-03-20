@@ -1,3 +1,5 @@
+import { getApiUrl } from "./api.js";
+
 const healthDot = document.getElementById("health-dot");
 const healthLabel = document.getElementById("health-label");
 const healthCopy = document.getElementById("health-copy");
@@ -119,7 +121,7 @@ function renderSchedule() {
 
 async function loadHealth() {
   try {
-    const response = await fetch("/api/health");
+    const response = await fetch(getApiUrl("/api/health"));
     const data = await response.json();
 
     setHealthState(Boolean(data.ok));
@@ -145,13 +147,13 @@ async function loadHealth() {
 }
 
 async function loadAlbums() {
-  const response = await fetch("/api/albums");
+  const response = await fetch(getApiUrl("/api/albums"));
   const data = await response.json();
   renderAlbums(data.items);
 }
 
 async function runAuthRequest(url, payload) {
-  const response = await fetch(url, {
+  const response = await fetch(getApiUrl(url), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -177,7 +179,7 @@ gptForm.addEventListener("submit", async (event) => {
   gptOutput.textContent = "Consultando o assistente...";
 
   try {
-    const response = await fetch("/api/gpt/ask", {
+    const response = await fetch(getApiUrl("/api/gpt/ask"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -243,7 +245,7 @@ meButton.addEventListener("click", async () => {
   authOutput.textContent = "Validando sessao...";
 
   try {
-    const response = await fetch("/api/auth/me", {
+    const response = await fetch(getApiUrl("/api/auth/me"), {
       headers: {
         Authorization: `Bearer ${getToken()}`
       }

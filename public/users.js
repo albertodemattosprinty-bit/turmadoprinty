@@ -1,4 +1,5 @@
 import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
+import { getApiUrl } from "./api.js";
 
 const usersStatus = document.getElementById("users-status");
 const usersTableBody = document.getElementById("users-table-body");
@@ -115,7 +116,7 @@ function fillEventOptions() {
 }
 
 async function loadUsers() {
-  const response = await fetch("/api/admin/users", {
+  const response = await fetch(getApiUrl("/api/admin/users"), {
     headers: {
       Authorization: `Bearer ${getToken()}`
     }
@@ -163,7 +164,7 @@ async function saveSelectedUser() {
 
   try {
     const responses = await Promise.all([
-      fetch(`/api/admin/users/${encodeURIComponent(user.id)}/plan`, {
+      fetch(getApiUrl(`/api/admin/users/${encodeURIComponent(user.id)}/plan`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -173,7 +174,7 @@ async function saveSelectedUser() {
           planId: userPlanSelect.value
         })
       }),
-      fetch(`/api/admin/users/${encodeURIComponent(user.id)}/contractor`, {
+      fetch(getApiUrl(`/api/admin/users/${encodeURIComponent(user.id)}/contractor`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -217,7 +218,7 @@ async function deleteSelectedUser() {
   userDetailStatus.textContent = "Excluindo...";
 
   try {
-    const response = await fetch(`/api/admin/users/${encodeURIComponent(user.id)}`, {
+    const response = await fetch(getApiUrl(`/api/admin/users/${encodeURIComponent(user.id)}`), {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getToken()}`

@@ -1,3 +1,5 @@
+import { getApiUrl } from "./api.js";
+
 const EDITABLE_SELECTOR = "h1, h2, h3, h4, h5, h6, p, span, strong, a, button, label, small, li";
 let activeConfig = {
   banners: {},
@@ -123,7 +125,7 @@ function bindBannerResize() {
 }
 
 async function saveBanner({ bannerKey, target, imageDataUrl, token }) {
-  const response = await fetch("/api/admin/site/banner", {
+  const response = await fetch(getApiUrl("/api/admin/site/banner"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -141,7 +143,7 @@ async function saveBanner({ bannerKey, target, imageDataUrl, token }) {
 }
 
 async function saveTextOverride({ key, text, token }) {
-  const response = await fetch("/api/admin/site/text", {
+  const response = await fetch(getApiUrl("/api/admin/site/text"), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

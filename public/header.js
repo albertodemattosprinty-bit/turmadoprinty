@@ -1,3 +1,5 @@
+import { getApiUrl } from "./api.js";
+
 const sessionStorageKey = "turma_do_printy_token";
 
 export function getToken() {
@@ -11,7 +13,7 @@ export async function loadCurrentUser() {
     return null;
   }
 
-  const response = await fetch("/api/auth/me", {
+  const response = await fetch(getApiUrl("/api/auth/me"), {
     headers: {
       Authorization: `Bearer ${token}`
     }

@@ -1,3 +1,5 @@
+import { getApiUrl } from "./api.js";
+
 const sessionStorageKey = "turma_do_printy_token";
 
 const authStatus = document.getElementById("auth-status");
@@ -38,7 +40,7 @@ function getNextPath() {
 }
 
 async function runAuthRequest(url, payload) {
-  const response = await fetch(url, {
+  const response = await fetch(getApiUrl(url), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -68,7 +70,7 @@ async function loadSessionState() {
   }
 
   try {
-    const response = await fetch("/api/auth/me", {
+    const response = await fetch(getApiUrl("/api/auth/me"), {
       headers: {
         Authorization: `Bearer ${getToken()}`
       }
@@ -136,7 +138,7 @@ meButton.addEventListener("click", async () => {
   authOutput.textContent = "Validando sessão...";
 
   try {
-    const response = await fetch("/api/auth/me", {
+    const response = await fetch(getApiUrl("/api/auth/me"), {
       headers: {
         Authorization: `Bearer ${getToken()}`
       }

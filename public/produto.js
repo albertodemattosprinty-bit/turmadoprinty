@@ -1,4 +1,5 @@
 import { getToken, initSiteHeader } from "./header.js";
+import { getApiUrl } from "./api.js";
 
 const offlineCacheName = "turma-do-printy-offline-v1";
 
@@ -390,12 +391,12 @@ async function loadAccessState() {
   }
 
   const [accessResponse, meResponse] = await Promise.all([
-    fetch("/api/account/access", {
+    fetch(getApiUrl("/api/account/access"), {
       headers: {
         Authorization: `Bearer ${token}`
       }
     }),
-    fetch("/api/auth/me", {
+    fetch(getApiUrl("/api/auth/me"), {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -475,7 +476,7 @@ async function startCheckout(albumId) {
   buyAlbumButton.textContent = "Abrindo checkout...";
 
   try {
-    const response = await fetch("/api/payments/stripe/checkout", {
+    const response = await fetch(getApiUrl("/api/payments/stripe/checkout"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -691,7 +692,7 @@ async function downloadTrackForOffline(card, albumId, track) {
     return;
   }
 
-  const response = await fetch(`/api/store/products/${encodeURIComponent(albumId)}/tracks/${track.number}/download`, {
+  const response = await fetch(getApiUrl(`/api/store/products/${encodeURIComponent(albumId)}/tracks/${track.number}/download`), {
     headers: {
       Authorization: `Bearer ${getToken()}`
     }
@@ -1134,7 +1135,7 @@ async function saveAlbumAdminChanges() {
   albumSaveButton.disabled = true;
 
   try {
-    const response = await fetch(`/api/admin/albums/${encodeURIComponent(currentAlbum.id)}`, {
+    const response = await fetch(getApiUrl(`/api/admin/albums/${encodeURIComponent(currentAlbum.id)}`), {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -1176,9 +1177,9 @@ async function loadAlbumDetail() {
   try {
     await loadAccessState();
 
-    const response = await fetch(isAdmin()
+    const response = await fetch(getApiUrl(isAdmin()
       ? `/api/admin/albums/${encodeURIComponent(albumId)}`
-      : `/api/store/products/${encodeURIComponent(albumId)}`, {
+      : `/api/store/products/${encodeURIComponent(albumId)}`), {
       headers: getToken() && isAdmin()
         ? { Authorization: `Bearer ${getToken()}` }
         : {}

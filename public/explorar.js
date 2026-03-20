@@ -1,4 +1,5 @@
 import { initContentAdmin } from "./content-admin.js";
+import { getApiUrl } from "./api.js";
 
 const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
@@ -137,6 +138,7 @@ const chatRevealCharsPerSecond = 100;
 const chatRevealTickMs = 50;
 const speechSilenceTimeoutMs = 3000;
 const speechChunkWordCount = 20;
+const assistantAudioMinCharacters = 101;
 const emptyConversationSupportText = "Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.";
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11a1 1 0 0 0 1.53.85l8.6-5.5a1 1 0 0 0 0-1.7l-8.6-5.5A1 1 0 0 0 8 6.5"/></svg>';
 const micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/></svg>';
@@ -172,7 +174,7 @@ function setToken(token) {
 }
 
 async function loadSiteConfig() {
-  const response = await fetch("/api/site/config");
+  const response = await fetch(getApiUrl("/api/site/config"));
   const data = await response.json();
 
   if (!response.ok) {
@@ -183,7 +185,7 @@ async function loadSiteConfig() {
 }
 
 async function runAuthRequest(url, payload) {
-  const response = await fetch(url, {
+  const response = await fetch(getApiUrl(url), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -402,7 +404,7 @@ async function loadAccessState() {
     return;
   }
 
-  const response = await fetch("/api/account/access", {
+  const response = await fetch(getApiUrl("/api/account/access"), {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -871,6 +873,9 @@ function syncAssistantAudioLayout(article) {
     return;
   }
 
+  const hasAudioButton = Boolean(article.querySelector(".assistant-audio-actions"));
+  article.classList.toggle("has-audio-button", hasAudioButton);
+
   const messageText = article.querySelector(".message-text");
   if (!(messageText instanceof HTMLElement)) {
     return;
@@ -878,7 +883,7 @@ function syncAssistantAudioLayout(article) {
 
   const computedStyle = window.getComputedStyle(messageText);
   const lineHeight = Number.parseFloat(computedStyle.lineHeight) || Number.parseFloat(computedStyle.fontSize) * 1.8 || 0;
-  const isSingleLine = lineHeight > 0 && messageText.scrollHeight <= lineHeight * 1.45;
+  const isSingleLine = hasAudioButton && lineHeight > 0 && messageText.scrollHeight <= lineHeight * 1.45;
   article.classList.toggle("assistant-single-line", isSingleLine);
 }
 
@@ -922,7 +927,8 @@ function buildResponseStylePrompt(modeKey) {
     "Se a pessoa nao trouxer elemento religioso, responda de modo respeitoso, aberto e neutro, sem inserir religiao por conta propria.",
     "Entregue somente o que foi pedido, sem oferecer proximos passos, extras ou sugestoes nao solicitadas.",
     "Mantenha etica, respeito e amizade.",
-    "Se a pergunta for minima ou basica, responda no mesmo tom e na mesma proporcao."
+    "Se a pergunta for minima ou basica, responda no mesmo tom e na mesma proporcao.",
+    "Leia e respeite o modo atual da conversa."
   ];
 
   if (settings.callName) {
@@ -942,18 +948,23 @@ function buildResponseStylePrompt(modeKey) {
   }
 
   if (modeKey === "fast") {
-    parts.push("Seja extremamente pratico, util e rapido.");
+    parts.push("Modo atual: Pratico. Seja extremamente pratico, util, objetivo e rapido, com resposta direta e aplicavel.");
   }
 
   if (modeKey === "think") {
-    parts.push("Pense melhor antes de responder e entregue mais contexto, mas sem enrolar.");
+    parts.push("Modo atual: Pensativo. Pense melhor antes de responder e entregue mais contexto, criterio e clareza, mas sem enrolar.");
   }
 
   if (modeKey === "project") {
-    parts.push("Responda em formato de projeto bem desenvolvido, normalmente entre 6.000 e 8.000 caracteres, com estrutura clara, blocos bem organizados e ideias aplicaveis.");
+    parts.push("Modo atual: Projeto. Este e o modo mais forte para ministerio infantil, excelente para trabalhar ideias em contexto, planejar sem limites e aproveitar memoria expandida.");
+    parts.push("Responda em formato de projeto bem desenvolvido, normalmente entre 6.000 e 8.000 caracteres, com estrutura clara, blocos bem organizados, profundidade, organizacao e ideias aplicaveis.");
   }
 
   return parts.join(" ");
+}
+
+function canShowAssistantAudioButton(text) {
+  return String(text || "").trim().length >= assistantAudioMinCharacters;
 }
 
 function splitTextIntoSpeechChunks(text) {
@@ -998,7 +1009,7 @@ function splitTextIntoSpeechChunks(text) {
 }
 
 async function fetchSpeechChunk(text, voice, controller) {
-  const response = await fetch("/api/audio/speak", {
+  const response = await fetch(getApiUrl("/api/audio/speak"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1115,7 +1126,11 @@ async function speakAssistantText(text, button) {
 }
 
 function attachAssistantAudioButton(article, text) {
-  if (!article || !text) {
+  if (!article || !canShowAssistantAudioButton(text)) {
+    if (article instanceof HTMLElement) {
+      article.querySelector(".assistant-audio-actions")?.remove();
+      article.classList.remove("has-audio-button", "assistant-single-line");
+    }
     return;
   }
 
@@ -1732,7 +1747,7 @@ async function loadSessionState() {
   }
 
   try {
-    const response = await fetch("/api/auth/me", {
+    const response = await fetch(getApiUrl("/api/auth/me"), {
       headers: {
         Authorization: `Bearer ${getToken()}`
       }
@@ -1825,7 +1840,7 @@ async function generateConversationTitle(conversationId, firstMessage) {
 
   try {
     const selectedMode = chatModes.fast;
-    const response = await fetch("/api/gpt/ask", {
+    const response = await fetch(getApiUrl("/api/gpt/ask"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1965,6 +1980,7 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
     finalizeAudio() {
       const cleanText = (state.finalText || state.previewText || "").trim();
       article.querySelector(".assistant-audio-actions")?.remove();
+      article.classList.remove("has-audio-button", "assistant-single-line");
       attachAssistantAudioButton(article, cleanText);
       syncAssistantAudioLayout(article);
     }
@@ -2079,7 +2095,7 @@ function blobToBase64(blob) {
 
 async function transcribeAudio(blob) {
   const audioBase64 = await blobToBase64(blob);
-  const response = await fetch("/api/audio/transcribe", {
+  const response = await fetch(getApiUrl("/api/audio/transcribe"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -2449,7 +2465,7 @@ chatForm.addEventListener("submit", async (event) => {
   const responseStyle = buildResponseStylePrompt(getChatMode());
 
   try {
-    const response = await fetch("/api/gpt/ask", {
+    const response = await fetch(getApiUrl("/api/gpt/ask"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

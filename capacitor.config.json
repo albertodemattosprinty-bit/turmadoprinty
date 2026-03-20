@@ -1,0 +1,12 @@
+{
+  "appId": "com.turmadoprinty.app",
+  "appName": "Turma do Printy",
+  "webDir": "public",
+  "server": {
+    "url": "https://www.turmadoprinty.com.br",
+    "allowNavigation": [
+      "www.turmadoprinty.com.br",
+      "turmadoprinty.com.br"
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
 import { applyTextOverrides, getTextOverride, initContentAdmin } from "./content-admin.js";
+import { getApiUrl } from "./api.js";
 
 const planStatus = document.getElementById("plan-status");
 const plansGrid = document.getElementById("plans-grid");
@@ -13,7 +14,7 @@ function redirectToAuth() {
 }
 
 async function loadSiteConfig() {
-  const response = await fetch("/api/site/config");
+  const response = await fetch(getApiUrl("/api/site/config"));
   const data = await response.json();
 
   if (!response.ok) {
@@ -83,7 +84,7 @@ async function loadAccessState() {
     return;
   }
 
-  const response = await fetch("/api/account/access", {
+  const response = await fetch(getApiUrl("/api/account/access"), {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -116,7 +117,7 @@ async function startRecurringCheckout(plan) {
     return;
   }
 
-  const response = await fetch("/api/payments/stripe/subscription-checkout", {
+  const response = await fetch(getApiUrl("/api/payments/stripe/subscription-checkout"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -194,7 +195,7 @@ function renderAdminPanel(user, siteConfig, refreshPage) {
     status.textContent = "Salvando...";
 
     try {
-      const response = await fetch("/api/admin/pricing", {
+      const response = await fetch(getApiUrl("/api/admin/pricing"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

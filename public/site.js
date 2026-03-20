@@ -1,5 +1,6 @@
 import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
 import { applyTextOverrides, initContentAdmin } from "./content-admin.js";
+import { getApiUrl } from "./api.js";
 
 const page = document.body.dataset.page || "";
 
@@ -17,7 +18,7 @@ function markActiveNav() {
 }
 
 async function loadSiteConfig() {
-  const response = await fetch("/api/site/config");
+  const response = await fetch(getApiUrl("/api/site/config"));
   const data = await response.json();
 
   if (!response.ok) {
@@ -47,7 +48,7 @@ function ensureAdminPanel() {
 }
 
 async function savePricing(payload, statusNode) {
-  const response = await fetch("/api/admin/pricing", {
+  const response = await fetch(getApiUrl("/api/admin/pricing"), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -128,7 +129,7 @@ async function loadAlbums(siteConfig, user) {
     grid.innerHTML = "";
 
     try {
-      const response = await fetch(page === "produtos" ? "/api/store/products" : "/api/albums");
+      const response = await fetch(getApiUrl(page === "produtos" ? "/api/store/products" : "/api/albums"));
       const data = await response.json();
 
       if (!response.ok) {
@@ -224,7 +225,7 @@ function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
     status.textContent = "Salvando...";
 
     try {
-      const response = await fetch("/api/admin/schedule", {
+      const response = await fetch(getApiUrl("/api/admin/schedule"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -262,7 +263,7 @@ async function loadSchedule(siteConfig, user) {
   }
 
   const refreshSchedule = async () => {
-    const response = await fetch("/api/site/config");
+    const response = await fetch(getApiUrl("/api/site/config"));
     const data = await response.json();
     const scheduleItems = Array.isArray(data.schedule) ? data.schedule : [];
 
@@ -320,7 +321,7 @@ async function loadSchedule(siteConfig, user) {
           button.disabled = true;
 
           try {
-            const response = await fetch(`/api/events/${encodeURIComponent(item.id)}/contractor`, {
+            const response = await fetch(getApiUrl(`/api/events/${encodeURIComponent(item.id)}/contractor`), {
               method: "PUT",
               headers: {
                 "Content-Type": "application/json",

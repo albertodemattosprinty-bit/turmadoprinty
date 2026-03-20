@@ -74,9 +74,43 @@ const mimeTypes = {
 const DEFAULT_RESPONSE_STYLE_PROMPT = "Responda de forma direta e natural, preferencialmente em ate 500 caracteres. So ultrapasse esse limite quando isso for realmente necessario para manter clareza ou utilidade.";
 const DEFAULT_PREVIEW_MAX_COMPLETION_TOKENS = Number(process.env.OPENAI_INSTANT_MAX_COMPLETION_TOKENS || 120);
 const DEFAULT_FINAL_MAX_COMPLETION_TOKENS = Number(process.env.OPENAI_FINAL_MAX_COMPLETION_TOKENS || 220);
+const allowedCorsOrigins = new Set([
+  "https://www.turmadoprinty.com.br",
+  "https://turmadoprinty.com.br",
+  "http://localhost",
+  "https://localhost",
+  "capacitor://localhost",
+  "ionic://localhost"
+]);
 
 function isAdminUser(user) {
   return String(user?.username || "").trim().toLowerCase() === ADMIN_USERNAME;
+}
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) {
+    return false;
+  }
+
+  if (allowedCorsOrigins.has(origin)) {
+    return true;
+  }
+
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+}
+
+function applyCorsHeaders(request, response) {
+  const origin = typeof request.headers.origin === "string" ? request.headers.origin.trim() : "";
+
+  if (!isAllowedCorsOrigin(origin)) {
+    return;
+  }
+
+  response.setHeader("Access-Control-Allow-Origin", origin);
+  response.setHeader("Vary", "Origin");
+  response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  response.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Type, Content-Disposition");
 }
 
 function sendJson(response, statusCode, payload) {
@@ -2037,6 +2071,14 @@ async function handleEduDownload(response, pathname) {
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   const { pathname } = requestUrl;
+
+  applyCorsHeaders(request, response);
+
+  if (request.method === "OPTIONS") {
+    response.writeHead(204);
+    response.end();
+    return;
+  }
 
   if (request.method === "GET" && pathname === "/api/health") {
     sendJson(response, 200, {
