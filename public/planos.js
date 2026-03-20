@@ -1,0 +1,318 @@
+import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
+import { applyTextOverrides, getTextOverride, initContentAdmin } from "./content-admin.js";
+import { getApiUrl } from "./api.js";
+
+const capacitor = window.Capacitor;
+const nativePlatform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
+const isNativePlatform = typeof capacitor?.isNativePlatform === "function"
+  ? capacitor.isNativePlatform()
+  : nativePlatform === "android" || nativePlatform === "ios";
+const isAndroidApp = isNativePlatform && nativePlatform === "android";
+
+if (isAndroidApp) {
+  document.documentElement.classList.add("native-android-app");
+}
+
+const planStatus = document.getElementById("plan-status");
+const plansGrid = document.getElementById("plans-grid");
+
+function getAuthRedirectUrl() {
+  return `/auth.html?next=${encodeURIComponent("/planos.html")}`;
+}
+
+function redirectToAuth() {
+  window.location.href = getAuthRedirectUrl();
+}
+
+async function loadSiteConfig() {
+  const response = await fetch(getApiUrl("/api/site/config"));
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao carregar configuracoes.");
+  }
+
+  return data;
+}
+
+function formatCurrency(valueInCents) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format((Number(valueInCents) || 0) / 100);
+}
+
+function buildPlans(siteConfig) {
+  const prices = siteConfig.pricing.planPrices || {};
+
+  return [
+    {
+      id: "gratis",
+      name: getTextOverride("plans.free.name", "Gratis"),
+      priceLabel: getTextOverride("plans.free.price", "Gratis"),
+      description: getTextOverride("plans.free.description", "Streaming e download offline liberados no navegador para usuarios logados."),
+      perks: ["Ouvir todas as faixas", "Downloads offline", "Navegar no catalogo"]
+    },
+    {
+      id: "plus",
+      name: getTextOverride("plans.plus.name", "Plus"),
+      priceLabel: `${formatCurrency(prices.plus)}/mes`,
+      description: getTextOverride("plans.plus.description", "9,90 · Músicas + IA Ministério Infantil."),
+      perks: ["Músicas", "IA Ministério Infantil", "Respostas rápidas para o dia a dia"]
+    },
+    {
+      id: "pro",
+      name: getTextOverride("plans.pro.name", "Pro"),
+      priceLabel: `${formatCurrency(prices.pro)}/mes`,
+      description: getTextOverride("plans.pro.description", "19,90 · Modelo pensador."),
+      perks: ["Modelo pensador", "Mais profundidade nas respostas", "Apoio criativo para ministério"]
+    },
+    {
+      id: "life",
+      name: getTextOverride("plans.life.name", "Life"),
+      priceLabel: `${formatCurrency(prices.life)}/mes`,
+      description: getTextOverride("plans.life.description", "29,90 · Modelo projeto + cantatas + downloads."),
+      perks: ["Modelo Projeto", "Cantatas", "Downloads", "Plano mais completo"]
+    }
+  ];
+}
+
+let accessState = {
+  authenticated: false,
+  planId: "gratis",
+  canDownloadAll: false
+};
+
+async function loadAccessState() {
+  const token = getToken();
+
+  if (!token) {
+    accessState = {
+      authenticated: false,
+      planId: "gratis",
+      canDownloadAll: false
+    };
+    return;
+  }
+
+  const response = await fetch(getApiUrl("/api/account/access"), {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+
+  if (response.status === 401) {
+    window.localStorage.removeItem(sessionStorageKey);
+    redirectToAuth();
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao carregar plano atual.");
+  }
+
+  accessState = {
+    authenticated: true,
+    planId: data.access.plan.id || "gratis",
+    canDownloadAll: Boolean(data.access.canDownloadAll)
+  };
+}
+
+async function startRecurringCheckout(plan) {
+  const token = getToken();
+
+  if (!token) {
+    redirectToAuth();
+    return;
+  }
+
+  const response = await fetch(getApiUrl("/api/payments/stripe/subscription-checkout"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ planId: plan.id })
+  });
+
+  const rawText = await response.text();
+  const data = rawText ? JSON.parse(rawText) : {};
+
+  if (response.status === 401) {
+    redirectToAuth();
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao criar checkout recorrente.");
+  }
+
+  if (!data.payUrl) {
+    throw new Error("Checkout recorrente criado sem link de pagamento.");
+  }
+
+  window.location.href = data.payUrl;
+}
+
+function ensureAdminPanel() {
+  let panel = document.getElementById("admin-panel");
+
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "admin-panel";
+    panel.className = "admin-panel";
+    document.querySelector(".page-shell")?.prepend(panel);
+  }
+
+  return panel;
+}
+
+function renderAdminPanel(user, siteConfig, refreshPage) {
+  if (!user?.isAdmin) {
+    return;
+  }
+
+  const panel = ensureAdminPanel();
+  const prices = siteConfig.pricing.planPrices || {};
+
+  panel.innerHTML = `
+    <div class="admin-panel-head">
+      <strong>Admin RoseMattos</strong>
+      <span>Planos</span>
+    </div>
+    <form id="admin-plan-form" class="admin-form-grid">
+      <label>Plus (centavos)
+        <input id="admin-plan-plus" type="number" min="0" step="1" value="${prices.plus || 990}">
+      </label>
+      <label>Pro (centavos)
+        <input id="admin-plan-pro" type="number" min="0" step="1" value="${prices.pro || 1990}">
+      </label>
+      <label>Life (centavos)
+        <input id="admin-plan-life" type="number" min="0" step="1" value="${prices.life || 2990}">
+      </label>
+      <button class="primary-button" type="submit">Salvar planos</button>
+      <p id="admin-plan-status" class="section-muted"></p>
+    </form>
+  `;
+  applyTextOverrides(panel);
+
+  const form = document.getElementById("admin-plan-form");
+  const status = document.getElementById("admin-plan-status");
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.textContent = "Salvando...";
+
+    try {
+      const response = await fetch(getApiUrl("/api/admin/pricing"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+          albumPriceCents: siteConfig.pricing.albumPriceCents,
+          planPrices: {
+            gratis: 0,
+            plus: Number(document.getElementById("admin-plan-plus").value || 0),
+            pro: Number(document.getElementById("admin-plan-pro").value || 0),
+            life: Number(document.getElementById("admin-plan-life").value || 0)
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Falha ao salvar planos.");
+      }
+
+      status.textContent = "Planos atualizados no servidor.";
+      await refreshPage();
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Erro ao salvar planos.";
+    }
+  });
+}
+
+function renderPlans(plans) {
+  const params = new URLSearchParams(window.location.search);
+  const paymentReturned = params.get("payment") === "return";
+  const activePlan = plans.find((plan) => plan.id === accessState.planId) || plans[0];
+
+  if (!accessState.authenticated) {
+    planStatus.textContent = "Faca login para ativar o plano Gratis e liberar downloads offline no navegador.";
+  } else if (params.get("from") === "project-mode") {
+    planStatus.textContent = "O modo Projeto faz parte do plano Life.";
+  } else if (paymentReturned) {
+    planStatus.textContent = "Pagamento enviado ao Stripe. Aguarde a confirmacao da assinatura.";
+  } else if (accessState.canDownloadAll) {
+    planStatus.textContent = `Plano ${activePlan.name} ativo no servidor. Streaming e downloads offline liberados para todo o catalogo.`;
+  } else {
+    planStatus.textContent = `Plano atual: ${activePlan.name}.`;
+  }
+
+  plansGrid.innerHTML = "";
+
+  plans.forEach((plan) => {
+    const isActive = accessState.canDownloadAll && plan.id === accessState.planId;
+    const article = document.createElement("article");
+    article.className = `plan-card${isActive ? " active" : ""}`;
+    article.innerHTML = `
+      <p class="eyebrow">${plan.name}</p>
+      <h2>${plan.priceLabel}</h2>
+      <p>${plan.description}</p>
+      <div class="plan-perks">${plan.perks.map((perk) => `<span class="status-pill">${perk}</span>`).join("")}</div>
+      <button class="${isActive || plan.id === "gratis" ? "ghost-button" : "primary-button"} full-width" type="button">
+        ${isActive ? "Plano ativo" : plan.id === "gratis" ? "Plano padrao" : "Assinar"}
+      </button>
+    `;
+
+    const button = article.querySelector("button");
+    button.disabled = isActive;
+    button.addEventListener("click", async () => {
+      if (plan.id === "gratis") {
+        planStatus.textContent = "O plano Gratis ja fica disponivel como padrao.";
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = "Abrindo checkout...";
+
+      try {
+        await startRecurringCheckout(plan);
+      } catch (error) {
+        planStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar assinatura.";
+        button.disabled = false;
+        button.textContent = "Assinar";
+      }
+    });
+
+    plansGrid.appendChild(article);
+  });
+
+  applyTextOverrides(plansGrid);
+}
+
+async function renderPage() {
+  const [siteConfig, user] = await Promise.all([loadSiteConfig(), loadCurrentUser()]);
+  initContentAdmin({
+    user,
+    getToken,
+    config: siteConfig
+  });
+  const plans = buildPlans(siteConfig);
+  renderAdminPanel(user, siteConfig, renderPage);
+  await loadAccessState();
+  renderPlans(plans);
+}
+
+await initSiteHeader().catch(() => null);
+
+try {
+  await renderPage();
+} catch (error) {
+  planStatus.textContent = error instanceof Error ? error.message : "Erro ao carregar planos.";
+}
