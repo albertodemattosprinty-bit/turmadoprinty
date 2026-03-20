@@ -15,6 +15,7 @@ const albumAdminStatus = document.getElementById("album-admin-status");
 
 let accessState = {
   authenticated: false,
+  planId: "gratis",
   canDownloadAll: false,
   purchasedAlbumIds: []
 };
@@ -29,6 +30,77 @@ let floatingNoticeTimer = null;
 let albumShortcutBuffer = "";
 let albumShortcutTimer = null;
 const adminUsername = "rosemattos";
+const freePreviewSeconds = 30;
+const freePreviewFadeSeconds = 4;
+
+function normalizeCatalogText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function hasFullCatalogAccess() {
+  return ["pro", "life"].includes(normalizeCatalogText(accessState.planId));
+}
+
+function isPlusPlaybackAlbumName(albumName) {
+  const normalized = normalizeCatalogText(albumName);
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (/^datas comemorativas [1-8]$/.test(normalized)) {
+    return true;
+  }
+
+  if (/^louvores da garotada [1-8]$/.test(normalized)) {
+    return true;
+  }
+
+  if (normalized.startsWith("coletanea")) {
+    return true;
+  }
+
+  return ["favoritas", "favoritas 1", "favoritas 2", "ebd", "zero a seis anos"].includes(normalized);
+}
+
+function canStreamTrack(albumId, albumName, track) {
+  if (hasPurchasedAlbum(albumId) || hasFullCatalogAccess()) {
+    return true;
+  }
+
+  if (track?.type !== "playback") {
+    return true;
+  }
+
+  return normalizeCatalogText(accessState.planId) === "plus" && isPlusPlaybackAlbumName(albumName);
+}
+
+function canDownloadTrack(albumId, albumName, track) {
+  if (hasPurchasedAlbum(albumId) || hasFullCatalogAccess()) {
+    return true;
+  }
+
+  if (normalizeCatalogText(accessState.planId) !== "plus") {
+    return false;
+  }
+
+  if (track?.type !== "playback") {
+    return true;
+  }
+
+  return isPlusPlaybackAlbumName(albumName);
+}
+
+function shouldLimitFreePreview(albumId, albumName, track) {
+  return !hasPurchasedAlbum(albumId)
+    && normalizeCatalogText(accessState.planId) === "gratis"
+    && canStreamTrack(albumId, albumName, track);
+}
 
 function getTrackModeLabel(track) {
   return track?.type === "playback" ? "Playback" : "Full";
@@ -309,6 +381,7 @@ async function loadAccessState() {
   if (!token) {
     accessState = {
       authenticated: false,
+      planId: "gratis",
       canDownloadAll: false,
       purchasedAlbumIds: []
     };
@@ -335,6 +408,7 @@ async function loadAccessState() {
     window.localStorage.removeItem(sessionStorageKey);
     accessState = {
       authenticated: false,
+      planId: "gratis",
       canDownloadAll: false,
       purchasedAlbumIds: []
     };
@@ -348,6 +422,7 @@ async function loadAccessState() {
 
   accessState = {
     authenticated: true,
+    planId: accessData.access?.plan?.id || accessData.access?.planId || "gratis",
     canDownloadAll: Boolean(accessData.access.canDownloadAll),
     purchasedAlbumIds: Array.isArray(accessData.access.purchasedAlbumIds) ? accessData.access.purchasedAlbumIds : []
   };
@@ -376,6 +451,11 @@ function setPurchaseStatus(albumId) {
     purchaseStatus.textContent = accessState.authenticated
       ? "Download liberado para este album na sua conta."
       : "Faca login para acessar seus downloads.";
+    return;
+  }
+
+  if (normalizeCatalogText(accessState.planId) === "plus") {
+    purchaseStatus.textContent = "Plano Plus: downloads e playbacks liberados conforme a faixa e a colecao.";
     return;
   }
 
@@ -504,12 +584,37 @@ function bindAudioToCard(card, audio) {
   }
 
   audio.addEventListener("loadedmetadata", updatePlayerButtons);
-  audio.addEventListener("timeupdate", updatePlayerButtons);
+  audio.addEventListener("timeupdate", () => {
+    const previewLimit = Number(card.dataset.previewLimitSeconds || 0);
+
+    if (previewLimit > 0) {
+      const fadeStart = Math.max(0, previewLimit - freePreviewFadeSeconds);
+
+      if (audio.currentTime >= previewLimit) {
+        audio.volume = 1;
+        audio.pause();
+        showFloatingNotice("No plano gratis a previa vai ate 30 segundos.");
+      } else if (audio.currentTime >= fadeStart) {
+        const remaining = Math.max(0, previewLimit - audio.currentTime);
+        audio.volume = Math.min(1, remaining / Math.max(freePreviewFadeSeconds, 1));
+      } else {
+        audio.volume = 1;
+      }
+    } else {
+      audio.volume = 1;
+    }
+
+    updatePlayerButtons();
+  });
   audio.addEventListener("ended", () => {
+    audio.volume = 1;
     audio.currentTime = 0;
     updatePlayerButtons();
   });
-  audio.addEventListener("pause", updatePlayerButtons);
+  audio.addEventListener("pause", () => {
+    audio.volume = 1;
+    updatePlayerButtons();
+  });
   audio.addEventListener("play", updatePlayerButtons);
 
   const progressBar = card.querySelector("[data-role='progress']");
@@ -530,6 +635,11 @@ async function playTrack(card, albumId, track) {
     return;
   }
 
+  if (!canStreamTrack(albumId, currentAlbum?.name, track)) {
+    showFloatingNotice("Seu plano nao libera ouvir este playback.");
+    return;
+  }
+
   if (currentAudio && currentAudio !== audio) {
     currentAudio.pause();
     currentAudio.currentTime = 0;
@@ -539,6 +649,11 @@ async function playTrack(card, albumId, track) {
     const offlineUrl = await getOfflineTrackUrl(albumId, track.number);
     audio.src = offlineUrl || track.streamUrl;
     audio.dataset.ready = "true";
+  }
+
+  const previewLimit = Number(card.dataset.previewLimitSeconds || 0);
+  if (previewLimit > 0 && audio.currentTime >= previewLimit) {
+    audio.currentTime = 0;
   }
 
   currentAudio = audio;
@@ -571,8 +686,8 @@ async function downloadTrackForOffline(card, albumId, track) {
     return;
   }
 
-  if (!canUseDownloads(albumId)) {
-    showFloatingNotice("Liberacao necessaria para baixar este album.");
+  if (!canDownloadTrack(albumId, currentAlbum?.name, track)) {
+    showFloatingNotice("Seu plano nao libera download desta faixa.");
     return;
   }
 
@@ -886,6 +1001,7 @@ async function renderTracks(album) {
     article.className = "track-card";
     article.dataset.trackNumber = String(track.number);
     article.dataset.trackMode = getTrackModeLabel(track);
+    article.dataset.previewLimitSeconds = shouldLimitFreePreview(album.id, album.name, track) ? String(freePreviewSeconds) : "0";
 
     const playbackOptions = album.tracks
       .filter((item) => item.number !== track.number)
@@ -906,6 +1022,18 @@ async function renderTracks(album) {
             <span data-role="duration">00:00</span>
           </div>
         </div>
+      </div>
+      <div class="track-download-row">
+        <span class="track-download-label">${
+          canDownloadTrack(album.id, album.name, track)
+            ? "Download disponivel"
+            : track.type === "playback"
+              ? "Playback"
+              : "Preview"
+        }</span>
+        <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="Baixar faixa">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1m-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1"/></svg>
+        </button>
       </div>
       ${isAdmin() ? `
         <div class="track-admin-tools">
@@ -954,6 +1082,29 @@ async function renderTracks(album) {
 
       await playTrack(article, album.id, track);
     });
+
+    article.querySelector("[data-role='download']")?.addEventListener("click", async () => {
+      try {
+        await downloadTrackForOffline(article, album.id, track);
+      } catch (error) {
+        setDownloadUi(article, {
+          label: track.type === "playback" ? "Playback" : "Faixa"
+        });
+        showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel baixar a faixa.");
+      }
+    });
+
+    setDownloadUi(article, {
+      label: canDownloadTrack(album.id, album.name, track)
+        ? "Download disponivel"
+        : track.type === "playback"
+          ? "Playback"
+          : "Faixa"
+    });
+
+    if (canDownloadTrack(album.id, album.name, track) && await isTrackDownloaded(album.id, track.number)) {
+      setDownloadUi(article, { downloaded: true });
+    }
 
     bindAdminTrackEditor(article, album, track);
     trackList.appendChild(article);

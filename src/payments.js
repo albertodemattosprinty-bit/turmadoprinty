@@ -1,4 +1,5 @@
 import { query } from "./db.js";
+import { getCatalogAccessSummary, hasFullCatalogAccess } from "./access-rules.js";
 
 const ACTIVE_PAYMENT_STATUSES = new Set(["PAID", "AUTHORIZED"]);
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["ACTIVE", "PAID", "AUTHORIZED"]);
@@ -335,6 +336,7 @@ export async function getUserAccessState(userId) {
   return {
     plan: effectivePlan,
     purchasedAlbumIds,
-    canDownloadAll: Boolean(effectivePlan && effectivePlan.id !== "gratis" && effectivePlan.active)
+    canDownloadAll: Boolean(effectivePlan && hasFullCatalogAccess(effectivePlan.id) && effectivePlan.active),
+    ...getCatalogAccessSummary(effectivePlan?.id)
   };
 }

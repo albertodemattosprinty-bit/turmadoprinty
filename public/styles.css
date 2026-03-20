@@ -1101,6 +1101,13 @@ body[data-page="eventos-pagamento"] {
   align-items: center;
 }
 
+.track-download-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .track-title-display {
   cursor: pointer;
 }
@@ -1158,6 +1165,23 @@ body[data-page="eventos-pagamento"] {
 .track-play-button svg {
   width: 20px;
   height: 20px;
+  fill: currentColor;
+}
+
+.download-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.download-icon-button svg {
+  width: 18px;
+  height: 18px;
   fill: currentColor;
 }
 
@@ -2531,6 +2555,12 @@ body[data-page="explorar"] .conversation-shell {
   padding: 26px;
 }
 
+body[data-page="explorar"] .ia-ambience {
+  border: 2px solid #1b53bb;
+  align-items: stretch;
+  justify-items: stretch;
+}
+
 body[data-page="explorar"] .sidebar-scroll-content {
   padding-right: 0;
 }
@@ -2715,7 +2745,7 @@ body[data-page="explorar"] .empty-conversation-state p {
 }
 
 body[data-page="explorar"] .message-card {
-  max-width: min(88%, 760px);
+  max-width: min(88%, 60ch);
   padding: 14px 18px;
   border-radius: 24px;
   box-shadow: 0 12px 30px rgba(18, 58, 126, 0.08);
@@ -3256,14 +3286,18 @@ body[data-page="explorar"] #chat-auth-status {
     padding: 16px 0 0;
   }
 
+  body[data-page="explorar"] .ia-ambience {
+    border-inline: 2px solid #1b53bb;
+  }
+
   body[data-page="explorar"] .chat-thread {
     min-height: auto;
     padding: 4px 0 calc(var(--explore-composer-height) + 10px);
   }
 
   body[data-page="explorar"] .message-card {
-    max-width: 100%;
-    border-radius: 0;
+    max-width: min(100%, 40ch);
+    border-radius: 24px;
   }
 
   body[data-page="explorar"] .message-role {

@@ -13,6 +13,7 @@ import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
 import { deleteUserById, ensureAdminUsersSchema, listUsersWithAdminData, recordNarrationUsage, recordTextTokenUsage, removeUserPlanOverride, setUserContractorStatus, setUserPlanOverride, touchUserPresence } from "./src/admin-users.js";
 import { createAlbumManifestStore } from "./src/album-manifests.js";
+import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
 import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -31,7 +32,7 @@ const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
 const OPENAI_TTS_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
-const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom cristao protestante, leve, humano, claro e acolhedor. Seja pratico, caloroso e direto. Nao sugira oracoes, devocionais ou momentos de oracao por conta propria; so fale disso se a pessoa pedir claramente. Evite formular convites espirituais automaticos no fim da resposta. Priorize ajuda objetiva, sensibilidade e boa conversa.";
+const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ADMIN_USERNAME = "rosemattos";
 
 const publicDir = path.join(__dirname, "public");
@@ -1757,10 +1758,22 @@ async function handleProtectedTrackDownload(request, response, pathname) {
   try {
     const accessState = await getUserAccessState(user.id);
     const hasAlbumPurchase = accessState.purchasedAlbumIds.includes(product.id);
+    const manifestTracks = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+    const track = manifestTracks.find((item) => Number(item.number) === trackNumber);
 
-    if (!accessState.canDownloadAll && !hasAlbumPurchase) {
+    if (!track) {
+      sendJson(response, 404, { error: "Faixa nao encontrada." });
+      return;
+    }
+
+    const canDownloadByPlan = canDownloadTrackForPlan(accessState.plan?.id, {
+      albumName: product.name,
+      trackType: track.type
+    });
+
+    if (!canDownloadByPlan && !hasAlbumPurchase) {
       sendJson(response, 403, {
-        error: "Compra ou plano pago necessario para baixar esta faixa."
+        error: "Seu plano nao libera download desta faixa."
       });
       return;
     }
