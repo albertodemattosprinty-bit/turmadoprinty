@@ -2136,6 +2136,10 @@ body[data-page="explorar"] .sidebar-actions .sidebar-icon-button.primary-button 
   font-weight: 800;
 }
 
+.conversation-title-line {
+  display: block;
+}
+
 .conversation-meta {
   margin: 0;
   color: var(--text-muted);
@@ -3304,17 +3308,17 @@ body[data-page="explorar"] #chat-auth-status {
   body[data-page="explorar"] .sidebar-topbar {
     position: absolute;
     top: 12px;
-    right: -58px;
+    right: -21px;
     margin: 0;
   }
 
   body[data-page="explorar"].explore-sidebar-open .sidebar-topbar {
-    right: -13px;
+    right: -21px;
   }
 
   body[data-page="explorar"] .sidebar-toggle-button {
     box-shadow: 0 10px 22px rgba(27, 83, 187, 0.24);
-    opacity: 0.5;
+    opacity: 1;
   }
 
   body[data-page="explorar"].explore-sidebar-open .chat-sidebar {
@@ -3420,7 +3424,7 @@ body[data-page="explorar"] #chat-auth-status {
   }
 
   body[data-page="explorar"] .conversation-title {
-    margin-top: 55px;
+    margin-top: 12px;
     line-height: 1.04;
   }
 

@@ -138,7 +138,7 @@ const chatRevealTickMs = 50;
 const speechSilenceTimeoutMs = 3000;
 const speechChunkWordCount = 20;
 const emptyConversationSupportText = "Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.";
-const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>';
+const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11a1 1 0 0 0 1.53.85l8.6-5.5a1 1 0 0 0 0-1.7l-8.6-5.5A1 1 0 0 0 8 6.5"/></svg>';
 const micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/></svg>';
 const squareStopIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>';
 const playAudioIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11a1 1 0 0 0 1.53.85l8.6-5.5a1 1 0 0 0 0-1.7l-8.6-5.5A1 1 0 0 0 8 6.5"/></svg>';
@@ -591,20 +591,31 @@ function splitBalancedLine(text) {
 
   const words = safeText.split(" ");
   if (words.length <= 1) {
-    return [safeText, ""];
+    if (safeText.length <= 1) {
+      return [safeText, ""];
+    }
+
+    const midpoint = Math.ceil(safeText.length / 2);
+    return [safeText.slice(0, midpoint), safeText.slice(midpoint)];
   }
 
   let bestIndex = 1;
   let bestDelta = Number.POSITIVE_INFINITY;
+  let bestLeftLength = 0;
 
   for (let index = 1; index < words.length; index += 1) {
     const left = words.slice(0, index).join(" ");
     const right = words.slice(index).join(" ");
+    if (left.length < right.length) {
+      continue;
+    }
+
     const delta = Math.abs(left.length - right.length);
 
-    if (delta < bestDelta) {
+    if (delta < bestDelta || (delta === bestDelta && left.length > bestLeftLength)) {
       bestDelta = delta;
       bestIndex = index;
+      bestLeftLength = left.length;
     }
   }
 
@@ -612,6 +623,14 @@ function splitBalancedLine(text) {
     words.slice(0, bestIndex).join(" "),
     words.slice(bestIndex).join(" ")
   ];
+}
+
+function getBalancedTitleMarkup(text) {
+  const [topLine, bottomLine] = splitBalancedLine(text);
+  return `
+    <span class="conversation-title-line">${escapeHtml(topLine)}</span>
+    <span class="conversation-title-line">${escapeHtml(bottomLine || topLine)}</span>
+  `;
 }
 
 function getConversationSearchResults(conversation, searchTerm) {
@@ -1581,7 +1600,7 @@ function renderConversation() {
   conversationTitle.dataset.searchTarget = "title";
   conversationTitle.innerHTML = titleSearchActive
     ? getHighlightedMarkup(conversation.title, pendingSearchFocus.searchTerm, pendingSearchFocus.occurrenceIndex, "search-highlight-target")
-    : escapeHtml(conversation.title);
+    : getBalancedTitleMarkup(conversation.title);
   conversationMeta.textContent = "";
 
   conversation.messages.forEach((item, messageIndex) => {
