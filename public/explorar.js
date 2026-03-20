@@ -1508,7 +1508,9 @@ function syncComposerEmptyState() {
     return;
   }
 
-  chatForm.classList.toggle("is-empty", !chatInput.value.trim());
+  const contentLength = chatInput.value.trim().length;
+  chatForm.classList.toggle("is-empty", contentLength === 0);
+  chatForm.classList.toggle("is-compact", contentLength < 24);
 }
 
 window.addEventListener("resize", () => {
@@ -2320,7 +2322,9 @@ stopButton.addEventListener("click", () => {
 
 chatInput.addEventListener("input", () => {
   chatInput.style.height = "auto";
-  chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
+  const contentLength = chatInput.value.trim().length;
+  const maxHeight = contentLength < 24 ? 104 : 180;
+  chatInput.style.height = `${Math.min(chatInput.scrollHeight, maxHeight)}px`;
   syncComposerEmptyState();
   syncComposerLayout();
 });
