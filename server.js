@@ -35,6 +35,7 @@ const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ADMIN_USERNAME = "rosemattos";
 const livePlayClients = new Set();
+const livePlayWsClients = new Set();
 let livePlayState = null;
 
 const publicDir = path.join(__dirname, "public");
@@ -126,6 +127,33 @@ function sendSseEvent(response, eventName, payload) {
   response.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
+function encodeWebSocketFrame(payloadText) {
+  const payload = Buffer.from(String(payloadText || ""), "utf8");
+  const length = payload.length;
+
+  if (length < 126) {
+    return Buffer.concat([Buffer.from([0x81, length]), payload]);
+  }
+
+  if (length < 65536) {
+    const header = Buffer.alloc(4);
+    header[0] = 0x81;
+    header[1] = 126;
+    header.writeUInt16BE(length, 2);
+    return Buffer.concat([header, payload]);
+  }
+
+  const header = Buffer.alloc(10);
+  header[0] = 0x81;
+  header[1] = 127;
+  header.writeBigUInt64BE(BigInt(length), 2);
+  return Buffer.concat([header, payload]);
+}
+
+function sendWebSocketJson(socket, payload) {
+  socket.write(encodeWebSocketFrame(JSON.stringify(payload)));
+}
+
 function publishLivePlay(payload) {
   livePlayState = payload;
 
@@ -134,6 +162,18 @@ function publishLivePlay(payload) {
       sendSseEvent(client, "playback", payload);
     } catch {
       livePlayClients.delete(client);
+    }
+  }
+
+  for (const socket of livePlayWsClients) {
+    try {
+      sendWebSocketJson(socket, {
+        type: "playback",
+        payload
+      });
+    } catch {
+      livePlayWsClients.delete(socket);
+      socket.destroy();
     }
   }
 }
@@ -570,6 +610,65 @@ function handleLivePlayStream(request, response) {
   });
 }
 
+function handleLivePlayWebSocket(request, socket) {
+  const upgradeHeader = request.headers.upgrade;
+  const websocketKey = request.headers["sec-websocket-key"];
+
+  if (String(upgradeHeader || "").toLowerCase() !== "websocket" || !websocketKey) {
+    socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+
+  const acceptKey = crypto
+    .createHash("sha1")
+    .update(`${websocketKey}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`, "utf8")
+    .digest("base64");
+
+  socket.write(
+    "HTTP/1.1 101 Switching Protocols\r\n"
+    + "Upgrade: websocket\r\n"
+    + "Connection: Upgrade\r\n"
+    + `Sec-WebSocket-Accept: ${acceptKey}\r\n\r\n`
+  );
+
+  livePlayWsClients.add(socket);
+
+  if (livePlayState) {
+    sendWebSocketJson(socket, {
+      type: "playback",
+      payload: livePlayState
+    });
+  }
+
+  socket.on("close", () => {
+    livePlayWsClients.delete(socket);
+  });
+
+  socket.on("error", () => {
+    livePlayWsClients.delete(socket);
+    socket.destroy();
+  });
+
+  socket.on("end", () => {
+    livePlayWsClients.delete(socket);
+  });
+
+  socket.on("data", (chunk) => {
+    const opcode = chunk?.[0] & 0x0f;
+
+    if (opcode === 0x8) {
+      livePlayWsClients.delete(socket);
+      socket.end();
+      return;
+    }
+
+    if (opcode === 0x9) {
+      socket.write(Buffer.from([0x8a, 0x00]));
+    }
+  });
+}
+
 async function handleLivePlayBroadcast(request, response) {
   const user = await requireAuth(request, response);
 
@@ -592,12 +691,14 @@ async function handleLivePlayBroadcast(request, response) {
   }
 
   const streamUrl = typeof body.streamUrl === "string" ? body.streamUrl.trim() : "";
+  const leadMs = Math.min(4000, Math.max(250, Number(body.leadMs) || 900));
 
   if (!/^https?:\/\//i.test(streamUrl)) {
     sendJson(response, 400, { error: "streamUrl invalida." });
     return;
   }
 
+  const startAt = Date.now() + leadMs;
   const payload = {
     id: crypto.randomUUID(),
     streamUrl,
@@ -605,6 +706,8 @@ async function handleLivePlayBroadcast(request, response) {
     trackTitle: typeof body.trackTitle === "string" ? body.trackTitle.trim() : "",
     trackNumber: Number.isInteger(Number(body.trackNumber)) ? Number(body.trackNumber) : null,
     username: user.username || "",
+    leadMs,
+    startAt,
     triggeredAt: new Date().toISOString()
   };
 
@@ -2337,6 +2440,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/live-play/time") {
+    sendJson(response, 200, { now: Date.now() });
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/live-play/broadcast") {
     await handleLivePlayBroadcast(request, response);
     return;
@@ -2609,6 +2717,18 @@ const server = http.createServer(async (request, response) => {
 
   response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
   response.end("Pagina nao encontrada.");
+});
+
+server.on("upgrade", (request, socket) => {
+  const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+
+  if (requestUrl.pathname === "/api/live-play/ws") {
+    handleLivePlayWebSocket(request, socket);
+    return;
+  }
+
+  socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+  socket.destroy();
 });
 
 server.listen(PORT, () => {

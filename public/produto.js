@@ -33,6 +33,7 @@ let albumShortcutTimer = null;
 const adminUsername = "rosemattos";
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
+const livePlayLeadMs = 900;
 
 function normalizeCatalogText(value) {
   return String(value || "")
@@ -111,7 +112,8 @@ async function notifyLivePlay(track, audio) {
         streamUrl,
         albumName: currentAlbum?.name || "",
         trackTitle: track?.title || track?.label || "",
-        trackNumber: Number(track?.number) || null
+        trackNumber: Number(track?.number) || null,
+        leadMs: livePlayLeadMs
       })
     });
   } catch {
