@@ -854,11 +854,41 @@ function buildResponseStylePrompt(modeKey) {
 }
 
 function splitTextIntoSpeechChunks(text) {
-  const words = String(text || "").trim().split(/\s+/).filter(Boolean);
-  const chunks = [];
+  const source = String(text || "").replace(/\s+/g, " ").trim();
 
-  for (let index = 0; index < words.length; index += speechChunkWordCount) {
-    chunks.push(words.slice(index, index + speechChunkWordCount).join(" "));
+  if (!source) {
+    return [];
+  }
+
+  const tokens = source.match(/\S+\s*/g) || [];
+  const chunks = [];
+  let currentChunk = "";
+  let wordCount = 0;
+  let reachedMinWords = false;
+
+  tokens.forEach((token) => {
+    const cleanToken = token.trim();
+    if (!cleanToken) {
+      return;
+    }
+
+    currentChunk += token;
+    wordCount += 1;
+    if (wordCount >= speechChunkWordCount) {
+      reachedMinWords = true;
+    }
+
+    const endsWithBoundary = /[,.]$/.test(cleanToken);
+    if (reachedMinWords && endsWithBoundary) {
+      chunks.push(currentChunk.trim());
+      currentChunk = "";
+      wordCount = 0;
+      reachedMinWords = false;
+    }
+  });
+
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
   }
 
   return chunks;
