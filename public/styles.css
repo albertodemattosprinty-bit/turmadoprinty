@@ -216,6 +216,13 @@ body[data-page="explorar"] {
   --explore-body-font: "PrintyText", "Open Sans", sans-serif;
 }
 
+body[data-page="eventos"],
+body[data-page="produtos"] {
+  background:
+    radial-gradient(circle at top, rgba(104, 175, 255, 0.22), transparent 28%),
+    linear-gradient(180deg, #08245e 0%, #0c3280 42%, #154ca8 100%);
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;
@@ -892,6 +899,48 @@ body[data-page="produtos"] {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+body[data-page="produtos"] .section-card,
+body[data-page="eventos"] .section-card {
+  background:
+    radial-gradient(circle at top left, rgba(139, 203, 255, 0.18), transparent 28%),
+    linear-gradient(145deg, rgba(6, 33, 90, 0.96), rgba(18, 70, 160, 0.92));
+  border-color: rgba(164, 212, 255, 0.22);
+  box-shadow: 0 24px 50px rgba(3, 22, 67, 0.34);
+}
+
+body[data-page="produtos"] .page-shell,
+body[data-page="home"] .page-shell {
+  width: 100%;
+  max-width: 100%;
+}
+
+body[data-page="produtos"] .section-card {
+  margin: 0 calc(50% - 50vw);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-page="home"] .page-top-banner + .page-shell {
+  margin-top: -1px;
+}
+
+body[data-page="produtos"] .section-title,
+body[data-page="produtos"] .section-muted,
+body[data-page="produtos"] .eyebrow,
+body[data-page="produtos"] #album-count,
+body[data-page="produtos"] #store-status,
+body[data-page="eventos"] .section-title,
+body[data-page="eventos"] .section-muted,
+body[data-page="eventos"] .eyebrow {
+  color: #ffffff;
+}
+
+body[data-page="produtos"] .section-muted,
+body[data-page="eventos"] .section-muted {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .album-card-link {
   display: block;
   text-decoration: none;
@@ -934,6 +983,18 @@ body[data-page="produtos"] {
   font-size: 1.05rem;
   font-weight: 800;
   color: var(--yellow);
+}
+
+body[data-page="produtos"] .album-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(165, 212, 255, 0.18);
+  box-shadow: 0 18px 34px rgba(5, 29, 82, 0.26);
+}
+
+body[data-page="produtos"] .album-body h3,
+body[data-page="produtos"] .album-body p,
+body[data-page="produtos"] .album-price {
+  color: #ffffff;
 }
 
 .buy-button {
@@ -1786,6 +1847,21 @@ body[data-page="users"] .users-admin-shell {
   border: 0;
 }
 
+body[data-page="eventos"] .schedule-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+
+body[data-page="eventos"] .schedule-card {
+  padding: 28px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 22px rgba(114, 201, 255, 0.14),
+    0 18px 42px rgba(5, 26, 72, 0.28);
+}
+
 .schedule-card p,
 .schedule-card h3,
 .schedule-card strong {
@@ -1797,6 +1873,17 @@ body[data-page="users"] .users-admin-shell {
   align-items: start;
   justify-content: space-between;
   gap: 12px;
+}
+
+body[data-page="eventos"] .schedule-card h3 {
+  font-size: 1.25rem;
+  line-height: 1.18;
+}
+
+body[data-page="eventos"] .schedule-card p,
+body[data-page="eventos"] .schedule-card strong {
+  font-size: 1.25rem;
+  line-height: 1.5;
 }
 
 .schedule-edit-button {
@@ -1829,23 +1916,23 @@ body[data-page="users"] .users-admin-shell {
 }
 
 .schedule-color-1 {
-  background: linear-gradient(135deg, #1b53bb 0%, #2f7cff 100%);
+  background: linear-gradient(135deg, #1050b5 0%, #2b86ff 100%);
 }
 
 .schedule-color-2 {
-  background: linear-gradient(135deg, #ff8a1f 0%, #f15b2a 100%);
+  background: linear-gradient(135deg, #0d3c9d 0%, #2381ec 100%);
 }
 
 .schedule-color-3 {
-  background: linear-gradient(135deg, #f06292 0%, #d14b8f 100%);
+  background: linear-gradient(135deg, #153d94 0%, #3f77ff 100%);
 }
 
 .schedule-color-4 {
-  background: linear-gradient(135deg, #d4a017 0%, #f0b429 100%);
+  background: linear-gradient(135deg, #0a2f7d 0%, #2762d7 100%);
 }
 
 .schedule-color-5 {
-  background: linear-gradient(135deg, #d63d3d 0%, #b51f3f 100%);
+  background: linear-gradient(135deg, #12346f 0%, #315fc9 100%);
 }
 
 .schedule-day {
@@ -1855,6 +1942,21 @@ body[data-page="users"] .users-admin-shell {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.18em;
+}
+
+.schedule-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-weight: 800;
+}
+
+.schedule-time svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  fill: currentColor;
 }
 
 .text-page {
@@ -4019,6 +4121,10 @@ body[data-page="explorar"] #chat-auth-status {
   body[data-page="home"] .page-banner-slide img {
     height: auto;
     object-fit: contain;
+  }
+
+  body[data-page="home"] .page-banner-slide {
+    align-items: flex-start;
   }
 
   body[data-page="home"] .page-banner-dots {

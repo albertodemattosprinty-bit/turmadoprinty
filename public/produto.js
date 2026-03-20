@@ -692,7 +692,7 @@ async function downloadTrackForOffline(card, albumId, track) {
   }
 
   if (!canDownloadTrack(albumId, currentAlbum?.name, track)) {
-    showFloatingNotice("Seu plano nao libera download desta faixa.");
+    window.location.href = "/planos.html";
     return;
   }
 

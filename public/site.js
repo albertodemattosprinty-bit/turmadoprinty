@@ -425,7 +425,10 @@ async function loadSchedule(siteConfig, user) {
         </div>
         <h3 data-field="place">${item.place}</h3>
         <p data-field="city">${item.city}</p>
-        <strong data-field="time">${item.time}</strong>
+        <strong class="schedule-time" data-field="time">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.75a10.25 10.25 0 1 0 10.25 10.25A10.26 10.26 0 0 0 12 1.75Zm0 18.5A8.25 8.25 0 1 1 20.25 12 8.26 8.26 0 0 1 12 20.25Zm.75-13h-1.5v5.06l4.17 2.5.77-1.29-3.44-2.06Z"/></svg>
+          <span>${item.time}</span>
+        </strong>
       `;
 
       if (canEditEvent) {
