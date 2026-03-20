@@ -39,9 +39,11 @@ const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
 const eduSongsDir = path.join(__dirname, "musicas Edu");
 const contextFilePath = path.join(__dirname, "contexto.txt");
+const projectFilePath = path.join(__dirname, "projeto.txt");
 const contentDir = path.join(__dirname, "Conteúdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
+let cachedProjectPrompt = "";
 
 const eduDownloadFiles = {
   "abandona-no-lixao": {
@@ -311,6 +313,20 @@ async function getContextPrompt() {
     const contextText = (await readFile(contextFilePath, "utf8")).trim();
     cachedContextPrompt = contextText;
     return contextText;
+  } catch {
+    return "";
+  }
+}
+
+async function getProjectPrompt() {
+  if (cachedProjectPrompt) {
+    return cachedProjectPrompt;
+  }
+
+  try {
+    const projectText = (await readFile(projectFilePath, "utf8")).trim();
+    cachedProjectPrompt = projectText;
+    return projectText;
   } catch {
     return "";
   }
@@ -664,7 +680,9 @@ async function handleGptRequest(request, response, user = null) {
   }
 
   const message = typeof body.message === "string" ? body.message.trim() : "";
+  const mode = typeof body.mode === "string" ? body.mode.trim().toLowerCase() : "";
   const contextPrompt = await getContextPrompt();
+  const projectPrompt = mode === "project" ? await getProjectPrompt() : "";
   const systemBase = typeof body.system === "string" && body.system.trim() ? body.system.trim() : DEFAULT_SYSTEM_PROMPT;
   const responseStylePrompt = typeof body.responseStyle === "string" && body.responseStyle.trim()
     ? body.responseStyle.trim()
@@ -673,9 +691,17 @@ async function handleGptRequest(request, response, user = null) {
   const userPrompt = user?.name
     ? `Nome da pessoa: ${user.name}.\n${userToneProfile.prompt}`
     : userToneProfile.prompt;
-  const system = contextPrompt
-    ? `${systemBase}\n\n${responseStylePrompt}\n\n${userPrompt}\n\nContexto principal da Turma do Printy:\n${contextPrompt}`
-    : `${systemBase}\n\n${responseStylePrompt}\n\n${userPrompt}`;
+  const systemParts = [systemBase, responseStylePrompt, userPrompt];
+
+  if (contextPrompt) {
+    systemParts.push(`Contexto principal da Turma do Printy:\n${contextPrompt}`);
+  }
+
+  if (projectPrompt) {
+    systemParts.push(`Base principal do modo Projeto (arquivo projeto.txt):\n${projectPrompt}`);
+  }
+
+  const system = systemParts.filter(Boolean).join("\n\n");
   const requestedFinalModel = getFinalModel(body);
   const instantModel = getInstantModel(body);
   const history = Array.isArray(body.history) ? body.history : [];

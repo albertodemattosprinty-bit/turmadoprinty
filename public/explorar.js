@@ -2484,8 +2484,9 @@ chatForm.addEventListener("submit", async (event) => {
   currentController = new AbortController();
   setAssistantThinkingState(true);
   const assistantMessage = createAssistantMessageElement("");
-  const selectedMode = chatModes[getChatMode()] || chatModes.fast;
-  const responseStyle = buildResponseStylePrompt(getChatMode());
+  const modeKey = getChatMode();
+  const selectedMode = chatModes[modeKey] || chatModes.fast;
+  const responseStyle = buildResponseStylePrompt(modeKey);
 
   try {
     const response = await fetch(getApiUrl("/api/gpt/ask"), {
@@ -2498,6 +2499,7 @@ chatForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         message,
         history,
+        mode: modeKey,
         stream: true,
         responseStyle,
         model: selectedMode.model,
