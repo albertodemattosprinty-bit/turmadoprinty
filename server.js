@@ -2384,7 +2384,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && pathname === "/api/album-sync/stream") {
-    await handleAlbumSyncStream(request, response, url);
+    await handleAlbumSyncStream(request, response, requestUrl);
     return;
   }
 
