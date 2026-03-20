@@ -2178,7 +2178,7 @@ body[data-page="explorar"].explore-authenticated .sidebar-card {
   min-height: 0;
   height: 100%;
   opacity: 1;
-  background: linear-gradient(180deg, rgba(50, 129, 255, 0.98) 0%, rgba(19, 80, 201, 0.99) 58%, rgba(8, 39, 126, 1) 100%);
+  background: linear-gradient(180deg, rgba(124, 215, 255, 0.92) 0%, rgba(66, 147, 245, 0.88) 100%);
   backdrop-filter: blur(18px);
   border-radius: 0 34px 34px 0;
   box-shadow: 0 26px 54px rgba(19, 69, 155, 0.22);
@@ -2661,7 +2661,6 @@ body[data-page="explorar"] .conversation-shell {
 }
 
 body[data-page="explorar"] .sidebar-header,
-body[data-page="explorar"] .conversation-header,
 body[data-page="explorar"] .settings-head,
 body[data-page="explorar"] .explore-auth-head {
   background: linear-gradient(180deg, rgba(124, 215, 255, 0.32) 0%, rgba(66, 147, 245, 0.22) 100%);
@@ -2670,8 +2669,15 @@ body[data-page="explorar"] .explore-auth-head {
   padding: 18px 18px 16px;
 }
 
+body[data-page="explorar"] .conversation-header {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 10px 18px 8px;
+}
+
 body[data-page="explorar"] .ia-ambience {
-  border: 2px solid #1b53bb;
+  border: 0;
   align-items: stretch;
   justify-items: stretch;
 }
@@ -2746,10 +2752,13 @@ body[data-page="explorar"] .conversation-header {
   display: grid;
   grid-template-columns: 1fr;
   justify-items: center;
-  align-content: start;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(27, 83, 187, 0.08);
+  align-content: center;
+  height: 10vh;
+  min-height: 10vh;
+  max-height: 10vh;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 0;
 }
 
 body[data-page="explorar"] .conversation-title-wrap {
@@ -2758,7 +2767,7 @@ body[data-page="explorar"] .conversation-title-wrap {
   display: grid;
   justify-items: center;
   order: 1;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 body[data-page="explorar"] .conversation-title {
@@ -2776,7 +2785,7 @@ body[data-page="explorar"] .conversation-tools {
   margin-left: 0;
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 4px;
   order: 0;
 }
 
@@ -2962,8 +2971,9 @@ body[data-page="explorar"] .message-text {
 }
 
 body[data-page="explorar"] .chat-composer {
-  padding-top: 18px;
-  background: linear-gradient(180deg, rgba(245, 249, 255, 0) 0%, rgba(245, 249, 255, 0.92) 24%, rgba(245, 249, 255, 1) 100%);
+  margin-top: 0;
+  padding-top: 0;
+  background: #f5f9ff;
 }
 
 body[data-page="explorar"] .chat-composer textarea {
@@ -3379,10 +3389,10 @@ body[data-page="explorar"] #chat-auth-status {
     z-index: 35;
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
-    padding: 10px 20px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding: 0 20px calc(10px + env(safe-area-inset-bottom, 0px));
     border: 0;
     border-radius: 0;
-    background: #ffffff;
+    background: #f5f9ff;
     box-shadow: 0 16px 34px rgba(12, 36, 88, 0.18);
   }
 
@@ -3464,19 +3474,22 @@ body[data-page="explorar"] #chat-auth-status {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
-    justify-content: flex-start !important;
+    justify-content: center !important;
     margin-top: 0;
     position: relative;
-    min-height: 0;
+    height: 10vh;
+    min-height: 10vh;
+    max-height: 10vh;
     padding-top: 0;
-    margin-bottom: 10px;
+    padding-bottom: 0;
+    margin-bottom: 0;
     justify-items: center;
   }
 
   body[data-page="explorar"] .conversation-title-wrap {
     order: 2 !important;
     width: 100% !important;
-    margin-top: 10px !important;
+    margin-top: 4px !important;
     display: flex !important;
     justify-content: center !important;
   }
@@ -3489,7 +3502,7 @@ body[data-page="explorar"] #chat-auth-status {
 
   body[data-page="explorar"] .conversation-tools {
     order: 1 !important;
-    gap: 10px;
+    gap: 4px;
   }
 
   body[data-page="explorar"] .chat-mode-picker {
@@ -3520,7 +3533,7 @@ body[data-page="explorar"] #chat-auth-status {
 
   body[data-page="explorar"] .chat-thread {
     min-height: auto;
-    padding: 4px 0 16px;
+    padding: 0 0 12px;
   }
 
   body[data-page="explorar"] .chat-thread-empty {
