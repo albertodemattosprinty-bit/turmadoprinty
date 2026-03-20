@@ -330,6 +330,13 @@ body[data-page="produtos"] {
   width: 100%;
 }
 
+.page-top-banner.is-loading .page-banner-viewport {
+  min-height: clamp(210px, 34vw, 420px);
+  background:
+    radial-gradient(circle at top, rgba(90, 206, 242, 0.18), transparent 45%),
+    linear-gradient(135deg, rgba(255, 128, 98, 0.08), rgba(90, 206, 242, 0.12));
+}
+
 .page-banner-slide {
   position: relative;
   grid-area: 1 / 1;
@@ -346,10 +353,59 @@ body[data-page="produtos"] {
   pointer-events: auto;
 }
 
+.page-top-banner.is-loading .page-banner-slide {
+  opacity: 0;
+}
+
 .page-banner-slide img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.page-banner-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.page-top-banner:not(.is-loading) .page-banner-loader {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.page-banner-loader-outer {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  animation: page-banner-loader-rotate 5s infinite;
+  background-color: #5acef2;
+  box-shadow: 0 20px 45px rgba(25, 89, 140, 0.18);
+}
+
+.page-banner-loader-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  margin: 10px;
+  border-radius: 12px;
+  transform: rotate(45deg);
+  animation: page-banner-loader-revolve 5s infinite;
+  background-color: #ff8062;
+}
+
+.page-banner-loader-core {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  animation: page-banner-loader-rotate 5s infinite;
+  background-color: #fefefe;
 }
 
 .page-banner-dots {
@@ -374,6 +430,54 @@ body[data-page="produtos"] {
 .page-banner-dot.is-active {
   background: #ffffff;
   transform: scale(1.12);
+}
+
+@keyframes page-banner-loader-revolve {
+  0% {
+    transform: rotate(45deg) translateX(0);
+  }
+
+  25% {
+    transform: rotate(45deg) translateY(100%);
+  }
+
+  50% {
+    transform: rotate(45deg) translateX(100%) translateY(100%);
+  }
+
+  75% {
+    transform: rotate(45deg) translateX(100%);
+  }
+
+  100% {
+    transform: rotate(45deg) translateX(0);
+  }
+}
+
+@keyframes page-banner-loader-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  20% {
+    transform: rotate(90deg);
+  }
+
+  40% {
+    transform: rotate(180deg);
+  }
+
+  60% {
+    transform: rotate(270deg);
+  }
+
+  80% {
+    transform: rotate(360deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
 }
 
 .home-banner {

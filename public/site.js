@@ -222,6 +222,38 @@ function createBannerPicture(slide, index, total) {
   return picture;
 }
 
+function buildBannerLoader() {
+  const loader = document.createElement("div");
+  loader.className = "page-banner-loader";
+  loader.setAttribute("aria-hidden", "true");
+  loader.innerHTML = `
+    <div class="page-banner-loader-outer">
+      <div class="page-banner-loader-inner">
+        <div class="page-banner-loader-core"></div>
+      </div>
+    </div>
+  `;
+  return loader;
+}
+
+function whenImageReady(image) {
+  return new Promise((resolve) => {
+    if (image.complete && image.naturalWidth > 0) {
+      resolve();
+      return;
+    }
+
+    const finish = () => {
+      image.removeEventListener("load", finish);
+      image.removeEventListener("error", finish);
+      resolve();
+    };
+
+    image.addEventListener("load", finish, { once: true });
+    image.addEventListener("error", finish, { once: true });
+  });
+}
+
 function initPageBanner() {
   const config = bannerConfigByPage[page];
 
@@ -241,7 +273,9 @@ function initPageBanner() {
 
   const viewport = document.createElement("div");
   viewport.className = "page-banner-viewport";
+  banner.classList.add("is-loading");
   banner.appendChild(viewport);
+  banner.appendChild(buildBannerLoader());
 
   const slides = config.slides.map((slide, index) => {
     const node = createBannerPicture(slide, index, config.slides.length);
@@ -249,6 +283,15 @@ function initPageBanner() {
     viewport.appendChild(node);
     return node;
   });
+
+  const firstBannerImage = slides[0]?.querySelector("img");
+  if (firstBannerImage) {
+    whenImageReady(firstBannerImage).then(() => {
+      banner.classList.remove("is-loading");
+    });
+  } else {
+    banner.classList.remove("is-loading");
+  }
 
   if (slides.length > 1) {
     const dots = document.createElement("div");
