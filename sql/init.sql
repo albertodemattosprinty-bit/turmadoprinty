@@ -139,3 +139,16 @@ create table if not exists admin_user_notes (
 
 alter table agenda_events add column if not exists contractor_user_id uuid references users(id) on delete set null;
 create index if not exists idx_agenda_events_contractor_user_id on agenda_events(contractor_user_id);
+
+create table if not exists admin_user_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  title text not null,
+  body text not null,
+  sent_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  dismissed_at timestamptz
+);
+
+create index if not exists idx_admin_user_messages_user_id on admin_user_messages(user_id);
+create index if not exists idx_admin_user_messages_active on admin_user_messages(user_id, dismissed_at, created_at desc);

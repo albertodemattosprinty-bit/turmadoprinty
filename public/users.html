@@ -62,6 +62,33 @@
           </label>
         </div>
 
+        <section id="user-message-panel" class="user-message-panel" hidden>
+          <div class="user-message-head">
+            <div>
+              <p class="eyebrow">Mensagem para o usuario</p>
+              <h3 class="section-title small">Enviar aviso em destaque</h3>
+              <p class="section-muted">Formato: titulo + texto. O texto aceita ate 500 caracteres.</p>
+            </div>
+          </div>
+
+          <div class="user-message-grid">
+            <label>
+              Titulo
+              <input id="user-message-title" type="text" maxlength="120" placeholder="Ex.: Aviso importante">
+            </label>
+
+            <label class="user-message-text-label">
+              Texto da mensagem
+              <textarea id="user-message-body" maxlength="500" rows="5" placeholder="Digite a mensagem que vai aparecer na tela do usuario"></textarea>
+            </label>
+          </div>
+
+          <div class="user-message-actions">
+            <span id="user-message-counter" class="section-muted">0/500</span>
+            <button id="user-message-send-button" class="primary-button" type="button">Enviar mensagem</button>
+          </div>
+        </section>
+
         <div class="user-detail-actions">
           <button id="user-save-button" class="primary-button" type="button">Salvar alteracoes</button>
           <button id="user-delete-button" class="ghost-button danger-outline" type="button">Excluir conta</button>
