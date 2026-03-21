@@ -188,6 +188,61 @@ a {
   color: #b72b45;
 }
 
+.admin-user-message-notice {
+  position: fixed;
+  top: 92px;
+  right: 20px;
+  z-index: 70;
+  width: min(360px, calc(100vw - 24px));
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px 18px 18px;
+  border-radius: 22px;
+  background: rgba(26, 108, 232, 0.8);
+  color: #ffffff;
+  box-shadow: 0 18px 40px rgba(11, 44, 98, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.admin-user-message-title,
+.admin-user-message-body {
+  color: #ffffff;
+}
+
+.admin-user-message-title {
+  display: block;
+  padding-right: 34px;
+  font-size: 1rem;
+}
+
+.admin-user-message-body {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.admin-user-message-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.admin-user-message-close svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
 .site-nav {
   display: flex;
   gap: 10px;
@@ -1184,6 +1239,14 @@ body[data-page="eventos-pagamento"] {
   .payment-option-card {
     border-radius: 22px;
   }
+
+  .admin-user-message-notice {
+    top: auto;
+    right: 12px;
+    bottom: 84px;
+    left: 12px;
+    width: auto;
+  }
 }
 
 @media (max-width: 880px) {
@@ -1194,6 +1257,15 @@ body[data-page="eventos-pagamento"] {
   .users-table-row,
   .user-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .user-message-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .user-message-actions .primary-button {
+    width: 100%;
   }
 }
 
@@ -1721,6 +1793,26 @@ body[data-page="users"] .users-admin-shell {
   display: block;
 }
 
+.users-table-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.users-table-select {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .users-table-card strong {
   display: block;
   margin-bottom: 4px;
@@ -1763,6 +1855,67 @@ body[data-page="users"] .users-admin-shell {
 .user-detail-actions {
   display: flex;
   flex-wrap: wrap;
+  gap: 12px;
+}
+
+.users-message-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.users-message-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.user-message-panel {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(27, 83, 187, 0.06);
+  border: 1px solid rgba(27, 83, 187, 0.12);
+}
+
+.user-message-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.user-message-grid label {
+  display: grid;
+  gap: 8px;
+  color: var(--text-soft);
+}
+
+.user-message-grid input,
+.user-message-grid textarea {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  padding: 12px 14px;
+  font: inherit;
+  resize: vertical;
+}
+
+.user-message-text-label textarea {
+  min-height: 132px;
+}
+
+.user-message-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 

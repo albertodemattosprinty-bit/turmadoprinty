@@ -1,6 +1,147 @@
 import { getApiUrl } from "./api.js";
 
 const sessionStorageKey = "turma_do_printy_token";
+const adminMessagePollMs = 15000;
+
+function ensureAdminMessageNotice() {
+  let notice = document.getElementById("admin-user-message-notice");
+
+  if (notice) {
+    return notice;
+  }
+
+  notice = document.createElement("aside");
+  notice.id = "admin-user-message-notice";
+  notice.className = "admin-user-message-notice";
+  notice.hidden = true;
+  notice.innerHTML = `
+    <button class="admin-user-message-close" type="button" aria-label="Fechar mensagem" title="Fechar mensagem">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+    </button>
+    <strong class="admin-user-message-title"></strong>
+    <p class="admin-user-message-body"></p>
+  `;
+
+  document.body.appendChild(notice);
+  return notice;
+}
+
+function hideAdminMessageNotice() {
+  const notice = document.getElementById("admin-user-message-notice");
+
+  if (notice) {
+    notice.hidden = true;
+  }
+}
+
+async function fetchCurrentAdminMessage() {
+  const token = getToken();
+
+  if (!token) {
+    hideAdminMessageNotice();
+    return null;
+  }
+
+  const response = await fetch(getApiUrl("/api/account/message"), {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (response.status === 401) {
+    hideAdminMessageNotice();
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("Falha ao carregar mensagem.");
+  }
+
+  const data = await response.json().catch(() => ({}));
+  return data.message || null;
+}
+
+async function dismissCurrentAdminMessage(messageId) {
+  const token = getToken();
+
+  if (!token || !messageId) {
+    hideAdminMessageNotice();
+    return;
+  }
+
+  const response = await fetch(getApiUrl("/api/account/message/dismiss"), {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ messageId })
+  });
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error("Falha ao fechar mensagem.");
+  }
+
+  hideAdminMessageNotice();
+}
+
+function renderAdminMessageNotice(message) {
+  const notice = ensureAdminMessageNotice();
+  const title = notice.querySelector(".admin-user-message-title");
+  const body = notice.querySelector(".admin-user-message-body");
+  const closeButton = notice.querySelector(".admin-user-message-close");
+
+  if (!message) {
+    notice.hidden = true;
+    notice.dataset.messageId = "";
+    return;
+  }
+
+  title.textContent = message.title || "";
+  body.textContent = message.body || "";
+  notice.dataset.messageId = message.id || "";
+  notice.hidden = false;
+
+  if (!closeButton.dataset.bound) {
+    closeButton.dataset.bound = "true";
+    closeButton.addEventListener("click", async () => {
+      closeButton.disabled = true;
+
+      try {
+        await dismissCurrentAdminMessage(notice.dataset.messageId || "");
+      } catch {
+        // Nao bloqueia a experiencia do usuario por falha ao fechar.
+      } finally {
+        closeButton.disabled = false;
+      }
+    });
+  }
+}
+
+async function syncAdminMessageNotice() {
+  try {
+    const message = await fetchCurrentAdminMessage();
+    renderAdminMessageNotice(message);
+  } catch {
+    // Silencioso para nao poluir a interface.
+  }
+}
+
+function startAdminMessagePolling(user) {
+  if (!user) {
+    hideAdminMessageNotice();
+    return;
+  }
+
+  if (window.__turmaDoPrintyAdminMessagePollTimer) {
+    window.clearInterval(window.__turmaDoPrintyAdminMessagePollTimer);
+  }
+
+  void syncAdminMessageNotice();
+  window.__turmaDoPrintyAdminMessagePollTimer = window.setInterval(() => {
+    void syncAdminMessageNotice();
+  }, adminMessagePollMs);
+}
 
 export function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -124,6 +265,8 @@ export async function initSiteHeader() {
       closeMenu();
     }
   });
+
+  startAdminMessagePolling(user);
 
   return user;
 }

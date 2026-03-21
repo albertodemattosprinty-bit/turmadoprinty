@@ -53,6 +53,20 @@ export async function ensureAdminUsersSchema() {
       updated_at timestamptz not null default now()
     );
   `);
+
+  await query(`
+    create table if not exists admin_user_messages (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references users(id) on delete cascade,
+      title text not null,
+      body text not null,
+      sent_by_user_id uuid references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      dismissed_at timestamptz
+    );
+  `);
+  await query("create index if not exists idx_admin_user_messages_user_id on admin_user_messages(user_id);");
+  await query("create index if not exists idx_admin_user_messages_active on admin_user_messages(user_id, dismissed_at, created_at desc);");
 }
 
 export async function touchUserPresence(userId) {
@@ -320,4 +334,79 @@ export async function getUserContractorState(userId) {
     isContractor: Boolean(row?.is_contractor),
     contractorEventId: row?.contractor_event_id || null
   };
+}
+
+function mapAdminUserMessage(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    body: row.body,
+    createdAt: row.created_at,
+    dismissedAt: row.dismissed_at || null,
+    sentByUserId: row.sent_by_user_id || null
+  };
+}
+
+export async function sendAdminUserMessage({ userId, title, body, sentByUserId }) {
+  await ensureAdminUsersSchema();
+
+  const result = await query(
+    `
+      insert into admin_user_messages (user_id, title, body, sent_by_user_id, created_at, dismissed_at)
+      values ($1, $2, $3, $4, now(), null)
+      returning id, user_id, title, body, sent_by_user_id, created_at, dismissed_at
+    `,
+    [userId, title, body, sentByUserId || null]
+  );
+
+  return mapAdminUserMessage(result.rows[0] || null);
+}
+
+export async function getActiveAdminUserMessage(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  await ensureAdminUsersSchema();
+
+  const result = await query(
+    `
+      select id, user_id, title, body, sent_by_user_id, created_at, dismissed_at
+      from admin_user_messages
+      where user_id = $1
+        and dismissed_at is null
+      order by created_at desc
+      limit 1
+    `,
+    [userId]
+  );
+
+  return mapAdminUserMessage(result.rows[0] || null);
+}
+
+export async function dismissAdminUserMessage({ userId, messageId }) {
+  if (!userId || !messageId) {
+    return null;
+  }
+
+  await ensureAdminUsersSchema();
+
+  const result = await query(
+    `
+      update admin_user_messages
+      set dismissed_at = now()
+      where id = $1
+        and user_id = $2
+        and dismissed_at is null
+      returning id, user_id, title, body, sent_by_user_id, created_at, dismissed_at
+    `,
+    [messageId, userId]
+  );
+
+  return mapAdminUserMessage(result.rows[0] || null);
 }

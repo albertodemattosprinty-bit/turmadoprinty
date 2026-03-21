@@ -11,7 +11,7 @@ import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
-import { deleteUserById, ensureAdminUsersSchema, getUserContractorState, listUsersWithAdminData, recordNarrationUsage, recordTextTokenUsage, removeUserPlanOverride, setUserContractorStatus, setUserPlanOverride, touchUserPresence } from "./src/admin-users.js";
+import { deleteUserById, dismissAdminUserMessage, ensureAdminUsersSchema, getActiveAdminUserMessage, getUserContractorState, listUsersWithAdminData, recordNarrationUsage, recordTextTokenUsage, removeUserPlanOverride, sendAdminUserMessage, setUserContractorStatus, setUserPlanOverride, touchUserPresence } from "./src/admin-users.js";
 import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
@@ -494,6 +494,22 @@ function detectUserToneProfile(user) {
   return {
     label: "pessoa",
     prompt: "Se o genero nao estiver claro pelo nome, mantenha linguagem neutra e natural, sem forcar vocativos."
+  };
+}
+
+function sanitizeAdminUserMessage(message) {
+  if (!message) {
+    return null;
+  }
+
+  return {
+    id: message.id,
+    userId: message.userId,
+    title: message.title,
+    body: message.body,
+    createdAt: message.createdAt,
+    dismissedAt: message.dismissedAt,
+    sentByUserId: message.sentByUserId
   };
 }
 
@@ -1993,6 +2009,136 @@ async function handleAdminUserDelete(request, response, userId) {
   }
 }
 
+async function handleAdminUserMessageSend(request, response, userId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const adminUser = await requireAdmin(request, response);
+
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const messageText = typeof body.body === "string" ? body.body.trim() : "";
+
+  if (!title) {
+    sendJson(response, 400, { error: "Informe o titulo da mensagem." });
+    return;
+  }
+
+  if (!messageText) {
+    sendJson(response, 400, { error: "Digite o texto da mensagem." });
+    return;
+  }
+
+  if (messageText.length > 500) {
+    sendJson(response, 400, { error: "A mensagem pode ter no maximo 500 caracteres." });
+    return;
+  }
+
+  try {
+    const message = await sendAdminUserMessage({
+      userId,
+      title,
+      body: messageText,
+      sentByUserId: adminUser.id
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      message: sanitizeAdminUserMessage(message)
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Erro ao enviar mensagem ao usuario."
+    });
+  }
+}
+
+async function handleCurrentUserMessage(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  try {
+    const message = await getActiveAdminUserMessage(user.id);
+    sendJson(response, 200, {
+      ok: true,
+      message: sanitizeAdminUserMessage(message)
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao carregar mensagem do usuario."
+    });
+  }
+}
+
+async function handleCurrentUserMessageDismiss(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const messageId = typeof body.messageId === "string" ? body.messageId.trim() : "";
+
+  if (!messageId) {
+    sendJson(response, 400, { error: "Informe a mensagem para fechar." });
+    return;
+  }
+
+  try {
+    const message = await dismissAdminUserMessage({
+      userId: user.id,
+      messageId
+    });
+
+    if (!message) {
+      sendJson(response, 404, { error: "Mensagem nao encontrada ou ja fechada." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      message: sanitizeAdminUserMessage(message)
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao fechar mensagem."
+    });
+  }
+}
+
 async function handleContractorEventUpdate(request, response, eventId) {
   if (!await ensurePaymentsReady(response)) {
     return;
@@ -2436,6 +2582,22 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "DELETE" && pathname.match(/^\/api\/admin\/users\/[^/]+$/)) {
     const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/users\/([^/]+)$/, "$1"));
     await handleAdminUserDelete(request, response, userId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/admin\/users\/[^/]+\/message$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/users\/([^/]+)\/message$/, "$1"));
+    await handleAdminUserMessageSend(request, response, userId);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/account/message") {
+    await handleCurrentUserMessage(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/account/message/dismiss") {
+    await handleCurrentUserMessageDismiss(request, response);
     return;
   }
 
