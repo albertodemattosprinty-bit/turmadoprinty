@@ -17,6 +17,8 @@ const userMessagePanel = document.getElementById("user-message-panel");
 const userMessagePreview = document.getElementById("user-message-preview");
 const userMessagePreviewTitle = document.getElementById("user-message-preview-title");
 const userMessagePreviewBody = document.getElementById("user-message-preview-body");
+const userReplyPreview = document.getElementById("user-reply-preview");
+const userReplyPreviewBody = document.getElementById("user-reply-preview-body");
 const userMessageTitle = document.getElementById("user-message-title");
 const userMessageBody = document.getElementById("user-message-body");
 const userMessageCounter = document.getElementById("user-message-counter");
@@ -27,7 +29,7 @@ let plans = [];
 let schedule = [];
 let selectedUserId = "";
 let messageComposerUserId = "";
-const viewedActiveMessageIds = new Set();
+const viewedReplyMessageIds = new Set();
 
 function redirectToAuth() {
   window.location.href = `/auth.html?next=${encodeURIComponent("/users.html")}`;
@@ -71,8 +73,8 @@ function openMessageComposer(userId) {
   messageComposerUserId = userId;
   const user = getSelectedUser();
 
-  if (user?.activeMessage?.id) {
-    viewedActiveMessageIds.add(user.activeMessage.id);
+  if (user?.activeMessage?.id && user?.activeMessage?.userReplyBody) {
+    viewedReplyMessageIds.add(user.activeMessage.id);
   }
 
   renderUsersTable();
@@ -106,6 +108,11 @@ function renderDetailPanel() {
     userMessagePreviewTitle.textContent = activeMessage?.title || "";
     userMessagePreviewBody.textContent = activeMessage?.body || "";
   }
+  if (userReplyPreview && userReplyPreviewBody) {
+    const replyBody = user.activeMessage?.userReplyBody || "";
+    userReplyPreview.hidden = !replyBody;
+    userReplyPreviewBody.textContent = replyBody;
+  }
   syncContractorEventVisibility();
 }
 
@@ -118,10 +125,10 @@ function renderUsersTable() {
   }
 
   users.forEach((user) => {
-    const hasUnseenActiveMessage = Boolean(
-      user.hasActiveMessage &&
+    const hasUnreadUserReply = Boolean(
       user.activeMessage?.id &&
-      !viewedActiveMessageIds.has(user.activeMessage.id)
+      user.activeMessage?.userReplyBody &&
+      !viewedReplyMessageIds.has(user.activeMessage.id)
     );
 
     const row = document.createElement("article");
@@ -131,8 +138,8 @@ function renderUsersTable() {
         <button class="users-table-select" type="button">
           <span class="users-table-user-copy">
             <strong class="users-table-user-name">
+              ${hasUnreadUserReply ? '<span class="users-message-dot users-message-dot-left" aria-hidden="true"></span>' : ""}
               <span>${user.name || user.username || "Usuario"}</span>
-              ${hasUnseenActiveMessage ? '<span class="users-message-dot" aria-hidden="true"></span>' : ""}
             </strong>
             <small>${user.username ? `@${user.username}` : ""}</small>
           </span>
@@ -147,8 +154,8 @@ function renderUsersTable() {
 
     row.querySelector(".users-table-select")?.addEventListener("click", () => {
       selectedUserId = user.id;
-      if (user.activeMessage?.id) {
-        viewedActiveMessageIds.add(user.activeMessage.id);
+      if (user.activeMessage?.id && user.activeMessage?.userReplyBody) {
+        viewedReplyMessageIds.add(user.activeMessage.id);
       }
       messageComposerUserId = messageComposerUserId === user.id || user.hasActiveMessage ? user.id : "";
       renderUsersTable();
@@ -272,9 +279,6 @@ async function sendMessageToSelectedUser() {
     }
 
     userDetailStatus.textContent = "Mensagem enviada para o usuario.";
-    if (data?.message?.id) {
-      viewedActiveMessageIds.add(data.message.id);
-    }
     resetMessageComposer();
     await loadUsers();
   } catch (error) {

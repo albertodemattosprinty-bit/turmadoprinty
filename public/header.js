@@ -2,7 +2,6 @@ import { getApiUrl } from "./api.js";
 
 const sessionStorageKey = "turma_do_printy_token";
 const adminMessagePollMs = 15000;
-const adminReplyDraftStorageKey = "turma_do_printy_admin_reply_draft";
 
 function ensureAdminMessageNotice() {
   let notice = document.getElementById("admin-user-message-notice");
@@ -24,6 +23,11 @@ function ensureAdminMessageNotice() {
     <div class="admin-user-message-actions">
       <button class="admin-user-message-reply" type="button">Responder</button>
     </div>
+    <form class="admin-user-message-compose" hidden>
+      <input class="admin-user-message-input" type="text" maxlength="500" placeholder="Digite sua mensagem para Rose">
+      <button class="admin-user-message-send" type="submit">Enviar</button>
+    </form>
+    <p class="admin-user-message-feedback" hidden></p>
   `;
 
   document.body.appendChild(notice);
@@ -35,6 +39,7 @@ function hideAdminMessageNotice() {
 
   if (notice) {
     notice.hidden = true;
+    notice.classList.remove("is-replying");
   }
 }
 
@@ -89,16 +94,47 @@ async function dismissCurrentAdminMessage(messageId) {
   hideAdminMessageNotice();
 }
 
+async function sendCurrentUserReply(messageId, body) {
+  const token = getToken();
+
+  if (!token || !messageId) {
+    throw new Error("Mensagem indisponivel para resposta.");
+  }
+
+  const response = await fetch(getApiUrl("/api/account/message/reply"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ messageId, body })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Falha ao enviar resposta.");
+  }
+
+  return data.message || null;
+}
+
 function renderAdminMessageNotice(message) {
   const notice = ensureAdminMessageNotice();
   const title = notice.querySelector(".admin-user-message-title");
   const body = notice.querySelector(".admin-user-message-body");
   const closeButton = notice.querySelector(".admin-user-message-close");
   const replyButton = notice.querySelector(".admin-user-message-reply");
+  const actions = notice.querySelector(".admin-user-message-actions");
+  const composeForm = notice.querySelector(".admin-user-message-compose");
+  const composeInput = notice.querySelector(".admin-user-message-input");
+  const sendButton = notice.querySelector(".admin-user-message-send");
+  const feedback = notice.querySelector(".admin-user-message-feedback");
 
   if (!message) {
     notice.hidden = true;
     notice.dataset.messageId = "";
+    notice.classList.remove("is-replying");
     return;
   }
 
@@ -106,6 +142,32 @@ function renderAdminMessageNotice(message) {
   body.textContent = message.body || "";
   notice.dataset.messageId = message.id || "";
   notice.hidden = false;
+  notice.classList.remove("is-replying");
+  if (composeForm) {
+    composeForm.hidden = true;
+  }
+  if (composeInput) {
+    composeInput.value = "";
+  }
+  if (feedback) {
+    feedback.hidden = true;
+    feedback.textContent = "";
+  }
+  if (actions) {
+    actions.hidden = Boolean(message.userReplyBody);
+  }
+
+  title.hidden = false;
+  body.hidden = false;
+
+  if (message.userReplyBody) {
+    title.hidden = true;
+    body.hidden = true;
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.textContent = "Mensagem enviada para Rose.";
+    }
+  }
 
   if (!closeButton.dataset.bound) {
     closeButton.dataset.bound = "true";
@@ -125,20 +187,68 @@ function renderAdminMessageNotice(message) {
   if (replyButton && !replyButton.dataset.bound) {
     replyButton.dataset.bound = "true";
     replyButton.addEventListener("click", () => {
-      const replyTitle = title.textContent?.trim() || "Mensagem da Rose";
-      const replyBody = body.textContent?.trim() || "";
-      const draft = replyBody
-        ? `Rose, sobre sua mensagem "${replyTitle}": `
-        : "Rose, ";
+      notice.classList.add("is-replying");
+      title.hidden = true;
+      body.hidden = true;
+      if (actions) {
+        actions.hidden = true;
+      }
+      if (feedback) {
+        feedback.hidden = true;
+        feedback.textContent = "";
+      }
+      if (composeForm) {
+        composeForm.hidden = false;
+      }
+      composeInput?.focus();
+    });
+  }
 
-      window.localStorage.setItem(adminReplyDraftStorageKey, draft);
-      window.location.href = "/explorar.html";
+  if (composeForm && !composeForm.dataset.bound) {
+    composeForm.dataset.bound = "true";
+    composeForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const replyText = String(composeInput?.value || "").trim();
+
+      if (!replyText) {
+        if (feedback) {
+          feedback.hidden = false;
+          feedback.textContent = "Digite sua mensagem.";
+        }
+        composeInput?.focus();
+        return;
+      }
+
+      if (sendButton) {
+        sendButton.disabled = true;
+      }
+
+      try {
+        const nextMessage = await sendCurrentUserReply(notice.dataset.messageId || "", replyText);
+        renderAdminMessageNotice(nextMessage);
+      } catch (error) {
+        if (feedback) {
+          feedback.hidden = false;
+          feedback.textContent = error instanceof Error ? error.message : "Erro ao enviar resposta.";
+        }
+      } finally {
+        if (sendButton) {
+          sendButton.disabled = false;
+        }
+      }
     });
   }
 }
 
 async function syncAdminMessageNotice() {
   try {
+    const currentNotice = document.getElementById("admin-user-message-notice");
+
+    if (currentNotice?.classList.contains("is-replying")) {
+      return;
+    }
+
     const message = await fetchCurrentAdminMessage();
     renderAdminMessageNotice(message);
   } catch {

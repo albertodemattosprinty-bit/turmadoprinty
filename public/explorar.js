@@ -31,7 +31,6 @@ const folderStorageKey = "turma_do_printy_chat_folders";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
 const chatModeStorageKey = "turma_do_printy_chat_mode";
 const chatSettingsStorageKey = "turma_do_printy_chat_settings";
-const adminReplyDraftStorageKey = "turma_do_printy_admin_reply_draft";
 const defaultOpenAiVoice = "alloy";
 const openAiVoiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"];
 
@@ -233,31 +232,6 @@ async function runAuthRequest(url, payload) {
 
 function setComposerStatus(message = "") {
   composerStatus.textContent = "";
-}
-
-function restorePendingAdminReplyDraft() {
-  if (!currentUser) {
-    return;
-  }
-
-  const draft = window.localStorage.getItem(adminReplyDraftStorageKey) || "";
-
-  if (!draft) {
-    return;
-  }
-
-  if (!chatInput.value.trim()) {
-    chatInput.value = draft;
-  }
-
-  window.localStorage.removeItem(adminReplyDraftStorageKey);
-  syncComposerEmptyState();
-  syncComposerLayout();
-  window.requestAnimationFrame(() => {
-    chatInput.focus();
-    const draftLength = chatInput.value.length;
-    chatInput.setSelectionRange(draftLength, draftLength);
-  });
 }
 
 function createDefaultChatSettings() {
@@ -1840,7 +1814,6 @@ async function loadSessionState() {
     syncModeAvailability();
     renderHistoryList();
     renderConversation();
-    restorePendingAdminReplyDraft();
   } catch (error) {
     currentUser = null;
     activeFolderId = null;

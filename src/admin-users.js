@@ -61,10 +61,14 @@ export async function ensureAdminUsersSchema() {
       title text not null,
       body text not null,
       sent_by_user_id uuid references users(id) on delete set null,
+      user_reply_body text,
+      user_reply_created_at timestamptz,
       created_at timestamptz not null default now(),
       dismissed_at timestamptz
     );
   `);
+  await query("alter table admin_user_messages add column if not exists user_reply_body text;");
+  await query("alter table admin_user_messages add column if not exists user_reply_created_at timestamptz;");
   await query("create index if not exists idx_admin_user_messages_user_id on admin_user_messages(user_id);");
   await query("create index if not exists idx_admin_user_messages_active on admin_user_messages(user_id, dismissed_at, created_at desc);");
 }
@@ -147,6 +151,8 @@ export async function listUsersWithAdminData(planPrices = {}) {
         active_message.active_message_title,
         active_message.active_message_body,
         active_message.active_message_created_at,
+        active_message.active_message_reply_body,
+        active_message.active_message_reply_created_at,
         case
           when u.last_seen_at is not null and u.last_seen_at >= now() - ($1::text || ' minutes')::interval then true
           else false
@@ -161,7 +167,9 @@ export async function listUsersWithAdminData(planPrices = {}) {
           id as active_message_id,
           title as active_message_title,
           body as active_message_body,
-          created_at as active_message_created_at
+          created_at as active_message_created_at,
+          user_reply_body as active_message_reply_body,
+          user_reply_created_at as active_message_reply_created_at
         from admin_user_messages
         where user_id = u.id
           and dismissed_at is null
@@ -201,7 +209,9 @@ export async function listUsersWithAdminData(planPrices = {}) {
           id: row.active_message_id,
           title: row.active_message_title,
           body: row.active_message_body,
-          createdAt: row.active_message_created_at
+          createdAt: row.active_message_created_at,
+          userReplyBody: row.active_message_reply_body || "",
+          userReplyCreatedAt: row.active_message_reply_created_at || null
         }
       : null,
     availablePlans
@@ -373,7 +383,9 @@ function mapAdminUserMessage(row) {
     body: row.body,
     createdAt: row.created_at,
     dismissedAt: row.dismissed_at || null,
-    sentByUserId: row.sent_by_user_id || null
+    sentByUserId: row.sent_by_user_id || null,
+    userReplyBody: row.user_reply_body || "",
+    userReplyCreatedAt: row.user_reply_created_at || null
   };
 }
 
@@ -384,7 +396,7 @@ export async function sendAdminUserMessage({ userId, title, body, sentByUserId }
     `
       insert into admin_user_messages (user_id, title, body, sent_by_user_id, created_at, dismissed_at)
       values ($1, $2, $3, $4, now(), null)
-      returning id, user_id, title, body, sent_by_user_id, created_at, dismissed_at
+      returning id, user_id, title, body, sent_by_user_id, user_reply_body, user_reply_created_at, created_at, dismissed_at
     `,
     [userId, title, body, sentByUserId || null]
   );
@@ -401,7 +413,7 @@ export async function getActiveAdminUserMessage(userId) {
 
   const result = await query(
     `
-      select id, user_id, title, body, sent_by_user_id, created_at, dismissed_at
+      select id, user_id, title, body, sent_by_user_id, user_reply_body, user_reply_created_at, created_at, dismissed_at
       from admin_user_messages
       where user_id = $1
         and dismissed_at is null
@@ -428,9 +440,32 @@ export async function dismissAdminUserMessage({ userId, messageId }) {
       where id = $1
         and user_id = $2
         and dismissed_at is null
-      returning id, user_id, title, body, sent_by_user_id, created_at, dismissed_at
+      returning id, user_id, title, body, sent_by_user_id, user_reply_body, user_reply_created_at, created_at, dismissed_at
     `,
     [messageId, userId]
+  );
+
+  return mapAdminUserMessage(result.rows[0] || null);
+}
+
+export async function saveUserReplyToAdminMessage({ userId, messageId, body }) {
+  if (!userId || !messageId || !String(body || "").trim()) {
+    return null;
+  }
+
+  await ensureAdminUsersSchema();
+
+  const result = await query(
+    `
+      update admin_user_messages
+      set user_reply_body = $3,
+          user_reply_created_at = now()
+      where id = $1
+        and user_id = $2
+        and dismissed_at is null
+      returning id, user_id, title, body, sent_by_user_id, user_reply_body, user_reply_created_at, created_at, dismissed_at
+    `,
+    [messageId, userId, String(body).trim()]
   );
 
   return mapAdminUserMessage(result.rows[0] || null);

@@ -239,6 +239,47 @@ a {
   cursor: pointer;
 }
 
+.admin-user-message-compose {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.admin-user-message-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: #1c79ff;
+  color: #ffffff;
+  font: inherit;
+}
+
+.admin-user-message-input::placeholder {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.admin-user-message-send {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1454b7;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-user-message-feedback {
+  margin: 0;
+  color: #ffffff;
+  font-weight: 600;
+}
+
 .admin-user-message-close {
   position: absolute;
   top: 10px;
@@ -1913,6 +1954,10 @@ body[data-page="users"] .users-admin-shell {
   background: #57f287;
   box-shadow: 0 0 0 4px rgba(87, 242, 135, 0.18);
   flex-shrink: 0;
+}
+
+.users-message-dot-left {
+  order: -1;
 }
 
 .user-message-panel {

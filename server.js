@@ -11,7 +11,7 @@ import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
 import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
-import { deleteUserById, dismissAdminUserMessage, ensureAdminUsersSchema, getActiveAdminUserMessage, getUserContractorState, listUsersWithAdminData, recordNarrationUsage, recordTextTokenUsage, removeUserPlanOverride, sendAdminUserMessage, setUserContractorStatus, setUserPlanOverride, touchUserPresence } from "./src/admin-users.js";
+import { deleteUserById, dismissAdminUserMessage, ensureAdminUsersSchema, getActiveAdminUserMessage, getUserContractorState, listUsersWithAdminData, recordNarrationUsage, recordTextTokenUsage, removeUserPlanOverride, saveUserReplyToAdminMessage, sendAdminUserMessage, setUserContractorStatus, setUserPlanOverride, touchUserPresence } from "./src/admin-users.js";
 import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
@@ -509,7 +509,9 @@ function sanitizeAdminUserMessage(message) {
     body: message.body,
     createdAt: message.createdAt,
     dismissedAt: message.dismissedAt,
-    sentByUserId: message.sentByUserId
+    sentByUserId: message.sentByUserId,
+    userReplyBody: message.userReplyBody,
+    userReplyCreatedAt: message.userReplyCreatedAt
   };
 }
 
@@ -2139,6 +2141,67 @@ async function handleCurrentUserMessageDismiss(request, response) {
   }
 }
 
+async function handleCurrentUserMessageReply(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const messageId = typeof body.messageId === "string" ? body.messageId.trim() : "";
+  const replyText = typeof body.body === "string" ? body.body.trim() : "";
+
+  if (!messageId) {
+    sendJson(response, 400, { error: "Informe a mensagem para responder." });
+    return;
+  }
+
+  if (!replyText) {
+    sendJson(response, 400, { error: "Digite sua resposta." });
+    return;
+  }
+
+  if (replyText.length > 500) {
+    sendJson(response, 400, { error: "A resposta pode ter no maximo 500 caracteres." });
+    return;
+  }
+
+  try {
+    const message = await saveUserReplyToAdminMessage({
+      userId: user.id,
+      messageId,
+      body: replyText
+    });
+
+    if (!message) {
+      sendJson(response, 404, { error: "Mensagem nao encontrada ou indisponivel para resposta." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      message: sanitizeAdminUserMessage(message)
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao enviar resposta."
+    });
+  }
+}
+
 async function handleContractorEventUpdate(request, response, eventId) {
   if (!await ensurePaymentsReady(response)) {
     return;
@@ -2598,6 +2661,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "PUT" && pathname === "/api/account/message/dismiss") {
     await handleCurrentUserMessageDismiss(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/account/message/reply") {
+    await handleCurrentUserMessageReply(request, response);
     return;
   }
 
