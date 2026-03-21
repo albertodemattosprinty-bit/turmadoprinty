@@ -14,6 +14,9 @@ const userSaveButton = document.getElementById("user-save-button");
 const userDeleteButton = document.getElementById("user-delete-button");
 const userDetailStatus = document.getElementById("user-detail-status");
 const userMessagePanel = document.getElementById("user-message-panel");
+const userMessagePreview = document.getElementById("user-message-preview");
+const userMessagePreviewTitle = document.getElementById("user-message-preview-title");
+const userMessagePreviewBody = document.getElementById("user-message-preview-body");
 const userMessageTitle = document.getElementById("user-message-title");
 const userMessageBody = document.getElementById("user-message-body");
 const userMessageCounter = document.getElementById("user-message-counter");
@@ -24,6 +27,7 @@ let plans = [];
 let schedule = [];
 let selectedUserId = "";
 let messageComposerUserId = "";
+const viewedActiveMessageIds = new Set();
 
 function redirectToAuth() {
   window.location.href = `/auth.html?next=${encodeURIComponent("/users.html")}`;
@@ -65,6 +69,12 @@ function resetMessageComposer() {
 function openMessageComposer(userId) {
   selectedUserId = userId;
   messageComposerUserId = userId;
+  const user = getSelectedUser();
+
+  if (user?.activeMessage?.id) {
+    viewedActiveMessageIds.add(user.activeMessage.id);
+  }
+
   renderUsersTable();
   renderDetailPanel();
   userMessageTitle.focus();
@@ -90,6 +100,12 @@ function renderDetailPanel() {
   userEventSelect.value = user.contractorEventId || "";
   userDetailStatus.textContent = "";
   userMessagePanel.hidden = messageComposerUserId !== user.id;
+  if (userMessagePreview && userMessagePreviewTitle && userMessagePreviewBody) {
+    const activeMessage = user.activeMessage || null;
+    userMessagePreview.hidden = !activeMessage;
+    userMessagePreviewTitle.textContent = activeMessage?.title || "";
+    userMessagePreviewBody.textContent = activeMessage?.body || "";
+  }
   syncContractorEventVisibility();
 }
 
@@ -102,17 +118,26 @@ function renderUsersTable() {
   }
 
   users.forEach((user) => {
+    const hasUnseenActiveMessage = Boolean(
+      user.hasActiveMessage &&
+      user.activeMessage?.id &&
+      !viewedActiveMessageIds.has(user.activeMessage.id)
+    );
+
     const row = document.createElement("article");
     row.className = `users-table-row users-table-card ${user.isOnline ? "is-online" : "is-offline"}${user.id === selectedUserId ? " is-selected" : ""}`;
     row.innerHTML = `
       <div class="users-table-user">
         <button class="users-table-select" type="button">
-          <span>
-            <strong>${user.name || user.username || "Usuario"}</strong>
+          <span class="users-table-user-copy">
+            <strong class="users-table-user-name">
+              <span>${user.name || user.username || "Usuario"}</span>
+              ${hasUnseenActiveMessage ? '<span class="users-message-dot" aria-hidden="true"></span>' : ""}
+            </strong>
             <small>${user.username ? `@${user.username}` : ""}</small>
           </span>
         </button>
-        <button class="users-message-button" type="button" aria-label="Enviar mensagem para ${user.name || user.username || "usuario"}" title="Enviar mensagem">
+        <button class="users-message-button" type="button" aria-label="Abrir mensagem de ${user.name || user.username || "usuario"}" title="Abrir mensagem">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7A2.5 2.5 0 0 1 17.5 15H9.41l-3.7 3.58A1 1 0 0 1 4 17.86V15.5A2.5 2.5 0 0 1 1.5 13v-7A2.5 2.5 0 0 1 4 3.5Zm2.5-.5a.5.5 0 0 0-.5.5v7c0 .28.22.5.5.5h3.31c.26 0 .51.1.7.29L12 14.82V13.5a1 1 0 0 1 1-1h4.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5Z"/></svg>
         </button>
       </div>
@@ -122,7 +147,10 @@ function renderUsersTable() {
 
     row.querySelector(".users-table-select")?.addEventListener("click", () => {
       selectedUserId = user.id;
-      messageComposerUserId = messageComposerUserId === user.id ? user.id : "";
+      if (user.activeMessage?.id) {
+        viewedActiveMessageIds.add(user.activeMessage.id);
+      }
+      messageComposerUserId = messageComposerUserId === user.id || user.hasActiveMessage ? user.id : "";
       renderUsersTable();
       renderDetailPanel();
     });
@@ -244,7 +272,11 @@ async function sendMessageToSelectedUser() {
     }
 
     userDetailStatus.textContent = "Mensagem enviada para o usuario.";
+    if (data?.message?.id) {
+      viewedActiveMessageIds.add(data.message.id);
+    }
     resetMessageComposer();
+    await loadUsers();
   } catch (error) {
     userDetailStatus.textContent = error instanceof Error ? error.message : "Erro ao enviar mensagem.";
   }

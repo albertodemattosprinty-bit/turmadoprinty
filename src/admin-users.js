@@ -143,6 +143,10 @@ export async function listUsersWithAdminData(planPrices = {}) {
         override.plan_id as override_plan_id,
         event.date_label as contractor_event_date_label,
         event.place as contractor_event_place,
+        active_message.active_message_id,
+        active_message.active_message_title,
+        active_message.active_message_body,
+        active_message.active_message_created_at,
         case
           when u.last_seen_at is not null and u.last_seen_at >= now() - ($1::text || ' minutes')::interval then true
           else false
@@ -152,6 +156,18 @@ export async function listUsersWithAdminData(planPrices = {}) {
       left join admin_user_notes notes on notes.user_id = u.id
       left join user_plan_overrides override on override.user_id = u.id
       left join agenda_events event on event.id = notes.contractor_event_id
+      left join lateral (
+        select
+          id as active_message_id,
+          title as active_message_title,
+          body as active_message_body,
+          created_at as active_message_created_at
+        from admin_user_messages
+        where user_id = u.id
+          and dismissed_at is null
+        order by created_at desc
+        limit 1
+      ) active_message on true
       order by
         case
           when u.last_seen_at is not null and u.last_seen_at >= now() - ($1::text || ' minutes')::interval then 0
@@ -179,6 +195,15 @@ export async function listUsersWithAdminData(planPrices = {}) {
     contractorEventLabel: row.contractor_event_date_label
       ? `${row.contractor_event_date_label} - ${row.contractor_event_place || ""}`.trim()
       : "",
+    hasActiveMessage: Boolean(row.active_message_id),
+    activeMessage: row.active_message_id
+      ? {
+          id: row.active_message_id,
+          title: row.active_message_title,
+          body: row.active_message_body,
+          createdAt: row.active_message_created_at
+        }
+      : null,
     availablePlans
   }));
 }

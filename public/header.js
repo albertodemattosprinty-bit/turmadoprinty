@@ -2,6 +2,7 @@ import { getApiUrl } from "./api.js";
 
 const sessionStorageKey = "turma_do_printy_token";
 const adminMessagePollMs = 15000;
+const adminReplyDraftStorageKey = "turma_do_printy_admin_reply_draft";
 
 function ensureAdminMessageNotice() {
   let notice = document.getElementById("admin-user-message-notice");
@@ -20,6 +21,9 @@ function ensureAdminMessageNotice() {
     </button>
     <strong class="admin-user-message-title"></strong>
     <p class="admin-user-message-body"></p>
+    <div class="admin-user-message-actions">
+      <button class="admin-user-message-reply" type="button">Responder</button>
+    </div>
   `;
 
   document.body.appendChild(notice);
@@ -90,6 +94,7 @@ function renderAdminMessageNotice(message) {
   const title = notice.querySelector(".admin-user-message-title");
   const body = notice.querySelector(".admin-user-message-body");
   const closeButton = notice.querySelector(".admin-user-message-close");
+  const replyButton = notice.querySelector(".admin-user-message-reply");
 
   if (!message) {
     notice.hidden = true;
@@ -116,6 +121,20 @@ function renderAdminMessageNotice(message) {
       }
     });
   }
+
+  if (replyButton && !replyButton.dataset.bound) {
+    replyButton.dataset.bound = "true";
+    replyButton.addEventListener("click", () => {
+      const replyTitle = title.textContent?.trim() || "Mensagem da Rose";
+      const replyBody = body.textContent?.trim() || "";
+      const draft = replyBody
+        ? `Rose, sobre sua mensagem "${replyTitle}": `
+        : "Rose, ";
+
+      window.localStorage.setItem(adminReplyDraftStorageKey, draft);
+      window.location.href = "/explorar.html";
+    });
+  }
 }
 
 async function syncAdminMessageNotice() {
@@ -129,6 +148,10 @@ async function syncAdminMessageNotice() {
 
 function startAdminMessagePolling(user) {
   if (!user) {
+    if (window.__turmaDoPrintyAdminMessagePollTimer) {
+      window.clearInterval(window.__turmaDoPrintyAdminMessagePollTimer);
+      window.__turmaDoPrintyAdminMessagePollTimer = null;
+    }
     hideAdminMessageNotice();
     return;
   }
@@ -141,6 +164,10 @@ function startAdminMessagePolling(user) {
   window.__turmaDoPrintyAdminMessagePollTimer = window.setInterval(() => {
     void syncAdminMessageNotice();
   }, adminMessagePollMs);
+}
+
+export function syncAdminMessageNoticeForUser(user) {
+  startAdminMessagePolling(user);
 }
 
 export function getToken() {

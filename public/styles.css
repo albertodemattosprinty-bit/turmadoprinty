@@ -221,6 +221,24 @@ a {
   white-space: pre-wrap;
 }
 
+.admin-user-message-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.admin-user-message-reply {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .admin-user-message-close {
   position: absolute;
   top: 10px;
@@ -1818,6 +1836,16 @@ body[data-page="users"] .users-admin-shell {
   margin-bottom: 4px;
 }
 
+.users-table-user-copy {
+  min-width: 0;
+}
+
+.users-table-user-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .users-table-card small {
   color: rgba(255, 255, 255, 0.74);
 }
@@ -1862,20 +1890,29 @@ body[data-page="users"] .users-admin-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 14px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   cursor: pointer;
 }
 
 .users-message-button svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   fill: currentColor;
+}
+
+.users-message-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #57f287;
+  box-shadow: 0 0 0 4px rgba(87, 242, 135, 0.18);
+  flex-shrink: 0;
 }
 
 .user-message-panel {
@@ -1885,6 +1922,20 @@ body[data-page="users"] .users-admin-shell {
   border-radius: 24px;
   background: rgba(27, 83, 187, 0.06);
   border: 1px solid rgba(27, 83, 187, 0.12);
+}
+
+.user-message-preview {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(27, 83, 187, 0.12);
+}
+
+.user-message-preview strong,
+.user-message-preview p {
+  margin: 0;
 }
 
 .user-message-grid {
