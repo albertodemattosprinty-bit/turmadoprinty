@@ -330,6 +330,13 @@ body[data-page="explorar"] {
   --explore-body-font: "PrintyText", "Open Sans", sans-serif;
 }
 
+body[data-page="mi-gestao"] {
+  --mi-panel-blue: #2f7cff;
+  --mi-panel-blue-deep: #1b53bb;
+  --mi-panel-sky: #7cd7ff;
+  --mi-panel-wash: #eef7ff;
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;
@@ -361,6 +368,387 @@ body[data-page="explorar"] {
   width: min(1200px, calc(100% - 28px));
   margin: 0 auto;
   padding: 0 0 54px;
+}
+
+.mi-gestao-shell {
+  display: grid;
+  gap: 22px;
+  padding-top: 24px;
+}
+
+.mi-gestao-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto;
+  gap: 20px;
+  align-items: end;
+  padding: 30px;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at top left, rgba(124, 215, 255, 0.38), transparent 30%),
+    linear-gradient(135deg, rgba(18, 83, 187, 0.98) 0%, rgba(47, 124, 255, 0.98) 52%, rgba(124, 215, 255, 0.94) 100%);
+  box-shadow: 0 24px 48px rgba(18, 67, 146, 0.18);
+}
+
+.mi-gestao-hero .eyebrow,
+.mi-gestao-hero .section-title,
+.mi-gestao-hero .section-muted,
+.mi-gestao-subtitle {
+  color: #ffffff;
+}
+
+.mi-gestao-subtitle {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.4vw, 1.7rem);
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.mi-gestao-hero-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.mi-gestao-hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mi-gestao-hero .ghost-button {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.mi-gestao-onboarding {
+  display: grid;
+  gap: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(124, 215, 255, 0.18), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 247, 255, 0.96));
+}
+
+.mi-gestao-onboarding-head,
+.mi-gestao-room-panel-head,
+.mi-gestao-feature-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 14px;
+}
+
+.mi-gestao-steps,
+.mi-gestao-overview-pills,
+.mi-gestao-room-panel-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mi-gestao-step,
+.mi-gestao-pill,
+.mi-gestao-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.mi-gestao-step,
+.mi-gestao-pill {
+  background: rgba(47, 124, 255, 0.08);
+  color: var(--blue-dark);
+}
+
+.mi-gestao-step.is-complete {
+  background: linear-gradient(135deg, rgba(27, 83, 187, 0.95), rgba(47, 124, 255, 0.9));
+  color: #ffffff;
+}
+
+.mi-gestao-form,
+.mi-gestao-room-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.mi-gestao-form-grid,
+.mi-gestao-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.mi-gestao-form label,
+.mi-gestao-role-fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  color: var(--blue-dark);
+  font-weight: 700;
+}
+
+.mi-gestao-form input,
+.mi-gestao-form select,
+.mi-gestao-form textarea,
+.mi-gestao-inline-form input,
+.mi-gestao-inline-form select,
+.mi-gestao-inline-form textarea {
+  width: 100%;
+  border: 1px solid rgba(27, 83, 187, 0.16);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: #ffffff;
+  color: var(--blue-dark);
+  font: inherit;
+  outline: none;
+}
+
+.mi-gestao-form textarea,
+.mi-gestao-inline-form textarea {
+  resize: vertical;
+}
+
+.mi-gestao-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.mi-gestao-role-fieldset {
+  grid-column: span 2;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(47, 124, 255, 0.04);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mi-gestao-role-fieldset legend {
+  padding: 0 6px;
+}
+
+.mi-gestao-radio-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 58px;
+  border-radius: 20px;
+  border: 1px solid rgba(27, 83, 187, 0.14);
+  background: #ffffff;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.mi-gestao-radio-card input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.mi-gestao-radio-card span {
+  position: relative;
+  z-index: 1;
+}
+
+.mi-gestao-radio-card:has(input:checked) {
+  background: linear-gradient(135deg, rgba(27, 83, 187, 0.98), rgba(47, 124, 255, 0.96));
+  color: #ffffff;
+}
+
+.mi-gestao-dashboard,
+.mi-gestao-room-section {
+  display: grid;
+  gap: 18px;
+}
+
+.mi-gestao-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.mi-gestao-overview-card {
+  display: grid;
+  gap: 14px;
+}
+
+.mi-gestao-mini-list,
+.mi-gestao-collection {
+  display: grid;
+  gap: 12px;
+}
+
+.mi-gestao-mini-item,
+.mi-gestao-list-card,
+.mi-gestao-material-card,
+.mi-gestao-detail-card {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  background: linear-gradient(180deg, #ffffff, rgba(238, 247, 255, 0.94));
+}
+
+.mi-gestao-list-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--blue-dark);
+}
+
+.mi-gestao-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.mi-gestao-room-card {
+  display: grid;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(124, 215, 255, 0.22), transparent 35%),
+    linear-gradient(180deg, #ffffff, rgba(238, 247, 255, 0.96));
+  color: var(--blue-dark);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 18px 32px rgba(32, 73, 152, 0.08);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.mi-gestao-room-card:hover,
+.mi-gestao-room-card.is-active {
+  transform: translateY(-2px);
+  border-color: rgba(27, 83, 187, 0.24);
+  box-shadow: 0 20px 38px rgba(20, 70, 156, 0.14);
+}
+
+.mi-gestao-room-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.mi-gestao-room-main {
+  font-size: 1.18rem;
+  line-height: 1.35;
+}
+
+.mi-gestao-room-meta {
+  color: var(--text-soft);
+}
+
+.mi-gestao-room-panel {
+  display: grid;
+  gap: 20px;
+  background:
+    radial-gradient(circle at top left, rgba(124, 215, 255, 0.14), transparent 25%),
+    linear-gradient(180deg, #ffffff, rgba(240, 248, 255, 0.98));
+}
+
+.mi-gestao-feature-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 28px;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.mi-gestao-feature-card h4 {
+  margin: 0;
+  color: var(--blue-dark);
+  font-size: 1.18rem;
+}
+
+.mi-gestao-inline-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mi-gestao-inline-form textarea,
+.mi-gestao-inline-form button {
+  grid-column: span 2;
+}
+
+.mi-gestao-inline-form-compact {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.mi-gestao-inline-form-compact button {
+  grid-column: auto;
+}
+
+.mi-gestao-material-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.mi-gestao-tag {
+  background: rgba(27, 83, 187, 0.94);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.mi-gestao-child-detail {
+  display: grid;
+  gap: 18px;
+  padding: 6px 0 0;
+}
+
+.mi-gestao-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(27, 83, 187, 0.98), rgba(47, 124, 255, 0.98));
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.mi-gestao-back-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.mi-gestao-child-detail-head {
+  display: grid;
+  gap: 10px;
+}
+
+.mi-gestao-detail-card span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.mi-gestao-detail-card strong {
+  color: var(--blue-dark);
+  line-height: 1.5;
+}
+
+.mi-gestao-detail-card-wide {
+  grid-column: span 2;
 }
 
 .app-native-auth-extra,
@@ -3829,7 +4217,11 @@ body[data-page="explorar"] #chat-auth-status {
   .auth-grid,
   .auth-hero,
   .product-hero,
-  .plans-grid {
+  .plans-grid,
+  .mi-gestao-hero,
+  .mi-gestao-overview-grid,
+  .mi-gestao-form-grid,
+  .mi-gestao-detail-grid {
     grid-template-columns: 1fr;
   }
 
@@ -3898,6 +4290,44 @@ body[data-page="explorar"] #chat-auth-status {
   .hero-home {
     min-height: 0;
     padding: 28px 20px;
+  }
+
+  .mi-gestao-shell {
+    padding-top: 18px;
+  }
+
+  .mi-gestao-hero,
+  .mi-gestao-onboarding,
+  .mi-gestao-room-panel,
+  .mi-gestao-feature-card {
+    border-radius: 28px;
+  }
+
+  .mi-gestao-hero {
+    padding: 24px 20px;
+  }
+
+  .mi-gestao-hero-actions,
+  .mi-gestao-form-actions,
+  .mi-gestao-onboarding-head,
+  .mi-gestao-room-panel-head,
+  .mi-gestao-feature-head,
+  .mi-gestao-material-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mi-gestao-role-fieldset,
+  .mi-gestao-inline-form,
+  .mi-gestao-inline-form-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .mi-gestao-inline-form textarea,
+  .mi-gestao-inline-form button,
+  .mi-gestao-inline-form-compact button,
+  .mi-gestao-detail-card-wide {
+    grid-column: auto;
   }
 
   .page-top-banner {

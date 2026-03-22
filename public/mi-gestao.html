@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Mi Gestao</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="mi-gestao">
+  <header class="site-header">
+    <a class="brand" href="/index.html">
+      <span class="brand-mark">P</span>
+      <span class="brand-text">Turma do Printy</span>
+    </a>
+  </header>
+
+  <main class="page-shell mi-gestao-shell">
+    <section class="mi-gestao-hero">
+      <div class="mi-gestao-hero-copy">
+        <p class="eyebrow">Painel Central</p>
+        <h1 id="mi-gestao-title" class="section-title">Departamento Infantil</h1>
+        <h2 id="mi-gestao-subtitle" class="mi-gestao-subtitle">Organize salas, professores, crianças e materiais em um só lugar.</h2>
+        <p id="mi-gestao-summary" class="section-muted">Monte o cadastro inicial do seu ministério para liberar o painel.</p>
+      </div>
+      <div class="mi-gestao-hero-actions">
+        <button id="open-onboarding-button" type="button" class="primary-button">Adicionar departamento infantil</button>
+        <button id="reset-ministry-button" type="button" class="ghost-button" hidden>Recomeçar cadastro</button>
+      </div>
+    </section>
+
+    <section id="mi-gestao-onboarding" class="section-card mi-gestao-onboarding">
+      <div class="mi-gestao-onboarding-head">
+        <div>
+          <p class="eyebrow">Cadastro de Etapas</p>
+          <h3 class="section-title small">Dados do ministério</h3>
+        </div>
+        <div id="onboarding-steps" class="mi-gestao-steps" aria-label="Etapas do cadastro"></div>
+      </div>
+
+      <form id="mi-gestao-form" class="mi-gestao-form">
+        <div class="mi-gestao-form-grid">
+          <label>
+            Nome da Igreja:
+            <input id="church-name" name="churchName" type="text" required>
+          </label>
+
+          <label>
+            Nome do pastor:
+            <input id="pastor-name" name="pastorName" type="text" required>
+          </label>
+
+          <label>
+            Nome do ministério: (Optional)
+            <input id="ministry-name" name="ministryName" type="text">
+          </label>
+
+          <label>
+            Seu nome:
+            <input id="owner-name" name="ownerName" type="text" required>
+          </label>
+
+          <fieldset class="mi-gestao-role-fieldset">
+            <legend>Você é professor de uma sala, ou líder de todas as salas?</legend>
+            <label class="mi-gestao-radio-card">
+              <input type="radio" name="role" value="Professor" checked>
+              <span>Professor</span>
+            </label>
+            <label class="mi-gestao-radio-card">
+              <input type="radio" name="role" value="Lider">
+              <span>Líder</span>
+            </label>
+          </fieldset>
+
+          <label>
+            Quantas salas tem no seu departamento?
+            <input id="room-count" name="roomCount" type="number" min="1" max="20" required>
+          </label>
+        </div>
+
+        <div class="mi-gestao-form-actions">
+          <p id="mi-gestao-form-status" class="section-muted" aria-live="polite"></p>
+          <button type="submit" class="primary-button">Criar painel central</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="mi-gestao-dashboard" class="mi-gestao-dashboard" hidden>
+      <div class="mi-gestao-overview-grid">
+        <article class="section-card mi-gestao-overview-card">
+          <p class="eyebrow">Visão Geral</p>
+          <div id="overview-pills" class="mi-gestao-overview-pills"></div>
+        </article>
+
+        <article class="section-card mi-gestao-overview-card">
+          <p class="eyebrow">Equipe</p>
+          <div id="overview-team" class="mi-gestao-mini-list"></div>
+        </article>
+      </div>
+
+      <section class="mi-gestao-room-section">
+        <div class="section-head mi-gestao-room-head">
+          <div>
+            <p class="eyebrow">Salas</p>
+            <h3 class="section-title small">Seu departamento</h3>
+          </div>
+          <p id="room-section-caption" class="section-muted"></p>
+        </div>
+
+        <div id="room-grid" class="mi-gestao-room-grid"></div>
+        <div id="room-panel" class="section-card mi-gestao-room-panel" hidden></div>
+      </section>
+    </section>
+  </main>
+
+  <nav class="site-footer-nav site-nav" aria-label="Navegação principal">
+    <a class="nav-link" href="/index.html"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+    <a class="nav-link" href="/produtos.html"><svg viewBox="0 0 24 24"><path d="M4 7h16v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm3-4h10l1 3H6z"/></svg><span>Produtos</span></a>
+    <a class="nav-link" href="/planos.html"><svg viewBox="0 0 24 24"><path d="M12 2 3 7v6c0 5 3.8 9.7 9 11 5.2-1.3 9-6 9-11V7zm0 4 5 2.7v4.1c0 3.6-2.4 7-5 8-2.6-1-5-4.4-5-8V8.7z"/></svg><span>Planos</span></a>
+    <a class="nav-link" href="/eventos.html"><svg viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></svg><span>Eventos</span></a>
+    <a class="nav-link" href="/explorar.html"><svg viewBox="0 0 24 24"><path d="m14 4 1.2 3.3L18.5 8.5l-3.3 1.2L14 13l-1.2-3.3L9.5 8.5l3.3-1.2zm-7 9 1 2.7L10.7 17 8 18l-1 2.7L6 18l-2.7-1.3L6 15.7zm10 2 1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z"/></svg><span>Explorar</span></a>
+    <a class="nav-link active" href="/mi-gestao"><svg viewBox="0 0 24 24"><path d="M4 5h16v4H4zm0 5.5h7v8H4zm8.5 0H20v3h-7.5zm0 4.5H20v3h-7.5z"/></svg><span>Mi Gestão</span></a>
+  </nav>
+
+  <script type="module" src="/mi-gestao.js"></script>
+</body>
+</html>
