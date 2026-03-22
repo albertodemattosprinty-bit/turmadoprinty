@@ -732,7 +732,8 @@ body[data-page="mi-gestao"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 72px;
+  height: 96px;
+  min-height: 96px;
   padding: 20px 24px;
   border-radius: 24px;
   background: linear-gradient(135deg, rgba(27, 83, 187, 0.98), rgba(47, 124, 255, 0.98));
@@ -791,6 +792,19 @@ body[data-page="mi-gestao"] {
   font-size: 0.82rem;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.mi-gestao-add-trigger {
+  align-self: center;
+}
+
+.mi-gestao-add-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  background: linear-gradient(180deg, rgba(238, 247, 255, 0.98), #ffffff);
 }
 
 .mi-gestao-child-detail {
@@ -4459,6 +4473,11 @@ body[data-page="explorar"] #chat-auth-status {
 
   .mi-gestao-action-button {
     min-width: 92px;
+  }
+
+  .mi-gestao-room-teacher-hero {
+    height: auto;
+    min-height: 96px;
   }
 
   .mi-gestao-role-fieldset,

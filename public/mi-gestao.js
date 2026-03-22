@@ -31,6 +31,7 @@ let activeRoomId = state.rooms[0]?.id || null;
 let activeChildId = null;
 let activeRoomSection = "children";
 let isChildrenPanelOpen = true;
+let activeAddPanel = null;
 
 function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -191,11 +192,6 @@ function getActionItems() {
       icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 8.18-4.09V15H22V8zM6 12.94V16c0 2.21 2.69 4 6 4s6-1.79 6-4v-3.06l-6 3z"/></svg>'
     },
     {
-      id: "age-range",
-      label: "Faixa etária",
-      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10v2h1a2 2 0 0 1 2 2v12a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a2 2 0 0 1 2-2h1zm0 6v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V8zm2-4v2h6V4z"/></svg>'
-    },
-    {
       id: "materials",
       label: "Materiais",
       icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm3-4h10l1 3H6z"/></svg>'
@@ -288,6 +284,7 @@ function renderRoomGrid() {
       activeChildId = null;
       activeRoomSection = "children";
       isChildrenPanelOpen = true;
+      activeAddPanel = null;
       renderRoomGrid();
       renderRoomPanel();
     });
@@ -365,14 +362,14 @@ function renderRoomPanel() {
   }
 
   const actions = getActionItems();
-  const sectionContent = {
-    children: `
-      <article class="mi-gestao-feature-card">
-        <div class="mi-gestao-feature-head">
-          <div>
-            <p class="eyebrow">Adicionar Crianças</p>
-            <h4>Crianças da sala</h4>
-          </div>
+  const addPanelContent = {
+    child: `
+      <div class="mi-gestao-add-panel">
+        <div class="mi-gestao-panel-subhead">
+          <strong>Adicionar criança</strong>
+          <button class="mi-gestao-inline-close" type="button" data-close-add-panel="true" aria-label="Fechar formulário">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+          </button>
         </div>
         <form class="mi-gestao-inline-form" data-form="child">
           <input name="name" type="text" placeholder="Nome" required>
@@ -381,8 +378,56 @@ function renderRoomPanel() {
           <input name="skills" type="text" placeholder="Habilidades">
           <input name="hobbies" type="text" placeholder="Hobbies">
           <textarea name="notes" rows="3" placeholder="Notas"></textarea>
-          <button class="primary-button" type="submit">Adicionar criança</button>
+          <button class="primary-button" type="submit">Salvar criança</button>
         </form>
+      </div>
+    `,
+    teacher: `
+      <div class="mi-gestao-add-panel">
+        <div class="mi-gestao-panel-subhead">
+          <strong>Adicionar professor</strong>
+          <button class="mi-gestao-inline-close" type="button" data-close-add-panel="true" aria-label="Fechar formulário">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+          </button>
+        </div>
+        <form class="mi-gestao-inline-form mi-gestao-inline-form-compact" data-form="teacher">
+          <input name="name" type="text" placeholder="Nome do professor" required>
+          <button class="primary-button" type="submit">Salvar professor</button>
+        </form>
+      </div>
+    `,
+    material: `
+      <div class="mi-gestao-add-panel">
+        <div class="mi-gestao-panel-subhead">
+          <strong>Adicionar material</strong>
+          <button class="mi-gestao-inline-close" type="button" data-close-add-panel="true" aria-label="Fechar formulário">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+          </button>
+        </div>
+        <form class="mi-gestao-inline-form" data-form="material">
+          <input name="name" type="text" placeholder="Nome do material" required>
+          <select name="type" required>
+            <option value="Durável">Durável</option>
+            <option value="Não durável">Não durável</option>
+          </select>
+          <input name="quantity" type="text" placeholder="Quantidade">
+          <textarea name="notes" rows="3" placeholder="Observações"></textarea>
+          <button class="primary-button" type="submit">Salvar material</button>
+        </form>
+      </div>
+    `
+  };
+  const sectionContent = {
+    children: `
+      <article class="mi-gestao-feature-card">
+        <div class="mi-gestao-feature-head">
+          <div>
+            <p class="eyebrow">Crianças</p>
+            <h4>Crianças da sala</h4>
+          </div>
+          <button class="primary-button mi-gestao-add-trigger" type="button" data-open-add-panel="child">Adicionar criança</button>
+        </div>
+        ${activeAddPanel === "child" ? addPanelContent.child : ""}
         ${isChildrenPanelOpen
           ? `
               <div class="mi-gestao-collection mi-gestao-child-collection">
@@ -411,14 +456,12 @@ function renderRoomPanel() {
       <article class="mi-gestao-feature-card">
         <div class="mi-gestao-feature-head">
           <div>
-            <p class="eyebrow">Adicionar Professores</p>
+            <p class="eyebrow">Professores</p>
             <h4>Equipe da sala</h4>
           </div>
+          <button class="primary-button mi-gestao-add-trigger" type="button" data-open-add-panel="teacher">Adicionar professor</button>
         </div>
-        <form class="mi-gestao-inline-form mi-gestao-inline-form-compact" data-form="teacher">
-          <input name="name" type="text" placeholder="Nome do professor" required>
-          <button class="primary-button" type="submit">Adicionar professor</button>
-        </form>
+        ${activeAddPanel === "teacher" ? addPanelContent.teacher : ""}
         <div class="mi-gestao-collection">
           ${room.teachers.length
             ? room.teachers.map((teacher) => `
@@ -431,38 +474,16 @@ function renderRoomPanel() {
         </div>
       </article>
     `,
-    "age-range": `
-      <article class="mi-gestao-feature-card">
-        <div class="mi-gestao-feature-head">
-          <div>
-            <p class="eyebrow">Definir Faixa Etária</p>
-            <h4>Perfil da sala</h4>
-          </div>
-        </div>
-        <form class="mi-gestao-inline-form mi-gestao-inline-form-compact" data-form="age-range">
-          <input name="ageRange" type="text" placeholder="Ex.: 4 a 6 anos" value="${escapeHtml(room.ageRange)}" required>
-          <button class="primary-button" type="submit">Salvar faixa etária</button>
-        </form>
-      </article>
-    `,
     materials: `
       <article class="mi-gestao-feature-card">
         <div class="mi-gestao-feature-head">
           <div>
-            <p class="eyebrow">Cadastrar Materiais</p>
+            <p class="eyebrow">Materiais</p>
             <h4>Materiais da sala</h4>
           </div>
+          <button class="primary-button mi-gestao-add-trigger" type="button" data-open-add-panel="material">Adicionar material</button>
         </div>
-        <form class="mi-gestao-inline-form" data-form="material">
-          <input name="name" type="text" placeholder="Nome do material" required>
-          <select name="type" required>
-            <option value="Durável">Durável</option>
-            <option value="Não durável">Não durável</option>
-          </select>
-          <input name="quantity" type="text" placeholder="Quantidade">
-          <textarea name="notes" rows="3" placeholder="Observações"></textarea>
-          <button class="primary-button" type="submit">Adicionar material</button>
-        </form>
+        ${activeAddPanel === "material" ? addPanelContent.material : ""}
         <div class="mi-gestao-collection">
           ${room.materials.length
             ? room.materials.map((material) => `
@@ -492,7 +513,8 @@ function renderRoomPanel() {
           <h3 class="section-title small">${escapeHtml(room.name)}</h3>
         </div>
         <div class="mi-gestao-room-panel-pills">
-          <span class="mi-gestao-pill">${escapeHtml(room.ageRange || "Sem faixa etária")}</span>
+          <span class="mi-gestao-pill">${room.children.length} crianças</span>
+          <span class="mi-gestao-pill">${room.materials.length} materiais</span>
         </div>
       </div>
 
@@ -526,6 +548,21 @@ function renderRoomPanel() {
   roomPanel.querySelectorAll("[data-room-section]").forEach((button) => {
     button.addEventListener("click", () => {
       activeRoomSection = button.dataset.roomSection || "children";
+      activeAddPanel = null;
+      renderRoomPanel();
+    });
+  });
+
+  roomPanel.querySelectorAll("[data-open-add-panel]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeAddPanel = button.dataset.openAddPanel || null;
+      renderRoomPanel();
+    });
+  });
+
+  roomPanel.querySelectorAll("[data-close-add-panel]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeAddPanel = null;
       renderRoomPanel();
     });
   });
@@ -553,6 +590,8 @@ function renderRoomPanel() {
       notes: String(formData.get("notes") || "").trim()
     });
     saveState();
+    activeAddPanel = null;
+    isChildrenPanelOpen = true;
     renderAll();
   });
 
@@ -568,14 +607,7 @@ function renderRoomPanel() {
       name
     });
     saveState();
-    renderAll();
-  });
-
-  roomPanel.querySelector('[data-form="age-range"]')?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    room.ageRange = String(formData.get("ageRange") || "").trim();
-    saveState();
+    activeAddPanel = null;
     renderAll();
   });
 
@@ -590,6 +622,7 @@ function renderRoomPanel() {
       notes: String(formData.get("notes") || "").trim()
     });
     saveState();
+    activeAddPanel = null;
     renderAll();
   });
 
@@ -640,7 +673,8 @@ form.addEventListener("submit", (event) => {
       if (existingRoom) {
         return {
           ...existingRoom,
-          name: `Sala ${index + 1}`
+          name: `Sala ${index + 1}`,
+          ageRange: ""
         };
       }
       return createRoom(index, ministry.role, ministry.ownerName);
@@ -649,6 +683,7 @@ form.addEventListener("submit", (event) => {
 
   activeRoomId = state.rooms[0]?.id || null;
   activeChildId = null;
+  activeAddPanel = null;
   saveState();
   formStatus.textContent = "Painel central criado com sucesso.";
   closeOnboarding();
