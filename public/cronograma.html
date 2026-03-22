@@ -29,26 +29,36 @@
     <section id="cronograma-step-1" class="section-card cronograma-step">
       <div class="cronograma-step-head">
         <p class="eyebrow">Tela 1</p>
-        <h2 class="section-title small">Definir tempo da aula</h2>
-        <p class="section-muted">Escolha a duração total da aula para liberar a barra do cronograma.</p>
+        <h1 class="section-title">Quanto tempo vai ter a sua aula?</h1>
+        <p id="cronograma-time-display" class="cronograma-time-display">Uma hora</p>
+        <p class="section-muted">Tempo mínimo 10 minutos</p>
+        <p class="section-muted">Tempo máximo 8 horas</p>
       </div>
 
       <form id="cronograma-duration-form" class="cronograma-duration-form">
-        <label>
-          Quantos minutos terá a aula?
-          <input id="cronograma-total-minutes" type="number" min="10" max="300" step="5" placeholder="Ex.: 90" required>
-        </label>
+        <div class="cronograma-time-picker" aria-label="Definir tempo da aula">
+          <button id="cronograma-decrease-time" type="button" class="ghost-button cronograma-icon-button" aria-label="Diminuir 5 minutos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 5.3-1.4-1.4L5.2 12l8.1 8.1 1.4-1.4L9 12.99z"/></svg>
+          </button>
+          <input id="cronograma-total-minutes" type="hidden" value="60">
+          <button id="cronograma-increase-time" type="button" class="ghost-button cronograma-icon-button" aria-label="Aumentar 5 minutos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.3 18.7 1.4 1.4 8.1-8.1-8.1-8.1-1.4 1.4 5.7 5.7z"/></svg>
+          </button>
+        </div>
         <div class="cronograma-duration-actions">
           <p id="cronograma-duration-status" class="section-muted" aria-live="polite"></p>
-          <button type="submit" class="primary-button">Ir para o cronograma</button>
+          <div class="cronograma-duration-buttons">
+            <button id="cronograma-reset-button" type="button" class="ghost-button" hidden>Novo cronograma</button>
+            <button type="submit" class="primary-button">Definir aula</button>
+          </div>
         </div>
       </form>
     </section>
 
     <section id="cronograma-step-2" class="section-card cronograma-board" hidden>
       <div class="cronograma-step-head">
-        <p class="eyebrow">Tela 2</p>
-        <h2 class="section-title small">Organizar blocos da aula</h2>
+        <p class="eyebrow">Planejamento</p>
+        <h2 class="section-title small">Planejamento</h2>
         <p id="cronograma-board-summary" class="section-muted"></p>
       </div>
 
@@ -65,10 +75,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.3 18.7 1.4 1.4 8.1-8.1-8.1-8.1-1.4 1.4 5.7 5.7z"/></svg>
           </button>
         </div>
-      </div>
-
-      <div class="cronograma-timeline-wrap">
-        <div id="cronograma-timeline" class="cronograma-timeline" aria-label="Barra do cronograma"></div>
       </div>
 
       <div class="cronograma-metrics">
@@ -119,6 +125,10 @@
     <a class="nav-link" href="/explorar.html"><svg viewBox="0 0 24 24"><path d="m14 4 1.2 3.3L18.5 8.5l-3.3 1.2L14 13l-1.2-3.3L9.5 8.5l3.3-1.2zm-7 9 1 2.7L10.7 17 8 18l-1 2.7L6 18l-2.7-1.3L6 15.7zm10 2 1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z"/></svg><span>Explorar</span></a>
     <a class="nav-link active" href="/cronograma"><svg viewBox="0 0 24 24"><path d="M6 3h2v3H6zm10 0h2v3h-2zM5 6h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2m1 5v2h4v-2zm5 0v2h7v-2zm-5 4v2h7v-2z"/></svg><span>Cronograma</span></a>
   </nav>
+
+  <div class="cronograma-fixed-bar-wrap" aria-label="Barra fixa da aula">
+    <div id="cronograma-timeline" class="cronograma-timeline" aria-label="Barra do cronograma"></div>
+  </div>
 
   <script type="module" src="/cronograma.js"></script>
 </body>

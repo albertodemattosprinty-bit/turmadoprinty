@@ -341,6 +341,10 @@ body[data-page="cronograma"] {
   --cronograma-track: linear-gradient(180deg, #e3e5e8 0%, #cfd4d9 100%);
 }
 
+body[data-page="cronograma"].cronograma-planning-mode {
+  background: #ffffff;
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;
@@ -918,6 +922,13 @@ body[data-page="cronograma"] {
   gap: 20px;
 }
 
+.cronograma-time-display {
+  margin: 0;
+  color: var(--blue-dark);
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  font-weight: 800;
+}
+
 .cronograma-step-head {
   display: grid;
   gap: 8px;
@@ -957,6 +968,19 @@ body[data-page="cronograma"] {
   flex-wrap: wrap;
 }
 
+.cronograma-duration-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cronograma-time-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
 .cronograma-toolbar {
   display: flex;
   justify-content: space-between;
@@ -991,6 +1015,17 @@ body[data-page="cronograma"] {
   justify-content: center;
 }
 
+.cronograma-fixed-bar-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+  z-index: 35;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .cronograma-timeline {
   position: relative;
   display: flex;
@@ -1001,6 +1036,7 @@ body[data-page="cronograma"] {
   overflow: hidden;
   background: var(--cronograma-track);
   box-shadow: inset 0 2px 10px rgba(112, 118, 125, 0.16);
+  pointer-events: auto;
 }
 
 .cronograma-empty-state {
@@ -1016,10 +1052,9 @@ body[data-page="cronograma"] {
 .cronograma-block {
   min-width: 56px;
   border: 0;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 6px;
   color: #ffffff;
   font: inherit;
@@ -1034,14 +1069,21 @@ body[data-page="cronograma"] {
   pointer-events: none;
 }
 
-.cronograma-block span {
-  font-size: 0.84rem;
-  line-height: 1.1;
+.cronograma-block-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
 }
 
-.cronograma-block small {
-  font-size: 0.72rem;
-  opacity: 0.92;
+.cronograma-block-icon.is-blue-icon {
+  color: #1b53bb;
+}
+
+.cronograma-block-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 
 .cronograma-block.is-selected {
@@ -1100,6 +1142,11 @@ body[data-page="cronograma"] {
   cursor: pointer;
   box-shadow: 0 14px 28px rgba(20, 66, 145, 0.12);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.cronograma-add-panel {
+  width: min(1100px, 90vw);
+  margin: 0 auto;
 }
 
 .cronograma-option-card.is-active {
@@ -4799,9 +4846,15 @@ body[data-page="explorar"] #chat-auth-status {
 
   .cronograma-toolbar,
   .cronograma-duration-actions,
-  .cronograma-panel-head {
+  .cronograma-panel-head,
+  .cronograma-time-picker {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .cronograma-fixed-bar-wrap {
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    padding: 0 10px;
   }
 
   .cronograma-timeline {
@@ -4809,8 +4862,9 @@ body[data-page="explorar"] #chat-auth-status {
     min-height: 92px;
   }
 
-  .cronograma-block span {
-    font-size: 0.76rem;
+  .cronograma-block-icon svg {
+    width: 20px;
+    height: 20px;
   }
 
   .cronograma-options-grid {
