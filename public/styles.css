@@ -652,8 +652,30 @@ body[data-page="mi-gestao"] {
 }
 
 .mi-gestao-room-panel {
+  position: fixed;
+  inset: 5vh 5vw auto;
+  z-index: 60;
+  display: none;
+  width: 90vw;
+  max-width: 90vw;
+  max-height: 90vh;
+  padding: 18px;
+  overflow: auto;
+  background: rgba(11, 49, 117, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.mi-gestao-room-panel.is-open {
+  display: grid;
+}
+
+.mi-gestao-room-panel-dialog {
+  position: relative;
   display: grid;
   gap: 20px;
+  min-height: min(76vh, 920px);
+  padding: 28px;
+  border-radius: 32px;
   background:
     radial-gradient(circle at top left, rgba(124, 215, 255, 0.14), transparent 25%),
     linear-gradient(180deg, #ffffff, rgba(240, 248, 255, 0.98));
@@ -706,10 +728,102 @@ body[data-page="mi-gestao"] {
   flex-shrink: 0;
 }
 
+.mi-gestao-room-teacher-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  padding: 20px 24px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(27, 83, 187, 0.98), rgba(47, 124, 255, 0.98));
+  color: #ffffff;
+  text-align: center;
+}
+
+.mi-gestao-room-teacher-hero strong {
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  line-height: 1.35;
+}
+
+.mi-gestao-room-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.mi-gestao-action-button {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  min-width: 108px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--blue-dark);
+  cursor: pointer;
+}
+
+.mi-gestao-action-button.is-active {
+  background: rgba(47, 124, 255, 0.1);
+}
+
+.mi-gestao-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(27, 83, 187, 0.98), rgba(47, 124, 255, 0.98));
+  color: #ffffff;
+  box-shadow: 0 16px 24px rgba(27, 83, 187, 0.18);
+}
+
+.mi-gestao-action-icon svg {
+  width: 28px;
+  height: 28px;
+  fill: currentColor;
+}
+
+.mi-gestao-action-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .mi-gestao-child-detail {
   display: grid;
   gap: 18px;
   padding: 6px 0 0;
+}
+
+.mi-gestao-panel-close,
+.mi-gestao-inline-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(27, 83, 187, 0.12);
+  color: var(--blue-dark);
+  cursor: pointer;
+}
+
+.mi-gestao-panel-close {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+}
+
+.mi-gestao-panel-close svg,
+.mi-gestao-inline-close svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 .mi-gestao-back-button {
@@ -734,6 +848,13 @@ body[data-page="mi-gestao"] {
 .mi-gestao-child-detail-head {
   display: grid;
   gap: 10px;
+}
+
+.mi-gestao-panel-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .mi-gestao-detail-card span {
@@ -4299,6 +4420,7 @@ body[data-page="explorar"] #chat-auth-status {
   .mi-gestao-hero,
   .mi-gestao-onboarding,
   .mi-gestao-room-panel,
+  .mi-gestao-room-panel-dialog,
   .mi-gestao-feature-card {
     border-radius: 28px;
   }
@@ -4312,9 +4434,31 @@ body[data-page="explorar"] #chat-auth-status {
   .mi-gestao-onboarding-head,
   .mi-gestao-room-panel-head,
   .mi-gestao-feature-head,
-  .mi-gestao-material-card {
+  .mi-gestao-material-card,
+  .mi-gestao-panel-subhead {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .mi-gestao-room-panel {
+    inset: 2vh 2vw auto;
+    width: 96vw;
+    max-width: 96vw;
+    max-height: 96vh;
+    padding: 10px;
+  }
+
+  .mi-gestao-room-panel-dialog {
+    min-height: auto;
+    padding: 22px 18px;
+  }
+
+  .mi-gestao-room-actions {
+    justify-content: flex-start;
+  }
+
+  .mi-gestao-action-button {
+    min-width: 92px;
   }
 
   .mi-gestao-role-fieldset,

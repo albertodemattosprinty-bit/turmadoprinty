@@ -29,6 +29,8 @@ const steps = [
 let state = loadState();
 let activeRoomId = state.rooms[0]?.id || null;
 let activeChildId = null;
+let activeRoomSection = "children";
+let isChildrenPanelOpen = true;
 
 function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -144,8 +146,11 @@ function syncStepPreview() {
 }
 
 function openOnboarding() {
+  if (state.ministry) {
+    formStatus.textContent = "Apenas um departamento pode ser adicionado por enquanto. Você pode editar o cadastro atual.";
+  }
   onboarding.hidden = false;
-  openOnboardingButton.textContent = state.ministry ? "Editar departamento infantil" : "Adicionar departamento infantil";
+  openOnboardingButton.textContent = "Editar departamento infantil";
   fillFormFromState();
   syncStepPreview();
   form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -171,6 +176,31 @@ function updateHeader() {
   summaryNode.textContent = state.ministry
     ? `${ownerName}${role ? ` • ${role}` : ""} • ${roomCount} sala${roomCount === 1 ? "" : "s"}`
     : "Monte o cadastro inicial do seu ministério para liberar o painel.";
+}
+
+function getActionItems() {
+  return [
+    {
+      id: "children",
+      label: "Crianças",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a3.5 3.5 0 1 0-3.5-3.5A3.5 3.5 0 0 0 12 12m-6 8a1 1 0 0 1-1-1c0-3.03 3.13-5.5 7-5.5s7 2.47 7 5.5a1 1 0 0 1-1 1z"/></svg>'
+    },
+    {
+      id: "teachers",
+      label: "Professores",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 8.18-4.09V15H22V8zM6 12.94V16c0 2.21 2.69 4 6 4s6-1.79 6-4v-3.06l-6 3z"/></svg>'
+    },
+    {
+      id: "age-range",
+      label: "Faixa etária",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10v2h1a2 2 0 0 1 2 2v12a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a2 2 0 0 1 2-2h1zm0 6v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V8zm2-4v2h6V4z"/></svg>'
+    },
+    {
+      id: "materials",
+      label: "Materiais",
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm3-4h10l1 3H6z"/></svg>'
+    }
+  ];
 }
 
 function renderOverview() {
@@ -256,6 +286,8 @@ function renderRoomGrid() {
     button.addEventListener("click", () => {
       activeRoomId = button.dataset.roomId || null;
       activeChildId = null;
+      activeRoomSection = "children";
+      isChildrenPanelOpen = true;
       renderRoomGrid();
       renderRoomPanel();
     });
@@ -265,6 +297,9 @@ function renderRoomGrid() {
 function renderChildDetail(room, child) {
   return `
     <article class="mi-gestao-child-detail">
+      <button class="mi-gestao-panel-close" type="button" data-close-room-panel="true" aria-label="Fechar sala expandida">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+      </button>
       <button class="mi-gestao-back-button" type="button" data-back-to-room="true" aria-label="Voltar para a sala">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 5.3-1.4-1.4L5.2 12l8.1 8.1 1.4-1.4L9 13h9v-2H9z"/></svg>
       </button>
@@ -308,11 +343,19 @@ function renderRoomPanel() {
   }
 
   roomPanel.hidden = false;
+  roomPanel.classList.add("is-open");
 
   if (activeChildId) {
     const child = room.children.find((item) => item.id === activeChildId);
     if (child) {
       roomPanel.innerHTML = renderChildDetail(room, child);
+      roomPanel.querySelector('[data-close-room-panel]')?.addEventListener("click", () => {
+        activeChildId = null;
+        activeRoomId = null;
+        roomPanel.classList.remove("is-open");
+        renderRoomGrid();
+        renderRoomPanel();
+      });
       roomPanel.querySelector("[data-back-to-room]")?.addEventListener("click", () => {
         activeChildId = null;
         renderRoomPanel();
@@ -321,23 +364,13 @@ function renderRoomPanel() {
     }
   }
 
-  roomPanel.innerHTML = `
-    <div class="mi-gestao-room-panel-head">
-      <div>
-        <p class="eyebrow">Sala Expandida</p>
-        <h3 class="section-title small">${escapeHtml(room.name)}</h3>
-      </div>
-      <div class="mi-gestao-room-panel-pills">
-        <span class="mi-gestao-pill">${escapeHtml(getTeacherSummary(room))}</span>
-        <span class="mi-gestao-pill">${escapeHtml(room.ageRange || "Sem faixa etária")}</span>
-      </div>
-    </div>
-
-    <div class="mi-gestao-room-sections">
+  const actions = getActionItems();
+  const sectionContent = {
+    children: `
       <article class="mi-gestao-feature-card">
         <div class="mi-gestao-feature-head">
           <div>
-            <p class="eyebrow">1. Adicionar Crianças</p>
+            <p class="eyebrow">Adicionar Crianças</p>
             <h4>Crianças da sala</h4>
           </div>
         </div>
@@ -350,22 +383,35 @@ function renderRoomPanel() {
           <textarea name="notes" rows="3" placeholder="Notas"></textarea>
           <button class="primary-button" type="submit">Adicionar criança</button>
         </form>
-        <div class="mi-gestao-collection">
-          ${room.children.length
-            ? room.children.map((child) => `
-                <button class="mi-gestao-list-card" type="button" data-child-id="${escapeHtml(child.id)}">
-                  <strong>${escapeHtml(child.name)}</strong>
-                  <span>${escapeHtml(child.guardianName || "Responsável não informado")}</span>
-                </button>
-              `).join("")
-            : '<p class="section-muted">Nenhuma criança cadastrada nesta sala ainda.</p>'}
-        </div>
+        ${isChildrenPanelOpen
+          ? `
+              <div class="mi-gestao-collection mi-gestao-child-collection">
+                <div class="mi-gestao-panel-subhead">
+                  <strong>Crianças cadastradas</strong>
+                  <button class="mi-gestao-inline-close" type="button" data-hide-children="true" aria-label="Fechar crianças">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+                  </button>
+                </div>
+                ${room.children.length
+                  ? room.children.map((child) => `
+                      <button class="mi-gestao-list-card" type="button" data-child-id="${escapeHtml(child.id)}">
+                        <strong>${escapeHtml(child.name)}</strong>
+                        <span>${escapeHtml(child.guardianName || "Responsável não informado")}</span>
+                      </button>
+                    `).join("")
+                  : '<p class="section-muted">Nenhuma criança cadastrada nesta sala ainda.</p>'}
+              </div>
+            `
+          : `
+              <button class="ghost-button mi-gestao-reopen-button" type="button" data-show-children="true">Mostrar crianças cadastradas</button>
+            `}
       </article>
-
+    `,
+    teachers: `
       <article class="mi-gestao-feature-card">
         <div class="mi-gestao-feature-head">
           <div>
-            <p class="eyebrow">2. Adicionar Professores</p>
+            <p class="eyebrow">Adicionar Professores</p>
             <h4>Equipe da sala</h4>
           </div>
         </div>
@@ -384,11 +430,12 @@ function renderRoomPanel() {
             : '<p class="section-muted">Cadastre um ou mais professores para esta sala.</p>'}
         </div>
       </article>
-
+    `,
+    "age-range": `
       <article class="mi-gestao-feature-card">
         <div class="mi-gestao-feature-head">
           <div>
-            <p class="eyebrow">3. Definir Faixa Etária</p>
+            <p class="eyebrow">Definir Faixa Etária</p>
             <h4>Perfil da sala</h4>
           </div>
         </div>
@@ -397,11 +444,12 @@ function renderRoomPanel() {
           <button class="primary-button" type="submit">Salvar faixa etária</button>
         </form>
       </article>
-
+    `,
+    materials: `
       <article class="mi-gestao-feature-card">
         <div class="mi-gestao-feature-head">
           <div>
-            <p class="eyebrow">4. Cadastrar Materiais</p>
+            <p class="eyebrow">Cadastrar Materiais</p>
             <h4>Materiais da sala</h4>
           </div>
         </div>
@@ -430,8 +478,67 @@ function renderRoomPanel() {
             : '<p class="section-muted">Cadastre os materiais duráveis e não duráveis desta sala.</p>'}
         </div>
       </article>
+    `
+  };
+
+  roomPanel.innerHTML = `
+    <div class="mi-gestao-room-panel-dialog">
+      <button class="mi-gestao-panel-close" type="button" data-close-room-panel="true" aria-label="Fechar sala expandida">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+      </button>
+      <div class="mi-gestao-room-panel-head">
+        <div>
+          <p class="eyebrow">Sala Expandida</p>
+          <h3 class="section-title small">${escapeHtml(room.name)}</h3>
+        </div>
+        <div class="mi-gestao-room-panel-pills">
+          <span class="mi-gestao-pill">${escapeHtml(room.ageRange || "Sem faixa etária")}</span>
+        </div>
+      </div>
+
+      <div class="mi-gestao-room-teacher-hero">
+        <strong>${escapeHtml(getTeacherSummary(room))}</strong>
+      </div>
+
+      <div class="mi-gestao-room-actions" aria-label="Ações da sala">
+        ${actions.map((action) => `
+          <button class="mi-gestao-action-button ${activeRoomSection === action.id ? "is-active" : ""}" type="button" data-room-section="${escapeHtml(action.id)}">
+            <span class="mi-gestao-action-icon">${action.icon}</span>
+            <span class="mi-gestao-action-label">${escapeHtml(action.label)}</span>
+          </button>
+        `).join("")}
+      </div>
+
+      <div class="mi-gestao-room-sections">
+        ${sectionContent[activeRoomSection] || sectionContent.children}
+      </div>
     </div>
   `;
+
+  roomPanel.querySelector('[data-close-room-panel]')?.addEventListener("click", () => {
+    activeRoomId = null;
+    activeChildId = null;
+    roomPanel.classList.remove("is-open");
+    renderRoomGrid();
+    renderRoomPanel();
+  });
+
+  roomPanel.querySelectorAll("[data-room-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeRoomSection = button.dataset.roomSection || "children";
+      renderRoomPanel();
+    });
+  });
+
+  roomPanel.querySelector('[data-hide-children]')?.addEventListener("click", () => {
+    isChildrenPanelOpen = false;
+    renderRoomPanel();
+  });
+
+  roomPanel.querySelector('[data-show-children]')?.addEventListener("click", () => {
+    isChildrenPanelOpen = true;
+    renderRoomPanel();
+  });
 
   roomPanel.querySelector('[data-form="child"]')?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -499,8 +606,8 @@ function renderAll() {
   updateHeader();
   dashboard.hidden = !hasMinistry;
   resetMinistryButton.hidden = !hasMinistry;
+  openOnboardingButton.textContent = hasMinistry ? "Editar departamento infantil" : "Adicionar departamento infantil";
   if (!hasMinistry) {
-    openOnboardingButton.textContent = "Adicionar departamento infantil";
     onboarding.hidden = false;
   }
   renderOverview();
