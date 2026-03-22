@@ -337,6 +337,10 @@ body[data-page="mi-gestao"] {
   --mi-panel-wash: #eef7ff;
 }
 
+body[data-page="cronograma"] {
+  --cronograma-track: linear-gradient(180deg, #e3e5e8 0%, #cfd4d9 100%);
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;
@@ -884,6 +888,312 @@ body[data-page="mi-gestao"] {
 
 .mi-gestao-detail-card-wide {
   grid-column: span 2;
+}
+
+.cronograma-shell {
+  display: grid;
+  gap: 22px;
+  padding-top: 24px;
+}
+
+.cronograma-hero {
+  padding: 30px;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at top left, rgba(124, 215, 255, 0.24), transparent 32%),
+    linear-gradient(135deg, rgba(27, 83, 187, 0.98), rgba(47, 124, 255, 0.94));
+  box-shadow: 0 22px 44px rgba(20, 66, 145, 0.16);
+}
+
+.cronograma-hero .eyebrow,
+.cronograma-hero .section-title,
+.cronograma-hero .section-muted {
+  color: #ffffff;
+}
+
+.cronograma-step,
+.cronograma-board,
+.cronograma-add-panel {
+  display: grid;
+  gap: 20px;
+}
+
+.cronograma-step-head {
+  display: grid;
+  gap: 8px;
+}
+
+.cronograma-duration-form,
+.cronograma-add-form {
+  display: grid;
+  gap: 16px;
+}
+
+.cronograma-duration-form label,
+.cronograma-add-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--blue-dark);
+  font-weight: 700;
+}
+
+.cronograma-duration-form input,
+.cronograma-add-form input {
+  width: 100%;
+  border: 1px solid rgba(27, 83, 187, 0.16);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: #ffffff;
+  color: var(--blue-dark);
+  font: inherit;
+  outline: none;
+}
+
+.cronograma-duration-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.cronograma-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.cronograma-toolbar-left,
+.cronograma-toolbar-right,
+.cronograma-metrics {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cronograma-icon-button {
+  min-width: 48px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+}
+
+.cronograma-icon-button svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.cronograma-timeline-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.cronograma-timeline {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 90%;
+  min-height: 8vh;
+  border-radius: 26px;
+  overflow: hidden;
+  background: var(--cronograma-track);
+  box-shadow: inset 0 2px 10px rgba(112, 118, 125, 0.16);
+}
+
+.cronograma-empty-state {
+  width: 100%;
+  display: grid;
+  place-items: center;
+  color: rgba(27, 83, 187, 0.7);
+  font-weight: 700;
+  padding: 18px;
+  text-align: center;
+}
+
+.cronograma-block {
+  min-width: 56px;
+  border: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  padding: 8px 6px;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.cronograma-block span,
+.cronograma-block small {
+  pointer-events: none;
+}
+
+.cronograma-block span {
+  font-size: 0.84rem;
+  line-height: 1.1;
+}
+
+.cronograma-block small {
+  font-size: 0.72rem;
+  opacity: 0.92;
+}
+
+.cronograma-block.is-selected {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.96);
+  z-index: 1;
+}
+
+.cronograma-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(47, 124, 255, 0.08);
+  color: var(--blue-dark);
+  font-weight: 700;
+}
+
+.cronograma-selected-panel {
+  display: grid;
+}
+
+.cronograma-selected-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.cronograma-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.cronograma-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.cronograma-option-card {
+  min-height: 92px;
+  border: 0;
+  border-radius: 22px;
+  padding: 16px;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(20, 66, 145, 0.12);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.cronograma-option-card.is-active {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 3px rgba(27, 83, 187, 0.14), 0 18px 30px rgba(20, 66, 145, 0.14);
+}
+
+.cronograma-add-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cronograma-type-abertura {
+  background: linear-gradient(135deg, #0e5ad8, #49a0ff);
+}
+
+.cronograma-type-boas-vindas {
+  background: linear-gradient(135deg, #1a74da, #75b4ff);
+}
+
+.cronograma-type-oracao-inicial {
+  background: linear-gradient(135deg, #ffffff, #f2f4f7);
+  color: #1b53bb;
+}
+
+.cronograma-type-louvor {
+  background: linear-gradient(135deg, #7a39d9, #57d7cf);
+}
+
+.cronograma-type-quebra-gelo {
+  background: linear-gradient(135deg, #38b86d, #86e08f);
+}
+
+.cronograma-type-dinamica {
+  background: linear-gradient(135deg, #6a31d8, #a86aff);
+}
+
+.cronograma-type-brincadeira {
+  background: linear-gradient(135deg, #ff8f2c, #ff4e4e);
+}
+
+.cronograma-type-historia-biblica {
+  background: linear-gradient(135deg, #6f4628, #b1794c);
+}
+
+.cronograma-type-ensino-mensagem {
+  background: linear-gradient(135deg, #77aef7, #b5d7ff);
+  color: #1647a2;
+}
+
+.cronograma-type-versiculo-do-dia {
+  background: linear-gradient(135deg, #98a2b3, #d2d8e1);
+  color: #153f8f;
+}
+
+.cronograma-type-memorizacao {
+  background: linear-gradient(135deg, #2d8be8, #7bc8ff);
+}
+
+.cronograma-type-atividade-pratica {
+  background: linear-gradient(135deg, #36a96d, #7ee0b5);
+}
+
+.cronograma-type-desenho-pintura {
+  background: linear-gradient(135deg, #ff9d57, #ffd36f);
+  color: #7a3900;
+}
+
+.cronograma-type-teatro-encenacao {
+  background: linear-gradient(135deg, #8547d6, #c085ff);
+}
+
+.cronograma-type-video {
+  background: linear-gradient(135deg, #d62020, #ff6a6a);
+}
+
+.cronograma-type-perguntas-interacao {
+  background: linear-gradient(135deg, #ff9630, #ffb366);
+  color: #7a3f00;
+}
+
+.cronograma-type-ofertas {
+  background: linear-gradient(135deg, #d4a21f, #ffd86c);
+  color: #6d4c00;
+}
+
+.cronograma-type-pedidos-de-oracao {
+  background: linear-gradient(135deg, #dff1ff, #f6fbff);
+  color: #1b53bb;
+}
+
+.cronograma-type-lanche-encerramento {
+  background: linear-gradient(135deg, #e33a3a, #ffce57);
 }
 
 .app-native-auth-extra,
@@ -4482,7 +4792,28 @@ body[data-page="explorar"] #chat-auth-status {
 
   .mi-gestao-role-fieldset,
   .mi-gestao-inline-form,
-  .mi-gestao-inline-form-compact {
+  .mi-gestao-inline-form-compact,
+  .cronograma-add-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cronograma-toolbar,
+  .cronograma-duration-actions,
+  .cronograma-panel-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cronograma-timeline {
+    width: 100%;
+    min-height: 92px;
+  }
+
+  .cronograma-block span {
+    font-size: 0.76rem;
+  }
+
+  .cronograma-options-grid {
     grid-template-columns: 1fr;
   }
 
