@@ -11,10 +11,11 @@ const boardSummary = document.getElementById("cronograma-board-summary");
 const timeline = document.getElementById("cronograma-timeline");
 const addButton = document.getElementById("cronograma-add-button");
 const deleteButton = document.getElementById("cronograma-delete-button");
+const startButton = document.getElementById("cronograma-start-button");
 const moveLeftButton = document.getElementById("cronograma-move-left-button");
 const moveRightButton = document.getElementById("cronograma-move-right-button");
-const usedTimeNode = document.getElementById("cronograma-used-time");
 const remainingTimeNode = document.getElementById("cronograma-remaining-time");
+const selectedPanelWrap = document.getElementById("cronograma-selected-panel-wrap");
 const selectedPanel = document.getElementById("cronograma-selected-panel");
 const addPanel = document.getElementById("cronograma-add-panel");
 const closeAddPanelButton = document.getElementById("cronograma-close-add-panel");
@@ -26,6 +27,7 @@ const addStatus = document.getElementById("cronograma-add-status");
 const decreaseTimeButton = document.getElementById("cronograma-decrease-time");
 const increaseTimeButton = document.getElementById("cronograma-increase-time");
 const resetButton = document.getElementById("cronograma-reset-button");
+const fixedBarWrap = document.getElementById("cronograma-fixed-bar-wrap");
 
 const blockTypes = [
   { id: "abertura", label: "Abertura", className: "cronograma-type-abertura", icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 8v8l8 5 8-5V8zm0 2.2 5.8 3.6L12 12.4 6.2 8.8z"/></svg>' },
@@ -52,6 +54,8 @@ const blockTypes = [
 let state = loadState();
 let selectedBlockId = null;
 let selectedTypeId = "";
+let lessonTimerId = 0;
+let lessonStartedAt = 0;
 
 function loadState() {
   try {
@@ -155,14 +159,18 @@ function renderSelectedPanel() {
   const selectedBlock = state.blocks.find((block) => block.id === selectedBlockId);
 
   if (!selectedBlock) {
-    selectedPanel.hidden = true;
-    selectedPanel.innerHTML = "";
+    selectedPanelWrap.hidden = false;
+    selectedPanel.innerHTML = `
+      <div class="cronograma-selected-card cronograma-selected-default">
+        <strong>Minha aula</strong>
+      </div>
+    `;
     updateToolbarState();
     return;
   }
 
   const type = getTypeById(selectedBlock.typeId);
-  selectedPanel.hidden = false;
+  selectedPanelWrap.hidden = false;
   selectedPanel.innerHTML = `
     <div class="cronograma-selected-card ${type?.className || ""}">
       <strong>${type?.label || "Etapa"}</strong>
@@ -178,13 +186,19 @@ function renderTimeline() {
     return;
   }
 
+  const elapsedMinutes = lessonStartedAt ? Math.floor((Date.now() - lessonStartedAt) / 60000) : 0;
+  let accumulatedMinutes = 0;
+
   timeline.innerHTML = state.blocks.length
     ? state.blocks.map((block) => {
         const type = getTypeById(block.typeId);
         const widthPercent = (block.minutes / state.totalMinutes) * 100;
+        const startsAt = accumulatedMinutes;
+        accumulatedMinutes += block.minutes;
+        const isCurrentBlock = lessonStartedAt && elapsedMinutes >= startsAt && elapsedMinutes < accumulatedMinutes;
         return `
           <button
-            class="cronograma-block ${type?.className || ""} ${selectedBlockId === block.id ? "is-selected" : ""}"
+            class="cronograma-block ${type?.className || ""} ${selectedBlockId === block.id ? "is-selected" : ""} ${lessonStartedAt ? "is-live" : ""} ${isCurrentBlock ? "is-current" : ""}"
             type="button"
             data-block-id="${block.id}"
             style="width: ${widthPercent}%"
@@ -209,19 +223,45 @@ function renderBoard() {
   if (!state.totalMinutes) {
     stepTwo.hidden = true;
     addPanel.hidden = true;
+    fixedBarWrap.hidden = true;
+    selectedPanelWrap.hidden = true;
     document.body.classList.remove("cronograma-planning-mode");
+    document.body.classList.remove("cronograma-live-mode");
     return;
   }
 
   stepOne.hidden = true;
   stepTwo.hidden = false;
-  resetButton.hidden = false;
+  fixedBarWrap.hidden = false;
+  selectedPanelWrap.hidden = false;
   document.body.classList.add("cronograma-planning-mode");
   boardSummary.textContent = `Tempo total da aula: ${state.totalMinutes} minutos. Organize os blocos abaixo com clareza.`;
-  usedTimeNode.textContent = `Usado: ${getUsedMinutes()} min`;
   remainingTimeNode.textContent = `Restante: ${getRemainingMinutes()} min`;
   renderTimeline();
   renderSelectedPanel();
+}
+
+function stopLessonTimer() {
+  if (lessonTimerId) {
+    window.clearInterval(lessonTimerId);
+    lessonTimerId = 0;
+  }
+}
+
+function startLesson() {
+  if (!state.blocks.length) {
+    return;
+  }
+
+  lessonStartedAt = Date.now();
+  document.body.classList.add("cronograma-live-mode");
+  stopLessonTimer();
+  lessonTimerId = window.setInterval(() => {
+    const elapsedMinutes = Math.floor((Date.now() - lessonStartedAt) / 60000);
+    remainingTimeNode.textContent = `Restante: ${Math.max(state.totalMinutes - elapsedMinutes, 0)} min`;
+    renderTimeline();
+  }, 1000);
+  renderTimeline();
 }
 
 durationForm.addEventListener("submit", (event) => {
@@ -330,20 +370,29 @@ moveRightButton.addEventListener("click", () => {
 });
 
 resetButton.addEventListener("click", () => {
+  stopLessonTimer();
   state = {
     totalMinutes: 0,
     blocks: []
   };
   selectedBlockId = null;
   selectedTypeId = "";
+  lessonStartedAt = 0;
   saveState();
   totalMinutesInput.value = "60";
   syncTimeDisplay();
   stepOne.hidden = false;
   stepTwo.hidden = true;
   addPanel.hidden = true;
-  resetButton.hidden = true;
   document.body.classList.remove("cronograma-planning-mode");
+  document.body.classList.remove("cronograma-live-mode");
+  fixedBarWrap.hidden = true;
+  selectedPanelWrap.hidden = true;
+  timeline.innerHTML = "";
+});
+
+startButton.addEventListener("click", () => {
+  startLesson();
 });
 
 await initSiteHeader().catch(() => null);
