@@ -7,7 +7,6 @@ const productCover = document.getElementById("product-cover");
 const productTitle = document.getElementById("product-title");
 const productPrice = document.getElementById("product-price");
 const buyAlbumButton = document.getElementById("buy-album-button");
-const manifestStatus = document.getElementById("manifest-status");
 const lyricsDownloadButton = document.getElementById("lyrics-download-button");
 const trackList = document.getElementById("track-list");
 const albumAdminPanel = document.getElementById("album-admin-panel");
@@ -142,18 +141,16 @@ function syncLyricsDownloadButton(album) {
     return;
   }
 
-  if (!hasLyricsZip(album)) {
-    lyricsDownloadButton.hidden = true;
-    lyricsDownloadButton.disabled = true;
-    lyricsDownloadButton.onclick = null;
-    return;
-  }
-
   lyricsDownloadButton.hidden = false;
   lyricsDownloadButton.disabled = false;
   lyricsDownloadButton.onclick = () => {
     if (!canUseDownloads(album.id)) {
       showFloatingNotice("Você ainda não tem esse álbum");
+      return;
+    }
+
+    if (!hasLyricsZip(album)) {
+      showFloatingNotice("Textos ainda nÃ£o disponÃ­veis para este Ã¡lbum");
       return;
     }
 
@@ -1230,9 +1227,6 @@ async function loadAlbumDetail() {
     productCover.alt = `Capa do album ${album.name}`;
     productTitle.textContent = album.name;
     productPrice.textContent = album.priceLabel;
-    manifestStatus.textContent = album.hasManifest
-      ? "Titulos carregados do manifest do album."
-      : "Manifest de faixas nao encontrado. Exibindo numeracao padrao.";
     syncLyricsDownloadButton(album);
     setPurchaseStatus(album.id);
     syncAdminPanel(album);
