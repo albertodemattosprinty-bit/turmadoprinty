@@ -158,13 +158,12 @@ const conversationTitleMaxLength = 30;
 const searchPreviewMaxLength = 45;
 const searchPreviewBaseMaxLength = 15;
 const searchTextHighlightDurationMs = 5000;
-const chatRevealCharsPerSecond = 100;
-const chatRevealTickMs = 50;
 const speechSilenceTimeoutMs = 3000;
 const speechChunkWordCount = 20;
 const assistantAudioMinCharacters = 101;
 const emptyConversationSupportText = "Posso ajudar com roteiros, programacoes, legendas, devocionais, cantatas e ideias para o ministerio infantil.";
 const sidebarMenuIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11a1 1 0 0 0 1.53.85l8.6-5.5a1 1 0 0 0 0-1.7l-8.6-5.5A1 1 0 0 0 8 6.5"/></svg>';
+const sidebarBackIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 5.3-1.4-1.4L5.2 12l8.1 8.1 1.4-1.4L9 12.99z"/><path d="M6 11h13v2H6z"/></svg>';
 const micIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/></svg>';
 const squareStopIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>';
 const playAudioIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.5v11a1 1 0 0 0 1.53.85l8.6-5.5a1 1 0 0 0 0-1.7l-8.6-5.5A1 1 0 0 0 8 6.5"/></svg>';
@@ -484,6 +483,14 @@ function getVisibleConversations() {
   }
 
   return conversations.filter((item) => item.folderId === activeFolderId);
+}
+
+function isNearConversationBottom() {
+  if (!(chatThread instanceof HTMLElement)) {
+    return false;
+  }
+
+  return chatThread.scrollHeight - chatThread.scrollTop - chatThread.clientHeight <= 48;
 }
 
 function getFilteredConversations() {
@@ -1404,6 +1411,10 @@ function createFolder(title) {
 }
 
 function renderFolderList() {
+  if (activeFolderId) {
+    return;
+  }
+
   const folders = getFolders();
 
   folders.forEach((folder) => {
@@ -1437,6 +1448,7 @@ function renderFolderList() {
 function renderHistoryList() {
   const entries = getHistoryEntries();
   historyList.innerHTML = "";
+  syncFolderNavigationUi();
 
   if (!currentUser) {
     historyList.innerHTML = "";
@@ -1605,6 +1617,7 @@ function renderHistoryList() {
 
 function renderConversation() {
   const conversation = getActiveConversation();
+  const shouldStickToBottom = isNearConversationBottom();
   chatThread.innerHTML = "";
 
   if (!conversation || conversation.messages.length === 0) {
@@ -1670,7 +1683,9 @@ function renderConversation() {
     }
   });
 
-  chatThread.scrollTop = chatThread.scrollHeight;
+  if (shouldStickToBottom) {
+    chatThread.scrollTop = chatThread.scrollHeight;
+  }
   window.requestAnimationFrame(() => {
     finalizePendingSearchFocus();
   });
@@ -1692,6 +1707,34 @@ function syncSidebarState() {
   sidebarToggleButton.setAttribute("aria-label", sidebarCollapsed ? "Mostrar historico" : "Recolher historico");
   sidebarToggleButton.title = sidebarCollapsed ? "Mostrar historico" : "Recolher historico";
   sidebarToggleButton.innerHTML = sidebarMenuIcon;
+}
+
+function syncFolderNavigationUi() {
+  if (!newChatButton || !editChatsButton || !newFolderButton) {
+    return;
+  }
+
+  const isInsideFolder = Boolean(activeFolderId) && Boolean(currentUser);
+
+  newChatButton.hidden = !currentUser || isInsideFolder;
+  editChatsButton.hidden = !currentUser || isInsideFolder;
+  newFolderButton.hidden = !currentUser;
+
+  if (isInsideFolder) {
+    historyEditMode = false;
+    editingConversationId = null;
+    editChatsButton.classList.remove("is-active");
+    newFolderButton.innerHTML = sidebarBackIcon;
+    newFolderButton.setAttribute("aria-label", "Voltar para todas as conversas");
+    newFolderButton.title = "Voltar para todas as conversas";
+    newFolderButton.classList.add("is-back-button");
+    return;
+  }
+
+  newFolderButton.innerHTML = folderIcon;
+  newFolderButton.setAttribute("aria-label", "Nova pasta");
+  newFolderButton.title = "Nova pasta";
+  newFolderButton.classList.remove("is-back-button");
 }
 
 function syncComposerLayout() {
@@ -1725,12 +1768,7 @@ function syncComposerState() {
     exploreBanner.hidden = isLoggedIn;
   }
   logoutButton.hidden = !isLoggedIn;
-  newChatButton.hidden = !isLoggedIn;
-  if (newFolderButton) {
-    newFolderButton.hidden = !isLoggedIn;
-  }
   if (editChatsButton) {
-    editChatsButton.hidden = !isLoggedIn;
     editChatsButton.classList.toggle("is-active", historyEditMode && isLoggedIn);
   }
   if (settingsButton) {
@@ -1746,6 +1784,7 @@ function syncComposerState() {
   chatInput.placeholder = "Digite sua mensagem aqui...";
   syncAdminMessageNoticeForUser(currentUser);
   syncSidebarState();
+  syncFolderNavigationUi();
   syncComposerEmptyState();
   syncComposerLayout();
   syncMicButtonUi();
@@ -1917,14 +1956,11 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
     <div class="message-text">${escapeHtml(initialText)}</div>
   `;
   chatThread.appendChild(article);
-  chatThread.scrollTop = chatThread.scrollHeight;
 
   const state = {
     previewText: initialText || "",
     finalText: "",
-    finalStarted: false,
-    renderedLength: 0,
-    typingTimerId: null
+    finalStarted: false
   };
 
   const api = {
@@ -1940,40 +1976,14 @@ function createAssistantMessageElement(initialText = "Preparando resposta...") {
 
       return state.previewText || "";
     },
-    ensureTypingLoop() {
-      if (state.typingTimerId) {
-        return;
-      }
-
-      const charsPerTick = Math.max(1, Math.round((chatRevealCharsPerSecond * chatRevealTickMs) / 1000));
-      const renderStep = () => {
-        const fullText = api.getFullText();
-
-        if (state.renderedLength >= fullText.length) {
-          window.clearInterval(state.typingTimerId);
-          state.typingTimerId = null;
-          return;
-        }
-
-        state.renderedLength = Math.min(fullText.length, state.renderedLength + charsPerTick);
-        api.target.textContent = fullText.slice(0, state.renderedLength);
-        article.hidden = state.renderedLength === 0;
-        if (state.renderedLength > 0) {
-          setAssistantThinkingState(false);
-        }
-        syncAssistantAudioLayout(article);
-        chatThread.scrollTop = chatThread.scrollHeight;
-      };
-
-      state.typingTimerId = window.setInterval(renderStep, chatRevealTickMs);
-      renderStep();
-    },
     syncText() {
       const fullText = api.getFullText();
-      if (state.renderedLength > fullText.length) {
-        state.renderedLength = fullText.length;
+      api.target.textContent = fullText;
+      article.hidden = fullText.length === 0;
+      if (fullText.length > 0) {
+        setAssistantThinkingState(false);
       }
-      api.ensureTypingLoop();
+      syncAssistantAudioLayout(article);
     },
     setText(nextText) {
       state.previewText = nextText || "";
@@ -2085,7 +2095,6 @@ function renderAssistantResponseImmediately(text) {
     <div class="message-text">${escapeHtml(text)}</div>
   `;
   chatThread.appendChild(article);
-  chatThread.scrollTop = chatThread.scrollHeight;
   return text.trim();
 }
 
@@ -2384,6 +2393,15 @@ newChatButton.addEventListener("click", () => {
 newFolderButton?.addEventListener("click", () => {
   if (!currentUser) {
     ensureLoggedInBeforeChat();
+    return;
+  }
+
+  if (activeFolderId) {
+    activeFolderId = null;
+    activeConversationId = getVisibleConversations()[0]?.id || null;
+    showEmptyDraftConversation = false;
+    renderHistoryList();
+    renderConversation();
     return;
   }
 

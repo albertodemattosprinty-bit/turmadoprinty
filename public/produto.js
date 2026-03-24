@@ -8,6 +8,7 @@ const productTitle = document.getElementById("product-title");
 const productPrice = document.getElementById("product-price");
 const buyAlbumButton = document.getElementById("buy-album-button");
 const manifestStatus = document.getElementById("manifest-status");
+const lyricsDownloadButton = document.getElementById("lyrics-download-button");
 const trackList = document.getElementById("track-list");
 const albumAdminPanel = document.getElementById("album-admin-panel");
 const albumPriceInput = document.getElementById("album-price-input");
@@ -130,6 +131,34 @@ function hasPurchasedAlbum(albumId) {
 
 function canUseDownloads(albumId) {
   return accessState.canDownloadAll || hasPurchasedAlbum(albumId);
+}
+
+function hasLyricsZip(album) {
+  return Boolean(album?.lyricsZipUrl && album.lyricsZipUrl !== "[none]");
+}
+
+function syncLyricsDownloadButton(album) {
+  if (!lyricsDownloadButton) {
+    return;
+  }
+
+  if (!hasLyricsZip(album)) {
+    lyricsDownloadButton.hidden = true;
+    lyricsDownloadButton.disabled = true;
+    lyricsDownloadButton.onclick = null;
+    return;
+  }
+
+  lyricsDownloadButton.hidden = false;
+  lyricsDownloadButton.disabled = false;
+  lyricsDownloadButton.onclick = () => {
+    if (!canUseDownloads(album.id)) {
+      showFloatingNotice("Você ainda não tem esse álbum");
+      return;
+    }
+
+    window.open(album.lyricsZipUrl, "_blank", "noopener");
+  };
 }
 
 function showFloatingNotice(message) {
@@ -1204,6 +1233,7 @@ async function loadAlbumDetail() {
     manifestStatus.textContent = album.hasManifest
       ? "Titulos carregados do manifest do album."
       : "Manifest de faixas nao encontrado. Exibindo numeracao padrao.";
+    syncLyricsDownloadButton(album);
     setPurchaseStatus(album.id);
     syncAdminPanel(album);
     await renderTracks(album);

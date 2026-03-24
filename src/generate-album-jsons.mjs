@@ -28,6 +28,11 @@ const genericFileKeywords = [
   "faixa"
 ];
 
+const albumLyricsZipUrls = {
+  "Datas Comemorativas 1": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/lyrics/Datas%20Comemorativas%201.zip",
+  "É Natal": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/lyrics/%C3%89%20Natal.zip"
+};
+
 const bitrates = {
   V1L1: [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 0],
   V1L2: [0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 0],
@@ -504,6 +509,7 @@ async function buildAlbumJson(albumName) {
 
   return {
     album: albumName,
+    lyricsZipUrl: albumLyricsZipUrls[albumName] || "[none]",
     tracks
   };
 }

@@ -1871,6 +1871,30 @@ body[data-page="produtos"] {
   margin-bottom: 20px;
 }
 
+.album-manifest-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.album-manifest-actions .section-muted {
+  margin: 0;
+  text-align: right;
+}
+
+.lyrics-download-button {
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.lyrics-download-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
 .admin-panel {
   margin-bottom: 18px;
   padding: 18px 22px;
@@ -3689,6 +3713,22 @@ body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item spa
   color: rgba(27, 83, 187, 0.84);
 }
 
+body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item svg,
+body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item path,
+body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item .history-folder-icon,
+body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item .history-action-button {
+  color: var(--blue-dark);
+  fill: currentColor;
+}
+
+body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item .history-action-button {
+  background: rgba(27, 83, 187, 0.08);
+}
+
+body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item .history-action-button:hover {
+  background: rgba(27, 83, 187, 0.14);
+}
+
 body[data-page="explorar"].explore-authenticated .chat-sidebar .history-item.active {
   background: #ffffff;
   border-color: rgba(66, 147, 245, 0.46);
@@ -3777,6 +3817,16 @@ body[data-page="explorar"].explore-authenticated .chat-sidebar .sidebar-actions 
   color: #ffffff !important;
 }
 
+body[data-page="explorar"] #new-folder-button.is-back-button {
+  background: #ffffff !important;
+  color: var(--blue-dark) !important;
+}
+
+body[data-page="explorar"] #new-folder-button.is-back-button svg,
+body[data-page="explorar"] #new-folder-button.is-back-button path {
+  fill: currentColor !important;
+}
+
 body[data-page="explorar"] #new-chat-button svg,
 body[data-page="explorar"] #edit-chats-button svg,
 body[data-page="explorar"] #new-folder-button svg,
@@ -3791,6 +3841,10 @@ body[data-page="explorar"] #edit-chats-button:hover,
 body[data-page="explorar"] #new-folder-button:hover {
   opacity: 1;
   background: #337fdf !important;
+}
+
+body[data-page="explorar"] #new-folder-button.is-back-button:hover {
+  background: #e8f1ff !important;
 }
 
 body[data-page="explorar"] #edit-chats-button.is-active {
@@ -4723,27 +4777,6 @@ body[data-page="explorar"] #chat-auth-status {
   border-radius: 24px;
   background: rgba(6, 21, 58, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.message-chunk {
-  display: inline-block;
-  opacity: 0;
-  filter: blur(8px);
-  animation-name: message-chunk-fade;
-  animation-fill-mode: forwards;
-  animation-timing-function: ease;
-}
-
-@keyframes message-chunk-fade {
-  from {
-    opacity: 0;
-    filter: blur(8px);
-  }
-
-  to {
-    opacity: 1;
-    filter: blur(0);
-  }
 }
 
 @media (max-width: 980px) {

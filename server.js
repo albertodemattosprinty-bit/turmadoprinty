@@ -384,7 +384,7 @@ function serializeManifestTrack(track) {
 }
 
 async function buildAlbumDetailResponse(product, pricing) {
-  const manifestTracks = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+  const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
   const unitAmount = getAlbumPriceCents(pricing, product.id);
 
   return {
@@ -393,12 +393,13 @@ async function buildAlbumDetailResponse(product, pricing) {
     priceLabel: formatPriceFromCents(unitAmount),
     coverUrl: buildCoverUrl(product.name),
     href: `/produto.html?album=${encodeURIComponent(product.id)}`,
-    tracks: manifestTracks.map((track) => ({
+    lyricsZipUrl: manifest.lyricsZipUrl,
+    tracks: manifest.tracks.map((track) => ({
       ...serializeManifestTrack(track),
       streamUrl: buildTrackUrl(product.name, track.number),
       downloadUrl: buildTrackUrl(product.name, track.number)
     })),
-    hasManifest: manifestTracks.some((track) => String(track.title || "").trim())
+    hasManifest: manifest.tracks.some((track) => String(track.title || "").trim())
   };
 }
 
@@ -1818,8 +1819,8 @@ async function handleProtectedTrackDownload(request, response, pathname) {
   try {
     const accessState = await getUserAccessState(user.id);
     const hasAlbumPurchase = accessState.purchasedAlbumIds.includes(product.id);
-    const manifestTracks = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
-    const track = manifestTracks.find((item) => Number(item.number) === trackNumber);
+    const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+    const track = manifest.tracks.find((item) => Number(item.number) === trackNumber);
 
     if (!track) {
       sendJson(response, 404, { error: "Faixa nao encontrada." });
