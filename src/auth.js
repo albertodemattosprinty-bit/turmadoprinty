@@ -5,7 +5,16 @@ import { query } from "./db.js";
 const SESSION_DURATION_DAYS = 30;
 
 function normalizeUsername(username) {
-  return String(username || "").trim().toLowerCase();
+  return String(username || "")
+    .normalize("NFC")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
+function buildSyntheticEmail(normalizedUsername) {
+  const usernameHash = crypto.createHash("sha256").update(normalizedUsername).digest("hex").slice(0, 24);
+  return `user-${usernameHash}@usuarios.turmadoprinty.local`;
 }
 
 function hashToken(token) {
@@ -70,7 +79,7 @@ export async function verifyPassword(password, storedHash) {
 export async function createUser({ name, username, password }) {
   const normalizedUsername = normalizeUsername(username);
   const passwordHash = await hashPassword(password);
-  const syntheticEmail = `${normalizedUsername}@usuarios.turmadoprinty.local`;
+  const syntheticEmail = buildSyntheticEmail(normalizedUsername);
 
   const result = await query(
     `

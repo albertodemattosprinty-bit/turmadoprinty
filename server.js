@@ -459,7 +459,7 @@ function sanitizeUser(user) {
 }
 
 function isValidUsername(username) {
-  return /^[a-zA-Z0-9._-]{3,24}$/.test(username);
+  return /^[\p{L}\p{M}\p{N} ._-]{3,24}$/u.test(username);
 }
 
 function detectUserToneProfile(user) {
@@ -2502,7 +2502,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (!isValidUsername(username)) {
-      sendJson(response, 400, { error: "Use um nome de usuario com 3 a 24 caracteres, letras, numeros, ponto, tracinho ou underline." });
+      sendJson(response, 400, { error: "Use um nome de usuario com 3 a 24 caracteres, incluindo letras com acento, numeros, espacos, ponto, tracinho ou underline." });
       return;
     }
 
