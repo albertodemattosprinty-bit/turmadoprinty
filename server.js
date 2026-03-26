@@ -15,7 +15,7 @@ import { deleteUserById, dismissAdminUserMessage, ensureAdminUsersSchema, getAct
 import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
-import { createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
+import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, ensureSiteConfigSchema, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
@@ -1892,6 +1892,7 @@ async function handleAdminUsersList(request, response) {
 
   try {
     const pricing = await getSitePricingSettings();
+    const storeProducts = buildStoreProducts(pricing.albumPriceCents, pricing.albumOverrides);
     const [users, schedule] = await Promise.all([
       listUsersWithAdminData(pricing.planPrices),
       getScheduleEntries()
@@ -1901,6 +1902,12 @@ async function handleAdminUsersList(request, response) {
       ok: true,
       users,
       plans: buildSubscriptionPlans(pricing.planPrices),
+      albums: storeProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        tracks: product.tracks,
+        priceLabel: formatPriceFromCents(product.unitAmount)
+      })),
       schedule
     });
   } catch (error) {
@@ -2199,6 +2206,62 @@ async function handleCurrentUserMessageReply(request, response) {
   } catch (error) {
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Erro ao enviar resposta."
+    });
+  }
+}
+
+async function handleAdminUserAlbumAssign(request, response, userId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const adminUser = await requireAdmin(request, response);
+
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const productId = typeof body.productId === "string" ? body.productId.trim() : "";
+
+  if (!productId) {
+    sendJson(response, 400, { error: "Escolha um album para atribuir." });
+    return;
+  }
+
+  try {
+    const pricing = await getSitePricingSettings();
+    const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+    if (!product) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+
+    await assignAlbumGrantToUser({
+      userId,
+      productId: product.id,
+      assignedByUserId: adminUser.id
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      product: {
+        id: product.id,
+        name: product.name
+      }
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Erro ao atribuir album."
     });
   }
 }
@@ -2640,6 +2703,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PUT" && pathname.match(/^\/api\/admin\/users\/[^/]+\/contractor$/)) {
     const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/users\/([^/]+)\/contractor$/, "$1"));
     await handleAdminUserContractorUpdate(request, response, userId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/admin\/users\/[^/]+\/albums$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/users\/([^/]+)\/albums$/, "$1"));
+    await handleAdminUserAlbumAssign(request, response, userId);
     return;
   }
 

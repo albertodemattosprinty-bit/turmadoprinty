@@ -10,6 +10,9 @@ const userPlanSelect = document.getElementById("user-plan-select");
 const userContractorSelect = document.getElementById("user-contractor-select");
 const userEventLabel = document.getElementById("user-event-label");
 const userEventSelect = document.getElementById("user-event-select");
+const userAlbumSelect = document.getElementById("user-album-select");
+const userAlbumAssignButton = document.getElementById("user-album-assign-button");
+const userAssignedAlbums = document.getElementById("user-assigned-albums");
 const userSaveButton = document.getElementById("user-save-button");
 const userDeleteButton = document.getElementById("user-delete-button");
 const userDetailStatus = document.getElementById("user-detail-status");
@@ -27,6 +30,7 @@ const userMessageSendButton = document.getElementById("user-message-send-button"
 let users = [];
 let plans = [];
 let schedule = [];
+let albums = [];
 let selectedUserId = "";
 let messageComposerUserId = "";
 const viewedReplyMessageIds = new Set();
@@ -86,6 +90,31 @@ function syncContractorEventVisibility() {
   userEventLabel.hidden = userContractorSelect.value !== "true";
 }
 
+function getAlbumById(albumId) {
+  return albums.find((item) => item.id === albumId) || null;
+}
+
+function renderAssignedAlbums(user) {
+  if (!userAssignedAlbums) {
+    return;
+  }
+
+  const assignedAlbumIds = Array.isArray(user?.assignedAlbumIds) ? user.assignedAlbumIds : [];
+
+  if (!assignedAlbumIds.length) {
+    userAssignedAlbums.innerHTML = "<p class=\"section-muted\">Nenhum album atribuido manualmente ainda.</p>";
+    return;
+  }
+
+  userAssignedAlbums.innerHTML = assignedAlbumIds
+    .map((albumId) => {
+      const album = getAlbumById(albumId);
+      const label = album ? `${album.name}${album.priceLabel ? ` - ${album.priceLabel}` : ""}` : albumId;
+      return `<span class="user-album-chip">${label}</span>`;
+    })
+    .join("");
+}
+
 function renderDetailPanel() {
   const user = getSelectedUser();
 
@@ -100,6 +129,7 @@ function renderDetailPanel() {
   userPlanSelect.value = user.assignedPlanId || "gratis";
   userContractorSelect.value = user.isContractor ? "true" : "false";
   userEventSelect.value = user.contractorEventId || "";
+  userAlbumSelect.value = "";
   userDetailStatus.textContent = "";
   userMessagePanel.hidden = messageComposerUserId !== user.id;
   if (userMessagePreview && userMessagePreviewTitle && userMessagePreviewBody) {
@@ -113,6 +143,7 @@ function renderDetailPanel() {
     userReplyPreview.hidden = !replyBody;
     userReplyPreviewBody.textContent = replyBody;
   }
+  renderAssignedAlbums(user);
   syncContractorEventVisibility();
 }
 
@@ -191,6 +222,13 @@ function fillEventOptions() {
   `;
 }
 
+function fillAlbumOptions() {
+  userAlbumSelect.innerHTML = `
+    <option value="">Escolher album</option>
+    ${albums.map((album) => `<option value="${album.id}">${album.name}</option>`).join("")}
+  `;
+}
+
 async function loadUsers() {
   const response = await fetch(getApiUrl("/api/admin/users"), {
     headers: {
@@ -217,6 +255,7 @@ async function loadUsers() {
   users = Array.isArray(data.users) ? data.users : [];
   plans = Array.isArray(data.plans) ? data.plans : [];
   schedule = Array.isArray(data.schedule) ? data.schedule : [];
+  albums = Array.isArray(data.albums) ? data.albums : [];
 
   if (!selectedUserId && users[0]) {
     selectedUserId = users[0].id;
@@ -224,6 +263,7 @@ async function loadUsers() {
 
   fillPlanOptions();
   fillEventOptions();
+  fillAlbumOptions();
   renderUsersTable();
   renderDetailPanel();
   usersStatus.textContent = `${users.length} usuarios carregados.`;
@@ -335,6 +375,56 @@ async function saveSelectedUser() {
   }
 }
 
+async function assignAlbumToSelectedUser() {
+  const user = getSelectedUser();
+  const productId = userAlbumSelect.value;
+
+  if (!user) {
+    return;
+  }
+
+  if (!productId) {
+    userDetailStatus.textContent = "Escolha um album para atribuir.";
+    userAlbumSelect.focus();
+    return;
+  }
+
+  if (Array.isArray(user.assignedAlbumIds) && user.assignedAlbumIds.includes(productId)) {
+    userDetailStatus.textContent = "Esse album ja foi atribuido manualmente para este usuario.";
+    return;
+  }
+
+  userDetailStatus.textContent = "Atribuindo album...";
+  userAlbumAssignButton.disabled = true;
+
+  try {
+    const response = await fetch(getApiUrl(`/api/admin/users/${encodeURIComponent(user.id)}/albums`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        productId
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.error || "Falha ao atribuir album.");
+    }
+
+    const assignedAlbumName = data?.product?.name || "Album";
+    await loadUsers();
+    userDetailStatus.textContent = `${assignedAlbumName} atribuido com sucesso.`;
+  } catch (error) {
+    userDetailStatus.textContent = error instanceof Error ? error.message : "Erro ao atribuir album.";
+  } finally {
+    userAlbumAssignButton.disabled = false;
+  }
+}
+
 async function deleteSelectedUser() {
   const user = getSelectedUser();
 
@@ -383,6 +473,7 @@ if (!currentUser) {
   userContractorSelect.addEventListener("change", syncContractorEventVisibility);
   userMessageBody.addEventListener("input", updateMessageCounter);
   userMessageSendButton.addEventListener("click", sendMessageToSelectedUser);
+  userAlbumAssignButton.addEventListener("click", assignAlbumToSelectedUser);
   userSaveButton.addEventListener("click", saveSelectedUser);
   userDeleteButton.addEventListener("click", deleteSelectedUser);
   updateMessageCounter();

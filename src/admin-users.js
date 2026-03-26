@@ -153,6 +153,7 @@ export async function listUsersWithAdminData(planPrices = {}) {
         active_message.active_message_created_at,
         active_message.active_message_reply_body,
         active_message.active_message_reply_created_at,
+        coalesce(album_grants.assigned_album_ids, '[]'::json) as assigned_album_ids,
         case
           when u.last_seen_at is not null and u.last_seen_at >= now() - ($1::text || ' minutes')::interval then true
           else false
@@ -176,6 +177,11 @@ export async function listUsersWithAdminData(planPrices = {}) {
         order by created_at desc
         limit 1
       ) active_message on true
+      left join lateral (
+        select json_agg(product_id order by created_at desc) as assigned_album_ids
+        from user_album_grants
+        where user_id = u.id
+      ) album_grants on true
       order by
         case
           when u.last_seen_at is not null and u.last_seen_at >= now() - ($1::text || ' minutes')::interval then 0
@@ -214,6 +220,7 @@ export async function listUsersWithAdminData(planPrices = {}) {
           userReplyCreatedAt: row.active_message_reply_created_at || null
         }
       : null,
+    assignedAlbumIds: Array.isArray(row.assigned_album_ids) ? row.assigned_album_ids : [],
     availablePlans
   }));
 }

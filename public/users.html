@@ -62,6 +62,26 @@
           </label>
         </div>
 
+        <section class="user-album-panel">
+          <div class="user-message-head">
+            <div>
+              <p class="eyebrow">Cantatas liberadas</p>
+              <h3 class="section-title small">Atribuir produto</h3>
+              <p class="section-muted">Escolha um album para liberar manualmente para este usuario.</p>
+            </div>
+          </div>
+
+          <div class="user-album-controls">
+            <label>
+              Album disponivel
+              <select id="user-album-select"></select>
+            </label>
+            <button id="user-album-assign-button" class="primary-button" type="button">Atribuir produto</button>
+          </div>
+
+          <div id="user-assigned-albums" class="user-album-list"></div>
+        </section>
+
         <section id="user-message-panel" class="user-message-panel" hidden>
           <div class="user-message-head">
             <div>

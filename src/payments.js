@@ -39,6 +39,20 @@ export async function ensurePaymentSchema() {
       await query("create index if not exists idx_user_album_purchases_status on user_album_purchases(status);");
 
       await query(`
+        create table if not exists user_album_grants (
+          id uuid primary key default gen_random_uuid(),
+          user_id uuid not null references users(id) on delete cascade,
+          product_id text not null,
+          assigned_by_user_id uuid references users(id) on delete set null,
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now(),
+          unique (user_id, product_id)
+        );
+      `);
+      await query("create index if not exists idx_user_album_grants_user_id on user_album_grants(user_id);");
+      await query("create index if not exists idx_user_album_grants_product_id on user_album_grants(product_id);");
+
+      await query(`
         create table if not exists user_plan_subscriptions (
           id uuid primary key default gen_random_uuid(),
           user_id uuid not null references users(id) on delete cascade,
@@ -131,6 +145,30 @@ export async function createAlbumPurchaseRecord({ userId, productId, referenceId
   );
 
   return result.rows[0];
+}
+
+export async function assignAlbumGrantToUser({ userId, productId, assignedByUserId }) {
+  await ensurePaymentSchema();
+
+  const result = await query(
+    `
+      insert into user_album_grants (
+        user_id,
+        product_id,
+        assigned_by_user_id,
+        created_at,
+        updated_at
+      )
+      values ($1, $2, $3, now(), now())
+      on conflict (user_id, product_id) do update
+        set assigned_by_user_id = excluded.assigned_by_user_id,
+            updated_at = now()
+      returning *
+    `,
+    [userId, productId, assignedByUserId || null]
+  );
+
+  return result.rows[0] || null;
 }
 
 export async function createPlanSubscriptionRecord({ userId, planId, referenceId, checkoutId, amountCents, environment, payload }) {
@@ -270,7 +308,7 @@ export async function markPlanSubscriptionStatus({
 }
 
 export async function getUserAccessState(userId) {
-  const [subscriptionResult, purchasesResult, overrideResult] = await Promise.all([
+  const [subscriptionResult, purchasesResult, grantsResult, overrideResult] = await Promise.all([
     query(
       `
         select plan_id, status, activated_at, canceled_at, updated_at
@@ -294,6 +332,14 @@ export async function getUserAccessState(userId) {
     ),
     query(
       `
+        select distinct product_id
+        from user_album_grants
+        where user_id = $1
+      `,
+      [userId]
+    ),
+    query(
+      `
         select plan_id, updated_at
         from user_plan_overrides
         where user_id = $1
@@ -305,7 +351,13 @@ export async function getUserAccessState(userId) {
 
   const plan = subscriptionResult.rows[0] || null;
   const override = overrideResult.rows[0] || null;
-  const purchasedAlbumIds = purchasesResult.rows.map((row) => row.product_id);
+  const purchasedAlbumIds = Array.from(
+    new Set([
+      ...purchasesResult.rows.map((row) => row.product_id),
+      ...grantsResult.rows.map((row) => row.product_id)
+    ])
+  );
+  const grantedAlbumIds = grantsResult.rows.map((row) => row.product_id);
   const effectivePlan = override
     ? {
         id: override.plan_id,
@@ -336,6 +388,7 @@ export async function getUserAccessState(userId) {
   return {
     plan: effectivePlan,
     purchasedAlbumIds,
+    grantedAlbumIds,
     canDownloadAll: Boolean(effectivePlan && hasFullCatalogAccess(effectivePlan.id) && effectivePlan.active),
     ...getCatalogAccessSummary(effectivePlan?.id)
   };

@@ -61,6 +61,19 @@ create index if not exists idx_user_album_purchases_user_id on user_album_purcha
 create index if not exists idx_user_album_purchases_product_id on user_album_purchases(product_id);
 create index if not exists idx_user_album_purchases_status on user_album_purchases(status);
 
+create table if not exists user_album_grants (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  product_id text not null,
+  assigned_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, product_id)
+);
+
+create index if not exists idx_user_album_grants_user_id on user_album_grants(user_id);
+create index if not exists idx_user_album_grants_product_id on user_album_grants(product_id);
+
 create table if not exists user_plan_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,
