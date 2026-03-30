@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Debug</title>
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, max-snippet:0, max-image-preview:none, max-video-preview:0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script>
+    (function () {
+      var capacitor = window.Capacitor;
+      var platform = capacitor && typeof capacitor.getPlatform === "function"
+        ? capacitor.getPlatform()
+        : "web";
+      var isNative = capacitor && typeof capacitor.isNativePlatform === "function"
+        ? capacitor.isNativePlatform()
+        : platform === "android" || platform === "ios";
+
+      if (isNative && platform === "android") {
+        document.documentElement.classList.add("native-android-app");
+      }
+    }());
+  </script>
+</head>
+<body data-page="debug">
+  <main class="page-shell">
+    <section id="explore-auth-shell" class="explore-auth-shell section-card">
+      <div class="explore-auth-head">
+        <img class="app-native-mini-logo" src="/images/mini.png" alt="Debug">
+        <p id="auth-status" class="section-muted" hidden aria-live="polite"></p>
+      </div>
+
+      <div class="auth-tabs" role="tablist" aria-label="Acesso ao explorar">
+        <button class="auth-tab active" type="button" data-auth-tab="login" role="tab" aria-selected="true">Entrar</button>
+        <button class="auth-tab" type="button" data-auth-tab="register" role="tab" aria-selected="false">Cadastrar</button>
+      </div>
+
+      <div class="auth-panel active" data-auth-panel="login" role="tabpanel">
+        <form id="login-form" class="auth-form auth-form-compact">
+          <label><input id="login-username" type="text" placeholder="Nome de usuario" aria-label="Nome de usuario"></label>
+          <label><input id="login-password" type="password" placeholder="Senha" aria-label="Senha"></label>
+          <button type="submit" class="primary-button">Entrar</button>
+        </form>
+      </div>
+
+      <div class="auth-panel" data-auth-panel="register" role="tabpanel" hidden>
+        <form id="register-form" class="auth-form auth-form-compact">
+          <label><input id="register-name" type="text" placeholder="Nome" aria-label="Nome"></label>
+          <label><input id="register-username" type="text" placeholder="Nome de usuario" aria-label="Nome de usuario"></label>
+          <label><input id="register-password" type="password" placeholder="Senha" aria-label="Senha"></label>
+          <label><input id="register-password-confirm" type="password" placeholder="Confirmar senha" aria-label="Confirmar senha"></label>
+          <button type="submit" class="primary-button">Cadastrar</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="explore-chat-layout" class="chat-layout" hidden>
+      <aside class="chat-sidebar">
+        <div class="sidebar-topbar">
+          <button id="sidebar-toggle-button" class="sidebar-toggle-button" type="button" aria-label="Recolher historico" title="Recolher historico">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m0 5.5A1.5 1.5 0 0 1 5.5 16h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 17.5"/></svg>
+          </button>
+        </div>
+        <div class="sidebar-card">
+          <div class="sidebar-scroll-content">
+            <div class="sidebar-header">
+            <h2 class="section-title small" data-text-key="explore.sidebar.title">Chats</h2>
+            <p class="section-muted" id="chat-auth-status">Verificando sessao...</p>
+            <label class="chat-search-field" aria-label="Pesquisar chats">
+              <input id="chat-search-input" type="search" placeholder="Pesquisar chats">
+            </label>
+            <div class="chat-actions sidebar-actions">
+              <button id="new-chat-button" class="sidebar-icon-button primary-button" type="button" aria-label="Nova conversa" title="Nova conversa">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a1.5 1.5 0 0 1 1.5 1.5v5h5a1.5 1.5 0 1 1 0 3h-5v5a1.5 1.5 0 1 1-3 0v-5h-5a1.5 1.5 0 1 1 0-3h5v-5A1.5 1.5 0 0 1 12 4"/></svg>
+              </button>
+              <button id="edit-chats-button" class="sidebar-icon-button primary-button" type="button" aria-label="Editar chats" title="Editar chats">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.2V20h2.8l9.86-9.87-2.8-2.8zM18.71 8.04a1 1 0 0 0 0-1.41l-1.34-1.34a1 1 0 0 0-1.41 0l-1.17 1.17 2.8 2.8z"/></svg>
+              </button>
+              <button id="new-folder-button" class="sidebar-icon-button primary-button" type="button" aria-label="Nova pasta" title="Nova pasta">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4.2a2 2 0 0 1 1.4.58L12 7h7a2 2 0 0 1 2 2v1H3zm0 3h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+              </button>
+            </div>
+            </div>
+            <div class="history-scroll-shell">
+              <div id="history-list" class="history-list"></div>
+            </div>
+            <div class="chat-actions sidebar-actions sidebar-actions-bottom">
+              <a href="/index.html" id="sidebar-home-link" class="sidebar-icon-button ghost-button" aria-label="Ir para home" title="Ir para home">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+              </a>
+              <button id="settings-button" class="sidebar-icon-button ghost-button" type="button" aria-label="Abrir configuracoes" title="Abrir configuracoes">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.55 2.53a1 1 0 0 1 2.9 0l.38 1.55a8.2 8.2 0 0 1 1.8.74l1.4-.8a1 1 0 0 1 1.45.53l.96 2.32a1 1 0 0 1-.38 1.22l-1.26.94q.14.46.22.94H20a1 1 0 0 1 1 1v2.94a1 1 0 0 1-1 1h-1.58q-.09.48-.22.94l1.26.94a1 1 0 0 1 .38 1.22l-.96 2.32a1 1 0 0 1-1.45.53l-1.4-.8a8.2 8.2 0 0 1-1.8.74l-.38 1.55a1 1 0 0 1-2.9 0l-.38-1.55a8.2 8.2 0 0 1-1.8-.74l-1.4.8a1 1 0 0 1-1.45-.53l-.96-2.32a1 1 0 0 1 .38-1.22l1.26-.94a8 8 0 0 1-.22-.94H4a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1h1.58q.09-.48.22-.94l-1.26-.94a1 1 0 0 1-.38-1.22l.96-2.32a1 1 0 0 1 1.45-.53l1.4.8a8.2 8.2 0 0 1 1.8-.74zM12 9.25A2.75 2.75 0 1 0 12 14.75 2.75 2.75 0 0 0 12 9.25"/></svg>
+              </button>
+              <button id="logout-button" class="sidebar-icon-button ghost-button" type="button" aria-label="Sair da conta" title="Sair da conta">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v-2H5V6h5zm7.59 7L14 7.41 15.41 6 21.83 12l-6.42 6-1.41-1.41L17.59 13H9v-2z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="chat-main">
+        <div id="chat-shell" class="conversation-shell ia-ambience">
+          <div id="conversation-header" class="conversation-header">
+            <div class="conversation-title-wrap">
+              <h2 id="conversation-title" class="conversation-title"></h2>
+            </div>
+            <div class="conversation-tools">
+              <div class="chat-mode-picker">
+                <button id="chat-mode-button" class="chat-mode-button" type="button" aria-label="Escolher modelo" aria-expanded="false" aria-haspopup="menu">
+                  <span id="chat-mode-button-icon" class="chat-mode-button-icon" aria-hidden="true"></span>
+                  <span id="chat-mode-button-label" class="chat-mode-button-label">Pratico</span>
+                  <span class="chat-mode-button-caret" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m7 10 5 5 5-5z"/></svg>
+                  </span>
+                </button>
+                <div id="chat-mode-menu" class="chat-mode-menu" role="menu" hidden>
+                  <button class="chat-mode-option" type="button" role="menuitemradio" data-chat-mode="think" aria-checked="false">
+                    <span class="chat-mode-option-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-4.37 12.47c.3.24.47.61.47.99V18a2 2 0 0 0 2 2h1v1a1 1 0 1 0 2 0v-1h1a2 2 0 0 0 2-2v-1.54c0-.38.17-.75.47-.99A7 7 0 0 0 12 3m-2 6a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1m4 0a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1m-4 7h4v2h-4z"/></svg>
+                    </span>
+                    <span class="chat-mode-option-text">Pensativo</span>
+                  </button>
+                  <button class="chat-mode-option" type="button" role="menuitemradio" data-chat-mode="fast" aria-checked="true">
+                    <span class="chat-mode-option-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+                    </span>
+                    <span class="chat-mode-option-text">Pratico</span>
+                  </button>
+                  <button class="chat-mode-option" type="button" role="menuitemradio" data-chat-mode="project" aria-checked="false">
+                    <span class="chat-mode-option-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M14.5 3c2.8.2 4.88 1.14 6.5 2.77-1.63 1.62-2.57 3.7-2.77 6.5l-3.41 3.4-1.92-1.92-3.95 3.95 1.07 1.07-1.42 1.42-4.24-4.24 1.42-1.42 1.07 1.07 3.95-3.95-1.92-1.92zm-7.9 13.56 1.84 1.84-3.89 1.06z"/></svg>
+                    </span>
+                    <span class="chat-mode-option-text">Projeto</span>
+                  </button>
+                </div>
+              </div>
+              <p id="conversation-meta" class="conversation-meta"></p>
+            </div>
+          </div>
+          <div id="chat-thread" class="chat-thread"></div>
+          <form id="chat-form" class="chat-composer">
+            <div class="composer-input-shell">
+              <textarea id="chat-input" placeholder="Digite sua mensagem aqui..." rows="1"></textarea>
+              <div class="chat-actions composer-actions">
+                <button id="mic-button" type="button" class="icon-button ghost-button" aria-label="Gravar mensagem de voz" title="Gravar mensagem de voz">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3m5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 12a1 1 0 1 1 2 0 5 5 0 1 0 10 0"/>
+                  </svg>
+                </button>
+                <button id="stop-button" type="button" class="icon-button primary-button stop-button" aria-label="Parar geracao" title="Parar geracao" disabled hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7 7h10v10H7z"/>
+                  </svg>
+                </button>
+                <button id="send-button" type="submit" class="icon-button primary-button" aria-label="Enviar mensagem" title="Enviar mensagem">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.1 2-12.1 2z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <p id="composer-status" class="composer-status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <section id="settings-modal" class="settings-modal" hidden>
+    <div class="settings-backdrop" data-settings-close="true"></div>
+    <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow">Settings</p>
+          <h2 id="settings-title" class="section-title small">Seu jeito de conversar</h2>
+        </div>
+        <button id="settings-close-button" class="sidebar-icon-button ghost-button" type="button" aria-label="Fechar configuracoes" title="Fechar configuracoes">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+        </button>
+      </div>
+      <form id="settings-form" class="settings-form">
+        <label>
+          Voz da IA
+          <select id="settings-voice-select"></select>
+        </label>
+        <label>
+          Como a IA deve responder voce
+          <textarea id="settings-response-style" rows="4" placeholder="Ex.: Respostas objetivas, claras, criativas e praticas."></textarea>
+        </label>
+        <label>
+          Como quer que a IA te chame
+          <input id="settings-call-name" type="text" placeholder="Ex.: Lucas">
+        </label>
+        <label>
+          Seu foco atual
+          <input id="settings-ministry-dream" type="text" placeholder="Ex.: Criar ideias melhores, resolver duvidas e organizar projetos.">
+        </label>
+        <label>
+          Seu perfil
+          <select id="settings-role-select">
+            <option value="Criador">Criador</option>
+            <option value="Estudante">Estudante</option>
+            <option value="Profissional">Profissional</option>
+            <option value="Empreendedor">Empreendedor</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </label>
+        <div class="settings-actions">
+          <button class="ghost-button" type="button" id="settings-cancel-button">Cancelar</button>
+          <button class="primary-button" type="submit">Salvar preferencias</button>
+        </div>
+        <p id="settings-status" class="section-muted"></p>
+      </form>
+    </div>
+  </section>
+
+  <script type="module" src="/debug.js"></script>
+</body>
+</html>

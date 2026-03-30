@@ -1870,8 +1870,14 @@ async function serveStatic(response, filePath) {
   try {
     const extension = path.extname(filePath).toLowerCase();
     const contentType = mimeTypes[extension] || "application/octet-stream";
+    const headers = { "Content-Type": contentType };
+    const normalizedFilePath = filePath.replaceAll("\\", "/").toLowerCase();
 
-    response.writeHead(200, { "Content-Type": contentType });
+    if (normalizedFilePath.endsWith("/public/debug.html")) {
+      headers["X-Robots-Tag"] = "noindex, nofollow, noarchive, nosnippet, noimageindex";
+    }
+
+    response.writeHead(200, headers);
     createReadStream(filePath).pipe(response);
   } catch {
     response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
