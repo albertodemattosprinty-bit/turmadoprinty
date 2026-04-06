@@ -1905,7 +1905,13 @@ async function handleAdminAlbumZipUpload(request, response, pathname) {
     return;
   }
 
-  if (contentType && contentType !== "application/zip" && contentType !== "application/x-zip-compressed" && contentType !== "multipart/x-zip") {
+  if (
+    contentType
+    && contentType !== "application/zip"
+    && contentType !== "application/x-zip-compressed"
+    && contentType !== "multipart/x-zip"
+    && contentType !== "application/octet-stream"
+  ) {
     sendJson(response, 400, { error: "Use um arquivo ZIP valido." });
     return;
   }

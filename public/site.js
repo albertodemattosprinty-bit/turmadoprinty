@@ -302,6 +302,7 @@ async function loadAlbums(siteConfig, user) {
   let selectedAlbumId = "";
   let uploadAlbumId = "";
   let items = [];
+  const albumFeedbackById = new Map();
   let accessState = {
     authenticated: false,
     canDownloadAll: false,
@@ -323,6 +324,42 @@ async function loadAlbums(siteConfig, user) {
   };
 
   const getOwnedAlbums = () => items.filter((album) => ownsAlbum(album));
+
+  const setAlbumFeedback = (albumId, message, tone = "neutral") => {
+    if (!albumId) {
+      return;
+    }
+
+    if (!message) {
+      albumFeedbackById.delete(albumId);
+      return;
+    }
+
+    albumFeedbackById.set(albumId, {
+      message,
+      tone
+    });
+  };
+
+  const getAlbumFeedback = (album) => {
+    const savedFeedback = albumFeedbackById.get(album.id);
+
+    if (savedFeedback?.message) {
+      return savedFeedback;
+    }
+
+    if (isRose) {
+      return {
+        message: album.hasAlbumZip ? "ZIP online neste álbum" : "Aguardando envio do ZIP",
+        tone: album.hasAlbumZip ? "success" : "neutral"
+      };
+    }
+
+    return {
+      message: album.hasAlbumZip ? "ZIP pronto para download" : "Album liberado na sua conta",
+      tone: album.hasAlbumZip ? "success" : "neutral"
+    };
+  };
 
   const setFilterButtons = () => {
     filterBar?.querySelectorAll("[data-filter]").forEach((button) => {
@@ -460,9 +497,11 @@ async function loadAlbums(siteConfig, user) {
 
         if (!album.hasAlbumZip) {
           triggerMissingZipEffect(card);
+          setAlbumFeedback(album.id, "ZIP ainda nao disponivel para este album.", "error");
           if (storeStatus) {
             storeStatus.textContent = "Esse album ainda esta sem ZIP online.";
           }
+          renderProducts();
           return;
         }
 
@@ -488,6 +527,7 @@ async function loadAlbums(siteConfig, user) {
             triggerMissingZipEffect(card);
             album.hasAlbumZip = false;
             album.albumZipUrl = "[none]";
+            setAlbumFeedback(album.id, "ZIP ainda nao disponivel para este album.", "error");
             if (storeStatus) {
               storeStatus.textContent = "Esse album ainda esta sem ZIP online.";
             }
@@ -557,6 +597,7 @@ async function loadAlbums(siteConfig, user) {
 
       const card = document.createElement("article");
       const isSelected = album.id === selectedAlbumId;
+      const feedback = getAlbumFeedback(album);
       card.className = `album-card album-card-owned${isSelected ? " is-selected" : ""}`;
       card.dataset.albumId = album.id;
       card.setAttribute("role", "button");
@@ -567,7 +608,7 @@ async function loadAlbums(siteConfig, user) {
         <div class="album-body">
           <h3>${album.name}</h3>
           ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
-          <p class="album-support-line">${isRose ? (album.hasAlbumZip ? "ZIP publicado" : "Aguardando envio do ZIP") : "Album liberado para sua conta"}</p>
+          <p class="album-support-line album-support-line-${feedback.tone}">${feedback.message}</p>
         </div>
         ${renderOwnedCardAction(album)}
       `;
@@ -645,6 +686,7 @@ async function loadAlbums(siteConfig, user) {
     }
 
     uploadAlbumId = album.id;
+    setAlbumFeedback(album.id, "Enviando ZIP para este album...", "neutral");
     renderProducts();
 
     try {
@@ -672,10 +714,12 @@ async function loadAlbums(siteConfig, user) {
       }
 
       updateAlbumInState(data.album || {});
+      setAlbumFeedback(album.id, "ZIP online neste album.", "success");
       if (storeStatus) {
         storeStatus.textContent = `ZIP de ${album.name} publicado no bucket.`;
       }
     } catch (error) {
+      setAlbumFeedback(album.id, error instanceof Error ? error.message : "Erro ao enviar ZIP.", "error");
       if (storeStatus) {
         storeStatus.textContent = error instanceof Error ? error.message : "Erro ao enviar ZIP.";
       }

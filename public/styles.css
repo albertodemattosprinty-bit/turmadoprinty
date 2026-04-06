@@ -1981,7 +1981,7 @@ body[data-page="produtos"] {
 }
 
 .album-grid {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   align-items: stretch;
 }
 
@@ -2042,6 +2042,14 @@ body[data-page="produtos"] {
   font-weight: 700;
 }
 
+.album-support-line-success {
+  color: #1e8d50 !important;
+}
+
+.album-support-line-error {
+  color: #c03c50 !important;
+}
+
 .album-card-owned {
   display: flex;
   flex-direction: column;
@@ -2095,7 +2103,7 @@ body[data-page="produtos"] {
 }
 
 .album-zip-button-admin {
-  background: linear-gradient(135deg, #c52f2f 0%, #ef5757 100%);
+  background: linear-gradient(135deg, #1b53bb 0%, #2f7cff 100%);
 }
 
 .album-zip-button-admin.is-online {
