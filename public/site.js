@@ -219,6 +219,14 @@ function inferDownloadName(response, fallbackName) {
   return asciiMatch?.[1] || fallbackName;
 }
 
+function escapeHtmlAttribute(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function triggerBrowserDownload(blob, fileName) {
   const downloadUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -303,6 +311,7 @@ async function loadAlbums(siteConfig, user) {
   let uploadAlbumId = "";
   let items = [];
   const albumFeedbackById = new Map();
+  const albumLinkDraftById = new Map();
   let accessState = {
     authenticated: false,
     canDownloadAll: false,
@@ -434,6 +443,7 @@ async function loadAlbums(siteConfig, user) {
       const isUploading = uploadAlbumId === album.id;
       const isOnline = Boolean(album.hasAlbumZip);
       const label = isUploading ? "Enviando..." : isOnline ? "Zip Online" : "Enviar Zip";
+      const draftLink = albumLinkDraftById.get(album.id) || (album.albumZipUrl && album.albumZipUrl !== "[none]" ? album.albumZipUrl : "");
 
       return `
         <div class="album-card-action${isSelected ? " is-visible" : ""}">
@@ -444,6 +454,24 @@ async function loadAlbums(siteConfig, user) {
             data-album-id="${album.id}"
             ${isUploading || !isSelected ? "disabled" : ""}
           >${label}</button>
+        </div>
+        <div class="album-link-form${isSelected ? " is-visible" : ""}">
+          <input
+            class="album-link-input"
+            type="url"
+            placeholder="https://seu-link-do-zip"
+            value="${escapeHtmlAttribute(draftLink)}"
+            data-role="album-link-input"
+            data-album-id="${album.id}"
+            ${!isSelected ? "disabled" : ""}
+          >
+          <button
+            class="ghost-button album-link-button"
+            type="button"
+            data-role="album-link-submit"
+            data-album-id="${album.id}"
+            ${isUploading || !isSelected ? "disabled" : ""}
+          >Enviar link</button>
         </div>
       `;
     }
@@ -553,6 +581,81 @@ async function loadAlbums(siteConfig, user) {
           }
         } finally {
           button.removeAttribute("disabled");
+        }
+      });
+    });
+
+    grid.querySelectorAll("[data-role='album-link-input']").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const field = event.currentTarget;
+
+        if (!(field instanceof HTMLInputElement)) {
+          return;
+        }
+
+        albumLinkDraftById.set(field.dataset.albumId || "", field.value);
+      });
+    });
+
+    grid.querySelectorAll("[data-role='album-link-submit']").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+
+        if (!isRose) {
+          return;
+        }
+
+        const albumId = button.getAttribute("data-album-id") || "";
+        const album = items.find((item) => item.id === albumId);
+        const linkInput = grid.querySelector(`[data-role='album-link-input'][data-album-id='${albumId}']`);
+        const zipUrl = linkInput instanceof HTMLInputElement ? linkInput.value.trim() : "";
+
+        if (!album) {
+          return;
+        }
+
+        albumLinkDraftById.set(albumId, zipUrl);
+
+        if (!/^https?:\/\//i.test(zipUrl)) {
+          setAlbumFeedback(albumId, "Cole um link valido com http:// ou https://.", "error");
+          renderProducts();
+          return;
+        }
+
+        button.setAttribute("disabled", "disabled");
+        setAlbumFeedback(albumId, "Salvando link deste album...", "neutral");
+        renderProducts();
+
+        try {
+          const response = await fetch(getApiUrl(`/api/admin/albums/${encodeURIComponent(albumId)}/zip-link`), {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ zipUrl })
+          });
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(data.error || "Nao foi possivel salvar o link do ZIP.");
+          }
+
+          updateAlbumInState(data.album || {});
+          albumLinkDraftById.set(albumId, zipUrl);
+          setAlbumFeedback(albumId, "Link salvo e publicado neste album.", "success");
+
+          if (storeStatus) {
+            storeStatus.textContent = `Link de ZIP salvo para ${album.name}.`;
+          }
+        } catch (error) {
+          setAlbumFeedback(albumId, error instanceof Error ? error.message : "Erro ao salvar link do ZIP.", "error");
+          if (storeStatus) {
+            storeStatus.textContent = error instanceof Error ? error.message : "Erro ao salvar link do ZIP.";
+          }
+        } finally {
+          button.removeAttribute("disabled");
+          renderProducts();
         }
       });
     });

@@ -2102,6 +2102,38 @@ body[data-page="produtos"] {
   pointer-events: none;
 }
 
+.album-link-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.album-link-form.is-visible {
+  opacity: 1;
+}
+
+.album-link-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(27, 83, 187, 0.16);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--blue-dark);
+  background: #ffffff;
+}
+
+.album-link-button {
+  min-height: 46px;
+}
+
+.album-link-form:not(.is-visible) .album-link-input,
+.album-link-form:not(.is-visible) .album-link-button {
+  pointer-events: none;
+}
+
 .album-zip-button-admin {
   background: linear-gradient(135deg, #1b53bb 0%, #2f7cff 100%);
 }

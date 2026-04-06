@@ -24,6 +24,7 @@ export const DEFAULT_BANNERS = {
 };
 
 export const DEFAULT_TEXT_OVERRIDES = {};
+export const DEFAULT_ALBUM_ZIP_LINKS = {};
 
 export const DEFAULT_SCHEDULE = [
   { monthLabel: "Setembro", dateLabel: "06/09", place: "Igreja Assembleia de Deus Belem", city: "Pinheiros - SP", time: "10:00" },
@@ -112,6 +113,44 @@ function normalizeTextOverrides(value) {
   );
 }
 
+function normalizeAlbumZipUrl(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeAlbumZipSourceType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "r2" ? "r2" : "link";
+}
+
+function normalizeAlbumZipLinks(value) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([productId, entry]) => {
+        const payload = typeof entry === "object" && entry ? entry : {};
+        const url = normalizeAlbumZipUrl(payload.url);
+
+        if (!productId || !url) {
+          return null;
+        }
+
+        return [
+          String(productId).trim(),
+          {
+            albumName: String(payload.albumName || "").trim(),
+            url,
+            sourceType: normalizeAlbumZipSourceType(payload.sourceType),
+            updatedAt: String(payload.updatedAt || "").trim() || new Date().toISOString()
+          }
+        ];
+      })
+      .filter(Boolean)
+  );
+}
+
 export async function ensureSiteConfigSchema() {
   if (!hasDatabase()) {
     return;
@@ -160,6 +199,15 @@ export async function ensureSiteConfigSchema() {
           on conflict (key) do nothing
         `,
         [JSON.stringify({ banners: DEFAULT_BANNERS, textOverrides: DEFAULT_TEXT_OVERRIDES })]
+      );
+
+      await query(
+        `
+          insert into app_settings (key, value)
+          values ('album_zip_links', $1::jsonb)
+          on conflict (key) do nothing
+        `,
+        [JSON.stringify(DEFAULT_ALBUM_ZIP_LINKS)]
       );
 
       const existingAgenda = await query("select count(*)::int as total from agenda_events");
@@ -269,6 +317,54 @@ export async function saveSiteContentSettings({ banners, textOverrides }) {
   );
 
   return payload;
+}
+
+export async function getAlbumZipLinks() {
+  if (!hasDatabase()) {
+    return {};
+  }
+
+  await ensureSiteConfigSchema();
+  const result = await query("select value from app_settings where key = 'album_zip_links' limit 1");
+  return normalizeAlbumZipLinks(result.rows[0]?.value || {});
+}
+
+export async function saveAlbumZipLink({ productId, albumName, zipUrl, sourceType = "link" }) {
+  await ensureSiteConfigSchema();
+  const currentLinks = await getAlbumZipLinks();
+  const normalizedProductId = String(productId || "").trim();
+  const normalizedZipUrl = normalizeAlbumZipUrl(zipUrl);
+
+  if (!normalizedProductId) {
+    throw new Error("Produto do ZIP invalido.");
+  }
+
+  if (!normalizedZipUrl) {
+    throw new Error("Informe um link valido para o ZIP.");
+  }
+
+  const payload = {
+    ...currentLinks,
+    [normalizedProductId]: {
+      albumName: String(albumName || "").trim(),
+      url: normalizedZipUrl,
+      sourceType: normalizeAlbumZipSourceType(sourceType),
+      updatedAt: new Date().toISOString()
+    }
+  };
+
+  await query(
+    `
+      insert into app_settings (key, value, updated_at)
+      values ('album_zip_links', $1::jsonb, now())
+      on conflict (key) do update
+        set value = excluded.value,
+            updated_at = now()
+    `,
+    [JSON.stringify(payload)]
+  );
+
+  return normalizeAlbumZipLinks(payload);
 }
 
 export async function getScheduleEntries() {

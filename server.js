@@ -18,7 +18,7 @@ import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
-import { createScheduleEntry, ensureSiteConfigSchema, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
+import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -153,6 +153,20 @@ function buildAlbumZipPublicUrlFromKey(key) {
 
 function hasAlbumZip(album) {
   return Boolean(album?.albumZipUrl && album.albumZipUrl !== "[none]");
+}
+
+function resolveAlbumZipUrl(manifest, productId, albumZipLinks = {}) {
+  const storedUrl = typeof albumZipLinks?.[productId]?.url === "string"
+    ? albumZipLinks[productId].url.trim()
+    : "";
+
+  if (storedUrl) {
+    return storedUrl;
+  }
+
+  return typeof manifest?.albumZipUrl === "string" && manifest.albumZipUrl.trim()
+    ? manifest.albumZipUrl.trim()
+    : "[none]";
 }
 
 function getR2Client() {
@@ -426,22 +440,23 @@ function getStorePayload() {
   }));
 }
 
-async function buildStoreProductCard(product, pricing) {
+async function buildStoreProductCard(product, pricing, albumZipLinks = {}) {
   const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+  const albumZipUrl = resolveAlbumZipUrl(manifest, product.id, albumZipLinks);
 
   return {
     ...product,
     priceLabel: formatPriceFromCents(product.unitAmount),
     coverUrl: buildCoverUrl(product.name),
     href: `/produto.html?album=${encodeURIComponent(product.id)}`,
-    albumZipUrl: manifest.albumZipUrl,
-    hasAlbumZip: hasAlbumZip(manifest)
+    albumZipUrl,
+    hasAlbumZip: albumZipUrl !== "[none]"
   };
 }
 
-async function buildStoreProductsResponse(pricing) {
+async function buildStoreProductsResponse(pricing, albumZipLinks = {}) {
   const storeProducts = buildStoreProducts(pricing.albumPriceCents, pricing.albumOverrides);
-  return Promise.all(storeProducts.map((product) => buildStoreProductCard(product, pricing)));
+  return Promise.all(storeProducts.map((product) => buildStoreProductCard(product, pricing, albumZipLinks)));
 }
 
 function getAlbumPriceCents(pricing, productId) {
@@ -463,9 +478,10 @@ function serializeManifestTrack(track) {
   };
 }
 
-async function buildAlbumDetailResponse(product, pricing) {
+async function buildAlbumDetailResponse(product, pricing, albumZipLinks = {}) {
   const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
   const unitAmount = getAlbumPriceCents(pricing, product.id);
+  const albumZipUrl = resolveAlbumZipUrl(manifest, product.id, albumZipLinks);
 
   return {
     ...product,
@@ -473,8 +489,8 @@ async function buildAlbumDetailResponse(product, pricing) {
     priceLabel: formatPriceFromCents(unitAmount),
     coverUrl: buildCoverUrl(product.name),
     href: `/produto.html?album=${encodeURIComponent(product.id)}`,
-    albumZipUrl: manifest.albumZipUrl,
-    hasAlbumZip: hasAlbumZip(manifest),
+    albumZipUrl,
+    hasAlbumZip: albumZipUrl !== "[none]",
     lyricsZipUrl: manifest.lyricsZipUrl,
     tracks: manifest.tracks.map((track) => ({
       ...serializeManifestTrack(track),
@@ -1785,7 +1801,8 @@ async function handleAdminAlbumDetail(request, response, pathname) {
     return;
   }
 
-  const detail = await buildAlbumDetailResponse(product, pricing);
+  const albumZipLinks = await getAlbumZipLinks();
+  const detail = await buildAlbumDetailResponse(product, pricing, albumZipLinks);
   sendJson(response, 200, { ok: true, album: detail });
 }
 
@@ -1861,7 +1878,8 @@ async function handleAdminAlbumUpdate(request, response, pathname) {
     });
 
     const nextPricing = await getSitePricingSettings();
-    const detail = await buildAlbumDetailResponse(product, nextPricing);
+    const albumZipLinks = await getAlbumZipLinks();
+    const detail = await buildAlbumDetailResponse(product, nextPricing, albumZipLinks);
     sendJson(response, 200, { ok: true, album: detail });
   } catch (error) {
     sendJson(response, 500, {
@@ -1938,12 +1956,20 @@ async function handleAdminAlbumZipUpload(request, response, pathname) {
     const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
     const publicZipUrl = buildAlbumZipPublicUrlFromKey(r2Key);
 
+    await saveAlbumZipLink({
+      productId: product.id,
+      albumName: product.name,
+      zipUrl: publicZipUrl,
+      sourceType: "r2"
+    });
+
     await albumManifestStore.writeAlbumManifest(product.name, manifest.tracks, {
       albumZipUrl: publicZipUrl,
       lyricsZipUrl: manifest.lyricsZipUrl
     });
 
-    const detail = await buildAlbumDetailResponse(product, pricing);
+    const albumZipLinks = await getAlbumZipLinks();
+    const detail = await buildAlbumDetailResponse(product, pricing, albumZipLinks);
     sendJson(response, 200, {
       ok: true,
       album: detail
@@ -1951,6 +1977,65 @@ async function handleAdminAlbumZipUpload(request, response, pathname) {
   } catch (error) {
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Erro ao enviar ZIP."
+    });
+  }
+}
+
+async function handleAdminAlbumZipLinkUpdate(request, response, pathname) {
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  const productId = decodeURIComponent(pathname.replace(/^\/api\/admin\/albums\/([^/]+)\/zip-link$/, "$1"));
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const zipUrl = typeof body?.zipUrl === "string" ? body.zipUrl.trim() : "";
+
+  if (!/^https?:\/\//i.test(zipUrl)) {
+    sendJson(response, 400, { error: "Informe um link valido com http:// ou https://." });
+    return;
+  }
+
+  try {
+    await saveAlbumZipLink({
+      productId: product.id,
+      albumName: product.name,
+      zipUrl,
+      sourceType: "link"
+    });
+
+    const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+    await albumManifestStore.writeAlbumManifest(product.name, manifest.tracks, {
+      albumZipUrl: zipUrl,
+      lyricsZipUrl: manifest.lyricsZipUrl
+    });
+
+    const albumZipLinks = await getAlbumZipLinks();
+    const detail = await buildAlbumDetailResponse(product, pricing, albumZipLinks);
+    sendJson(response, 200, {
+      ok: true,
+      album: detail
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao salvar link do ZIP."
     });
   }
 }
@@ -1993,15 +2078,17 @@ async function handleProtectedAlbumZipDownload(request, response, pathname) {
     }
 
     const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+    const albumZipLinks = await getAlbumZipLinks();
+    const albumZipUrl = resolveAlbumZipUrl(manifest, product.id, albumZipLinks);
 
-    if (!hasAlbumZip(manifest)) {
+    if (!albumZipUrl || albumZipUrl === "[none]") {
       sendJson(response, 404, {
         error: "ZIP ainda nao disponivel para este album."
       });
       return;
     }
 
-    const assetResponse = await fetch(manifest.albumZipUrl);
+    const assetResponse = await fetch(albumZipUrl);
 
     if (!assetResponse.ok || !assetResponse.body) {
       sendJson(response, assetResponse.status || 502, {
@@ -2695,8 +2782,11 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && pathname === "/api/store/products") {
-    const pricing = await getSitePricingSettings();
-    const storeProducts = await buildStoreProductsResponse(pricing);
+    const [pricing, albumZipLinks] = await Promise.all([
+      getSitePricingSettings(),
+      getAlbumZipLinks()
+    ]);
+    const storeProducts = await buildStoreProductsResponse(pricing, albumZipLinks);
     sendJson(response, 200, {
       items: storeProducts,
       total: storeProducts.length
@@ -2727,7 +2817,8 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    sendJson(response, 200, await buildAlbumDetailResponse(product, pricing));
+    const albumZipLinks = await getAlbumZipLinks();
+    sendJson(response, 200, await buildAlbumDetailResponse(product, pricing, albumZipLinks));
     return;
   }
 
@@ -3013,6 +3104,11 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && pathname.startsWith("/api/admin/albums/")) {
+    if (pathname.match(/^\/api\/admin\/albums\/[^/]+\/zip-link$/)) {
+      sendJson(response, 405, { error: "Use PUT para salvar o link do ZIP." });
+      return;
+    }
+
     if (pathname.match(/^\/api\/admin\/albums\/[^/]+\/zip$/)) {
       sendJson(response, 405, { error: "Use PUT para enviar ZIP." });
       return;
@@ -3024,6 +3120,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "PUT" && pathname.match(/^\/api\/admin\/albums\/[^/]+\/zip$/)) {
     await handleAdminAlbumZipUpload(request, response, pathname);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/admin\/albums\/[^/]+\/zip-link$/)) {
+    await handleAdminAlbumZipLinkUpdate(request, response, pathname);
     return;
   }
 
