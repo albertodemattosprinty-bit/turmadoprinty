@@ -33,6 +33,15 @@ function normalizeLyricsZipUrl(value) {
   return normalized ? normalized : "[none]";
 }
 
+function normalizeAlbumZipUrl(value) {
+  if (typeof value !== "string") {
+    return "[none]";
+  }
+
+  const normalized = value.trim();
+  return normalized ? normalized : "[none]";
+}
+
 export function createAlbumManifestStore({ rootDir }) {
   const manifestsDir = path.join(rootDir, "albuns-json");
 
@@ -53,15 +62,18 @@ export function createAlbumManifestStore({ rootDir }) {
     const payload = await readOptionalJson(getManifestPath(albumName));
     const rawTracks = Array.isArray(payload?.tracks) ? payload.tracks : [];
     const lyricsZipUrl = normalizeLyricsZipUrl(payload?.lyricsZipUrl);
+    const albumZipUrl = normalizeAlbumZipUrl(payload?.albumZipUrl);
 
     if (!rawTracks.length) {
       return {
+        albumZipUrl,
         lyricsZipUrl,
         tracks: Array.from({ length: trackCount }, (_, index) => normalizeTrack({}, index))
       };
     }
 
     return {
+      albumZipUrl,
       lyricsZipUrl,
       tracks: rawTracks.slice(0, trackCount).map((item, index) => normalizeTrack(item, index))
     };
@@ -70,6 +82,7 @@ export function createAlbumManifestStore({ rootDir }) {
   async function writeAlbumManifest(albumName, tracks, options = {}) {
     await mkdir(manifestsDir, { recursive: true });
     const currentManifest = await readOptionalJson(getManifestPath(albumName));
+    const albumZipUrl = normalizeAlbumZipUrl(options.albumZipUrl ?? currentManifest?.albumZipUrl);
     const lyricsZipUrl = normalizeLyricsZipUrl(options.lyricsZipUrl ?? currentManifest?.lyricsZipUrl);
     const nextTracks = tracks
       .map((item, index) => normalizeTrack(item, index))
@@ -101,6 +114,7 @@ export function createAlbumManifestStore({ rootDir }) {
 
     const manifest = {
       album: albumName,
+      albumZipUrl,
       lyricsZipUrl,
       tracks: nextTracks
     };

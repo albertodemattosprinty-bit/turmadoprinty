@@ -19,12 +19,17 @@
       <div class="section-head">
         <div>
           <p class="eyebrow" data-text-key="products.eyebrow">Produtos</p>
-          <h1 class="section-title" data-text-key="products.title">Todos os albuns</h1>
+          <h1 class="section-title" data-text-key="products.title">Albuns do site</h1>
         </div>
         <p class="section-muted" id="album-count">Carregando catalogo...</p>
       </div>
+      <div class="products-filter-bar" id="products-filter-bar" aria-label="Filtros de albuns">
+        <button class="products-filter-button is-active" type="button" data-filter="all">Todos os albuns</button>
+        <button class="products-filter-button" type="button" data-filter="owned">Meus albuns</button>
+      </div>
       <p id="store-status" class="section-muted"></p>
       <div class="album-grid" id="album-grid"></div>
+      <input id="album-zip-input" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden>
     </section>
   </main>
 

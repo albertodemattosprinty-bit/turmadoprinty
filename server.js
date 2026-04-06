@@ -7,6 +7,7 @@ import http from "node:http";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
@@ -32,8 +33,15 @@ const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
 const OPENAI_TTS_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || "").trim();
+const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || "").trim();
+const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || "").trim();
+const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || "").trim();
+const R2_PUBLIC_BASE_URL = (process.env.R2_PUBLIC_BASE_URL || CONTENT_BASE_URL).replace(/\/+$/, "");
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ADMIN_USERNAME = "rosemattos";
+const ALBUM_ZIP_FOLDER = "album-zips";
+const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
 
 const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
@@ -42,6 +50,7 @@ const contextFilePath = path.join(__dirname, "contexto.txt");
 const contentDir = path.join(__dirname, "Conteúdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
+let r2Client = null;
 
 const eduDownloadFiles = {
   "abandona-no-lixao": {
@@ -130,6 +139,41 @@ function buildContentDisposition(filename) {
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(safeName)}`;
 }
 
+function buildAlbumZipKey(product) {
+  return `${ALBUM_ZIP_FOLDER}/${slugifyAlbumName(product.name)}.zip`;
+}
+
+function buildAlbumZipPublicUrlFromKey(key) {
+  return `${R2_PUBLIC_BASE_URL}/${String(key || "")
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+function hasAlbumZip(album) {
+  return Boolean(album?.albumZipUrl && album.albumZipUrl !== "[none]");
+}
+
+function getR2Client() {
+  if (!R2_ACCOUNT_ID || !R2_BUCKET_NAME || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+    throw new Error("Configure R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID e R2_SECRET_ACCESS_KEY para enviar ZIP.");
+  }
+
+  if (!r2Client) {
+    r2Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY
+      }
+    });
+  }
+
+  return r2Client;
+}
+
 async function readApiResponse(response) {
   const rawText = await response.text();
   const text = rawText.trim();
@@ -159,6 +203,24 @@ async function readRawTextBody(request) {
   }
 
   return Buffer.concat(chunks).toString("utf8");
+}
+
+async function readBinaryBody(request, maxBytes = MAX_ALBUM_ZIP_BYTES) {
+  const chunks = [];
+  let totalBytes = 0;
+
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+
+    if (maxBytes > 0 && totalBytes > maxBytes) {
+      throw new Error(`Arquivo acima do limite de ${Math.round(maxBytes / (1024 * 1024))} MB.`);
+    }
+
+    chunks.push(buffer);
+  }
+
+  return Buffer.concat(chunks);
 }
 
 async function readTextBody(request) {
@@ -364,6 +426,24 @@ function getStorePayload() {
   }));
 }
 
+async function buildStoreProductCard(product, pricing) {
+  const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+
+  return {
+    ...product,
+    priceLabel: formatPriceFromCents(product.unitAmount),
+    coverUrl: buildCoverUrl(product.name),
+    href: `/produto.html?album=${encodeURIComponent(product.id)}`,
+    albumZipUrl: manifest.albumZipUrl,
+    hasAlbumZip: hasAlbumZip(manifest)
+  };
+}
+
+async function buildStoreProductsResponse(pricing) {
+  const storeProducts = buildStoreProducts(pricing.albumPriceCents, pricing.albumOverrides);
+  return Promise.all(storeProducts.map((product) => buildStoreProductCard(product, pricing)));
+}
+
 function getAlbumPriceCents(pricing, productId) {
   return Number(pricing?.albumOverrides?.[productId]) || Number(pricing?.albumPriceCents) || 4990;
 }
@@ -393,6 +473,8 @@ async function buildAlbumDetailResponse(product, pricing) {
     priceLabel: formatPriceFromCents(unitAmount),
     coverUrl: buildCoverUrl(product.name),
     href: `/produto.html?album=${encodeURIComponent(product.id)}`,
+    albumZipUrl: manifest.albumZipUrl,
+    hasAlbumZip: hasAlbumZip(manifest),
     lyricsZipUrl: manifest.lyricsZipUrl,
     tracks: manifest.tracks.map((track) => ({
       ...serializeManifestTrack(track),
@@ -1788,6 +1870,158 @@ async function handleAdminAlbumUpdate(request, response, pathname) {
   }
 }
 
+function canAccessAlbumZip(accessState, productId) {
+  return Boolean(accessState?.canDownloadAll || accessState?.purchasedAlbumIds?.includes(productId));
+}
+
+async function handleAdminAlbumZipUpload(request, response, pathname) {
+  const user = await requireAdmin(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  const productId = decodeURIComponent(pathname.replace(/^\/api\/admin\/albums\/([^/]+)\/zip$/, "$1"));
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  const providedFileName = String(request.headers["x-file-name"] || "").trim();
+  const contentType = String(request.headers["content-type"] || "").trim().toLowerCase();
+  const declaredBytes = Number(request.headers["content-length"] || 0);
+  const safeFileName = decodeURIComponent(providedFileName || `${slugifyAlbumName(product.name)}.zip`);
+
+  if (!safeFileName.toLowerCase().endsWith(".zip")) {
+    sendJson(response, 400, { error: "Envie um arquivo .zip." });
+    return;
+  }
+
+  if (declaredBytes > MAX_ALBUM_ZIP_BYTES) {
+    sendJson(response, 413, { error: `Arquivo acima do limite de ${Math.round(MAX_ALBUM_ZIP_BYTES / (1024 * 1024))} MB.` });
+    return;
+  }
+
+  if (contentType && contentType !== "application/zip" && contentType !== "application/x-zip-compressed" && contentType !== "multipart/x-zip") {
+    sendJson(response, 400, { error: "Use um arquivo ZIP valido." });
+    return;
+  }
+
+  try {
+    const fileBuffer = await readBinaryBody(request, MAX_ALBUM_ZIP_BYTES);
+
+    if (!fileBuffer.length) {
+      sendJson(response, 400, { error: "ZIP vazio." });
+      return;
+    }
+
+    const r2Key = buildAlbumZipKey(product);
+    const r2Client = getR2Client();
+
+    await r2Client.send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: r2Key,
+      Body: fileBuffer,
+      ContentType: "application/zip",
+      ContentDisposition: buildContentDisposition(`${slugifyAlbumName(product.name)}.zip`)
+    }));
+
+    const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+    const publicZipUrl = buildAlbumZipPublicUrlFromKey(r2Key);
+
+    await albumManifestStore.writeAlbumManifest(product.name, manifest.tracks, {
+      albumZipUrl: publicZipUrl,
+      lyricsZipUrl: manifest.lyricsZipUrl
+    });
+
+    const detail = await buildAlbumDetailResponse(product, pricing);
+    sendJson(response, 200, {
+      ok: true,
+      album: detail
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao enviar ZIP."
+    });
+  }
+}
+
+async function handleProtectedAlbumZipDownload(request, response, pathname) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  const match = pathname.match(/^\/api\/store\/products\/([^/]+)\/zip\/download$/);
+
+  if (!match) {
+    sendJson(response, 404, { error: "ZIP nao encontrado." });
+    return;
+  }
+
+  const productId = decodeURIComponent(match[1]);
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  try {
+    const accessState = await getUserAccessState(user.id);
+
+    if (!canAccessAlbumZip(accessState, product.id)) {
+      sendJson(response, 403, {
+        error: "Esse ZIP so fica liberado para quem possui o album."
+      });
+      return;
+    }
+
+    const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
+
+    if (!hasAlbumZip(manifest)) {
+      sendJson(response, 404, {
+        error: "ZIP ainda nao disponivel para este album."
+      });
+      return;
+    }
+
+    const assetResponse = await fetch(manifest.albumZipUrl);
+
+    if (!assetResponse.ok || !assetResponse.body) {
+      sendJson(response, assetResponse.status || 502, {
+        error: "Nao foi possivel baixar o ZIP agora."
+      });
+      return;
+    }
+
+    const contentType = assetResponse.headers.get("content-type") || "application/zip";
+    const contentLength = assetResponse.headers.get("content-length");
+    const fileName = `${slugifyAlbumName(product.name)}.zip`;
+
+    response.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Disposition": buildContentDisposition(fileName),
+      ...(contentLength ? { "Content-Length": contentLength } : {})
+    });
+
+    Readable.fromWeb(assetResponse.body).pipe(response);
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao validar o ZIP."
+    });
+  }
+}
+
 async function handleProtectedTrackDownload(request, response, pathname) {
   if (!await ensurePaymentsReady(response)) {
     return;
@@ -2456,21 +2690,22 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/store/products") {
     const pricing = await getSitePricingSettings();
-    const storeProducts = buildStoreProducts(pricing.albumPriceCents, pricing.albumOverrides);
+    const storeProducts = await buildStoreProductsResponse(pricing);
     sendJson(response, 200, {
-      items: storeProducts.map((product) => ({
-        ...product,
-        priceLabel: formatPriceFromCents(product.unitAmount),
-        coverUrl: buildCoverUrl(product.name),
-        href: `/produto.html?album=${encodeURIComponent(product.id)}`
-      })),
+      items: storeProducts,
       total: storeProducts.length
     });
     return;
   }
 
   if (request.method === "GET" && pathname.startsWith("/api/store/products/")) {
+    const albumZipDownloadMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/zip\/download$/);
     const trackDownloadMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/tracks\/(\d+)\/download$/);
+
+    if (albumZipDownloadMatch) {
+      await handleProtectedAlbumZipDownload(request, response, pathname);
+      return;
+    }
 
     if (trackDownloadMatch) {
       await handleProtectedTrackDownload(request, response, pathname);
@@ -2772,7 +3007,17 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && pathname.startsWith("/api/admin/albums/")) {
+    if (pathname.match(/^\/api\/admin\/albums\/[^/]+\/zip$/)) {
+      sendJson(response, 405, { error: "Use PUT para enviar ZIP." });
+      return;
+    }
+
     await handleAdminAlbumDetail(request, response, pathname);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/admin\/albums\/[^/]+\/zip$/)) {
+    await handleAdminAlbumZipUpload(request, response, pathname);
     return;
   }
 

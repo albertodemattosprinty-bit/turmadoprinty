@@ -1,4 +1,4 @@
-import { getToken, initSiteHeader, loadCurrentUser } from "./header.js";
+import { getToken, initSiteHeader } from "./header.js";
 import { applyTextOverrides, initContentAdmin } from "./content-admin.js";
 import { getApiUrl } from "./api.js";
 
@@ -143,6 +143,107 @@ function renderProductsAdminPanel(user, siteConfig, refreshAlbums) {
   });
 }
 
+function normalizeUsername(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isRoseMattosUser(user) {
+  return Boolean(user?.isAdmin) && normalizeUsername(user?.username) === "rosemattos";
+}
+
+function buildProductsAuthRedirect(filter) {
+  const next = filter === "owned" ? "/produtos.html?modo=owned" : "/produtos.html";
+  return `/auth.html?next=${encodeURIComponent(next)}`;
+}
+
+function parseProductsMode() {
+  const mode = new URLSearchParams(window.location.search).get("modo");
+  return mode === "owned" ? "owned" : "all";
+}
+
+async function loadProductsAccessState() {
+  const token = getToken();
+
+  if (!token) {
+    return {
+      authenticated: false,
+      canDownloadAll: false,
+      purchasedAlbumIds: []
+    };
+  }
+
+  try {
+    const response = await fetch(getApiUrl("/api/account/access"), {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (response.status === 401) {
+      return {
+        authenticated: false,
+        canDownloadAll: false,
+        purchasedAlbumIds: []
+      };
+    }
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.error || "Falha ao carregar seus albuns.");
+    }
+
+    return {
+      authenticated: true,
+      canDownloadAll: Boolean(data.access?.canDownloadAll),
+      purchasedAlbumIds: Array.isArray(data.access?.purchasedAlbumIds) ? data.access.purchasedAlbumIds : []
+    };
+  } catch {
+    return {
+      authenticated: false,
+      canDownloadAll: false,
+      purchasedAlbumIds: []
+    };
+  }
+}
+
+function inferDownloadName(response, fallbackName) {
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const asciiMatch = contentDisposition.match(/filename="([^"]+)"/i);
+  return asciiMatch?.[1] || fallbackName;
+}
+
+function triggerBrowserDownload(blob, fileName) {
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(downloadUrl);
+  }, 1500);
+}
+
+function triggerMissingZipEffect(card) {
+  const cover = card?.querySelector(".album-cover");
+
+  if (!cover) {
+    return;
+  }
+
+  cover.classList.remove("album-cover-missing-zip");
+  void cover.offsetWidth;
+  cover.classList.add("album-cover-missing-zip");
+}
+
 async function loadAlbums(siteConfig, user) {
   const grid = document.getElementById("album-grid");
   const count = document.getElementById("album-count");
@@ -152,30 +253,275 @@ async function loadAlbums(siteConfig, user) {
     return;
   }
 
-  const refreshAlbums = async () => {
+  if (page !== "produtos") {
+    const refreshAlbums = async () => {
+      grid.innerHTML = "";
+
+      try {
+        const response = await fetch(getApiUrl("/api/albums"));
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Falha ao carregar o catalogo.");
+        }
+
+        const items = Array.isArray(data.items) ? data.items : [];
+        count.textContent = `${items.length} albuns disponiveis`;
+
+        if (!items.length) {
+          grid.innerHTML = "<p class=\"section-muted\">Nenhum album disponivel no momento.</p>";
+          return;
+        }
+
+        items.forEach((album) => {
+          const card = document.createElement("article");
+          card.className = "album-card";
+          card.innerHTML = `
+            <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
+            <div class="album-body">
+              <h3>${album.name}</h3>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+
+        applyTextOverrides(grid);
+      } catch (error) {
+        count.textContent = "Falha ao carregar";
+        grid.innerHTML = `<p class="section-muted">${error instanceof Error ? error.message : "Erro ao carregar albuns."}</p>`;
+      }
+    };
+
+    await refreshAlbums();
+    return;
+  }
+
+  const filterBar = document.getElementById("products-filter-bar");
+  const zipInput = document.getElementById("album-zip-input");
+  let activeFilter = parseProductsMode();
+  let selectedAlbumId = "";
+  let uploadAlbumId = "";
+  let items = [];
+  let accessState = {
+    authenticated: false,
+    canDownloadAll: false,
+    purchasedAlbumIds: []
+  };
+
+  const isRose = isRoseMattosUser(user);
+
+  const ownsAlbum = (album) => {
+    if (isRose) {
+      return true;
+    }
+
+    if (accessState.canDownloadAll) {
+      return true;
+    }
+
+    return accessState.purchasedAlbumIds.includes(album.id);
+  };
+
+  const getOwnedAlbums = () => items.filter((album) => ownsAlbum(album));
+
+  const setFilterButtons = () => {
+    filterBar?.querySelectorAll("[data-filter]").forEach((button) => {
+      button.classList.toggle("is-active", button.getAttribute("data-filter") === activeFilter);
+    });
+  };
+
+  const syncSelectedAlbum = (visibleItems) => {
+    if (!visibleItems.length) {
+      selectedAlbumId = "";
+      return;
+    }
+
+    if (!visibleItems.some((album) => album.id === selectedAlbumId)) {
+      selectedAlbumId = visibleItems[0].id;
+    }
+  };
+
+  const updateProductsStatus = (visibleItems) => {
+    count.textContent = `${visibleItems.length} albuns exibidos`;
+
+    if (!storeStatus) {
+      return;
+    }
+
+    if (activeFilter === "all") {
+      storeStatus.textContent = "Abra um album para ver detalhes, ouvir faixas e comprar.";
+      return;
+    }
+
+    if (!accessState.authenticated && !isRose) {
+      storeStatus.textContent = "Faca login para ver os albuns que ja estao liberados na sua conta.";
+      return;
+    }
+
+    if (!visibleItems.length) {
+      storeStatus.textContent = isRose
+        ? "Todos os albuns do site ficam disponiveis para a Rose enviar os ZIPs."
+        : "Seus albuns liberados vao aparecer aqui.";
+      return;
+    }
+
+    storeStatus.textContent = isRose
+      ? "Selecione um album para enviar ou atualizar o ZIP no bucket."
+      : "Selecione um album seu para baixar o ZIP.";
+  };
+
+  const updateAlbumInState = (nextAlbum) => {
+    items = items.map((album) => (album.id === nextAlbum.id ? { ...album, ...nextAlbum } : album));
+  };
+
+  const renderOwnedCardAction = (album) => {
+    const isSelected = album.id === selectedAlbumId;
+
+    if (!isSelected) {
+      return "";
+    }
+
+    if (isRose) {
+      const isUploading = uploadAlbumId === album.id;
+      const isOnline = Boolean(album.hasAlbumZip);
+      const label = isUploading ? "Enviando..." : isOnline ? "Zip Online" : "Enviar Zip";
+
+      return `
+        <div class="album-card-action">
+          <button
+            class="primary-button album-zip-button album-zip-button-admin${isOnline ? " is-online" : ""}"
+            type="button"
+            data-role="album-zip-action"
+            data-album-id="${album.id}"
+            ${isUploading ? "disabled" : ""}
+          >${label}</button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="album-card-action">
+        <button
+          class="primary-button album-zip-button"
+          type="button"
+          data-role="album-zip-action"
+          data-album-id="${album.id}"
+        >Download</button>
+      </div>
+    `;
+  };
+
+  const bindOwnedCardEvents = () => {
+    grid.querySelectorAll(".album-card-owned").forEach((card) => {
+      card.addEventListener("click", () => {
+        selectedAlbumId = card.dataset.albumId || "";
+        renderProducts();
+      });
+    });
+
+    grid.querySelectorAll("[data-role='album-zip-action']").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const albumId = button.getAttribute("data-album-id") || "";
+        const album = items.find((item) => item.id === albumId);
+        const card = button.closest(".album-card-owned");
+
+        if (!album || !card) {
+          return;
+        }
+
+        if (isRose) {
+          if (!(zipInput instanceof HTMLInputElement)) {
+            return;
+          }
+
+          zipInput.dataset.albumId = album.id;
+          zipInput.click();
+          return;
+        }
+
+        if (!accessState.authenticated) {
+          window.location.href = buildProductsAuthRedirect("owned");
+          return;
+        }
+
+        if (!album.hasAlbumZip) {
+          triggerMissingZipEffect(card);
+          if (storeStatus) {
+            storeStatus.textContent = "Esse album ainda esta sem ZIP online.";
+          }
+          return;
+        }
+
+        button.setAttribute("disabled", "disabled");
+
+        try {
+          if (storeStatus) {
+            storeStatus.textContent = "Preparando o ZIP para download...";
+          }
+
+          const response = await fetch(getApiUrl(`/api/store/products/${encodeURIComponent(album.id)}/zip/download`), {
+            headers: {
+              Authorization: `Bearer ${getToken()}`
+            }
+          });
+
+          if (response.status === 401) {
+            window.location.href = buildProductsAuthRedirect("owned");
+            return;
+          }
+
+          if (response.status === 404) {
+            triggerMissingZipEffect(card);
+            album.hasAlbumZip = false;
+            album.albumZipUrl = "[none]";
+            if (storeStatus) {
+              storeStatus.textContent = "Esse album ainda esta sem ZIP online.";
+            }
+            renderProducts();
+            return;
+          }
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || "Nao foi possivel baixar o ZIP.");
+          }
+
+          const blob = await response.blob();
+          const fileName = inferDownloadName(response, `${album.id}.zip`);
+          triggerBrowserDownload(blob, fileName);
+
+          if (storeStatus) {
+            storeStatus.textContent = "Download iniciado.";
+          }
+        } catch (error) {
+          if (storeStatus) {
+            storeStatus.textContent = error instanceof Error ? error.message : "Erro ao baixar ZIP.";
+          }
+        } finally {
+          button.removeAttribute("disabled");
+        }
+      });
+    });
+  };
+
+  const renderProducts = () => {
     grid.innerHTML = "";
+    setFilterButtons();
 
-    try {
-      const response = await fetch(getApiUrl(page === "produtos" ? "/api/store/products" : "/api/albums"));
-      const data = await response.json();
+    const visibleItems = activeFilter === "owned" ? getOwnedAlbums() : items;
+    syncSelectedAlbum(visibleItems);
+    updateProductsStatus(visibleItems);
 
-      if (!response.ok) {
-        throw new Error(data.error || "Falha ao carregar o catalogo.");
-      }
+    if (!visibleItems.length) {
+      grid.innerHTML = activeFilter === "owned"
+        ? `<p class="section-muted">${accessState.authenticated || isRose ? "Nenhum album disponivel neste filtro ainda." : "Entre na sua conta para liberar a lista dos seus albuns."}</p>`
+        : "<p class=\"section-muted\">Nenhum album disponivel no momento.</p>";
+      return;
+    }
 
-      const items = Array.isArray(data.items) ? data.items : [];
-      count.textContent = `${items.length} albuns disponiveis`;
-
-      if (storeStatus) {
-        storeStatus.textContent = "Abra um album para ouvir os MP3 e comprar na pagina de detalhes.";
-      }
-
-      if (!items.length) {
-        grid.innerHTML = "<p class=\"section-muted\">Nenhum album disponivel no momento.</p>";
-        return;
-      }
-
-      items.forEach((album) => {
+    visibleItems.forEach((album) => {
+      if (activeFilter === "all") {
         const card = document.createElement(album.href ? "a" : "article");
         card.className = `album-card${album.href ? " album-card-link" : ""}`;
 
@@ -189,12 +535,59 @@ async function loadAlbums(siteConfig, user) {
           <div class="album-body">
             <h3>${album.name}</h3>
             ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
+            ${ownsAlbum(album) ? `<p class="album-support-line">${album.hasAlbumZip ? "ZIP online" : "Album liberado na sua conta"}</p>` : ""}
           </div>
         `;
         grid.appendChild(card);
-      });
+        return;
+      }
 
-      applyTextOverrides(grid);
+      const card = document.createElement("article");
+      const isSelected = album.id === selectedAlbumId;
+      card.className = `album-card album-card-owned${isSelected ? " is-selected" : ""}`;
+      card.dataset.albumId = album.id;
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("aria-label", `Selecionar album ${album.name}`);
+      card.innerHTML = `
+        <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
+        <div class="album-body">
+          <h3>${album.name}</h3>
+          <p class="album-support-line">${isRose ? (album.hasAlbumZip ? "ZIP publicado" : "Aguardando envio do ZIP") : "Album liberado para sua conta"}</p>
+        </div>
+        ${renderOwnedCardAction(album)}
+      `;
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          selectedAlbumId = album.id;
+          renderProducts();
+        }
+      });
+      grid.appendChild(card);
+    });
+
+    bindOwnedCardEvents();
+    applyTextOverrides(grid);
+  };
+
+  const refreshAlbums = async () => {
+    grid.innerHTML = "";
+
+    try {
+      const [productsResponse, nextAccessState] = await Promise.all([
+        fetch(getApiUrl("/api/store/products")),
+        loadProductsAccessState()
+      ]);
+      const data = await productsResponse.json();
+
+      if (!productsResponse.ok) {
+        throw new Error(data.error || "Falha ao carregar o catalogo.");
+      }
+
+      items = Array.isArray(data.items) ? data.items : [];
+      accessState = nextAccessState;
+      renderProducts();
     } catch (error) {
       count.textContent = "Falha ao carregar";
       grid.innerHTML = `<p class="section-muted">${error instanceof Error ? error.message : "Erro ao carregar albuns."}</p>`;
@@ -204,6 +597,79 @@ async function loadAlbums(siteConfig, user) {
       }
     }
   };
+
+  filterBar?.querySelectorAll("[data-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activeFilter = button.getAttribute("data-filter") === "owned" ? "owned" : "all";
+      const url = new URL(window.location.href);
+
+      if (activeFilter === "owned") {
+        url.searchParams.set("modo", "owned");
+      } else {
+        url.searchParams.delete("modo");
+      }
+
+      window.history.replaceState({}, "", url);
+      renderProducts();
+    });
+  });
+
+  zipInput?.addEventListener("change", async (event) => {
+    const input = event.currentTarget;
+
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const albumId = input.dataset.albumId || "";
+    const album = items.find((item) => item.id === albumId);
+    const file = input.files?.[0];
+    input.value = "";
+
+    if (!album || !file) {
+      return;
+    }
+
+    uploadAlbumId = album.id;
+    renderProducts();
+
+    try {
+      if (!file.name.toLowerCase().endsWith(".zip")) {
+        throw new Error("Escolha um arquivo .zip.");
+      }
+
+      if (storeStatus) {
+        storeStatus.textContent = `Enviando ZIP de ${album.name}...`;
+      }
+
+      const response = await fetch(getApiUrl(`/api/admin/albums/${encodeURIComponent(album.id)}/zip`), {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          "Content-Type": file.type || "application/zip",
+          "X-File-Name": encodeURIComponent(file.name)
+        },
+        body: file
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "Nao foi possivel enviar o ZIP.");
+      }
+
+      updateAlbumInState(data.album || {});
+      if (storeStatus) {
+        storeStatus.textContent = `ZIP de ${album.name} publicado no bucket.`;
+      }
+    } catch (error) {
+      if (storeStatus) {
+        storeStatus.textContent = error instanceof Error ? error.message : "Erro ao enviar ZIP.";
+      }
+    } finally {
+      uploadAlbumId = "";
+      renderProducts();
+    }
+  });
 
   renderProductsAdminPanel(user, siteConfig, refreshAlbums);
   await refreshAlbums();
