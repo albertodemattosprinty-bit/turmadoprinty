@@ -1982,6 +1982,7 @@ body[data-page="produtos"] {
 
 .album-grid {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: stretch;
 }
 
 .album-card-link {
@@ -2009,6 +2010,10 @@ body[data-page="produtos"] {
 }
 
 .album-body {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  flex: 1;
   padding-top: 12px;
 }
 
@@ -2038,8 +2043,18 @@ body[data-page="produtos"] {
 }
 
 .album-card-owned {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   cursor: pointer;
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.album-card-link,
+.album-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .album-card-owned:hover {
@@ -2061,11 +2076,22 @@ body[data-page="produtos"] {
   display: flex;
   justify-content: stretch;
   margin-top: 16px;
+  min-height: 48px;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.album-card-action.is-visible {
+  opacity: 1;
 }
 
 .album-zip-button {
   width: 100%;
   min-height: 48px;
+}
+
+.album-card-action:not(.is-visible) .album-zip-button {
+  pointer-events: none;
 }
 
 .album-zip-button-admin {

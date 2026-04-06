@@ -371,15 +371,27 @@ async function loadAlbums(siteConfig, user) {
   };
 
   const updateAlbumInState = (nextAlbum) => {
-    items = items.map((album) => (album.id === nextAlbum.id ? { ...album, ...nextAlbum } : album));
+    const normalizedAlbumZipUrl = typeof nextAlbum?.albumZipUrl === "string" && nextAlbum.albumZipUrl.trim()
+      ? nextAlbum.albumZipUrl.trim()
+      : "";
+    const normalizedHasAlbumZip = typeof nextAlbum?.hasAlbumZip === "boolean"
+      ? nextAlbum.hasAlbumZip
+      : Boolean(normalizedAlbumZipUrl && normalizedAlbumZipUrl !== "[none]");
+
+    items = items.map((album) => (
+      album.id === nextAlbum.id
+        ? {
+            ...album,
+            ...nextAlbum,
+            albumZipUrl: normalizedAlbumZipUrl || album.albumZipUrl,
+            hasAlbumZip: normalizedHasAlbumZip
+          }
+        : album
+    ));
   };
 
   const renderOwnedCardAction = (album) => {
     const isSelected = album.id === selectedAlbumId;
-
-    if (!isSelected) {
-      return "";
-    }
 
     if (isRose) {
       const isUploading = uploadAlbumId === album.id;
@@ -387,25 +399,26 @@ async function loadAlbums(siteConfig, user) {
       const label = isUploading ? "Enviando..." : isOnline ? "Zip Online" : "Enviar Zip";
 
       return `
-        <div class="album-card-action">
+        <div class="album-card-action${isSelected ? " is-visible" : ""}">
           <button
             class="primary-button album-zip-button album-zip-button-admin${isOnline ? " is-online" : ""}"
             type="button"
             data-role="album-zip-action"
             data-album-id="${album.id}"
-            ${isUploading ? "disabled" : ""}
+            ${isUploading || !isSelected ? "disabled" : ""}
           >${label}</button>
         </div>
       `;
     }
 
     return `
-      <div class="album-card-action">
+      <div class="album-card-action${isSelected ? " is-visible" : ""}">
         <button
           class="primary-button album-zip-button"
           type="button"
           data-role="album-zip-action"
           data-album-id="${album.id}"
+          ${!isSelected ? "disabled" : ""}
         >Download</button>
       </div>
     `;
@@ -553,6 +566,7 @@ async function loadAlbums(siteConfig, user) {
         <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
         <div class="album-body">
           <h3>${album.name}</h3>
+          ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
           <p class="album-support-line">${isRose ? (album.hasAlbumZip ? "ZIP publicado" : "Aguardando envio do ZIP") : "Album liberado para sua conta"}</p>
         </div>
         ${renderOwnedCardAction(album)}
