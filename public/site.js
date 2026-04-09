@@ -254,10 +254,9 @@ function triggerMissingZipEffect(card) {
 
 async function loadAlbums(siteConfig, user) {
   const grid = document.getElementById("album-grid");
-  const count = document.getElementById("album-count");
   const storeStatus = document.getElementById("store-status");
 
-  if (!grid || !count) {
+  if (!grid) {
     return;
   }
 
@@ -274,7 +273,6 @@ async function loadAlbums(siteConfig, user) {
         }
 
         const items = Array.isArray(data.items) ? data.items : [];
-        count.textContent = `${items.length} albuns disponiveis`;
 
         if (!items.length) {
           grid.innerHTML = "<p class=\"section-muted\">Nenhum album disponivel no momento.</p>";
@@ -295,7 +293,6 @@ async function loadAlbums(siteConfig, user) {
 
         applyTextOverrides(grid);
       } catch (error) {
-        count.textContent = "Falha ao carregar";
         grid.innerHTML = `<p class="section-muted">${error instanceof Error ? error.message : "Erro ao carregar albuns."}</p>`;
       }
     };
@@ -388,32 +385,9 @@ async function loadAlbums(siteConfig, user) {
   };
 
   const updateProductsStatus = (visibleItems) => {
-    count.textContent = `${visibleItems.length} albuns exibidos`;
-
-    if (!storeStatus) {
-      return;
+    if (storeStatus) {
+      storeStatus.textContent = "";
     }
-
-    if (activeFilter === "all") {
-      storeStatus.textContent = "Abra um album para ver detalhes, ouvir faixas e comprar.";
-      return;
-    }
-
-    if (!accessState.authenticated && !isRose) {
-      storeStatus.textContent = "Faca login para ver os albuns que ja estao liberados na sua conta.";
-      return;
-    }
-
-    if (!visibleItems.length) {
-      storeStatus.textContent = isRose
-        ? "Todos os albuns do site ficam disponiveis para a Rose enviar os ZIPs."
-        : "Seus albuns liberados vao aparecer aqui.";
-      return;
-    }
-
-    storeStatus.textContent = isRose
-      ? "Selecione um album para enviar ou atualizar o ZIP no bucket."
-      : "Selecione um album seu para baixar o ZIP.";
   };
 
   const updateAlbumInState = (nextAlbum) => {
@@ -691,7 +665,6 @@ async function loadAlbums(siteConfig, user) {
           <div class="album-body">
             <h3>${album.name}</h3>
             ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
-            ${ownsAlbum(album) ? `<p class="album-support-line">${album.hasAlbumZip ? "ZIP online" : "Album liberado na sua conta"}</p>` : ""}
           </div>
         `;
         grid.appendChild(card);
@@ -700,7 +673,6 @@ async function loadAlbums(siteConfig, user) {
 
       const card = document.createElement("article");
       const isSelected = album.id === selectedAlbumId;
-      const feedback = getAlbumFeedback(album);
       card.className = `album-card album-card-owned${isSelected ? " is-selected" : ""}`;
       card.dataset.albumId = album.id;
       card.setAttribute("role", "button");
@@ -711,7 +683,6 @@ async function loadAlbums(siteConfig, user) {
         <div class="album-body">
           <h3>${album.name}</h3>
           ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
-          <p class="album-support-line album-support-line-${feedback.tone}">${feedback.message}</p>
         </div>
         ${renderOwnedCardAction(album)}
       `;
@@ -747,7 +718,6 @@ async function loadAlbums(siteConfig, user) {
       accessState = nextAccessState;
       renderProducts();
     } catch (error) {
-      count.textContent = "Falha ao carregar";
       grid.innerHTML = `<p class="section-muted">${error instanceof Error ? error.message : "Erro ao carregar albuns."}</p>`;
 
       if (storeStatus) {

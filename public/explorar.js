@@ -2686,6 +2686,10 @@ function redirectAfterRegister() {
   window.location.href = "/index.html";
 }
 
+function redirectAfterLogin() {
+  window.location.href = "/index.html";
+}
+
 document.querySelectorAll("[data-auth-tab]").forEach((button) => {
   button.addEventListener("click", () => {
     setActiveAuthTab(button.dataset.authTab || "login");
@@ -2703,7 +2707,7 @@ loginForm.addEventListener("submit", async (event) => {
     });
 
     authStatus.textContent = "Login feito com sucesso.";
-    await loadSessionState();
+    redirectAfterLogin();
   } catch (error) {
     authStatus.textContent = error instanceof Error ? error.message : "Erro ao entrar.";
   }

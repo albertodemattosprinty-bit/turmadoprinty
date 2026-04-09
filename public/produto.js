@@ -124,6 +124,25 @@ function redirectToAuth(albumId) {
   window.location.href = getAuthRedirectUrl(albumId);
 }
 
+function getOwnedProductsUrl() {
+  return "/produtos.html?modo=owned";
+}
+
+function setBuyButtonState({ label, onClick, disabled = false, ariaLabel = "" }) {
+  if (!buyAlbumButton) {
+    return;
+  }
+
+  const nextLabel = String(label || "").trim() || "Comprar";
+  buyAlbumButton.disabled = disabled;
+  buyAlbumButton.setAttribute("aria-label", ariaLabel || nextLabel);
+  buyAlbumButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h-2l-1 2H1v2h2l2.4 8.1A2 2 0 0 0 6.3 18H17a2 2 0 0 0 1.9-1.4L21 8H7.4l-.5-2zM9 20a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm8 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+    <span>${nextLabel}</span>
+  `;
+  buyAlbumButton.onclick = onClick || null;
+}
+
 function hasPurchasedAlbum(albumId) {
   return accessState.purchasedAlbumIds.includes(albumId);
 }
@@ -501,9 +520,11 @@ async function startCheckout(albumId) {
     return;
   }
 
-  const originalText = buyAlbumButton.textContent;
-  buyAlbumButton.disabled = true;
-  buyAlbumButton.textContent = "Abrindo checkout...";
+  setBuyButtonState({
+    label: "Abrindo checkout...",
+    disabled: true,
+    ariaLabel: "Abrindo checkout"
+  });
 
   try {
     const response = await fetch(getApiUrl("/api/payments/stripe/checkout"), {
@@ -537,8 +558,13 @@ async function startCheckout(albumId) {
     if (purchaseStatus) {
       purchaseStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar pagamento.";
     }
-    buyAlbumButton.disabled = false;
-    buyAlbumButton.textContent = originalText;
+    setBuyButtonState({
+      label: "Comprar",
+      onClick: async () => {
+        await startCheckout(albumId);
+      },
+      ariaLabel: "Comprar album"
+    });
   }
 }
 
@@ -707,7 +733,7 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
     return;
   }
 
-  actionLabel.textContent = downloaded ? "Disponivel offline neste navegador" : label || card.dataset.trackMode || "Full";
+  actionLabel.textContent = downloaded ? "Download concluido, voce pode acessar sem internet" : label || card.dataset.trackMode || "Full";
   downloadButton.disabled = false;
 }
 
@@ -1196,11 +1222,18 @@ async function saveAlbumAdminChanges() {
 
 async function loadAlbumDetail() {
   const albumId = getAlbumId();
+  const purchaseStatus = document.getElementById("purchase-status");
 
   if (!albumId) {
     productTitle.textContent = "Album nao encontrado";
-    purchaseStatus.textContent = "Escolha um album pela pagina de produtos.";
-    buyAlbumButton.disabled = true;
+    if (purchaseStatus) {
+      purchaseStatus.textContent = "Escolha um album pela pagina de produtos.";
+    }
+    setBuyButtonState({
+      label: "Comprar",
+      disabled: true,
+      ariaLabel: "Comprar album"
+    });
     return;
   }
 
@@ -1232,17 +1265,33 @@ async function loadAlbumDetail() {
     syncAdminPanel(album);
     await renderTracks(album);
 
-    buyAlbumButton.textContent = "Comprar";
-    buyAlbumButton.onclick = async () => {
-      await startCheckout(album.id);
-    };
+    if (hasPurchasedAlbum(album.id)) {
+      setBuyButtonState({
+        label: "Acessar",
+        onClick: () => {
+          window.location.href = getOwnedProductsUrl();
+        },
+        ariaLabel: "Acessar meus albuns"
+      });
+    } else {
+      setBuyButtonState({
+        label: "Comprar",
+        onClick: async () => {
+          await startCheckout(album.id);
+        },
+        ariaLabel: "Comprar album"
+      });
+    }
   } catch (error) {
     productTitle.textContent = "Nao foi possivel abrir o album";
-    const purchaseStatus = document.getElementById("purchase-status");
     if (purchaseStatus) {
       purchaseStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido.";
     }
-    buyAlbumButton.disabled = true;
+    setBuyButtonState({
+      label: "Comprar",
+      disabled: true,
+      ariaLabel: "Comprar album"
+    });
   }
 }
 
