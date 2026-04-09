@@ -3,9 +3,13 @@ import { getApiUrl } from "./api.js";
 
 const usersStatus = document.getElementById("users-status");
 const usersTableBody = document.getElementById("users-table-body");
+const userDetailModal = document.getElementById("user-detail-modal");
 const userDetailPanel = document.getElementById("user-detail-panel");
+const userDetailClose = document.getElementById("user-detail-close");
 const userDetailTitle = document.getElementById("user-detail-title");
 const userDetailSubtitle = document.getElementById("user-detail-subtitle");
+const userDetailTextConsumption = document.getElementById("user-detail-text-consumption");
+const userDetailNarrationConsumption = document.getElementById("user-detail-narration-consumption");
 const userPlanSelect = document.getElementById("user-plan-select");
 const userContractorSelect = document.getElementById("user-contractor-select");
 const userEventLabel = document.getElementById("user-event-label");
@@ -33,6 +37,7 @@ let schedule = [];
 let albums = [];
 let selectedUserId = "";
 let messageComposerUserId = "";
+let isDetailModalOpen = false;
 const viewedReplyMessageIds = new Set();
 
 function redirectToAuth() {
@@ -61,6 +66,31 @@ function getSelectedUser() {
   return users.find((item) => item.id === selectedUserId) || null;
 }
 
+function syncUserDetailModalState() {
+  const hasUser = Boolean(getSelectedUser());
+  const shouldOpen = isDetailModalOpen && hasUser;
+
+  userDetailModal.hidden = !shouldOpen;
+  userDetailPanel.hidden = !shouldOpen;
+  document.body.classList.toggle("user-detail-modal-open", shouldOpen);
+}
+
+function openUserDetailModal(userId) {
+  selectedUserId = userId;
+  isDetailModalOpen = true;
+  syncUserDetailModalState();
+  renderUsersTable();
+  renderDetailPanel();
+}
+
+function closeUserDetailModal() {
+  isDetailModalOpen = false;
+  messageComposerUserId = "";
+  userDetailStatus.textContent = "";
+  syncUserDetailModalState();
+  renderUsersTable();
+}
+
 function updateMessageCounter() {
   const total = String(userMessageBody.value || "").length;
   userMessageCounter.textContent = `${total}/500`;
@@ -73,15 +103,14 @@ function resetMessageComposer() {
 }
 
 function openMessageComposer(userId) {
-  selectedUserId = userId;
   messageComposerUserId = userId;
+  openUserDetailModal(userId);
   const user = getSelectedUser();
 
   if (user?.activeMessage?.id && user?.activeMessage?.userReplyBody) {
     viewedReplyMessageIds.add(user.activeMessage.id);
   }
 
-  renderUsersTable();
   renderDetailPanel();
   userMessageTitle.focus();
 }
@@ -119,13 +148,15 @@ function renderDetailPanel() {
   const user = getSelectedUser();
 
   if (!user) {
-    userDetailPanel.hidden = true;
+    syncUserDetailModalState();
     return;
   }
 
-  userDetailPanel.hidden = false;
+  syncUserDetailModalState();
   userDetailTitle.textContent = user.name || user.username || "Usuario";
   userDetailSubtitle.textContent = user.username ? `@${user.username}` : "Sem username";
+  userDetailTextConsumption.textContent = formatTextTokens(user.textTokensTotal);
+  userDetailNarrationConsumption.textContent = formatNarrationDuration(user.narrationSecondsTotal);
   userPlanSelect.value = user.assignedPlanId || "gratis";
   userContractorSelect.value = user.isContractor ? "true" : "false";
   userEventSelect.value = user.contractorEventId || "";
@@ -179,18 +210,14 @@ function renderUsersTable() {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7A2.5 2.5 0 0 1 17.5 15H9.41l-3.7 3.58A1 1 0 0 1 4 17.86V15.5A2.5 2.5 0 0 1 1.5 13v-7A2.5 2.5 0 0 1 4 3.5Zm2.5-.5a.5.5 0 0 0-.5.5v7c0 .28.22.5.5.5h3.31c.26 0 .51.1.7.29L12 14.82V13.5a1 1 0 0 1 1-1h4.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5Z"/></svg>
         </button>
       </div>
-      <span>${formatTextTokens(user.textTokensTotal)}</span>
-      <span>${formatNarrationDuration(user.narrationSecondsTotal)}</span>
     `;
 
     row.querySelector(".users-table-select")?.addEventListener("click", () => {
-      selectedUserId = user.id;
       if (user.activeMessage?.id && user.activeMessage?.userReplyBody) {
         viewedReplyMessageIds.add(user.activeMessage.id);
       }
       messageComposerUserId = messageComposerUserId === user.id || user.hasActiveMessage ? user.id : "";
-      renderUsersTable();
-      renderDetailPanel();
+      openUserDetailModal(user.id);
     });
 
     row.querySelector(".users-message-button")?.addEventListener("click", () => {
@@ -455,6 +482,7 @@ async function deleteSelectedUser() {
     }
 
     selectedUserId = "";
+    closeUserDetailModal();
     userDetailStatus.textContent = "";
     await loadUsers();
   } catch (error) {
@@ -476,6 +504,17 @@ if (!currentUser) {
   userAlbumAssignButton.addEventListener("click", assignAlbumToSelectedUser);
   userSaveButton.addEventListener("click", saveSelectedUser);
   userDeleteButton.addEventListener("click", deleteSelectedUser);
+  userDetailClose?.addEventListener("click", closeUserDetailModal);
+  userDetailModal?.addEventListener("click", (event) => {
+    if (event.target instanceof HTMLElement && event.target.hasAttribute("data-close-user-detail")) {
+      closeUserDetailModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isDetailModalOpen) {
+      closeUserDetailModal();
+    }
+  });
   updateMessageCounter();
 
   try {

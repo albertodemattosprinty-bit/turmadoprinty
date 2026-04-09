@@ -2427,6 +2427,10 @@ body[data-page="eventos-pagamento"] {
     grid-template-columns: 1fr;
   }
 
+  .user-detail-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .user-album-controls {
     grid-template-columns: 1fr;
   }
@@ -2438,6 +2442,19 @@ body[data-page="eventos-pagamento"] {
 
   .user-message-actions .primary-button {
     width: 100%;
+  }
+
+  .user-detail-panel {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    margin: 8px auto;
+    padding: 20px 16px;
+    border-radius: 24px;
+  }
+
+  .user-detail-close {
+    top: 14px;
+    right: 14px;
   }
 }
 
@@ -2920,7 +2937,7 @@ body[data-page="users"] .users-admin-shell {
 
 .users-table-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: center;
 }
@@ -3005,12 +3022,94 @@ body[data-page="users"] .users-admin-shell {
 }
 
 .user-detail-panel {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 18px;
-  padding: 22px;
-  border-radius: 28px;
-  background: linear-gradient(180deg, rgba(27, 83, 187, 0.06), rgba(27, 83, 187, 0.02));
-  border: 1px solid rgba(27, 83, 187, 0.1);
+  width: min(1120px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  margin: 14px auto;
+  padding: 26px;
+  overflow: auto;
+  border-radius: 32px;
+  background:
+    radial-gradient(circle at top left, rgba(124, 215, 255, 0.16), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(240, 247, 255, 0.99));
+  border: 1px solid rgba(27, 83, 187, 0.12);
+  box-shadow: 0 24px 54px rgba(11, 45, 106, 0.2);
+}
+
+.user-detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+}
+
+.user-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 46, 109, 0.5);
+  backdrop-filter: blur(12px);
+}
+
+body.user-detail-modal-open {
+  overflow: hidden;
+}
+
+.user-detail-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(27, 83, 187, 0.1);
+  color: var(--blue-dark);
+  cursor: pointer;
+}
+
+.user-detail-close svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.user-detail-head {
+  padding-right: 52px;
+}
+
+.user-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.user-detail-metric-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(27, 83, 187, 0.96), rgba(47, 124, 255, 0.9));
+  color: #ffffff;
+  box-shadow: 0 16px 28px rgba(19, 65, 146, 0.16);
+}
+
+.user-detail-metric-card span {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.user-detail-metric-card strong {
+  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  line-height: 1.1;
 }
 
 .user-detail-grid {
