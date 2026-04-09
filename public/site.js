@@ -507,44 +507,9 @@ async function loadAlbums(siteConfig, user) {
           return;
         }
 
-        button.setAttribute("disabled", "disabled");
-
         try {
-          if (storeStatus) {
-            storeStatus.textContent = "Preparando o ZIP para download...";
-          }
-
-          const response = await fetch(getApiUrl(`/api/store/products/${encodeURIComponent(album.id)}/zip/download`), {
-            headers: {
-              Authorization: `Bearer ${getToken()}`
-            }
-          });
-
-          if (response.status === 401) {
-            window.location.href = buildProductsAuthRedirect("owned");
-            return;
-          }
-
-          if (response.status === 404) {
-            triggerMissingZipEffect(card);
-            album.hasAlbumZip = false;
-            album.albumZipUrl = "[none]";
-            setAlbumFeedback(album.id, "ZIP ainda nao disponivel para este album.", "error");
-            if (storeStatus) {
-              storeStatus.textContent = "Esse album ainda esta sem ZIP online.";
-            }
-            renderProducts();
-            return;
-          }
-
-          if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(data.error || "Nao foi possivel baixar o ZIP.");
-          }
-
-          const blob = await response.blob();
-          const fileName = inferDownloadName(response, `${album.id}.zip`);
-          triggerBrowserDownload(blob, fileName);
+          button.setAttribute("disabled", "disabled");
+          window.open(album.albumZipUrl, "_blank", "noopener");
 
           if (storeStatus) {
             storeStatus.textContent = "Download iniciado.";

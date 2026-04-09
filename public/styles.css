@@ -2219,6 +2219,21 @@ body[data-page="produto"] .status-pill {
   background: rgba(255, 255, 255, 0.12);
 }
 
+body[data-page="eventos"] .section-card {
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+body[data-page="eventos"] .events-section-head {
+  justify-content: center;
+  text-align: center;
+}
+
+body[data-page="eventos"] .events-section-head .section-title {
+  color: #ffffff;
+}
+
 body[data-page="eventos-pagamento"] {
   background:
     radial-gradient(circle at top center, rgba(140, 208, 255, 0.45), transparent 32%),
@@ -3554,6 +3569,18 @@ html.native-android-app body[data-page="explorar"]:not(.explore-authenticated) .
   padding-top: 18px;
 }
 
+.sidebar-text-button {
+  width: auto;
+  min-width: 0;
+  padding: 0 16px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.sidebar-text-button span {
+  white-space: nowrap;
+}
+
 .chat-search-field {
   display: block;
   margin-top: 12px;
@@ -4575,6 +4602,7 @@ body[data-page="explorar"] .sidebar-actions {
 body[data-page="explorar"] .sidebar-actions-bottom {
   margin-top: 20px;
   padding-top: 20px;
+  transform: translateY(-60px);
   flex-shrink: 0;
   width: fit-content;
   max-width: 100%;
