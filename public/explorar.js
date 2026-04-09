@@ -2682,6 +2682,10 @@ function setActiveAuthTab(tabId) {
   });
 }
 
+function redirectAfterRegister() {
+  window.location.href = "/index.html";
+}
+
 document.querySelectorAll("[data-auth-tab]").forEach((button) => {
   button.addEventListener("click", () => {
     setActiveAuthTab(button.dataset.authTab || "login");
@@ -2722,7 +2726,7 @@ registerForm.addEventListener("submit", async (event) => {
     });
 
     authStatus.textContent = "Conta criada com sucesso.";
-    await loadSessionState();
+    redirectAfterRegister();
   } catch (error) {
     authStatus.textContent = error instanceof Error ? error.message : "Erro ao cadastrar.";
   }

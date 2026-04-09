@@ -94,6 +94,10 @@ function redirectToNext() {
   window.location.href = getNextPath();
 }
 
+function redirectAfterRegister() {
+  window.location.href = "/index.html";
+}
+
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   authOutput.textContent = "Criando conta...";
@@ -111,7 +115,7 @@ registerForm.addEventListener("submit", async (event) => {
     });
 
     authOutput.textContent = JSON.stringify(data, null, 2);
-    redirectToNext();
+    redirectAfterRegister();
   } catch (error) {
     authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
   }
