@@ -51,7 +51,7 @@ async function runAuthRequest(url, payload) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Falha na autenticação.");
+    throw new Error(data.error || "Falha na autenticacao.");
   }
 
   if (data.token) {
@@ -61,11 +61,25 @@ async function runAuthRequest(url, payload) {
   return data;
 }
 
+function setActiveAuthTab(tabId) {
+  document.querySelectorAll("[data-auth-tab]").forEach((button) => {
+    const isActive = button.getAttribute("data-auth-tab") === tabId;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  document.querySelectorAll("[data-auth-panel]").forEach((panel) => {
+    const isActive = panel.getAttribute("data-auth-panel") === tabId;
+    panel.classList.toggle("active", isActive);
+    panel.hidden = !isActive;
+  });
+}
+
 async function loadSessionState() {
   returnLink.href = getNextPath();
 
   if (!getToken()) {
-    authStatus.textContent = "Nenhuma sessão ativa. Faça login para liberar o chat.";
+    authStatus.textContent = "Entre ou cadastre sua conta para continuar.";
     return;
   }
 
@@ -79,11 +93,11 @@ async function loadSessionState() {
 
     if (!response.ok) {
       setToken("");
-      authStatus.textContent = data.error || "Sessão inválida.";
+      authStatus.textContent = data.error || "Sessao invalida.";
       return;
     }
 
-    authStatus.textContent = `Sessão ativa para @${data.user.username}. Redirecionando...`;
+    authStatus.textContent = `Sessao ativa para @${data.user.username}. Redirecionando...`;
     window.location.href = getNextPath();
   } catch (error) {
     authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
@@ -98,12 +112,18 @@ function redirectAfterRegister() {
   window.location.href = "/index.html";
 }
 
+function setAuthOutput(message) {
+  if (authOutput) {
+    authOutput.textContent = message;
+  }
+}
+
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  authOutput.textContent = "Criando conta...";
+  setAuthOutput("Criando conta...");
 
   if (registerPassword.value !== registerPasswordConfirm.value) {
-    authOutput.textContent = "As senhas não conferem.";
+    setAuthOutput("As senhas nao conferem.");
     return;
   }
 
@@ -114,16 +134,16 @@ registerForm.addEventListener("submit", async (event) => {
       password: registerPassword.value
     });
 
-    authOutput.textContent = JSON.stringify(data, null, 2);
+    setAuthOutput(JSON.stringify(data, null, 2));
     redirectAfterRegister();
   } catch (error) {
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
+    setAuthOutput(error instanceof Error ? error.message : "Erro desconhecido");
   }
 });
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  authOutput.textContent = "Entrando...";
+  setAuthOutput("Entrando...");
 
   try {
     const data = await runAuthRequest("/api/auth/login", {
@@ -131,15 +151,15 @@ loginForm.addEventListener("submit", async (event) => {
       password: loginPassword.value
     });
 
-    authOutput.textContent = JSON.stringify(data, null, 2);
+    setAuthOutput(JSON.stringify(data, null, 2));
     redirectToNext();
   } catch (error) {
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
+    setAuthOutput(error instanceof Error ? error.message : "Erro desconhecido");
   }
 });
 
-meButton.addEventListener("click", async () => {
-  authOutput.textContent = "Validando sessão...";
+meButton?.addEventListener("click", async () => {
+  setAuthOutput("Validando sessao...");
 
   try {
     const response = await fetch(getApiUrl("/api/auth/me"), {
@@ -148,10 +168,17 @@ meButton.addEventListener("click", async () => {
       }
     });
     const data = await response.json();
-    authOutput.textContent = JSON.stringify(data, null, 2);
+    setAuthOutput(JSON.stringify(data, null, 2));
   } catch (error) {
-    authOutput.textContent = error instanceof Error ? error.message : "Erro desconhecido";
+    setAuthOutput(error instanceof Error ? error.message : "Erro desconhecido");
   }
 });
 
+document.querySelectorAll("[data-auth-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setActiveAuthTab(button.getAttribute("data-auth-tab") || "login");
+  });
+});
+
+setActiveAuthTab("login");
 await loadSessionState();
