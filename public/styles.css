@@ -318,7 +318,7 @@ a {
   justify-content: space-between;
   align-items: center;
   flex-wrap: nowrap;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
   background: rgba(27, 83, 187, 0.98);
   border-top: 1px solid rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(14px);
@@ -359,7 +359,7 @@ body[data-page="cronograma"].cronograma-live-mode .site-footer-nav {
   justify-content: center;
   flex: 1;
   gap: 8px;
-  min-height: 56px;
+  min-height: 46px;
   padding: 4px;
   border-radius: 0;
   text-decoration: none;
@@ -368,11 +368,12 @@ body[data-page="cronograma"].cronograma-live-mode .site-footer-nav {
   font-size: 0.95rem;
   font-weight: 700;
   border: 0;
+  opacity: 0.75;
 }
 
 .nav-link svg {
-  width: 50px;
-  height: 50px;
+  width: 41px;
+  height: 41px;
   fill: currentColor;
 }
 
@@ -380,11 +381,16 @@ body[data-page="cronograma"].cronograma-live-mode .site-footer-nav {
   display: none;
 }
 
-.nav-link.active,
+.nav-link.active {
+  background: transparent;
+  border-color: transparent;
+  opacity: 1;
+}
+
 .nav-link:hover {
   background: transparent;
   border-color: transparent;
-  opacity: 0.86;
+  opacity: 1;
 }
 
 .page-shell {
