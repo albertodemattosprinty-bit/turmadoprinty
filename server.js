@@ -1468,7 +1468,7 @@ async function handleStripeWebhook(request, response) {
             ? "DECLINED"
             : normalizeStripePaymentStatus(resource?.payment_status);
 
-          const purchase = await markAlbumPurchaseStatus({
+          await markAlbumPurchaseStatus({
             referenceId,
             status: paymentStatus,
             orderId: resource?.payment_intent || resource?.id || null,
@@ -1476,14 +1476,6 @@ async function handleStripeWebhook(request, response) {
             payload,
             paidAt: isActivePaymentStatus(paymentStatus) ? new Date().toISOString() : null
           });
-
-          if (purchase && isActivePaymentStatus(paymentStatus)) {
-            await assignAlbumGrantToUser({
-              userId: purchase.user_id,
-              productId: purchase.product_id,
-              assignedByUserId: null
-            });
-          }
         }
       }
     } catch (error) {

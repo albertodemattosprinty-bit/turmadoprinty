@@ -232,6 +232,8 @@ export async function markAlbumPurchaseStatus({
   payload,
   paidAt
 }) {
+  await ensurePaymentSchema();
+
   const normalizedStatus = normalizeStatus(status);
   const result = await query(
     `
@@ -252,7 +254,17 @@ export async function markAlbumPurchaseStatus({
     [referenceId, normalizedStatus, orderId || null, chargeId || null, JSON.stringify(payload || {}), paidAt || null]
   );
 
-  return result.rows[0] || null;
+  const row = result.rows[0] || null;
+
+  if (row && isActivePaymentStatus(normalizedStatus)) {
+    await assignAlbumGrantToUser({
+      userId: row.user_id,
+      productId: row.product_id,
+      assignedByUserId: null
+    });
+  }
+
+  return row;
 }
 
 export async function markPlanSubscriptionStatus({
