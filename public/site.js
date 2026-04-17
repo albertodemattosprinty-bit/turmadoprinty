@@ -147,6 +147,22 @@ function normalizeUsername(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+async function registerProductsOfflineShell() {
+  if (page !== "produtos") {
+    return;
+  }
+
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register("/sw-produtos.js");
+  } catch (error) {
+    console.warn("[Produtos Offline] Falha ao registrar service worker:", error);
+  }
+}
+
 function isRoseMattosUser(user) {
   return Boolean(user?.isAdmin) && normalizeUsername(user?.username) === "rosemattos";
 }
@@ -1064,6 +1080,7 @@ async function loadSchedule(siteConfig, user) {
 
 markActiveNav();
 initPageBanner();
+await registerProductsOfflineShell();
 const headerUser = await initSiteHeader().catch(() => null);
 
 const [siteConfig, currentUser] = await Promise.all([
