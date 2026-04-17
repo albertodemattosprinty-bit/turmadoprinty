@@ -1378,6 +1378,96 @@ async function handleStripeSubscriptionCheckoutRequest(request, response) {
   }
 }
 
+async function handleStripeCheckoutConfirmationRequest(request, response) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+
+  if (!user) {
+    return;
+  }
+
+  let body;
+
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : "";
+
+  if (!sessionId) {
+    sendJson(response, 400, { error: "sessionId obrigatorio." });
+    return;
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (!session || session.mode !== "payment") {
+      sendJson(response, 400, { error: "Checkout invalido para compra de album." });
+      return;
+    }
+
+    const referenceId = getMetadataReferenceId(session) || session.client_reference_id || "";
+    const metadataUserId = typeof session.metadata?.userId === "string" ? session.metadata.userId.trim() : "";
+    const metadataProductId = typeof session.metadata?.productId === "string" ? session.metadata.productId.trim() : "";
+
+    if (!referenceId) {
+      sendJson(response, 400, { error: "Checkout sem referencia para confirmar." });
+      return;
+    }
+
+    if (metadataUserId && metadataUserId !== user.id) {
+      sendJson(response, 403, { error: "Checkout pertence a outro usuario." });
+      return;
+    }
+
+    if (!metadataProductId) {
+      sendJson(response, 400, { error: "Checkout sem produto vinculado." });
+      return;
+    }
+
+    const paymentStatus = normalizeStripePaymentStatus(session.payment_status);
+
+    await createAlbumPurchaseRecord({
+      userId: user.id,
+      productId: metadataProductId,
+      referenceId,
+      checkoutId: session.id,
+      amountCents: Number(session.amount_total) || 0,
+      environment: getStripeEnvironment(),
+      payload: session
+    });
+
+    await markAlbumPurchaseStatus({
+      referenceId,
+      status: paymentStatus,
+      orderId: typeof session.payment_intent === "string" ? session.payment_intent : session.id,
+      chargeId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+      payload: session,
+      paidAt: isActivePaymentStatus(paymentStatus) ? new Date().toISOString() : null
+    });
+
+    const accessState = await getUserAccessState(user.id);
+    sendJson(response, 200, {
+      ok: true,
+      paymentStatus,
+      referenceId,
+      access: accessState
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Erro ao confirmar checkout Stripe."
+    });
+  }
+}
+
 async function handleStripeWebhook(request, response) {
   const rawBody = await readRawTextBody(request);
   let event = null;
@@ -2862,6 +2952,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && (pathname === "/api/payments/stripe/checkout" || pathname === "/api/payments/pagbank/checkout")) {
     await handleStripeCheckoutRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/payments/stripe/checkout/confirm") {
+    await handleStripeCheckoutConfirmationRequest(request, response);
     return;
   }
 

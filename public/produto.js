@@ -455,7 +455,6 @@ async function loadAccessState() {
   const accessData = await accessResponse.json();
 
   if (accessResponse.status === 401) {
-    window.localStorage.removeItem(sessionStorageKey);
     accessState = {
       authenticated: false,
       planId: "gratis",
@@ -483,6 +482,50 @@ async function loadAccessState() {
   }
 }
 
+async function confirmReturnedCheckoutIfNeeded(albumId) {
+  const params = new URLSearchParams(window.location.search);
+  const paymentReturned = params.get("payment") === "return";
+  const sessionId = params.get("session_id") || "";
+  const purchaseStatus = document.getElementById("purchase-status");
+  const token = getToken();
+
+  if (!paymentReturned || !sessionId || !token) {
+    return;
+  }
+
+  try {
+    if (purchaseStatus) {
+      purchaseStatus.textContent = "Confirmando pagamento do album...";
+    }
+
+    const response = await fetch(getApiUrl("/api/payments/stripe/checkout/confirm"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        sessionId,
+        albumId
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Nao foi possivel confirmar seu pagamento.");
+    }
+
+    if (purchaseStatus && payload.paymentStatus === "PAID") {
+      purchaseStatus.textContent = "Pagamento confirmado. Seu album ja foi liberado.";
+    }
+  } catch (error) {
+    if (purchaseStatus) {
+      purchaseStatus.textContent = error instanceof Error ? error.message : "Erro ao confirmar pagamento.";
+    }
+  }
+}
+
 function setPurchaseStatus(albumId) {
   const purchaseStatus = document.getElementById("purchase-status");
 
@@ -492,15 +535,15 @@ function setPurchaseStatus(albumId) {
 
   const params = new URLSearchParams(window.location.search);
 
-  if (params.get("payment") === "return") {
-    purchaseStatus.textContent = "Pagamento enviado ao Stripe. Aguarde a confirmacao para liberar seus downloads.";
-    return;
-  }
-
   if (canUseDownloads(albumId)) {
     purchaseStatus.textContent = accessState.authenticated
       ? "Download liberado para este album na sua conta."
       : "Faca login para acessar seus downloads.";
+    return;
+  }
+
+  if (params.get("payment") === "return") {
+    purchaseStatus.textContent = "Pagamento enviado ao Stripe. Aguarde a confirmacao para liberar seus downloads.";
     return;
   }
 
@@ -1238,6 +1281,7 @@ async function loadAlbumDetail() {
   }
 
   try {
+    await confirmReturnedCheckoutIfNeeded(albumId);
     await loadAccessState();
 
     const response = await fetch(getApiUrl(isAdmin()
