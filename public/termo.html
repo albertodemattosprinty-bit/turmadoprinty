@@ -235,8 +235,9 @@
   <section class="screen" data-screen="success">
     <div class="card">
       <h1>Tudo certo!</h1>
-      <p class="success-copy">Seu formulário foi preenchido com sucesso.</p>
+      <p class="success-copy" id="successCopy">Seu formulário foi preenchido com sucesso.</p>
       <div class="actions">
+        <button class="btn-secondary" id="downloadPdfBtn" type="button" style="display:none;">Baixar PDF</button>
         <button class="btn-primary" id="restartBtn" type="button">Preencher novamente</button>
       </div>
     </div>
@@ -315,11 +316,14 @@
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
     const restartBtn = document.getElementById("restartBtn");
+    const successCopy = document.getElementById("successCopy");
+    const downloadPdfBtn = document.getElementById("downloadPdfBtn");
 
     const arrowLeft = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 19L8 12L15 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     const arrowRight = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
     let currentStep = -1;
+    let currentPdfUrl = "";
 
     function showScreen(name) {
       Object.values(screens).forEach((el) => el.classList.remove("active"));
@@ -451,7 +455,7 @@
       renderStep();
     });
 
-    nextBtn.addEventListener("click", () => {
+    nextBtn.addEventListener("click", async () => {
       if (!validateStep()) return;
 
       if (currentStep < steps.length - 1) {
@@ -460,16 +464,49 @@
         return;
       }
 
-      showScreen("success");
-      currentStep = steps.length;
-      updateProgress();
-      console.log("Respostas do formulário:", answers);
+      nextBtn.disabled = true;
+      nextBtn.textContent = "Enviando...";
+      errorBox.textContent = "";
+
+      try {
+        const response = await fetch("/api/terms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers })
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data?.ok) {
+          throw new Error(data?.error || "Falha ao enviar formulário.");
+        }
+
+        currentPdfUrl = data.pdfUrl || "";
+        successCopy.textContent = "Seu formulário foi preenchido com sucesso e já foi salvo no sistema.";
+        downloadPdfBtn.style.display = currentPdfUrl ? "inline-block" : "none";
+
+        showScreen("success");
+        currentStep = steps.length;
+        updateProgress();
+      } catch (error) {
+        errorBox.textContent = error instanceof Error ? error.message : "Falha ao enviar formulário.";
+      } finally {
+        nextBtn.disabled = false;
+        nextBtn.textContent = "Finalizar";
+      }
     });
 
     restartBtn.addEventListener("click", () => {
       currentStep = -1;
+      currentPdfUrl = "";
+      successCopy.textContent = "Seu formulário foi preenchido com sucesso.";
+      downloadPdfBtn.style.display = "none";
       showScreen("intro");
       updateProgress();
+    });
+
+    downloadPdfBtn.addEventListener("click", () => {
+      if (!currentPdfUrl) return;
+      window.open(currentPdfUrl, "_blank");
     });
 
     updateProgress();

@@ -20,6 +20,7 @@ import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscripti
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
+import { createAllTermEntry, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -674,6 +675,7 @@ async function ensurePaymentsReady(response) {
     await ensurePaymentSchema();
     await ensureSiteConfigSchema();
     await ensureAdminUsersSchema();
+    await ensureAllTermsSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -1376,6 +1378,171 @@ async function handleStripeSubscriptionCheckoutRequest(request, response) {
       error: error instanceof Error ? error.message : "Erro ao criar checkout recorrente Stripe."
     });
   }
+}
+
+function escapePdfText(text) {
+  return String(text || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function buildTermPdfBuffer(term) {
+  const questions = getTermQuestionOrder();
+  const lines = ["Formulario do Evento", ""];
+
+  for (const item of questions) {
+    const value = String(term?.answers?.[item.key] || "-");
+    lines.push(item.label);
+    lines.push(value);
+    lines.push("");
+  }
+
+  const streamParts = [];
+  streamParts.push("0 0.22 0.66 rg");
+  streamParts.push("0 0 595 842 re f");
+  streamParts.push("1 1 1 rg");
+  streamParts.push("BT");
+  streamParts.push("/F1 22 Tf");
+  streamParts.push("40 790 Td");
+  streamParts.push(`(${escapePdfText(lines[0])}) Tj`);
+  streamParts.push("ET");
+
+  let y = 755;
+  for (let i = 1; i < lines.length; i += 1) {
+    const rawLine = lines[i];
+    const fontSize = i % 3 === 1 ? 12 : 11;
+    const maxChars = i % 3 === 1 ? 78 : 88;
+    const wrapped = [];
+
+    if (!rawLine) {
+      wrapped.push("");
+    } else {
+      let current = "";
+      for (const chunk of rawLine.split(/\s+/)) {
+        const next = current ? `${current} ${chunk}` : chunk;
+        if (next.length > maxChars) {
+          if (current) {
+            wrapped.push(current);
+            current = chunk;
+          } else {
+            wrapped.push(next.slice(0, maxChars));
+            current = next.slice(maxChars);
+          }
+        } else {
+          current = next;
+        }
+      }
+      if (current) {
+        wrapped.push(current);
+      }
+    }
+
+    for (const line of wrapped) {
+      if (y < 38) {
+        break;
+      }
+      streamParts.push("BT");
+      streamParts.push(`/F1 ${fontSize} Tf`);
+      streamParts.push(`40 ${y} Td`);
+      streamParts.push(`(${escapePdfText(line)}) Tj`);
+      streamParts.push("ET");
+      y -= line ? 18 : 10;
+    }
+    if (y < 38) {
+      break;
+    }
+  }
+
+  const contentStream = `${streamParts.join("\n")}\n`;
+  const contentLength = Buffer.byteLength(contentStream, "utf8");
+
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n",
+    "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    `5 0 obj\n<< /Length ${contentLength} >>\nstream\n${contentStream}endstream\nendobj\n`
+  ];
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(pdf, "utf8"));
+    pdf += object;
+  }
+
+  const xrefStart = Buffer.byteLength(pdf, "utf8");
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += "0000000000 65535 f \n";
+  for (let i = 1; i <= objects.length; i += 1) {
+    pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return Buffer.from(pdf, "utf8");
+}
+
+async function handleCreateTerm(request, response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return;
+  }
+
+  try {
+    const body = await readJsonBody(request);
+    const term = await createAllTermEntry(body?.answers || {});
+    sendJson(response, 201, { ok: true, termId: term.id, pdfUrl: `/api/terms/${term.id}/pdf` });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar o termo."
+    });
+  }
+}
+
+async function handleListAllTerms(request, response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return;
+  }
+
+  try {
+    const dates = await listAllTermDates();
+    const requestUrl = new URL(request.url, `http://${request.headers.host || "localhost:3000"}`);
+    const selectedDate = requestUrl.searchParams.get("date") || dates[0] || null;
+    const terms = selectedDate ? await listAllTermsByDate(selectedDate) : [];
+    sendJson(response, 200, {
+      ok: true,
+      dates,
+      selectedDate,
+      questions: getTermQuestionOrder(),
+      terms
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel listar os termos."
+    });
+  }
+}
+
+async function handleTermPdfDownload(response, termId) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return;
+  }
+
+  const term = await getAllTermById(termId);
+  if (!term) {
+    sendJson(response, 404, { error: "Termo nao encontrado." });
+    return;
+  }
+
+  const pdfBuffer = buildTermPdfBuffer(term);
+  response.writeHead(200, {
+    "Content-Type": "application/pdf",
+    "Content-Length": pdfBuffer.length,
+    "Content-Disposition": buildContentDisposition(`termo-${term.id}.pdf`)
+  });
+  response.end(pdfBuffer);
 }
 
 async function handleStripeCheckoutConfirmationRequest(request, response) {
@@ -3093,6 +3260,22 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Erro ao fazer login."
       });
     }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/terms") {
+    await handleCreateTerm(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/all-terms") {
+    await handleListAllTerms(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/terms\/[^/]+\/pdf$/)) {
+    const termId = decodeURIComponent(pathname.replace(/^\/api\/terms\/([^/]+)\/pdf$/, "$1"));
+    await handleTermPdfDownload(response, termId);
     return;
   }
 

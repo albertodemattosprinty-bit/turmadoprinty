@@ -1,0 +1,204 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>All Terms</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-a: #0b3da8;
+      --bg-b: #1f7ee7;
+      --text: #fff;
+      --soft: rgba(255,255,255,0.9);
+      --card: rgba(255,255,255,0.09);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Exo 2", sans-serif;
+      color: var(--text);
+      background: linear-gradient(145deg, var(--bg-a), var(--bg-b));
+      padding: 20px;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    .date-nav {
+      display: grid;
+      grid-template-columns: 48px 1fr 48px;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .nav-btn {
+      border: 0;
+      border-radius: 12px;
+      height: 48px;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .date-title {
+      text-align: center;
+      font-weight: 600;
+      font-size: clamp(1.05rem, 2vw, 1.3rem);
+    }
+    .empty {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      font-weight: 300;
+      color: var(--soft);
+    }
+    .term-card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .meta {
+      font-size: 0.95rem;
+      font-weight: 300;
+      color: var(--soft);
+      margin-bottom: 12px;
+    }
+    .q {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+    .a {
+      font-weight: 300;
+      font-size: 0.94rem;
+      color: var(--soft);
+      margin-bottom: 12px;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="date-nav">
+      <button class="nav-btn" id="prevDate" type="button" aria-label="data anterior">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 19L8 12L15 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="date-title" id="dateTitle">Datas</div>
+      <button class="nav-btn" id="nextDate" type="button" aria-label="próxima data">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div id="termsList"></div>
+  </div>
+
+  <script>
+    const dateTitle = document.getElementById("dateTitle");
+    const termsList = document.getElementById("termsList");
+    const prevDate = document.getElementById("prevDate");
+    const nextDate = document.getElementById("nextDate");
+
+    let dates = [];
+    let selectedIndex = 0;
+    let selectedDate = "";
+
+    function formatDate(dateIso) {
+      const [year, month, day] = String(dateIso || "").split("-");
+      if (!year || !month || !day) return "Datas";
+      return `${day}/${month}/${year}`;
+    }
+
+    function renderEmpty(message) {
+      termsList.innerHTML = `<div class="empty">${message}</div>`;
+    }
+
+    function renderTerms(payload) {
+      const { questions = [], terms = [] } = payload || {};
+
+      if (!dates.length) {
+        dateTitle.textContent = "Datas";
+        renderEmpty("Sem termos ainda");
+        prevDate.disabled = true;
+        nextDate.disabled = true;
+        return;
+      }
+
+      dateTitle.textContent = formatDate(selectedDate);
+      prevDate.disabled = selectedIndex <= 0;
+      nextDate.disabled = selectedIndex >= dates.length - 1;
+
+      if (!terms.length) {
+        renderEmpty("Sem termos ainda");
+        return;
+      }
+
+      termsList.innerHTML = terms.map((term) => {
+        const rows = questions.map((q) => {
+          const answer = (term.answers && term.answers[q.key]) ? term.answers[q.key] : "-";
+          return `<div class="q">${escapeHtml(q.label)}</div><div class="a">${escapeHtml(answer)}</div>`;
+        }).join("");
+
+        return `
+          <article class="term-card">
+            <div class="meta">Data/hora do evento: ${formatDate(term.eventDate)} ${term.eventTime || ""}</div>
+            ${rows}
+          </article>
+        `;
+      }).join("");
+    }
+
+    function escapeHtml(text) {
+      return String(text || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    async function loadTerms(date = "") {
+      const query = date ? `?date=${encodeURIComponent(date)}` : "";
+      const response = await fetch(`/api/all-terms${query}`);
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erro ao carregar termos.");
+      }
+
+      dates = Array.isArray(payload.dates) ? payload.dates : [];
+      if (dates.length && payload.selectedDate) {
+        const found = dates.indexOf(payload.selectedDate);
+        selectedIndex = found >= 0 ? found : 0;
+        selectedDate = dates[selectedIndex];
+      } else {
+        selectedIndex = 0;
+        selectedDate = "";
+      }
+
+      renderTerms(payload);
+    }
+
+    prevDate.addEventListener("click", async () => {
+      if (selectedIndex <= 0) return;
+      selectedIndex -= 1;
+      selectedDate = dates[selectedIndex];
+      await loadTerms(selectedDate);
+    });
+
+    nextDate.addEventListener("click", async () => {
+      if (selectedIndex >= dates.length - 1) return;
+      selectedIndex += 1;
+      selectedDate = dates[selectedIndex];
+      await loadTerms(selectedDate);
+    });
+
+    loadTerms().catch((error) => {
+      renderEmpty(error instanceof Error ? error.message : "Erro ao carregar termos.");
+    });
+  </script>
+</body>
+</html>
