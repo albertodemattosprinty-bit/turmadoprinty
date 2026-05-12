@@ -1,0 +1,478 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Termo - Formulário</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-a: #0b3da8;
+      --bg-b: #1f7ee7;
+      --text: #ffffff;
+      --text-soft: rgba(255, 255, 255, 0.92);
+      --input-bg: #d8ecff;
+      --input-text: #0f3f83;
+      --accent: #24d166;
+      --glass: rgba(255, 255, 255, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Exo 2", sans-serif;
+      color: var(--text);
+      background: linear-gradient(145deg, var(--bg-a), var(--bg-b));
+      overflow: hidden;
+    }
+
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px 84px;
+    }
+
+    .screen.active { display: flex; }
+
+    .card {
+      width: min(760px, 100%);
+      background: var(--glass);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 24px;
+      backdrop-filter: blur(6px);
+      padding: 28px 22px;
+    }
+
+    .question-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .icon {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 auto;
+      opacity: 0.95;
+    }
+
+    h1, h2 {
+      margin: 0 0 14px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); text-align: center; }
+    h2 { font-size: clamp(1.3rem, 2.8vw, 2rem); }
+
+    p {
+      margin: 0;
+      font-size: clamp(1rem, 2vw, 1.15rem);
+      font-weight: 300;
+      line-height: 1.5;
+      color: var(--text-soft);
+    }
+
+    .intro-copy,
+    .success-copy { text-align: center; margin-bottom: 24px; }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font: inherit;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 22px;
+      cursor: pointer;
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+
+    .btn-primary {
+      background: #ffffff;
+      color: #0d4ea8;
+      font-weight: 600;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+      font-weight: 300;
+    }
+
+    .input,
+    .picker-value {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      min-height: 52px;
+      padding: 14px 16px;
+      background: var(--input-bg);
+      color: var(--input-text);
+      font: inherit;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .input::placeholder {
+      color: rgba(15, 63, 131, 0.7);
+      font-weight: 300;
+    }
+
+    .picker {
+      display: grid;
+      grid-template-columns: 52px 1fr 52px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .picker-btn {
+      height: 52px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+
+    .picker-value {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 14px;
+    }
+
+    .error {
+      min-height: 20px;
+      margin-top: 8px;
+      color: #ffe4e4;
+      font-size: 0.95rem;
+      font-weight: 300;
+    }
+
+    .progress-wrap {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.24);
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.2s ease;
+    }
+
+    .progress-label {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      font-size: 0.9rem;
+      font-weight: 300;
+      color: rgba(255,255,255,0.92);
+    }
+
+    @media (max-width: 560px) {
+      .card { padding: 24px 16px; border-radius: 18px; }
+      .picker { grid-template-columns: 48px 1fr 48px; }
+      .picker-btn { height: 48px; }
+    }
+  </style>
+</head>
+<body>
+  <section class="screen active" data-screen="intro">
+    <div class="card">
+      <h1>Formulário do Evento</h1>
+      <p class="intro-copy">São 12 etapas rápidas. Preencha com calma e avance no seu ritmo.</p>
+      <div class="actions">
+        <button class="btn-primary" id="startBtn" type="button">Iniciar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="question">
+    <div class="card">
+      <div class="question-head">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" stroke="white" stroke-width="1.8"></circle>
+          <path d="M12 7.2V12" stroke="white" stroke-width="1.8" stroke-linecap="round"></path>
+          <circle cx="12" cy="16.3" r="1" fill="white"></circle>
+        </svg>
+        <h2 id="questionTitle">Pergunta</h2>
+      </div>
+
+      <div id="inputArea"></div>
+      <div class="error" id="errorBox"></div>
+
+      <div class="actions">
+        <button class="btn-secondary" id="prevBtn" type="button">Voltar</button>
+        <button class="btn-primary" id="nextBtn" type="button">Próximo</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="success">
+    <div class="card">
+      <h1>Tudo certo!</h1>
+      <p class="success-copy">Seu formulário foi preenchido com sucesso.</p>
+      <div class="actions">
+        <button class="btn-primary" id="restartBtn" type="button">Preencher novamente</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="progress-label" id="progressLabel">Etapa 0/12</div>
+
+  <script>
+    const historyOptions = [
+      "Fábrica de heróis",
+      "História de Samuel",
+      "Davi e Golias",
+      "História de Jonas",
+      "História de Naamã",
+      "História da criação",
+      "Apresentação Mista",
+      "História de Noé"
+    ];
+
+    const months = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+
+    const years = ["2026", "2027", "2028", "2029", "2030"];
+
+    const countries = [
+      "Brasil", "Estados Unidos", "China", "Japão", "Alemanha", "Índia", "Reino Unido", "França", "Itália",
+      "Canadá", "Coreia do Sul", "Austrália", "Espanha", "Países Baixos", "Suíça", "Arábia Saudita",
+      "Argentina", "Chile", "Colômbia", "Peru", "Uruguai", "Paraguai"
+    ];
+
+    const timeSlots = [];
+    for (let hour = 6; hour <= 21; hour++) {
+      for (const minute of [0, 30]) {
+        if (hour === 21 && minute > 0) continue;
+        const period = hour < 12 ? "am" : "pm";
+        const viewHour = hour > 12 ? hour - 12 : hour;
+        const mm = minute === 0 ? "00" : "30";
+        timeSlots.push(`${viewHour}h${mm}${period}`);
+      }
+    }
+
+    const steps = [
+      { key: "igreja", title: "Qual é o nome da igreja?", type: "text", placeholder: "Digite o nome da igreja" },
+      { key: "contratante", title: "Qual é o nome do contratante?", type: "text", placeholder: "Digite o nome do contratante" },
+      { key: "whatsapp", title: "Qual é o WhatsApp do contratante?", type: "text", placeholder: "Somente números", maxLength: 15, numeric: true },
+      { key: "historia", title: "Qual história foi escolhida?", type: "picker", options: historyOptions },
+      { key: "dia", title: "Em que dia será o evento?", type: "picker", options: Array.from({ length: 31 }, (_, i) => String(i + 1)) },
+      { key: "mes", title: "Em qual mês será o evento?", type: "picker", options: months },
+      { key: "ano", title: "Em qual ano será o evento?", type: "picker", options: years },
+      { key: "horario", title: "Qual será o horário do evento?", type: "picker", options: timeSlots },
+      { key: "pais", title: "Em qual país ou região será o evento?", type: "picker", options: countries },
+      { key: "endereco", title: "Qual é o endereço do evento?", type: "text", placeholder: "Digite o endereço" },
+      { key: "cidade", title: "Em qual cidade será o evento?", type: "text", placeholder: "Digite a cidade" },
+      { key: "cep", title: "Qual é o código postal (CEP)?", type: "text", placeholder: "8 dígitos", maxLength: 8, numeric: true }
+    ];
+
+    const answers = {};
+    const pickerIndexes = {};
+    steps.forEach((s) => { if (s.type === "picker") pickerIndexes[s.key] = 0; });
+
+    const screens = {
+      intro: document.querySelector('[data-screen="intro"]'),
+      question: document.querySelector('[data-screen="question"]'),
+      success: document.querySelector('[data-screen="success"]')
+    };
+
+    const questionTitle = document.getElementById("questionTitle");
+    const inputArea = document.getElementById("inputArea");
+    const errorBox = document.getElementById("errorBox");
+    const progressBar = document.getElementById("progressBar");
+    const progressLabel = document.getElementById("progressLabel");
+    const startBtn = document.getElementById("startBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const restartBtn = document.getElementById("restartBtn");
+
+    const arrowLeft = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 19L8 12L15 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const arrowRight = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+    let currentStep = -1;
+
+    function showScreen(name) {
+      Object.values(screens).forEach((el) => el.classList.remove("active"));
+      screens[name].classList.add("active");
+    }
+
+    function updateProgress() {
+      if (currentStep < 0) {
+        progressBar.style.width = "0%";
+        progressLabel.textContent = "Etapa 0/12";
+        return;
+      }
+
+      const done = Math.min(currentStep + 1, steps.length);
+      const percent = (done / steps.length) * 100;
+      progressBar.style.width = `${percent}%`;
+      progressLabel.textContent = `Etapa ${done}/12`;
+    }
+
+    function renderStep() {
+      const step = steps[currentStep];
+      questionTitle.textContent = step.title;
+      errorBox.textContent = "";
+
+      if (step.type === "text") {
+        const value = answers[step.key] || "";
+        inputArea.innerHTML = `<input id="stepInput" class="input" type="text" placeholder="${step.placeholder || ""}" value="${escapeHtml(value)}" ${step.maxLength ? `maxlength="${step.maxLength}"` : ""} ${step.numeric ? 'inputmode="numeric"' : ""} />`;
+        const input = document.getElementById("stepInput");
+        input.focus();
+        input.addEventListener("input", () => {
+          if (step.numeric) {
+            input.value = input.value.replace(/\D/g, "");
+          }
+        });
+      }
+
+      if (step.type === "picker") {
+        const index = pickerIndexes[step.key] || 0;
+        const value = step.options[index];
+        answers[step.key] = value;
+
+        inputArea.innerHTML = `
+          <div class="picker">
+            <button class="picker-btn" id="pickPrev" type="button" aria-label="anterior">${arrowLeft}</button>
+            <div class="picker-value" id="pickValue"></div>
+            <button class="picker-btn" id="pickNext" type="button" aria-label="próximo">${arrowRight}</button>
+          </div>`;
+
+        const pickValue = document.getElementById("pickValue");
+        const refresh = () => {
+          const i = pickerIndexes[step.key];
+          const current = step.options[i];
+          pickValue.textContent = current;
+          answers[step.key] = current;
+        };
+
+        document.getElementById("pickPrev").addEventListener("click", () => {
+          const len = step.options.length;
+          pickerIndexes[step.key] = (pickerIndexes[step.key] - 1 + len) % len;
+          refresh();
+        });
+
+        document.getElementById("pickNext").addEventListener("click", () => {
+          const len = step.options.length;
+          pickerIndexes[step.key] = (pickerIndexes[step.key] + 1) % len;
+          refresh();
+        });
+
+        refresh();
+      }
+
+      prevBtn.style.visibility = currentStep === 0 ? "hidden" : "visible";
+      nextBtn.textContent = currentStep === steps.length - 1 ? "Finalizar" : "Próximo";
+      updateProgress();
+    }
+
+    function validateStep() {
+      const step = steps[currentStep];
+      errorBox.textContent = "";
+
+      if (step.type === "text") {
+        const input = document.getElementById("stepInput");
+        const value = (input.value || "").trim();
+
+        if (!value) {
+          errorBox.textContent = "Preencha esse campo para continuar.";
+          return false;
+        }
+
+        if (step.numeric && !/^\d+$/.test(value)) {
+          errorBox.textContent = "Use somente números nesse campo.";
+          return false;
+        }
+
+        if (step.key === "cep" && value.length !== 8) {
+          errorBox.textContent = "O CEP precisa ter exatamente 8 dígitos.";
+          return false;
+        }
+
+        if (step.key === "whatsapp" && value.length > 15) {
+          errorBox.textContent = "O WhatsApp pode ter no máximo 15 dígitos.";
+          return false;
+        }
+
+        answers[step.key] = value;
+      }
+
+      return true;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    startBtn.addEventListener("click", () => {
+      currentStep = 0;
+      showScreen("question");
+      renderStep();
+    });
+
+    prevBtn.addEventListener("click", () => {
+      if (currentStep <= 0) return;
+      currentStep -= 1;
+      renderStep();
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (!validateStep()) return;
+
+      if (currentStep < steps.length - 1) {
+        currentStep += 1;
+        renderStep();
+        return;
+      }
+
+      showScreen("success");
+      currentStep = steps.length;
+      updateProgress();
+      console.log("Respostas do formulário:", answers);
+    });
+
+    restartBtn.addEventListener("click", () => {
+      currentStep = -1;
+      showScreen("intro");
+      updateProgress();
+    });
+
+    updateProgress();
+  </script>
+</body>
+</html>
