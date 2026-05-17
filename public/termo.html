@@ -36,13 +36,29 @@
     .screen {
       position: fixed;
       inset: 0;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px 20px 84px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateX(24px);
+      transition: opacity 0.35s ease, transform 0.35s ease, visibility 0.35s ease;
     }
 
-    .screen.active { display: flex; }
+    .screen.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .screen.leaving-left {
+      opacity: 0;
+      transform: translateX(-24px);
+      pointer-events: none;
+    }
 
     .card {
       width: min(760px, 100%);
@@ -255,11 +271,6 @@
       .card { padding: 24px 16px; border-radius: 18px; }
       .picker { grid-template-columns: 48px 1fr 48px; }
       .picker-btn { height: 48px; }
-    }
-    @media (max-width: 760px) {
-      body {
-        background-image: linear-gradient(145deg, rgba(11, 61, 168, 0.58), rgba(31, 126, 231, 0.58)), url("/termo-bg-mobile.jpg");
-      }
     }
   </style>
 </head>
@@ -488,8 +499,18 @@
     const totalStages = 1 + steps.length + (agreementSteps.length - 1) + 3 + 1 + 1;
 
     function showScreen(name) {
-      Object.values(screens).forEach((el) => el.classList.remove("active"));
-      screens[name].classList.add("active");
+      const current = Object.values(screens).find((el) => el.classList.contains("active"));
+      const next = screens[name];
+      if (!next) return;
+      if (current === next) return;
+
+      if (current) {
+        current.classList.add("leaving-left");
+        current.classList.remove("active");
+        setTimeout(() => current.classList.remove("leaving-left"), 360);
+      }
+
+      next.classList.add("active");
     }
 
     function clearCountdown() {
