@@ -1545,6 +1545,51 @@ async function handleCreateTerm(request, response) {
   }
 }
 
+async function handleTermStripeCheckout(request, response) {
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "JSON invalido." });
+    return;
+  }
+
+  const stripeProductId = String(body?.stripeProductId || "").trim();
+  if (!stripeProductId) {
+    sendJson(response, 400, { error: "Produto Stripe nao informado." });
+    return;
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const prices = await stripe.prices.list({
+      product: stripeProductId,
+      active: true,
+      limit: 1
+    });
+
+    const price = prices.data[0];
+    if (!price?.id) {
+      sendJson(response, 404, { error: "Preco ativo nao encontrado para este produto." });
+      return;
+    }
+
+    const baseUrl = getBaseUrl(request);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: price.id, quantity: 1 }],
+      success_url: `${baseUrl}/termo?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/termo?payment=cancel`
+    });
+
+    sendJson(response, 200, { ok: true, payUrl: session.url || "" });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Falha ao criar checkout do termo."
+    });
+  }
+}
+
 async function handleDeleteAllTerms(response) {
   if (!hasDatabase()) {
     sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
@@ -3369,6 +3414,11 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && pathname.match(/^\/api\/terms\/[^/]+\/pdf$/)) {
     const termId = decodeURIComponent(pathname.replace(/^\/api\/terms\/([^/]+)\/pdf$/, "$1"));
     await handleTermPdfDownload(response, termId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/terms/checkout") {
+    await handleTermStripeCheckout(request, response);
     return;
   }
 

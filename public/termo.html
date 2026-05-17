@@ -102,6 +102,49 @@
       color: var(--text-soft);
       margin-bottom: 22px;
     }
+    .payment-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .payment-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.16);
+      font-weight: 300;
+    }
+    .payment-table tr:last-child td { border-bottom: 0; }
+    .payment-choice {
+      width: 100%;
+      margin-bottom: 8px;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      text-align: left;
+      font: inherit;
+      font-weight: 300;
+      cursor: pointer;
+    }
+    .payment-choice.active {
+      border-color: rgba(33, 203, 99, 0.82);
+      background: rgba(33, 203, 99, 0.24);
+    }
+    .countdown {
+      text-align: center;
+      font-size: clamp(1.3rem, 3.8vw, 2rem);
+      font-weight: 600;
+      margin: 12px 0;
+    }
+    .pix-copy {
+      margin-top: 10px;
+      text-align: center;
+      font-weight: 300;
+      color: var(--text-soft);
+    }
 
     .actions {
       display: flex;
@@ -292,6 +335,24 @@
     </div>
   </section>
 
+  <section class="screen" data-screen="payment">
+    <div class="card">
+      <div class="agreement-title">
+        <svg class="agreement-icon" id="paymentIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true"></svg>
+        <h1 id="paymentH1">Pagamento</h1>
+      </div>
+      <h2 class="agreement-copy" id="paymentH2"></h2>
+      <div id="paymentBody"></div>
+      <div class="error" id="paymentError"></div>
+      <div class="actions">
+        <button class="btn-approve" id="paymentNextBtn" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17L4 12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          CONCORDO
+        </button>
+      </div>
+    </div>
+  </section>
+
   <section class="screen" data-screen="success">
     <div class="card">
       <h1>Tudo certo!</h1>
@@ -304,7 +365,7 @@
   </section>
 
   <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
-  <div class="progress-label" id="progressLabel">Etapa 0/25</div>
+  <div class="progress-label" id="progressLabel">Etapa 0/29</div>
 
   <script>
     const historyOptions = [
@@ -366,6 +427,7 @@
       agreement: document.querySelector('[data-screen="agreement"]'),
       signature: document.querySelector('[data-screen="signature"]'),
       question: document.querySelector('[data-screen="question"]'),
+      payment: document.querySelector('[data-screen="payment"]'),
       success: document.querySelector('[data-screen="success"]')
     };
 
@@ -388,6 +450,12 @@
     const signatureCpf = document.getElementById("signatureCpf");
     const signatureError = document.getElementById("signatureError");
     const signAgreeBtn = document.getElementById("signAgreeBtn");
+    const paymentIcon = document.getElementById("paymentIcon");
+    const paymentH1 = document.getElementById("paymentH1");
+    const paymentH2 = document.getElementById("paymentH2");
+    const paymentBody = document.getElementById("paymentBody");
+    const paymentError = document.getElementById("paymentError");
+    const paymentNextBtn = document.getElementById("paymentNextBtn");
 
     const arrowLeft = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 19L8 12L15 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     const arrowRight = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -396,7 +464,8 @@
     let currentPdfUrl = "";
     let agreementIndex = 0;
     let inPostQuestionAgreements = false;
-    const totalStages = 25;
+    let paymentStage = 0;
+    let countdownTimer = null;
 
     const agreementSteps = [
       {
@@ -417,15 +486,45 @@
       { icon: `<rect x="6" y="4" width="12" height="16" rx="2" stroke="white" stroke-width="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="white" stroke-width="1.8"/>`, h1: "Considerações finais", h2: "As informações utilizadas serão exatamente as informadas no termo de compromisso pelo contratante. Se houver alguma variação necessária, como nome de congresso/evento, escrita/pronúncia de nomes próprios, igreja/end, deverá ser informada no campo \"Notas adicionais\" deste formulário. O material é enviado 8 dias após o preenchimento do contrato." }
     ];
 
+    const paymentOptions = [
+      { key: "one", label: "Uma (1) apresentação", priceLabel: "R$ 3.400,00", stripeProductId: "prod_UXFmEqk2kOwZdA" },
+      { key: "two", label: "Duas (2) apresentações", priceLabel: "R$ 5.100,00", stripeProductId: "prod_UXFnHWguWzdbst" }
+    ];
+
+    const totalStages = 1 + steps.length + (agreementSteps.length - 1) + 3 + 1 + 1;
+
     function showScreen(name) {
       Object.values(screens).forEach((el) => el.classList.remove("active"));
       screens[name].classList.add("active");
+    }
+
+    function clearCountdown() {
+      if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+      }
+    }
+
+    function getDueDateOptions() {
+      const options = [];
+      const now = new Date();
+      for (let i = 1; i <= 5; i += 1) {
+        const d = new Date(now);
+        d.setDate(now.getDate() + i);
+        options.push(d);
+      }
+      return options;
+    }
+
+    function formatDateBr(date) {
+      return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
     }
 
     function getCurrentStage() {
       if (screens.success.classList.contains("active")) return totalStages;
       if (screens.intro.classList.contains("active")) return 0;
       if (screens.signature.classList.contains("active")) return totalStages - 1;
+      if (screens.payment.classList.contains("active")) return 1 + steps.length + (agreementSteps.length - 1) + paymentStage + 1;
       if (screens.question.classList.contains("active")) return 1 + Math.max(0, currentStep + 1);
       if (screens.agreement.classList.contains("active")) {
         if (inPostQuestionAgreements) return 1 + steps.length + agreementIndex;
@@ -447,6 +546,110 @@
       agreementH2.textContent = step.h2 || "";
       agreementIcon.innerHTML = step.icon;
       showScreen("agreement");
+      updateProgress();
+    }
+
+    function renderPaymentStage() {
+      clearCountdown();
+      paymentError.textContent = "";
+      showScreen("payment");
+
+      if (paymentStage === 0) {
+        paymentIcon.innerHTML = `<path d="M3 8h18v8H3z" stroke="white" stroke-width="1.8"/><path d="M3 12h18" stroke="white" stroke-width="1.8"/>`;
+        paymentH1.textContent = "Escolha da apresentação";
+        paymentH2.textContent = "Selecione uma opção:";
+        paymentBody.innerHTML = `
+          <table class="payment-table">
+            <tr><td>O valor de uma (1) apresentação:</td><td><strong>R$ 3.400,00</strong></td></tr>
+            <tr><td>O valor de duas (2) apresentações:</td><td><strong>R$ 5.100,00</strong></td></tr>
+          </table>
+          ${paymentOptions.map((opt) => `<button type="button" class="payment-choice ${answers.pagamentoOpcao === opt.key ? "active" : ""}" data-option="${opt.key}">${opt.label} - ${opt.priceLabel}</button>`).join("")}
+        `;
+
+        paymentBody.querySelectorAll("[data-option]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const key = btn.getAttribute("data-option");
+            const selected = paymentOptions.find((item) => item.key === key);
+            if (!selected) return;
+            answers.pagamentoOpcao = selected.key;
+            answers.pagamentoValor = selected.priceLabel;
+            answers.pagamentoStripeProduto = selected.stripeProductId;
+            renderPaymentStage();
+          });
+        });
+      } else if (paymentStage === 1) {
+        const dueDates = getDueDateOptions();
+        paymentIcon.innerHTML = `<rect x="4" y="5" width="16" height="15" rx="2" stroke="white" stroke-width="1.8"/><path d="M4 9h16" stroke="white" stroke-width="1.8"/>`;
+        paymentH1.textContent = "Dia do pagamento";
+        paymentH2.textContent = "Escolha um dia (até 5 dias a partir de amanhã).";
+        paymentBody.innerHTML = dueDates.map((d, idx) => `<button type="button" class="payment-choice ${answers.pagamentoVencimento === formatDateBr(d) ? "active" : ""}" data-due="${idx}">${formatDateBr(d)}</button>`).join("");
+
+        paymentBody.querySelectorAll("[data-due]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const idx = Number(btn.getAttribute("data-due"));
+            const selected = dueDates[idx];
+            if (!selected) return;
+            answers.pagamentoVencimento = formatDateBr(selected);
+            answers.pagamentoVencimentoIso = selected.toISOString();
+            renderPaymentStage();
+          });
+        });
+      } else {
+        paymentIcon.innerHTML = `<rect x="4" y="5" width="16" height="15" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 3v4M16 3v4" stroke="white" stroke-width="1.8"/>`;
+        paymentH1.textContent = "Sua data foi reservada";
+        paymentH2.textContent = "Pague até o vencimento em até 12x";
+        paymentBody.innerHTML = `
+          <div class="countdown" id="countdownBox">00d : 00h : 00min</div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn-approve" id="payNowBtn" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 8h18v8H3z" stroke="white" stroke-width="2"/><path d="M3 12h18" stroke="white" stroke-width="2"/></svg>
+              PAGAR AGORA
+            </button>
+          </div>
+          <div class="pix-copy">ou chave pix abaixo em letra branca<br><strong>36-442-785-0001 (CNPJ)</strong></div>
+        `;
+
+        const due = answers.pagamentoVencimentoIso ? new Date(answers.pagamentoVencimentoIso) : null;
+        const countdownBox = document.getElementById("countdownBox");
+        if (due && countdownBox) {
+          due.setHours(23, 59, 59, 999);
+          const tick = () => {
+            const diff = due.getTime() - Date.now();
+            if (diff <= 0) {
+              countdownBox.textContent = "00d : 00h : 00min";
+              return;
+            }
+            const mins = Math.floor(diff / 60000);
+            const days = Math.floor(mins / (24 * 60));
+            const hours = Math.floor((mins % (24 * 60)) / 60);
+            const remMins = mins % 60;
+            countdownBox.textContent = `${days}d : ${String(hours).padStart(2, "0")}h : ${String(remMins).padStart(2, "0")}min`;
+          };
+          tick();
+          countdownTimer = setInterval(tick, 1000);
+        }
+
+        const payNowBtn = document.getElementById("payNowBtn");
+        if (payNowBtn) {
+          payNowBtn.addEventListener("click", async () => {
+            try {
+              const response = await fetch("/api/terms/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ stripeProductId: answers.pagamentoStripeProduto })
+              });
+              const data = await response.json();
+              if (!response.ok || !data?.payUrl) {
+                throw new Error(data?.error || "Nao foi possivel abrir o pagamento.");
+              }
+              window.location.href = data.payUrl;
+            } catch (error) {
+              paymentError.textContent = error instanceof Error ? error.message : "Erro ao abrir pagamento.";
+            }
+          });
+        }
+      }
+
       updateProgress();
     }
 
@@ -609,8 +812,6 @@
         renderAgreement();
         return;
       }
-
-      await submitTerm();
     });
 
     restartBtn.addEventListener("click", () => {
@@ -618,6 +819,8 @@
       currentPdfUrl = "";
       agreementIndex = 0;
       inPostQuestionAgreements = false;
+      paymentStage = 0;
+      clearCountdown();
       signatureCpf.value = "";
       signatureError.textContent = "";
       successCopy.textContent = "Seu formulário foi preenchido com sucesso.";
@@ -644,10 +847,36 @@
         renderAgreement();
         return;
       }
+      paymentStage = 0;
+      renderPaymentStage();
+    });
+
+    paymentNextBtn.addEventListener("click", () => {
+      paymentError.textContent = "";
+      if (paymentStage === 0) {
+        if (!answers.pagamentoOpcao) {
+          paymentError.textContent = "Escolha uma opção de apresentação.";
+          return;
+        }
+        paymentStage = 1;
+        renderPaymentStage();
+        return;
+      }
+
+      if (paymentStage === 1) {
+        if (!answers.pagamentoVencimentoIso) {
+          paymentError.textContent = "Escolha o dia do pagamento.";
+          return;
+        }
+        paymentStage = 2;
+        renderPaymentStage();
+        return;
+      }
 
       signatureName.textContent = answers.contratante || "contratante";
       signatureCpf.value = answers.assinaturaCpf || "";
       signatureError.textContent = "";
+      clearCountdown();
       showScreen("signature");
       updateProgress();
     });
