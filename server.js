@@ -20,7 +20,7 @@ import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscripti
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
-import { createAllTermEntry, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
+import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1500,10 +1500,83 @@ async function handleCreateTerm(request, response) {
   try {
     const body = await readJsonBody(request);
     const term = await createAllTermEntry(body?.answers || {});
+    const answers = term?.answers || {};
+    const months = [
+      "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+
+    const monthInput = String(answers.mes || "").trim();
+    const monthAsNumber = Number(monthInput);
+    const monthLabel = Number.isInteger(monthAsNumber) && monthAsNumber >= 1 && monthAsNumber <= 12
+      ? months[monthAsNumber - 1]
+      : (monthInput || "-");
+
+    const day = String(answers.dia || "").trim().padStart(2, "0");
+    const monthDisplayNumber = Number.isInteger(monthAsNumber) && monthAsNumber >= 1 && monthAsNumber <= 12
+      ? String(monthAsNumber).padStart(2, "0")
+      : String((months.findIndex((m) => m.toLowerCase() === monthInput.toLowerCase()) + 1) || "").padStart(2, "0");
+    const dateLabel = `${day}/${monthDisplayNumber || "00"}`;
+
+    let timeLabel = String(answers.horario || "").trim();
+    const timeMatch = timeLabel.toLowerCase().match(/^(\d{1,2})h(\d{2})(am|pm)$/);
+    if (timeMatch) {
+      let h = Number(timeMatch[1]);
+      const m = timeMatch[2];
+      const p = timeMatch[3];
+      if (p === "pm" && h < 12) h += 12;
+      if (p === "am" && h === 12) h = 0;
+      timeLabel = `${String(h).padStart(2, "0")}:${m}`;
+    }
+
+    await createScheduleEntry({
+      monthLabel,
+      dateLabel,
+      place: String(answers.igreja || "-"),
+      city: String(answers.cidade || "-"),
+      time: timeLabel || "-"
+    });
+
     sendJson(response, 201, { ok: true, termId: term.id, pdfUrl: `/api/terms/${term.id}/pdf` });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel salvar o termo."
+    });
+  }
+}
+
+async function handleDeleteAllTerms(response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return;
+  }
+
+  try {
+    await deleteAllTerms();
+    sendJson(response, 200, { ok: true });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel apagar os termos."
+    });
+  }
+}
+
+async function handleDeleteOneTerm(response, termId) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return;
+  }
+
+  try {
+    const deleted = await deleteTermById(termId);
+    if (!deleted) {
+      sendJson(response, 404, { error: "Termo nao encontrado." });
+      return;
+    }
+    sendJson(response, 200, { ok: true });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel apagar o termo."
     });
   }
 }
@@ -3279,6 +3352,17 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/all-terms") {
     await handleListAllTerms(request, response);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname === "/api/all-terms") {
+    await handleDeleteAllTerms(response);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/all-terms\/[^/]+$/)) {
+    const termId = decodeURIComponent(pathname.replace(/^\/api\/all-terms\/([^/]+)$/, "$1"));
+    await handleDeleteOneTerm(response, termId);
     return;
   }
 

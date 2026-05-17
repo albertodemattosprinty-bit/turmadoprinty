@@ -194,6 +194,17 @@ export function getTermQuestionOrder() {
   return QUESTION_ORDER.slice();
 }
 
+export async function deleteAllTerms() {
+  await ensureAllTermsSchema();
+  await query(`delete from "all-terms";`);
+}
+
+export async function deleteTermById(termId) {
+  await ensureAllTermsSchema();
+  const result = await query(`delete from "all-terms" where id = $1`, [String(termId || "").trim()]);
+  return Number(result.rowCount || 0) > 0;
+}
+
 export async function getAllTermById(termId) {
   await ensureAllTermsSchema();
   const result = await query(

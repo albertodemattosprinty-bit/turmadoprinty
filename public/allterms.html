@@ -62,6 +62,32 @@
       font-weight: 300;
       color: var(--soft);
     }
+    .top-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin: 8px 0 12px;
+    }
+    .danger-btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: #ff4f4f;
+      color: #fff;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .danger-outline {
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 10px;
+      padding: 8px 12px;
+      background: transparent;
+      color: #fff;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
     .term-card {
       background: var(--card);
       border: 1px solid rgba(255,255,255,0.18);
@@ -104,6 +130,10 @@
       </button>
     </div>
 
+    <div class="top-actions">
+      <button class="danger-btn" id="deleteAllBtn" type="button">Apagar todos os termos</button>
+    </div>
+
     <div id="termsList"></div>
   </div>
 
@@ -113,6 +143,7 @@
     const churchTitle = document.getElementById("churchTitle");
     const prevDate = document.getElementById("prevDate");
     const nextDate = document.getElementById("nextDate");
+    const deleteAllBtn = document.getElementById("deleteAllBtn");
 
     let dates = [];
     let selectedIndex = 0;
@@ -168,9 +199,26 @@
         return `
           <article class="term-card">
             ${rows}
+            <button class="danger-outline" data-delete-id="${escapeHtml(term.id)}" type="button">Apagar termo</button>
           </article>
         `;
       }).join("");
+
+      termsList.querySelectorAll("[data-delete-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const termId = btn.getAttribute("data-delete-id");
+          if (!termId) return;
+          const ok = window.confirm("Deseja apagar este termo?");
+          if (!ok) return;
+          const resp = await fetch(`/api/all-terms/${encodeURIComponent(termId)}`, { method: "DELETE" });
+          const data = await resp.json();
+          if (!resp.ok) {
+            window.alert(data?.error || "Erro ao apagar termo.");
+            return;
+          }
+          await loadTerms(selectedDate);
+        });
+      });
     }
 
     function escapeHtml(text) {
@@ -216,6 +264,18 @@
       selectedIndex += 1;
       selectedDate = dates[selectedIndex];
       await loadTerms(selectedDate);
+    });
+
+    deleteAllBtn.addEventListener("click", async () => {
+      const ok = window.confirm("Tem certeza que deseja apagar todos os termos?");
+      if (!ok) return;
+      const resp = await fetch("/api/all-terms", { method: "DELETE" });
+      const data = await resp.json();
+      if (!resp.ok) {
+        window.alert(data?.error || "Erro ao apagar termos.");
+        return;
+      }
+      await loadTerms();
     });
 
     loadTerms().catch((error) => {
