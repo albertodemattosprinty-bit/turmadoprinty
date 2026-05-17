@@ -27,7 +27,9 @@ const QUESTION_ORDER = [
   { key: "pais", label: "Em qual país ou região será o evento?" },
   { key: "endereco", label: "Qual é o endereço do evento?" },
   { key: "cidade", label: "Em qual cidade será o evento?" },
-  { key: "cep", label: "Qual é o código postal (CEP)?" }
+  { key: "cep", label: "Qual é o código postal (CEP)?" },
+  { key: "assinatura", label: "Assinatura" },
+  { key: "assinaturaCpf", label: "CPF da assinatura" }
 ];
 
 export async function ensureAllTermsSchema() {
@@ -129,6 +131,8 @@ export function sanitizeTermAnswers(input) {
   if (!answers.endereco) throw new Error("Endereço é obrigatório.");
   if (!answers.cidade) throw new Error("Cidade é obrigatória.");
   if (!/^\d{8}$/.test(answers.cep)) throw new Error("CEP inválido. Use exatamente 8 dígitos.");
+  if (!answers.assinatura) throw new Error("Assinatura é obrigatória.");
+  if (!/^\d{11}$/.test(answers.assinaturaCpf)) throw new Error("CPF da assinatura inválido. Use 11 dígitos.");
 
   return answers;
 }
