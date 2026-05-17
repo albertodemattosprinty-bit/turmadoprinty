@@ -84,6 +84,24 @@
 
     .intro-copy,
     .success-copy { text-align: center; margin-bottom: 24px; }
+    .agreement-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .agreement-icon {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+    }
+    .agreement-copy {
+      font-weight: 300;
+      line-height: 1.5;
+      white-space: pre-line;
+      color: var(--text-soft);
+      margin-bottom: 22px;
+    }
 
     .actions {
       display: flex;
@@ -108,6 +126,14 @@
       background: #ffffff;
       color: #0d4ea8;
       font-weight: 600;
+    }
+    .btn-approve {
+      background: #21cb63;
+      color: #fff;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .btn-secondary {
@@ -207,6 +233,22 @@
       <p class="intro-copy">São 12 etapas rápidas. Preencha com calma e avance no seu ritmo.</p>
       <div class="actions">
         <button class="btn-primary" id="startBtn" type="button">Iniciar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="agreement">
+    <div class="card">
+      <div class="agreement-title">
+        <svg class="agreement-icon" id="agreementIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true"></svg>
+        <h2 id="agreementH1">Termo</h2>
+      </div>
+      <p class="agreement-copy" id="agreementH2"></p>
+      <div class="actions">
+        <button class="btn-approve" id="agreeBtn" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17L4 12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          CONCORDO
+        </button>
       </div>
     </div>
   </section>
@@ -318,12 +360,37 @@
     const restartBtn = document.getElementById("restartBtn");
     const successCopy = document.getElementById("successCopy");
     const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+    const agreementH1 = document.getElementById("agreementH1");
+    const agreementH2 = document.getElementById("agreementH2");
+    const agreementIcon = document.getElementById("agreementIcon");
+    const agreeBtn = document.getElementById("agreeBtn");
 
     const arrowLeft = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 19L8 12L15 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     const arrowRight = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
     let currentStep = -1;
     let currentPdfUrl = "";
+    let agreementIndex = 0;
+    let inPostQuestionAgreements = false;
+
+    const agreementSteps = [
+      {
+        icon: `<path d="M4 20h16" stroke="white" stroke-width="1.8"/><path d="M7 17V5a2 2 0 0 1 2-2h8v14" stroke="white" stroke-width="1.8"/><path d="M10 8h5M10 11h5" stroke="white" stroke-width="1.8"/>`,
+        h1: "Termo de Compromisso",
+        h2: "Agradecemos pela contratação da Turma do Printy. Gentilmente pedimos que atentem à importância do correto e imediato preenchimento deste documento, pois ele será utilizado como registro oficial das informações do evento, bem como para a gravação do vídeo de divulgação e para a inclusão da agenda no site e nas mídias sociais."
+      },
+      { icon: `<path d="M3 11L12 4L21 11" stroke="white" stroke-width="1.8"/><path d="M6 10v10h12V10" stroke="white" stroke-width="1.8"/>`, h1: "Compromisso da igreja", h2: "" },
+      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M9 9c1-1 5-1 6 1s-1 3-3 3-4 1-3 3 4 2 6 0" stroke="white" stroke-width="1.8"/>`, h1: "Financeiro/Logístico", h2: "O valor de uma (1) apresentação: R$ 3.400,00\nO valor de duas (2) apresentações: R$ 5.100,00\n\nO transporte para a cidade de São Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor será definido mediante orçamento prévio." },
+      { icon: `<path d="M12 4c4 3 5 6 5 8a5 5 0 1 1-10 0c0-2 1-5 5-8z" stroke="white" stroke-width="1.8"/><path d="M12 14c1 0 2-.8 2-2" stroke="white" stroke-width="1.8"/>`, h1: "ALIMENTAÇÃO", h2: "A equipe é composta pelo mínimo de 3 pessoas e máximo de 6, a depender da história escolhida. A alimentação pode ser na igreja, hotel ou restaurante.\n\nCafé da manhã - Almoço - Jantar, a depender do horário do evento ou solicitação prévia da equipe." },
+      { icon: `<path d="M4 14h16l-1.5 4H5.5L4 14z" stroke="white" stroke-width="1.8"/><circle cx="8" cy="18.5" r="1.5" fill="white"/><circle cx="16" cy="18.5" r="1.5" fill="white"/>`, h1: "ESTACIONAMENTO", h2: "Solicitamos liberação de vaga na porta da igreja para 2 carros para descarga de equipamento, ou acesso a estacionamento próprio." },
+      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.8"/>`, h1: "SALA / CAMARIM", h2: "Precisamos de uma sala exclusiva para a Turma do Printy, próxima ao palco/púlpito. Sempre lembrando que iremos nos adequar ao espaço físico da igreja. Também solicitamos:\nCadeiras e mesas para figurinos e acessórios\n\nÁgua mineral ou água de coco (norte e nordeste) disponível no palco durante a apresentação." },
+      { icon: `<path d="M5 14V8l6-3 6 3v6" stroke="white" stroke-width="1.8"/><path d="M9 18h6" stroke="white" stroke-width="1.8"/>`, h1: "EQUIPAMENTO DE SOM", h2: "Usamos o equipamento disponível da igreja e 1 microfone sem fio carregado.\n\nUm técnico apto para exercer a função de operar a sonoplastia da igreja, a fim de garantir a qualidade sonora do evento." },
+      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M10 10l5 2-5 2v-4z" fill="white"/>`, h1: "VÍDEOS DA PROGRAMAÇÃO", h2: "Estão liberadas a gravação de imagens da performance da Turma do Printy, desde que as mesmas sejam repassadas à equipe, para a liberação de veiculação das imagens em plataforma digital. As gravações de lives estão liberadas, desde que seja repassado o respectivo link à Turma do Printy antecipadamente, para a divulgação do mesmo." },
+      { icon: `<path d="M5 16l3-7 4 5 3-3 4 5" stroke="white" stroke-width="1.8"/><circle cx="6" cy="7" r="1.2" fill="white"/>`, h1: "COMPROMISSOS DA TURMA DO PRINTY", h2: "" },
+      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="white" stroke-width="1.8"/>`, h1: "CHEGADA E MONTAGEM", h2: "Chegar com 2h00 de antecedência para reconhecimento do espaço, passagem de som, montagem de cenário e luz, alimentação e estruturação do evento junto ao responsável pelo mesmo." },
+      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M10 9l5 3-5 3V9z" fill="white"/>`, h1: "Vídeo Divulgação", h2: "Gravação de 1 vídeo chamada para WhatsApp e rede social, e divulgar chamada do evento em nossos stories ou feed.\n\n*Enviar imagens e logomarca para a confecção de flyers e banners, caso a igreja deseje divulgar." },
+      { icon: `<rect x="6" y="4" width="12" height="16" rx="2" stroke="white" stroke-width="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="white" stroke-width="1.8"/>`, h1: "Considerações finais", h2: "As informações utilizadas serão exatamente as informadas no termo de compromisso pelo contratante. Se houver alguma variação necessária, como nome de congresso/evento, escrita/pronúncia de nomes próprios, igreja/end, deverá ser informada no campo \"Notas adicionais\" deste formulário. O material é enviado 8 dias após o preenchimento do contrato." }
+    ];
 
     function showScreen(name) {
       Object.values(screens).forEach((el) => el.classList.remove("active"));
@@ -331,7 +398,13 @@
     }
 
     function updateProgress() {
-      if (currentStep < 0) {
+      const questionVisible = screens.question.classList.contains("active");
+      if (currentStep < 0 || !questionVisible) {
+        if (currentStep >= steps.length) {
+          progressBar.style.width = "100%";
+          progressLabel.textContent = "Etapa 12/12";
+          return;
+        }
         progressBar.style.width = "0%";
         progressLabel.textContent = "Etapa 0/12";
         return;
@@ -341,6 +414,15 @@
       const percent = (done / steps.length) * 100;
       progressBar.style.width = `${percent}%`;
       progressLabel.textContent = `Etapa ${done}/12`;
+    }
+
+    function renderAgreement() {
+      const step = agreementSteps[agreementIndex];
+      agreementH1.textContent = step.h1;
+      agreementH2.textContent = step.h2 || "";
+      agreementIcon.innerHTML = step.icon;
+      showScreen("agreement");
+      updateProgress();
     }
 
     function renderStep() {
@@ -444,9 +526,9 @@
     }
 
     startBtn.addEventListener("click", () => {
-      currentStep = 0;
-      showScreen("question");
-      renderStep();
+      agreementIndex = 0;
+      inPostQuestionAgreements = false;
+      renderAgreement();
     });
 
     prevBtn.addEventListener("click", () => {
@@ -455,15 +537,7 @@
       renderStep();
     });
 
-    nextBtn.addEventListener("click", async () => {
-      if (!validateStep()) return;
-
-      if (currentStep < steps.length - 1) {
-        currentStep += 1;
-        renderStep();
-        return;
-      }
-
+    async function submitTerm() {
       nextBtn.disabled = true;
       nextBtn.textContent = "Enviando...";
       errorBox.textContent = "";
@@ -493,11 +567,32 @@
         nextBtn.disabled = false;
         nextBtn.textContent = "Finalizar";
       }
+    }
+
+    nextBtn.addEventListener("click", async () => {
+      if (!validateStep()) return;
+
+      if (currentStep < steps.length - 1) {
+        currentStep += 1;
+        renderStep();
+        return;
+      }
+
+      if (!inPostQuestionAgreements) {
+        inPostQuestionAgreements = true;
+        agreementIndex = 1;
+        renderAgreement();
+        return;
+      }
+
+      await submitTerm();
     });
 
     restartBtn.addEventListener("click", () => {
       currentStep = -1;
       currentPdfUrl = "";
+      agreementIndex = 0;
+      inPostQuestionAgreements = false;
       successCopy.textContent = "Seu formulário foi preenchido com sucesso.";
       downloadPdfBtn.style.display = "none";
       showScreen("intro");
@@ -507,6 +602,23 @@
     downloadPdfBtn.addEventListener("click", () => {
       if (!currentPdfUrl) return;
       window.open(currentPdfUrl, "_blank");
+    });
+
+    agreeBtn.addEventListener("click", () => {
+      if (!inPostQuestionAgreements) {
+        currentStep = 0;
+        showScreen("question");
+        renderStep();
+        return;
+      }
+
+      if (agreementIndex < agreementSteps.length - 1) {
+        agreementIndex += 1;
+        renderAgreement();
+        return;
+      }
+
+      submitTerm();
     });
 
     updateProgress();

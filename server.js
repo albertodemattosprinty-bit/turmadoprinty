@@ -1387,12 +1387,21 @@ function escapePdfText(text) {
     .replace(/\)/g, "\\)");
 }
 
+function toPdfLatinText(text) {
+  return String(text || "")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, "\"")
+    .replace(/\u2013|\u2014/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ");
+}
+
 function buildTermPdfBuffer(term) {
   const questions = getTermQuestionOrder();
   const lines = ["Formulario do Evento", ""];
 
   for (const item of questions) {
-    const value = String(term?.answers?.[item.key] || "-");
+    const value = toPdfLatinText(String(term?.answers?.[item.key] || "-"));
     lines.push(item.label);
     lines.push(value);
     lines.push("");
@@ -1445,7 +1454,7 @@ function buildTermPdfBuffer(term) {
       streamParts.push("BT");
       streamParts.push(`/F1 ${fontSize} Tf`);
       streamParts.push(`40 ${y} Td`);
-      streamParts.push(`(${escapePdfText(line)}) Tj`);
+      streamParts.push(`(${escapePdfText(toPdfLatinText(line))}) Tj`);
       streamParts.push("ET");
       y -= line ? 18 : 10;
     }
@@ -1455,31 +1464,31 @@ function buildTermPdfBuffer(term) {
   }
 
   const contentStream = `${streamParts.join("\n")}\n`;
-  const contentLength = Buffer.byteLength(contentStream, "utf8");
+  const contentLength = Buffer.byteLength(contentStream, "latin1");
 
   const objects = [
     "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
     "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
     "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n",
-    "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n",
     `5 0 obj\n<< /Length ${contentLength} >>\nstream\n${contentStream}endstream\nendobj\n`
   ];
 
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
   for (const object of objects) {
-    offsets.push(Buffer.byteLength(pdf, "utf8"));
+    offsets.push(Buffer.byteLength(pdf, "latin1"));
     pdf += object;
   }
 
-  const xrefStart = Buffer.byteLength(pdf, "utf8");
+  const xrefStart = Buffer.byteLength(pdf, "latin1");
   pdf += `xref\n0 ${objects.length + 1}\n`;
   pdf += "0000000000 65535 f \n";
   for (let i = 1; i <= objects.length; i += 1) {
     pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
   }
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-  return Buffer.from(pdf, "utf8");
+  return Buffer.from(pdf, "latin1");
 }
 
 async function handleCreateTerm(request, response) {

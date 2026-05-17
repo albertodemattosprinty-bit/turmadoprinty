@@ -46,6 +46,14 @@
       text-align: center;
       font-weight: 600;
       font-size: clamp(1.05rem, 2vw, 1.3rem);
+      color: #ffe16a;
+    }
+    .church-title {
+      text-align: center;
+      font-weight: 600;
+      font-size: clamp(1.4rem, 2.6vw, 1.7rem);
+      margin-bottom: 4px;
+      color: #fff;
     }
     .empty {
       background: var(--card);
@@ -87,7 +95,10 @@
       <button class="nav-btn" id="prevDate" type="button" aria-label="data anterior">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 19L8 12L15 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <div class="date-title" id="dateTitle">Datas</div>
+      <div>
+        <div class="church-title" id="churchTitle">Igreja</div>
+        <div class="date-title" id="dateTitle">Datas</div>
+      </div>
       <button class="nav-btn" id="nextDate" type="button" aria-label="próxima data">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -99,6 +110,7 @@
   <script>
     const dateTitle = document.getElementById("dateTitle");
     const termsList = document.getElementById("termsList");
+    const churchTitle = document.getElementById("churchTitle");
     const prevDate = document.getElementById("prevDate");
     const nextDate = document.getElementById("nextDate");
 
@@ -109,7 +121,13 @@
     function formatDate(dateIso) {
       const [year, month, day] = String(dateIso || "").split("-");
       if (!year || !month || !day) return "Datas";
-      return `${day}/${month}/${year}`;
+      const monthNames = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+      ];
+      const monthIndex = Number(month) - 1;
+      const monthLabel = monthNames[monthIndex] || month;
+      return `${Number(day)} de ${monthLabel}`;
     }
 
     function renderEmpty(message) {
@@ -120,6 +138,7 @@
       const { questions = [], terms = [] } = payload || {};
 
       if (!dates.length) {
+        churchTitle.textContent = "Igreja";
         dateTitle.textContent = "Datas";
         renderEmpty("Sem termos ainda");
         prevDate.disabled = true;
@@ -132,9 +151,13 @@
       nextDate.disabled = selectedIndex >= dates.length - 1;
 
       if (!terms.length) {
+        churchTitle.textContent = "Igreja";
         renderEmpty("Sem termos ainda");
         return;
       }
+
+      const firstChurch = terms[0]?.answers?.igreja || "Igreja";
+      churchTitle.textContent = firstChurch;
 
       termsList.innerHTML = terms.map((term) => {
         const rows = questions.map((q) => {
@@ -144,7 +167,6 @@
 
         return `
           <article class="term-card">
-            <div class="meta">Data/hora do evento: ${formatDate(term.eventDate)} ${term.eventTime || ""}</div>
             ${rows}
           </article>
         `;
