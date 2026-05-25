@@ -790,7 +790,7 @@ function toggleWeekday(day) {
 }
 
 function moveWizardDate(amount) {
-  state.wizard.dateOffset = Math.max(0, state.wizard.dateOffset + amount);
+  state.wizard.dateOffset += amount;
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
 }
 
@@ -834,12 +834,6 @@ function buildOccurrences() {
   const selectedDate = dateFromOffset(state.wizard.dateOffset);
   const firstStart = buildDateWithTime(selectedDate, state.wizard.startHour, state.wizard.startMinute);
   const firstEnd = buildDateWithTime(selectedDate, state.wizard.endHour, state.wizard.endMinute);
-  const now = new Date();
-
-  if (firstStart < now) {
-    throw new Error("Nao e possivel adicionar tarefa antes da hora atual.");
-  }
-
   if (firstEnd <= firstStart) {
     throw new Error("O horario final precisa ser depois do inicial.");
   }
@@ -862,10 +856,7 @@ function buildOccurrences() {
 
     const startAt = buildDateWithTime(date, state.wizard.startHour, state.wizard.startMinute);
     const endAt = buildDateWithTime(date, state.wizard.endHour, state.wizard.endMinute);
-
-    if (startAt >= now) {
-      occurrences.push({ startAt: startAt.toISOString(), endAt: endAt.toISOString() });
-    }
+    occurrences.push({ startAt: startAt.toISOString(), endAt: endAt.toISOString() });
   }
 
   if (!occurrences.length) {

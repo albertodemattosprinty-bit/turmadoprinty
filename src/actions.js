@@ -237,16 +237,9 @@ export async function createUserAction(userId, payload) {
   if (rawOccurrences.length > MAX_OCCURRENCES) {
     throw new Error("Limite de recorrencias excedido.");
   }
-
-  const now = new Date();
   const occurrences = rawOccurrences.map((occurrence) => {
     const startAt = parseDate(occurrence?.startAt, "Horario inicial");
     const endAt = parseDate(occurrence?.endAt, "Horario final");
-
-    if (startAt < now) {
-      throw new Error("Nao e possivel criar tarefas antes da data e hora atuais.");
-    }
-
     if (endAt <= startAt) {
       throw new Error("O horario final precisa ser depois do horario inicial.");
     }

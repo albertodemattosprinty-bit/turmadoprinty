@@ -137,8 +137,8 @@
     const baseText = String(field.value || "").trim();
     const recognition = new Recognition();
     recognition.lang = "pt-BR";
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.interimResults = false;
 
     let finalTranscript = "";
 

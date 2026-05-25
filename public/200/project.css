@@ -30,7 +30,7 @@ body {
 body {
   font-family: "Exo 2", sans-serif;
   color: #123b73;
-  background-image: radial-gradient(1200px 520px at 50% 115%, rgba(140, 148, 163, 0.26), rgba(255, 255, 255, 0) 68%), linear-gradient(180deg, #f8fbff 0%, #f3f6fb 54%, #edf1f7 100%);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.7)), url("/200/home-bg.png");
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
@@ -749,17 +749,18 @@ svg {
 
 #platformCategoryRow .category-icon-btn {
   width: 100%;
-  height: 38px;
+  aspect-ratio: 1 / 1;
+  height: auto;
   min-width: 0;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 12px;
   display: grid;
   place-items: center;
 }
 
 #platformCategoryRow .category-icon-btn img {
-  width: 22px;
-  height: 22px;
+  width: 70%;
+  height: 70%;
   object-fit: contain;
   display: block;
 }
