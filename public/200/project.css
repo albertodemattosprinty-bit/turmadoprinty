@@ -334,7 +334,7 @@ svg {
 
 .task-row {
   display: grid;
-  grid-template-columns: 96px 52px 1fr 44px;
+  grid-template-columns: 52px 1fr 96px;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -369,6 +369,8 @@ svg {
 }
 
 .task-time {
+  grid-column: 3;
+  text-align: right;
   font-weight: 800;
   color: var(--white);
 }
@@ -397,7 +399,7 @@ svg {
   border-radius: 50%;
   background: rgba(255, 111, 138, 0.18);
   color: var(--white);
-  display: grid;
+  display: none;
   place-items: center;
   cursor: pointer;
 }
@@ -474,7 +476,8 @@ svg {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.26);
   overflow: hidden;
 }
 
@@ -487,8 +490,7 @@ svg {
 }
 
 .actions-progress-people {
-  display: grid;
-  gap: 8px;
+  display: none;
 }
 
 .actions-progress-person {
@@ -921,4 +923,31 @@ svg {
   .finance-metric {
     min-height: 126px;
   }
+}
+
+.actions-side-actions {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 26;
+}
+
+.actions-side-btn {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.actions-side-btn-left {
+  left: 12px;
+}
+
+.actions-side-btn-right {
+  right: 12px;
+}
+
+#actionsModal .actions-progress-track {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.26);
 }

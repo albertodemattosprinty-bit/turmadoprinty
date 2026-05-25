@@ -1,4 +1,4 @@
-import { getApiUrl } from "../api.js";
+ï»¿import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -84,7 +84,6 @@ const actionsProgress = document.getElementById("actionsProgress");
 const actionsProgressLabel = document.getElementById("actionsProgressLabel");
 const actionsProgressMinutes = document.getElementById("actionsProgressMinutes");
 const actionsProgressFill = document.getElementById("actionsProgressFill");
-const actionsProgressPeople = document.getElementById("actionsProgressPeople");
 const financeDateLabel = document.getElementById("financeDateLabel");
 const platformEntriesList = document.getElementById("platformEntriesList");
 const platformMonthlyIncome = document.getElementById("platformMonthlyIncome");
@@ -147,8 +146,9 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
 });
 
 let financeTimer = null;
-let assigneeProgressTicker = null;
 let platformMetricsTicker = null;
+let longPressTimer = null;
+let longPressHandledActionId = "";
 
 const state = {
   activeOffset: 0,
@@ -164,8 +164,6 @@ const state = {
   platformBalanceHidden: false,
   platformMetricIndex: 0,
   platformBaseIncomeCents: 0,
-  assigneeProgressRows: [],
-  assigneeProgressIndex: 0,
   statsSummary: null,
   statsGoals: null,
   statsRanking: [],
@@ -291,7 +289,8 @@ function buildInitialWizardState() {
     startHour: rounded.getHours(),
     startMinute: rounded.getMinutes() % 60,
     endHour: end.getHours(),
-    endMinute: end.getMinutes()
+    endMinute: end.getMinutes(),
+    editingActionId: null
   };
 }
 
@@ -425,7 +424,7 @@ async function loadFinanceSummary() {
 
   if (!getToken()) {
     financeDashboard.hidden = true;
-    financeStatus.innerHTML = 'Entre como administrador para ver as finanças. <a href="/auth.html?next=/200">Entrar</a>';
+    financeStatus.innerHTML = 'Entre como administrador para ver as finanÃ§as. <a href="/auth.html?next=/200">Entrar</a>';
     return;
   }
 
@@ -483,15 +482,12 @@ function renderActions() {
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.innerHTML = `
-      <div class="task-time">${formatHourChip(action.startAt)}</div>
       <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
         <div class="task-title">${escapeHtml(action.title)}</div>
         <div class="task-assignee">${escapeHtml(assignee)}</div>
       </div>
-      <button class="delete-task" type="button" data-delete-action="${action.id}" aria-label="Excluir tarefa">
-        <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
-      </button>
+      <div class="task-time">${formatHourChip(action.startAt)}</div>
     `;
     actionsList.appendChild(row);
   });
@@ -534,80 +530,6 @@ function renderActionsProgress() {
   actionsProgressMinutes.textContent = "";
   actionsProgressFill.style.width = `${percent}%`;
   actionsProgressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
-  renderAssigneeProgressBars();
-}
-
-function renderAssigneeProgressBars() {
-  actionsProgressPeople.innerHTML = "";
-  state.assigneeProgressRows = [];
-  state.assigneeProgressIndex = 0;
-
-  const grouped = new Map();
-
-  state.actions.forEach((action) => {
-    const assignee = normalizeAssigneeName(action.assignee);
-
-    if (assignee === "Geral") {
-      return;
-    }
-
-    const total = getActionDurationMinutes(action);
-    const completed = normalizeActionStatus(action.status) === actionStatuses.completed ? total : 0;
-    const current = grouped.get(assignee) || { total: 0, completed: 0 };
-    current.total += total;
-    current.completed += completed;
-    grouped.set(assignee, current);
-  });
-
-  [...grouped.entries()]
-    .sort((left, right) => left[0].localeCompare(right[0], "pt-BR"))
-    .forEach(([assignee, summary]) => {
-      if (summary.total <= 0) {
-        return;
-      }
-
-      const percent = Math.max(0, Math.min(100, Math.round((summary.completed / summary.total) * 100)));
-      const row = document.createElement("article");
-      row.className = "actions-progress-person";
-      row.innerHTML = `
-        <div class="actions-progress-person-head">
-          <strong>${escapeHtml(assignee)}</strong>
-          <span>${percent}%</span>
-        </div>
-        <div class="actions-progress-track">
-          <div class="actions-progress-fill" style="width:${percent}%"></div>
-        </div>
-      `;
-      actionsProgressPeople.appendChild(row);
-      state.assigneeProgressRows.push(row);
-    });
-
-  updateAssigneeProgressVisibility();
-}
-
-function updateAssigneeProgressVisibility() {
-  if (!state.assigneeProgressRows.length) {
-    return;
-  }
-
-  state.assigneeProgressRows.forEach((row, index) => {
-    row.hidden = index !== state.assigneeProgressIndex;
-  });
-}
-
-function startAssigneeProgressTicker() {
-  if (assigneeProgressTicker) {
-    window.clearInterval(assigneeProgressTicker);
-    assigneeProgressTicker = null;
-  }
-
-  assigneeProgressTicker = window.setInterval(() => {
-    if (!state.assigneeProgressRows.length) {
-      return;
-    }
-    state.assigneeProgressIndex = (state.assigneeProgressIndex + 1) % state.assigneeProgressRows.length;
-    updateAssigneeProgressVisibility();
-  }, 2000);
 }
 
 function escapeHtml(value) {
@@ -677,9 +599,25 @@ function moveActiveDate(amount) {
   void loadActions();
 }
 
-function openWizard() {
+function openWizard(action = null) {
   state.wizard = buildInitialWizardState();
-  taskTitle.value = "";
+  if (action) {
+    const startAt = new Date(action.startAt);
+    const endAt = new Date(action.endAt);
+    const today = todayStart();
+    const actionDay = new Date(startAt);
+    actionDay.setHours(0, 0, 0, 0);
+    state.wizard.dateOffset = Math.round((actionDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    state.wizard.assigneeIndex = Math.max(0, assigneeOptions.indexOf(normalizeAssigneeName(action.assignee)));
+    state.wizard.startHour = startAt.getHours();
+    state.wizard.startMinute = startAt.getMinutes();
+    state.wizard.endHour = endAt.getHours();
+    state.wizard.endMinute = endAt.getMinutes();
+    state.wizard.editingActionId = action.id;
+    taskTitle.value = action.title || "";
+  } else {
+    taskTitle.value = "";
+  }
   wizardMessage.textContent = "";
   actionWizard.classList.add("active");
   actionWizard.setAttribute("aria-hidden", "false");
@@ -874,8 +812,13 @@ async function saveAction() {
       ? state.wizard.repeatDays
       : recurrenceDays[repeatRule] || [];
 
-    await apiRequest("/api/actions", {
-      method: "POST",
+    const requestPath = state.wizard.editingActionId
+      ? `/api/actions/${encodeURIComponent(state.wizard.editingActionId)}`
+      : "/api/actions";
+    const requestMethod = state.wizard.editingActionId ? "PATCH" : "POST";
+
+    await apiRequest(requestPath, {
+      method: requestMethod,
       headers: {
         "Content-Type": "application/json"
       },
@@ -896,6 +839,49 @@ async function saveAction() {
   }
 }
 
+async function openActionLongPressMenu(actionId) {
+  const choice = window.prompt("OpÃ§Ãµes da tarefa:\n1 - Excluir\n2 - Editar", "2");
+  if (choice == null) {
+    return;
+  }
+
+  const action = state.actions.find((item) => item.id === actionId);
+  if (!action) {
+    return;
+  }
+
+  const option = String(choice).trim();
+  if (option === "1") {
+    if (!window.confirm("Excluir essa tarefa? Se for repetida, toda a rede sera removida.")) {
+      return;
+    }
+    await apiRequest(`/api/actions/${encodeURIComponent(actionId)}`, { method: "DELETE" });
+    await loadActions();
+    return;
+  }
+
+  if (option === "2") {
+    openWizard(action);
+  }
+}
+
+function beginActionLongPress(actionId) {
+  if (longPressTimer) {
+    window.clearTimeout(longPressTimer);
+  }
+  longPressTimer = window.setTimeout(() => {
+    longPressHandledActionId = actionId;
+    void openActionLongPressMenu(actionId);
+  }, 500);
+}
+
+function endActionLongPress() {
+  if (longPressTimer) {
+    window.clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
+
 function renderPlatformDateHeader() {
   if (financeDateLabel) {
     financeDateLabel.textContent = formatDateLabel(dateFromOffset(state.platformOffset));
@@ -903,7 +889,7 @@ function renderPlatformDateHeader() {
 }
 
 function getPlatformKindLabel(kind) {
-  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "Saída";
+  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "SaÃ­da";
 }
 
 function getPlatformStatusClass(entry) {
@@ -927,7 +913,7 @@ function renderPlatformBalance() {
     : formatMoney(state.platformBalanceCents);
 
   if (togglePlatformBalanceButton) {
-    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "•";
+    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "â€¢";
   }
 }
 
@@ -962,12 +948,12 @@ function renderPlatformEntries() {
   platformEntriesList.innerHTML = "";
 
   if (!getToken()) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanças.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanÃ§as.</div>';
     return;
   }
 
   if (!state.platformEntries.length) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Sem lançamentos nessa data.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Sem lanÃ§amentos nessa data.</div>';
     return;
   }
 
@@ -980,9 +966,9 @@ function renderPlatformEntries() {
       <div class="task-time">${formatHourChip(entry.occurredAt)}</div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} · ${entry.category}`)}</div>
+        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} Â· ${entry.category}`)}</div>
       </div>
-      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lançamento">
+      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lanÃ§amento">
         <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
       </button>
     `;
@@ -1128,10 +1114,10 @@ function renderStatsRanking() {
     row.innerHTML = `
       <div class="stats-avatar-wrap">
         <img class="task-avatar" src="${getActionAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
-        <span class="stats-rank-badge">${index + 1}º</span>
+        <span class="stats-rank-badge">${index + 1}Âº</span>
       </div>
       <div class="task-main">
-        <div class="task-title">${escapeHtml(`${entry.name} · ${entry.percent}%`)}</div>
+        <div class="task-title">${escapeHtml(`${entry.name} Â· ${entry.percent}%`)}</div>
       </div>
     `;
     statsRankingList.appendChild(row);
@@ -1175,7 +1161,7 @@ async function editStatsGoals() {
     monthlyBalanceGoalCents: 0,
     recurringIncomeGoalCents: 0
   };
-  const dailyRaw = window.prompt("Meta diária de entradas (R$):", String((current.dailyIncomeGoalCents || 0) / 100).replace(".", ","));
+  const dailyRaw = window.prompt("Meta diÃ¡ria de entradas (R$):", String((current.dailyIncomeGoalCents || 0) / 100).replace(".", ","));
   if (dailyRaw == null) {
     return;
   }
@@ -1269,7 +1255,7 @@ async function savePlatformEntry() {
       throw new Error("Informe o nome.");
     }
     if (!Number.isFinite(value) || value <= 0) {
-      throw new Error("Informe um valor válido.");
+      throw new Error("Informe um valor vÃ¡lido.");
     }
 
     await apiRequest("/api/platform/entries", {
@@ -1289,7 +1275,7 @@ async function savePlatformEntry() {
     closePlatformWizard();
     await loadPlatformFinance();
   } catch (error) {
-    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lançamento.";
+    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lanÃ§amento.";
   }
 }
 
@@ -1411,7 +1397,7 @@ platformWizardBackButton?.addEventListener("click", () => {
 platformWizardNextButton?.addEventListener("click", () => {
   platformWizardMessage.textContent = "";
   if (state.platformWizard.step === 1 && platformNameInput.value.trim().length < 2) {
-    platformWizardMessage.textContent = "Digite um nome válido.";
+    platformWizardMessage.textContent = "Digite um nome vÃ¡lido.";
     return;
   }
 
@@ -1419,7 +1405,7 @@ platformWizardNextButton?.addEventListener("click", () => {
     const raw = String(platformValueInput.value || "").replace(/\./g, "").replace(",", ".");
     const value = Number(raw);
     if (!Number.isFinite(value) || value <= 0) {
-      platformWizardMessage.textContent = "Digite um valor válido.";
+      platformWizardMessage.textContent = "Digite um valor vÃ¡lido.";
       return;
     }
   }
@@ -1513,32 +1499,29 @@ actionForm.addEventListener("submit", (event) => {
   event.preventDefault();
 });
 
+actionsList.addEventListener("pointerdown", (event) => {
+  const row = event.target.closest("[data-action-id]");
+  if (!row) {
+    return;
+  }
+  beginActionLongPress(row.dataset.actionId);
+});
+
+actionsList.addEventListener("pointerup", endActionLongPress);
+actionsList.addEventListener("pointerleave", endActionLongPress);
+actionsList.addEventListener("pointercancel", endActionLongPress);
+
 actionsList.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-delete-action]");
-
-  if (!button) {
-    const row = event.target.closest("[data-action-id]");
-
-    if (!row) {
-      return;
-    }
-
-    await toggleActionStatus(row.dataset.actionId);
+  const row = event.target.closest("[data-action-id]");
+  if (!row) {
     return;
   }
-
-  if (!window.confirm("Excluir essa tarefa? Se for repetida, toda a rede sera removida.")) {
+  const actionId = row.dataset.actionId;
+  if (longPressHandledActionId === actionId) {
+    longPressHandledActionId = "";
     return;
   }
-
-  try {
-    await apiRequest(`/api/actions/${encodeURIComponent(button.dataset.deleteAction)}`, {
-      method: "DELETE"
-    });
-    await loadActions();
-  } catch (error) {
-    actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
-  }
+  await toggleActionStatus(actionId);
 });
 
 platformEntriesList?.addEventListener("click", async (event) => {
@@ -1559,7 +1542,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
     return;
   }
 
-  if (!window.confirm("Excluir este lançamento recorrente? Os valores já realizados permanecem.")) {
+  if (!window.confirm("Excluir este lanÃ§amento recorrente? Os valores jÃ¡ realizados permanecem.")) {
     return;
   }
 
@@ -1575,10 +1558,6 @@ platformEntriesList?.addEventListener("click", async (event) => {
 
 actionsList.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter" && event.key !== " ") {
-    return;
-  }
-
-  if (event.target.closest("[data-delete-action]")) {
     return;
   }
 
@@ -1600,7 +1579,6 @@ handleSwipe(wizardAssigneeLabel, moveWizardAssignee);
 handleSwipe(financeDateLabel, movePlatformDate);
 renderFinancePeriod();
 renderDateHeader();
-startAssigneeProgressTicker();
 
 openPlatformWizardButton?.addEventListener("click", () => {
   if (!getToken()) {

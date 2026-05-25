@@ -301,6 +301,71 @@ export async function createUserAction(userId, payload) {
   return result.rows.map(normalizeAction);
 }
 
+export async function updateUserAction(userId, actionId, payload) {
+  await ensureActionsSchema();
+
+  const action = await getUserActionById(userId, actionId);
+  if (!action) {
+    throw new Error("Tarefa nao encontrada.");
+  }
+
+  const title = String(payload?.title || "").trim();
+  const assignee = normalizeAssignee(payload?.assignee);
+  const occurrence = Array.isArray(payload?.occurrences) && payload.occurrences.length
+    ? payload.occurrences[0]
+    : { startAt: payload?.startAt, endAt: payload?.endAt };
+  const startAt = parseDate(occurrence?.startAt, "Horario inicial");
+  const endAt = parseDate(occurrence?.endAt, "Horario final");
+
+  if (title.length < 2) {
+    throw new Error("Titulo da tarefa invalido.");
+  }
+  if (endAt <= startAt) {
+    throw new Error("O horario final precisa ser depois do horario inicial.");
+  }
+  if (endAt.getTime() - startAt.getTime() > 24 * 60 * 60 * 1000) {
+    throw new Error("A tarefa nao pode passar de 24 horas.");
+  }
+
+  const overlap = await query(
+    `
+      select id
+      from actions
+      where user_id = $1
+        and assignee = $2
+        and id <> $3
+        and start_at < $5
+        and end_at > $4
+      limit 1
+    `,
+    [userId, assignee, action.id, startAt.toISOString(), endAt.toISOString()]
+  );
+
+  if (overlap.rows[0]) {
+    throw new Error("Horario indisponivel para essa pessoa.");
+  }
+
+  const result = await query(
+    `
+      update actions
+      set title = $3,
+          assignee = $4,
+          start_at = $5::timestamptz,
+          end_at = $6::timestamptz
+      where user_id = $1
+        and id = $2
+      returning id
+    `,
+    [userId, action.id, title, assignee, startAt.toISOString(), endAt.toISOString()]
+  );
+
+  if (!result.rows[0]) {
+    throw new Error("Tarefa nao encontrada.");
+  }
+
+  return getUserActionById(userId, action.id);
+}
+
 export async function updateUserActionStatus(userId, actionId) {
   await ensureActionsSchema();
 
