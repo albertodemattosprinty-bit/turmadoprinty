@@ -2,6 +2,25 @@ import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const financePeriods = [
+  { key: "total", label: "Total" },
+  { key: "today", label: "Hoje" },
+  { key: "week", label: "Esta semana" },
+  { key: "last15", label: "Ultimos 15 dias" },
+  { key: "last30", label: "Ultimos 30 dias" },
+  { key: "month-01", label: "Janeiro" },
+  { key: "month-02", label: "Fevereiro" },
+  { key: "month-03", label: "Marco" },
+  { key: "month-04", label: "Abril" },
+  { key: "month-05", label: "Maio" },
+  { key: "month-06", label: "Junho" },
+  { key: "month-07", label: "Julho" },
+  { key: "month-08", label: "Agosto" },
+  { key: "month-09", label: "Setembro" },
+  { key: "month-10", label: "Outubro" },
+  { key: "month-11", label: "Novembro" },
+  { key: "month-12", label: "Dezembro" }
+];
 const weekdayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
 const recurrenceDays = {
   none: [],
@@ -26,8 +45,13 @@ const repeatToggle = document.getElementById("repeatToggle");
 const repeatBox = document.getElementById("repeatBox");
 const weekdayRow = document.getElementById("weekdayRow");
 const financeIntroTitle = document.getElementById("financeIntroTitle");
+const financePeriodPicker = document.getElementById("financePeriodPicker");
+const financePeriodPrev = document.getElementById("financePeriodPrev");
+const financePeriodNext = document.getElementById("financePeriodNext");
+const financePeriodLabel = document.getElementById("financePeriodLabel");
 const financeDashboard = document.getElementById("financeDashboard");
 const financeStatus = document.getElementById("financeStatus");
+const financeSalesLabel = document.getElementById("financeSalesLabel");
 const financeTotalSales = document.getElementById("financeTotalSales");
 const financeSubscribers = document.getElementById("financeSubscribers");
 const financeMonthlyRevenue = document.getElementById("financeMonthlyRevenue");
@@ -40,6 +64,7 @@ let financeTimer = null;
 
 const state = {
   activeOffset: 0,
+  financePeriodIndex: 0,
   actions: [],
   wizard: buildInitialWizardState()
 };
@@ -179,12 +204,39 @@ function closeModal(modal) {
   }
 }
 
+function getActiveFinancePeriod() {
+  return financePeriods[state.financePeriodIndex] || financePeriods[0];
+}
+
+function setFinanceSalesTitle(periodLabel) {
+  financeSalesLabel.textContent = `Total de vendas (${periodLabel})`;
+}
+
+function renderFinancePeriod() {
+  const period = getActiveFinancePeriod();
+  financePeriodLabel.textContent = period.label;
+  setFinanceSalesTitle(period.label);
+}
+
+function moveFinancePeriod(direction) {
+  const total = financePeriods.length;
+  state.financePeriodIndex = (state.financePeriodIndex + direction + total) % total;
+  renderFinancePeriod();
+
+  const financeModal = document.getElementById("financeModal");
+  if (financeModal?.classList.contains("active") && financeIntroTitle.hidden) {
+    void loadFinanceSummary();
+  }
+}
+
 function startFinancePresentation() {
   if (financeTimer) {
     window.clearTimeout(financeTimer);
   }
 
+  renderFinancePeriod();
   financeIntroTitle.hidden = false;
+  financePeriodPicker.hidden = true;
   financeDashboard.hidden = true;
   financeStatus.textContent = "";
 
@@ -195,19 +247,27 @@ function startFinancePresentation() {
 }
 
 async function loadFinanceSummary() {
+  const selectedPeriod = getActiveFinancePeriod();
+
   financeIntroTitle.hidden = true;
+  financePeriodPicker.hidden = false;
 
   if (!getToken()) {
+    financeDashboard.hidden = true;
     financeStatus.innerHTML = 'Entre como administrador para ver as finanças. <a href="/auth.html?next=/200">Entrar</a>';
     return;
   }
 
   financeStatus.textContent = "Carregando...";
+  setFinanceSalesTitle(selectedPeriod.label);
 
   try {
-    const payload = await apiRequest("/api/finance/summary");
+    const payload = await apiRequest(`/api/finance/summary?period=${encodeURIComponent(selectedPeriod.key)}`);
     const summary = payload.summary || {};
+    const periodLabel = String(summary.periodLabel || selectedPeriod.label || "").trim() || "Total";
 
+    setFinanceSalesTitle(periodLabel);
+    financePeriodLabel.textContent = periodLabel;
     financeTotalSales.textContent = formatMoney(summary.totalSalesCents);
     financeSubscribers.textContent = String(summary.activeSubscribers || 0);
     financeMonthlyRevenue.textContent = formatMoney(summary.monthlyRevenueCents);
@@ -507,6 +567,10 @@ async function saveAction() {
 }
 
 function handleSwipe(element, callback) {
+  if (!element) {
+    return;
+  }
+
   let startX = 0;
 
   element.addEventListener("touchstart", (event) => {
@@ -534,6 +598,9 @@ document.querySelectorAll("[data-close-modal]").forEach((button) => {
 document.querySelectorAll("[data-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveActiveDate(Number(button.dataset.dayNav)));
 });
+
+financePeriodPrev?.addEventListener("click", () => moveFinancePeriod(-1));
+financePeriodNext?.addEventListener("click", () => moveFinancePeriod(1));
 
 openActionWizardButton.addEventListener("click", () => {
   if (!getToken()) {
@@ -623,4 +690,7 @@ actionsList.addEventListener("click", async (event) => {
 
 handleSwipe(activeDateLabel, moveActiveDate);
 handleSwipe(actionsList, moveActiveDate);
+handleSwipe(financePeriodLabel, moveFinancePeriod);
+handleSwipe(financePeriodPicker, moveFinancePeriod);
+renderFinancePeriod();
 renderDateHeader();

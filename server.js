@@ -663,15 +663,290 @@ async function requireAdmin(request, response) {
   return user;
 }
 
-async function buildFinanceSummary() {
+const FINANCE_PERIOD_MONTHS = [
+  "Janeiro",
+  "Fevereiro",
+  "Marco",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro"
+];
+const FINANCE_STRIPE_SYNC_INTERVAL_MS = 2 * 60 * 1000;
+let financeStripeLastSyncAt = 0;
+let financeStripeSyncPromise = null;
+
+function startOfDay(date) {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function addDays(date, days) {
+  const value = new Date(date);
+  value.setDate(value.getDate() + days);
+  return value;
+}
+
+function formatFinanceRangeLabel(rawPeriod) {
+  const value = String(rawPeriod || "").trim().toLowerCase();
+
+  if (!value || value === "total") {
+    return "Total";
+  }
+
+  if (value === "today") {
+    return "Hoje";
+  }
+
+  if (value === "week") {
+    return "Esta semana";
+  }
+
+  if (value === "last15") {
+    return "Ultimos 15 dias";
+  }
+
+  if (value === "last30") {
+    return "Ultimos 30 dias";
+  }
+
+  if (/^month-\d{2}$/.test(value)) {
+    const monthIndex = Number(value.slice(-2)) - 1;
+    if (monthIndex >= 0 && monthIndex < FINANCE_PERIOD_MONTHS.length) {
+      return FINANCE_PERIOD_MONTHS[monthIndex];
+    }
+  }
+
+  return "Total";
+}
+
+function resolveFinanceRange(rawPeriod) {
+  const now = new Date();
+  const today = startOfDay(now);
+  const normalized = String(rawPeriod || "total").trim().toLowerCase() || "total";
+  const result = {
+    key: "total",
+    label: "Total",
+    fromIso: null,
+    toIso: null
+  };
+
+  if (normalized === "today") {
+    return {
+      key: "today",
+      label: "Hoje",
+      fromIso: today.toISOString(),
+      toIso: addDays(today, 1).toISOString()
+    };
+  }
+
+  if (normalized === "week") {
+    const weekday = today.getDay();
+    const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
+    const weekStart = addDays(today, -daysSinceMonday);
+    return {
+      key: "week",
+      label: "Esta semana",
+      fromIso: weekStart.toISOString(),
+      toIso: addDays(weekStart, 7).toISOString()
+    };
+  }
+
+  if (normalized === "last15") {
+    return {
+      key: "last15",
+      label: "Ultimos 15 dias",
+      fromIso: addDays(today, -14).toISOString(),
+      toIso: addDays(today, 1).toISOString()
+    };
+  }
+
+  if (normalized === "last30") {
+    return {
+      key: "last30",
+      label: "Ultimos 30 dias",
+      fromIso: addDays(today, -29).toISOString(),
+      toIso: addDays(today, 1).toISOString()
+    };
+  }
+
+  if (/^month-\d{2}$/.test(normalized)) {
+    const monthIndex = Number(normalized.slice(-2)) - 1;
+
+    if (monthIndex >= 0 && monthIndex < 12) {
+      const year = today.getFullYear();
+      const monthStart = new Date(year, monthIndex, 1);
+      const nextMonthStart = monthIndex === 11
+        ? new Date(year + 1, 0, 1)
+        : new Date(year, monthIndex + 1, 1);
+
+      return {
+        key: normalized,
+        label: FINANCE_PERIOD_MONTHS[monthIndex],
+        fromIso: monthStart.toISOString(),
+        toIso: nextMonthStart.toISOString()
+      };
+    }
+  }
+
+  result.label = formatFinanceRangeLabel(normalized);
+  return result;
+}
+
+function readSubscriptionIdFromPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const subscription = payload.subscription;
+
+  if (typeof subscription === "string" && subscription.trim()) {
+    return subscription.trim();
+  }
+
+  if (subscription && typeof subscription === "object" && typeof subscription.id === "string" && subscription.id.trim()) {
+    return subscription.id.trim();
+  }
+
+  if (typeof payload.subscription_id === "string" && payload.subscription_id.trim()) {
+    return payload.subscription_id.trim();
+  }
+
+  return null;
+}
+
+async function resolveSubscriptionIdFromCheckout(stripe, checkoutId) {
+  if (!checkoutId) {
+    return null;
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(String(checkoutId));
+    return readSubscriptionIdFromPayload(session);
+  } catch {
+    return null;
+  }
+}
+
+async function syncFinanceSubscriptionsWithStripe() {
+  if (!STRIPE_SECRET_KEY || !hasDatabase()) {
+    return;
+  }
+
   await ensurePaymentSchema();
+  const stripe = getStripeClient();
+  const result = await query(
+    `
+      select
+        reference_id,
+        subscription_id,
+        checkout_id,
+        status,
+        raw_payload
+      from user_plan_subscriptions
+      where plan_id <> 'gratis'
+        and (
+          status in ('ACTIVE', 'PAID', 'AUTHORIZED', 'PENDING', 'OVERDUE')
+          or subscription_id is not null
+        )
+      order by updated_at desc
+      limit 120
+    `
+  );
+
+  for (const row of result.rows) {
+    let subscriptionId = typeof row.subscription_id === "string" ? row.subscription_id.trim() : "";
+
+    if (!subscriptionId) {
+      subscriptionId = readSubscriptionIdFromPayload(row.raw_payload || {}) || "";
+    }
+
+    if (!subscriptionId) {
+      subscriptionId = await resolveSubscriptionIdFromCheckout(stripe, row.checkout_id);
+    }
+
+    if (!subscriptionId) {
+      continue;
+    }
+
+    let subscription = null;
+
+    try {
+      subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    } catch {
+      continue;
+    }
+
+    const nextStatus = normalizeStripeSubscriptionStatus(subscription?.status);
+    const activatedAt = isActiveSubscriptionStatus(nextStatus)
+      ? toIsoDateFromUnix(subscription?.current_period_start) || toIsoDateFromUnix(subscription?.start_date)
+      : null;
+    const canceledAt = isInactiveSubscriptionStatus(nextStatus)
+      ? toIsoDateFromUnix(subscription?.canceled_at) || new Date().toISOString()
+      : null;
+
+    await markPlanSubscriptionStatus({
+      referenceId: row.reference_id,
+      status: nextStatus,
+      subscriptionId,
+      payload: subscription,
+      activatedAt,
+      canceledAt
+    });
+  }
+}
+
+async function syncFinanceSubscriptionsWithStripeIfNeeded() {
+  if (!STRIPE_SECRET_KEY) {
+    return;
+  }
+
+  const now = Date.now();
+
+  if (financeStripeSyncPromise) {
+    await financeStripeSyncPromise;
+    return;
+  }
+
+  if (financeStripeLastSyncAt && (now - financeStripeLastSyncAt) < FINANCE_STRIPE_SYNC_INTERVAL_MS) {
+    return;
+  }
+
+  financeStripeSyncPromise = (async () => {
+    try {
+      await syncFinanceSubscriptionsWithStripe();
+    } catch (error) {
+      console.error("[finance stripe sync]", error);
+    } finally {
+      financeStripeLastSyncAt = Date.now();
+      financeStripeSyncPromise = null;
+    }
+  })();
+
+  await financeStripeSyncPromise;
+}
+
+async function buildFinanceSummary(rawPeriod = "total") {
+  await ensurePaymentSchema();
+  await syncFinanceSubscriptionsWithStripeIfNeeded();
+  const range = resolveFinanceRange(rawPeriod);
 
   const result = await query(`
     with album_sales as (
       select coalesce(sum(amount_cents), 0)::bigint as total_cents
       from user_album_purchases
-      where status in ('PAID', 'AUTHORIZED')
-         or paid_at is not null
+      where (
+          status in ('PAID', 'AUTHORIZED')
+          or paid_at is not null
+        )
+        and ($1::timestamptz is null or coalesce(paid_at, created_at) >= $1::timestamptz)
+        and ($2::timestamptz is null or coalesce(paid_at, created_at) < $2::timestamptz)
     ),
     plan_sales as (
       select coalesce(sum(amount_cents), 0)::bigint as total_cents
@@ -681,6 +956,8 @@ async function buildFinanceSummary() {
           status in ('ACTIVE', 'PAID', 'AUTHORIZED')
           or activated_at is not null
         )
+        and ($1::timestamptz is null or coalesce(activated_at, created_at) >= $1::timestamptz)
+        and ($2::timestamptz is null or coalesce(activated_at, created_at) < $2::timestamptz)
     ),
     active_subscriptions as (
       select distinct on (user_id)
@@ -695,7 +972,7 @@ async function buildFinanceSummary() {
       ((select total_cents from album_sales) + (select total_cents from plan_sales))::bigint as total_sales_cents,
       (select count(*)::int from active_subscriptions) as active_subscribers,
       (select coalesce(sum(amount_cents), 0)::bigint from active_subscriptions) as monthly_revenue_cents
-  `);
+  `, [range.fromIso, range.toIso]);
 
   const row = result.rows[0] || {};
 
@@ -703,6 +980,10 @@ async function buildFinanceSummary() {
     totalSalesCents: Number(row.total_sales_cents || 0),
     activeSubscribers: Number(row.active_subscribers || 0),
     monthlyRevenueCents: Number(row.monthly_revenue_cents || 0),
+    periodKey: range.key,
+    periodLabel: range.label,
+    periodFrom: range.fromIso,
+    periodTo: range.toIso,
     generatedAt: new Date().toISOString()
   };
 }
@@ -3567,7 +3848,7 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const summary = await buildFinanceSummary();
+      const summary = await buildFinanceSummary(requestUrl.searchParams.get("period"));
       sendJson(response, 200, { ok: true, summary });
     } catch (error) {
       sendJson(response, 500, {

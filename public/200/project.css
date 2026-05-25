@@ -173,6 +173,21 @@ svg {
   gap: 12px;
 }
 
+.finance-period-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.finance-period-label {
+  min-width: 210px;
+  text-align: center;
+  font-size: clamp(1.1rem, 3.2vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 .finance-metric {
   min-height: 168px;
   border: 1px solid var(--line);
@@ -550,6 +565,10 @@ svg {
 
   .finance-dashboard {
     grid-template-columns: 1fr;
+  }
+
+  .finance-period-label {
+    min-width: 180px;
   }
 
   .finance-metric {

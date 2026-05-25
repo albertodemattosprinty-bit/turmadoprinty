@@ -146,9 +146,14 @@
     <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
     <div class="finance-content">
       <h1 id="financeIntroTitle">Finanças</h1>
+      <div class="finance-period-picker" id="financePeriodPicker" hidden>
+        <button class="circle-nav" type="button" id="financePeriodPrev" aria-label="Periodo anterior">‹</button>
+        <span class="finance-period-label" id="financePeriodLabel">Total</span>
+        <button class="circle-nav" type="button" id="financePeriodNext" aria-label="Proximo periodo">›</button>
+      </div>
       <div class="finance-dashboard" id="financeDashboard" hidden>
         <article class="finance-metric">
-          <span>Total de vendas</span>
+          <span id="financeSalesLabel">Total de vendas</span>
           <strong id="financeTotalSales">R$ 0,00</strong>
         </article>
         <article class="finance-metric">
