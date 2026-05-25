@@ -1,4 +1,4 @@
-import { getApiUrl } from "../api.js";
+﻿import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -48,6 +48,9 @@ const financeDateLabel = document.getElementById("financeDateLabel");
 const platformEntriesList = document.getElementById("platformEntriesList");
 const platformMonthlyIncome = document.getElementById("platformMonthlyIncome");
 const platformMonthlyExpense = document.getElementById("platformMonthlyExpense");
+const platformBalanceValue = document.getElementById("platformBalanceValue");
+const togglePlatformBalanceButton = document.getElementById("togglePlatformBalance");
+const addPlatformBalanceButton = document.getElementById("addPlatformBalance");
 const openPlatformWizardButton = document.getElementById("openPlatformWizard");
 const platformWizard = document.getElementById("platformWizard");
 const closePlatformWizardButton = document.getElementById("closePlatformWizard");
@@ -102,6 +105,8 @@ const state = {
     incomeCents: 0,
     expenseCents: 0
   },
+  platformBalanceCents: 0,
+  platformBalanceHidden: false,
   platformBaseIncomeCents: 0,
   assigneeProgressRows: [],
   assigneeProgressIndex: 0,
@@ -345,7 +350,7 @@ async function loadFinanceSummary() {
 
   if (!getToken()) {
     financeDashboard.hidden = true;
-    financeStatus.innerHTML = 'Entre como administrador para ver as finanças. <a href="/auth.html?next=/200">Entrar</a>';
+    financeStatus.innerHTML = 'Entre como administrador para ver as finanÃ§as. <a href="/auth.html?next=/200">Entrar</a>';
     return;
   }
 
@@ -830,9 +835,33 @@ function renderPlatformDateHeader() {
 }
 
 function getPlatformKindLabel(kind) {
-  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "Saída";
+  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "SaÃ­da";
 }
 
+function getPlatformStatusClass(entry) {
+  const status = String(entry?.status || "").trim().toUpperCase();
+  if (status === "DUE_TODAY") {
+    return "task-pending-due";
+  }
+  if (status === "OVERDUE") {
+    return "task-overdue";
+  }
+  return entry.kind === "INCOME" ? "task-completed" : "task-in-progress";
+}
+
+function renderPlatformBalance() {
+  if (!platformBalanceValue) {
+    return;
+  }
+
+  platformBalanceValue.textContent = state.platformBalanceHidden
+    ? "R$ ****"
+    : formatMoney(state.platformBalanceCents);
+
+  if (togglePlatformBalanceButton) {
+    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "•";
+  }
+}
 function renderPlatformEntries() {
   if (!platformEntriesList) {
     return;
@@ -841,25 +870,27 @@ function renderPlatformEntries() {
   platformEntriesList.innerHTML = "";
 
   if (!getToken()) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanças.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanÃ§as.</div>';
     return;
   }
 
   if (!state.platformEntries.length) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Sem lançamentos nessa data.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Sem lanÃ§amentos nessa data.</div>';
     return;
   }
 
   state.platformEntries.forEach((entry) => {
     const row = document.createElement("article");
-    row.className = `task-row ${entry.kind === "INCOME" ? "task-completed" : "task-in-progress"}`;
+    row.className = `task-row ${getPlatformStatusClass(entry)}`;
+    row.dataset.occurrenceId = entry.id || "";
+    row.dataset.status = String(entry.status || "").trim().toUpperCase();
     row.innerHTML = `
       <div class="task-time">${formatHourChip(entry.occurredAt)}</div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} · ${entry.category}`)}</div>
+        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} Â· ${entry.category}`)}</div>
       </div>
-      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lançamento">
+      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lanÃ§amento">
         <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
       </button>
     `;
@@ -893,9 +924,11 @@ async function loadPlatformFinance() {
     state.platformEntries = entriesPayload.entries || [];
     state.platformMonthly = monthPayload.summary || { incomeCents: 0, expenseCents: 0 };
     state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
+    state.platformBalanceCents = Number(monthPayload?.summary?.balanceCents || 0);
 
     platformMonthlyExpense.textContent = formatMoney(state.platformMonthly.expenseCents);
     platformMonthlyIncome.textContent = formatMoney(Number(state.platformMonthly.incomeCents || 0) + state.platformBaseIncomeCents);
+    renderPlatformBalance();
     renderPlatformEntries();
   } catch (error) {
     platformEntriesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
@@ -967,7 +1000,7 @@ async function savePlatformEntry() {
       throw new Error("Informe o nome.");
     }
     if (!Number.isFinite(value) || value <= 0) {
-      throw new Error("Informe um valor válido.");
+      throw new Error("Informe um valor vÃ¡lido.");
     }
 
     await apiRequest("/api/platform/entries", {
@@ -987,10 +1020,47 @@ async function savePlatformEntry() {
     closePlatformWizard();
     await loadPlatformFinance();
   } catch (error) {
-    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lançamento.";
+    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lanÃ§amento.";
   }
 }
 
+async function addPlatformBalanceNow() {
+  const raw = window.prompt("Quanto deseja adicionar de saldo? (ex: 120,50)", "");
+  if (raw == null) {
+    return;
+  }
+
+  const value = Number(String(raw).replace(/\./g, "").replace(",", "."));
+  if (!Number.isFinite(value) || value <= 0) {
+    window.alert("Valor invalido.");
+    return;
+  }
+
+  try {
+    const payload = await apiRequest("/api/platform/balance/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amountCents: Math.round(value * 100) })
+    });
+    state.platformBalanceCents = Number(payload.balanceCents || 0);
+    renderPlatformBalance();
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : "Nao foi possivel adicionar saldo.");
+  }
+}
+
+async function payPlatformOccurrenceNow(occurrenceId) {
+  try {
+    const payload = await apiRequest(`/api/platform/occurrences/${encodeURIComponent(occurrenceId)}/pay`, {
+      method: "POST"
+    });
+    state.platformBalanceCents = Number(payload?.result?.balanceCents || state.platformBalanceCents);
+    renderPlatformBalance();
+    await loadPlatformFinance();
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : "Nao foi possivel pagar agora.");
+  }
+}
 function handleSwipe(element, callback) {
   if (!element) {
     return;
@@ -1069,7 +1139,7 @@ platformWizardBackButton?.addEventListener("click", () => {
 platformWizardNextButton?.addEventListener("click", () => {
   platformWizardMessage.textContent = "";
   if (state.platformWizard.step === 1 && platformNameInput.value.trim().length < 2) {
-    platformWizardMessage.textContent = "Digite um nome válido.";
+    platformWizardMessage.textContent = "Digite um nome vÃ¡lido.";
     return;
   }
 
@@ -1077,7 +1147,7 @@ platformWizardNextButton?.addEventListener("click", () => {
     const raw = String(platformValueInput.value || "").replace(/\./g, "").replace(",", ".");
     const value = Number(raw);
     if (!Number.isFinite(value) || value <= 0) {
-      platformWizardMessage.textContent = "Digite um valor válido.";
+      platformWizardMessage.textContent = "Digite um valor vÃ¡lido.";
       return;
     }
   }
@@ -1202,6 +1272,13 @@ actionsList.addEventListener("click", async (event) => {
 platformEntriesList?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-delete-platform-entry]");
   if (!button) {
+    const row = event.target.closest("[data-occurrence-id]");
+    const status = String(row?.dataset?.status || "").trim().toUpperCase();
+    if (row && (status === "DUE_TODAY" || status === "OVERDUE")) {
+      if (window.confirm("Pagar agora?")) {
+        await payPlatformOccurrenceNow(row.dataset.occurrenceId);
+      }
+    }
     return;
   }
 
@@ -1210,7 +1287,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
     return;
   }
 
-  if (!window.confirm("Excluir este lançamento recorrente? Os valores já realizados permanecem.")) {
+  if (!window.confirm("Excluir este lanÃ§amento recorrente? Os valores jÃ¡ realizados permanecem.")) {
     return;
   }
 
@@ -1264,3 +1341,20 @@ openPlatformWizardButton?.addEventListener("click", () => {
 platformForm?.addEventListener("submit", (event) => {
   event.preventDefault();
 });
+
+togglePlatformBalanceButton?.addEventListener("click", () => {
+  state.platformBalanceHidden = !state.platformBalanceHidden;
+  renderPlatformBalance();
+});
+
+addPlatformBalanceButton?.addEventListener("click", () => {
+  void addPlatformBalanceNow();
+});
+
+
+
+
+
+
+
+

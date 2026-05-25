@@ -22,7 +22,7 @@ import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getSched
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions, updateUserActionStatus } from "./src/actions.js";
-import { createPlatformFinanceEntry, deletePlatformFinanceEntry, ensurePlatformFinanceSchema, listPlatformFinanceByRange, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
+import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3854,6 +3854,50 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel criar lancamento."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/platform/balance/add") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const balanceCents = await addPlatformBalance(user.id, body?.amountCents);
+      sendJson(response, 200, {
+        ok: true,
+        balanceCents
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel adicionar saldo."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/platform\/occurrences\/[^/]+\/pay$/)) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const occurrenceId = decodeURIComponent(pathname.replace(/^\/api\/platform\/occurrences\/([^/]+)\/pay$/, "$1"));
+      const result = await payPlatformOccurrence(user.id, occurrenceId);
+      sendJson(response, 200, {
+        ok: true,
+        result
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel pagar a despesa."
       });
     }
     return;

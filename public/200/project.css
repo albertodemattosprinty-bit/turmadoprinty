@@ -433,8 +433,36 @@ svg {
 .finance-overview {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.finance-balance {
+  position: relative;
+}
+
+.balance-visibility {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--white);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.task-row.task-pending-due {
+  background: rgba(244, 157, 38, 0.82);
+  border-color: rgba(255, 220, 163, 0.78);
+}
+
+.task-row.task-overdue {
+  background: rgba(197, 63, 63, 0.84);
+  border-color: rgba(255, 178, 178, 0.82);
 }
 
 .action-wizard {
@@ -671,6 +699,10 @@ svg {
   }
 
   .finance-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-overview {
     grid-template-columns: 1fr;
   }
 

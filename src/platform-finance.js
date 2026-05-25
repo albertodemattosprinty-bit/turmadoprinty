@@ -5,6 +5,11 @@ const KIND_EXPENSE = "EXPENSE";
 const RECURRENCE_SIMPLE = "SIMPLE";
 const RECURRENCE_RECURRING = "RECURRING";
 const MAX_TITLE_LENGTH = 90;
+const OCCURRENCE_STATUS_POSTED = "POSTED";
+const OCCURRENCE_STATUS_SCHEDULED = "SCHEDULED";
+const OCCURRENCE_STATUS_DUE_TODAY = "DUE_TODAY";
+const OCCURRENCE_STATUS_OVERDUE = "OVERDUE";
+const OCCURRENCE_STATUS_PAID = "PAID";
 
 const INCOME_CATEGORIES = new Set(["Eventos", "Inscricoes", "Apoiadores", "Emprestimo", "Venda de ativo"]);
 const EXPENSE_CATEGORIES = new Set(["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer"]);
@@ -109,8 +114,86 @@ function normalizeOccurrenceRow(row) {
     category: row.category,
     amountCents: Number(row.amount_cents || 0),
     occurredAt: toIso(row.occurred_at),
+    status: String(row.status || "").trim().toUpperCase() || OCCURRENCE_STATUS_POSTED,
+    paidAt: toIso(row.paid_at),
     source: row.source || "MATERIALIZED"
   };
+}
+
+function startOfToday() {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+}
+
+function addDays(date, amount) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function resolveExpensePendingStatus(occurredAt) {
+  const dueDate = new Date(occurredAt);
+  const today = startOfToday();
+  const tomorrow = addDays(today, 1);
+
+  if (dueDate < today) {
+    return OCCURRENCE_STATUS_OVERDUE;
+  }
+
+  if (dueDate >= today && dueDate < tomorrow) {
+    return OCCURRENCE_STATUS_DUE_TODAY;
+  }
+
+  return OCCURRENCE_STATUS_SCHEDULED;
+}
+
+async function setPlatformBalance(userId, nextBalanceCents) {
+  await query(
+    `
+      insert into platform_finance_balances (user_id, balance_cents)
+      values ($1, $2)
+      on conflict (user_id) do update
+        set balance_cents = excluded.balance_cents,
+            updated_at = now()
+    `,
+    [userId, Math.trunc(nextBalanceCents)]
+  );
+}
+
+async function adjustPlatformBalance(userId, deltaCents) {
+  const result = await query(
+    `
+      insert into platform_finance_balances (user_id, balance_cents)
+      values ($1, $2)
+      on conflict (user_id) do update
+        set balance_cents = platform_finance_balances.balance_cents + excluded.balance_cents,
+            updated_at = now()
+      returning balance_cents
+    `,
+    [userId, Math.trunc(deltaCents)]
+  );
+  return Number(result.rows[0]?.balance_cents || 0);
+}
+
+export async function getPlatformBalance(userId) {
+  await ensurePlatformFinanceSchema();
+  const result = await query(
+    `
+      select balance_cents
+      from platform_finance_balances
+      where user_id = $1
+      limit 1
+    `,
+    [userId]
+  );
+  return Number(result.rows[0]?.balance_cents || 0);
+}
+
+export async function addPlatformBalance(userId, amountCents) {
+  await ensurePlatformFinanceSchema();
+  const cents = normalizeAmountCents(amountCents);
+  return adjustPlatformBalance(userId, cents);
 }
 
 export async function ensurePlatformFinanceSchema() {
@@ -143,11 +226,22 @@ export async function ensurePlatformFinanceSchema() {
       category text not null,
       amount_cents integer not null,
       occurred_at timestamptz not null,
+      status text not null default 'POSTED',
+      paid_at timestamptz,
       created_at timestamptz not null default now()
     );
   `);
+  await query("alter table platform_finance_occurrences add column if not exists status text not null default 'POSTED';");
+  await query("alter table platform_finance_occurrences add column if not exists paid_at timestamptz;");
   await query("create index if not exists idx_platform_finance_occurrences_user_time on platform_finance_occurrences(user_id, occurred_at);");
   await query("create index if not exists idx_platform_finance_occurrences_entry on platform_finance_occurrences(entry_id);");
+  await query(`
+    create table if not exists platform_finance_balances (
+      user_id uuid primary key references users(id) on delete cascade,
+      balance_cents bigint not null default 0,
+      updated_at timestamptz not null default now()
+    );
+  `);
 }
 
 export async function createPlatformFinanceEntry(userId, payload) {
@@ -183,15 +277,20 @@ export async function createPlatformFinanceEntry(userId, payload) {
   const entry = normalizeEntryRow(result.rows[0]);
 
   if (recurrenceType === RECURRENCE_SIMPLE) {
+    const occurrenceStatus = kind === KIND_EXPENSE ? OCCURRENCE_STATUS_PAID : OCCURRENCE_STATUS_POSTED;
+    const paidAt = kind === KIND_EXPENSE ? new Date().toISOString() : null;
     await query(
       `
         insert into platform_finance_occurrences (
-          user_id, entry_id, name, kind, category, amount_cents, occurred_at
+          user_id, entry_id, name, kind, category, amount_cents, occurred_at, status, paid_at
         )
-        values ($1,$2,$3,$4,$5,$6,$7::timestamptz)
+        values ($1,$2,$3,$4,$5,$6,$7::timestamptz,$8,$9::timestamptz)
       `,
-      [userId, entry.id, entry.name, entry.kind, entry.category, entry.amountCents, new Date().toISOString()]
+      [userId, entry.id, entry.name, entry.kind, entry.category, entry.amountCents, new Date().toISOString(), occurrenceStatus, paidAt]
     );
+    if (kind === KIND_EXPENSE) {
+      await adjustPlatformBalance(userId, -entry.amountCents);
+    }
   }
 
   return entry;
@@ -227,11 +326,20 @@ async function materializeRecurringUntil(userId, entry, untilDate) {
         await query(
           `
             insert into platform_finance_occurrences (
-              user_id, entry_id, name, kind, category, amount_cents, occurred_at
+              user_id, entry_id, name, kind, category, amount_cents, occurred_at, status
             )
-            values ($1,$2,$3,$4,$5,$6,$7::timestamptz)
+            values ($1,$2,$3,$4,$5,$6,$7::timestamptz,$8)
           `,
-          [userId, entry.id, entry.name, entry.kind, entry.category, entry.amountCents, occDate.toISOString()]
+          [
+            userId,
+            entry.id,
+            entry.name,
+            entry.kind,
+            entry.category,
+            entry.amountCents,
+            occDate.toISOString(),
+            entry.kind === KIND_EXPENSE ? resolveExpensePendingStatus(occDate) : OCCURRENCE_STATUS_POSTED
+          ]
         );
       }
     }
@@ -278,35 +386,6 @@ export async function deletePlatformFinanceEntry(userId, entryId) {
   return { deleted: 1 };
 }
 
-function buildVirtualRecurringOccurrences(entries, fromDate, toDate) {
-  const occurrences = [];
-
-  for (const entry of entries) {
-    const start = new Date(entry.startsOn);
-    const cursor = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1);
-    const lastMonth = new Date(toDate.getFullYear(), toDate.getMonth(), 1);
-
-    while (cursor <= lastMonth) {
-      const occDate = resolveOccurrenceDateForMonth(cursor.getFullYear(), cursor.getMonth(), entry.recurrenceDayOfMonth);
-      if (occDate >= fromDate && occDate < toDate && occDate >= start) {
-        occurrences.push({
-          id: `virtual-${entry.id}-${toDateOnly(occDate)}`,
-          entryId: entry.id,
-          name: entry.name,
-          kind: entry.kind,
-          category: entry.category,
-          amountCents: entry.amountCents,
-          occurredAt: occDate.toISOString(),
-          source: "RECURRING"
-        });
-      }
-      cursor.setMonth(cursor.getMonth() + 1);
-    }
-  }
-
-  return occurrences;
-}
-
 export async function listPlatformFinanceByRange(userId, { from, to }) {
   await ensurePlatformFinanceSchema();
 
@@ -316,34 +395,102 @@ export async function listPlatformFinanceByRange(userId, { from, to }) {
     throw new Error("Intervalo de datas invalido.");
   }
 
-  const [materializedResult, recurringResult] = await Promise.all([
-    query(
-      `
-        select id, entry_id, name, kind, category, amount_cents, occurred_at, 'MATERIALIZED'::text as source
-        from platform_finance_occurrences
-        where user_id = $1
-          and occurred_at >= $2::timestamptz
-          and occurred_at < $3::timestamptz
-      `,
-      [userId, fromDate.toISOString(), toDate.toISOString()]
-    ),
-    query(
-      `
-        select *
-        from platform_finance_entries
-        where user_id = $1
-          and recurrence_type = 'RECURRING'
-          and deleted_at is null
-      `,
-      [userId]
-    )
-  ]);
-
+  const recurringResult = await query(
+    `
+      select *
+      from platform_finance_entries
+      where user_id = $1
+        and recurrence_type = 'RECURRING'
+        and deleted_at is null
+    `,
+    [userId]
+  );
   const recurringEntries = recurringResult.rows.map(normalizeEntryRow);
-  const virtual = buildVirtualRecurringOccurrences(recurringEntries, fromDate, toDate);
-  const list = [...materializedResult.rows.map(normalizeOccurrenceRow), ...virtual]
+  for (const recurringEntry of recurringEntries) {
+    await materializeRecurringUntil(userId, recurringEntry, toDate);
+  }
+
+  await syncDueStatuses(userId);
+
+  const materializedResult = await query(
+    `
+      select id, entry_id, name, kind, category, amount_cents, occurred_at, status, paid_at, 'MATERIALIZED'::text as source
+      from platform_finance_occurrences
+      where user_id = $1
+        and occurred_at >= $2::timestamptz
+        and occurred_at < $3::timestamptz
+    `,
+    [userId, fromDate.toISOString(), toDate.toISOString()]
+  );
+
+  const list = materializedResult.rows.map(normalizeOccurrenceRow)
     .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
   return list;
+}
+
+async function syncDueStatuses(userId) {
+  await query(
+    `
+      update platform_finance_occurrences
+      set status = case
+        when kind = 'EXPENSE' and paid_at is not null then '${OCCURRENCE_STATUS_PAID}'
+        when kind = 'EXPENSE' and paid_at is null and occurred_at::date < now()::date then '${OCCURRENCE_STATUS_OVERDUE}'
+        when kind = 'EXPENSE' and paid_at is null and occurred_at::date = now()::date then '${OCCURRENCE_STATUS_DUE_TODAY}'
+        when kind = 'EXPENSE' and paid_at is null and occurred_at::date > now()::date then '${OCCURRENCE_STATUS_SCHEDULED}'
+        else status
+      end
+      where user_id = $1
+        and kind = 'EXPENSE'
+    `,
+    [userId]
+  );
+}
+
+export async function payPlatformOccurrence(userId, occurrenceId) {
+  await ensurePlatformFinanceSchema();
+  await syncDueStatuses(userId);
+
+  const result = await query(
+    `
+      select id, amount_cents, kind, status, paid_at
+      from platform_finance_occurrences
+      where user_id = $1
+        and id = $2
+      limit 1
+    `,
+    [userId, String(occurrenceId || "").trim()]
+  );
+  const row = result.rows[0];
+
+  if (!row) {
+    throw new Error("Despesa nao encontrada.");
+  }
+
+  if (row.kind !== KIND_EXPENSE) {
+    throw new Error("Somente despesas podem ser pagas.");
+  }
+
+  if (row.paid_at || row.status === OCCURRENCE_STATUS_PAID) {
+    return { ok: true, alreadyPaid: true, balanceCents: await getPlatformBalance(userId) };
+  }
+
+  await query(
+    `
+      update platform_finance_occurrences
+      set status = $3,
+          paid_at = now()
+      where user_id = $1
+        and id = $2
+    `,
+    [userId, row.id, OCCURRENCE_STATUS_PAID]
+  );
+
+  const balanceCents = await adjustPlatformBalance(userId, -Number(row.amount_cents || 0));
+  return {
+    ok: true,
+    alreadyPaid: false,
+    balanceCents
+  };
 }
 
 export async function summarizePlatformFinanceMonth(userId, focusDate) {
@@ -369,9 +516,9 @@ export async function summarizePlatformFinanceMonth(userId, focusDate) {
   return {
     incomeCents,
     expenseCents,
+    balanceCents: await getPlatformBalance(userId),
     monthStart: monthStart.toISOString(),
     monthEnd: nextMonth.toISOString(),
     entries: items
   };
 }
-
