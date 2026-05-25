@@ -25,6 +25,18 @@ const wizardDateLabel = document.getElementById("wizardDateLabel");
 const repeatToggle = document.getElementById("repeatToggle");
 const repeatBox = document.getElementById("repeatBox");
 const weekdayRow = document.getElementById("weekdayRow");
+const financeIntroTitle = document.getElementById("financeIntroTitle");
+const financeDashboard = document.getElementById("financeDashboard");
+const financeStatus = document.getElementById("financeStatus");
+const financeTotalSales = document.getElementById("financeTotalSales");
+const financeSubscribers = document.getElementById("financeSubscribers");
+const financeMonthlyRevenue = document.getElementById("financeMonthlyRevenue");
+const moneyFormatter = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL"
+});
+
+let financeTimer = null;
 
 const state = {
   activeOffset: 0,
@@ -69,6 +81,10 @@ function formatDateLabel(date) {
 function formatTime(value) {
   const date = new Date(value);
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatMoney(cents) {
+  return moneyFormatter.format(Number(cents || 0) / 100);
 }
 
 function buildDateWithTime(date, hour, minute) {
@@ -146,12 +162,61 @@ function openModal(id) {
   if (id === "actionsModal") {
     void loadActions();
   }
+
+  if (id === "financeModal") {
+    startFinancePresentation();
+  }
 }
 
 function closeModal(modal) {
   modal.classList.remove("active");
   modal.setAttribute("aria-hidden", "true");
   closeWizard();
+
+  if (modal.id === "financeModal" && financeTimer) {
+    window.clearTimeout(financeTimer);
+    financeTimer = null;
+  }
+}
+
+function startFinancePresentation() {
+  if (financeTimer) {
+    window.clearTimeout(financeTimer);
+  }
+
+  financeIntroTitle.hidden = false;
+  financeDashboard.hidden = true;
+  financeStatus.textContent = "";
+
+  financeTimer = window.setTimeout(() => {
+    financeTimer = null;
+    void loadFinanceSummary();
+  }, 1000);
+}
+
+async function loadFinanceSummary() {
+  financeIntroTitle.hidden = true;
+
+  if (!getToken()) {
+    financeStatus.innerHTML = 'Entre como administrador para ver as finanças. <a href="/auth.html?next=/200">Entrar</a>';
+    return;
+  }
+
+  financeStatus.textContent = "Carregando...";
+
+  try {
+    const payload = await apiRequest("/api/finance/summary");
+    const summary = payload.summary || {};
+
+    financeTotalSales.textContent = formatMoney(summary.totalSalesCents);
+    financeSubscribers.textContent = String(summary.activeSubscribers || 0);
+    financeMonthlyRevenue.textContent = formatMoney(summary.monthlyRevenueCents);
+    financeDashboard.hidden = false;
+    financeStatus.textContent = "";
+  } catch (error) {
+    financeDashboard.hidden = true;
+    financeStatus.textContent = error instanceof Error ? error.message : "Nao foi possivel carregar as financas.";
+  }
 }
 
 function renderDateHeader() {

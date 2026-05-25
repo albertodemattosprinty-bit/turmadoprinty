@@ -663,6 +663,50 @@ async function requireAdmin(request, response) {
   return user;
 }
 
+async function buildFinanceSummary() {
+  await ensurePaymentSchema();
+
+  const result = await query(`
+    with album_sales as (
+      select coalesce(sum(amount_cents), 0)::bigint as total_cents
+      from user_album_purchases
+      where status in ('PAID', 'AUTHORIZED')
+         or paid_at is not null
+    ),
+    plan_sales as (
+      select coalesce(sum(amount_cents), 0)::bigint as total_cents
+      from user_plan_subscriptions
+      where plan_id <> 'gratis'
+        and (
+          status in ('ACTIVE', 'PAID', 'AUTHORIZED')
+          or activated_at is not null
+        )
+    ),
+    active_subscriptions as (
+      select distinct on (user_id)
+        user_id,
+        amount_cents
+      from user_plan_subscriptions
+      where plan_id <> 'gratis'
+        and status in ('ACTIVE', 'PAID', 'AUTHORIZED')
+      order by user_id, updated_at desc
+    )
+    select
+      ((select total_cents from album_sales) + (select total_cents from plan_sales))::bigint as total_sales_cents,
+      (select count(*)::int from active_subscriptions) as active_subscribers,
+      (select coalesce(sum(amount_cents), 0)::bigint from active_subscriptions) as monthly_revenue_cents
+  `);
+
+  const row = result.rows[0] || {};
+
+  return {
+    totalSalesCents: Number(row.total_sales_cents || 0),
+    activeSubscribers: Number(row.active_subscribers || 0),
+    monthlyRevenueCents: Number(row.monthly_revenue_cents || 0),
+    generatedAt: new Date().toISOString()
+  };
+}
+
 async function ensurePaymentsReady(response) {
   if (!hasDatabase()) {
     sendJson(response, 503, {
@@ -3510,6 +3554,24 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel excluir a acao."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/finance/summary") {
+    try {
+      const adminUser = await requireAdmin(request, response);
+
+      if (!adminUser) {
+        return;
+      }
+
+      const summary = await buildFinanceSummary();
+      sendJson(response, 200, { ok: true, summary });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar as financas."
       });
     }
     return;
