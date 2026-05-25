@@ -3,7 +3,12 @@
   const managedSelector = 'input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="date"]):not([type="datetime-local"]):not([type="month"]):not([type="time"]):not([type="week"]), textarea';
   const skipTypes = new Set(["number"]);
   const stateByField = new WeakMap();
+  const mobileOnly = window.matchMedia("(max-width: 900px)").matches;
   let activeSession = null;
+
+  if (!mobileOnly) {
+    return;
+  }
 
   function injectStyles() {
     if (document.getElementById("speech-input-kit-styles")) {
@@ -54,6 +59,19 @@
     return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="${color}" d="M18.3 5.7a1 1 0 0 0-1.4 0L12 10.6 7.1 5.7a1 1 0 0 0-1.4 1.4l4.9 4.9-4.9 4.9a1 1 0 1 0 1.4 1.4l4.9-4.9 4.9 4.9a1 1 0 0 0 1.4-1.4l-4.9-4.9 4.9-4.9a1 1 0 0 0 0-1.4"/></svg>`;
   }
 
+  function toTitleCase(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return "";
+    }
+    if (/^[\d\s.,:/-]+$/.test(text)) {
+      return text;
+    }
+    return text
+      .toLocaleLowerCase("pt-BR")
+      .replace(/\p{L}+/gu, (word) => word.charAt(0).toLocaleUpperCase("pt-BR") + word.slice(1));
+  }
+
   function isSupportedField(field) {
     if (!field || field.dataset.speechKitReady === "1") {
       return false;
@@ -61,7 +79,6 @@
     if (field.disabled || field.readOnly) {
       return false;
     }
-
     const type = String(field.type || "").toLowerCase();
     if (skipTypes.has(type)) {
       return false;
@@ -79,17 +96,14 @@
     if (!state?.button) {
       return;
     }
-
     if (mode === "listening") {
       state.button.innerHTML = createMicSvg("#c72127");
       return;
     }
-
     if (mode === "clear") {
       state.button.innerHTML = createCloseSvg("#d92626");
       return;
     }
-
     state.button.innerHTML = createMicSvg("#0b3da8");
   }
 
@@ -144,7 +158,7 @@
       }
 
       const composed = [baseText, finalTranscript, interim].filter(Boolean).join(" ").trim();
-      field.value = composed;
+      field.value = toTitleCase(composed);
       triggerInputEvents(field);
       setButtonVisual(field, "listening");
     };
@@ -211,6 +225,12 @@
 
     field.addEventListener("input", () => {
       if (activeSession?.field !== field) {
+        const normalized = toTitleCase(field.value);
+        if (normalized !== field.value) {
+          field.value = normalized;
+        }
+      }
+      if (activeSession?.field !== field) {
         syncButtonByValue(field);
       }
     });
@@ -231,7 +251,6 @@
           if (!(node instanceof HTMLElement)) {
             continue;
           }
-
           if (node.matches?.(managedSelector)) {
             installField(node);
           }
@@ -239,7 +258,6 @@
         }
       }
     });
-
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
