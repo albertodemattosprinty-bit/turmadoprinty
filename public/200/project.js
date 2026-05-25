@@ -95,11 +95,10 @@ const statsGeneralGoals = document.getElementById("statsGeneralGoals");
 const statsDailyGoalProgress = document.getElementById("statsDailyGoalProgress");
 const statsMonthlyGoalProgress = document.getElementById("statsMonthlyGoalProgress");
 const statsRecurringGoalProgress = document.getElementById("statsRecurringGoalProgress");
-const statsAssigneeCard = document.getElementById("statsAssigneeCard");
-const statsAssigneePercent = document.getElementById("statsAssigneePercent");
-const statsAssigneeAvatar = document.getElementById("statsAssigneeAvatar");
-const statsAssigneeName = document.getElementById("statsAssigneeName");
-const statsAssigneeDetail = document.getElementById("statsAssigneeDetail");
+const statsGeneralPercent = document.getElementById("statsGeneralPercent");
+const statsGeneralAvatar = document.getElementById("statsGeneralAvatar");
+const statsGeneralDetail = document.getElementById("statsGeneralDetail");
+const statsRankingList = document.getElementById("statsRankingList");
 const editStatsGoalsButton = document.getElementById("editStatsGoals");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
@@ -133,7 +132,6 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
 
 let financeTimer = null;
 let assigneeProgressTicker = null;
-let statsTicker = null;
 
 const state = {
   activeOffset: 0,
@@ -152,8 +150,8 @@ const state = {
   assigneeProgressIndex: 0,
   statsSummary: null,
   statsGoals: null,
-  statsRotation: [],
-  statsRotationIndex: 0,
+  statsRanking: [],
+  statsGeneral: null,
   actions: [],
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState()
@@ -351,10 +349,6 @@ function closeModal(modal) {
     financeTimer = null;
   }
 
-  if (modal.id === "statsModal" && statsTicker) {
-    window.clearInterval(statsTicker);
-    statsTicker = null;
-  }
 }
 
 function getActiveFinancePeriod() {
@@ -1010,39 +1004,6 @@ function moveStatsScope(amount) {
   void loadStatsSummary();
 }
 
-function renderStatsRotationCard() {
-  if (!state.statsRotation.length) {
-    statsAssigneePercent.textContent = "0%";
-    statsAssigneeName.textContent = "Sem dados";
-    statsAssigneeDetail.textContent = "0/0 min";
-    statsAssigneeAvatar.src = actionAvatarByAssignee.Geral;
-    return;
-  }
-
-  const current = state.statsRotation[state.statsRotationIndex] || state.statsRotation[0];
-  statsAssigneePercent.textContent = `${current.percent}%`;
-  statsAssigneeName.textContent = current.name;
-  statsAssigneeDetail.textContent = `${current.completed}/${current.total} min`;
-  statsAssigneeAvatar.src = getActionAvatarPath(current.name);
-}
-
-function startStatsRotation() {
-  if (statsTicker) {
-    window.clearInterval(statsTicker);
-    statsTicker = null;
-  }
-
-  renderStatsRotationCard();
-
-  statsTicker = window.setInterval(() => {
-    if (!state.statsRotation.length) {
-      return;
-    }
-    state.statsRotationIndex = (state.statsRotationIndex + 1) % state.statsRotation.length;
-    renderStatsRotationCard();
-  }, 1500);
-}
-
 function safeGoalPercent(value, goal) {
   if (!goal || goal <= 0) {
     return 0;
@@ -1069,24 +1030,73 @@ function renderStatsGoals() {
   statsRecurringGoalProgress.textContent = `${recurringPercent}%`;
 }
 
-function buildStatsRotationFromSummary() {
+function buildStatsRankingFromSummary() {
   const byAssignee = state.statsSummary?.byAssignee || {};
-  const rotation = [];
-  const orderedNames = ["Geral", ...assigneeOptions.filter((name) => name !== "Geral")];
+  const ranking = [];
+  const orderedNames = assigneeOptions;
   for (const name of orderedNames) {
     const item = byAssignee[name] || { totalMinutes: 0, completedMinutes: 0 };
     const total = Number(item.totalMinutes || 0);
     const completed = Number(item.completedMinutes || 0);
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-    rotation.push({
+    const payload = {
       name,
       total,
       completed,
       percent
-    });
+    };
+
+    if (name === "Geral") {
+      state.statsGeneral = payload;
+    } else {
+      ranking.push(payload);
+    }
   }
-  state.statsRotation = rotation;
-  state.statsRotationIndex = 0;
+
+  ranking.sort((left, right) => {
+    if (right.percent !== left.percent) {
+      return right.percent - left.percent;
+    }
+    if (right.completed !== left.completed) {
+      return right.completed - left.completed;
+    }
+    return left.name.localeCompare(right.name, "pt-BR");
+  });
+
+  state.statsRanking = ranking;
+}
+
+function renderStatsRanking() {
+  const general = state.statsGeneral || { percent: 0, completed: 0, total: 0 };
+  statsGeneralPercent.textContent = `${general.percent}%`;
+  statsGeneralAvatar.src = actionAvatarByAssignee.Geral;
+  statsGeneralDetail.textContent = `${general.completed}/${general.total} min`;
+
+  if (!statsRankingList) {
+    return;
+  }
+
+  statsRankingList.innerHTML = "";
+
+  if (!state.statsRanking.length) {
+    statsRankingList.innerHTML = '<div class="empty-state">Sem tarefas para ranking nesse periodo.</div>';
+    return;
+  }
+
+  state.statsRanking.forEach((entry, index) => {
+    const row = document.createElement("article");
+    row.className = "task-row";
+    row.innerHTML = `
+      <div class="task-time">${entry.percent}%</div>
+      <img class="task-avatar" src="${getActionAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
+      <div class="task-main">
+        <div class="task-title">${escapeHtml(entry.name)}</div>
+        <div class="task-assignee">${entry.completed}/${entry.total} min</div>
+      </div>
+      <div class="stats-rank-badge">${index + 1}º</div>
+    `;
+    statsRankingList.appendChild(row);
+  });
 }
 
 async function loadStatsSummary() {
@@ -1106,15 +1116,17 @@ async function loadStatsSummary() {
     state.statsSummary = summaryPayload.summary || {};
     state.statsGoals = goalsPayload.goals || null;
     state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
-    buildStatsRotationFromSummary();
+    buildStatsRankingFromSummary();
     renderStatsGoals();
-    startStatsRotation();
+    renderStatsRanking();
 
     const isGeneral = scope.key === "general";
     statsGeneralGoals.hidden = !isGeneral;
     editStatsGoalsButton.hidden = !isGeneral;
   } catch (error) {
-    statsAssigneeName.textContent = error instanceof Error ? error.message : "Falha";
+    if (statsRankingList) {
+      statsRankingList.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha")}</div>`;
+    }
   }
 }
 

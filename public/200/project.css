@@ -439,6 +439,22 @@ svg {
   color: rgba(255, 255, 255, 0.98);
 }
 
+.stats-general-card {
+  background: rgba(143, 211, 255, 0.32);
+  border-color: rgba(186, 231, 255, 0.92);
+}
+
+#statsRankingList {
+  display: grid;
+  gap: 10px;
+}
+
+.stats-rank-badge {
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.94);
+  text-align: right;
+}
+
 .finance-overview {
   width: 100%;
   display: grid;
