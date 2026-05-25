@@ -7,7 +7,7 @@ const ACTION_STATUS_PENDING = "PENDING";
 const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
 const DEFAULT_ASSIGNEE = "Geral";
-const ALLOWED_ASSIGNEES = new Set(["Rose", "Geral", "Alberto", "Lucas", "Thainan", "Wilton"]);
+const ALLOWED_ASSIGNEES = new Set(["Rose", "Geral", "Alberto", "Lucas", "Thainan"]);
 
 function toIso(value) {
   if (!value) {

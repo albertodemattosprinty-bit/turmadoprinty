@@ -520,11 +520,15 @@ svg {
 }
 
 .task-assignee {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.98);
 }
 
 .stats-general-card {
+  grid-template-columns: 52px 1fr;
   background: rgba(143, 211, 255, 0.32);
   border-color: rgba(186, 231, 255, 0.92);
 }

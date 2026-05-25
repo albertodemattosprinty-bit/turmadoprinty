@@ -7,7 +7,7 @@ const actionStatuses = {
   inProgress: "IN_PROGRESS",
   completed: "COMPLETED"
 };
-const assigneeOptions = ["Rose", "Geral", "Alberto", "Lucas", "Thainan", "Wilton"];
+const assigneeOptions = ["Rose", "Geral", "Alberto", "Lucas", "Thainan"];
 const statsScopes = [
   { key: "general", label: "Geral" },
   { key: "today", label: "Hoje" },
@@ -110,7 +110,6 @@ const statsGeneralGoals = document.getElementById("statsGeneralGoals");
 const statsDailyGoalProgress = document.getElementById("statsDailyGoalProgress");
 const statsMonthlyGoalProgress = document.getElementById("statsMonthlyGoalProgress");
 const statsRecurringGoalProgress = document.getElementById("statsRecurringGoalProgress");
-const statsGeneralPercent = document.getElementById("statsGeneralPercent");
 const statsGeneralAvatar = document.getElementById("statsGeneralAvatar");
 const statsGeneralDetail = document.getElementById("statsGeneralDetail");
 const statsRankingList = document.getElementById("statsRankingList");
@@ -1093,9 +1092,8 @@ function buildStatsRankingFromSummary() {
 
 function renderStatsRanking() {
   const general = state.statsGeneral || { percent: 0, completed: 0, total: 0 };
-  statsGeneralPercent.textContent = `${general.percent}%`;
   statsGeneralAvatar.src = actionAvatarByAssignee.Geral;
-  statsGeneralDetail.textContent = `${general.completed}/${general.total} min`;
+  statsGeneralDetail.textContent = `${general.percent}%`;
 
   if (!statsRankingList) {
     return;
@@ -1117,7 +1115,8 @@ function renderStatsRanking() {
         <span class="stats-rank-badge">${index + 1}º</span>
       </div>
       <div class="task-main">
-        <div class="task-title">${escapeHtml(`${entry.name} · ${entry.percent}%`)}</div>
+        <div class="task-title">${escapeHtml(entry.name)}</div>
+        <div class="task-assignee">${entry.percent}%</div>
       </div>
     `;
     statsRankingList.appendChild(row);

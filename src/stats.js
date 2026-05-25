@@ -1,6 +1,6 @@
 import { query } from "./db.js";
 
-const ASSIGNEES = ["Geral", "Rose", "Alberto", "Lucas", "Thainan", "Wilton"];
+const ASSIGNEES = ["Geral", "Rose", "Alberto", "Lucas", "Thainan"];
 
 function startOfDay(date) {
   const value = new Date(date);
@@ -261,4 +261,3 @@ export async function getStatsSummary(userId, scope) {
     to: range.to ? range.to.toISOString() : null
   });
 }
-
