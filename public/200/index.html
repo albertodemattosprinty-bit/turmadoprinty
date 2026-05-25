@@ -274,7 +274,6 @@
   </section>
 
   <section class="workspace-modal" id="statsModal" aria-hidden="true" aria-label="Estatísticas">
-    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
     <div class="actions-app">
       <header class="actions-head">
         <button class="circle-nav" type="button" data-stats-scope-nav="-1" aria-label="Escopo anterior">
@@ -288,7 +287,6 @@
 
       <section class="finance-overview" id="statsGeneralGoals">
         <article class="finance-metric">
-          <button class="balance-visibility" type="button" id="editStatsGoals" aria-label="Editar metas">?</button>
           <span>Meta diária</span>
           <strong id="statsDailyGoalProgress">0%</strong>
         </article>
@@ -313,6 +311,14 @@
           </div>
         </article>
         <div id="statsRankingList"></div>
+      </div>
+      <div class="actions-side-actions stats-side-actions">
+        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="editStatsGoals" aria-label="Editar metas">
+          <img src="/200/icons/star.svg" alt="" aria-hidden="true" />
+        </button>
+        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar estatísticas">
+          <img src="/200/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
       </div>
     </div>
   </section>

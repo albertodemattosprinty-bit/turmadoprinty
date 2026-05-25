@@ -243,6 +243,11 @@ svg {
   gap: 14px;
 }
 
+#actionsModal .actions-head,
+#statsModal .actions-head {
+  gap: 8px;
+}
+
 #calendarModal .actions-head {
   flex-wrap: wrap;
   justify-content: space-between;
@@ -299,6 +304,19 @@ svg {
   font-size: clamp(2rem, 8vw, 4.2rem);
   font-weight: 800;
   cursor: grab;
+}
+
+#actionsModal .circle-nav,
+#statsModal .circle-nav {
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+}
+
+#actionsModal .date-title,
+#statsModal .date-title {
+  min-width: 90px;
+  font-size: clamp(1.2rem, 4.8vw, 2.5rem);
 }
 
 .auth-alert {
@@ -959,6 +977,11 @@ svg {
 
 .actions-side-btn-right {
   right: 12px;
+}
+
+.stats-side-actions .actions-side-btn-left,
+.stats-side-actions .actions-side-btn-right {
+  top: 12px;
 }
 
 #actionsModal .actions-progress-track {
