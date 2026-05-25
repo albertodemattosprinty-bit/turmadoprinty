@@ -73,6 +73,15 @@
       </div>
 
       <div class="actions-list" id="actionsList" aria-live="polite"></div>
+      <footer class="actions-progress" id="actionsProgress" hidden>
+        <div class="actions-progress-head">
+          <strong id="actionsProgressLabel">0% concluido</strong>
+          <span id="actionsProgressMinutes">0/0 min</span>
+        </div>
+        <div class="actions-progress-track" role="progressbar" aria-label="Progresso diario de tarefas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="actions-progress-fill" id="actionsProgressFill"></div>
+        </div>
+      </footer>
       <button class="floating-add" type="button" id="openActionWizard">Adicionar tarefa</button>
     </div>
 

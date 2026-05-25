@@ -21,7 +21,7 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions } from "./src/actions.js";
+import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions, updateUserActionStatus } from "./src/actions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -120,7 +120,7 @@ function applyCorsHeaders(request, response) {
 
   response.setHeader("Access-Control-Allow-Origin", origin);
   response.setHeader("Vary", "Origin");
-  response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
   response.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Type, Content-Disposition");
 }
@@ -3835,6 +3835,29 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel excluir a acao."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/actions\/[^/]+\/status$/)) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)\/status$/, "$1"));
+      const action = await updateUserActionStatus(user.id, actionId);
+
+      sendJson(response, action ? 200 : 404, {
+        ok: Boolean(action),
+        action
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel atualizar o status da tarefa."
       });
     }
     return;

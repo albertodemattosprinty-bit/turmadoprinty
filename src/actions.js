@@ -3,6 +3,9 @@ import crypto from "node:crypto";
 import { query } from "./db.js";
 
 const MAX_OCCURRENCES = 370;
+const ACTION_STATUS_PENDING = "PENDING";
+const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
+const ACTION_STATUS_COMPLETED = "COMPLETED";
 
 function toIso(value) {
   if (!value) {
@@ -10,6 +13,34 @@ function toIso(value) {
   }
 
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function normalizeActionStatus(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+
+  if (normalized === ACTION_STATUS_IN_PROGRESS) {
+    return ACTION_STATUS_IN_PROGRESS;
+  }
+
+  if (normalized === ACTION_STATUS_COMPLETED) {
+    return ACTION_STATUS_COMPLETED;
+  }
+
+  return ACTION_STATUS_PENDING;
+}
+
+function getNextActionStatus(currentStatus) {
+  const normalized = normalizeActionStatus(currentStatus);
+
+  if (normalized === ACTION_STATUS_PENDING) {
+    return ACTION_STATUS_IN_PROGRESS;
+  }
+
+  if (normalized === ACTION_STATUS_IN_PROGRESS) {
+    return ACTION_STATUS_COMPLETED;
+  }
+
+  return ACTION_STATUS_COMPLETED;
 }
 
 function normalizeAction(row) {
@@ -22,6 +53,10 @@ function normalizeAction(row) {
     repeatGroupId: row.repeat_group_id || null,
     repeatRule: row.repeat_rule || "none",
     repeatDays: Array.isArray(row.repeat_days) ? row.repeat_days : [],
+    status: normalizeActionStatus(row.status_override),
+    startedAt: toIso(row.status_started_at),
+    completedAt: toIso(row.status_completed_at),
+    statusUpdatedAt: toIso(row.status_updated_at),
     createdAt: toIso(row.created_at)
   };
 }
@@ -64,6 +99,60 @@ export async function ensureActionsSchema() {
 
   await query("create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);");
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");
+
+  await query(`
+    create table if not exists action_status_overrides (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references users(id) on delete cascade,
+      action_id uuid not null,
+      repeat_group_id uuid,
+      status text not null default 'PENDING',
+      started_at timestamptz,
+      completed_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (user_id, action_id)
+    );
+  `);
+  await query("create index if not exists idx_action_status_overrides_repeat_group on action_status_overrides(user_id, repeat_group_id);");
+  await query("create index if not exists idx_action_status_overrides_status on action_status_overrides(user_id, status);");
+}
+
+async function getUserActionById(userId, actionId) {
+  const trimmedActionId = String(actionId || "").trim();
+
+  if (!trimmedActionId) {
+    return null;
+  }
+
+  const result = await query(
+    `
+      select
+        a.id,
+        a.user_id,
+        a.title,
+        a.start_at,
+        a.end_at,
+        a.repeat_group_id,
+        a.repeat_rule,
+        a.repeat_days,
+        a.created_at,
+        o.status as status_override,
+        o.started_at as status_started_at,
+        o.completed_at as status_completed_at,
+        o.updated_at as status_updated_at
+      from actions a
+      left join action_status_overrides o
+        on o.user_id = a.user_id
+       and o.action_id = a.id
+      where a.user_id = $1
+        and a.id = $2
+      limit 1
+    `,
+    [userId, trimmedActionId]
+  );
+
+  return result.rows[0] ? normalizeAction(result.rows[0]) : null;
 }
 
 export async function listUserActions(userId, { from, to }) {
@@ -78,12 +167,28 @@ export async function listUserActions(userId, { from, to }) {
 
   const result = await query(
     `
-      select id, user_id, title, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
-      from actions
-      where user_id = $1
-        and start_at < $3
-        and end_at > $2
-      order by start_at asc, created_at asc
+      select
+        a.id,
+        a.user_id,
+        a.title,
+        a.start_at,
+        a.end_at,
+        a.repeat_group_id,
+        a.repeat_rule,
+        a.repeat_days,
+        a.created_at,
+        o.status as status_override,
+        o.started_at as status_started_at,
+        o.completed_at as status_completed_at,
+        o.updated_at as status_updated_at
+      from actions a
+      left join action_status_overrides o
+        on o.user_id = a.user_id
+       and o.action_id = a.id
+      where a.user_id = $1
+        and a.start_at < $3
+        and a.end_at > $2
+      order by a.start_at asc, a.created_at asc
     `,
     [userId, fromDate.toISOString(), toDate.toISOString()]
   );
@@ -175,6 +280,64 @@ export async function createUserAction(userId, payload) {
   );
 
   return result.rows.map(normalizeAction);
+}
+
+export async function updateUserActionStatus(userId, actionId) {
+  await ensureActionsSchema();
+
+  const action = await getUserActionById(userId, actionId);
+
+  if (!action) {
+    throw new Error("Tarefa nao encontrada.");
+  }
+
+  const nextStatus = getNextActionStatus(action.status);
+
+  if (action.status === ACTION_STATUS_COMPLETED && nextStatus === ACTION_STATUS_COMPLETED) {
+    return action;
+  }
+
+  const nowIso = new Date().toISOString();
+  let startedAt = action.startedAt;
+  let completedAt = action.completedAt;
+
+  if (nextStatus === ACTION_STATUS_IN_PROGRESS) {
+    startedAt = startedAt || nowIso;
+    completedAt = null;
+  } else if (nextStatus === ACTION_STATUS_COMPLETED) {
+    startedAt = startedAt || nowIso;
+    completedAt = completedAt || nowIso;
+  }
+
+  await query(
+    `
+      insert into action_status_overrides (
+        user_id,
+        action_id,
+        repeat_group_id,
+        status,
+        started_at,
+        completed_at
+      )
+      values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+      on conflict (user_id, action_id) do update
+        set repeat_group_id = excluded.repeat_group_id,
+            status = excluded.status,
+            started_at = excluded.started_at,
+            completed_at = excluded.completed_at,
+            updated_at = now()
+    `,
+    [
+      userId,
+      action.id,
+      action.repeatGroupId,
+      nextStatus,
+      startedAt || null,
+      completedAt || null
+    ]
+  );
+
+  return getUserActionById(userId, action.id);
 }
 
 export async function deleteUserAction(userId, actionId) {

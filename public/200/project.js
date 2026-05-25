@@ -2,6 +2,11 @@ import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const actionStatuses = {
+  pending: "PENDING",
+  inProgress: "IN_PROGRESS",
+  completed: "COMPLETED"
+};
 const financePeriods = [
   { key: "total", label: "Total" },
   { key: "today", label: "Hoje" },
@@ -31,6 +36,10 @@ const recurrenceDays = {
 const activeDateLabel = document.getElementById("activeDateLabel");
 const actionsAuthAlert = document.getElementById("actionsAuthAlert");
 const actionsList = document.getElementById("actionsList");
+const actionsProgress = document.getElementById("actionsProgress");
+const actionsProgressLabel = document.getElementById("actionsProgressLabel");
+const actionsProgressMinutes = document.getElementById("actionsProgressMinutes");
+const actionsProgressFill = document.getElementById("actionsProgressFill");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
@@ -110,6 +119,20 @@ function formatTime(value) {
 
 function formatMoney(cents) {
   return moneyFormatter.format(Number(cents || 0) / 100);
+}
+
+function normalizeActionStatus(status) {
+  const normalized = String(status || "").trim().toUpperCase();
+
+  if (normalized === actionStatuses.inProgress) {
+    return actionStatuses.inProgress;
+  }
+
+  if (normalized === actionStatuses.completed) {
+    return actionStatuses.completed;
+  }
+
+  return actionStatuses.pending;
 }
 
 function buildDateWithTime(date, hour, minute) {
@@ -288,27 +311,94 @@ function renderActions() {
   actionsAuthAlert.hidden = Boolean(getToken());
 
   if (!getToken()) {
+    actionsProgress.hidden = true;
     actionsList.innerHTML = '<div class="empty-state">A agenda fica salva quando voce entra na conta.</div>';
     return;
   }
 
   if (!state.actions.length) {
     actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse dia.</div>';
+    renderActionsProgress();
     return;
   }
 
   state.actions.forEach((action) => {
+    const status = normalizeActionStatus(action.status);
+    const stateClass = status === actionStatuses.inProgress
+      ? " task-in-progress"
+      : (status === actionStatuses.completed ? " task-completed" : "");
+    const statusMeta = getActionStatusMeta(action, status);
     const row = document.createElement("article");
-    row.className = "task-row";
+    row.className = `task-row${stateClass}`;
+    row.dataset.actionId = action.id;
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
     row.innerHTML = `
       <div class="task-time">${formatTime(action.startAt)}<br>${formatTime(action.endAt)}</div>
-      <div class="task-title">${escapeHtml(action.title)}</div>
+      <div class="task-main">
+        <div class="task-title">${escapeHtml(action.title)}</div>
+        <div class="task-meta">${escapeHtml(statusMeta)}</div>
+      </div>
       <button class="delete-task" type="button" data-delete-action="${action.id}" aria-label="Excluir tarefa">
         <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
       </button>
     `;
     actionsList.appendChild(row);
   });
+
+  renderActionsProgress();
+}
+
+function getActionStatusMeta(action, normalizedStatus = normalizeActionStatus(action.status)) {
+  if (normalizedStatus === actionStatuses.inProgress) {
+    const startedAt = action.startedAt ? formatTime(action.startedAt) : formatTime(action.startAt);
+    return `Em andamento desde ${startedAt}`;
+  }
+
+  if (normalizedStatus === actionStatuses.completed) {
+    const startedAt = action.startedAt ? formatTime(action.startedAt) : formatTime(action.startAt);
+    const completedAt = action.completedAt ? formatTime(action.completedAt) : formatTime(action.endAt);
+    return `Concluida (${startedAt} - ${completedAt})`;
+  }
+
+  return "Toque para iniciar";
+}
+
+function getActionDurationMinutes(action) {
+  const start = new Date(action.startAt).getTime();
+  const end = new Date(action.endAt).getTime();
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return 0;
+  }
+
+  return Math.max(0, Math.round((end - start) / (60 * 1000)));
+}
+
+function renderActionsProgress() {
+  if (!getToken()) {
+    actionsProgress.hidden = true;
+    return;
+  }
+
+  actionsProgress.hidden = false;
+
+  const totalMinutes = state.actions.reduce((sum, action) => sum + getActionDurationMinutes(action), 0);
+  const completedMinutes = state.actions.reduce((sum, action) => {
+    const status = normalizeActionStatus(action.status);
+    if (status !== actionStatuses.completed) {
+      return sum;
+    }
+    return sum + getActionDurationMinutes(action);
+  }, 0);
+  const percent = totalMinutes > 0
+    ? Math.max(0, Math.min(100, Math.round((completedMinutes / totalMinutes) * 100)))
+    : 0;
+
+  actionsProgressLabel.textContent = `${percent}% concluido`;
+  actionsProgressMinutes.textContent = `${completedMinutes}/${totalMinutes} min`;
+  actionsProgressFill.style.width = `${percent}%`;
+  actionsProgressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
 }
 
 function escapeHtml(value) {
@@ -337,7 +427,39 @@ async function loadActions() {
     state.actions = payload.actions || [];
     renderActions();
   } catch (error) {
+    actionsProgress.hidden = true;
     actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function toggleActionStatus(actionId) {
+  const targetId = String(actionId || "").trim();
+
+  if (!targetId) {
+    return;
+  }
+
+  const targetAction = state.actions.find((item) => item.id === targetId);
+
+  if (!targetAction) {
+    return;
+  }
+
+  try {
+    const payload = await apiRequest(`/api/actions/${encodeURIComponent(targetId)}/status`, {
+      method: "PATCH"
+    });
+    const updated = payload?.action || null;
+
+    if (!updated) {
+      throw new Error("Nao foi possivel atualizar o status.");
+    }
+
+    state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
+    renderActions();
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : "Nao foi possivel atualizar a tarefa.");
+    renderActions();
   }
 }
 
@@ -671,6 +793,13 @@ actionsList.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-delete-action]");
 
   if (!button) {
+    const row = event.target.closest("[data-action-id]");
+
+    if (!row) {
+      return;
+    }
+
+    await toggleActionStatus(row.dataset.actionId);
     return;
   }
 
@@ -686,6 +815,25 @@ actionsList.addEventListener("click", async (event) => {
   } catch (error) {
     actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
   }
+});
+
+actionsList.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+
+  if (event.target.closest("[data-delete-action]")) {
+    return;
+  }
+
+  const row = event.target.closest("[data-action-id]");
+
+  if (!row) {
+    return;
+  }
+
+  event.preventDefault();
+  await toggleActionStatus(row.dataset.actionId);
 });
 
 handleSwipe(activeDateLabel, moveActiveDate);
