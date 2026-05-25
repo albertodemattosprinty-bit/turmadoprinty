@@ -51,6 +51,7 @@ const platformCategoryIconByName = {
   Site: "/200/icons/site.svg",
   "Venda de ativo": "/200/icons/venda-de-ativo.svg"
 };
+const constitutionDefaultText = "O Projeto Família é o nosso principal e mais importante projeto, ele visa bem estar, segurança em um projeto contínuo de longo prazo, todos os envolvidos se comprometem a concluir de boa vontade as propostas descritas no projeto";
 const financePeriods = [
   { key: "total", label: "Total" },
   { key: "today", label: "Hoje" },
@@ -139,6 +140,16 @@ const financeSalesLabel = document.getElementById("financeSalesLabel");
 const financeTotalSales = document.getElementById("financeTotalSales");
 const financeSubscribers = document.getElementById("financeSubscribers");
 const financeMonthlyRevenue = document.getElementById("financeMonthlyRevenue");
+const constitutionVersionLabel = document.getElementById("constitutionVersionLabel");
+const constitutionAuthAlert = document.getElementById("constitutionAuthAlert");
+const constitutionTextView = document.getElementById("constitutionTextView");
+const constitutionMessage = document.getElementById("constitutionMessage");
+const constitutionAvatars = document.getElementById("constitutionAvatars");
+const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
+const constitutionEditWrap = document.getElementById("constitutionEditWrap");
+const constitutionEditor = document.getElementById("constitutionEditor");
+const saveConstitutionEditButton = document.getElementById("saveConstitutionEdit");
+const cancelConstitutionEditButton = document.getElementById("cancelConstitutionEdit");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
@@ -167,6 +178,9 @@ const state = {
   statsGoals: null,
   statsRanking: [],
   statsGeneral: null,
+  constitutionVersions: [],
+  constitutionIndex: 0,
+  constitutionEditing: false,
   actions: [],
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState()
@@ -353,6 +367,10 @@ function openModal(id) {
   if (id === "financeModal") {
     startFinancePresentation();
   }
+
+  if (id === "constitutionModal") {
+    void loadConstitution();
+  }
 }
 
 function closeModal(modal) {
@@ -371,6 +389,160 @@ function closeModal(modal) {
     platformMetricsTicker = null;
   }
 
+  if (modal.id === "constitutionModal") {
+    state.constitutionEditing = false;
+    constitutionEditWrap.hidden = true;
+    constitutionMessage.textContent = "";
+  }
+}
+
+function getActiveConstitutionVersion() {
+  if (!state.constitutionVersions.length) {
+    return null;
+  }
+  return state.constitutionVersions[state.constitutionIndex] || state.constitutionVersions[state.constitutionVersions.length - 1];
+}
+
+function renderConstitution() {
+  const hasToken = Boolean(getToken());
+  constitutionAuthAlert.hidden = hasToken;
+
+  const current = getActiveConstitutionVersion();
+  const label = current?.label || "Versão 1";
+  constitutionVersionLabel.textContent = label;
+  constitutionTextView.textContent = current?.text || constitutionDefaultText;
+
+  constitutionAvatars.querySelectorAll("[data-constitution-approver]").forEach((button) => {
+    const approver = button.dataset.constitutionApprover;
+    const approved = Boolean(current?.approvals?.[approver]);
+    button.classList.toggle("is-approved", approved);
+    button.disabled = !hasToken;
+  });
+}
+
+function moveConstitutionVersion(amount) {
+  const total = state.constitutionVersions.length;
+  if (!total) {
+    return;
+  }
+  state.constitutionIndex = (state.constitutionIndex + amount + total) % total;
+  state.constitutionEditing = false;
+  constitutionEditWrap.hidden = true;
+  constitutionMessage.textContent = "";
+  renderConstitution();
+}
+
+async function loadConstitution() {
+  state.constitutionEditing = false;
+  constitutionEditWrap.hidden = true;
+  constitutionMessage.textContent = "";
+
+  if (!getToken()) {
+    state.constitutionVersions = [{
+      id: "local-default",
+      versionNumber: 1,
+      label: "Versão 1",
+      text: constitutionDefaultText,
+      approvals: {}
+    }];
+    state.constitutionIndex = 0;
+    renderConstitution();
+    return;
+  }
+
+  constitutionMessage.textContent = "Carregando...";
+  try {
+    const payload = await apiRequest("/api/constitution/versions");
+    state.constitutionVersions = Array.isArray(payload?.versions) && payload.versions.length
+      ? payload.versions
+      : [{
+        id: "local-default",
+        versionNumber: 1,
+        label: "Versão 1",
+        text: constitutionDefaultText,
+        approvals: {}
+      }];
+    state.constitutionIndex = state.constitutionVersions.length - 1;
+    constitutionMessage.textContent = "";
+    renderConstitution();
+  } catch (error) {
+    constitutionMessage.textContent = error instanceof Error ? error.message : "Falha ao carregar constituicao.";
+    renderConstitution();
+  }
+}
+
+function startConstitutionEdit() {
+  if (!getToken()) {
+    constitutionMessage.textContent = "Entre na conta para editar.";
+    return;
+  }
+  const current = getActiveConstitutionVersion();
+  constitutionEditor.value = current?.text || constitutionDefaultText;
+  state.constitutionEditing = true;
+  constitutionEditWrap.hidden = false;
+  constitutionMessage.textContent = "";
+}
+
+async function saveConstitutionEdit() {
+  if (!getToken()) {
+    constitutionMessage.textContent = "Entre na conta para salvar.";
+    return;
+  }
+
+  const text = String(constitutionEditor.value || "").trim();
+  if (text.length < 10) {
+    constitutionMessage.textContent = "Texto muito curto.";
+    return;
+  }
+
+  constitutionMessage.textContent = "Salvando nova versao...";
+  try {
+    const payload = await apiRequest("/api/constitution/versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    state.constitutionVersions = payload?.versions || state.constitutionVersions;
+    state.constitutionIndex = Math.max(0, state.constitutionVersions.length - 1);
+    state.constitutionEditing = false;
+    constitutionEditWrap.hidden = true;
+    constitutionMessage.textContent = "Nova versao salva. Aprovacoes reiniciadas.";
+    renderConstitution();
+  } catch (error) {
+    constitutionMessage.textContent = error instanceof Error ? error.message : "Falha ao salvar versao.";
+  }
+}
+
+async function approveConstitution(approver) {
+  if (!getToken()) {
+    constitutionMessage.textContent = "Entre na conta para aprovar.";
+    return;
+  }
+
+  const version = getActiveConstitutionVersion();
+  if (!version?.id) {
+    return;
+  }
+
+  const ok = window.confirm(`${approver}: Concordar com essa versão?`);
+  if (!ok) {
+    return;
+  }
+
+  constitutionMessage.textContent = "Salvando aprovacao...";
+  try {
+    const payload = await apiRequest(`/api/constitution/versions/${encodeURIComponent(version.id)}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approver })
+    });
+    state.constitutionVersions = payload?.versions || state.constitutionVersions;
+    state.constitutionIndex = Math.max(0, state.constitutionVersions.findIndex((item) => item.id === version.id));
+    constitutionMessage.textContent = `${approver} aprovou essa versao.`;
+    renderConstitution();
+  } catch (error) {
+    constitutionMessage.textContent = error instanceof Error ? error.message : "Falha ao aprovar versao.";
+  }
 }
 
 function getActiveFinancePeriod() {
@@ -1356,6 +1528,9 @@ document.querySelectorAll("[data-finance-day-nav]").forEach((button) => {
 document.querySelectorAll("[data-stats-scope-nav]").forEach((button) => {
   button.addEventListener("click", () => moveStatsScope(Number(button.dataset.statsScopeNav)));
 });
+document.querySelectorAll("[data-constitution-nav]").forEach((button) => {
+  button.addEventListener("click", () => moveConstitutionVersion(Number(button.dataset.constitutionNav)));
+});
 
 openActionWizardButton.addEventListener("click", () => {
   if (!getToken()) {
@@ -1602,6 +1777,22 @@ addPlatformBalanceButton?.addEventListener("click", () => {
 
 editStatsGoalsButton?.addEventListener("click", () => {
   void editStatsGoals();
+});
+openConstitutionEditButton?.addEventListener("click", startConstitutionEdit);
+cancelConstitutionEditButton?.addEventListener("click", () => {
+  state.constitutionEditing = false;
+  constitutionEditWrap.hidden = true;
+  constitutionMessage.textContent = "";
+});
+saveConstitutionEditButton?.addEventListener("click", () => {
+  void saveConstitutionEdit();
+});
+constitutionAvatars?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-constitution-approver]");
+  if (!button) {
+    return;
+  }
+  void approveConstitution(button.dataset.constitutionApprover || "");
 });
 
 

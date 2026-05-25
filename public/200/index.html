@@ -145,9 +145,61 @@
     </div>
   </section>
 
-  <section class="workspace-modal simple-modal" id="constitutionModal" aria-hidden="true" aria-label="Constituição">
-    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
-    <h1>Constituição</h1>
+  <section class="workspace-modal" id="constitutionModal" aria-hidden="true" aria-label="Constituição">
+    <div class="constitution-app">
+      <header class="actions-head">
+        <button class="circle-nav" type="button" data-constitution-nav="-1" aria-label="Versão anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <button class="date-title" type="button" id="constitutionVersionLabel">Versão 1</button>
+        <button class="circle-nav" type="button" data-constitution-nav="1" aria-label="Próxima versão">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+        </button>
+      </header>
+
+      <div class="auth-alert" id="constitutionAuthAlert" hidden>
+        <span>Entre na sua conta para editar e aprovar versões da constituição.</span>
+        <a href="/auth.html?next=/200">Entrar</a>
+      </div>
+
+      <article class="constitution-text-wrap">
+        <p class="constitution-text" id="constitutionTextView"></p>
+      </article>
+
+      <div class="constitution-edit" id="constitutionEditWrap" hidden>
+        <textarea id="constitutionEditor" class="text-field constitution-editor" maxlength="6000"></textarea>
+        <div class="constitution-edit-actions">
+          <button class="ghost-btn" type="button" id="cancelConstitutionEdit">Cancelar</button>
+          <button class="primary-btn" type="button" id="saveConstitutionEdit">Salvar nova versão</button>
+        </div>
+      </div>
+
+      <section class="constitution-avatars" id="constitutionAvatars">
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Rose" aria-label="Rose">
+          <img class="task-avatar" src="/200/avatars/rose.png" alt="Rose" />
+        </button>
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Alberto" aria-label="Alberto">
+          <img class="task-avatar" src="/200/avatars/alberto.png" alt="Alberto" />
+        </button>
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Lucas" aria-label="Lucas">
+          <img class="task-avatar" src="/200/avatars/lucas.png" alt="Lucas" />
+        </button>
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Thainan" aria-label="Thainan">
+          <img class="task-avatar" src="/200/avatars/thainan.png" alt="Thainan" />
+        </button>
+      </section>
+
+      <p class="wizard-message" id="constitutionMessage" role="status"></p>
+
+      <div class="actions-side-actions">
+        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openConstitutionEdit" aria-label="Editar constituição">
+          <svg viewBox="0 0 24 24"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg>
+        </button>
+        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar constituição">
+          <img src="/200/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   </section>
 
   <section class="workspace-modal simple-modal finance-modal" id="financeModal" aria-hidden="true" aria-label="Plataforma">

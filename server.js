@@ -24,6 +24,7 @@ import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchem
 import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions, updateUserAction, updateUserActionStatus } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
+import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1007,6 +1008,7 @@ async function ensurePaymentsReady(response) {
     await ensureActionsSchema();
     await ensurePlatformFinanceSchema();
     await ensureStatsSchema();
+    await ensureConstitutionSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -3796,6 +3798,65 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel listar as acoes."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/constitution/versions") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const versions = await listConstitutionVersions(user.id);
+      sendJson(response, 200, { ok: true, versions });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar a constituicao."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/constitution/versions") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const versionId = await createConstitutionVersion(user.id, body?.text);
+      const versions = await listConstitutionVersions(user.id);
+      sendJson(response, 201, { ok: true, versionId, versions });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar a versao da constituicao."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/constitution\/versions\/[^/]+\/approve$/)) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const versionId = decodeURIComponent(pathname.replace(/^\/api\/constitution\/versions\/([^/]+)\/approve$/, "$1"));
+      const body = await readJsonBody(request);
+      await approveConstitutionVersion(user.id, versionId, body?.approver);
+      const versions = await listConstitutionVersions(user.id);
+      sendJson(response, 200, { ok: true, versions });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel registrar aprovacao."
       });
     }
     return;

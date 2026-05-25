@@ -886,6 +886,95 @@ svg {
   color: var(--ink);
 }
 
+.constitution-app {
+  width: min(920px, 100%);
+  height: 100vh;
+  margin: 0 auto;
+  padding: 68px 18px 24px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 60vh) auto auto auto;
+  gap: 12px;
+  overflow: hidden;
+}
+
+#constitutionModal .actions-head {
+  gap: 8px;
+}
+
+#constitutionModal .circle-nav {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+}
+
+#constitutionModal .date-title {
+  min-width: 110px;
+  font-size: clamp(1.25rem, 5vw, 2.1rem);
+}
+
+.constitution-text-wrap {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  min-height: 0;
+  overflow: auto;
+}
+
+.constitution-text {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.constitution-edit {
+  display: grid;
+  gap: 8px;
+}
+
+.constitution-editor {
+  width: 100%;
+  min-height: 170px;
+  text-align: left;
+  resize: vertical;
+  overflow: auto;
+}
+
+.constitution-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.constitution-avatars {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.constitution-avatar-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.constitution-avatar-btn:hover,
+.constitution-avatar-btn:focus-visible,
+.constitution-avatar-btn.is-approved {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.constitution-avatar-btn .task-avatar {
+  width: 58px;
+  height: 58px;
+}
+
 @media (max-width: 720px) {
   body {
     background-attachment: scroll;
@@ -954,6 +1043,16 @@ svg {
 
   .finance-metric {
     min-height: 126px;
+  }
+
+  .constitution-app {
+    padding: 68px 12px 18px;
+    grid-template-rows: auto auto minmax(0, 60vh) auto auto auto;
+  }
+
+  .constitution-avatar-btn .task-avatar {
+    width: 52px;
+    height: 52px;
   }
 }
 
