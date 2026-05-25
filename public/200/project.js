@@ -8,6 +8,25 @@ const actionStatuses = {
   completed: "COMPLETED"
 };
 const assigneeOptions = ["Rose", "Geral", "Alberto", "Lucas", "Thainan", "Wilton"];
+const statsScopes = [
+  { key: "general", label: "Geral" },
+  { key: "today", label: "Hoje" },
+  { key: "week", label: "Esta semana" },
+  { key: "last15", label: "Ultimos 15 dias" },
+  { key: "last30", label: "Ultimos 30 dias" },
+  { key: "month-01", label: "Janeiro" },
+  { key: "month-02", label: "Fevereiro" },
+  { key: "month-03", label: "Marco" },
+  { key: "month-04", label: "Abril" },
+  { key: "month-05", label: "Maio" },
+  { key: "month-06", label: "Junho" },
+  { key: "month-07", label: "Julho" },
+  { key: "month-08", label: "Agosto" },
+  { key: "month-09", label: "Setembro" },
+  { key: "month-10", label: "Outubro" },
+  { key: "month-11", label: "Novembro" },
+  { key: "month-12", label: "Dezembro" }
+];
 const actionAvatarByAssignee = {
   Rose: "/200/avatars/rose.png",
   Geral: "/200/avatars/familyplan.png",
@@ -71,6 +90,17 @@ const platformNameInput = document.getElementById("platformName");
 const platformValueInput = document.getElementById("platformValue");
 const platformCategoryRow = document.getElementById("platformCategoryRow");
 const platformRecurrenceDayLabel = document.getElementById("platformRecurrenceDayLabel");
+const statsScopeLabel = document.getElementById("statsScopeLabel");
+const statsGeneralGoals = document.getElementById("statsGeneralGoals");
+const statsDailyGoalProgress = document.getElementById("statsDailyGoalProgress");
+const statsMonthlyGoalProgress = document.getElementById("statsMonthlyGoalProgress");
+const statsRecurringGoalProgress = document.getElementById("statsRecurringGoalProgress");
+const statsAssigneeCard = document.getElementById("statsAssigneeCard");
+const statsAssigneePercent = document.getElementById("statsAssigneePercent");
+const statsAssigneeAvatar = document.getElementById("statsAssigneeAvatar");
+const statsAssigneeName = document.getElementById("statsAssigneeName");
+const statsAssigneeDetail = document.getElementById("statsAssigneeDetail");
+const editStatsGoalsButton = document.getElementById("editStatsGoals");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
@@ -103,10 +133,12 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
 
 let financeTimer = null;
 let assigneeProgressTicker = null;
+let statsTicker = null;
 
 const state = {
   activeOffset: 0,
   platformOffset: 0,
+  statsScopeIndex: 0,
   financePeriodIndex: 0,
   platformEntries: [],
   platformMonthly: {
@@ -118,6 +150,10 @@ const state = {
   platformBaseIncomeCents: 0,
   assigneeProgressRows: [],
   assigneeProgressIndex: 0,
+  statsSummary: null,
+  statsGoals: null,
+  statsRotation: [],
+  statsRotationIndex: 0,
   actions: [],
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState()
@@ -295,6 +331,10 @@ function openModal(id) {
     void loadPlatformFinance();
   }
 
+  if (id === "statsModal") {
+    void loadStatsSummary();
+  }
+
   if (id === "financeModal") {
     startFinancePresentation();
   }
@@ -309,6 +349,11 @@ function closeModal(modal) {
   if (modal.id === "financeModal" && financeTimer) {
     window.clearTimeout(financeTimer);
     financeTimer = null;
+  }
+
+  if (modal.id === "statsModal" && statsTicker) {
+    window.clearInterval(statsTicker);
+    statsTicker = null;
   }
 }
 
@@ -954,6 +999,163 @@ function movePlatformDate(amount) {
   void loadPlatformFinance();
 }
 
+function getActiveStatsScope() {
+  return statsScopes[state.statsScopeIndex] || statsScopes[0];
+}
+
+function moveStatsScope(amount) {
+  const total = statsScopes.length;
+  state.statsScopeIndex = (state.statsScopeIndex + amount + total) % total;
+  statsScopeLabel.textContent = getActiveStatsScope().label;
+  void loadStatsSummary();
+}
+
+function renderStatsRotationCard() {
+  if (!state.statsRotation.length) {
+    statsAssigneePercent.textContent = "0%";
+    statsAssigneeName.textContent = "Sem dados";
+    statsAssigneeDetail.textContent = "0/0 min";
+    statsAssigneeAvatar.src = actionAvatarByAssignee.Geral;
+    return;
+  }
+
+  const current = state.statsRotation[state.statsRotationIndex] || state.statsRotation[0];
+  statsAssigneePercent.textContent = `${current.percent}%`;
+  statsAssigneeName.textContent = current.name;
+  statsAssigneeDetail.textContent = `${current.completed}/${current.total} min`;
+  statsAssigneeAvatar.src = getActionAvatarPath(current.name);
+}
+
+function startStatsRotation() {
+  if (statsTicker) {
+    window.clearInterval(statsTicker);
+    statsTicker = null;
+  }
+
+  renderStatsRotationCard();
+
+  statsTicker = window.setInterval(() => {
+    if (!state.statsRotation.length) {
+      return;
+    }
+    state.statsRotationIndex = (state.statsRotationIndex + 1) % state.statsRotation.length;
+    renderStatsRotationCard();
+  }, 1500);
+}
+
+function safeGoalPercent(value, goal) {
+  if (!goal || goal <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(999, Math.round((value / goal) * 100)));
+}
+
+function renderStatsGoals() {
+  const summary = state.statsSummary || {};
+  const goals = state.statsGoals || {
+    dailyIncomeGoalCents: 0,
+    monthlyBalanceGoalCents: 0,
+    recurringIncomeGoalCents: 0
+  };
+  const totals = summary.totals || {};
+  const recurringIncome = Number(state.platformBaseIncomeCents || 0);
+
+  const dailyPercent = safeGoalPercent(Number(totals.incomeCents || 0), Number(goals.dailyIncomeGoalCents || 0));
+  const monthlyPercent = safeGoalPercent(Number(totals.balanceCents || 0), Number(goals.monthlyBalanceGoalCents || 0));
+  const recurringPercent = safeGoalPercent(recurringIncome, Number(goals.recurringIncomeGoalCents || 0));
+
+  statsDailyGoalProgress.textContent = `${dailyPercent}%`;
+  statsMonthlyGoalProgress.textContent = `${monthlyPercent}%`;
+  statsRecurringGoalProgress.textContent = `${recurringPercent}%`;
+}
+
+function buildStatsRotationFromSummary() {
+  const byAssignee = state.statsSummary?.byAssignee || {};
+  const rotation = [];
+  const orderedNames = ["Geral", ...assigneeOptions.filter((name) => name !== "Geral")];
+  for (const name of orderedNames) {
+    const item = byAssignee[name] || { totalMinutes: 0, completedMinutes: 0 };
+    const total = Number(item.totalMinutes || 0);
+    const completed = Number(item.completedMinutes || 0);
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    rotation.push({
+      name,
+      total,
+      completed,
+      percent
+    });
+  }
+  state.statsRotation = rotation;
+  state.statsRotationIndex = 0;
+}
+
+async function loadStatsSummary() {
+  if (!getToken()) {
+    return;
+  }
+
+  try {
+    const scope = getActiveStatsScope();
+    statsScopeLabel.textContent = scope.label;
+    const [summaryPayload, goalsPayload, platformPayload] = await Promise.all([
+      apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`),
+      apiRequest("/api/stats/goals"),
+      apiRequest("/api/finance/summary?period=total")
+    ]);
+
+    state.statsSummary = summaryPayload.summary || {};
+    state.statsGoals = goalsPayload.goals || null;
+    state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
+    buildStatsRotationFromSummary();
+    renderStatsGoals();
+    startStatsRotation();
+
+    const isGeneral = scope.key === "general";
+    statsGeneralGoals.hidden = !isGeneral;
+    editStatsGoalsButton.hidden = !isGeneral;
+  } catch (error) {
+    statsAssigneeName.textContent = error instanceof Error ? error.message : "Falha";
+  }
+}
+
+async function editStatsGoals() {
+  const current = state.statsGoals || {
+    dailyIncomeGoalCents: 0,
+    monthlyBalanceGoalCents: 0,
+    recurringIncomeGoalCents: 0
+  };
+  const dailyRaw = window.prompt("Meta diária de entradas (R$):", String((current.dailyIncomeGoalCents || 0) / 100).replace(".", ","));
+  if (dailyRaw == null) {
+    return;
+  }
+  const monthlyRaw = window.prompt("Meta mensal de saldo final (R$):", String((current.monthlyBalanceGoalCents || 0) / 100).replace(".", ","));
+  if (monthlyRaw == null) {
+    return;
+  }
+  const recurringRaw = window.prompt("Meta recorrente mensal (R$):", String((current.recurringIncomeGoalCents || 0) / 100).replace(".", ","));
+  if (recurringRaw == null) {
+    return;
+  }
+
+  const parseCurrency = (value) => Math.max(0, Math.round(Number(String(value).replace(/\./g, "").replace(",", ".")) * 100) || 0);
+
+  try {
+    const payload = await apiRequest("/api/stats/goals", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dailyIncomeGoalCents: parseCurrency(dailyRaw),
+        monthlyBalanceGoalCents: parseCurrency(monthlyRaw),
+        recurringIncomeGoalCents: parseCurrency(recurringRaw)
+      })
+    });
+    state.statsGoals = payload.goals || state.statsGoals;
+    renderStatsGoals();
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : "Nao foi possivel salvar metas.");
+  }
+}
+
 function renderPlatformCategoryOptions() {
   const categories = state.platformWizard.kind === "INCOME" ? platformIncomeCategories : platformExpenseCategories;
   if (!categories.includes(state.platformWizard.category)) {
@@ -1112,6 +1314,9 @@ financePeriodPrev?.addEventListener("click", () => moveFinancePeriod(-1));
 financePeriodNext?.addEventListener("click", () => moveFinancePeriod(1));
 document.querySelectorAll("[data-finance-day-nav]").forEach((button) => {
   button.addEventListener("click", () => movePlatformDate(Number(button.dataset.financeDayNav)));
+});
+document.querySelectorAll("[data-stats-scope-nav]").forEach((button) => {
+  button.addEventListener("click", () => moveStatsScope(Number(button.dataset.statsScopeNav)));
 });
 
 openActionWizardButton.addEventListener("click", () => {
@@ -1363,6 +1568,10 @@ togglePlatformBalanceButton?.addEventListener("click", () => {
 
 addPlatformBalanceButton?.addEventListener("click", () => {
   void addPlatformBalanceNow();
+});
+
+editStatsGoalsButton?.addEventListener("click", () => {
+  void editStatsGoals();
 });
 
 

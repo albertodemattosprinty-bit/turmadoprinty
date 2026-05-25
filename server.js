@@ -23,6 +23,7 @@ import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugify
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions, updateUserActionStatus } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
+import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1005,6 +1006,7 @@ async function ensurePaymentsReady(response) {
     await ensureAllTermsSchema();
     await ensureActionsSchema();
     await ensurePlatformFinanceSchema();
+    await ensureStatsSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -3834,6 +3836,61 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel resumir as financas."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/stats/summary") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const summary = await getStatsSummary(user.id, requestUrl.searchParams.get("scope"));
+      sendJson(response, 200, { ok: true, summary });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar estatisticas."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/stats/goals") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const goals = await getStatsGoals(user.id);
+      sendJson(response, 200, { ok: true, goals });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar metas."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/stats/goals") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const goals = await updateStatsGoals(user.id, body);
+      sendJson(response, 200, { ok: true, goals });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel atualizar metas."
       });
     }
     return;
