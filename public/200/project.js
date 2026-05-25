@@ -35,8 +35,22 @@ const actionAvatarByAssignee = {
   Thainan: "/200/avatars/thainan.png",
   Wilton: "/200/avatars/wilton.png"
 };
-const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Emprestimo", "Venda de ativo"];
+const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo"];
 const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer"];
+const platformCategoryIconByName = {
+  Alimentacao: "/200/icons/alimentacao.svg",
+  Aluguel: "/200/icons/aluguel.svg",
+  Carro: "/200/icons/carro.svg",
+  Eventos: "/200/icons/eventos.svg",
+  "Servicos casa": "/200/icons/servicos-casa.svg",
+  Anuncios: "/200/icons/anuncios.svg",
+  Plataformas: "/200/icons/plataformas.svg",
+  Lazer: "/200/icons/lazer.svg",
+  Inscricoes: "/200/icons/inscricoes.svg",
+  Apoiadores: "/200/icons/apoiadores.svg",
+  Site: "/200/icons/site.svg",
+  "Venda de ativo": "/200/icons/venda-de-ativo.svg"
+};
 const financePeriods = [
   { key: "total", label: "Total" },
   { key: "today", label: "Hoje" },
@@ -1212,8 +1226,10 @@ function renderPlatformCategoryOptions() {
   categories.forEach((category) => {
     const button = document.createElement("button");
     button.type = "button";
+    button.className = "category-icon-btn";
     button.dataset.platformCategory = category;
-    button.textContent = category;
+    const iconPath = platformCategoryIconByName[category] || "/200/icons/agenda.svg";
+    button.innerHTML = `<img src="${iconPath}" alt="${escapeHtml(category)}" loading="lazy" />`;
     button.classList.toggle("active", category === state.platformWizard.category);
     platformCategoryRow.appendChild(button);
   });

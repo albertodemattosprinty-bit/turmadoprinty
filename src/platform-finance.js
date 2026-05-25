@@ -11,7 +11,7 @@ const OCCURRENCE_STATUS_DUE_TODAY = "DUE_TODAY";
 const OCCURRENCE_STATUS_OVERDUE = "OVERDUE";
 const OCCURRENCE_STATUS_PAID = "PAID";
 
-const INCOME_CATEGORIES = new Set(["Eventos", "Inscricoes", "Apoiadores", "Emprestimo", "Venda de ativo"]);
+const INCOME_CATEGORIES = new Set(["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo"]);
 const EXPENSE_CATEGORIES = new Set(["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer"]);
 
 function toIso(value) {
