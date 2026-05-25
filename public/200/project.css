@@ -402,6 +402,34 @@ svg {
   transition: width 260ms ease;
 }
 
+.actions-progress-people {
+  display: grid;
+  gap: 8px;
+}
+
+.actions-progress-person {
+  display: grid;
+  gap: 4px;
+}
+
+.actions-progress-person-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.83rem;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.actions-progress-person .actions-progress-track {
+  height: 6px;
+}
+
+.task-assignee {
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.98);
+}
+
 .action-wizard {
   position: fixed;
   inset: 0;

@@ -7,6 +7,7 @@ const actionStatuses = {
   inProgress: "IN_PROGRESS",
   completed: "COMPLETED"
 };
+const assigneeOptions = ["Rose", "Geral", "Alberto", "Lucas", "Thainan", "Wilton"];
 const financePeriods = [
   { key: "total", label: "Total" },
   { key: "today", label: "Hoje" },
@@ -40,6 +41,7 @@ const actionsProgress = document.getElementById("actionsProgress");
 const actionsProgressLabel = document.getElementById("actionsProgressLabel");
 const actionsProgressMinutes = document.getElementById("actionsProgressMinutes");
 const actionsProgressFill = document.getElementById("actionsProgressFill");
+const actionsProgressPeople = document.getElementById("actionsProgressPeople");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
@@ -50,6 +52,7 @@ const wizardNextButton = document.getElementById("wizardNext");
 const wizardMessage = document.getElementById("wizardMessage");
 const taskTitle = document.getElementById("taskTitle");
 const wizardDateLabel = document.getElementById("wizardDateLabel");
+const wizardAssigneeLabel = document.getElementById("wizardAssigneeLabel");
 const repeatToggle = document.getElementById("repeatToggle");
 const repeatBox = document.getElementById("repeatBox");
 const weekdayRow = document.getElementById("weekdayRow");
@@ -135,6 +138,21 @@ function normalizeActionStatus(status) {
   return actionStatuses.pending;
 }
 
+function normalizeAssigneeName(value) {
+  const input = String(value || "").trim();
+
+  if (!input) {
+    return "Geral";
+  }
+
+  const found = assigneeOptions.find((name) => name.toLowerCase() === input.toLowerCase());
+  return found || "Geral";
+}
+
+function getWizardAssigneeName() {
+  return assigneeOptions[state.wizard.assigneeIndex] || "Geral";
+}
+
 function buildDateWithTime(date, hour, minute) {
   const next = new Date(date);
   next.setHours(hour, minute, 0, 0);
@@ -163,6 +181,7 @@ function buildInitialWizardState() {
   return {
     step: 1,
     dateOffset: 0,
+    assigneeIndex: 1,
     repeatOpen: false,
     repeatMode: "none",
     repeatDays: [],
@@ -324,10 +343,11 @@ function renderActions() {
 
   state.actions.forEach((action) => {
     const status = normalizeActionStatus(action.status);
+    const assignee = normalizeAssigneeName(action.assignee);
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
-    const statusMeta = getActionStatusMeta(action, status);
+    const statusMeta = getActionStatusMeta(action, status, assignee);
     const row = document.createElement("article");
     row.className = `task-row${stateClass}`;
     row.dataset.actionId = action.id;
@@ -337,6 +357,7 @@ function renderActions() {
       <div class="task-time">${formatTime(action.startAt)}<br>${formatTime(action.endAt)}</div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(action.title)}</div>
+        <div class="task-assignee">${escapeHtml(assignee)}</div>
         <div class="task-meta">${escapeHtml(statusMeta)}</div>
       </div>
       <button class="delete-task" type="button" data-delete-action="${action.id}" aria-label="Excluir tarefa">
@@ -349,19 +370,21 @@ function renderActions() {
   renderActionsProgress();
 }
 
-function getActionStatusMeta(action, normalizedStatus = normalizeActionStatus(action.status)) {
+function getActionStatusMeta(action, normalizedStatus = normalizeActionStatus(action.status), assignee = normalizeAssigneeName(action.assignee)) {
+  const prefix = assignee === "Geral" ? "" : `Para ${assignee} · `;
+
   if (normalizedStatus === actionStatuses.inProgress) {
     const startedAt = action.startedAt ? formatTime(action.startedAt) : formatTime(action.startAt);
-    return `Em andamento desde ${startedAt}`;
+    return `${prefix}Em andamento desde ${startedAt}`;
   }
 
   if (normalizedStatus === actionStatuses.completed) {
     const startedAt = action.startedAt ? formatTime(action.startedAt) : formatTime(action.startAt);
     const completedAt = action.completedAt ? formatTime(action.completedAt) : formatTime(action.endAt);
-    return `Concluida (${startedAt} - ${completedAt})`;
+    return `${prefix}Concluida (${startedAt} - ${completedAt})`;
   }
 
-  return "Toque para iniciar";
+  return `${prefix}Toque para iniciar`;
 }
 
 function getActionDurationMinutes(action) {
@@ -399,6 +422,50 @@ function renderActionsProgress() {
   actionsProgressMinutes.textContent = `${completedMinutes}/${totalMinutes} min`;
   actionsProgressFill.style.width = `${percent}%`;
   actionsProgressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
+  renderAssigneeProgressBars();
+}
+
+function renderAssigneeProgressBars() {
+  actionsProgressPeople.innerHTML = "";
+
+  const grouped = new Map();
+
+  state.actions.forEach((action) => {
+    const assignee = normalizeAssigneeName(action.assignee);
+
+    if (assignee === "Geral") {
+      return;
+    }
+
+    const total = getActionDurationMinutes(action);
+    const completed = normalizeActionStatus(action.status) === actionStatuses.completed ? total : 0;
+    const current = grouped.get(assignee) || { total: 0, completed: 0 };
+    current.total += total;
+    current.completed += completed;
+    grouped.set(assignee, current);
+  });
+
+  [...grouped.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0], "pt-BR"))
+    .forEach(([assignee, summary]) => {
+      if (summary.total <= 0) {
+        return;
+      }
+
+      const percent = Math.max(0, Math.min(100, Math.round((summary.completed / summary.total) * 100)));
+      const row = document.createElement("article");
+      row.className = "actions-progress-person";
+      row.innerHTML = `
+        <div class="actions-progress-person-head">
+          <strong>${escapeHtml(assignee)}</strong>
+          <span>${percent}% - ${summary.completed}/${summary.total} min</span>
+        </div>
+        <div class="actions-progress-track">
+          <div class="actions-progress-fill" style="width:${percent}%"></div>
+        </div>
+      `;
+      actionsProgressPeople.appendChild(row);
+    });
 }
 
 function escapeHtml(value) {
@@ -485,7 +552,7 @@ function closeWizard() {
 
 function renderWizard() {
   const { step } = state.wizard;
-  wizardStepLabel.textContent = `${step} de 4`;
+  wizardStepLabel.textContent = `${step} de 5`;
 
   document.querySelectorAll(".wizard-step").forEach((section) => {
     const isActive = Number(section.dataset.step) === step;
@@ -493,8 +560,9 @@ function renderWizard() {
   });
 
   wizardBackButton.style.visibility = step === 1 ? "hidden" : "visible";
-  wizardNextButton.textContent = step === 4 ? "Salvar" : "Continuar";
+  wizardNextButton.textContent = step === 5 ? "Salvar" : "Continuar";
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
+  wizardAssigneeLabel.textContent = getWizardAssigneeName();
   renderRepeatControls();
   renderTimePickers();
 }
@@ -582,6 +650,12 @@ function toggleWeekday(day) {
 function moveWizardDate(amount) {
   state.wizard.dateOffset = Math.max(0, state.wizard.dateOffset + amount);
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
+}
+
+function moveWizardAssignee(direction) {
+  const total = assigneeOptions.length;
+  state.wizard.assigneeIndex = (state.wizard.assigneeIndex + direction + total) % total;
+  wizardAssigneeLabel.textContent = getWizardAssigneeName();
 }
 
 function moveTime(type, unit, direction) {
@@ -674,6 +748,7 @@ async function saveAction() {
       },
       body: JSON.stringify({
         title: taskTitle.value.trim(),
+        assignee: getWizardAssigneeName(),
         repeatRule,
         repeatDays,
         occurrences: buildOccurrences()
@@ -745,7 +820,7 @@ wizardNextButton.addEventListener("click", () => {
     return;
   }
 
-  if (state.wizard.step === 4) {
+  if (state.wizard.step === 5) {
     void saveAction();
     return;
   }
@@ -761,6 +836,10 @@ repeatToggle.addEventListener("click", () => {
 
 document.querySelectorAll("[data-wizard-date]").forEach((button) => {
   button.addEventListener("click", () => moveWizardDate(Number(button.dataset.wizardDate)));
+});
+
+document.querySelectorAll("[data-wizard-assignee]").forEach((button) => {
+  button.addEventListener("click", () => moveWizardAssignee(Number(button.dataset.wizardAssignee)));
 });
 
 document.querySelectorAll("[data-repeat-mode]").forEach((button) => {
@@ -840,5 +919,6 @@ handleSwipe(activeDateLabel, moveActiveDate);
 handleSwipe(actionsList, moveActiveDate);
 handleSwipe(financePeriodLabel, moveFinancePeriod);
 handleSwipe(financePeriodPicker, moveFinancePeriod);
+handleSwipe(wizardAssigneeLabel, moveWizardAssignee);
 renderFinancePeriod();
 renderDateHeader();

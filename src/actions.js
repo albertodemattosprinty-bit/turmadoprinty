@@ -6,6 +6,8 @@ const MAX_OCCURRENCES = 370;
 const ACTION_STATUS_PENDING = "PENDING";
 const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
+const DEFAULT_ASSIGNEE = "Geral";
+const ALLOWED_ASSIGNEES = new Set(["Rose", "Geral", "Alberto", "Lucas", "Thainan", "Wilton"]);
 
 function toIso(value) {
   if (!value) {
@@ -29,6 +31,22 @@ function normalizeActionStatus(value) {
   return ACTION_STATUS_PENDING;
 }
 
+function normalizeAssignee(value) {
+  const input = String(value || "").trim();
+
+  if (!input) {
+    return DEFAULT_ASSIGNEE;
+  }
+
+  for (const name of ALLOWED_ASSIGNEES) {
+    if (name.toLowerCase() === input.toLowerCase()) {
+      return name;
+    }
+  }
+
+  throw new Error("Pessoa da tarefa invalida.");
+}
+
 function getNextActionStatus(currentStatus) {
   const normalized = normalizeActionStatus(currentStatus);
 
@@ -48,6 +66,7 @@ function normalizeAction(row) {
     id: row.id,
     userId: row.user_id,
     title: row.title,
+    assignee: normalizeAssignee(row.assignee),
     startAt: toIso(row.start_at),
     endAt: toIso(row.end_at),
     repeatGroupId: row.repeat_group_id || null,
@@ -96,9 +115,11 @@ export async function ensureActionsSchema() {
       created_at timestamptz not null default now()
     );
   `);
+  await query(`alter table actions add column if not exists assignee text not null default '${DEFAULT_ASSIGNEE}';`);
 
   await query("create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);");
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");
+  await query("create index if not exists idx_actions_user_assignee on actions(user_id, assignee);");
 
   await query(`
     create table if not exists action_status_overrides (
@@ -131,6 +152,7 @@ async function getUserActionById(userId, actionId) {
         a.id,
         a.user_id,
         a.title,
+        a.assignee,
         a.start_at,
         a.end_at,
         a.repeat_group_id,
@@ -171,6 +193,7 @@ export async function listUserActions(userId, { from, to }) {
         a.id,
         a.user_id,
         a.title,
+        a.assignee,
         a.start_at,
         a.end_at,
         a.repeat_group_id,
@@ -200,6 +223,7 @@ export async function createUserAction(userId, payload) {
   await ensureActionsSchema();
 
   const title = String(payload?.title || "").trim();
+  const assignee = normalizeAssignee(payload?.assignee);
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
@@ -240,11 +264,12 @@ export async function createUserAction(userId, payload) {
         select title, start_at, end_at
         from actions
         where user_id = $1
-          and start_at < $3
-          and end_at > $2
+          and assignee = $2
+          and start_at < $4
+          and end_at > $3
         limit 1
       `,
-      [userId, occurrence.startAt.toISOString(), occurrence.endAt.toISOString()]
+      [userId, assignee, occurrence.startAt.toISOString(), occurrence.endAt.toISOString()]
     );
 
     if (overlap.rows[0]) {
@@ -256,10 +281,11 @@ export async function createUserAction(userId, payload) {
   const repeatGroupId = occurrences.length > 1 || repeatRule !== "none" ? crypto.randomUUID() : null;
   const values = [];
   const placeholders = occurrences.map((occurrence, index) => {
-    const offset = index * 7;
+    const offset = index * 8;
     values.push(
       userId,
       title,
+      assignee,
       occurrence.startAt.toISOString(),
       occurrence.endAt.toISOString(),
       repeatGroupId,
@@ -267,14 +293,14 @@ export async function createUserAction(userId, payload) {
       JSON.stringify(repeatDays)
     );
 
-    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}::jsonb)`;
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}::jsonb)`;
   });
 
   const result = await query(
     `
-      insert into actions (user_id, title, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
+      insert into actions (user_id, title, assignee, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
       values ${placeholders.join(", ")}
-      returning id, user_id, title, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
+      returning id, user_id, title, assignee, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
     `,
     values
   );
