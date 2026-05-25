@@ -1,0 +1,500 @@
+:root {
+  --bg-a: #0b3da8;
+  --bg-b: #1f7ee7;
+  --white: #ffffff;
+  --soft: rgba(255, 255, 255, 0.82);
+  --muted: rgba(255, 255, 255, 0.62);
+  --glass: rgba(8, 31, 83, 0.34);
+  --line: rgba(255, 255, 255, 0.2);
+  --accent: #24d166;
+  --warn: #ffe26a;
+  --danger: #ff6f8a;
+  --ink: #06346d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Exo 2", sans-serif;
+  color: var(--white);
+  background-image: linear-gradient(145deg, rgba(11, 61, 168, 0.72), rgba(31, 126, 231, 0.72)), url("/termo-bg-desktop.jpg");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}
+
+.project-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+}
+
+.project-hub {
+  width: min(900px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.hub-action {
+  min-height: 156px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.hub-action:hover,
+.hub-action:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.46);
+  transform: translateY(-3px);
+  outline: none;
+}
+
+.hub-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--white);
+  font-size: 28px;
+}
+
+.hub-action span:last-child {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.workspace-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  color: var(--white);
+  background-image: linear-gradient(145deg, rgba(11, 61, 168, 0.88), rgba(31, 126, 231, 0.82)), url("/termo-bg-desktop.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+.workspace-modal.active {
+  display: block;
+}
+
+.modal-close,
+.wizard-close,
+.circle-nav {
+  border: 0;
+  background: rgba(255, 255, 255, 0.16);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.modal-close {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 40;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  font-size: 26px;
+}
+
+.modal-close:hover,
+.wizard-close:hover,
+.circle-nav:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.simple-modal {
+  place-items: center;
+}
+
+.simple-modal.active {
+  display: grid;
+}
+
+.simple-modal h1 {
+  margin: 0;
+  font-size: clamp(2rem, 7vw, 6rem);
+}
+
+.actions-app {
+  width: min(920px, 100%);
+  height: 100vh;
+  margin: 0 auto;
+  padding: 26px 18px 100px;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
+}
+
+.actions-head,
+.date-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.circle-nav {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 24px;
+}
+
+.date-title {
+  min-width: 150px;
+  border: 0;
+  background: transparent;
+  font-size: clamp(2rem, 8vw, 4.2rem);
+  font-weight: 800;
+  cursor: grab;
+}
+
+.auth-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(255, 226, 106, 0.48);
+  border-radius: 8px;
+  background: rgba(9, 25, 64, 0.42);
+  padding: 12px 14px;
+}
+
+.auth-alert a {
+  color: var(--warn);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.actions-list {
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 6px 0 20px;
+}
+
+.empty-state {
+  color: var(--soft);
+  text-align: center;
+  padding: 42px 12px;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.task-time {
+  font-weight: 800;
+  color: var(--warn);
+}
+
+.task-title {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.delete-task {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 111, 138, 0.18);
+  color: var(--white);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.floating-add {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #05371b;
+  font-weight: 800;
+  padding: 14px 22px;
+  cursor: pointer;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+.action-wizard {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: none;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 10, 34, 0.64);
+}
+
+.action-wizard.active {
+  display: grid;
+}
+
+.wizard-panel {
+  width: min(640px, 100%);
+  min-height: min(580px, calc(100vh - 40px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(7, 39, 102, 0.86);
+  backdrop-filter: blur(12px);
+  padding: 18px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.wizard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.wizard-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+#actionForm {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+}
+
+.wizard-step {
+  display: none;
+  min-height: 320px;
+  align-content: center;
+  gap: 20px;
+  position: relative;
+}
+
+.wizard-step.active {
+  display: grid;
+}
+
+.step-label {
+  display: block;
+  text-align: center;
+  font-size: clamp(2rem, 7vw, 4rem);
+  font-weight: 800;
+}
+
+.text-field {
+  width: min(460px, 100%);
+  margin: 0 auto;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font-size: 1.3rem;
+  font-weight: 800;
+  padding: 16px 18px;
+  text-align: center;
+  outline: none;
+}
+
+.date-picker strong {
+  min-width: 140px;
+  text-align: center;
+  font-size: clamp(1.7rem, 6vw, 3.4rem);
+}
+
+.repeat-toggle {
+  position: absolute;
+  right: 10px;
+  bottom: 4px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.repeat-toggle.active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.repeat-box {
+  width: min(460px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+}
+
+.repeat-presets,
+.weekday-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repeat-presets button,
+.weekday-row button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  font-weight: 800;
+  padding: 10px 12px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.repeat-presets button.active,
+.weekday-row button.active {
+  opacity: 1;
+  background: rgba(36, 209, 102, 0.28);
+  border-color: rgba(36, 209, 102, 0.7);
+}
+
+.weekday-row button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+}
+
+.time-picker {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+}
+
+.time-row {
+  width: min(360px, 100%);
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-value {
+  text-align: center;
+  font-size: clamp(3rem, 14vw, 6rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.minute-value {
+  font-size: clamp(2.4rem, 10vw, 4.8rem);
+}
+
+.time-caption {
+  text-align: center;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.wizard-message {
+  min-height: 24px;
+  margin: 0;
+  text-align: center;
+  color: var(--warn);
+  font-weight: 800;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ghost-btn,
+.primary-btn {
+  min-height: 48px;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  padding: 0 18px;
+  cursor: pointer;
+}
+
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.primary-btn {
+  background: var(--white);
+  color: var(--ink);
+}
+
+@media (max-width: 720px) {
+  .project-shell {
+    padding: 18px;
+  }
+
+  .project-hub {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .hub-action {
+    min-height: 132px;
+  }
+
+  .task-row {
+    grid-template-columns: 76px 1fr 40px;
+  }
+
+  .actions-app {
+    padding-top: 68px;
+  }
+}

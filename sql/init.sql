@@ -165,3 +165,18 @@ create table if not exists admin_user_messages (
 
 create index if not exists idx_admin_user_messages_user_id on admin_user_messages(user_id);
 create index if not exists idx_admin_user_messages_active on admin_user_messages(user_id, dismissed_at, created_at desc);
+
+create table if not exists actions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  title text not null,
+  start_at timestamptz not null,
+  end_at timestamptz not null,
+  repeat_group_id uuid,
+  repeat_rule text not null default 'none',
+  repeat_days jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);
+create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);

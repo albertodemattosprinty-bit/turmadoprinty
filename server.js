@@ -21,6 +21,7 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
+import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions } from "./src/actions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -676,6 +677,7 @@ async function ensurePaymentsReady(response) {
     await ensureSiteConfigSchema();
     await ensureAdminUsersSchema();
     await ensureAllTermsSchema();
+    await ensureActionsSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -3448,6 +3450,71 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/actions") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const actions = await listUserActions(user.id, {
+        from: requestUrl.searchParams.get("from"),
+        to: requestUrl.searchParams.get("to")
+      });
+
+      sendJson(response, 200, { ok: true, actions });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel listar as acoes."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/actions") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const actions = await createUserAction(user.id, body);
+
+      sendJson(response, 201, { ok: true, actions });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar a acao."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/actions\/[^/]+$/)) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)$/, "$1"));
+      const result = await deleteUserAction(user.id, actionId);
+
+      sendJson(response, result.deleted ? 200 : 404, {
+        ok: Boolean(result.deleted),
+        deleted: result.deleted
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel excluir a acao."
+      });
+    }
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/admin/users") {
     await handleAdminUsersList(request, response);
     return;
@@ -3571,7 +3638,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && (pathname === "/200" || pathname === "/200/")) {
-    const page200Path = path.join(publicDir, "200.html");
+    const page200Path = path.join(publicDir, "200", "index.html");
     if (existsSync(page200Path)) {
       await serveStatic(response, page200Path);
       return;

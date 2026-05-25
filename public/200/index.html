@@ -1,924 +1,167 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Termo - Formulário</title>
+  <title>Projeto 200</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;600&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg-a: #0b3da8;
-      --bg-b: #1f7ee7;
-      --text: #ffffff;
-      --text-soft: rgba(255, 255, 255, 0.92);
-      --input-bg: #d8ecff;
-      --input-text: #0f3f83;
-      --accent: #24d166;
-      --glass: rgba(255, 255, 255, 0.08);
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Exo 2", sans-serif;
-      color: var(--text);
-      background-image: linear-gradient(145deg, rgba(11, 61, 168, 0.72), rgba(31, 126, 231, 0.72)), url("/termo-bg-desktop.jpg");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      overflow: hidden;
-    }
-
-    .screen {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px 20px 84px;
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transform: translateX(24px);
-      transition: opacity 0.35s ease, transform 0.35s ease, visibility 0.35s ease;
-    }
-
-    .screen.active {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
-      transform: translateX(0);
-    }
-
-    .screen.leaving-left {
-      opacity: 0;
-      transform: translateX(-24px);
-      pointer-events: none;
-    }
-
-    .card {
-      width: min(760px, 100%);
-      background: var(--glass);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 24px;
-      backdrop-filter: blur(6px);
-      padding: 28px 22px;
-    }
-
-    .question-head {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-
-    .icon {
-      width: 30px;
-      height: 30px;
-      flex: 0 0 auto;
-      opacity: 0.95;
-    }
-
-    h1, h2 {
-      margin: 0 0 14px;
-      font-weight: 600;
-      line-height: 1.2;
-      color: var(--text);
-    }
-
-    h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); text-align: center; }
-    h2 { font-size: clamp(1.3rem, 2.8vw, 2rem); }
-
-    p {
-      margin: 0;
-      font-size: clamp(1rem, 2vw, 1.15rem);
-      font-weight: 300;
-      line-height: 1.5;
-      color: var(--text-soft);
-    }
-
-    .intro-copy,
-    .success-copy { text-align: center; margin-bottom: 24px; }
-    .agreement-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .agreement-icon {
-      width: 34px;
-      height: 34px;
-      flex: 0 0 auto;
-    }
-    .agreement-copy {
-      font-weight: 300;
-      line-height: 1.5;
-      white-space: pre-line;
-      color: var(--text-soft);
-      margin-bottom: 22px;
-    }
-    .payment-choice {
-      width: 100%;
-      margin-bottom: 8px;
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 12px;
-      padding: 10px 12px;
-      background: rgba(255,255,255,0.08);
-      color: #fff;
-      text-align: left;
-      font: inherit;
-      font-weight: 300;
-      cursor: pointer;
-    }
-    .payment-choice.active {
-      border-color: rgba(33, 203, 99, 0.82);
-      background: rgba(33, 203, 99, 0.24);
-    }
-    .countdown {
-      text-align: center;
-      font-size: clamp(1.3rem, 3.8vw, 2rem);
-      font-weight: 600;
-      margin: 12px 0;
-    }
-    .pix-copy {
-      margin-top: 10px;
-      text-align: center;
-      font-weight: 300;
-      color: var(--text-soft);
-    }
-
-    .actions {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
-
-    button {
-      font: inherit;
-      border: 0;
-      border-radius: 12px;
-      padding: 12px 22px;
-      cursor: pointer;
-      transition: transform 0.18s ease, opacity 0.18s ease;
-    }
-
-    button:hover { transform: translateY(-1px); }
-
-    .btn-primary {
-      background: #ffffff;
-      color: #0d4ea8;
-      font-weight: 600;
-    }
-    .btn-approve {
-      background: #21cb63;
-      color: #fff;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.18);
-      color: #fff;
-      font-weight: 300;
-    }
-
-    .input,
-    .picker-value {
-      width: 100%;
-      border: 0;
-      border-radius: 12px;
-      min-height: 52px;
-      padding: 14px 16px;
-      background: var(--input-bg);
-      color: var(--input-text);
-      font: inherit;
-      font-weight: 600;
-      font-size: 1rem;
-    }
-
-    .input::placeholder {
-      color: rgba(15, 63, 131, 0.7);
-      font-weight: 300;
-    }
-
-    .picker {
-      display: grid;
-      grid-template-columns: 52px 1fr 52px;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .picker-btn {
-      height: 52px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.2);
-      color: #fff;
-      display: grid;
-      place-items: center;
-      padding: 0;
-    }
-
-    .picker-value {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 14px;
-    }
-
-    .error {
-      min-height: 20px;
-      margin-top: 8px;
-      color: #ffe4e4;
-      font-size: 0.95rem;
-      font-weight: 300;
-    }
-
-    .progress-wrap {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 10px;
-      background: rgba(255, 255, 255, 0.24);
-    }
-
-    .progress-bar {
-      height: 100%;
-      width: 0%;
-      background: var(--accent);
-      transition: width 0.2s ease;
-    }
-
-    .progress-label {
-      position: fixed;
-      right: 14px;
-      bottom: 14px;
-      font-size: 0.9rem;
-      font-weight: 300;
-      color: rgba(255,255,255,0.92);
-    }
-
-    @media (max-width: 560px) {
-      .card { padding: 24px 16px; border-radius: 18px; }
-      .picker { grid-template-columns: 48px 1fr 48px; }
-      .picker-btn { height: 48px; }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/200/project.css" />
 </head>
 <body>
-  <section class="screen active" data-screen="intro">
-    <div class="card">
-      <h1>Formulário do Evento</h1>
-      <p class="intro-copy">Leva cerca de 5 minutos. Preencha com calma e avance no seu ritmo.</p>
-      <div class="actions">
-        <button class="btn-primary" id="startBtn" type="button">Iniciar</button>
-      </div>
-    </div>
-  </section>
+  <main class="project-shell">
+    <section class="project-hub" aria-label="Projeto 200">
+      <button class="hub-action" type="button" data-open-modal="actionsModal">
+        <span class="hub-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9 4h6l1 2h3v14H5V6h3zm1.2 5.8-1.4 1.4 2.4 2.4 4.9-4.9-1.4-1.4-3.5 3.5z"/></svg>
+        </span>
+        <span>Ações</span>
+      </button>
+      <button class="hub-action" type="button" data-open-modal="constitutionModal">
+        <span class="hub-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6 3h11a2 2 0 0 1 2 2v16H7a2 2 0 0 1-2-2V4a1 1 0 0 1 1-1m2 4v2h8V7zm0 4v2h8v-2zm0 4v2h5v-2z"/></svg>
+        </span>
+        <span>Constituição</span>
+      </button>
+      <button class="hub-action" type="button" data-open-modal="financeModal">
+        <span class="hub-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zm2 3v6h12v-6zm5 1h2v1h2v2h-2v1h-2v-1H9v-2h2z"/></svg>
+        </span>
+        <span>Finanças</span>
+      </button>
+      <button class="hub-action" type="button" data-open-modal="calendarModal">
+        <span class="hub-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M7 2h2v3h6V2h2v3h3v16H4V5h3zm11 8H6v9h12z"/></svg>
+        </span>
+        <span>Calendário</span>
+      </button>
+      <button class="hub-action" type="button" data-open-modal="statsModal">
+        <span class="hub-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 19V5h2v14zm6 0V9h2v10zm6 0V3h2v16z"/></svg>
+        </span>
+        <span>Estatísicas</span>
+      </button>
+      <button class="hub-action" type="button" data-open-modal="historyModal">
+        <span class="hub-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.3 4H3l4-4 4 4H8a5 5 0 1 0 4-2zm-1 3h2v4l3 2-1 1.7-4-2.4z"/></svg>
+        </span>
+        <span>Histórico</span>
+      </button>
+    </section>
+  </main>
 
-  <section class="screen" data-screen="signature">
-    <div class="card">
-      <div class="agreement-title">
-        <svg class="agreement-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 16c3-4 7-7 12-9l4 4c-2 5-5 9-9 12H4v-7z" stroke="white" stroke-width="1.8"/></svg>
-        <h1>Assinatura</h1>
-      </div>
-      <h2 class="agreement-copy">Eu <u id="signatureName">contratante</u> concordo com os termos desse documento.</h2>
-      <input id="signatureCpf" class="input" type="text" inputmode="numeric" maxlength="11" placeholder="Digite o CPF (11 dígitos)" />
-      <div class="error" id="signatureError"></div>
-      <div class="actions">
-        <button class="btn-approve" id="signAgreeBtn" type="button">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17L4 12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          CONCORDO
+  <section class="workspace-modal" id="actionsModal" aria-hidden="true" aria-label="Ações">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+    </button>
+
+    <div class="actions-app">
+      <header class="actions-head">
+        <button class="circle-nav" type="button" data-day-nav="-1" aria-label="Data anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
         </button>
-      </div>
-    </div>
-  </section>
-
-  <section class="screen" data-screen="agreement">
-    <div class="card">
-      <div class="agreement-title">
-        <svg class="agreement-icon" id="agreementIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true"></svg>
-        <h1 id="agreementH1">Termo</h1>
-      </div>
-      <h2 class="agreement-copy" id="agreementH2"></h2>
-      <div class="actions">
-        <button class="btn-approve" id="agreeBtn" type="button">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17L4 12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          CONCORDO
+        <button class="date-title" type="button" id="activeDateLabel">Hoje</button>
+          <button class="circle-nav" type="button" data-day-nav="1" aria-label="Próxima data">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
         </button>
+      </header>
+
+      <div class="auth-alert" id="actionsAuthAlert" hidden>
+        <span>Entre na sua conta para salvar a agenda.</span>
+        <a href="/auth.html?next=/200">Entrar</a>
       </div>
+
+      <div class="actions-list" id="actionsList" aria-live="polite"></div>
+      <button class="floating-add" type="button" id="openActionWizard">Adicionar tarefa</button>
     </div>
-  </section>
 
-  <section class="screen" data-screen="question">
-    <div class="card">
-      <div class="question-head">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" stroke="white" stroke-width="1.8"></circle>
-          <path d="M12 7.2V12" stroke="white" stroke-width="1.8" stroke-linecap="round"></path>
-          <circle cx="12" cy="16.3" r="1" fill="white"></circle>
-        </svg>
-        <h2 id="questionTitle">Pergunta</h2>
-      </div>
+    <div class="action-wizard" id="actionWizard" aria-hidden="true">
+      <div class="wizard-panel">
+        <header class="wizard-head">
+          <span id="wizardStepLabel">1 de 4</span>
+          <button class="wizard-close" type="button" id="closeActionWizard" aria-label="Fechar etapa">
+            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+          </button>
+        </header>
 
-      <div id="inputArea"></div>
-      <div class="error" id="errorBox"></div>
+        <form id="actionForm">
+          <section class="wizard-step active" data-step="1">
+            <label class="step-label" for="taskTitle">Titulo da Tarefa</label>
+            <input id="taskTitle" class="text-field" name="title" autocomplete="off" maxlength="80" />
+          </section>
 
-      <div class="actions">
-        <button class="btn-secondary" id="prevBtn" type="button">Voltar</button>
-        <button class="btn-primary" id="nextBtn" type="button">Próximo</button>
-      </div>
-    </div>
-  </section>
+          <section class="wizard-step" data-step="2">
+            <span class="step-label">Data</span>
+            <div class="date-picker">
+              <button class="circle-nav" type="button" data-wizard-date="-1" aria-label="Data anterior">
+                <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+              </button>
+              <strong id="wizardDateLabel">Hoje</strong>
+              <button class="circle-nav" type="button" data-wizard-date="1" aria-label="Próxima data">
+                <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+              </button>
+            </div>
 
-  <section class="screen" data-screen="payment">
-    <div class="card">
-      <div class="agreement-title">
-        <svg class="agreement-icon" id="paymentIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true"></svg>
-        <h1 id="paymentH1">Pagamento</h1>
-      </div>
-      <h2 class="agreement-copy" id="paymentH2"></h2>
-      <div id="paymentBody"></div>
-      <div class="error" id="paymentError"></div>
-      <div class="actions">
-        <button class="btn-approve" id="paymentNextBtn" type="button">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6L9 17L4 12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          CONCORDO
-        </button>
-      </div>
-    </div>
-  </section>
+            <div class="repeat-box" id="repeatBox" hidden>
+              <div class="repeat-presets">
+                <button type="button" data-repeat-mode="daily">Diariamente</button>
+                <button type="button" data-repeat-mode="weekdays">Segunda a Sexta</button>
+              </div>
+              <div class="weekday-row" id="weekdayRow" aria-label="Dias da semana"></div>
+            </div>
 
-  <section class="screen" data-screen="success">
-    <div class="card">
-      <h1>Tudo certo!</h1>
-      <p class="success-copy" id="successCopy">Seu formulário foi preenchido com sucesso.</p>
-      <div class="actions">
-        <button class="btn-secondary" id="downloadPdfBtn" type="button" style="display:none;">Baixar PDF</button>
-        <button class="btn-primary" id="restartBtn" type="button">Preencher novamente</button>
-      </div>
-    </div>
-  </section>
-
-  <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
-  <div class="progress-label" id="progressLabel">Etapa 0/29</div>
-
-  <script>
-    const historyOptions = [
-      "Fábrica de heróis",
-      "História de Samuel",
-      "Davi e Golias",
-      "História de Jonas",
-      "História de Naamã",
-      "História da criação",
-      "Apresentação Mista",
-      "História de Noé"
-    ];
-
-    const months = [
-      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ];
-
-    const years = ["2026", "2027", "2028", "2029", "2030"];
-
-    const countries = [
-      "Brasil", "Estados Unidos", "China", "Japão", "Alemanha", "Índia", "Reino Unido", "França", "Itália",
-      "Canadá", "Coreia do Sul", "Austrália", "Espanha", "Países Baixos", "Suíça", "Arábia Saudita",
-      "Argentina", "Chile", "Colômbia", "Peru", "Uruguai", "Paraguai"
-    ];
-
-    const timeSlots = [];
-    for (let hour = 6; hour <= 21; hour++) {
-      for (const minute of [0, 30]) {
-        if (hour === 21 && minute > 0) continue;
-        const period = hour < 12 ? "am" : "pm";
-        const viewHour = hour > 12 ? hour - 12 : hour;
-        const mm = minute === 0 ? "00" : "30";
-        timeSlots.push(`${viewHour}h${mm}${period}`);
-      }
-    }
-
-    const steps = [
-      { key: "igreja", title: "Qual é o nome da igreja?", type: "text", placeholder: "Digite o nome da igreja" },
-      { key: "contratante", title: "Qual é o nome do contratante?", type: "text", placeholder: "Digite o nome do contratante" },
-      { key: "whatsapp", title: "Qual é o WhatsApp do contratante?", type: "text", placeholder: "Somente números", maxLength: 15, numeric: true },
-      { key: "historia", title: "Qual história foi escolhida?", type: "picker", options: historyOptions },
-      { key: "dia", title: "Em que dia será o evento?", type: "picker", options: Array.from({ length: 31 }, (_, i) => String(i + 1)) },
-      { key: "mes", title: "Em qual mês será o evento?", type: "picker", options: months },
-      { key: "ano", title: "Em qual ano será o evento?", type: "picker", options: years },
-      { key: "horario", title: "Qual será o horário do evento?", type: "picker", options: timeSlots },
-      { key: "pais", title: "Em qual país ou região será o evento?", type: "picker", options: countries },
-      { key: "endereco", title: "Qual é o endereço do evento?", type: "text", placeholder: "Digite o endereço" },
-      { key: "cidade", title: "Em qual cidade será o evento?", type: "text", placeholder: "Digite a cidade" },
-      { key: "cep", title: "Qual é o código postal (CEP)?", type: "text", placeholder: "8 dígitos", maxLength: 8, numeric: true }
-    ];
-
-    const answers = {};
-    const pickerIndexes = {};
-    steps.forEach((s) => { if (s.type === "picker") pickerIndexes[s.key] = 0; });
-
-    const screens = {
-      intro: document.querySelector('[data-screen="intro"]'),
-      agreement: document.querySelector('[data-screen="agreement"]'),
-      signature: document.querySelector('[data-screen="signature"]'),
-      question: document.querySelector('[data-screen="question"]'),
-      payment: document.querySelector('[data-screen="payment"]'),
-      success: document.querySelector('[data-screen="success"]')
-    };
-
-    const questionTitle = document.getElementById("questionTitle");
-    const inputArea = document.getElementById("inputArea");
-    const errorBox = document.getElementById("errorBox");
-    const progressBar = document.getElementById("progressBar");
-    const progressLabel = document.getElementById("progressLabel");
-    const startBtn = document.getElementById("startBtn");
-    const prevBtn = document.getElementById("prevBtn");
-    const nextBtn = document.getElementById("nextBtn");
-    const restartBtn = document.getElementById("restartBtn");
-    const successCopy = document.getElementById("successCopy");
-    const downloadPdfBtn = document.getElementById("downloadPdfBtn");
-    const agreementH1 = document.getElementById("agreementH1");
-    const agreementH2 = document.getElementById("agreementH2");
-    const agreementIcon = document.getElementById("agreementIcon");
-    const agreeBtn = document.getElementById("agreeBtn");
-    const signatureName = document.getElementById("signatureName");
-    const signatureCpf = document.getElementById("signatureCpf");
-    const signatureError = document.getElementById("signatureError");
-    const signAgreeBtn = document.getElementById("signAgreeBtn");
-    const paymentIcon = document.getElementById("paymentIcon");
-    const paymentH1 = document.getElementById("paymentH1");
-    const paymentH2 = document.getElementById("paymentH2");
-    const paymentBody = document.getElementById("paymentBody");
-    const paymentError = document.getElementById("paymentError");
-    const paymentNextBtn = document.getElementById("paymentNextBtn");
-
-    const arrowLeft = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 19L8 12L15 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    const arrowRight = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5L16 12L9 19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-    let currentStep = -1;
-    let currentPdfUrl = "";
-    let agreementIndex = 0;
-    let inPostQuestionAgreements = false;
-    let paymentStage = 0;
-    let countdownTimer = null;
-
-    const agreementSteps = [
-      {
-        icon: `<path d="M4 20h16" stroke="white" stroke-width="1.8"/><path d="M7 17V5a2 2 0 0 1 2-2h8v14" stroke="white" stroke-width="1.8"/><path d="M10 8h5M10 11h5" stroke="white" stroke-width="1.8"/>`,
-        h1: "Termo de Compromisso",
-        h2: "Agradecemos pela contratação da Turma do Printy. Gentilmente pedimos que atentem à importância do correto e imediato preenchimento deste documento, pois ele será utilizado como registro oficial das informações do evento, bem como para a gravação do vídeo de divulgação e para a inclusão da agenda no site e nas mídias sociais."
-      },
-      { icon: `<path d="M3 11L12 4L21 11" stroke="white" stroke-width="1.8"/><path d="M6 10v10h12V10" stroke="white" stroke-width="1.8"/>`, h1: "Compromisso da igreja", h2: "" },
-      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M9 9c1-1 5-1 6 1s-1 3-3 3-4 1-3 3 4 2 6 0" stroke="white" stroke-width="1.8"/>`, h1: "Financeiro/Logístico", h2: "O valor de uma (1) apresentação: R$ 3.400,00\nO valor de duas (2) apresentações: R$ 5.100,00\n\nO transporte para a cidade de São Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor será definido mediante orçamento prévio." },
-      { icon: `<path d="M12 4c4 3 5 6 5 8a5 5 0 1 1-10 0c0-2 1-5 5-8z" stroke="white" stroke-width="1.8"/><path d="M12 14c1 0 2-.8 2-2" stroke="white" stroke-width="1.8"/>`, h1: "ALIMENTAÇÃO", h2: "A equipe é composta pelo mínimo de 3 pessoas e máximo de 6, a depender da história escolhida. A alimentação pode ser na igreja, hotel ou restaurante.\n\nCafé da manhã - Almoço - Jantar, a depender do horário do evento ou solicitação prévia da equipe." },
-      { icon: `<path d="M4 14h16l-1.5 4H5.5L4 14z" stroke="white" stroke-width="1.8"/><circle cx="8" cy="18.5" r="1.5" fill="white"/><circle cx="16" cy="18.5" r="1.5" fill="white"/>`, h1: "ESTACIONAMENTO", h2: "Solicitamos liberação de vaga na porta da igreja para 2 carros para descarga de equipamento, ou acesso a estacionamento próprio." },
-      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.8"/>`, h1: "SALA / CAMARIM", h2: "Precisamos de uma sala exclusiva para a Turma do Printy, próxima ao palco/púlpito. Sempre lembrando que iremos nos adequar ao espaço físico da igreja. Também solicitamos:\nCadeiras e mesas para figurinos e acessórios\n\nÁgua mineral ou água de coco (norte e nordeste) disponível no palco durante a apresentação." },
-      { icon: `<path d="M5 14V8l6-3 6 3v6" stroke="white" stroke-width="1.8"/><path d="M9 18h6" stroke="white" stroke-width="1.8"/>`, h1: "EQUIPAMENTO DE SOM", h2: "Usamos o equipamento disponível da igreja e 1 microfone sem fio carregado.\n\nUm técnico apto para exercer a função de operar a sonoplastia da igreja, a fim de garantir a qualidade sonora do evento." },
-      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M10 10l5 2-5 2v-4z" fill="white"/>`, h1: "VÍDEOS DA PROGRAMAÇÃO", h2: "Estão liberadas a gravação de imagens da performance da Turma do Printy, desde que as mesmas sejam repassadas à equipe, para a liberação de veiculação das imagens em plataforma digital. As gravações de lives estão liberadas, desde que seja repassado o respectivo link à Turma do Printy antecipadamente, para a divulgação do mesmo." },
-      { icon: `<path d="M5 16l3-7 4 5 3-3 4 5" stroke="white" stroke-width="1.8"/><circle cx="6" cy="7" r="1.2" fill="white"/>`, h1: "COMPROMISSOS DA TURMA DO PRINTY", h2: "" },
-      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="white" stroke-width="1.8"/>`, h1: "CHEGADA E MONTAGEM", h2: "Chegar com 2h00 de antecedência para reconhecimento do espaço, passagem de som, montagem de cenário e luz, alimentação e estruturação do evento junto ao responsável pelo mesmo." },
-      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M10 9l5 3-5 3V9z" fill="white"/>`, h1: "Vídeo Divulgação", h2: "Gravação de 1 vídeo chamada para WhatsApp e rede social, e divulgar chamada do evento em nossos stories ou feed.\n\n*Enviar imagens e logomarca para a confecção de flyers e banners, caso a igreja deseje divulgar." },
-      { icon: `<rect x="6" y="4" width="12" height="16" rx="2" stroke="white" stroke-width="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="white" stroke-width="1.8"/>`, h1: "Considerações finais", h2: "As informações utilizadas serão exatamente as informadas no termo de compromisso pelo contratante. Se houver alguma variação necessária, como nome de congresso/evento, escrita/pronúncia de nomes próprios, igreja/end, deverá ser informada no campo \"Notas adicionais\" deste formulário. O material é enviado 8 dias após o preenchimento do contrato." }
-    ];
-
-    const paymentOptions = [
-      { key: "one", label: "Uma (1) apresentação", priceLabel: "R$ 3.400,00", stripeProductId: "prod_UXGPN4quiGCV2S" },
-      { key: "two", label: "Duas (2) apresentações", priceLabel: "R$ 5.100,00", stripeProductId: "prod_UXFnHWguWzdbst" }
-    ];
-
-    const totalStages = 1 + steps.length + (agreementSteps.length - 1) + 3 + 1 + 1;
-
-    function showScreen(name) {
-      const current = Object.values(screens).find((el) => el.classList.contains("active"));
-      const next = screens[name];
-      if (!next) return;
-      if (current === next) return;
-
-      if (current) {
-        current.classList.add("leaving-left");
-        current.classList.remove("active");
-        setTimeout(() => current.classList.remove("leaving-left"), 360);
-      }
-
-      next.classList.add("active");
-    }
-
-    function clearCountdown() {
-      if (countdownTimer) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-      }
-    }
-
-    function getDueDateOptions() {
-      const options = [];
-      const now = new Date();
-      for (let i = 1; i <= 5; i += 1) {
-        const d = new Date(now);
-        d.setDate(now.getDate() + i);
-        options.push(d);
-      }
-      return options;
-    }
-
-    function formatDateBr(date) {
-      return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
-    }
-
-    function getWeekdayPt(date) {
-      const days = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-      return days[date.getDay()] || "";
-    }
-
-    function getCurrentStage() {
-      if (screens.success.classList.contains("active")) return totalStages;
-      if (screens.intro.classList.contains("active")) return 0;
-      if (screens.signature.classList.contains("active")) return totalStages - 1;
-      if (screens.payment.classList.contains("active")) return 1 + steps.length + (agreementSteps.length - 1) + paymentStage + 1;
-      if (screens.question.classList.contains("active")) return 1 + Math.max(0, currentStep + 1);
-      if (screens.agreement.classList.contains("active")) {
-        if (inPostQuestionAgreements) return 1 + steps.length + agreementIndex;
-        return 1;
-      }
-      return 0;
-    }
-
-    function updateProgress() {
-      const done = getCurrentStage();
-      const percent = (done / totalStages) * 100;
-      progressBar.style.width = `${percent}%`;
-      progressLabel.textContent = `Etapa ${done}/${totalStages}`;
-    }
-
-    function renderAgreement() {
-      const step = agreementSteps[agreementIndex];
-      agreementH1.textContent = step.h1;
-      agreementH2.textContent = step.h2 || "";
-      agreementIcon.innerHTML = step.icon;
-      showScreen("agreement");
-      updateProgress();
-    }
-
-    function renderPaymentStage() {
-      clearCountdown();
-      paymentError.textContent = "";
-      showScreen("payment");
-      paymentBody.style.textAlign = "left";
-
-      if (paymentStage === 0) {
-        paymentIcon.innerHTML = `<path d="M3 8h18v8H3z" stroke="white" stroke-width="1.8"/><path d="M3 12h18" stroke="white" stroke-width="1.8"/>`;
-        paymentH1.textContent = "Escolha da apresentação";
-        paymentH2.textContent = "";
-        paymentBody.innerHTML = `
-          ${paymentOptions.map((opt) => `<button type="button" class="payment-choice ${answers.pagamentoOpcao === opt.key ? "active" : ""}" data-option="${opt.key}">${opt.label} - ${opt.priceLabel}</button>`).join("")}
-        `;
-
-        paymentBody.querySelectorAll("[data-option]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const key = btn.getAttribute("data-option");
-            const selected = paymentOptions.find((item) => item.key === key);
-            if (!selected) return;
-            answers.pagamentoOpcao = selected.key;
-            answers.pagamentoValor = selected.priceLabel;
-            answers.pagamentoStripeProduto = selected.stripeProductId;
-            renderPaymentStage();
-          });
-        });
-      } else if (paymentStage === 1) {
-        const dueDates = getDueDateOptions();
-        paymentIcon.innerHTML = `<rect x="4" y="5" width="16" height="15" rx="2" stroke="white" stroke-width="1.8"/><path d="M4 9h16" stroke="white" stroke-width="1.8"/>`;
-        paymentH1.textContent = "Dia do pagamento";
-        paymentH2.textContent = "Escolha um dia";
-        paymentBody.innerHTML = dueDates.map((d, idx) => {
-          const dateLabel = formatDateBr(d);
-          const dayLabel = idx === 0 ? "Amanhã" : `<strong>${getWeekdayPt(d)}</strong>`;
-          return `<button type="button" class="payment-choice ${answers.pagamentoVencimento === dateLabel ? "active" : ""}" data-due="${idx}">${dayLabel}<br>${dateLabel}</button>`;
-        }).join("");
-
-        paymentBody.querySelectorAll("[data-due]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const idx = Number(btn.getAttribute("data-due"));
-            const selected = dueDates[idx];
-            if (!selected) return;
-            answers.pagamentoVencimento = formatDateBr(selected);
-            answers.pagamentoVencimentoIso = selected.toISOString();
-            renderPaymentStage();
-          });
-        });
-      } else {
-        paymentIcon.innerHTML = `<rect x="4" y="5" width="16" height="15" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 3v4M16 3v4" stroke="white" stroke-width="1.8"/>`;
-        paymentH1.textContent = "Sua data foi reservada";
-        paymentH2.textContent = "Pague até o vencimento em até 12x";
-        paymentBody.style.textAlign = "center";
-        paymentBody.innerHTML = `
-          <div class="countdown" id="countdownBox">00d : 00h : 00min</div>
-          <div class="actions" style="margin-top:10px;">
-            <button class="btn-approve" id="payNowBtn" type="button">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 8h18v8H3z" stroke="white" stroke-width="2"/><path d="M3 12h18" stroke="white" stroke-width="2"/></svg>
-              PAGAR AGORA
+            <button class="repeat-toggle" type="button" id="repeatToggle" aria-label="Editar repetição">
+              <svg viewBox="0 0 24 24"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg>
             </button>
-          </div>
-          <div class="pix-copy"><strong>Chave Pix</strong><br>36-442-785-0001 (CNPJ)</div>
-        `;
+          </section>
 
-        const due = answers.pagamentoVencimentoIso ? new Date(answers.pagamentoVencimentoIso) : null;
-        const countdownBox = document.getElementById("countdownBox");
-        if (due && countdownBox) {
-          due.setHours(23, 59, 59, 999);
-          const tick = () => {
-            const diff = due.getTime() - Date.now();
-            if (diff <= 0) {
-              countdownBox.textContent = "00d : 00h : 00min";
-              return;
-            }
-            const mins = Math.floor(diff / 60000);
-            const days = Math.floor(mins / (24 * 60));
-            const hours = Math.floor((mins % (24 * 60)) / 60);
-            const remMins = mins % 60;
-            countdownBox.textContent = `${days}d : ${String(hours).padStart(2, "0")}h : ${String(remMins).padStart(2, "0")}min`;
-          };
-          tick();
-          countdownTimer = setInterval(tick, 1000);
-        }
+          <section class="wizard-step" data-step="3">
+            <span class="step-label">Horario inicio</span>
+            <div class="time-picker" data-time-picker="start"></div>
+          </section>
 
-        const payNowBtn = document.getElementById("payNowBtn");
-        if (payNowBtn) {
-          payNowBtn.addEventListener("click", async () => {
-            try {
-              const response = await fetch("/api/terms/checkout", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ stripeProductId: answers.pagamentoStripeProduto })
-              });
-              const data = await response.json();
-              if (!response.ok || !data?.payUrl) {
-                throw new Error(data?.error || "Nao foi possivel abrir o pagamento.");
-              }
-              window.location.href = data.payUrl;
-            } catch (error) {
-              paymentError.textContent = error instanceof Error ? error.message : "Erro ao abrir pagamento.";
-            }
-          });
-        }
-      }
+          <section class="wizard-step" data-step="4">
+            <span class="step-label">Horario fim</span>
+            <div class="time-picker" data-time-picker="end"></div>
+          </section>
 
-      updateProgress();
-    }
+          <p class="wizard-message" id="wizardMessage" role="status"></p>
 
-    function renderStep() {
-      const step = steps[currentStep];
-      questionTitle.textContent = step.title;
-      errorBox.textContent = "";
+          <footer class="wizard-actions">
+            <button class="ghost-btn" type="button" id="wizardBack">Voltar</button>
+            <button class="primary-btn" type="button" id="wizardNext">Continuar</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  </section>
 
-      if (step.type === "text") {
-        const value = answers[step.key] || "";
-        inputArea.innerHTML = `<input id="stepInput" class="input" type="text" placeholder="${step.placeholder || ""}" value="${escapeHtml(value)}" ${step.maxLength ? `maxlength="${step.maxLength}"` : ""} ${step.numeric ? 'inputmode="numeric"' : ""} />`;
-        const input = document.getElementById("stepInput");
-        input.focus();
-        input.addEventListener("input", () => {
-          if (step.numeric) {
-            input.value = input.value.replace(/\D/g, "");
-          }
-        });
-      }
+  <section class="workspace-modal simple-modal" id="constitutionModal" aria-hidden="true" aria-label="Constituição">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <h1>Constituição</h1>
+  </section>
 
-      if (step.type === "picker") {
-        const index = pickerIndexes[step.key] || 0;
-        const value = step.options[index];
-        answers[step.key] = value;
+  <section class="workspace-modal simple-modal" id="financeModal" aria-hidden="true" aria-label="Finanças">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <h1>Finanças</h1>
+  </section>
 
-        inputArea.innerHTML = `
-          <div class="picker">
-            <button class="picker-btn" id="pickPrev" type="button" aria-label="anterior">${arrowLeft}</button>
-            <div class="picker-value" id="pickValue"></div>
-            <button class="picker-btn" id="pickNext" type="button" aria-label="próximo">${arrowRight}</button>
-          </div>`;
+  <section class="workspace-modal simple-modal" id="calendarModal" aria-hidden="true" aria-label="Calendário">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <h1>Calendário</h1>
+  </section>
 
-        const pickValue = document.getElementById("pickValue");
-        const refresh = () => {
-          const i = pickerIndexes[step.key];
-          const current = step.options[i];
-          pickValue.textContent = current;
-          answers[step.key] = current;
-        };
+  <section class="workspace-modal simple-modal" id="statsModal" aria-hidden="true" aria-label="Estatísicas">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <h1>Estatísicas</h1>
+  </section>
 
-        document.getElementById("pickPrev").addEventListener("click", () => {
-          const len = step.options.length;
-          pickerIndexes[step.key] = (pickerIndexes[step.key] - 1 + len) % len;
-          refresh();
-        });
+  <section class="workspace-modal simple-modal" id="historyModal" aria-hidden="true" aria-label="Histórico">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <h1>Histórico</h1>
+  </section>
 
-        document.getElementById("pickNext").addEventListener("click", () => {
-          const len = step.options.length;
-          pickerIndexes[step.key] = (pickerIndexes[step.key] + 1) % len;
-          refresh();
-        });
-
-        refresh();
-      }
-
-      prevBtn.style.visibility = currentStep === 0 ? "hidden" : "visible";
-      nextBtn.textContent = currentStep === steps.length - 1 ? "Finalizar" : "Próximo";
-      updateProgress();
-    }
-
-    function validateStep() {
-      const step = steps[currentStep];
-      errorBox.textContent = "";
-
-      if (step.type === "text") {
-        const input = document.getElementById("stepInput");
-        const value = (input.value || "").trim();
-
-        if (!value) {
-          errorBox.textContent = "Preencha esse campo para continuar.";
-          return false;
-        }
-
-        if (step.numeric && !/^\d+$/.test(value)) {
-          errorBox.textContent = "Use somente números nesse campo.";
-          return false;
-        }
-
-        if (step.key === "cep" && value.length !== 8) {
-          errorBox.textContent = "O CEP precisa ter exatamente 8 dígitos.";
-          return false;
-        }
-
-        if (step.key === "whatsapp" && value.length > 15) {
-          errorBox.textContent = "O WhatsApp pode ter no máximo 15 dígitos.";
-          return false;
-        }
-
-        answers[step.key] = value;
-      }
-
-      return true;
-    }
-
-    function escapeHtml(text) {
-      return String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
-
-    startBtn.addEventListener("click", () => {
-      agreementIndex = 0;
-      inPostQuestionAgreements = false;
-      renderAgreement();
-    });
-
-    prevBtn.addEventListener("click", () => {
-      if (currentStep <= 0) return;
-      currentStep -= 1;
-      renderStep();
-    });
-
-    async function submitTerm() {
-      nextBtn.disabled = true;
-      nextBtn.textContent = "Enviando...";
-      errorBox.textContent = "";
-
-      try {
-        const response = await fetch("/api/terms", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers })
-        });
-        const data = await response.json();
-
-        if (!response.ok || !data?.ok) {
-          throw new Error(data?.error || "Falha ao enviar formulário.");
-        }
-
-        currentPdfUrl = data.pdfUrl || "";
-        successCopy.textContent = "Seu formulário foi preenchido com sucesso e já foi salvo no sistema.";
-        downloadPdfBtn.style.display = currentPdfUrl ? "inline-block" : "none";
-
-        showScreen("success");
-        currentStep = steps.length + 1;
-        updateProgress();
-      } catch (error) {
-        errorBox.textContent = error instanceof Error ? error.message : "Falha ao enviar formulário.";
-      } finally {
-        nextBtn.disabled = false;
-        nextBtn.textContent = "Finalizar";
-      }
-    }
-
-    nextBtn.addEventListener("click", async () => {
-      if (!validateStep()) return;
-
-      if (currentStep < steps.length - 1) {
-        currentStep += 1;
-        renderStep();
-        return;
-      }
-
-      if (!inPostQuestionAgreements) {
-        inPostQuestionAgreements = true;
-        agreementIndex = 1;
-        renderAgreement();
-        return;
-      }
-    });
-
-    restartBtn.addEventListener("click", () => {
-      currentStep = -1;
-      currentPdfUrl = "";
-      agreementIndex = 0;
-      inPostQuestionAgreements = false;
-      paymentStage = 0;
-      clearCountdown();
-      signatureCpf.value = "";
-      signatureError.textContent = "";
-      successCopy.textContent = "Seu formulário foi preenchido com sucesso.";
-      downloadPdfBtn.style.display = "none";
-      showScreen("intro");
-      updateProgress();
-    });
-
-    downloadPdfBtn.addEventListener("click", () => {
-      if (!currentPdfUrl) return;
-      window.open(currentPdfUrl, "_blank");
-    });
-
-    agreeBtn.addEventListener("click", () => {
-      if (!inPostQuestionAgreements) {
-        currentStep = 0;
-        showScreen("question");
-        renderStep();
-        return;
-      }
-
-      if (agreementIndex < agreementSteps.length - 1) {
-        agreementIndex += 1;
-        renderAgreement();
-        return;
-      }
-      paymentStage = 0;
-      renderPaymentStage();
-    });
-
-    paymentNextBtn.addEventListener("click", () => {
-      paymentError.textContent = "";
-      if (paymentStage === 0) {
-        if (!answers.pagamentoOpcao) {
-          paymentError.textContent = "Escolha uma opção de apresentação.";
-          return;
-        }
-        paymentStage = 1;
-        renderPaymentStage();
-        return;
-      }
-
-      if (paymentStage === 1) {
-        if (!answers.pagamentoVencimentoIso) {
-          paymentError.textContent = "Escolha o dia do pagamento.";
-          return;
-        }
-        paymentStage = 2;
-        renderPaymentStage();
-        return;
-      }
-
-      signatureName.textContent = answers.contratante || "contratante";
-      signatureCpf.value = answers.assinaturaCpf || "";
-      signatureError.textContent = "";
-      clearCountdown();
-      showScreen("signature");
-      updateProgress();
-    });
-
-    signatureCpf.addEventListener("input", () => {
-      signatureCpf.value = signatureCpf.value.replace(/\D/g, "");
-    });
-
-    signAgreeBtn.addEventListener("click", () => {
-      const cpf = String(signatureCpf.value || "").trim();
-      if (!/^\d{11}$/.test(cpf)) {
-        signatureError.textContent = "Informe um CPF válido com 11 dígitos.";
-        return;
-      }
-      answers.assinatura = `Eu ${answers.contratante || "contratante"} concordo com os termos desse documento.`;
-      answers.assinaturaCpf = cpf;
-      submitTerm();
-    });
-
-    updateProgress();
-  </script>
+  <script type="module" src="/200/project.js"></script>
 </body>
 </html>
