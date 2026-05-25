@@ -75,6 +75,8 @@ const financeDateLabel = document.getElementById("financeDateLabel");
 const platformEntriesList = document.getElementById("platformEntriesList");
 const platformMonthlyIncome = document.getElementById("platformMonthlyIncome");
 const platformMonthlyExpense = document.getElementById("platformMonthlyExpense");
+const platformExpenseCard = document.getElementById("platformExpenseCard");
+const platformIncomeCard = document.getElementById("platformIncomeCard");
 const platformBalanceValue = document.getElementById("platformBalanceValue");
 const togglePlatformBalanceButton = document.getElementById("togglePlatformBalance");
 const addPlatformBalanceButton = document.getElementById("addPlatformBalance");
@@ -132,6 +134,7 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
 
 let financeTimer = null;
 let assigneeProgressTicker = null;
+let platformMetricsTicker = null;
 
 const state = {
   activeOffset: 0,
@@ -145,6 +148,7 @@ const state = {
   },
   platformBalanceCents: 0,
   platformBalanceHidden: false,
+  platformMetricIndex: 0,
   platformBaseIncomeCents: 0,
   assigneeProgressRows: [],
   assigneeProgressIndex: 0,
@@ -327,6 +331,7 @@ function openModal(id) {
 
   if (id === "calendarModal") {
     void loadPlatformFinance();
+    startPlatformMetricsRotation();
   }
 
   if (id === "statsModal") {
@@ -347,6 +352,11 @@ function closeModal(modal) {
   if (modal.id === "financeModal" && financeTimer) {
     window.clearTimeout(financeTimer);
     financeTimer = null;
+  }
+
+  if (modal.id === "calendarModal" && platformMetricsTicker) {
+    window.clearInterval(platformMetricsTicker);
+    platformMetricsTicker = null;
   }
 
 }
@@ -914,6 +924,30 @@ function renderPlatformBalance() {
   if (togglePlatformBalanceButton) {
     togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "•";
   }
+}
+
+function renderPlatformMetricCards() {
+  if (!platformExpenseCard || !platformIncomeCard) {
+    return;
+  }
+
+  const showExpense = state.platformMetricIndex % 2 === 0;
+  platformExpenseCard.hidden = !showExpense;
+  platformIncomeCard.hidden = showExpense;
+}
+
+function startPlatformMetricsRotation() {
+  renderPlatformMetricCards();
+
+  if (platformMetricsTicker) {
+    window.clearInterval(platformMetricsTicker);
+    platformMetricsTicker = null;
+  }
+
+  platformMetricsTicker = window.setInterval(() => {
+    state.platformMetricIndex = (state.platformMetricIndex + 1) % 2;
+    renderPlatformMetricCards();
+  }, 1500);
 }
 function renderPlatformEntries() {
   if (!platformEntriesList) {

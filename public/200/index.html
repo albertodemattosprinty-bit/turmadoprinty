@@ -186,21 +186,20 @@
         <button class="circle-nav" type="button" data-finance-day-nav="1" aria-label="Próxima data">
           <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
         </button>
+        <div class="finance-head-balance">
+          <button class="balance-visibility" type="button" id="togglePlatformBalance" aria-label="Ocultar saldo">*</button>
+          <strong id="platformBalanceValue">R$ 0,00</strong>
+          <button class="ghost-btn" type="button" id="addPlatformBalance">+</button>
+        </div>
       </header>
 
       <div class="finance-overview">
-        <article class="finance-metric finance-balance">
-          <button class="balance-visibility" type="button" id="togglePlatformBalance" aria-label="Ocultar saldo">*</button>
-          <span>Saldo</span>
-          <strong id="platformBalanceValue">R$ 0,00</strong>
-          <button class="ghost-btn" type="button" id="addPlatformBalance">Adicionar saldo</button>
-        </article>
-        <article class="finance-metric">
-          <span>Gasto mensal</span>
+        <article class="finance-metric finance-rotating-card" id="platformExpenseCard">
+          <span class="finance-metric-title"><img src="/200/icons/saidas.svg" alt="" aria-hidden="true" />Saídas</span>
           <strong id="platformMonthlyExpense">R$ 0,00</strong>
         </article>
-        <article class="finance-metric">
-          <span>Renda mensal</span>
+        <article class="finance-metric finance-rotating-card" id="platformIncomeCard" hidden>
+          <span class="finance-metric-title"><img src="/200/icons/entradas.svg" alt="" aria-hidden="true" />Entradas</span>
           <strong id="platformMonthlyIncome">R$ 0,00</strong>
         </article>
       </div>

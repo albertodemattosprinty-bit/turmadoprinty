@@ -238,6 +238,37 @@ svg {
   gap: 14px;
 }
 
+.finance-head-balance {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(6, 22, 61, 0.62);
+}
+
+.finance-head-balance .ghost-btn {
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 0.82rem;
+}
+
+.finance-head-balance .balance-visibility {
+  position: static;
+  width: 26px;
+  height: 26px;
+  font-size: 0.86rem;
+}
+
+.finance-head-balance strong {
+  font-size: 0.92rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .circle-nav {
   width: 44px;
   height: 44px;
@@ -476,7 +507,7 @@ svg {
 .finance-overview {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -496,6 +527,41 @@ svg {
   color: var(--white);
   font-size: 1.1rem;
   font-weight: 800;
+}
+
+.finance-metric-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-metric-title img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.finance-rotating-card {
+  min-height: 118px;
+}
+
+#statsGeneralGoals {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#statsGeneralGoals .finance-metric {
+  min-height: 96px;
+  padding: 10px;
+  gap: 6px;
+}
+
+#statsGeneralGoals .finance-metric span {
+  font-size: 0.78rem;
+}
+
+#statsGeneralGoals .finance-metric strong {
+  font-size: clamp(1.1rem, 3.4vw, 1.6rem);
 }
 
 .task-row.task-pending-due {
@@ -753,6 +819,12 @@ svg {
 
   .finance-overview {
     grid-template-columns: 1fr;
+  }
+
+  .finance-head-balance {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
   }
 
   .finance-period-label {
