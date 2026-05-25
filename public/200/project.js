@@ -1,4 +1,4 @@
-ï»¿import { getApiUrl } from "../api.js";
+import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -425,7 +425,7 @@ async function loadFinanceSummary() {
 
   if (!getToken()) {
     financeDashboard.hidden = true;
-    financeStatus.innerHTML = 'Entre como administrador para ver as finanÃƒÂ§as. <a href="/auth.html?next=/200">Entrar</a>';
+    financeStatus.innerHTML = 'Entre como administrador para ver as finanças. <a href="/auth.html?next=/200">Entrar</a>';
     return;
   }
 
@@ -912,7 +912,7 @@ function renderPlatformDateHeader() {
 }
 
 function getPlatformKindLabel(kind) {
-  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "SaÃƒÂ­da";
+  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "Saída";
 }
 
 function getPlatformStatusClass(entry) {
@@ -936,7 +936,7 @@ function renderPlatformBalance() {
     : formatMoney(state.platformBalanceCents);
 
   if (togglePlatformBalanceButton) {
-    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "â€¢";
+    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "•";
   }
 }
 
@@ -971,12 +971,12 @@ function renderPlatformEntries() {
   platformEntriesList.innerHTML = "";
 
   if (!getToken()) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanÃƒÂ§as.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanças.</div>';
     return;
   }
 
   if (!state.platformEntries.length) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Sem lanÃƒÂ§amentos nessa data.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Sem lançamentos nessa data.</div>';
     return;
   }
 
@@ -989,9 +989,9 @@ function renderPlatformEntries() {
       <div class="task-time">${formatHourChip(entry.occurredAt)}</div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} Ã‚Â· ${entry.category}`)}</div>
+        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} · ${entry.category}`)}</div>
       </div>
-      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lanÃƒÂ§amento">
+      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lançamento">
         <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
       </button>
     `;
@@ -1137,10 +1137,10 @@ function renderStatsRanking() {
     row.innerHTML = `
       <div class="stats-avatar-wrap">
         <img class="task-avatar" src="${getActionAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
-        <span class="stats-rank-badge">${index + 1}Âº</span>
+        <span class="stats-rank-badge">${index + 1}º</span>
       </div>
       <div class="task-main">
-        <div class="task-title">${escapeHtml(`${entry.name} Â· ${entry.percent}%`)}</div>
+        <div class="task-title">${escapeHtml(`${entry.name} · ${entry.percent}%`)}</div>
       </div>
     `;
     statsRankingList.appendChild(row);
@@ -1184,7 +1184,7 @@ async function editStatsGoals() {
     monthlyBalanceGoalCents: 0,
     recurringIncomeGoalCents: 0
   };
-  const dailyRaw = window.prompt("Meta diÃ¡ria de entradas (R$):", String((current.dailyIncomeGoalCents || 0) / 100).replace(".", ","));
+  const dailyRaw = window.prompt("Meta diária de entradas (R$):", String((current.dailyIncomeGoalCents || 0) / 100).replace(".", ","));
   if (dailyRaw == null) {
     return;
   }
@@ -1278,7 +1278,7 @@ async function savePlatformEntry() {
       throw new Error("Informe o nome.");
     }
     if (!Number.isFinite(value) || value <= 0) {
-      throw new Error("Informe um valor vÃƒÂ¡lido.");
+      throw new Error("Informe um valor válido.");
     }
 
     await apiRequest("/api/platform/entries", {
@@ -1298,7 +1298,7 @@ async function savePlatformEntry() {
     closePlatformWizard();
     await loadPlatformFinance();
   } catch (error) {
-    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lanÃƒÂ§amento.";
+    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lançamento.";
   }
 }
 
@@ -1420,7 +1420,7 @@ platformWizardBackButton?.addEventListener("click", () => {
 platformWizardNextButton?.addEventListener("click", () => {
   platformWizardMessage.textContent = "";
   if (state.platformWizard.step === 1 && platformNameInput.value.trim().length < 2) {
-    platformWizardMessage.textContent = "Digite um nome vÃƒÂ¡lido.";
+    platformWizardMessage.textContent = "Digite um nome válido.";
     return;
   }
 
@@ -1428,7 +1428,7 @@ platformWizardNextButton?.addEventListener("click", () => {
     const raw = String(platformValueInput.value || "").replace(/\./g, "").replace(",", ".");
     const value = Number(raw);
     if (!Number.isFinite(value) || value <= 0) {
-      platformWizardMessage.textContent = "Digite um valor vÃƒÂ¡lido.";
+      platformWizardMessage.textContent = "Digite um valor válido.";
       return;
     }
   }
@@ -1568,7 +1568,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
     return;
   }
 
-  if (!window.confirm("Excluir este lanÃƒÂ§amento recorrente? Os valores jÃƒÂ¡ realizados permanecem.")) {
+  if (!window.confirm("Excluir este lançamento recorrente? Os valores já realizados permanecem.")) {
     return;
   }
 
