@@ -8,6 +8,14 @@ const actionStatuses = {
   completed: "COMPLETED"
 };
 const assigneeOptions = ["Rose", "Geral", "Alberto", "Lucas", "Thainan", "Wilton"];
+const actionAvatarByAssignee = {
+  Rose: "/200/avatars/rose.png",
+  Geral: "/200/avatars/familyplan.png",
+  Alberto: "/200/avatars/alberto.png",
+  Lucas: "/200/avatars/lucas.png",
+  Thainan: "/200/avatars/thainan.png",
+  Wilton: "/200/avatars/wilton.png"
+};
 const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Emprestimo", "Venda de ativo"];
 const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer"];
 const financePeriods = [
@@ -190,6 +198,10 @@ function normalizeAssigneeName(value) {
 
 function getWizardAssigneeName() {
   return assigneeOptions[state.wizard.assigneeIndex] || "Geral";
+}
+
+function getActionAvatarPath(assignee) {
+  return actionAvatarByAssignee[assignee] || actionAvatarByAssignee.Geral;
 }
 
 function buildDateWithTime(date, hour, minute) {
@@ -398,6 +410,7 @@ function renderActions() {
   state.actions.forEach((action) => {
     const status = normalizeActionStatus(action.status);
     const assignee = normalizeAssigneeName(action.assignee);
+    const avatarPath = getActionAvatarPath(assignee);
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
@@ -408,6 +421,7 @@ function renderActions() {
     row.tabIndex = 0;
     row.innerHTML = `
       <div class="task-time">${formatHourChip(action.startAt)}</div>
+      <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
         <div class="task-title">${escapeHtml(action.title)}</div>
         <div class="task-assignee">${escapeHtml(assignee)}</div>

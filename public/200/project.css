@@ -289,7 +289,7 @@ svg {
 
 .task-row {
   display: grid;
-  grid-template-columns: 96px 1fr 44px;
+  grid-template-columns: 96px 52px 1fr 44px;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -298,6 +298,15 @@ svg {
   background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease, transform 120ms ease;
+}
+
+.task-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .task-row:hover {
@@ -686,7 +695,7 @@ svg {
   }
 
   .task-row {
-    grid-template-columns: 76px 1fr 40px;
+    grid-template-columns: 76px 44px 1fr 40px;
   }
 
   .actions-app {
