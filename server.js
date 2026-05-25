@@ -3570,7 +3570,7 @@ const server = http.createServer(async (request, response) => {
     }
   }
 
-  if (request.method === "GET" && pathname === "/200") {
+  if (request.method === "GET" && (pathname === "/200" || pathname === "/200/")) {
     const page200Path = path.join(publicDir, "200.html");
     if (existsSync(page200Path)) {
       await serveStatic(response, page200Path);
@@ -3585,6 +3585,13 @@ const server = http.createServer(async (request, response) => {
   if (!resolvedPath.startsWith(publicDir)) {
     response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Acesso negado.");
+    return;
+  }
+
+  const directoryIndexPath = path.join(resolvedPath, "index.html");
+
+  if (existsSync(directoryIndexPath) && directoryIndexPath.startsWith(publicDir)) {
+    await serveStatic(response, directoryIndexPath);
     return;
   }
 
