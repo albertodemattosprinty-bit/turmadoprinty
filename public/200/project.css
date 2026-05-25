@@ -334,9 +334,9 @@ svg {
 
 .task-row {
   display: grid;
-  grid-template-columns: 52px 1fr 96px;
+  grid-template-columns: 52px minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 8px 12px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -372,7 +372,8 @@ svg {
   grid-column: 3;
   text-align: right;
   justify-self: end;
-  margin-right: -2px;
+  margin-right: -1px;
+  font-size: 0.92rem;
   font-weight: 800;
   color: var(--white);
 }
@@ -539,7 +540,7 @@ svg {
 }
 
 .stats-ranking-row {
-  grid-template-columns: 52px 1fr;
+  grid-template-columns: 52px minmax(0, 1fr);
 }
 
 .stats-avatar-wrap {
@@ -893,7 +894,8 @@ svg {
   }
 
   .task-row {
-    grid-template-columns: 76px 44px 1fr 40px;
+    grid-template-columns: 44px minmax(0, 1fr) max-content;
+    gap: 6px;
   }
 
   .actions-app {
