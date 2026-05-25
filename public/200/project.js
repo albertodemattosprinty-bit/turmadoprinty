@@ -1085,15 +1085,15 @@ function renderStatsRanking() {
 
   state.statsRanking.forEach((entry, index) => {
     const row = document.createElement("article");
-    row.className = "task-row";
+    row.className = "task-row stats-ranking-row";
     row.innerHTML = `
-      <div class="task-time">${entry.percent}%</div>
-      <img class="task-avatar" src="${getActionAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
-      <div class="task-main">
-        <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${entry.completed}/${entry.total} min</div>
+      <div class="stats-avatar-wrap">
+        <img class="task-avatar" src="${getActionAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
+        <span class="stats-rank-badge">${index + 1}º</span>
       </div>
-      <div class="stats-rank-badge">${index + 1}º</div>
+      <div class="task-main">
+        <div class="task-title">${escapeHtml(`${entry.name} · ${entry.percent}%`)}</div>
+      </div>
     `;
     statsRankingList.appendChild(row);
   });
