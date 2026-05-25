@@ -22,6 +22,7 @@ import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getSched
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions, updateUserActionStatus } from "./src/actions.js";
+import { createPlatformFinanceEntry, deletePlatformFinanceEntry, ensurePlatformFinanceSchema, listPlatformFinanceByRange, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1003,6 +1004,7 @@ async function ensurePaymentsReady(response) {
     await ensureAdminUsersSchema();
     await ensureAllTermsSchema();
     await ensureActionsSchema();
+    await ensurePlatformFinanceSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -3792,6 +3794,89 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel listar as acoes."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/platform/entries") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const entries = await listPlatformFinanceByRange(user.id, {
+        from: requestUrl.searchParams.get("from"),
+        to: requestUrl.searchParams.get("to")
+      });
+
+      sendJson(response, 200, { ok: true, entries });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel listar os lancamentos."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/platform/summary") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const summary = await summarizePlatformFinanceMonth(user.id, requestUrl.searchParams.get("date") || new Date().toISOString());
+      sendJson(response, 200, { ok: true, summary });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel resumir as financas."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/platform/entries") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const entry = await createPlatformFinanceEntry(user.id, body);
+
+      sendJson(response, 201, { ok: true, entry });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel criar lancamento."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/platform\/entries\/[^/]+$/)) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const entryId = decodeURIComponent(pathname.replace(/^\/api\/platform\/entries\/([^/]+)$/, "$1"));
+      const result = await deletePlatformFinanceEntry(user.id, entryId);
+
+      sendJson(response, result.deleted ? 200 : 404, {
+        ok: Boolean(result.deleted),
+        deleted: result.deleted
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel excluir lancamento."
       });
     }
     return;

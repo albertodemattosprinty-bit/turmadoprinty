@@ -8,6 +8,8 @@ const actionStatuses = {
   completed: "COMPLETED"
 };
 const assigneeOptions = ["Rose", "Geral", "Alberto", "Lucas", "Thainan", "Wilton"];
+const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Emprestimo", "Venda de ativo"];
+const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer"];
 const financePeriods = [
   { key: "total", label: "Total" },
   { key: "today", label: "Hoje" },
@@ -42,6 +44,22 @@ const actionsProgressLabel = document.getElementById("actionsProgressLabel");
 const actionsProgressMinutes = document.getElementById("actionsProgressMinutes");
 const actionsProgressFill = document.getElementById("actionsProgressFill");
 const actionsProgressPeople = document.getElementById("actionsProgressPeople");
+const financeDateLabel = document.getElementById("financeDateLabel");
+const platformEntriesList = document.getElementById("platformEntriesList");
+const platformMonthlyIncome = document.getElementById("platformMonthlyIncome");
+const platformMonthlyExpense = document.getElementById("platformMonthlyExpense");
+const openPlatformWizardButton = document.getElementById("openPlatformWizard");
+const platformWizard = document.getElementById("platformWizard");
+const closePlatformWizardButton = document.getElementById("closePlatformWizard");
+const platformForm = document.getElementById("platformForm");
+const platformWizardStepLabel = document.getElementById("platformWizardStepLabel");
+const platformWizardMessage = document.getElementById("platformWizardMessage");
+const platformWizardBackButton = document.getElementById("platformWizardBack");
+const platformWizardNextButton = document.getElementById("platformWizardNext");
+const platformNameInput = document.getElementById("platformName");
+const platformValueInput = document.getElementById("platformValue");
+const platformCategoryRow = document.getElementById("platformCategoryRow");
+const platformRecurrenceDayLabel = document.getElementById("platformRecurrenceDayLabel");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
@@ -73,11 +91,22 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
 });
 
 let financeTimer = null;
+let assigneeProgressTicker = null;
 
 const state = {
   activeOffset: 0,
+  platformOffset: 0,
   financePeriodIndex: 0,
+  platformEntries: [],
+  platformMonthly: {
+    incomeCents: 0,
+    expenseCents: 0
+  },
+  platformBaseIncomeCents: 0,
+  assigneeProgressRows: [],
+  assigneeProgressIndex: 0,
   actions: [],
+  platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState()
 };
 
@@ -118,6 +147,11 @@ function formatDateLabel(date) {
 function formatTime(value) {
   const date = new Date(value);
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatHourChip(value) {
+  const date = new Date(value);
+  return `${date.getHours()}h${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function formatMoney(cents) {
@@ -192,6 +226,16 @@ function buildInitialWizardState() {
   };
 }
 
+function buildInitialPlatformWizardState() {
+  return {
+    step: 1,
+    kind: "INCOME",
+    category: platformIncomeCategories[0],
+    recurrenceType: "SIMPLE",
+    recurrenceDayOfMonth: new Date().getDate()
+  };
+}
+
 async function apiRequest(path, options = {}) {
   const token = getToken();
   const headers = {
@@ -230,6 +274,10 @@ function openModal(id) {
     void loadActions();
   }
 
+  if (id === "calendarModal") {
+    void loadPlatformFinance();
+  }
+
   if (id === "financeModal") {
     startFinancePresentation();
   }
@@ -239,6 +287,7 @@ function closeModal(modal) {
   modal.classList.remove("active");
   modal.setAttribute("aria-hidden", "true");
   closeWizard();
+  closePlatformWizard();
 
   if (modal.id === "financeModal" && financeTimer) {
     window.clearTimeout(financeTimer);
@@ -347,18 +396,16 @@ function renderActions() {
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
-    const statusMeta = getActionStatusMeta(action, status, assignee);
     const row = document.createElement("article");
     row.className = `task-row${stateClass}`;
     row.dataset.actionId = action.id;
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.innerHTML = `
-      <div class="task-time">${formatTime(action.startAt)}<br>${formatTime(action.endAt)}</div>
+      <div class="task-time">${formatHourChip(action.startAt)}</div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(action.title)}</div>
         <div class="task-assignee">${escapeHtml(assignee)}</div>
-        <div class="task-meta">${escapeHtml(statusMeta)}</div>
       </div>
       <button class="delete-task" type="button" data-delete-action="${action.id}" aria-label="Excluir tarefa">
         <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
@@ -368,23 +415,6 @@ function renderActions() {
   });
 
   renderActionsProgress();
-}
-
-function getActionStatusMeta(action, normalizedStatus = normalizeActionStatus(action.status), assignee = normalizeAssigneeName(action.assignee)) {
-  const prefix = assignee === "Geral" ? "" : `Para ${assignee} · `;
-
-  if (normalizedStatus === actionStatuses.inProgress) {
-    const startedAt = action.startedAt ? formatTime(action.startedAt) : formatTime(action.startAt);
-    return `${prefix}Em andamento desde ${startedAt}`;
-  }
-
-  if (normalizedStatus === actionStatuses.completed) {
-    const startedAt = action.startedAt ? formatTime(action.startedAt) : formatTime(action.startAt);
-    const completedAt = action.completedAt ? formatTime(action.completedAt) : formatTime(action.endAt);
-    return `${prefix}Concluida (${startedAt} - ${completedAt})`;
-  }
-
-  return `${prefix}Toque para iniciar`;
 }
 
 function getActionDurationMinutes(action) {
@@ -419,7 +449,7 @@ function renderActionsProgress() {
     : 0;
 
   actionsProgressLabel.textContent = `${percent}% concluido`;
-  actionsProgressMinutes.textContent = `${completedMinutes}/${totalMinutes} min`;
+  actionsProgressMinutes.textContent = "";
   actionsProgressFill.style.width = `${percent}%`;
   actionsProgressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
   renderAssigneeProgressBars();
@@ -427,6 +457,8 @@ function renderActionsProgress() {
 
 function renderAssigneeProgressBars() {
   actionsProgressPeople.innerHTML = "";
+  state.assigneeProgressRows = [];
+  state.assigneeProgressIndex = 0;
 
   const grouped = new Map();
 
@@ -458,14 +490,42 @@ function renderAssigneeProgressBars() {
       row.innerHTML = `
         <div class="actions-progress-person-head">
           <strong>${escapeHtml(assignee)}</strong>
-          <span>${percent}% - ${summary.completed}/${summary.total} min</span>
+          <span>${percent}%</span>
         </div>
         <div class="actions-progress-track">
           <div class="actions-progress-fill" style="width:${percent}%"></div>
         </div>
       `;
       actionsProgressPeople.appendChild(row);
+      state.assigneeProgressRows.push(row);
     });
+
+  updateAssigneeProgressVisibility();
+}
+
+function updateAssigneeProgressVisibility() {
+  if (!state.assigneeProgressRows.length) {
+    return;
+  }
+
+  state.assigneeProgressRows.forEach((row, index) => {
+    row.hidden = index !== state.assigneeProgressIndex;
+  });
+}
+
+function startAssigneeProgressTicker() {
+  if (assigneeProgressTicker) {
+    window.clearInterval(assigneeProgressTicker);
+    assigneeProgressTicker = null;
+  }
+
+  assigneeProgressTicker = window.setInterval(() => {
+    if (!state.assigneeProgressRows.length) {
+      return;
+    }
+    state.assigneeProgressIndex = (state.assigneeProgressIndex + 1) % state.assigneeProgressRows.length;
+    updateAssigneeProgressVisibility();
+  }, 2000);
 }
 
 function escapeHtml(value) {
@@ -763,6 +823,174 @@ async function saveAction() {
   }
 }
 
+function renderPlatformDateHeader() {
+  if (financeDateLabel) {
+    financeDateLabel.textContent = formatDateLabel(dateFromOffset(state.platformOffset));
+  }
+}
+
+function getPlatformKindLabel(kind) {
+  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "Saída";
+}
+
+function renderPlatformEntries() {
+  if (!platformEntriesList) {
+    return;
+  }
+
+  platformEntriesList.innerHTML = "";
+
+  if (!getToken()) {
+    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanças.</div>';
+    return;
+  }
+
+  if (!state.platformEntries.length) {
+    platformEntriesList.innerHTML = '<div class="empty-state">Sem lançamentos nessa data.</div>';
+    return;
+  }
+
+  state.platformEntries.forEach((entry) => {
+    const row = document.createElement("article");
+    row.className = `task-row ${entry.kind === "INCOME" ? "task-completed" : "task-in-progress"}`;
+    row.innerHTML = `
+      <div class="task-time">${formatHourChip(entry.occurredAt)}</div>
+      <div class="task-main">
+        <div class="task-title">${escapeHtml(entry.name)}</div>
+        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} · ${entry.category}`)}</div>
+      </div>
+      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lançamento">
+        <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
+      </button>
+    `;
+    platformEntriesList.appendChild(row);
+  });
+}
+
+function getPlatformMonthReferenceDate() {
+  const base = dateFromOffset(state.platformOffset);
+  return new Date(base.getFullYear(), base.getMonth(), 15).toISOString();
+}
+
+async function loadPlatformFinance() {
+  renderPlatformDateHeader();
+
+  if (!getToken()) {
+    renderPlatformEntries();
+    return;
+  }
+
+  const date = dateFromOffset(state.platformOffset);
+  platformEntriesList.innerHTML = '<div class="empty-state">Carregando...</div>';
+
+  try {
+    const [entriesPayload, monthPayload, platformPayload] = await Promise.all([
+      apiRequest(`/api/platform/entries?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`),
+      apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`),
+      apiRequest("/api/finance/summary?period=total")
+    ]);
+
+    state.platformEntries = entriesPayload.entries || [];
+    state.platformMonthly = monthPayload.summary || { incomeCents: 0, expenseCents: 0 };
+    state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
+
+    platformMonthlyExpense.textContent = formatMoney(state.platformMonthly.expenseCents);
+    platformMonthlyIncome.textContent = formatMoney(Number(state.platformMonthly.incomeCents || 0) + state.platformBaseIncomeCents);
+    renderPlatformEntries();
+  } catch (error) {
+    platformEntriesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function movePlatformDate(amount) {
+  state.platformOffset += amount;
+  void loadPlatformFinance();
+}
+
+function renderPlatformCategoryOptions() {
+  const categories = state.platformWizard.kind === "INCOME" ? platformIncomeCategories : platformExpenseCategories;
+  if (!categories.includes(state.platformWizard.category)) {
+    state.platformWizard.category = categories[0];
+  }
+
+  platformCategoryRow.innerHTML = "";
+  categories.forEach((category) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.platformCategory = category;
+    button.textContent = category;
+    button.classList.toggle("active", category === state.platformWizard.category);
+    platformCategoryRow.appendChild(button);
+  });
+}
+
+function renderPlatformWizard() {
+  platformWizardStepLabel.textContent = `${state.platformWizard.step} de 4`;
+  document.querySelectorAll("[data-platform-step]").forEach((section) => {
+    section.classList.toggle("active", Number(section.dataset.platformStep) === state.platformWizard.step);
+  });
+  platformWizardBackButton.style.visibility = state.platformWizard.step === 1 ? "hidden" : "visible";
+  platformWizardNextButton.textContent = state.platformWizard.step === 4 || state.platformWizard.recurrenceType === "SIMPLE" && state.platformWizard.step === 3
+    ? "Salvar"
+    : "Continuar";
+  platformRecurrenceDayLabel.textContent = String(state.platformWizard.recurrenceDayOfMonth);
+  renderPlatformCategoryOptions();
+}
+
+function openPlatformWizard() {
+  state.platformWizard = buildInitialPlatformWizardState();
+  platformNameInput.value = "";
+  platformValueInput.value = "";
+  platformWizardMessage.textContent = "";
+  platformWizard.classList.add("active");
+  platformWizard.setAttribute("aria-hidden", "false");
+  renderPlatformWizard();
+  setTimeout(() => platformNameInput.focus(), 60);
+}
+
+function closePlatformWizard() {
+  platformWizard.classList.remove("active");
+  platformWizard.setAttribute("aria-hidden", "true");
+}
+
+function movePlatformRecurrenceDay(amount) {
+  const current = Number(state.platformWizard.recurrenceDayOfMonth || 1);
+  state.platformWizard.recurrenceDayOfMonth = ((current - 1 + amount + 31) % 31) + 1;
+  platformRecurrenceDayLabel.textContent = String(state.platformWizard.recurrenceDayOfMonth);
+}
+
+async function savePlatformEntry() {
+  try {
+    const raw = String(platformValueInput.value || "").replace(/\./g, "").replace(",", ".");
+    const value = Number(raw);
+    if (!String(platformNameInput.value || "").trim()) {
+      throw new Error("Informe o nome.");
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error("Informe um valor válido.");
+    }
+
+    await apiRequest("/api/platform/entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: platformNameInput.value.trim(),
+        kind: state.platformWizard.kind,
+        category: state.platformWizard.category,
+        amountCents: Math.round(value * 100),
+        recurrenceType: state.platformWizard.recurrenceType,
+        recurrenceDayOfMonth: state.platformWizard.recurrenceType === "RECURRING" ? state.platformWizard.recurrenceDayOfMonth : null,
+        baseDate: dateFromOffset(state.platformOffset).toISOString()
+      })
+    });
+
+    closePlatformWizard();
+    await loadPlatformFinance();
+  } catch (error) {
+    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lançamento.";
+  }
+}
+
 function handleSwipe(element, callback) {
   if (!element) {
     return;
@@ -798,6 +1026,9 @@ document.querySelectorAll("[data-day-nav]").forEach((button) => {
 
 financePeriodPrev?.addEventListener("click", () => moveFinancePeriod(-1));
 financePeriodNext?.addEventListener("click", () => moveFinancePeriod(1));
+document.querySelectorAll("[data-finance-day-nav]").forEach((button) => {
+  button.addEventListener("click", () => movePlatformDate(Number(button.dataset.financeDayNav)));
+});
 
 openActionWizardButton.addEventListener("click", () => {
   if (!getToken()) {
@@ -809,6 +1040,7 @@ openActionWizardButton.addEventListener("click", () => {
 });
 
 closeActionWizardButton.addEventListener("click", closeWizard);
+closePlatformWizardButton?.addEventListener("click", closePlatformWizard);
 
 wizardBackButton.addEventListener("click", () => {
   state.wizard.step = Math.max(1, state.wizard.step - 1);
@@ -829,6 +1061,41 @@ wizardNextButton.addEventListener("click", () => {
   renderWizard();
 });
 
+platformWizardBackButton?.addEventListener("click", () => {
+  state.platformWizard.step = Math.max(1, state.platformWizard.step - 1);
+  renderPlatformWizard();
+});
+
+platformWizardNextButton?.addEventListener("click", () => {
+  platformWizardMessage.textContent = "";
+  if (state.platformWizard.step === 1 && platformNameInput.value.trim().length < 2) {
+    platformWizardMessage.textContent = "Digite um nome válido.";
+    return;
+  }
+
+  if (state.platformWizard.step === 2) {
+    const raw = String(platformValueInput.value || "").replace(/\./g, "").replace(",", ".");
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0) {
+      platformWizardMessage.textContent = "Digite um valor válido.";
+      return;
+    }
+  }
+
+  if (state.platformWizard.step === 3 && state.platformWizard.recurrenceType === "SIMPLE") {
+    void savePlatformEntry();
+    return;
+  }
+
+  if (state.platformWizard.step === 4) {
+    void savePlatformEntry();
+    return;
+  }
+
+  state.platformWizard.step += 1;
+  renderPlatformWizard();
+});
+
 repeatToggle.addEventListener("click", () => {
   state.wizard.repeatOpen = !state.wizard.repeatOpen;
   renderRepeatControls();
@@ -844,6 +1111,42 @@ document.querySelectorAll("[data-wizard-assignee]").forEach((button) => {
 
 document.querySelectorAll("[data-repeat-mode]").forEach((button) => {
   button.addEventListener("click", () => setRepeatMode(button.dataset.repeatMode));
+});
+
+document.querySelectorAll("[data-platform-kind]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.platformWizard.kind = button.dataset.platformKind;
+    document.querySelectorAll("[data-platform-kind]").forEach((other) => {
+      other.classList.toggle("active", other.dataset.platformKind === state.platformWizard.kind);
+    });
+    renderPlatformCategoryOptions();
+  });
+});
+
+platformCategoryRow?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-platform-category]");
+  if (!button) {
+    return;
+  }
+  state.platformWizard.category = button.dataset.platformCategory;
+  renderPlatformCategoryOptions();
+});
+
+document.querySelectorAll("[data-platform-recurrence]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.platformWizard.recurrenceType = button.dataset.platformRecurrence;
+    document.querySelectorAll("[data-platform-recurrence]").forEach((other) => {
+      other.classList.toggle("active", other.dataset.platformRecurrence === state.platformWizard.recurrenceType);
+    });
+    if (state.platformWizard.recurrenceType === "RECURRING" && state.platformWizard.step < 4) {
+      state.platformWizard.step = 4;
+    }
+    renderPlatformWizard();
+  });
+});
+
+document.querySelectorAll("[data-platform-day]").forEach((button) => {
+  button.addEventListener("click", () => movePlatformRecurrenceDay(Number(button.dataset.platformDay)));
 });
 
 weekdayRow.addEventListener("click", (event) => {
@@ -896,6 +1199,31 @@ actionsList.addEventListener("click", async (event) => {
   }
 });
 
+platformEntriesList?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-delete-platform-entry]");
+  if (!button) {
+    return;
+  }
+
+  const entryId = String(button.dataset.deletePlatformEntry || "").trim();
+  if (!entryId) {
+    return;
+  }
+
+  if (!window.confirm("Excluir este lançamento recorrente? Os valores já realizados permanecem.")) {
+    return;
+  }
+
+  try {
+    await apiRequest(`/api/platform/entries/${encodeURIComponent(entryId)}`, {
+      method: "DELETE"
+    });
+    await loadPlatformFinance();
+  } catch (error) {
+    platformEntriesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+  }
+});
+
 actionsList.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter" && event.key !== " ") {
     return;
@@ -920,5 +1248,19 @@ handleSwipe(actionsList, moveActiveDate);
 handleSwipe(financePeriodLabel, moveFinancePeriod);
 handleSwipe(financePeriodPicker, moveFinancePeriod);
 handleSwipe(wizardAssigneeLabel, moveWizardAssignee);
+handleSwipe(financeDateLabel, movePlatformDate);
 renderFinancePeriod();
 renderDateHeader();
+startAssigneeProgressTicker();
+
+openPlatformWizardButton?.addEventListener("click", () => {
+  if (!getToken()) {
+    window.location.href = "/auth.html?next=/200";
+    return;
+  }
+  openPlatformWizard();
+});
+
+platformForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+});
