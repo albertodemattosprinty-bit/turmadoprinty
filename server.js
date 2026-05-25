@@ -3570,6 +3570,14 @@ const server = http.createServer(async (request, response) => {
     }
   }
 
+  if (request.method === "GET" && pathname === "/200") {
+    const page200Path = path.join(publicDir, "200.html");
+    if (existsSync(page200Path)) {
+      await serveStatic(response, page200Path);
+      return;
+    }
+  }
+
   const requestedPath = pathname === "/" ? "index.html" : pathname.slice(1);
   const resolvedPath = path.join(publicDir, requestedPath);
   const htmlResolvedPath = path.join(publicDir, `${requestedPath}.html`);
