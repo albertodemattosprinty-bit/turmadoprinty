@@ -337,7 +337,7 @@ svg {
   grid-template-columns: 52px 1fr 96px;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 8px 12px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.12);
@@ -371,6 +371,8 @@ svg {
 .task-time {
   grid-column: 3;
   text-align: right;
+  justify-self: end;
+  margin-right: -2px;
   font-weight: 800;
   color: var(--white);
 }
@@ -382,7 +384,9 @@ svg {
 }
 
 .task-title {
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 700;
 }
 
@@ -455,11 +459,11 @@ svg {
   bottom: 82px;
   transform: translateX(-50%);
   width: min(920px, calc(100% - 40px));
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 10px;
   padding: 10px 12px;
-  background: rgba(6, 22, 61, 0.88);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  backdrop-filter: none;
   display: grid;
   gap: 8px;
 }
@@ -467,9 +471,13 @@ svg {
 .actions-progress-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 10px;
   font-size: 0.93rem;
+}
+
+#actionsProgressMinutes {
+  display: none;
 }
 
 .actions-progress-track {
@@ -934,8 +942,8 @@ svg {
 
 .actions-side-btn {
   position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 12px;
+  transform: none;
   pointer-events: auto;
 }
 

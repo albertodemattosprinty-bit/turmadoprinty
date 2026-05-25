@@ -526,7 +526,7 @@ function renderActionsProgress() {
     ? Math.max(0, Math.min(100, Math.round((completedMinutes / totalMinutes) * 100)))
     : 0;
 
-  actionsProgressLabel.textContent = `${percent}% concluido`;
+  actionsProgressLabel.textContent = `${percent}%`;
   actionsProgressMinutes.textContent = "";
   actionsProgressFill.style.width = `${percent}%`;
   actionsProgressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
