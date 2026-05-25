@@ -238,6 +238,17 @@ svg {
   gap: 14px;
 }
 
+#calendarModal .actions-head {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#calendarModal .date-title {
+  min-width: 120px;
+  font-size: clamp(1.6rem, 7vw, 3.1rem);
+}
+
 .finance-head-balance {
   margin-left: auto;
   display: flex;
@@ -399,6 +410,36 @@ svg {
   padding: 14px 22px;
   cursor: pointer;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+.finance-bottom-actions {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(920px, calc(100% - 28px));
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  z-index: 26;
+}
+
+.icon-action-btn {
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(8, 31, 83, 0.7);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.icon-action-btn img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
 }
 
 .actions-progress {
@@ -808,9 +849,18 @@ svg {
     padding-top: 68px;
   }
 
+  #calendarModal .actions-app {
+    padding-top: 88px;
+  }
+
   .actions-progress {
     width: calc(100% - 24px);
     bottom: 86px;
+  }
+
+  .finance-bottom-actions {
+    width: calc(100% - 24px);
+    bottom: 16px;
   }
 
   .finance-dashboard {
