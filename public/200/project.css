@@ -1337,16 +1337,23 @@ svg {
 
 .history-panels {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+  align-content: start;
+  grid-auto-rows: max-content;
   overflow: auto;
+  padding-top: 2px;
   padding-bottom: 24px;
 }
 
-.history-panels {
-  display: grid;
-  gap: 8px;
-  overflow: auto;
-  padding-bottom: 24px;
+#historyModal .history-app {
+  padding-top: 6px;
+}
+
+#historyModal .history-app .actions-head {
+  padding: 0 64px;
+  min-height: 44px;
+  gap: 10px;
+  margin: 0;
 }
 
 .history-item {
