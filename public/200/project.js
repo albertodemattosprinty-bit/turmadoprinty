@@ -78,8 +78,6 @@ const recurrenceDays = {
   daily: [0, 1, 2, 3, 4, 5, 6],
   weekdays: [1, 2, 3, 4, 5]
 };
-const historySystemStorageKey = "project200_history_system_v1";
-const historyTextsStorageKey = "project200_history_texts_v1";
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
 const selectableProfiles = ["project", "Alberto", "Rose", "Lucas", "Thainan"];
 const profileTintByName = {
@@ -466,8 +464,10 @@ function openModal(id) {
   }
 
   if (id === "historyModal") {
-    loadHistoryFromStorage();
-    renderHistory();
+    void (async () => {
+      await loadHistoryFromApi();
+      renderHistory();
+    })();
   }
 }
 
@@ -1608,27 +1608,15 @@ async function payPlatformOccurrenceNow(occurrenceId) {
   }
 }
 
-function readStoredJson(key, fallback) {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) {
-      return fallback;
-    }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
+async function loadHistoryFromApi() {
+  if (!getToken()) {
+    state.historySystem = [];
+    state.historyTexts = [];
+    return;
   }
-}
-
-function saveHistoryToStorage() {
-  window.localStorage.setItem(historySystemStorageKey, JSON.stringify(state.historySystem.slice(0, 500)));
-  window.localStorage.setItem(historyTextsStorageKey, JSON.stringify(state.historyTexts.slice(0, 200)));
-}
-
-function loadHistoryFromStorage() {
-  state.historySystem = readStoredJson(historySystemStorageKey, []);
-  state.historyTexts = readStoredJson(historyTextsStorageKey, []);
+  const payload = await apiRequest("/api/200/history");
+  state.historySystem = Array.isArray(payload.systemEvents) ? payload.systemEvents : [];
+  state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
 }
 
 function historyIconSvg(type) {
@@ -1643,19 +1631,30 @@ function historyIconSvg(type) {
   return map[type] || map.start;
 }
 
-function pushSystemHistoryEvent(payload) {
-  const event = {
-    id: crypto.randomUUID(),
-    type: payload.type,
-    assignee: normalizeAssigneeName(payload.assignee),
-    taskTitle: String(payload.taskTitle || "").trim(),
-    occurredAt: payload.occurredAt || new Date().toISOString(),
-    percent: Number(payload.percent || 0),
-    pendingCount: Number(payload.pendingCount || 0),
-    scopeDate: payload.scopeDate || null
-  };
-  state.historySystem.unshift(event);
-  saveHistoryToStorage();
+async function pushSystemHistoryEvent(payload) {
+  if (!getToken()) {
+    return;
+  }
+  try {
+    const response = await apiRequest("/api/200/history/system", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: payload.type,
+        assignee: normalizeAssigneeName(payload.assignee),
+        taskTitle: String(payload.taskTitle || "").trim(),
+        occurredAt: payload.occurredAt || new Date().toISOString(),
+        percent: Number(payload.percent || 0),
+        pendingCount: Number(payload.pendingCount || 0),
+        scopeDate: payload.scopeDate || null
+      })
+    });
+    if (response?.event) {
+      state.historySystem = [response.event, ...state.historySystem.filter((item) => item.id !== response.event.id)];
+    }
+  } catch {
+    // no-op
+  }
 }
 
 function hasSystemEventForTask(actionId, type) {
@@ -1778,7 +1777,7 @@ function registerDailyMissionEvents() {
     const todayKey = `${toLocalDateKey(new Date())}:${assignee}:star`;
     const exists = state.historySystem.some((entry) => entry.scopeDate === todayKey);
     if (!exists) {
-      pushSystemHistoryEvent({ type: "star", assignee, scopeDate: todayKey });
+      void pushSystemHistoryEvent({ type: "star", assignee, scopeDate: todayKey });
     }
   });
 }
@@ -1799,7 +1798,7 @@ function registerDayCloseEventIfNeeded() {
   if (state.historySystem.some((entry) => entry.type === "day_close" && entry.scopeDate === dateKey)) {
     return;
   }
-  pushSystemHistoryEvent({
+  void pushSystemHistoryEvent({
     type: "day_close",
     assignee: "Geral",
     pendingCount: pending.length,
@@ -1829,7 +1828,7 @@ function registerSystemEventFromActionTransition(before, after) {
   if (!type) {
     return;
   }
-  pushSystemHistoryEvent({
+  void pushSystemHistoryEvent({
     type,
     assignee,
     taskTitle,
@@ -2395,19 +2394,28 @@ historyTextForm?.addEventListener("submit", (event) => {
     return;
   }
   const title = String(state.historyTextComposer.organizedTitle || "").trim() || "Texto novo";
-  state.historyTexts.unshift({
-    id: crypto.randomUUID(),
-    speaker: state.historyTextComposer.speaker,
-    title,
-    text: text.slice(0, 2000),
-    createdAt: new Date().toISOString()
-  });
-  saveHistoryToStorage();
-  renderHistory();
-  closeHistoryTextComposer();
+  void (async () => {
+    try {
+      const payload = await apiRequest("/api/200/history/text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          speaker: state.historyTextComposer.speaker,
+          title,
+          text: text.slice(0, 2000),
+          createdAt: new Date().toISOString()
+        })
+      });
+      if (payload?.entry) {
+        state.historyTexts = [payload.entry, ...state.historyTexts.filter((item) => item.id !== payload.entry.id)];
+      }
+      renderHistory();
+      closeHistoryTextComposer();
+    } catch (error) {
+      historyVoiceStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar texto.";
+    }
+  })();
 });
-
-loadHistoryFromStorage();
 applySelectedProfile(readSelectedProfile());
 
 profileButtons.forEach((button) => {

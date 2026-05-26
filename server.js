@@ -25,6 +25,7 @@ import { createUserAction, deleteUserAction, ensureActionsSchema, listUserAction
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
+import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3878,6 +3879,68 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel listar as acoes."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/history") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      await ensureProject200HistorySchema();
+      const history = await listProject200History(user.id, {
+        from: requestUrl.searchParams.get("from"),
+        to: requestUrl.searchParams.get("to")
+      });
+      sendJson(response, 200, { ok: true, ...history });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar historico."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/history/system") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      await ensureProject200HistorySchema();
+      const body = await readJsonBody(request);
+      const event = await createProject200SystemEvent(user.id, body);
+      sendJson(response, 201, { ok: true, event });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar evento do historico."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/history/text") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      await ensureProject200HistorySchema();
+      const body = await readJsonBody(request);
+      const entry = await createProject200TextEntry(user.id, body);
+      sendJson(response, 201, { ok: true, entry });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar texto do historico."
       });
     }
     return;
