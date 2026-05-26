@@ -41,6 +41,9 @@
     <section class="home-datetime" aria-label="Data e horário atual">
       <span id="homeDateTimeLabel">--</span>
     </section>
+    <button class="home-running-btn" id="openRunningTaskModal" type="button" data-open-modal="runningTaskModal" aria-label="Tarefa em execução" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+    </button>
     <section class="profile-selector profile-footer" aria-label="Usuários">
       <button class="profile-chip active" type="button" data-profile="Geral" aria-label="Geral">
         <img class="task-avatar" src="/200/avatars/familyplan.png" alt="Geral" />
@@ -59,6 +62,18 @@
       </button>
     </section>
   </main>
+
+  <section class="workspace-modal simple-modal" id="runningTaskModal" aria-hidden="true" aria-label="Tarefa em execução">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <div class="finance-content running-task-content">
+      <h2>Em execução</h2>
+      <div class="running-task-name" id="runningTaskName">Sem tarefa em execução.</div>
+      <div class="actions-progress-track" role="progressbar" aria-label="Progresso da tarefa em execução" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="runningTaskProgressTrack">
+        <div class="actions-progress-fill running-task-progress-fill" id="runningTaskProgressFill"></div>
+      </div>
+      <div class="running-task-percent" id="runningTaskPercent">0%</div>
+    </div>
+  </section>
 
   <section class="workspace-modal" id="actionsModal" aria-hidden="true" aria-label="AçÃµes">
     <div class="actions-app">

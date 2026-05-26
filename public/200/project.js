@@ -211,6 +211,11 @@ const historyLiveText = document.getElementById("historyLiveText");
 const historyReadTitle = document.getElementById("historyReadTitle");
 const historyReadBody = document.getElementById("historyReadBody");
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
+const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
+const runningTaskName = document.getElementById("runningTaskName");
+const runningTaskProgressTrack = document.getElementById("runningTaskProgressTrack");
+const runningTaskProgressFill = document.getElementById("runningTaskProgressFill");
+const runningTaskPercent = document.getElementById("runningTaskPercent");
 const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -241,6 +246,7 @@ let actionSpeechMonitorTimer = null;
 let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
+let runningTaskTicker = null;
 
 const state = {
   activeOffset: 0,
@@ -305,6 +311,7 @@ function applySelectedProfile(profile) {
   profileButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.profile === next);
   });
+  renderHomeRunningTask();
 }
 
 function todayStart() {
@@ -328,6 +335,50 @@ function getVisibleActions() {
     return state.actions;
   }
   return state.actions.filter((action) => normalizeAssigneeName(action.assignee) === state.selectedProfile);
+}
+
+function getRunningActionForSelectedProfile() {
+  const list = getVisibleActions();
+  return list.find((action) => normalizeActionStatus(action?.status) === actionStatuses.inProgress) || null;
+}
+
+function getRunningActionProgressPercent(action) {
+  if (!action) {
+    return 0;
+  }
+  const durationMinutes = getActionDurationMinutes(action);
+  if (!durationMinutes) {
+    return 0;
+  }
+  const startedAtMs = new Date(action?.startedAt || action?.startAt).getTime();
+  if (!Number.isFinite(startedAtMs)) {
+    return 0;
+  }
+  const elapsedMinutes = Math.max(0, (Date.now() - startedAtMs) / (60 * 1000));
+  return Math.max(0, Math.min(100, Math.round((elapsedMinutes / durationMinutes) * 100)));
+}
+
+function renderHomeRunningTask() {
+  const action = getRunningActionForSelectedProfile();
+  const hasRunning = Boolean(action);
+  if (openRunningTaskModalButton) {
+    openRunningTaskModalButton.hidden = !hasRunning;
+  }
+  if (!runningTaskName || !runningTaskProgressFill || !runningTaskPercent) {
+    return;
+  }
+  if (!hasRunning) {
+    runningTaskName.textContent = "Sem tarefa em execução.";
+    runningTaskProgressFill.style.width = "0%";
+    runningTaskPercent.textContent = "0%";
+    runningTaskProgressTrack?.setAttribute("aria-valuenow", "0");
+    return;
+  }
+  const percent = getRunningActionProgressPercent(action);
+  runningTaskName.textContent = String(action.title || "Tarefa");
+  runningTaskProgressFill.style.width = `${percent}%`;
+  runningTaskPercent.textContent = `${percent}%`;
+  runningTaskProgressTrack?.setAttribute("aria-valuenow", String(percent));
 }
 
 function isSameDate(a, b) {
@@ -387,6 +438,16 @@ function startHomeDateTimeTicker() {
   };
   render();
   window.setInterval(render, 30000);
+}
+
+function startRunningTaskTicker() {
+  renderHomeRunningTask();
+  if (runningTaskTicker) {
+    window.clearInterval(runningTaskTicker);
+  }
+  runningTaskTicker = window.setInterval(() => {
+    renderHomeRunningTask();
+  }, 15000);
 }
 
 function formatMoney(cents) {
@@ -924,6 +985,7 @@ function renderActions() {
   });
 
   renderActionsProgress();
+  renderHomeRunningTask();
 }
 
 function getActionDurationMinutes(action) {
@@ -1039,6 +1101,7 @@ async function loadActions() {
     actionsProgress.hidden = true;
     actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
   }
+  renderHomeRunningTask();
 }
 
 async function toggleActionStatus(actionId) {
@@ -3147,6 +3210,11 @@ historyTextForm?.addEventListener("submit", (event) => {
   })();
 });
 applySelectedProfile(readSelectedProfile());
+if (getToken()) {
+  void loadActions();
+} else {
+  renderHomeRunningTask();
+}
 
 profileButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -3162,6 +3230,7 @@ document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
 handleSwipe(historyDateLabel, moveHistoryDate);
 handleSwipe(historyTimelineList, moveHistoryDate);
 startHomeDateTimeTicker();
+startRunningTaskTicker();
 
 
 
