@@ -374,7 +374,7 @@ svg {
 }
 
 .platform-entry-row {
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: 70% 30%;
   padding: 10px 12px;
   min-height: 46px;
 }
@@ -389,6 +389,16 @@ svg {
   font-size: 0.95rem;
   font-weight: 700;
   white-space: nowrap;
+  text-align: right;
+  justify-self: end;
+}
+
+.platform-entry-row.platform-entry-income .platform-entry-value {
+  color: #3ddc84;
+}
+
+.platform-entry-row.platform-entry-debit .platform-entry-value {
+  color: #ff6b6b;
 }
 
 .task-avatar {

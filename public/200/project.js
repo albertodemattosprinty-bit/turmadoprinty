@@ -1209,7 +1209,10 @@ function renderPlatformEntries() {
     const amountCents = getEntryAmountCents(entry);
     const signed = String(entry.kind || "").toUpperCase() === "INCOME" ? amountCents : -amountCents;
     const row = document.createElement("article");
-    row.className = `task-row platform-entry-row ${getPlatformStatusClass(entry)}`;
+    const kindClass = String(entry.kind || "").toUpperCase() === "INCOME"
+      ? "platform-entry-income"
+      : "platform-entry-debit";
+    row.className = `task-row platform-entry-row ${kindClass} ${getPlatformStatusClass(entry)}`;
     row.dataset.occurrenceId = entry.id || "";
     row.dataset.status = String(entry.status || "").trim().toUpperCase();
     row.innerHTML = `
