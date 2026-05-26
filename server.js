@@ -4347,7 +4347,7 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel pagar a despesa."
+        error: error instanceof Error ? error.message : "Nao foi possivel confirmar o lançamento."
       });
     }
     return;

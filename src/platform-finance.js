@@ -433,14 +433,13 @@ async function syncDueStatuses(userId) {
     `
       update platform_finance_occurrences
       set status = case
-        when kind = 'EXPENSE' and paid_at is not null then '${OCCURRENCE_STATUS_PAID}'
-        when kind = 'EXPENSE' and paid_at is null and occurred_at::date < now()::date then '${OCCURRENCE_STATUS_OVERDUE}'
-        when kind = 'EXPENSE' and paid_at is null and occurred_at::date = now()::date then '${OCCURRENCE_STATUS_DUE_TODAY}'
-        when kind = 'EXPENSE' and paid_at is null and occurred_at::date > now()::date then '${OCCURRENCE_STATUS_SCHEDULED}'
+        when paid_at is not null then '${OCCURRENCE_STATUS_PAID}'
+        when paid_at is null and occurred_at::date < now()::date then '${OCCURRENCE_STATUS_OVERDUE}'
+        when paid_at is null and occurred_at::date = now()::date then '${OCCURRENCE_STATUS_DUE_TODAY}'
+        when paid_at is null and occurred_at::date > now()::date then '${OCCURRENCE_STATUS_SCHEDULED}'
         else status
       end
       where user_id = $1
-        and kind = 'EXPENSE'
     `,
     [userId]
   );
@@ -463,11 +462,7 @@ export async function payPlatformOccurrence(userId, occurrenceId) {
   const row = result.rows[0];
 
   if (!row) {
-    throw new Error("Despesa nao encontrada.");
-  }
-
-  if (row.kind !== KIND_EXPENSE) {
-    throw new Error("Somente despesas podem ser pagas.");
+    throw new Error("Lançamento nao encontrado.");
   }
 
   if (row.paid_at || row.status === OCCURRENCE_STATUS_PAID) {
@@ -485,7 +480,9 @@ export async function payPlatformOccurrence(userId, occurrenceId) {
     [userId, row.id, OCCURRENCE_STATUS_PAID]
   );
 
-  const balanceCents = await adjustPlatformBalance(userId, -Number(row.amount_cents || 0));
+  const amount = Number(row.amount_cents || 0);
+  const balanceDelta = row.kind === KIND_INCOME ? amount : -amount;
+  const balanceCents = await adjustPlatformBalance(userId, balanceDelta);
   return {
     ok: true,
     alreadyPaid: false,

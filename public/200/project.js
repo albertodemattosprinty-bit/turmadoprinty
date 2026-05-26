@@ -104,6 +104,8 @@ const platformMonthlyIncome = document.getElementById("platformMonthlyIncome");
 const platformMonthlyExpense = document.getElementById("platformMonthlyExpense");
 const platformExpenseCard = document.getElementById("platformExpenseCard");
 const platformIncomeCard = document.getElementById("platformIncomeCard");
+const platformSaldoCard = document.getElementById("platformSaldoCard");
+const platformRealizedBalance = document.getElementById("platformRealizedBalance");
 const platformBalanceValue = document.getElementById("platformBalanceValue");
 const togglePlatformBalanceButton = document.getElementById("togglePlatformBalance");
 const addPlatformBalanceButton = document.getElementById("addPlatformBalance");
@@ -115,6 +117,7 @@ const platformWizardStepLabel = document.getElementById("platformWizardStepLabel
 const platformWizardMessage = document.getElementById("platformWizardMessage");
 const platformWizardBackButton = document.getElementById("platformWizardBack");
 const platformWizardNextButton = document.getElementById("platformWizardNext");
+const platformWizardAiCreateButton = document.getElementById("platformWizardAiCreate");
 const platformNameInput = document.getElementById("platformName");
 const platformValueInput = document.getElementById("platformValue");
 const platformCategoryRow = document.getElementById("platformCategoryRow");
@@ -1284,6 +1287,10 @@ function getPlatformKindLabel(kind) {
 
 function getPlatformStatusClass(entry) {
   const status = String(entry?.status || "").trim().toUpperCase();
+  const kind = String(entry?.kind || "").trim().toUpperCase();
+  if (kind === "INCOME") {
+    return "";
+  }
   if (status === "DUE_TODAY") {
     return "task-pending-due";
   }
@@ -1308,13 +1315,14 @@ function renderPlatformBalance() {
 }
 
 function renderPlatformMetricCards() {
-  if (!platformExpenseCard || !platformIncomeCard) {
+  if (!platformExpenseCard || !platformIncomeCard || !platformSaldoCard) {
     return;
   }
 
-  const showExpense = state.platformMetricIndex % 2 === 0;
-  platformExpenseCard.hidden = !showExpense;
-  platformIncomeCard.hidden = showExpense;
+  const index = state.platformMetricIndex % 3;
+  platformExpenseCard.hidden = index !== 0;
+  platformIncomeCard.hidden = index !== 1;
+  platformSaldoCard.hidden = index !== 2;
 }
 
 function startPlatformMetricsRotation() {
@@ -1326,7 +1334,7 @@ function startPlatformMetricsRotation() {
   }
 
   platformMetricsTicker = window.setInterval(() => {
-    state.platformMetricIndex = (state.platformMetricIndex + 1) % 2;
+    state.platformMetricIndex = (state.platformMetricIndex + 1) % 3;
     renderPlatformMetricCards();
   }, 1500);
 }
@@ -1370,9 +1378,16 @@ function renderPlatformEntries() {
     const isDebit = String(entry.kind || "").toUpperCase() !== "INCOME";
     const categoryName = String(entry.category || "").trim();
     const categoryIcon = platformCategoryIconByName[categoryName] || "/200/icons/financas.svg";
-    row.className = `platform-entry-row ${kindClass} ${getPlatformStatusClass(entry)}`.trim();
+    const statusClass = getPlatformStatusClass(entry);
+    const dueIncomeClass = String(entry.kind || "").toUpperCase() === "INCOME" && String(entry.status || "").toUpperCase() === "DUE_TODAY"
+      ? "platform-entry-due"
+      : "";
+    row.className = `platform-entry-row ${kindClass} ${statusClass} ${dueIncomeClass}`.trim();
     row.dataset.occurrenceId = entry.id || "";
     row.dataset.status = String(entry.status || "").trim().toUpperCase();
+    row.dataset.kind = String(entry.kind || "").trim().toUpperCase();
+    row.dataset.amountCents = String(amountCents);
+    row.dataset.entryName = String(entry.name || "");
     row.innerHTML = `
       <div class="task-title">
         ${isDebit ? `<img class="platform-entry-icon" src="${categoryIcon}" alt="Saída" loading="lazy" />` : ""}
@@ -1414,6 +1429,26 @@ async function loadPlatformFinance() {
 
     platformMonthlyExpense.textContent = formatMoney(state.platformMonthly.expenseCents);
     platformMonthlyIncome.textContent = formatMoney(Number(state.platformMonthly.incomeCents || 0) + state.platformBaseIncomeCents);
+    const entries = Array.isArray(state.platformMonthly.entries) ? state.platformMonthly.entries : [];
+    const realizedIncomeCents = entries.reduce((sum, item) => {
+      const kind = String(item?.kind || "").toUpperCase();
+      const paidAt = item?.paidAt;
+      if (kind !== "INCOME" || !paidAt) {
+        return sum;
+      }
+      return sum + Number(item?.amountCents || 0);
+    }, 0);
+    const realizedExpenseCents = entries.reduce((sum, item) => {
+      const kind = String(item?.kind || "").toUpperCase();
+      const paidAt = item?.paidAt;
+      if (kind !== "EXPENSE" || !paidAt) {
+        return sum;
+      }
+      return sum + Number(item?.amountCents || 0);
+    }, 0);
+    if (platformRealizedBalance) {
+      platformRealizedBalance.textContent = formatMoney(realizedIncomeCents - realizedExpenseCents);
+    }
     renderPlatformBalance();
     renderPlatformEntries();
   } catch (error) {
@@ -1936,6 +1971,9 @@ function renderPlatformWizard() {
     section.classList.toggle("active", Number(section.dataset.platformStep) === state.platformWizard.step);
   });
   platformWizardBackButton.style.visibility = state.platformWizard.step === 1 ? "hidden" : "visible";
+  if (platformWizardAiCreateButton) {
+    platformWizardAiCreateButton.hidden = state.platformWizard.step !== 1;
+  }
   platformWizardNextButton.textContent = state.platformWizard.step === 4 || state.platformWizard.recurrenceType === "SIMPLE" && state.platformWizard.step === 3
     ? "Salvar"
     : "Continuar";
@@ -2579,6 +2617,24 @@ platformWizardNextButton?.addEventListener("click", () => {
   renderPlatformWizard();
 });
 
+platformWizardAiCreateButton?.addEventListener("click", () => {
+  const text = String(platformNameInput.value || "").trim();
+  if (!text) {
+    platformWizardMessage.textContent = "Digite a frase para a IA criar.";
+    return;
+  }
+  platformWizardMessage.textContent = "Interpretando e criando...";
+  void (async () => {
+    try {
+      await createPlatformEntryFromVoiceInterpret(text);
+      closePlatformWizard();
+      platformWizardMessage.textContent = "";
+    } catch (error) {
+      platformWizardMessage.textContent = error instanceof Error ? error.message : "Falha ao criar.";
+    }
+  })();
+});
+
 repeatToggle.addEventListener("click", () => {
   state.wizard.repeatOpen = !state.wizard.repeatOpen;
   renderRepeatControls();
@@ -2685,7 +2741,13 @@ platformEntriesList?.addEventListener("click", async (event) => {
     const row = event.target.closest("[data-occurrence-id]");
     const status = String(row?.dataset?.status || "").trim().toUpperCase();
     if (row && (status === "DUE_TODAY" || status === "OVERDUE")) {
-      if (window.confirm("Pagar agora?")) {
+      const kind = String(row.dataset.kind || "").toUpperCase();
+      const amountCents = Number(row.dataset.amountCents || 0);
+      const label = row.dataset.entryName || "lançamento";
+      const message = kind === "INCOME"
+        ? `Confirmar recebimento de ${formatMoney(amountCents)} em "${label}"?`
+        : `Confirmar pagamento de ${formatMoney(-amountCents)} em "${label}"?`;
+      if (window.confirm(message)) {
         await payPlatformOccurrenceNow(row.dataset.occurrenceId);
       }
     }
