@@ -199,7 +199,12 @@ let historyAudioContext = null;
 let historyAudioAnalyser = null;
 let historySpeechMonitorTimer = null;
 let historyLastSpeechAt = 0;
-let financeSpeechRecognition = null;
+let financeMediaRecorder = null;
+let financeMediaStream = null;
+let financeAudioContext = null;
+let financeAudioAnalyser = null;
+let financeSpeechMonitorTimer = null;
+let financeLastSpeechAt = 0;
 let financeSpeechText = "";
 
 const state = {
@@ -1403,7 +1408,8 @@ async function createPlatformEntryFromVoiceInterpret(text) {
   if (!entry) {
     throw new Error("Sem interpretação.");
   }
-  const confirmText = `Criar lançamento "${entry.name}" de ${formatMoney(entry.kind === "INCOME" ? entry.amountCents : -entry.amountCents)}?`;
+  const categoryLabel = String(entry.category || "").trim() || "Sem categoria";
+  const confirmText = `Criar lançamento "${entry.name}" (${categoryLabel}) de ${formatMoney(entry.kind === "INCOME" ? entry.amountCents : -entry.amountCents)}?`;
   if (!window.confirm(confirmText)) {
     return;
   }
@@ -1424,78 +1430,105 @@ async function createPlatformEntryFromVoiceInterpret(text) {
 }
 
 function stopFinanceSpeechCapture() {
-  if (financeSpeechRecognition) {
-    try {
-      financeSpeechRecognition.stop();
-    } catch {
-      // noop
-    }
-    financeSpeechRecognition = null;
+  if (financeSpeechMonitorTimer) {
+    window.clearInterval(financeSpeechMonitorTimer);
+    financeSpeechMonitorTimer = null;
+  }
+  if (financeMediaRecorder && financeMediaRecorder.state !== "inactive") {
+    financeMediaRecorder.stop();
+  }
+  financeMediaRecorder = null;
+  financeAudioAnalyser = null;
+  if (financeAudioContext) {
+    financeAudioContext.close().catch(() => {});
+    financeAudioContext = null;
+  }
+  if (financeMediaStream) {
+    financeMediaStream.getTracks().forEach((track) => track.stop());
+    financeMediaStream = null;
   }
 }
 
-function startFinanceSpeechCapture() {
-  if (financeSpeechRecognition) {
+async function startFinanceSpeechCapture() {
+  if (financeMediaRecorder && financeMediaRecorder.state !== "inactive") {
     financeVoiceStatus.textContent = "Microfone já está ouvindo...";
     return;
   }
 
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) {
-    financeVoiceStatus.textContent = "Reconhecimento de voz indisponível neste navegador.";
-    return;
-  }
   financeSpeechText = "";
   financeVoiceBox.hidden = false;
   financeVoiceText.textContent = "";
-  financeVoiceStatus.textContent = "Ouvindo...";
+  financeVoiceStatus.textContent = "Gravando...";
 
-  const recognition = new Recognition();
-  financeSpeechRecognition = recognition;
-  recognition.lang = "pt-BR";
-  recognition.continuous = true;
-  recognition.interimResults = true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    financeMediaStream = stream;
+    financeAudioContext = new AudioContext();
+    const source = financeAudioContext.createMediaStreamSource(stream);
+    financeAudioAnalyser = financeAudioContext.createAnalyser();
+    financeAudioAnalyser.fftSize = 2048;
+    source.connect(financeAudioAnalyser);
 
-  recognition.onresult = (event) => {
-    let interimChunk = "";
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      const chunk = String(event.results[i][0]?.transcript || "").trim();
-      if (!chunk) {
-        continue;
+    const chunks = [];
+    financeMediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    financeMediaRecorder.ondataavailable = (event) => {
+      if (event.data?.size) {
+        chunks.push(event.data);
       }
-      if (event.results[i].isFinal) {
-        const current = String(financeSpeechText || "").trim();
-        if (!current.endsWith(chunk)) {
-          financeSpeechText = `${current} ${chunk}`.trim();
+    };
+    financeMediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (!blob.size) {
+        financeVoiceStatus.textContent = "Sem áudio captado.";
+        return;
+      }
+      financeVoiceStatus.textContent = "Transcrevendo...";
+      try {
+        const base64 = await blob.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
+        const transcribed = await apiRequest("/api/audio/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm", fileName: "finance-voice.webm" })
+        });
+        financeSpeechText = String(transcribed?.text || "").trim();
+        financeVoiceText.textContent = financeSpeechText;
+        if (!financeSpeechText) {
+          financeVoiceStatus.textContent = "Sem texto captado.";
+          return;
         }
-      } else {
-        interimChunk = `${interimChunk} ${chunk}`.trim();
+        financeVoiceStatus.textContent = "Interpretando...";
+        await createPlatformEntryFromVoiceInterpret(financeSpeechText);
+        financeVoiceStatus.textContent = "Lançamento criado.";
+      } catch (error) {
+        financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no processamento.";
       }
-    }
-    financeVoiceText.textContent = `${financeSpeechText} ${interimChunk}`.trim();
-  };
-
-  recognition.onerror = () => {
-    financeVoiceStatus.textContent = "Falha na captura de voz.";
-  };
-
-  recognition.onend = async () => {
-    financeSpeechRecognition = null;
-    const text = String(financeSpeechText || "").trim();
-    if (!text) {
-      financeVoiceStatus.textContent = "Sem texto captado.";
-      return;
-    }
-    financeVoiceStatus.textContent = "Interpretando...";
-    try {
-      await createPlatformEntryFromVoiceInterpret(text);
-      financeVoiceStatus.textContent = "Lançamento criado.";
-    } catch (error) {
-      financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha ao criar lançamento.";
-    }
-  };
-
-  recognition.start();
+    };
+    financeMediaRecorder.start();
+    financeLastSpeechAt = Date.now();
+    financeSpeechMonitorTimer = window.setInterval(() => {
+      if (!financeAudioAnalyser || !financeMediaRecorder || financeMediaRecorder.state === "inactive") {
+        return;
+      }
+      const buffer = new Uint8Array(financeAudioAnalyser.fftSize);
+      financeAudioAnalyser.getByteTimeDomainData(buffer);
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i += 1) {
+        const value = (buffer[i] - 128) / 128;
+        sum += value * value;
+      }
+      const rms = Math.sqrt(sum / buffer.length);
+      if (rms > 0.02) {
+        financeLastSpeechAt = Date.now();
+      }
+      if (Date.now() - financeLastSpeechAt >= 1200) {
+        financeVoiceStatus.textContent = "Processando...";
+        stopFinanceSpeechCapture();
+      }
+    }, 90);
+  } catch (error) {
+    financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no microfone.";
+    stopFinanceSpeechCapture();
+  }
 }
 
 function getActiveStatsScope() {
