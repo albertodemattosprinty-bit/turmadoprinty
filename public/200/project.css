@@ -299,10 +299,10 @@ svg {
   width: min(920px, 100%);
   height: 100vh;
   margin: 0 auto;
-  padding: 26px 18px 100px;
+  padding: 12px 18px 14px;
   display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 16px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
 }
 
 .actions-head,
@@ -417,7 +417,7 @@ svg {
   display: grid;
   align-content: start;
   gap: 10px;
-  padding: 6px 0 180px;
+  padding: 2px 0 10px;
 }
 
 #calendarModal .actions-list {
@@ -627,18 +627,15 @@ svg {
 }
 
 .actions-progress {
-  position: fixed;
-  left: 50%;
-  bottom: 82px;
-  transform: translateX(-50%);
-  width: min(920px, calc(100% - 40px));
+  position: static;
+  width: 100%;
   border: 0;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 4px 2px 0;
   background: transparent;
   backdrop-filter: none;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .actions-progress-head {
@@ -1171,7 +1168,7 @@ svg {
   }
 
   .actions-app {
-    padding-top: 68px;
+    padding-top: 54px;
   }
 
   #calendarModal .actions-app {
@@ -1230,7 +1227,7 @@ svg {
 
 .actions-side-btn {
   position: fixed;
-  top: 12px;
+  top: 6px;
   transform: none;
   pointer-events: auto;
 }
@@ -1245,7 +1242,18 @@ svg {
 
 .stats-side-actions .actions-side-btn-left,
 .stats-side-actions .actions-side-btn-right {
-  top: 12px;
+  top: 6px;
+}
+
+.action-voice-tools {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-voice-status {
+  margin-top: 0;
 }
 
 #actionsModal .actions-progress-track {

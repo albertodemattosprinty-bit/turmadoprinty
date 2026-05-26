@@ -1638,6 +1638,106 @@ async function handleProject200FinanceInterpret(request, response) {
   }
 }
 
+async function handleProject200ActionInterpret(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const text = String(body?.text || "").trim();
+  if (!text) {
+    sendJson(response, 400, { error: "Texto ausente." });
+    return;
+  }
+
+  try {
+    const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+    const completion = await createChatCompletion(apiKey, {
+      model,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: "Interprete pedido de tarefa em pt-BR. Responda JSON puro com: title(max 25 chars, minimo possivel), startHour(0-23), startMinute(0-59), endHour(0-23), endMinute(0-59), repeatRule(none|daily|custom), repeatDays(array com 0=dom..6=sab), assignee(Rose|Alberto|Lucas|Thainan|Geral|\"\"), assigneeDetected(boolean). Se horario faltar: use proxima hora cheia e +1h no fim. Se pessoa nao for citada: assignee vazio e assigneeDetected false. Se texto disser todo dia: daily. Se citar dias da semana (ex: terça e quinta): custom com repeatDays. Se nao mencionar recorrencia: none."
+        },
+        { role: "user", content: text.slice(0, 1200) }
+      ]
+    });
+
+    const raw = extractChatCompletionText(completion);
+    const parsed = JSON.parse(raw);
+
+    const clampHour = (value, fallback) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        return fallback;
+      }
+      return Math.max(0, Math.min(23, Math.round(n)));
+    };
+    const clampMinute = (value, fallback) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        return fallback;
+      }
+      return Math.max(0, Math.min(59, Math.round(n)));
+    };
+
+    const now = new Date();
+    const defaultStartHour = (now.getHours() + 1) % 24;
+    const title = String(parsed?.title || "Tarefa").trim().slice(0, 25) || "Tarefa";
+    const startHour = clampHour(parsed?.startHour, defaultStartHour);
+    const startMinute = clampMinute(parsed?.startMinute, 0);
+    let endHour = clampHour(parsed?.endHour, (startHour + 1) % 24);
+    let endMinute = clampMinute(parsed?.endMinute, startMinute);
+    if (endHour === startHour && endMinute <= startMinute) {
+      endHour = (startHour + 1) % 24;
+      endMinute = startMinute;
+    }
+
+    const repeatRuleRaw = String(parsed?.repeatRule || "none").toLowerCase();
+    const repeatRule = repeatRuleRaw === "daily" || repeatRuleRaw === "custom" ? repeatRuleRaw : "none";
+    const repeatDays = Array.isArray(parsed?.repeatDays)
+      ? [...new Set(parsed.repeatDays.map((day) => Number(day)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))].sort((a, b) => a - b)
+      : [];
+    const assignee = String(parsed?.assignee || "").trim();
+    const assigneeDetected = Boolean(parsed?.assigneeDetected && assignee);
+
+    sendJson(response, 200, {
+      ok: true,
+      action: {
+        title,
+        startHour,
+        startMinute,
+        endHour,
+        endMinute,
+        repeatRule: repeatRule === "custom" && !repeatDays.length ? "none" : repeatRule,
+        repeatDays,
+        assignee,
+        assigneeDetected
+      },
+      model
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Nao foi possivel interpretar a tarefa.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -3728,6 +3828,17 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleProject200FinanceInterpret(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/actions/interpret") {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    await handleProject200ActionInterpret(request, response);
     return;
   }
 

@@ -174,6 +174,8 @@ const historyTextBackButton = document.getElementById("historyTextBack");
 const historyTextNextButton = document.getElementById("historyTextNext");
 const historyTextAvatarGrid = document.getElementById("historyTextAvatarGrid");
 const historyMicButton = document.getElementById("historyMicButton");
+const actionMicButton = document.getElementById("actionMicButton");
+const actionVoiceStatus = document.getElementById("actionVoiceStatus");
 const historyDeleteWordButton = document.getElementById("historyDeleteWordButton");
 const historyClearTextButton = document.getElementById("historyClearTextButton");
 const historyVoiceStatus = document.getElementById("historyVoiceStatus");
@@ -206,6 +208,12 @@ let financeAudioAnalyser = null;
 let financeSpeechMonitorTimer = null;
 let financeLastSpeechAt = 0;
 let financeSpeechText = "";
+let actionMediaRecorder = null;
+let actionMediaStream = null;
+let actionAudioContext = null;
+let actionAudioAnalyser = null;
+let actionSpeechMonitorTimer = null;
+let actionLastSpeechAt = 0;
 
 const state = {
   activeOffset: 0,
@@ -994,6 +1002,10 @@ function openWizard(action = null) {
 }
 
 function closeWizard() {
+  stopActionMic();
+  if (actionVoiceStatus) {
+    actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
+  }
   actionWizard.classList.remove("active");
   actionWizard.setAttribute("aria-hidden", "true");
 }
@@ -1528,6 +1540,133 @@ async function startFinanceSpeechCapture() {
   } catch (error) {
     financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no microfone.";
     stopFinanceSpeechCapture();
+  }
+}
+
+function stopActionMic() {
+  if (actionSpeechMonitorTimer) {
+    window.clearInterval(actionSpeechMonitorTimer);
+    actionSpeechMonitorTimer = null;
+  }
+  if (actionMediaRecorder && actionMediaRecorder.state !== "inactive") {
+    actionMediaRecorder.stop();
+  }
+  actionMediaRecorder = null;
+  actionAudioAnalyser = null;
+  if (actionAudioContext) {
+    actionAudioContext.close().catch(() => {});
+    actionAudioContext = null;
+  }
+  if (actionMediaStream) {
+    actionMediaStream.getTracks().forEach((track) => track.stop());
+    actionMediaStream = null;
+  }
+  actionMicButton?.classList.remove("mic-active");
+  actionMicButton?.classList.add("mic-idle");
+}
+
+function applyInterpretedAction(entry) {
+  taskTitle.value = String(entry?.title || "").trim().slice(0, 80);
+  state.wizard.startHour = Math.max(0, Math.min(23, Number(entry?.startHour || state.wizard.startHour)));
+  state.wizard.startMinute = Math.max(0, Math.min(55, Math.round(Number(entry?.startMinute || state.wizard.startMinute) / 5) * 5));
+  state.wizard.endHour = Math.max(0, Math.min(23, Number(entry?.endHour || state.wizard.endHour)));
+  state.wizard.endMinute = Math.max(0, Math.min(55, Math.round(Number(entry?.endMinute || state.wizard.endMinute) / 5) * 5));
+  state.wizard.repeatOpen = String(entry?.repeatRule || "none") !== "none";
+  state.wizard.repeatMode = String(entry?.repeatRule || "none");
+  state.wizard.repeatDays = Array.isArray(entry?.repeatDays) ? entry.repeatDays.map((day) => Number(day)).filter((day) => day >= 0 && day <= 6) : [];
+  if (entry?.assigneeDetected && entry?.assignee) {
+    const normalized = normalizeAssigneeName(entry.assignee);
+    state.wizard.assigneeIndex = Math.max(0, assigneeOptions.indexOf(normalized));
+  }
+  renderWizard();
+  state.wizard.step = entry?.assigneeDetected ? 2 : 5;
+  renderWizard();
+}
+
+async function startActionMic() {
+  if (actionMediaRecorder && actionMediaRecorder.state !== "inactive") {
+    actionVoiceStatus.textContent = "Microfone já está ouvindo...";
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    actionMediaStream = stream;
+    actionAudioContext = new AudioContext();
+    const source = actionAudioContext.createMediaStreamSource(stream);
+    actionAudioAnalyser = actionAudioContext.createAnalyser();
+    actionAudioAnalyser.fftSize = 2048;
+    source.connect(actionAudioAnalyser);
+
+    const chunks = [];
+    actionMediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    actionMediaRecorder.ondataavailable = (event) => {
+      if (event.data?.size) {
+        chunks.push(event.data);
+      }
+    };
+    actionMediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (!blob.size) {
+        actionVoiceStatus.textContent = "Sem áudio captado.";
+        return;
+      }
+      try {
+        actionVoiceStatus.textContent = "Transcrevendo...";
+        const base64 = await blob.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
+        const transcribed = await apiRequest("/api/audio/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm", fileName: "action-voice.webm" })
+        });
+        const speechText = String(transcribed?.text || "").trim();
+        if (!speechText) {
+          actionVoiceStatus.textContent = "Sem texto captado.";
+          return;
+        }
+        actionVoiceStatus.textContent = "Interpretando tarefa...";
+        const interpreted = await apiRequest("/api/200/actions/interpret", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: speechText })
+        });
+        applyInterpretedAction(interpreted?.action || {});
+        const parsedAssignee = interpreted?.action?.assigneeDetected
+          ? normalizeAssigneeName(interpreted?.action?.assignee)
+          : "não identificado";
+        actionVoiceStatus.textContent = `Tarefa pronta (${parsedAssignee}).`;
+      } catch (error) {
+        actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretação.";
+      }
+    };
+    actionMediaRecorder.start();
+    actionMicButton?.classList.remove("mic-idle");
+    actionMicButton?.classList.add("mic-active");
+    actionVoiceStatus.textContent = "Gravando...";
+    actionLastSpeechAt = Date.now();
+    actionSpeechMonitorTimer = window.setInterval(() => {
+      if (!actionAudioAnalyser) {
+        return;
+      }
+      const buffer = new Uint8Array(actionAudioAnalyser.fftSize);
+      actionAudioAnalyser.getByteTimeDomainData(buffer);
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i += 1) {
+        const value = (buffer[i] - 128) / 128;
+        sum += value * value;
+      }
+      const rms = Math.sqrt(sum / buffer.length);
+      if (rms > 0.02) {
+        actionLastSpeechAt = Date.now();
+      }
+      if (Date.now() - actionLastSpeechAt >= 2000) {
+        actionVoiceStatus.textContent = "Processando...";
+        stopActionMic();
+      }
+    }, 110);
+  } catch (error) {
+    actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no microfone.";
+    stopActionMic();
   }
 }
 
@@ -2621,6 +2760,10 @@ historyTextBackButton?.addEventListener("click", () => {
 
 historyMicButton?.addEventListener("click", () => {
   void startHistoryMic();
+});
+
+actionMicButton?.addEventListener("click", () => {
+  void startActionMic();
 });
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);
