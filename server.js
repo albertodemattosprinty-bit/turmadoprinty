@@ -22,7 +22,7 @@ import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getSched
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
-import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
+import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
@@ -1633,6 +1633,102 @@ async function handleProject200FinanceInterpret(request, response) {
   } catch (error) {
     sendJson(response, 500, {
       error: "Nao foi possivel interpretar o texto financeiro.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
+function getPeriodRangeByKey(periodKey) {
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (periodKey === "today") {
+    return { from: today.toISOString(), to: tomorrow.toISOString() };
+  }
+
+  if (periodKey === "week") {
+    const weekday = today.getDay();
+    const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - daysSinceMonday);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    return { from: weekStart.toISOString(), to: weekEnd.toISOString() };
+  }
+
+  if (periodKey === "month") {
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return { from: monthStart.toISOString(), to: nextMonth.toISOString() };
+  }
+
+  return { from: today.toISOString(), to: tomorrow.toISOString() };
+}
+
+async function handleProject200FinanceDeleteInterpret(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const text = String(body?.text || "").trim();
+  if (!text) {
+    sendJson(response, 400, { error: "Texto ausente." });
+    return;
+  }
+
+  try {
+    const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+    const completion = await createChatCompletion(apiKey, {
+      model,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: "Interprete pedido de limpeza financeira e responda JSON puro com: intent('DELETE'), periodKey('today'|'week'|'month'), kind('ALL'|'INCOME'|'EXPENSE'), confirmationText. Exemplos: 'apagar tudo de hoje' => today+ALL; 'apagar entradas dessa semana' => week+INCOME; 'apagar saídas do mês' => month+EXPENSE."
+        },
+        { role: "user", content: text.slice(0, 600) }
+      ]
+    });
+
+    const parsed = JSON.parse(extractChatCompletionText(completion));
+    const periodKeyRaw = String(parsed?.periodKey || "today").toLowerCase();
+    const periodKey = ["today", "week", "month"].includes(periodKeyRaw) ? periodKeyRaw : "today";
+    const kindRaw = String(parsed?.kind || "ALL").toUpperCase();
+    const kind = ["ALL", "INCOME", "EXPENSE"].includes(kindRaw) ? kindRaw : "ALL";
+    const range = getPeriodRangeByKey(periodKey);
+
+    sendJson(response, 200, {
+      ok: true,
+      command: {
+        intent: "DELETE",
+        periodKey,
+        kind,
+        from: range.from,
+        to: range.to,
+        confirmationText: String(parsed?.confirmationText || "Confirma apagar os lançamentos selecionados?")
+      },
+      model
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Nao foi possivel interpretar o comando de exclusão.",
       details: error instanceof Error ? error.message : "Erro desconhecido."
     });
   }
@@ -3831,6 +3927,17 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/200/finance/delete/interpret") {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    await handleProject200FinanceDeleteInterpret(request, response);
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/200/actions/interpret") {
     const user = await requireAuth(request, response);
 
@@ -4371,6 +4478,33 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel excluir lancamento."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/platform/entries/delete-by-filter") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const result = await deletePlatformOccurrencesByFilter(user.id, {
+        from: body?.from,
+        to: body?.to,
+        kind: body?.kind
+      });
+
+      sendJson(response, 200, {
+        ok: true,
+        result
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel apagar os lançamentos."
       });
     }
     return;

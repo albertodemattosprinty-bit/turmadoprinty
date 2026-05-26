@@ -519,3 +519,70 @@ export async function summarizePlatformFinanceMonth(userId, focusDate) {
     entries: items
   };
 }
+
+export async function deletePlatformOccurrencesByFilter(userId, { from, to, kind = "ALL" }) {
+  await ensurePlatformFinanceSchema();
+
+  const fromDate = parseIsoDate(from, "Data inicial");
+  const toDate = parseIsoDate(to, "Data final");
+  if (toDate <= fromDate) {
+    throw new Error("Intervalo de datas invalido.");
+  }
+
+  const normalizedKind = String(kind || "ALL").trim().toUpperCase();
+  const kindFilter = normalizedKind === "INCOME" || normalizedKind === "EXPENSE" ? normalizedKind : "ALL";
+
+  const params = [userId, fromDate.toISOString(), toDate.toISOString()];
+  const kindClause = kindFilter === "ALL" ? "" : "and kind = $4";
+  if (kindFilter !== "ALL") {
+    params.push(kindFilter);
+  }
+
+  const toDelete = await query(
+    `
+      select id, kind, amount_cents, paid_at
+      from platform_finance_occurrences
+      where user_id = $1
+        and occurred_at >= $2::timestamptz
+        and occurred_at < $3::timestamptz
+        ${kindClause}
+    `,
+    params
+  );
+
+  if (!toDelete.rows.length) {
+    return { deleted: 0, balanceCents: await getPlatformBalance(userId) };
+  }
+
+  let balanceDelta = 0;
+  for (const row of toDelete.rows) {
+    if (!row.paid_at) {
+      continue;
+    }
+    const cents = Number(row.amount_cents || 0);
+    if (String(row.kind || "").toUpperCase() === KIND_INCOME) {
+      balanceDelta -= cents;
+    } else {
+      balanceDelta += cents;
+    }
+  }
+
+  const ids = toDelete.rows.map((row) => row.id);
+  await query(
+    `
+      delete from platform_finance_occurrences
+      where user_id = $1
+        and id = any($2::uuid[])
+    `,
+    [userId, ids]
+  );
+
+  const nextBalance = balanceDelta !== 0
+    ? await adjustPlatformBalance(userId, balanceDelta)
+    : await getPlatformBalance(userId);
+
+  return {
+    deleted: ids.length,
+    balanceCents: nextBalance
+  };
+}
