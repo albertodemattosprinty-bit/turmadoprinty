@@ -169,7 +169,10 @@ svg {
   z-index: 20;
   display: none;
   color: var(--white);
-  background: transparent;
+  background-image: var(--app-tint-current), url("/200/home-bg.png");
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
 }
 
 .workspace-modal.active {
@@ -1072,11 +1075,17 @@ svg {
 @media (max-width: 720px) {
   body {
     background-attachment: scroll;
+    background-size: 150% auto;
   }
 
   body[data-profile="project"] {
     animation: projectBgDrift 36s ease-in-out infinite;
-    background-size: 140% auto;
+    background-size: 150% auto;
+  }
+
+  .workspace-modal {
+    background-attachment: scroll;
+    background-size: 150% auto;
   }
 
   .project-shell {
