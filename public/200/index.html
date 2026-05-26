@@ -159,6 +159,18 @@
 
           <p class="wizard-message" id="wizardMessage" role="status"></p>
 
+          <section class="wizard-ai-confirm" id="actionAiConfirm" hidden>
+            <h3>Confirmação da tarefa</h3>
+            <p><strong>Título:</strong> <span id="actionAiConfirmTitle">-</span></p>
+            <p><strong>Horário:</strong> <span id="actionAiConfirmStart">-</span></p>
+            <p><strong>Horário final:</strong> <span id="actionAiConfirmEnd">-</span></p>
+            <p><strong>Datas selecionadas:</strong> <span id="actionAiConfirmDates">-</span></p>
+            <div class="wizard-ai-confirm-actions">
+              <button class="ghost-btn" type="button" id="actionAiEdit">Editar manualmente</button>
+              <button class="primary-btn" type="button" id="actionAiApply">Confirmar</button>
+            </div>
+          </section>
+
           <footer class="wizard-actions">
             <button class="ghost-btn" type="button" id="wizardBack">Voltar</button>
             <button class="primary-btn" type="button" id="wizardNext">Continuar</button>

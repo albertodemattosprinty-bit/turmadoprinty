@@ -176,6 +176,13 @@ const historyTextAvatarGrid = document.getElementById("historyTextAvatarGrid");
 const historyMicButton = document.getElementById("historyMicButton");
 const actionMicButton = document.getElementById("actionMicButton");
 const actionVoiceStatus = document.getElementById("actionVoiceStatus");
+const actionAiConfirm = document.getElementById("actionAiConfirm");
+const actionAiConfirmTitle = document.getElementById("actionAiConfirmTitle");
+const actionAiConfirmStart = document.getElementById("actionAiConfirmStart");
+const actionAiConfirmEnd = document.getElementById("actionAiConfirmEnd");
+const actionAiConfirmDates = document.getElementById("actionAiConfirmDates");
+const actionAiEditButton = document.getElementById("actionAiEdit");
+const actionAiApplyButton = document.getElementById("actionAiApply");
 const historyDeleteWordButton = document.getElementById("historyDeleteWordButton");
 const historyClearTextButton = document.getElementById("historyClearTextButton");
 const historyVoiceStatus = document.getElementById("historyVoiceStatus");
@@ -214,6 +221,7 @@ let actionAudioContext = null;
 let actionAudioAnalyser = null;
 let actionSpeechMonitorTimer = null;
 let actionLastSpeechAt = 0;
+let actionPendingAiPayload = null;
 
 const state = {
   activeOffset: 0,
@@ -995,6 +1003,7 @@ function openWizard(action = null) {
     taskTitle.value = "";
   }
   wizardMessage.textContent = "";
+  hideActionAiConfirmation();
   actionWizard.classList.add("active");
   actionWizard.setAttribute("aria-hidden", "false");
   renderWizard();
@@ -1003,6 +1012,7 @@ function openWizard(action = null) {
 
 function closeWizard() {
   stopActionMic();
+  hideActionAiConfirmation();
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
@@ -1571,6 +1581,42 @@ function stopActionMic() {
   actionMicButton?.classList.add("mic-idle");
 }
 
+function formatRepeatLabel(repeatRule, repeatDays) {
+  if (repeatRule === "daily") {
+    return "Diariamente";
+  }
+  if (repeatRule === "custom" && Array.isArray(repeatDays) && repeatDays.length) {
+    const names = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+    return repeatDays.map((day) => names[day] || day).join(", ");
+  }
+  return "Data única";
+}
+
+function renderActionAiConfirmation(payload) {
+  if (!actionAiConfirm) {
+    return;
+  }
+  const startHour = Number(payload?.startHour || 0);
+  const startMinute = Number(payload?.startMinute || 0);
+  const endHour = Number(payload?.endHour || 0);
+  const endMinute = Number(payload?.endMinute || 0);
+  const repeatRule = String(payload?.repeatRule || "none");
+  const repeatDays = Array.isArray(payload?.repeatDays) ? payload.repeatDays : [];
+
+  actionAiConfirmTitle.textContent = String(payload?.title || "Tarefa").trim() || "Tarefa";
+  actionAiConfirmStart.textContent = `${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}`;
+  actionAiConfirmEnd.textContent = `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
+  actionAiConfirmDates.textContent = formatRepeatLabel(repeatRule, repeatDays);
+  actionAiConfirm.hidden = false;
+}
+
+function hideActionAiConfirmation() {
+  if (actionAiConfirm) {
+    actionAiConfirm.hidden = true;
+  }
+  actionPendingAiPayload = null;
+}
+
 function applyInterpretedAction(entry) {
   taskTitle.value = String(entry?.title || "").trim().slice(0, 80);
   state.wizard.startHour = Math.max(0, Math.min(23, Number(entry?.startHour || state.wizard.startHour)));
@@ -1585,8 +1631,17 @@ function applyInterpretedAction(entry) {
     state.wizard.assigneeIndex = Math.max(0, assigneeOptions.indexOf(normalized));
   }
   renderWizard();
+}
+
+function applyPendingInterpretedActionAndContinue() {
+  if (!actionPendingAiPayload) {
+    return;
+  }
+  const entry = actionPendingAiPayload;
+  applyInterpretedAction(entry);
   state.wizard.step = entry?.assigneeDetected ? 2 : 5;
   renderWizard();
+  hideActionAiConfirmation();
 }
 
 async function startActionMic() {
@@ -1636,11 +1691,12 @@ async function startActionMic() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: speechText })
         });
-        applyInterpretedAction(interpreted?.action || {});
+        actionPendingAiPayload = interpreted?.action || null;
+        renderActionAiConfirmation(actionPendingAiPayload || {});
         const parsedAssignee = interpreted?.action?.assigneeDetected
           ? normalizeAssigneeName(interpreted?.action?.assignee)
           : "não identificado";
-        actionVoiceStatus.textContent = `Tarefa pronta (${parsedAssignee}).`;
+        actionVoiceStatus.textContent = `Tarefa pronta (${parsedAssignee}). Confirme abaixo.`;
       } catch (error) {
         actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretação.";
       }
@@ -2770,6 +2826,16 @@ historyMicButton?.addEventListener("click", () => {
 
 actionMicButton?.addEventListener("click", () => {
   void startActionMic();
+});
+
+actionAiEditButton?.addEventListener("click", () => {
+  hideActionAiConfirmation();
+  actionVoiceStatus.textContent = "Edite manualmente e continue.";
+});
+
+actionAiApplyButton?.addEventListener("click", () => {
+  applyPendingInterpretedActionAndContinue();
+  actionVoiceStatus.textContent = "Dados aplicados.";
 });
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);

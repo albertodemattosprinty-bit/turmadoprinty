@@ -1671,7 +1671,7 @@ async function handleProject200ActionInterpret(request, response) {
       messages: [
         {
           role: "system",
-          content: "Interprete pedido de tarefa em pt-BR. Responda JSON puro com: title(max 25 chars, minimo possivel), startHour(0-23), startMinute(0-59), endHour(0-23), endMinute(0-59), repeatRule(none|daily|custom), repeatDays(array com 0=dom..6=sab), assignee(Rose|Alberto|Lucas|Thainan|Geral|\"\"), assigneeDetected(boolean). Se horario faltar: use proxima hora cheia e +1h no fim. Se pessoa nao for citada: assignee vazio e assigneeDetected false. Se texto disser todo dia: daily. Se citar dias da semana (ex: terça e quinta): custom com repeatDays. Se nao mencionar recorrencia: none."
+          content: "Interprete pedido de tarefa em pt-BR. Responda JSON puro com: title(max 25 chars, minimo possivel), startHour(0-23), startMinute(0-59), endHour(0-23), endMinute(0-59), repeatRule(none|daily|custom), repeatDays(array com 0=dom..6=sab), assignee(Rose|Alberto|Lucas|Thainan|Geral|\"\"), assigneeDetected(boolean). Se horario final nao ficar claro, infira pelo contexto da tarefa (ex: treino/caminhada tende a 60-120 min; higiene matinal 20-60 min; leitura/estudo 30-90 min), mantendo inicio e fim coerentes. Se ainda assim faltar horario: use proxima hora cheia e +1h no fim. Se pessoa nao for citada: assignee vazio e assigneeDetected false. Se texto disser todo dia: daily. Se citar dias da semana (ex: terça e quinta): custom com repeatDays. Se nao mencionar recorrencia: none."
         },
         { role: "user", content: text.slice(0, 1200) }
       ]
