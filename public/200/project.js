@@ -1748,11 +1748,6 @@ async function createPlatformEntryFromVoiceInterpret(text) {
       entry.recurrenceDayOfMonth = Math.max(1, Math.min(31, Number(dayMatch[1])));
     }
   }
-  const categoryLabel = String(entry.category || "").trim() || "Sem categoria";
-  const ok = await openFinanceEntryConfirm(entry, categoryLabel);
-  if (!ok) {
-    return;
-  }
   await apiRequest("/api/platform/entries", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
