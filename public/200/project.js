@@ -98,10 +98,6 @@ const actionsProgressMinutes = document.getElementById("actionsProgressMinutes")
 const actionsProgressFill = document.getElementById("actionsProgressFill");
 const financeDateLabel = document.getElementById("financeDateLabel");
 const platformEntriesList = document.getElementById("platformEntriesList");
-const financeVoiceBox = document.getElementById("financeVoiceBox");
-const financeVoiceStatus = document.getElementById("financeVoiceStatus");
-const financeVoiceText = document.getElementById("financeVoiceText");
-const openFinanceMicButton = document.getElementById("openFinanceMic");
 const financeEntryConfirmWizard = document.getElementById("financeEntryConfirmWizard");
 const closeFinanceEntryConfirmButton = document.getElementById("closeFinanceEntryConfirm");
 const financeEntryConfirmCard = document.getElementById("financeEntryConfirmCard");
@@ -236,13 +232,6 @@ let historyAudioContext = null;
 let historyAudioAnalyser = null;
 let historySpeechMonitorTimer = null;
 let historyLastSpeechAt = 0;
-let financeMediaRecorder = null;
-let financeMediaStream = null;
-let financeAudioContext = null;
-let financeAudioAnalyser = null;
-let financeSpeechMonitorTimer = null;
-let financeLastSpeechAt = 0;
-let financeSpeechText = "";
 let financeEntryConfirmResolve = null;
 let actionMediaRecorder = null;
 let actionMediaStream = null;
@@ -660,10 +649,6 @@ function closeModal(modal) {
     closeHistoryTextComposer();
   }
   if (modal.id === "calendarModal") {
-    stopFinanceSpeechCapture();
-    if (financeVoiceBox) {
-      financeVoiceBox.hidden = true;
-    }
     closeFinanceEntryConfirm(false);
   }
 }
@@ -1701,9 +1686,6 @@ async function createPlatformEntryFromVoiceInterpret(text) {
     }
   }
   const categoryLabel = String(entry.category || "").trim() || "Sem categoria";
-  if (financeVoiceStatus) {
-    financeVoiceStatus.textContent = "Aguardando confirmação...";
-  }
   const ok = await openFinanceEntryConfirm(entry, categoryLabel);
   if (!ok) {
     return;
@@ -1753,108 +1735,6 @@ function openFinanceEntryConfirm(entry, categoryLabel) {
     financeEntryConfirmWizard.classList.add("active");
     financeEntryConfirmWizard.setAttribute("aria-hidden", "false");
   });
-}
-
-function stopFinanceSpeechCapture() {
-  if (financeSpeechMonitorTimer) {
-    window.clearInterval(financeSpeechMonitorTimer);
-    financeSpeechMonitorTimer = null;
-  }
-  if (financeMediaRecorder && financeMediaRecorder.state !== "inactive") {
-    financeMediaRecorder.stop();
-  }
-  financeMediaRecorder = null;
-  financeAudioAnalyser = null;
-  if (financeAudioContext) {
-    financeAudioContext.close().catch(() => {});
-    financeAudioContext = null;
-  }
-  if (financeMediaStream) {
-    financeMediaStream.getTracks().forEach((track) => track.stop());
-    financeMediaStream = null;
-  }
-}
-
-async function startFinanceSpeechCapture() {
-  if (financeMediaRecorder && financeMediaRecorder.state !== "inactive") {
-    financeVoiceStatus.textContent = "Microfone já está ouvindo...";
-    return;
-  }
-
-  financeSpeechText = "";
-  financeVoiceBox.hidden = false;
-  financeVoiceText.textContent = "";
-  financeVoiceStatus.textContent = "Gravando...";
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    financeMediaStream = stream;
-    financeAudioContext = new AudioContext();
-    const source = financeAudioContext.createMediaStreamSource(stream);
-    financeAudioAnalyser = financeAudioContext.createAnalyser();
-    financeAudioAnalyser.fftSize = 2048;
-    source.connect(financeAudioAnalyser);
-
-    const chunks = [];
-    financeMediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-    financeMediaRecorder.ondataavailable = (event) => {
-      if (event.data?.size) {
-        chunks.push(event.data);
-      }
-    };
-    financeMediaRecorder.onstop = async () => {
-      const blob = new Blob(chunks, { type: "audio/webm" });
-      if (!blob.size) {
-        financeVoiceStatus.textContent = "Sem áudio captado.";
-        return;
-      }
-      financeVoiceStatus.textContent = "Transcrevendo...";
-      try {
-        const base64 = await blob.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
-        const transcribed = await apiRequest("/api/audio/transcribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm", fileName: "finance-voice.webm" })
-        });
-        financeSpeechText = String(transcribed?.text || "").trim();
-        financeVoiceText.textContent = financeSpeechText;
-        if (!financeSpeechText) {
-          financeVoiceStatus.textContent = "Sem texto captado.";
-          return;
-        }
-        financeVoiceStatus.textContent = "Interpretando...";
-        await createPlatformEntryFromVoiceInterpret(financeSpeechText);
-        financeVoiceStatus.textContent = "Lançamento criado.";
-      } catch (error) {
-        financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no processamento.";
-      }
-    };
-    financeMediaRecorder.start();
-    financeLastSpeechAt = Date.now();
-    financeSpeechMonitorTimer = window.setInterval(() => {
-      if (!financeAudioAnalyser || !financeMediaRecorder || financeMediaRecorder.state === "inactive") {
-        return;
-      }
-      const buffer = new Uint8Array(financeAudioAnalyser.fftSize);
-      financeAudioAnalyser.getByteTimeDomainData(buffer);
-      let sum = 0;
-      for (let i = 0; i < buffer.length; i += 1) {
-        const value = (buffer[i] - 128) / 128;
-        sum += value * value;
-      }
-      const rms = Math.sqrt(sum / buffer.length);
-      if (rms > 0.02) {
-        financeLastSpeechAt = Date.now();
-      }
-      if (Date.now() - financeLastSpeechAt >= 1200) {
-        financeVoiceStatus.textContent = "Processando...";
-        stopFinanceSpeechCapture();
-      }
-    }, 90);
-  } catch (error) {
-    financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no microfone.";
-    stopFinanceSpeechCapture();
-  }
 }
 
 function stopActionMic() {
@@ -3101,9 +2981,6 @@ openPlatformWizardButton?.addEventListener("click", () => {
     return;
   }
   openPlatformWizard();
-});
-openFinanceMicButton?.addEventListener("click", () => {
-  void startFinanceSpeechCapture();
 });
 closeFinanceEntryConfirmButton?.addEventListener("click", () => closeFinanceEntryConfirm(false));
 financeEntryConfirmCancel?.addEventListener("click", () => closeFinanceEntryConfirm(false));
