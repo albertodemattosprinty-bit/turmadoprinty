@@ -474,13 +474,18 @@ svg {
   font-size: 0.98rem;
   font-weight: 700;
   line-height: 1.2;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  word-break: break-word;
+  min-width: 0;
+}
+
+.platform-entry-row .task-title span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .platform-entry-icon {

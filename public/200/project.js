@@ -1280,7 +1280,7 @@ function getPlatformStatusClass(entry) {
   if (status === "OVERDUE") {
     return "task-overdue";
   }
-  return entry.kind === "INCOME" ? "task-completed" : "task-in-progress";
+  return "";
 }
 
 function renderPlatformBalance() {
