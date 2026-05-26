@@ -1571,6 +1571,73 @@ async function handleProject200TextOrganize(request, response) {
   }
 }
 
+async function handleProject200FinanceInterpret(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const text = String(body?.text || "").trim();
+  if (!text) {
+    sendJson(response, 400, { error: "Texto ausente." });
+    return;
+  }
+
+  try {
+    const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+    const completion = await createChatCompletion(apiKey, {
+      model,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: "Interprete texto financeiro em pt-BR e responda JSON puro com campos: name, kind(INCOME|EXPENSE), category, amountCents, recurrenceType(SIMPLE|RECURRING), recurrenceDayOfMonth(optional). Se não houver recorrência explícita, use SIMPLE. Categorias de saída: Alimentacao, Aluguel, Carro, Eventos, Servicos casa, Anuncios, Plataformas, Lazer. Categorias de entrada: Eventos, Inscricoes, Apoiadores, Site, Venda de ativo. Título minimalista."
+        },
+        { role: "user", content: text.slice(0, 1200) }
+      ]
+    });
+
+    const raw = extractChatCompletionText(completion);
+    const parsed = JSON.parse(raw);
+    const amountCents = Math.max(0, Math.round(Number(parsed?.amountCents || 0)));
+    if (!amountCents) {
+      sendJson(response, 422, { error: "Nao consegui identificar o valor." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      entry: {
+        name: String(parsed?.name || "Lançamento").slice(0, 90),
+        kind: String(parsed?.kind || "EXPENSE").toUpperCase() === "INCOME" ? "INCOME" : "EXPENSE",
+        category: String(parsed?.category || "Eventos"),
+        amountCents,
+        recurrenceType: String(parsed?.recurrenceType || "SIMPLE").toUpperCase() === "RECURRING" ? "RECURRING" : "SIMPLE",
+        recurrenceDayOfMonth: Number(parsed?.recurrenceDayOfMonth || 1)
+      },
+      model
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Nao foi possivel interpretar o texto financeiro.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -3650,6 +3717,17 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleProject200TextOrganize(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/finance/interpret") {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    await handleProject200FinanceInterpret(request, response);
     return;
   }
 

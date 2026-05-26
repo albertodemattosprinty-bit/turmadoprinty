@@ -97,6 +97,9 @@ const actionsProgressMinutes = document.getElementById("actionsProgressMinutes")
 const actionsProgressFill = document.getElementById("actionsProgressFill");
 const financeDateLabel = document.getElementById("financeDateLabel");
 const platformEntriesList = document.getElementById("platformEntriesList");
+const financeVoiceBox = document.getElementById("financeVoiceBox");
+const financeVoiceStatus = document.getElementById("financeVoiceStatus");
+const financeVoiceText = document.getElementById("financeVoiceText");
 const platformMonthlyIncome = document.getElementById("platformMonthlyIncome");
 const platformMonthlyExpense = document.getElementById("platformMonthlyExpense");
 const platformExpenseCard = document.getElementById("platformExpenseCard");
@@ -194,6 +197,8 @@ let historyAudioContext = null;
 let historyAudioAnalyser = null;
 let historySpeechMonitorTimer = null;
 let historyLastSpeechAt = 0;
+let financeSpeechRecognition = null;
+let financeSpeechText = "";
 
 const state = {
   activeOffset: 0,
@@ -507,6 +512,12 @@ function closeModal(modal) {
 
   if (modal.id === "historyModal") {
     closeHistoryTextComposer();
+  }
+  if (modal.id === "calendarModal") {
+    stopFinanceSpeechCapture();
+    if (financeVoiceBox) {
+      financeVoiceBox.hidden = true;
+    }
   }
 }
 
@@ -1378,6 +1389,96 @@ async function loadPlatformFinance() {
 function movePlatformDate(amount) {
   state.platformOffset += amount;
   void loadPlatformFinance();
+}
+
+async function createPlatformEntryFromVoiceInterpret(text) {
+  const interpreted = await apiRequest("/api/200/finance/interpret", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const entry = interpreted?.entry;
+  if (!entry) {
+    throw new Error("Sem interpretação.");
+  }
+  const confirmText = `Criar lançamento "${entry.name}" de ${formatMoney(entry.kind === "INCOME" ? entry.amountCents : -entry.amountCents)}?`;
+  if (!window.confirm(confirmText)) {
+    return;
+  }
+  await apiRequest("/api/platform/entries", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: entry.name,
+      kind: entry.kind,
+      category: entry.category,
+      amountCents: entry.amountCents,
+      recurrenceType: entry.recurrenceType || "SIMPLE",
+      recurrenceDayOfMonth: entry.recurrenceType === "RECURRING" ? Math.max(1, Math.min(31, Number(entry.recurrenceDayOfMonth || 1))) : null,
+      baseDate: dateFromOffset(state.platformOffset).toISOString()
+    })
+  });
+  await loadPlatformFinance();
+}
+
+function stopFinanceSpeechCapture() {
+  if (financeSpeechRecognition) {
+    try {
+      financeSpeechRecognition.stop();
+    } catch {
+      // noop
+    }
+    financeSpeechRecognition = null;
+  }
+}
+
+function startFinanceSpeechCapture() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+    financeVoiceStatus.textContent = "Reconhecimento de voz indisponível neste navegador.";
+    return;
+  }
+  financeSpeechText = "";
+  financeVoiceBox.hidden = false;
+  financeVoiceText.textContent = "";
+  financeVoiceStatus.textContent = "Ouvindo...";
+
+  const recognition = new Recognition();
+  financeSpeechRecognition = recognition;
+  recognition.lang = "pt-BR";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onresult = (event) => {
+    let full = "";
+    for (let i = 0; i < event.results.length; i += 1) {
+      full += `${event.results[i][0].transcript} `;
+    }
+    financeSpeechText = full.trim();
+    financeVoiceText.textContent = financeSpeechText;
+  };
+
+  recognition.onerror = () => {
+    financeVoiceStatus.textContent = "Falha na captura de voz.";
+  };
+
+  recognition.onend = async () => {
+    financeSpeechRecognition = null;
+    const text = String(financeSpeechText || "").trim();
+    if (!text) {
+      financeVoiceStatus.textContent = "Sem texto captado.";
+      return;
+    }
+    financeVoiceStatus.textContent = "Interpretando...";
+    try {
+      await createPlatformEntryFromVoiceInterpret(text);
+      financeVoiceStatus.textContent = "Lançamento criado.";
+    } catch (error) {
+      financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha ao criar lançamento.";
+    }
+  };
+
+  recognition.start();
 }
 
 function getActiveStatsScope() {
@@ -2357,6 +2458,20 @@ platformEntriesList?.addEventListener("click", async (event) => {
     platformEntriesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
   }
 });
+
+if (platformEntriesList) {
+  let financeStartY = 0;
+  platformEntriesList.addEventListener("touchstart", (event) => {
+    financeStartY = event.changedTouches[0]?.clientY || 0;
+  }, { passive: true });
+  platformEntriesList.addEventListener("touchend", (event) => {
+    const endY = event.changedTouches[0]?.clientY || 0;
+    const deltaY = financeStartY - endY;
+    if (deltaY >= 48) {
+      startFinanceSpeechCapture();
+    }
+  }, { passive: true });
+}
 
 actionsList.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter" && event.key !== " ") {

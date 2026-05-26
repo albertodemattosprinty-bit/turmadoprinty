@@ -413,6 +413,27 @@ svg {
   padding: 2px 0 110px;
 }
 
+.finance-voice-box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(5, 20, 58, 0.45);
+}
+
+.finance-voice-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.finance-voice-text {
+  margin-top: 8px;
+  min-height: 44px;
+  white-space: pre-wrap;
+  color: var(--soft);
+}
+
 .empty-state {
   color: var(--soft);
   text-align: center;
