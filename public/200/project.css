@@ -33,9 +33,10 @@ body {
 body {
   font-family: "Exo 2", sans-serif;
   color: #123b73;
-  background-image: url("/200/home-bg.png");
+  background-image: url("/200/home-bg-clouds.jpg");
+  background-repeat: no-repeat;
   background-size: cover;
-  background-position: center top;
+  background-position: center center;
   background-attachment: fixed;
   overflow: hidden;
   position: relative;
@@ -127,6 +128,11 @@ svg {
   border-radius: 999px;
 }
 
+.profile-footer .profile-chip .task-avatar {
+  width: 36px;
+  height: 36px;
+}
+
 .home-top-logo {
   width: min(250px, 60vw);
   height: auto;
@@ -180,9 +186,10 @@ svg {
   z-index: 20;
   display: none;
   color: var(--white);
-  background-image: var(--app-tint-current), url("/200/home-bg.png");
+  background-image: var(--app-tint-current), url("/200/home-bg-clouds.jpg");
+  background-repeat: no-repeat;
   background-size: cover;
-  background-position: center top;
+  background-position: center center;
   background-attachment: fixed;
 }
 
@@ -1181,18 +1188,18 @@ svg {
 
 @media (max-width: 720px) {
   body {
-    background-attachment: scroll;
-    background-size: 150% auto;
+    background-attachment: fixed;
+    background-size: cover;
   }
 
   body[data-profile="project"] {
-    animation: projectBgDrift 36s ease-in-out infinite;
-    background-size: 150% auto;
+    animation: none;
+    background-size: cover;
   }
 
   .workspace-modal {
-    background-attachment: scroll;
-    background-size: 150% auto;
+    background-attachment: fixed;
+    background-size: cover;
   }
 
   .project-shell {
@@ -1202,7 +1209,7 @@ svg {
 
   .project-hub {
     width: calc(100vw - 24px);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
