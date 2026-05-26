@@ -101,6 +101,15 @@ const platformEntriesList = document.getElementById("platformEntriesList");
 const financeVoiceBox = document.getElementById("financeVoiceBox");
 const financeVoiceStatus = document.getElementById("financeVoiceStatus");
 const financeVoiceText = document.getElementById("financeVoiceText");
+const openFinanceMicButton = document.getElementById("openFinanceMic");
+const financeEntryConfirmWizard = document.getElementById("financeEntryConfirmWizard");
+const closeFinanceEntryConfirmButton = document.getElementById("closeFinanceEntryConfirm");
+const financeEntryConfirmCard = document.getElementById("financeEntryConfirmCard");
+const financeEntryConfirmName = document.getElementById("financeEntryConfirmName");
+const financeEntryConfirmValue = document.getElementById("financeEntryConfirmValue");
+const financeEntryConfirmMeta = document.getElementById("financeEntryConfirmMeta");
+const financeEntryConfirmCancel = document.getElementById("financeEntryConfirmCancel");
+const financeEntryConfirmApply = document.getElementById("financeEntryConfirmApply");
 const platformMonthlyIncome = document.getElementById("platformMonthlyIncome");
 const platformMonthlyExpense = document.getElementById("platformMonthlyExpense");
 const platformExpenseCard = document.getElementById("platformExpenseCard");
@@ -232,6 +241,7 @@ let financeAudioAnalyser = null;
 let financeSpeechMonitorTimer = null;
 let financeLastSpeechAt = 0;
 let financeSpeechText = "";
+let financeEntryConfirmResolve = null;
 let actionMediaRecorder = null;
 let actionMediaStream = null;
 let actionAudioContext = null;
@@ -580,6 +590,7 @@ function closeModal(modal) {
     if (financeVoiceBox) {
       financeVoiceBox.hidden = true;
     }
+    closeFinanceEntryConfirm(false);
   }
 }
 
@@ -1587,9 +1598,16 @@ async function createPlatformEntryFromVoiceInterpret(text) {
   if (!entry) {
     throw new Error("Sem interpretação.");
   }
+  if (String(entry.recurrenceType || "").toUpperCase() !== "RECURRING" && /\bdia\s+\d{1,2}\b/i.test(text)) {
+    entry.recurrenceType = "RECURRING";
+    const dayMatch = text.match(/\bdia\s+(\d{1,2})\b/i);
+    if (dayMatch) {
+      entry.recurrenceDayOfMonth = Math.max(1, Math.min(31, Number(dayMatch[1])));
+    }
+  }
   const categoryLabel = String(entry.category || "").trim() || "Sem categoria";
-  const confirmText = `Criar lançamento "${entry.name}" (${categoryLabel}) de ${formatMoney(entry.kind === "INCOME" ? entry.amountCents : -entry.amountCents)}?`;
-  if (!window.confirm(confirmText)) {
+  const ok = await openFinanceEntryConfirm(entry, categoryLabel);
+  if (!ok) {
     return;
   }
   await apiRequest("/api/platform/entries", {
@@ -1606,6 +1624,37 @@ async function createPlatformEntryFromVoiceInterpret(text) {
     })
   });
   await loadPlatformFinance();
+}
+
+function closeFinanceEntryConfirm(decision = false) {
+  if (financeEntryConfirmWizard) {
+    financeEntryConfirmWizard.classList.remove("active");
+    financeEntryConfirmWizard.setAttribute("aria-hidden", "true");
+  }
+  if (typeof financeEntryConfirmResolve === "function") {
+    const resolve = financeEntryConfirmResolve;
+    financeEntryConfirmResolve = null;
+    resolve(Boolean(decision));
+  }
+}
+
+function openFinanceEntryConfirm(entry, categoryLabel) {
+  return new Promise((resolve) => {
+    financeEntryConfirmResolve = resolve;
+    const kind = String(entry.kind || "").toUpperCase();
+    const value = kind === "INCOME" ? Number(entry.amountCents || 0) : -Number(entry.amountCents || 0);
+    const icon = platformCategoryIconByName[String(entry.category || "").trim()] || "/200/icons/financas.svg";
+    financeEntryConfirmCard.classList.toggle("platform-entry-income", kind === "INCOME");
+    financeEntryConfirmCard.classList.toggle("platform-entry-debit", kind !== "INCOME");
+    financeEntryConfirmName.innerHTML = `<img class="platform-entry-icon" src="${icon}" alt="" aria-hidden="true" /><span>${escapeHtml(entry.name || "Lançamento")}</span>`;
+    financeEntryConfirmValue.textContent = formatMoney(value);
+    const recurrenceMeta = String(entry.recurrenceType || "").toUpperCase() === "RECURRING"
+      ? `Tag: ${categoryLabel} • Data: dia ${Math.max(1, Math.min(31, Number(entry.recurrenceDayOfMonth || 1)))}`
+      : `Tag: ${categoryLabel} • Data: ${formatDateLabel(dateFromOffset(state.platformOffset))}`;
+    financeEntryConfirmMeta.textContent = recurrenceMeta;
+    financeEntryConfirmWizard.classList.add("active");
+    financeEntryConfirmWizard.setAttribute("aria-hidden", "false");
+  });
 }
 
 function isLikelyDeleteCommand(text) {
@@ -2935,20 +2984,6 @@ platformEntriesList?.addEventListener("click", async (event) => {
   }
 });
 
-if (platformEntriesList) {
-  let financeStartY = 0;
-  platformEntriesList.addEventListener("touchstart", (event) => {
-    financeStartY = event.changedTouches[0]?.clientY || 0;
-  }, { passive: true });
-  platformEntriesList.addEventListener("touchend", (event) => {
-    const endY = event.changedTouches[0]?.clientY || 0;
-    const deltaY = financeStartY - endY;
-    if (deltaY >= 48) {
-      startFinanceSpeechCapture();
-    }
-  }, { passive: true });
-}
-
 actionsList.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter" && event.key !== " ") {
     return;
@@ -2979,6 +3014,12 @@ openPlatformWizardButton?.addEventListener("click", () => {
   }
   openPlatformWizard();
 });
+openFinanceMicButton?.addEventListener("click", () => {
+  void startFinanceSpeechCapture();
+});
+closeFinanceEntryConfirmButton?.addEventListener("click", () => closeFinanceEntryConfirm(false));
+financeEntryConfirmCancel?.addEventListener("click", () => closeFinanceEntryConfirm(false));
+financeEntryConfirmApply?.addEventListener("click", () => closeFinanceEntryConfirm(true));
 
 platformForm?.addEventListener("submit", (event) => {
   event.preventDefault();

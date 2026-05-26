@@ -713,6 +713,12 @@ svg {
   object-fit: contain;
 }
 
+.icon-action-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: #fff;
+}
+
 .actions-progress {
   position: static;
   width: 100%;

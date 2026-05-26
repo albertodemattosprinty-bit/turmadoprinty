@@ -577,6 +577,21 @@ export async function deletePlatformOccurrencesByFilter(userId, { from, to, kind
     [userId, ids]
   );
 
+  const entryIds = [...new Set(toDelete.rows.map((row) => row.entry_id).filter(Boolean))];
+  if (entryIds.length) {
+    await query(
+      `
+        update platform_finance_entries
+        set deleted_at = now(),
+            updated_at = now()
+        where user_id = $1
+          and id = any($2::uuid[])
+          and deleted_at is null
+      `,
+      [userId, entryIds]
+    );
+  }
+
   const nextBalance = balanceDelta !== 0
     ? await adjustPlatformBalance(userId, balanceDelta)
     : await getPlatformBalance(userId);
