@@ -1,6 +1,7 @@
 ﻿import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
+const projectProfileKey = "project_200_profile_v1";
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const actionStatuses = {
   pending: "PENDING",
@@ -80,6 +81,7 @@ const recurrenceDays = {
 const historySystemStorageKey = "project200_history_system_v1";
 const historyTextsStorageKey = "project200_history_texts_v1";
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
+const selectableProfiles = ["project", "Alberto", "Rose", "Lucas", "Thainan"];
 
 const activeDateLabel = document.getElementById("activeDateLabel");
 const actionsAuthAlert = document.getElementById("actionsAuthAlert");
@@ -168,6 +170,7 @@ const historyDeleteWordButton = document.getElementById("historyDeleteWordButton
 const historyClearTextButton = document.getElementById("historyClearTextButton");
 const historyVoiceStatus = document.getElementById("historyVoiceStatus");
 const historyLiveText = document.getElementById("historyLiveText");
+const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
@@ -210,6 +213,7 @@ const state = {
   actions: [],
   historySystem: [],
   historyTexts: [],
+  selectedProfile: "project",
   historyOffset: 0,
   historyTextComposer: {
     step: 1,
@@ -227,6 +231,21 @@ function getToken() {
   return window.localStorage.getItem(tokenKey) || "";
 }
 
+function readSelectedProfile() {
+  const saved = String(window.localStorage.getItem(projectProfileKey) || "project");
+  return selectableProfiles.includes(saved) ? saved : "project";
+}
+
+function applySelectedProfile(profile) {
+  const next = selectableProfiles.includes(profile) ? profile : "project";
+  state.selectedProfile = next;
+  document.body.dataset.profile = next;
+  window.localStorage.setItem(projectProfileKey, next);
+  profileButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.profile === next);
+  });
+}
+
 function todayStart() {
   const date = new Date();
   date.setHours(0, 0, 0, 0);
@@ -241,6 +260,13 @@ function addDays(date, amount) {
 
 function dateFromOffset(offset) {
   return addDays(todayStart(), offset);
+}
+
+function getVisibleActions() {
+  if (state.selectedProfile === "project") {
+    return state.actions;
+  }
+  return state.actions.filter((action) => normalizeAssigneeName(action.assignee) === state.selectedProfile);
 }
 
 function isSameDate(a, b) {
@@ -695,13 +721,15 @@ function renderActions() {
     return;
   }
 
-  if (!state.actions.length) {
+  const visibleActions = getVisibleActions();
+
+  if (!visibleActions.length) {
     actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse dia.</div>';
     renderActionsProgress();
     return;
   }
 
-  state.actions.forEach((action) => {
+  visibleActions.forEach((action) => {
     const status = normalizeActionStatus(action.status);
     const assignee = normalizeAssigneeName(action.assignee);
     const avatarPath = getActionAvatarPath(assignee);
@@ -746,8 +774,9 @@ function renderActionsProgress() {
 
   actionsProgress.hidden = false;
 
-  const totalMinutes = state.actions.reduce((sum, action) => sum + getActionDurationMinutes(action), 0);
-  const completedMinutes = state.actions.reduce((sum, action) => {
+  const visibleActions = getVisibleActions();
+  const totalMinutes = visibleActions.reduce((sum, action) => sum + getActionDurationMinutes(action), 0);
+  const completedMinutes = visibleActions.reduce((sum, action) => {
     const status = normalizeActionStatus(action.status);
     if (status !== actionStatuses.completed) {
       return sum;
@@ -2364,6 +2393,14 @@ historyTextForm?.addEventListener("submit", (event) => {
 });
 
 loadHistoryFromStorage();
+applySelectedProfile(readSelectedProfile());
+
+profileButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    applySelectedProfile(button.dataset.profile || "project");
+    renderActions();
+  });
+});
 
 document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));
