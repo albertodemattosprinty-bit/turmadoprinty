@@ -452,6 +452,85 @@ export async function updateUserActionStatus(userId, actionId) {
   return getUserActionById(userId, action.id);
 }
 
+function isSameLocalDay(aIso, bIso) {
+  const a = new Date(aIso);
+  const b = new Date(bIso);
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+export async function updateUserActionStatusManual(userId, actionId, payload = {}) {
+  await ensureActionsSchema();
+
+  const action = await getUserActionById(userId, actionId);
+  if (!action) {
+    throw new Error("Tarefa nao encontrada.");
+  }
+
+  const mode = String(payload?.mode || "").trim().toLowerCase();
+  if (mode === "restore") {
+    await query(
+      `
+        insert into action_status_overrides (
+          user_id,
+          action_id,
+          repeat_group_id,
+          status,
+          started_at,
+          completed_at
+        )
+        values ($1, $2, $3, $4, null, null)
+        on conflict (user_id, action_id) do update
+          set status = excluded.status,
+              started_at = null,
+              completed_at = null,
+              updated_at = now()
+      `,
+      [userId, action.id, action.repeatGroupId, ACTION_STATUS_PENDING]
+    );
+    return getUserActionById(userId, action.id);
+  }
+
+  if (mode === "manual_complete") {
+    const startedAtRaw = parseDate(payload?.startedAt, "Horario inicial manual");
+    const completedAtRaw = parseDate(payload?.completedAt, "Horario final manual");
+    if (completedAtRaw <= startedAtRaw) {
+      throw new Error("O horario final precisa ser depois do inicial.");
+    }
+
+    let startedAt = startedAtRaw.toISOString();
+    const completedAt = completedAtRaw.toISOString();
+    const shouldAdjustDelay = isSameLocalDay(action.startAt, new Date().toISOString());
+    if (!shouldAdjustDelay) {
+      startedAt = action.startedAt || action.startAt;
+    }
+
+    await query(
+      `
+        insert into action_status_overrides (
+          user_id,
+          action_id,
+          repeat_group_id,
+          status,
+          started_at,
+          completed_at
+        )
+        values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+        on conflict (user_id, action_id) do update
+          set status = excluded.status,
+              started_at = excluded.started_at,
+              completed_at = excluded.completed_at,
+              updated_at = now()
+      `,
+      [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedAt, completedAt]
+    );
+    return getUserActionById(userId, action.id);
+  }
+
+  throw new Error("Modo manual invalido.");
+}
+
 export async function deleteUserAction(userId, actionId) {
   await ensureActionsSchema();
 

@@ -186,6 +186,18 @@ const actionAiConfirmEnd = document.getElementById("actionAiConfirmEnd");
 const actionAiConfirmDates = document.getElementById("actionAiConfirmDates");
 const actionAiEditButton = document.getElementById("actionAiEdit");
 const actionAiApplyButton = document.getElementById("actionAiApply");
+const actionStatusWizard = document.getElementById("actionStatusWizard");
+const closeActionStatusWizardButton = document.getElementById("closeActionStatusWizard");
+const actionStatusOptionsStep = document.getElementById("actionStatusOptionsStep");
+const actionStatusManualStep = document.getElementById("actionStatusManualStep");
+const actionRestoreButton = document.getElementById("actionRestoreButton");
+const actionManualFinishButton = document.getElementById("actionManualFinishButton");
+const actionManualBackButton = document.getElementById("actionManualBackButton");
+const actionManualSaveButton = document.getElementById("actionManualSaveButton");
+const actionStatusWizardMessage = document.getElementById("actionStatusWizardMessage");
+const actionStatusManualMessage = document.getElementById("actionStatusManualMessage");
+const manualStartTimeInput = document.getElementById("manualStartTime");
+const manualEndTimeInput = document.getElementById("manualEndTime");
 const historyDeleteWordButton = document.getElementById("historyDeleteWordButton");
 const historyClearTextButton = document.getElementById("historyClearTextButton");
 const historyVoiceStatus = document.getElementById("historyVoiceStatus");
@@ -225,6 +237,7 @@ let actionAudioAnalyser = null;
 let actionSpeechMonitorTimer = null;
 let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
+let actionStatusTargetId = "";
 
 const state = {
   activeOffset: 0,
@@ -534,6 +547,7 @@ function closeModal(modal) {
   if (modal.id === "actionsModal" && actionsDelayTicker) {
     window.clearInterval(actionsDelayTicker);
     actionsDelayTicker = null;
+    closeActionStatusWizard();
   }
 
   if (modal.id === "historyModal") {
@@ -1233,13 +1247,27 @@ async function saveAction() {
 }
 
 async function openActionLongPressMenu(actionId) {
-  const choice = window.prompt("Opções da tarefa:\n1 - Excluir\n2 - Editar", "2");
-  if (choice == null) {
+  const action = state.actions.find((item) => item.id === actionId);
+  if (!action) {
+    return;
+  }
+  const status = normalizeActionStatus(action.status);
+
+  if (status === actionStatuses.inProgress) {
+    actionStatusTargetId = action.id;
+    actionStatusWizardMessage.textContent = `Tarefa: ${action.title}`;
+    actionStatusManualMessage.textContent = "";
+    actionStatusOptionsStep.hidden = false;
+    actionStatusManualStep.hidden = true;
+    manualStartTimeInput.value = formatTime(action.startedAt || action.startAt);
+    manualEndTimeInput.value = formatTime(action.endAt);
+    actionStatusWizard.classList.add("active");
+    actionStatusWizard.setAttribute("aria-hidden", "false");
     return;
   }
 
-  const action = state.actions.find((item) => item.id === actionId);
-  if (!action) {
+  const choice = window.prompt("Opções da tarefa:\n1 - Excluir\n2 - Editar", "2");
+  if (choice == null) {
     return;
   }
 
@@ -1256,6 +1284,72 @@ async function openActionLongPressMenu(actionId) {
   if (option === "2") {
     openWizard(action);
   }
+}
+
+function closeActionStatusWizard() {
+  actionStatusWizard.classList.remove("active");
+  actionStatusWizard.setAttribute("aria-hidden", "true");
+  actionStatusTargetId = "";
+}
+
+function parseTimeToIso(baseIso, hhmm) {
+  const base = new Date(baseIso);
+  const [hh, mm] = String(hhmm || "").split(":").map((v) => Number(v));
+  if (!Number.isInteger(hh) || !Number.isInteger(mm)) {
+    return null;
+  }
+  base.setHours(hh, mm, 0, 0);
+  return base.toISOString();
+}
+
+async function restoreActionToPending(actionId) {
+  const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "restore" })
+  });
+  const updated = payload?.action;
+  if (updated) {
+    state.actions = state.actions.map((item) => (item.id === actionId ? updated : item));
+  }
+  const targetDay = toLocalDateKey(updated?.startAt || new Date().toISOString());
+  const target = state.historySystem.find((item) => item.type === "start"
+    && item.taskTitle === (updated?.title || "")
+    && normalizeAssigneeName(item.assignee) === normalizeAssigneeName(updated?.assignee)
+    && toLocalDateKey(item.occurredAt || item.createdAt || new Date().toISOString()) === targetDay);
+  if (target?.id) {
+    state.historySystem = state.historySystem.filter((item) => item.id !== target.id);
+  }
+  renderActions();
+  renderHistory();
+}
+
+async function manualFinishAction(actionId) {
+  const target = state.actions.find((item) => item.id === actionId);
+  if (!target) {
+    return;
+  }
+  const startedAt = parseTimeToIso(target.startAt, manualStartTimeInput.value);
+  const completedAt = parseTimeToIso(target.startAt, manualEndTimeInput.value);
+  if (!startedAt || !completedAt) {
+    actionStatusManualMessage.textContent = "Preencha início e fim.";
+    return;
+  }
+  if (new Date(completedAt).getTime() <= new Date(startedAt).getTime()) {
+    actionStatusManualMessage.textContent = "Fim precisa ser após início.";
+    return;
+  }
+  const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "manual_complete", startedAt, completedAt })
+  });
+  const updated = payload?.action;
+  if (updated) {
+    state.actions = state.actions.map((item) => (item.id === actionId ? updated : item));
+  }
+  renderActions();
+  await loadStatsSummary();
 }
 
 function beginActionLongPress(actionId) {
@@ -2888,6 +2982,44 @@ historyMicButton?.addEventListener("click", () => {
 
 actionMicButton?.addEventListener("click", () => {
   void startActionMic();
+});
+
+closeActionStatusWizardButton?.addEventListener("click", closeActionStatusWizard);
+actionManualFinishButton?.addEventListener("click", () => {
+  actionStatusOptionsStep.hidden = true;
+  actionStatusManualStep.hidden = false;
+  actionStatusManualMessage.textContent = "";
+});
+actionManualBackButton?.addEventListener("click", () => {
+  actionStatusManualStep.hidden = true;
+  actionStatusOptionsStep.hidden = false;
+  actionStatusManualMessage.textContent = "";
+});
+actionRestoreButton?.addEventListener("click", () => {
+  if (!actionStatusTargetId) {
+    return;
+  }
+  void (async () => {
+    try {
+      await restoreActionToPending(actionStatusTargetId);
+      closeActionStatusWizard();
+    } catch (error) {
+      actionStatusWizardMessage.textContent = error instanceof Error ? error.message : "Falha ao restaurar.";
+    }
+  })();
+});
+actionManualSaveButton?.addEventListener("click", () => {
+  if (!actionStatusTargetId) {
+    return;
+  }
+  void (async () => {
+    try {
+      await manualFinishAction(actionStatusTargetId);
+      closeActionStatusWizard();
+    } catch (error) {
+      actionStatusManualMessage.textContent = error instanceof Error ? error.message : "Falha ao finalizar manual.";
+    }
+  })();
 });
 
 actionAiEditButton?.addEventListener("click", () => {
