@@ -1357,11 +1357,17 @@ function renderPlatformEntries() {
     const kindClass = String(entry.kind || "").toUpperCase() === "INCOME"
       ? "platform-entry-income"
       : "platform-entry-debit";
+    const isDebit = String(entry.kind || "").toUpperCase() !== "INCOME";
+    const categoryName = String(entry.category || "").trim();
+    const categoryIcon = platformCategoryIconByName[categoryName] || "/200/icons/financas.svg";
     row.className = `task-row platform-entry-row ${kindClass} ${getPlatformStatusClass(entry)}`;
     row.dataset.occurrenceId = entry.id || "";
     row.dataset.status = String(entry.status || "").trim().toUpperCase();
     row.innerHTML = `
-      <div class="task-title">${escapeHtml(entry.name)}</div>
+      <div class="task-title">
+        ${isDebit ? `<img class="platform-entry-icon" src="${categoryIcon}" alt="Saída" loading="lazy" />` : ""}
+        <span>${escapeHtml(entry.name)}</span>
+      </div>
       <div class="platform-entry-value">${escapeHtml(formatMoney(signed))}</div>
     `;
     platformEntriesList.appendChild(row);

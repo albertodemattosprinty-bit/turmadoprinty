@@ -325,7 +325,7 @@ svg {
 }
 
 #calendarModal .actions-app {
-  padding-top: 10px;
+  padding-top: 0;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 10px;
 }
@@ -465,7 +465,7 @@ svg {
 }
 
 .platform-entry-row {
-  grid-template-columns: 70% 30%;
+  grid-template-columns: 78% 22%;
   padding: 10px 12px;
   min-height: 46px;
 }
@@ -474,6 +474,20 @@ svg {
   font-size: 0.98rem;
   font-weight: 700;
   line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+
+.platform-entry-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  object-fit: contain;
 }
 
 .platform-entry-value {
@@ -482,14 +496,25 @@ svg {
   white-space: nowrap;
   text-align: right;
   justify-self: end;
+  color: #fff;
 }
 
 .platform-entry-row.platform-entry-income .platform-entry-value {
-  color: #3ddc84;
+  color: #fff;
 }
 
 .platform-entry-row.platform-entry-debit .platform-entry-value {
-  color: #ff6b6b;
+  color: #fff;
+}
+
+.platform-entry-row .task-title,
+.platform-entry-row .task-title span {
+  color: #fff;
+}
+
+.platform-entry-row.platform-entry-debit {
+  background: linear-gradient(135deg, rgba(178, 34, 34, 0.88), rgba(130, 20, 20, 0.9));
+  border-color: rgba(255, 170, 170, 0.65);
 }
 
 .task-avatar {
@@ -1172,7 +1197,7 @@ svg {
   }
 
   #calendarModal .actions-app {
-    padding-top: 88px;
+    padding-top: 54px;
   }
 
   .actions-progress {
