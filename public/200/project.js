@@ -153,10 +153,8 @@ const constitutionEditWrap = document.getElementById("constitutionEditWrap");
 const constitutionEditor = document.getElementById("constitutionEditor");
 const saveConstitutionEditButton = document.getElementById("saveConstitutionEdit");
 const cancelConstitutionEditButton = document.getElementById("cancelConstitutionEdit");
-const historySystemPanel = document.getElementById("historySystemPanel");
-const historyTextPanel = document.getElementById("historyTextPanel");
-const historySystemList = document.getElementById("historySystemList");
-const historyTextList = document.getElementById("historyTextList");
+const historyDateLabel = document.getElementById("historyDateLabel");
+const historyTimelineList = document.getElementById("historyTimelineList");
 const openHistoryTextComposerButton = document.getElementById("openHistoryTextComposer");
 const historyTextComposer = document.getElementById("historyTextComposer");
 const closeHistoryTextComposerButton = document.getElementById("closeHistoryTextComposer");
@@ -212,10 +210,7 @@ const state = {
   actions: [],
   historySystem: [],
   historyTexts: [],
-  historyPanel: {
-    systemOpen: true,
-    textOpen: true
-  },
+  historyOffset: 0,
   historyTextComposer: {
     step: 1,
     speaker: "Rose",
@@ -260,6 +255,13 @@ function formatDateLabel(date) {
   }
 
   return `${date.getDate()} ${monthLabels[date.getMonth()]}`;
+}
+
+function formatHistoryDateLabel(date) {
+  if (isSameDate(date, todayStart())) {
+    return "Hoje";
+  }
+  return `${String(date.getDate()).padStart(2, "0")} ${monthLabels[date.getMonth()]}`;
 }
 
 function formatTime(value) {
@@ -1620,19 +1622,41 @@ function buildSystemMessage(entry) {
   return `${person} atualizou ${task}`;
 }
 
-function renderHistorySystem() {
-  if (!historySystemList) {
+function sameDayIso(a, b) {
+  return new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10);
+}
+
+function renderHistoryTimeline() {
+  if (!historyTimelineList) {
     return;
   }
-  historySystemList.innerHTML = "";
-  if (!state.historySystem.length) {
-    historySystemList.innerHTML = '<div class="empty-state">Sem movimentos ainda.</div>';
+  const targetDate = dateFromOffset(state.historyOffset);
+  historyDateLabel.textContent = formatHistoryDateLabel(targetDate);
+  historyTimelineList.innerHTML = "";
+
+  const systemItems = state.historySystem.map((entry) => ({
+    kind: "system",
+    occurredAt: entry.occurredAt,
+    payload: entry
+  }));
+  const textItems = state.historyTexts.map((entry) => ({
+    kind: "text",
+    occurredAt: entry.createdAt,
+    payload: entry
+  }));
+
+  const merged = [...systemItems, ...textItems]
+    .filter((item) => sameDayIso(item.occurredAt, targetDate))
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+
+  if (!merged.length) {
+    historyTimelineList.innerHTML = '<div class="empty-state">Sem histórico nesse dia.</div>';
     return;
   }
-  state.historySystem
-    .slice()
-    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
-    .forEach((entry) => {
+
+  merged.forEach((item) => {
+    if (item.kind === "system") {
+      const entry = item.payload;
       const card = document.createElement("article");
       card.className = `history-item system-${entry.type === "day_close" ? "day-close" : entry.type}`;
       card.innerHTML = `
@@ -1642,20 +1666,11 @@ function renderHistorySystem() {
         </div>
         <div class="history-item-text">${buildSystemMessage(entry)}</div>
       `;
-      historySystemList.appendChild(card);
-    });
-}
+      historyTimelineList.appendChild(card);
+      return;
+    }
 
-function renderHistoryTexts() {
-  if (!historyTextList) {
-    return;
-  }
-  historyTextList.innerHTML = "";
-  if (!state.historyTexts.length) {
-    historyTextList.innerHTML = '<div class="empty-state">Sem textos ainda.</div>';
-    return;
-  }
-  state.historyTexts.forEach((entry) => {
+    const entry = item.payload;
     const card = document.createElement("article");
     card.className = "history-text-card";
     card.dataset.historyTextId = entry.id;
@@ -1664,25 +1679,22 @@ function renderHistoryTexts() {
         <img class="task-avatar" src="${getActionAvatarPath(entry.speaker)}" alt="${escapeHtml(entry.speaker)}" />
         <div>
           <div class="history-text-title">${escapeHtml(entry.title)}</div>
-          <div class="task-assignee">${formatHourChip(entry.createdAt)}</div>
+          <div class="task-assignee history-time">${formatHourChip(entry.createdAt)}</div>
         </div>
       </div>
-      <div class="history-text-preview">${escapeHtml(entry.text.slice(0, 130))}${entry.text.length > 130 ? "..." : ""}</div>
       <div class="history-text-full" hidden>${escapeHtml(entry.text)}</div>
     `;
-    historyTextList.appendChild(card);
+    historyTimelineList.appendChild(card);
   });
 }
 
-function renderHistoryPanels() {
-  historySystemPanel?.classList.toggle("collapsed", !state.historyPanel.systemOpen);
-  historyTextPanel?.classList.toggle("collapsed", !state.historyPanel.textOpen);
+function renderHistory() {
+  renderHistoryTimeline();
 }
 
-function renderHistory() {
-  renderHistoryPanels();
-  renderHistorySystem();
-  renderHistoryTexts();
+function moveHistoryDate(amount) {
+  state.historyOffset += amount;
+  renderHistory();
 }
 
 function registerDailyMissionEvents() {
@@ -2268,20 +2280,7 @@ constitutionAvatars?.addEventListener("click", (event) => {
   void approveConstitution(button.dataset.constitutionApprover || "");
 });
 
-document.querySelectorAll("[data-history-panel-toggle]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const key = button.dataset.historyPanelToggle;
-    if (key === "system") {
-      state.historyPanel.systemOpen = !state.historyPanel.systemOpen;
-    }
-    if (key === "text") {
-      state.historyPanel.textOpen = !state.historyPanel.textOpen;
-    }
-    renderHistoryPanels();
-  });
-});
-
-historyTextList?.addEventListener("click", (event) => {
+historyTimelineList?.addEventListener("click", (event) => {
   const card = event.target.closest("[data-history-text-id]");
   if (!card) {
     return;
@@ -2340,11 +2339,18 @@ historyTextForm?.addEventListener("submit", (event) => {
     createdAt: new Date().toISOString()
   });
   saveHistoryToStorage();
-  renderHistoryTexts();
+  renderHistory();
   closeHistoryTextComposer();
 });
 
 loadHistoryFromStorage();
+
+document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
+  button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));
+});
+
+handleSwipe(historyDateLabel, moveHistoryDate);
+handleSwipe(historyTimelineList, moveHistoryDate);
 
 
 

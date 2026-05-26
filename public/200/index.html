@@ -378,24 +378,15 @@
   <section class="workspace-modal" id="historyModal" aria-hidden="true" aria-label="Histórico">
     <div class="actions-app history-app">
       <header class="actions-head">
-        <button class="date-title" type="button">Histórico</button>
+        <button class="circle-nav" type="button" data-history-day-nav="-1" aria-label="Dia anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <button class="date-title" type="button" id="historyDateLabel">Hoje</button>
+        <button class="circle-nav" type="button" data-history-day-nav="1" aria-label="Próximo dia">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+        </button>
       </header>
-      <div class="history-panels">
-        <section class="history-panel" id="historySystemPanel">
-          <button class="history-panel-toggle" type="button" data-history-panel-toggle="system">
-            <span>Sistema</span>
-            <span class="history-panel-chevron">▾</span>
-          </button>
-          <div class="history-panel-body" id="historySystemList"></div>
-        </section>
-        <section class="history-panel" id="historyTextPanel">
-          <button class="history-panel-toggle" type="button" data-history-panel-toggle="text">
-            <span>Texto</span>
-            <span class="history-panel-chevron">▾</span>
-          </button>
-          <div class="history-panel-body" id="historyTextList"></div>
-        </section>
-      </div>
+      <div class="history-panels" id="historyTimelineList"></div>
       <div class="actions-side-actions">
         <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openHistoryTextComposer" aria-label="Novo texto">
           <img src="/200/icons/add.svg" alt="" aria-hidden="true" />
