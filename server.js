@@ -1501,6 +1501,75 @@ async function handleAudioSpeech(request, response, user = null) {
   }
 }
 
+async function handleProject200TextOrganize(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  if (!text) {
+    sendJson(response, 400, { error: "Texto ausente." });
+    return;
+  }
+
+  const clipped = text.slice(0, 2000);
+  const model = getInstantModel(body);
+
+  try {
+    const completion = await createChatCompletion(apiKey, {
+      model,
+      temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content: "Você organiza textos em pt-BR. Corrija apenas grafia/pontuação, sem mudar a ideia. Crie um título curto (até 60 chars). Responda JSON puro: {\"title\":\"...\",\"text\":\"...\"}."
+        },
+        {
+          role: "user",
+          content: clipped
+        }
+      ]
+    });
+
+    const raw = extractChatCompletionText(completion);
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+
+    const organizedTitle = String(parsed?.title || "").trim() || "Texto novo";
+    const organizedText = String(parsed?.text || "").trim() || clipped;
+
+    sendJson(response, 200, {
+      ok: true,
+      title: organizedTitle.slice(0, 60),
+      text: organizedText.slice(0, 2000),
+      model
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Erro ao organizar texto.",
+      details: error instanceof Error ? error.message : "Falha desconhecida."
+    });
+  }
+}
+
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -3569,6 +3638,17 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleAudioSpeech(request, response, user);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/texts/organize") {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    await handleProject200TextOrganize(request, response);
     return;
   }
 

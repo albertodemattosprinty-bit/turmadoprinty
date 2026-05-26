@@ -77,6 +77,9 @@ const recurrenceDays = {
   daily: [0, 1, 2, 3, 4, 5, 6],
   weekdays: [1, 2, 3, 4, 5]
 };
+const historySystemStorageKey = "project200_history_system_v1";
+const historyTextsStorageKey = "project200_history_texts_v1";
+const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
 
 const activeDateLabel = document.getElementById("activeDateLabel");
 const actionsAuthAlert = document.getElementById("actionsAuthAlert");
@@ -150,6 +153,23 @@ const constitutionEditWrap = document.getElementById("constitutionEditWrap");
 const constitutionEditor = document.getElementById("constitutionEditor");
 const saveConstitutionEditButton = document.getElementById("saveConstitutionEdit");
 const cancelConstitutionEditButton = document.getElementById("cancelConstitutionEdit");
+const historySystemPanel = document.getElementById("historySystemPanel");
+const historyTextPanel = document.getElementById("historyTextPanel");
+const historySystemList = document.getElementById("historySystemList");
+const historyTextList = document.getElementById("historyTextList");
+const openHistoryTextComposerButton = document.getElementById("openHistoryTextComposer");
+const historyTextComposer = document.getElementById("historyTextComposer");
+const closeHistoryTextComposerButton = document.getElementById("closeHistoryTextComposer");
+const historyTextStepLabel = document.getElementById("historyTextStepLabel");
+const historyTextForm = document.getElementById("historyTextForm");
+const historyTextBackButton = document.getElementById("historyTextBack");
+const historyTextNextButton = document.getElementById("historyTextNext");
+const historyTextAvatarGrid = document.getElementById("historyTextAvatarGrid");
+const historyMicButton = document.getElementById("historyMicButton");
+const historyDeleteWordButton = document.getElementById("historyDeleteWordButton");
+const historyClearTextButton = document.getElementById("historyClearTextButton");
+const historyVoiceStatus = document.getElementById("historyVoiceStatus");
+const historyLiveText = document.getElementById("historyLiveText");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
@@ -159,6 +179,14 @@ let financeTimer = null;
 let platformMetricsTicker = null;
 let longPressTimer = null;
 let longPressHandledActionId = "";
+let historyDeleteHoldTimer = null;
+let historyDeleteHoldInterval = null;
+let historyMediaRecorder = null;
+let historyMediaStream = null;
+let historyAudioContext = null;
+let historyAudioAnalyser = null;
+let historySpeechMonitorTimer = null;
+let historyLastSpeechAt = 0;
 
 const state = {
   activeOffset: 0,
@@ -182,6 +210,20 @@ const state = {
   constitutionIndex: 0,
   constitutionEditing: false,
   actions: [],
+  historySystem: [],
+  historyTexts: [],
+  historyPanel: {
+    systemOpen: true,
+    textOpen: true
+  },
+  historyTextComposer: {
+    step: 1,
+    speaker: "Rose",
+    liveText: "",
+    organizedText: "",
+    organizedTitle: "",
+    micActive: false
+  },
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState()
 };
@@ -371,6 +413,11 @@ function openModal(id) {
   if (id === "constitutionModal") {
     void loadConstitution();
   }
+
+  if (id === "historyModal") {
+    loadHistoryFromStorage();
+    renderHistory();
+  }
 }
 
 function closeModal(modal) {
@@ -393,6 +440,10 @@ function closeModal(modal) {
     state.constitutionEditing = false;
     constitutionEditWrap.hidden = true;
     constitutionMessage.textContent = "";
+  }
+
+  if (modal.id === "historyModal") {
+    closeHistoryTextComposer();
   }
 }
 
@@ -701,6 +752,7 @@ function renderActionsProgress() {
   actionsProgressMinutes.textContent = "";
   actionsProgressFill.style.width = `${percent}%`;
   actionsProgressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
+  registerDailyMissionEvents();
 }
 
 function escapeHtml(value) {
@@ -728,6 +780,7 @@ async function loadActions() {
     const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`);
     state.actions = payload.actions || [];
     renderActions();
+    registerDayCloseEventIfNeeded();
   } catch (error) {
     actionsProgress.hidden = true;
     actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
@@ -758,6 +811,7 @@ async function toggleActionStatus(actionId) {
     }
 
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
+    registerSystemEventFromActionTransition(targetAction, updated);
     renderActions();
   } catch (error) {
     window.alert(error instanceof Error ? error.message : "Nao foi possivel atualizar a tarefa.");
@@ -1487,6 +1541,421 @@ async function payPlatformOccurrenceNow(occurrenceId) {
     window.alert(error instanceof Error ? error.message : "Nao foi possivel pagar agora.");
   }
 }
+
+function readStoredJson(key, fallback) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return fallback;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveHistoryToStorage() {
+  window.localStorage.setItem(historySystemStorageKey, JSON.stringify(state.historySystem.slice(0, 500)));
+  window.localStorage.setItem(historyTextsStorageKey, JSON.stringify(state.historyTexts.slice(0, 200)));
+}
+
+function loadHistoryFromStorage() {
+  state.historySystem = readStoredJson(historySystemStorageKey, []);
+  state.historyTexts = readStoredJson(historyTextsStorageKey, []);
+}
+
+function historyIconSvg(type) {
+  const map = {
+    start: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+    pause: '<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>',
+    resume: '<svg viewBox="0 0 24 24"><path d="m8 12 8-7v5h4v4h-4v5z"/></svg>',
+    complete: '<svg viewBox="0 0 24 24"><path d="m9 16.2-3.5-3.5L4 14.2 9 19l11-11-1.5-1.5z"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="m12 17.3-6.2 3.7 1.6-7.1L2 9.2l7.2-.6L12 2l2.8 6.6 7.2.6-5.4 4.7 1.6 7.1z"/></svg>',
+    day_close: '<svg viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h3v18H4V4h3zm11 8H6v10h12z"/></svg>'
+  };
+  return map[type] || map.start;
+}
+
+function pushSystemHistoryEvent(payload) {
+  const event = {
+    id: crypto.randomUUID(),
+    type: payload.type,
+    assignee: normalizeAssigneeName(payload.assignee),
+    taskTitle: String(payload.taskTitle || "").trim(),
+    occurredAt: payload.occurredAt || new Date().toISOString(),
+    percent: Number(payload.percent || 0),
+    pendingCount: Number(payload.pendingCount || 0),
+    scopeDate: payload.scopeDate || null
+  };
+  state.historySystem.unshift(event);
+  saveHistoryToStorage();
+}
+
+function hasSystemEventForTask(actionId, type) {
+  return state.historySystem.some((entry) => entry.actionId === actionId && entry.type === type);
+}
+
+function buildSystemMessage(entry) {
+  const person = escapeHtml(entry.assignee || "Geral");
+  const task = `<strong>${escapeHtml(entry.taskTitle || "Tarefa")}</strong>`;
+  if (entry.type === "start") {
+    return `${person} começou ${task}`;
+  }
+  if (entry.type === "pause") {
+    return `${person} pausou ${task}`;
+  }
+  if (entry.type === "resume") {
+    return `${person} retornou ${task}`;
+  }
+  if (entry.type === "complete") {
+    return `${person} finalizou ${task}`;
+  }
+  if (entry.type === "star") {
+    return `${person} completou a missão diária`;
+  }
+  if (entry.type === "day_close") {
+    return `${person} não concluiu <strong>${entry.pendingCount}</strong> tarefas, encerrou com <strong>${entry.percent}%</strong>`;
+  }
+  return `${person} atualizou ${task}`;
+}
+
+function renderHistorySystem() {
+  if (!historySystemList) {
+    return;
+  }
+  historySystemList.innerHTML = "";
+  if (!state.historySystem.length) {
+    historySystemList.innerHTML = '<div class="empty-state">Sem movimentos ainda.</div>';
+    return;
+  }
+  state.historySystem
+    .slice()
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    .forEach((entry) => {
+      const card = document.createElement("article");
+      card.className = `history-item system-${entry.type === "day_close" ? "day-close" : entry.type}`;
+      card.innerHTML = `
+        <div class="history-item-head">
+          <span class="history-icon-badge">${historyIconSvg(entry.type)}</span>
+          <span class="history-time">${formatHourChip(entry.occurredAt)}</span>
+        </div>
+        <div class="history-item-text">${buildSystemMessage(entry)}</div>
+      `;
+      historySystemList.appendChild(card);
+    });
+}
+
+function renderHistoryTexts() {
+  if (!historyTextList) {
+    return;
+  }
+  historyTextList.innerHTML = "";
+  if (!state.historyTexts.length) {
+    historyTextList.innerHTML = '<div class="empty-state">Sem textos ainda.</div>';
+    return;
+  }
+  state.historyTexts.forEach((entry) => {
+    const card = document.createElement("article");
+    card.className = "history-text-card";
+    card.dataset.historyTextId = entry.id;
+    card.innerHTML = `
+      <div class="history-text-head">
+        <img class="task-avatar" src="${getActionAvatarPath(entry.speaker)}" alt="${escapeHtml(entry.speaker)}" />
+        <div>
+          <div class="history-text-title">${escapeHtml(entry.title)}</div>
+          <div class="task-assignee">${formatHourChip(entry.createdAt)}</div>
+        </div>
+      </div>
+      <div class="history-text-preview">${escapeHtml(entry.text.slice(0, 130))}${entry.text.length > 130 ? "..." : ""}</div>
+      <div class="history-text-full" hidden>${escapeHtml(entry.text)}</div>
+    `;
+    historyTextList.appendChild(card);
+  });
+}
+
+function renderHistoryPanels() {
+  historySystemPanel?.classList.toggle("collapsed", !state.historyPanel.systemOpen);
+  historyTextPanel?.classList.toggle("collapsed", !state.historyPanel.textOpen);
+}
+
+function renderHistory() {
+  renderHistoryPanels();
+  renderHistorySystem();
+  renderHistoryTexts();
+}
+
+function registerDailyMissionEvents() {
+  const byAssignee = {};
+  state.actions.forEach((action) => {
+    const assignee = normalizeAssigneeName(action.assignee);
+    byAssignee[assignee] = byAssignee[assignee] || { total: 0, completed: 0 };
+    byAssignee[assignee].total += 1;
+    if (normalizeActionStatus(action.status) === actionStatuses.completed) {
+      byAssignee[assignee].completed += 1;
+    }
+  });
+  Object.entries(byAssignee).forEach(([assignee, info]) => {
+    if (!info.total || info.completed !== info.total) {
+      return;
+    }
+    const todayKey = `${new Date().toISOString().slice(0, 10)}:${assignee}:star`;
+    const exists = state.historySystem.some((entry) => entry.scopeDate === todayKey);
+    if (!exists) {
+      pushSystemHistoryEvent({ type: "star", assignee, scopeDate: todayKey });
+    }
+  });
+}
+
+function registerDayCloseEventIfNeeded() {
+  const selectedDate = dateFromOffset(state.activeOffset);
+  const today = todayStart();
+  if (selectedDate >= today) {
+    return;
+  }
+  const pending = state.actions.filter((item) => normalizeActionStatus(item.status) !== actionStatuses.completed);
+  if (!pending.length) {
+    return;
+  }
+  const completed = state.actions.length - pending.length;
+  const percent = state.actions.length ? Math.round((completed / state.actions.length) * 100) : 0;
+  const dateKey = selectedDate.toISOString().slice(0, 10);
+  if (state.historySystem.some((entry) => entry.type === "day_close" && entry.scopeDate === dateKey)) {
+    return;
+  }
+  pushSystemHistoryEvent({
+    type: "day_close",
+    assignee: "Geral",
+    pendingCount: pending.length,
+    percent,
+    scopeDate: dateKey,
+    occurredAt: `${dateKey}T23:59:59.000Z`
+  });
+}
+
+function registerSystemEventFromActionTransition(before, after) {
+  const prev = normalizeActionStatus(before?.status);
+  const next = normalizeActionStatus(after?.status);
+  if (prev === next) {
+    return;
+  }
+  const assignee = normalizeAssigneeName(after?.assignee || before?.assignee);
+  const taskTitle = after?.title || before?.title || "Tarefa";
+  let type = "";
+  if (next === actionStatuses.inProgress && prev === actionStatuses.pending) {
+    const hasPause = state.historySystem.some((entry) => entry.type === "pause" && entry.taskTitle === taskTitle && entry.assignee === assignee);
+    type = hasPause ? "resume" : "start";
+  } else if (next === actionStatuses.pending && prev === actionStatuses.inProgress) {
+    type = "pause";
+  } else if (next === actionStatuses.completed) {
+    type = "complete";
+  }
+  if (!type) {
+    return;
+  }
+  pushSystemHistoryEvent({
+    type,
+    assignee,
+    taskTitle,
+    occurredAt: new Date().toISOString()
+  });
+}
+
+function setHistoryTextStep(step) {
+  state.historyTextComposer.step = step;
+  historyTextStepLabel.textContent = `${step} de 2`;
+  document.querySelectorAll("[data-history-text-step]").forEach((section) => {
+    section.classList.toggle("active", Number(section.dataset.historyTextStep) === step);
+  });
+  historyTextBackButton.style.visibility = step === 1 ? "hidden" : "visible";
+  historyTextNextButton.textContent = step === 2 ? "Salvar texto" : "Continuar";
+}
+
+function renderHistorySpeakerSelection() {
+  historyTextAvatarGrid?.querySelectorAll("[data-history-speaker]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.historySpeaker === state.historyTextComposer.speaker);
+  });
+}
+
+function renderHistoryLiveText() {
+  historyLiveText.textContent = state.historyTextComposer.liveText || "Sem texto ainda.";
+}
+
+function openHistoryTextComposer() {
+  state.historyTextComposer = {
+    step: 1,
+    speaker: "Rose",
+    liveText: "",
+    organizedText: "",
+    organizedTitle: "",
+    micActive: false
+  };
+  historyTextComposer.classList.add("active");
+  historyTextComposer.setAttribute("aria-hidden", "false");
+  historyVoiceStatus.textContent = "Aguardando gravação...";
+  setHistoryTextStep(1);
+  renderHistorySpeakerSelection();
+  renderHistoryLiveText();
+}
+
+function closeHistoryTextComposer() {
+  stopHistoryMic();
+  historyTextComposer.classList.remove("active");
+  historyTextComposer.setAttribute("aria-hidden", "true");
+}
+
+function cutLastWord() {
+  const words = String(state.historyTextComposer.liveText || "").trim().split(/\s+/).filter(Boolean);
+  words.pop();
+  state.historyTextComposer.liveText = words.join(" ");
+  renderHistoryLiveText();
+}
+
+function clearAllHistoryText() {
+  state.historyTextComposer.liveText = "";
+  renderHistoryLiveText();
+}
+
+function stopDeleteHold() {
+  if (historyDeleteHoldTimer) {
+    window.clearTimeout(historyDeleteHoldTimer);
+    historyDeleteHoldTimer = null;
+  }
+  if (historyDeleteHoldInterval) {
+    window.clearInterval(historyDeleteHoldInterval);
+    historyDeleteHoldInterval = null;
+  }
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 8192;
+  for (let index = 0; index < bytes.length; index += chunk) {
+    const slice = bytes.subarray(index, index + chunk);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
+function startDeleteHold() {
+  stopDeleteHold();
+  historyDeleteHoldTimer = window.setTimeout(() => {
+    historyDeleteHoldInterval = window.setInterval(() => {
+      cutLastWord();
+    }, 170);
+  }, 1000);
+}
+
+async function refineHistoryTextWithAi(rawText) {
+  const payload = await apiRequest("/api/200/texts/organize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: rawText })
+  });
+  return {
+    title: String(payload.title || "Texto sem título"),
+    text: String(payload.text || rawText)
+  };
+}
+
+function stopHistoryMic() {
+  state.historyTextComposer.micActive = false;
+  if (historySpeechMonitorTimer) {
+    window.clearInterval(historySpeechMonitorTimer);
+    historySpeechMonitorTimer = null;
+  }
+  if (historyMediaRecorder && historyMediaRecorder.state !== "inactive") {
+    historyMediaRecorder.stop();
+  }
+  historyMediaRecorder = null;
+  historyAudioAnalyser = null;
+  if (historyAudioContext) {
+    historyAudioContext.close().catch(() => {});
+    historyAudioContext = null;
+  }
+  if (historyMediaStream) {
+    historyMediaStream.getTracks().forEach((track) => track.stop());
+    historyMediaStream = null;
+  }
+  historyMicButton.textContent = "Iniciar microfone";
+}
+
+async function startHistoryMic() {
+  if (state.historyTextComposer.micActive) {
+    stopHistoryMic();
+    historyVoiceStatus.textContent = "Microfone parado.";
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    historyMediaStream = stream;
+    historyAudioContext = new AudioContext();
+    const source = historyAudioContext.createMediaStreamSource(stream);
+    historyAudioAnalyser = historyAudioContext.createAnalyser();
+    historyAudioAnalyser.fftSize = 2048;
+    source.connect(historyAudioAnalyser);
+    const chunks = [];
+    historyMediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    historyMediaRecorder.ondataavailable = (event) => {
+      if (event.data?.size) {
+        chunks.push(event.data);
+      }
+    };
+    historyMediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (!blob.size) {
+        return;
+      }
+      historyVoiceStatus.textContent = "Transcrevendo...";
+      const base64 = await blob.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
+      const transcribed = await apiRequest("/api/audio/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm", fileName: "history-text.webm" })
+      });
+      const excerpt = String(transcribed?.text || "").trim();
+      const joined = `${state.historyTextComposer.liveText} ${excerpt}`.trim().slice(0, 2000);
+      state.historyTextComposer.liveText = joined;
+      if (joined) {
+        const organized = await refineHistoryTextWithAi(joined);
+        state.historyTextComposer.organizedText = organized.text.slice(0, 2000);
+        state.historyTextComposer.organizedTitle = organized.title;
+        state.historyTextComposer.liveText = state.historyTextComposer.organizedText;
+      }
+      renderHistoryLiveText();
+      historyVoiceStatus.textContent = "Texto atualizado.";
+    };
+    historyMediaRecorder.start();
+    state.historyTextComposer.micActive = true;
+    historyMicButton.textContent = "Parar microfone";
+    historyVoiceStatus.textContent = "Microfone ouvindo...";
+    historyLastSpeechAt = Date.now();
+    historySpeechMonitorTimer = window.setInterval(() => {
+      if (!historyAudioAnalyser) {
+        return;
+      }
+      const buffer = new Uint8Array(historyAudioAnalyser.fftSize);
+      historyAudioAnalyser.getByteTimeDomainData(buffer);
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i += 1) {
+        const value = (buffer[i] - 128) / 128;
+        sum += value * value;
+      }
+      const rms = Math.sqrt(sum / buffer.length);
+      if (rms > 0.02) {
+        historyLastSpeechAt = Date.now();
+      }
+      if (Date.now() - historyLastSpeechAt >= 2000) {
+        historyVoiceStatus.textContent = "Silêncio detectado. Encerrando...";
+        stopHistoryMic();
+      }
+    }, 120);
+  } catch (error) {
+    historyVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no microfone.";
+    stopHistoryMic();
+  }
+}
 function handleSwipe(element, callback) {
   if (!element) {
     return;
@@ -1794,6 +2263,84 @@ constitutionAvatars?.addEventListener("click", (event) => {
   }
   void approveConstitution(button.dataset.constitutionApprover || "");
 });
+
+document.querySelectorAll("[data-history-panel-toggle]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const key = button.dataset.historyPanelToggle;
+    if (key === "system") {
+      state.historyPanel.systemOpen = !state.historyPanel.systemOpen;
+    }
+    if (key === "text") {
+      state.historyPanel.textOpen = !state.historyPanel.textOpen;
+    }
+    renderHistoryPanels();
+  });
+});
+
+historyTextList?.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-history-text-id]");
+  if (!card) {
+    return;
+  }
+  const body = card.querySelector(".history-text-full");
+  if (!body) {
+    return;
+  }
+  body.hidden = !body.hidden;
+});
+
+openHistoryTextComposerButton?.addEventListener("click", openHistoryTextComposer);
+closeHistoryTextComposerButton?.addEventListener("click", closeHistoryTextComposer);
+
+historyTextAvatarGrid?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-history-speaker]");
+  if (!button) {
+    return;
+  }
+  state.historyTextComposer.speaker = button.dataset.historySpeaker || "Rose";
+  renderHistorySpeakerSelection();
+});
+
+historyTextBackButton?.addEventListener("click", () => {
+  setHistoryTextStep(Math.max(1, state.historyTextComposer.step - 1));
+});
+
+historyMicButton?.addEventListener("click", () => {
+  void startHistoryMic();
+});
+
+historyDeleteWordButton?.addEventListener("click", cutLastWord);
+historyDeleteWordButton?.addEventListener("pointerdown", startDeleteHold);
+historyDeleteWordButton?.addEventListener("pointerup", stopDeleteHold);
+historyDeleteWordButton?.addEventListener("pointerleave", stopDeleteHold);
+historyDeleteWordButton?.addEventListener("pointercancel", stopDeleteHold);
+historyClearTextButton?.addEventListener("click", clearAllHistoryText);
+
+historyTextForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (state.historyTextComposer.step === 1) {
+    setHistoryTextStep(2);
+    return;
+  }
+  const text = String(state.historyTextComposer.liveText || "").trim();
+  if (!text) {
+    historyVoiceStatus.textContent = "Fale algum texto antes de salvar.";
+    return;
+  }
+  const title = String(state.historyTextComposer.organizedTitle || "").trim() || "Texto novo";
+  state.historyTexts.unshift({
+    id: crypto.randomUUID(),
+    speaker: state.historyTextComposer.speaker,
+    title,
+    text: text.slice(0, 2000),
+    createdAt: new Date().toISOString()
+  });
+  saveHistoryToStorage();
+  renderHistoryTexts();
+  closeHistoryTextComposer();
+});
+
+loadHistoryFromStorage();
 
 
 
