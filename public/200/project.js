@@ -264,6 +264,14 @@ function formatHistoryDateLabel(date) {
   return `${String(date.getDate()).padStart(2, "0")} ${monthLabels[date.getMonth()]}`;
 }
 
+function toLocalDateKey(value) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function formatTime(value) {
   const date = new Date(value);
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
@@ -1623,7 +1631,7 @@ function buildSystemMessage(entry) {
 }
 
 function sameDayIso(a, b) {
-  return new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10);
+  return toLocalDateKey(a) === toLocalDateKey(b);
 }
 
 function renderHistoryTimeline() {
@@ -1711,7 +1719,7 @@ function registerDailyMissionEvents() {
     if (!info.total || info.completed !== info.total) {
       return;
     }
-    const todayKey = `${new Date().toISOString().slice(0, 10)}:${assignee}:star`;
+    const todayKey = `${toLocalDateKey(new Date())}:${assignee}:star`;
     const exists = state.historySystem.some((entry) => entry.scopeDate === todayKey);
     if (!exists) {
       pushSystemHistoryEvent({ type: "star", assignee, scopeDate: todayKey });
@@ -1731,7 +1739,7 @@ function registerDayCloseEventIfNeeded() {
   }
   const completed = state.actions.length - pending.length;
   const percent = state.actions.length ? Math.round((completed / state.actions.length) * 100) : 0;
-  const dateKey = selectedDate.toISOString().slice(0, 10);
+  const dateKey = toLocalDateKey(selectedDate);
   if (state.historySystem.some((entry) => entry.type === "day_close" && entry.scopeDate === dateKey)) {
     return;
   }
