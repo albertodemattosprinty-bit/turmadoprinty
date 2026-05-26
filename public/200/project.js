@@ -1435,6 +1435,11 @@ function stopFinanceSpeechCapture() {
 }
 
 function startFinanceSpeechCapture() {
+  if (financeSpeechRecognition) {
+    financeVoiceStatus.textContent = "Microfone já está ouvindo...";
+    return;
+  }
+
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) {
     financeVoiceStatus.textContent = "Reconhecimento de voz indisponível neste navegador.";
@@ -1452,12 +1457,22 @@ function startFinanceSpeechCapture() {
   recognition.interimResults = true;
 
   recognition.onresult = (event) => {
-    let full = "";
-    for (let i = 0; i < event.results.length; i += 1) {
-      full += `${event.results[i][0].transcript} `;
+    let interimChunk = "";
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const chunk = String(event.results[i][0]?.transcript || "").trim();
+      if (!chunk) {
+        continue;
+      }
+      if (event.results[i].isFinal) {
+        const current = String(financeSpeechText || "").trim();
+        if (!current.endsWith(chunk)) {
+          financeSpeechText = `${current} ${chunk}`.trim();
+        }
+      } else {
+        interimChunk = `${interimChunk} ${chunk}`.trim();
+      }
     }
-    financeSpeechText = full.trim();
-    financeVoiceText.textContent = financeSpeechText;
+    financeVoiceText.textContent = `${financeSpeechText} ${interimChunk}`.trim();
   };
 
   recognition.onerror = () => {
