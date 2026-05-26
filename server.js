@@ -1630,6 +1630,43 @@ async function handleProject200FinanceInterpret(request, response) {
       return Math.round(value * 100);
     };
 
+    const normalizeCategory = (rawCategory, kind) => {
+      const normalized = String(rawCategory || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+      const incomeMap = new Map([
+        ["eventos", "Eventos"],
+        ["inscricoes", "Inscricoes"],
+        ["apoiadores", "Apoiadores"],
+        ["site", "Site"],
+        ["venda de ativo", "Venda de ativo"]
+      ]);
+      const expenseMap = new Map([
+        ["alimentacao", "Alimentacao"],
+        ["aluguel", "Aluguel"],
+        ["carro", "Carro"],
+        ["eventos", "Eventos"],
+        ["lazer", "Lazer"],
+        ["anuncios", "Anuncios"],
+        ["plataformas", "Plataformas"],
+        ["plataforma", "Plataformas"],
+        ["servicos casa", "Servicos casa"],
+        ["casa", "Servicos casa"]
+      ]);
+      const map = kind === "INCOME" ? incomeMap : expenseMap;
+      if (map.has(normalized)) {
+        return map.get(normalized);
+      }
+      for (const [key, value] of map.entries()) {
+        if (normalized.includes(key)) {
+          return value;
+        }
+      }
+      return kind === "INCOME" ? "Eventos" : "Alimentacao";
+    };
+
     const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
     const completion = await createChatCompletion(apiKey, {
       model,
@@ -1637,7 +1674,7 @@ async function handleProject200FinanceInterpret(request, response) {
       messages: [
         {
           role: "system",
-          content: "Interprete texto financeiro em pt-BR e responda JSON puro com campos: name, kind(INCOME|EXPENSE), category, amountCents, amount(optional), recurrenceType(SIMPLE|RECURRING), recurrenceDayOfMonth(optional). Se nao houver recorrencia explicita, use SIMPLE. Categorias de saida: Alimentacao, Aluguel, Carro, Eventos, Servicos casa, Anuncios, Plataformas, Lazer. Categorias de entrada: Eventos, Inscricoes, Apoiadores, Site, Venda de ativo. Titulo minimalista."
+          content: "Interprete texto financeiro em pt-BR e responda APENAS JSON puro com campos: name, kind(INCOME|EXPENSE), category, amountCents, amount(optional), recurrenceType(SIMPLE|RECURRING), recurrenceDayOfMonth(optional). Regra: se recorrencia nao estiver explicita, use SIMPLE. Titulo minimalista com ate 25 caracteres. Categorias de saida permitidas: Alimentacao, Aluguel, Carro, Eventos, Servicos casa, Anuncios, Plataformas, Lazer. Categorias de entrada permitidas: Eventos, Inscricoes, Apoiadores, Site, Venda de ativo. Mapeamento: pao/comida/restaurante/mercado => Alimentacao; gasolina/uber/oficina => Carro; render/site/openai/chatgpt => Plataformas; luz/internet/gas/streaming/reparo/pintura/aluguel casa => Servicos casa (ou Aluguel quando aluguel); viagens/pedagio/leds => Eventos ou Lazer conforme contexto. Exemplo: 'comprei pao custou 10 conto' => name:'Padaria', kind:'EXPENSE', category:'Alimentacao', amountCents:1000, recurrenceType:'SIMPLE'."
         },
         { role: "user", content: text.slice(0, 1200) }
       ]
@@ -1654,15 +1691,20 @@ async function handleProject200FinanceInterpret(request, response) {
       return;
     }
 
+    const kind = String(parsed?.kind || "EXPENSE").toUpperCase() === "INCOME" ? "INCOME" : "EXPENSE";
+    const recurrenceType = String(parsed?.recurrenceType || "SIMPLE").toUpperCase() === "RECURRING" ? "RECURRING" : "SIMPLE";
+    const recurrenceDayOfMonthRaw = Number(parsed?.recurrenceDayOfMonth || 1);
+    const recurrenceDayOfMonth = Math.min(31, Math.max(1, Number.isFinite(recurrenceDayOfMonthRaw) ? recurrenceDayOfMonthRaw : 1));
+
     sendJson(response, 200, {
       ok: true,
       entry: {
         name: String(parsed?.name || "Lancamento").slice(0, 90),
-        kind: String(parsed?.kind || "EXPENSE").toUpperCase() === "INCOME" ? "INCOME" : "EXPENSE",
-        category: String(parsed?.category || "Eventos"),
+        kind,
+        category: normalizeCategory(parsed?.category, kind),
         amountCents,
-        recurrenceType: String(parsed?.recurrenceType || "SIMPLE").toUpperCase() === "RECURRING" ? "RECURRING" : "SIMPLE",
-        recurrenceDayOfMonth: Number(parsed?.recurrenceDayOfMonth || 1)
+        recurrenceType,
+        recurrenceDayOfMonth
       },
       model
     });
