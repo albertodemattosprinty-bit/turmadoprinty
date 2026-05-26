@@ -1332,9 +1332,26 @@ svg {
 }
 
 .history-text-full {
-  margin-top: 0;
-  border-top: 0;
-  padding-top: 0;
+  display: none;
+}
+
+.history-read-content {
+  align-items: stretch;
+  text-align: left;
+}
+
+.history-read-content h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 4vw, 2rem);
+}
+
+.history-read-body {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  min-height: 120px;
+  white-space: pre-wrap;
   white-space: pre-wrap;
 }
 

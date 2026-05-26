@@ -178,6 +178,8 @@ const historyDeleteWordButton = document.getElementById("historyDeleteWordButton
 const historyClearTextButton = document.getElementById("historyClearTextButton");
 const historyVoiceStatus = document.getElementById("historyVoiceStatus");
 const historyLiveText = document.getElementById("historyLiveText");
+const historyReadTitle = document.getElementById("historyReadTitle");
+const historyReadBody = document.getElementById("historyReadBody");
 const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -1917,6 +1919,8 @@ function renderHistoryTimeline() {
     const card = document.createElement("article");
     card.className = "history-text-card";
     card.dataset.historyTextId = entry.id;
+    card.dataset.historyTextTitle = entry.title || "Texto";
+    card.dataset.historyTextBody = entry.text || "";
     card.innerHTML = `
       <div class="history-text-head">
         <img class="task-avatar" src="${getActionAvatarPath(entry.speaker)}" alt="${escapeHtml(entry.speaker)}" />
@@ -1925,7 +1929,6 @@ function renderHistoryTimeline() {
           <div class="task-assignee history-time">${formatHourChip(entry.createdAt)}</div>
         </div>
       </div>
-      <div class="history-text-full" hidden>${escapeHtml(entry.text)}</div>
     `;
     historyTimelineList.appendChild(card);
   });
@@ -2543,11 +2546,13 @@ historyTimelineList?.addEventListener("click", (event) => {
   if (!card) {
     return;
   }
-  const body = card.querySelector(".history-text-full");
-  if (!body) {
-    return;
+  if (historyReadTitle) {
+    historyReadTitle.textContent = card.dataset.historyTextTitle || "Texto";
   }
-  body.hidden = !body.hidden;
+  if (historyReadBody) {
+    historyReadBody.textContent = card.dataset.historyTextBody || "";
+  }
+  openModal("historyReadModal");
 });
 
 openHistoryTextComposerButton?.addEventListener("click", openHistoryTextComposer);
