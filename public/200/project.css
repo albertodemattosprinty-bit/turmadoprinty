@@ -465,20 +465,22 @@ svg {
 }
 
 .platform-entry-row {
-  grid-template-columns: 78% 22%;
+  grid-template-columns: minmax(0, 1fr) max-content;
   padding: 10px 12px;
   min-height: 46px;
+  gap: 12px;
 }
 
 .platform-entry-row .task-title {
   font-size: 0.98rem;
   font-weight: 700;
   line-height: 1.2;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .platform-entry-row .task-title span {
