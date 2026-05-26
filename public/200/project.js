@@ -1192,20 +1192,29 @@ function renderPlatformEntries() {
     return;
   }
 
+  const getEntryAmountCents = (entry) => {
+    if (Number.isFinite(Number(entry?.amountCents))) {
+      return Number(entry.amountCents);
+    }
+    if (Number.isFinite(Number(entry?.valueCents))) {
+      return Number(entry.valueCents);
+    }
+    if (Number.isFinite(Number(entry?.amount))) {
+      return Math.round(Number(entry.amount) * 100);
+    }
+    return 0;
+  };
+
   state.platformEntries.forEach((entry) => {
+    const amountCents = getEntryAmountCents(entry);
+    const signed = String(entry.kind || "").toUpperCase() === "INCOME" ? amountCents : -amountCents;
     const row = document.createElement("article");
-    row.className = `task-row ${getPlatformStatusClass(entry)}`;
+    row.className = `task-row platform-entry-row ${getPlatformStatusClass(entry)}`;
     row.dataset.occurrenceId = entry.id || "";
     row.dataset.status = String(entry.status || "").trim().toUpperCase();
     row.innerHTML = `
-      <div class="task-time">${formatHourChip(entry.occurredAt)}</div>
-      <div class="task-main">
-        <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${escapeHtml(`${getPlatformKindLabel(entry.kind)} · ${entry.category}`)}</div>
-      </div>
-      <button class="delete-task" type="button" data-delete-platform-entry="${entry.entryId || ""}" aria-label="Excluir lançamento">
-        <svg viewBox="0 0 24 24"><path d="M8 4h8l1 2h4v2H3V6h4zm1 6h2v8H9zm4 0h2v8h-2zM7 10h10l-1 10H8z"/></svg>
-      </button>
+      <div class="task-title">${escapeHtml(entry.name)}</div>
+      <div class="platform-entry-value">${escapeHtml(formatMoney(signed))}</div>
     `;
     platformEntriesList.appendChild(row);
   });

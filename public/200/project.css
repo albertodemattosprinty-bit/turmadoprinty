@@ -254,6 +254,12 @@ svg {
   gap: 10px;
 }
 
+#calendarModal .actions-app {
+  padding-top: 10px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
 #calendarModal .date-title {
   min-width: 120px;
   font-size: clamp(1.6rem, 7vw, 3.1rem);
@@ -344,6 +350,10 @@ svg {
   padding: 6px 0 180px;
 }
 
+#calendarModal .actions-list {
+  padding: 2px 0 110px;
+}
+
 .empty-state {
   color: var(--soft);
   text-align: center;
@@ -361,6 +371,24 @@ svg {
   background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease, transform 120ms ease;
+}
+
+.platform-entry-row {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  padding: 10px 12px;
+  min-height: 46px;
+}
+
+.platform-entry-row .task-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.platform-entry-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .task-avatar {
