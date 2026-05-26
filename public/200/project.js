@@ -82,6 +82,13 @@ const historySystemStorageKey = "project200_history_system_v1";
 const historyTextsStorageKey = "project200_history_texts_v1";
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
 const selectableProfiles = ["project", "Alberto", "Rose", "Lucas", "Thainan"];
+const profileTintByName = {
+  project: "linear-gradient(145deg, rgba(11, 61, 168, 0), rgba(31, 126, 231, 0))",
+  Alberto: "linear-gradient(145deg, rgba(2, 27, 77, 0.7), rgba(11, 61, 168, 0.7))",
+  Rose: "linear-gradient(145deg, rgba(31, 78, 216, 0.7), rgba(234, 76, 137, 0.7))",
+  Lucas: "linear-gradient(145deg, rgba(79, 195, 247, 0.7), rgba(212, 160, 23, 0.7))",
+  Thainan: "linear-gradient(145deg, rgba(0, 184, 169, 0.7), rgba(138, 92, 255, 0.7))"
+};
 
 const activeDateLabel = document.getElementById("activeDateLabel");
 const actionsAuthAlert = document.getElementById("actionsAuthAlert");
@@ -238,6 +245,14 @@ function readSelectedProfile() {
 
 function applySelectedProfile(profile) {
   const next = selectableProfiles.includes(profile) ? profile : "project";
+  const nextTint = profileTintByName[next] || profileTintByName.project;
+  const root = document.documentElement;
+  root.style.setProperty("--app-tint-next", nextTint);
+  root.style.setProperty("--app-next-opacity", "1");
+  window.setTimeout(() => {
+    root.style.setProperty("--app-tint-current", nextTint);
+    root.style.setProperty("--app-next-opacity", "0");
+  }, 1500);
   state.selectedProfile = next;
   document.body.dataset.profile = next;
   window.localStorage.setItem(projectProfileKey, next);

@@ -10,7 +10,9 @@
   --warn: #ffe26a;
   --danger: #ff6f8a;
   --ink: #06346d;
-  --app-bg: linear-gradient(145deg, #0b3da8, #1f7ee7);
+  --app-tint-current: linear-gradient(145deg, rgba(11, 61, 168, 0.7), rgba(31, 126, 231, 0.7));
+  --app-tint-next: linear-gradient(145deg, rgba(11, 61, 168, 0.7), rgba(31, 126, 231, 0.7));
+  --app-next-opacity: 0;
 }
 
 * {
@@ -31,31 +33,32 @@ body {
 body {
   font-family: "Exo 2", sans-serif;
   color: #123b73;
-  background-image: var(--app-bg);
+  background-image: url("/200/home-bg.png");
   background-size: cover;
   background-position: center top;
   background-attachment: fixed;
   overflow: hidden;
+  position: relative;
 }
 
-body[data-profile="project"] {
-  --app-bg: url("/200/home-bg.png");
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
 }
 
-body[data-profile="Alberto"] {
-  --app-bg: linear-gradient(145deg, #021b4d, #0b3da8);
+body::before {
+  background-image: var(--app-tint-current);
+  opacity: 1;
 }
 
-body[data-profile="Rose"] {
-  --app-bg: linear-gradient(145deg, #1f4ed8, #ea4c89);
-}
-
-body[data-profile="Lucas"] {
-  --app-bg: linear-gradient(145deg, #4fc3f7, #d4a017);
-}
-
-body[data-profile="Thainan"] {
-  --app-bg: linear-gradient(145deg, #00b8a9, #8a5cff);
+body::after {
+  background-image: var(--app-tint-next);
+  opacity: var(--app-next-opacity);
+  transition: opacity 1500ms ease;
 }
 
 button,
@@ -166,9 +169,7 @@ svg {
   z-index: 20;
   display: none;
   color: var(--white);
-  background-image: var(--app-bg);
-  background-size: cover;
-  background-position: center top;
+  background: transparent;
 }
 
 .workspace-modal.active {
