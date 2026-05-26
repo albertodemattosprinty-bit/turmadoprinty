@@ -81,10 +81,11 @@ svg {
   width: 100%;
   max-width: 100vw;
   display: grid;
-  align-content: center;
+  grid-template-rows: auto auto auto 1fr auto;
+  align-content: start;
   justify-items: center;
-  gap: 16px;
-  padding: 28px;
+  gap: 10px;
+  padding: 12px 20px 20px;
 }
 
 .profile-selector {
@@ -116,8 +117,18 @@ svg {
   border-color: rgba(255, 255, 255, 0.55);
 }
 
+.profile-footer {
+  margin-top: auto;
+  padding-bottom: 8px;
+}
+
+.profile-footer .profile-chip {
+  padding: 2px;
+  border-radius: 999px;
+}
+
 .home-top-logo {
-  width: min(280px, 68vw);
+  width: min(250px, 60vw);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.32));
@@ -133,7 +144,7 @@ svg {
   width: min(420px, calc(100vw - 36px));
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .hub-action {
@@ -1135,18 +1146,18 @@ svg {
   }
 
   .project-shell {
-    padding: 18px;
-    gap: 12px;
+    padding: 8px 12px 14px;
+    gap: 8px;
   }
 
   .project-hub {
     width: calc(100vw - 24px);
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    gap: 8px;
   }
 
   .home-top-logo {
-    width: min(220px, 72vw);
+    width: min(190px, 64vw);
   }
 
   .hub-icon-image {
