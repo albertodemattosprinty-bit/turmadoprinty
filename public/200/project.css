@@ -721,6 +721,11 @@ svg {
   z-index: 26;
 }
 
+.finance-bottom-actions.swipe-active {
+  transform: translateX(-50%) translateY(-8px);
+  transition: transform 140ms ease;
+}
+
 .icon-action-btn {
   width: 58px;
   height: 58px;
@@ -947,6 +952,34 @@ svg {
   padding: 18px;
   display: grid;
   grid-template-rows: auto 1fr;
+}
+
+.platform-voice-panel {
+  min-height: min(420px, calc(100vh - 60px));
+}
+
+.platform-voice-body {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.platform-voice-live-text {
+  min-height: 170px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(5, 19, 58, 0.55);
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.platform-voice-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .wizard-head {
