@@ -1262,7 +1262,7 @@ svg {
 
 .history-item {
   border-radius: 12px;
-  padding: 12px;
+  padding: 8px 10px;
   color: #fff;
 }
 
@@ -1277,27 +1277,28 @@ svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
 }
 
 .history-icon-badge {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.2);
   display: grid;
   place-items: center;
 }
 
 .history-icon-badge svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   fill: #fff;
 }
 
 .history-item-text {
-  margin-top: 8px;
+  margin-top: 4px;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .history-item-text strong {
@@ -1305,7 +1306,7 @@ svg {
 }
 
 .history-time {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 500;
 }
 
@@ -1313,18 +1314,19 @@ svg {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.08);
-  padding: 10px;
+  padding: 6px 8px;
   cursor: pointer;
 }
 
 .history-text-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .history-text-title {
   font-weight: 900;
+  line-height: 1.2;
 }
 
 .history-text-preview {
