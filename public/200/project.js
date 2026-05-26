@@ -1780,12 +1780,23 @@ async function startFinanceSpeechCapture() {
         }
         financeVoiceStatus.textContent = "Interpretando...";
         if (isLikelyDeleteCommand(financeSpeechText)) {
+          try {
+            const result = await executeFinanceDeleteByVoiceCommand(financeSpeechText);
+            financeVoiceStatus.textContent = result?.canceled ? "Exclusão cancelada." : `Apagados: ${Number(result?.deleted || 0)}.`;
+            return;
+          } catch (_deleteError) {
+            await createPlatformEntryFromVoiceInterpret(financeSpeechText);
+            financeVoiceStatus.textContent = "Lançamento criado.";
+            return;
+          }
+        }
+        try {
+          await createPlatformEntryFromVoiceInterpret(financeSpeechText);
+          financeVoiceStatus.textContent = "Lançamento criado.";
+        } catch (_createError) {
           const result = await executeFinanceDeleteByVoiceCommand(financeSpeechText);
           financeVoiceStatus.textContent = result?.canceled ? "Exclusão cancelada." : `Apagados: ${Number(result?.deleted || 0)}.`;
-          return;
         }
-        await createPlatformEntryFromVoiceInterpret(financeSpeechText);
-        financeVoiceStatus.textContent = "Lançamento criado.";
       } catch (error) {
         financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no processamento.";
       }

@@ -1597,6 +1597,39 @@ async function handleProject200FinanceInterpret(request, response) {
   }
 
   try {
+    const parseAmountCents = (value) => {
+      if (value === null || value === undefined) {
+        return 0;
+      }
+      const raw = String(value).trim();
+      if (!raw) {
+        return 0;
+      }
+      const normalized = raw
+        .replace(/[Rr]\$/g, "")
+        .replace(/\s+/g, "")
+        .replace(/\./g, "")
+        .replace(/,/g, ".");
+      const direct = Number(normalized);
+      if (!Number.isFinite(direct) || direct <= 0) {
+        return 0;
+      }
+      return direct >= 1000 ? Math.round(direct) : Math.round(direct * 100);
+    };
+
+    const parseAmountFromText = (input) => {
+      const match = String(input || "").match(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/);
+      if (!match) {
+        return 0;
+      }
+      const normalized = match[1].replace(/\./g, "").replace(/,/g, ".");
+      const value = Number(normalized);
+      if (!Number.isFinite(value) || value <= 0) {
+        return 0;
+      }
+      return Math.round(value * 100);
+    };
+
     const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
     const completion = await createChatCompletion(apiKey, {
       model,
@@ -1604,7 +1637,7 @@ async function handleProject200FinanceInterpret(request, response) {
       messages: [
         {
           role: "system",
-          content: "Interprete texto financeiro em pt-BR e responda JSON puro com campos: name, kind(INCOME|EXPENSE), category, amountCents, recurrenceType(SIMPLE|RECURRING), recurrenceDayOfMonth(optional). Se não houver recorrência explícita, use SIMPLE. Categorias de saída: Alimentacao, Aluguel, Carro, Eventos, Servicos casa, Anuncios, Plataformas, Lazer. Categorias de entrada: Eventos, Inscricoes, Apoiadores, Site, Venda de ativo. Título minimalista."
+          content: "Interprete texto financeiro em pt-BR e responda JSON puro com campos: name, kind(INCOME|EXPENSE), category, amountCents, amount(optional), recurrenceType(SIMPLE|RECURRING), recurrenceDayOfMonth(optional). Se nao houver recorrencia explicita, use SIMPLE. Categorias de saida: Alimentacao, Aluguel, Carro, Eventos, Servicos casa, Anuncios, Plataformas, Lazer. Categorias de entrada: Eventos, Inscricoes, Apoiadores, Site, Venda de ativo. Titulo minimalista."
         },
         { role: "user", content: text.slice(0, 1200) }
       ]
@@ -1612,7 +1645,10 @@ async function handleProject200FinanceInterpret(request, response) {
 
     const raw = extractChatCompletionText(completion);
     const parsed = JSON.parse(raw);
-    const amountCents = Math.max(0, Math.round(Number(parsed?.amountCents || 0)));
+    const amountFromAmountCents = parseAmountCents(parsed?.amountCents);
+    const amountFromAmount = parseAmountCents(parsed?.amount);
+    const amountFromText = parseAmountFromText(text);
+    const amountCents = Math.max(0, amountFromAmountCents || amountFromAmount || amountFromText);
     if (!amountCents) {
       sendJson(response, 422, { error: "Nao consegui identificar o valor." });
       return;
@@ -1621,7 +1657,7 @@ async function handleProject200FinanceInterpret(request, response) {
     sendJson(response, 200, {
       ok: true,
       entry: {
-        name: String(parsed?.name || "Lançamento").slice(0, 90),
+        name: String(parsed?.name || "Lancamento").slice(0, 90),
         kind: String(parsed?.kind || "EXPENSE").toUpperCase() === "INCOME" ? "INCOME" : "EXPENSE",
         category: String(parsed?.category || "Eventos"),
         amountCents,
@@ -1637,7 +1673,6 @@ async function handleProject200FinanceInterpret(request, response) {
     });
   }
 }
-
 function getPeriodRangeByKey(periodKey) {
   const now = new Date();
   const today = new Date(now);
@@ -4837,3 +4872,4 @@ const server = http.createServer(async (request, response) => {
 server.listen(PORT, () => {
   console.log(`Servidor online em http://localhost:${PORT}`);
 });
+
