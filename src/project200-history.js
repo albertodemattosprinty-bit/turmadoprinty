@@ -25,11 +25,13 @@ export async function ensureProject200HistorySchema() {
       body_text text,
       percent integer,
       pending_count integer,
+      late_start_minutes integer,
       scope_date text,
       occurred_at timestamptz not null default now(),
       created_at timestamptz not null default now()
     );
   `);
+  await query("alter table project_200_history_entries add column if not exists late_start_minutes integer;");
   await query("create index if not exists idx_project_200_history_user_time on project_200_history_entries(user_id, occurred_at desc);");
   await query("create index if not exists idx_project_200_history_user_type on project_200_history_entries(user_id, entry_type);");
 }
@@ -43,6 +45,7 @@ function normalizeSystemEntry(row) {
     occurredAt: toIso(row.occurred_at) || toIso(row.created_at),
     percent: Number(row.percent || 0),
     pendingCount: Number(row.pending_count || 0),
+    lateStartMinutes: Number(row.late_start_minutes || 0),
     scopeDate: row.scope_date || null
   };
 }
@@ -93,6 +96,7 @@ export async function createProject200SystemEvent(userId, payload) {
   const scopeDate = String(payload?.scopeDate || "").trim() || null;
   const percent = Number.isFinite(Number(payload?.percent)) ? Number(payload.percent) : 0;
   const pendingCount = Number.isFinite(Number(payload?.pendingCount)) ? Number(payload.pendingCount) : 0;
+  const lateStartMinutes = Number.isFinite(Number(payload?.lateStartMinutes)) ? Number(payload.lateStartMinutes) : 0;
 
   if (scopeDate && (eventType === "star" || eventType === "day_close")) {
     const dedupe = await query(
@@ -116,12 +120,12 @@ export async function createProject200SystemEvent(userId, payload) {
   const result = await query(
     `
       insert into project_200_history_entries (
-        user_id, entry_type, event_type, assignee, task_title, percent, pending_count, scope_date, occurred_at
+        user_id, entry_type, event_type, assignee, task_title, percent, pending_count, late_start_minutes, scope_date, occurred_at
       )
-      values ($1, 'SYSTEM', $2, $3, $4, $5, $6, $7, $8::timestamptz)
+      values ($1, 'SYSTEM', $2, $3, $4, $5, $6, $7, $8, $9::timestamptz)
       returning *
     `,
-    [userId, eventType, assignee, taskTitle, percent, pendingCount, scopeDate, occurredAt]
+    [userId, eventType, assignee, taskTitle, percent, pendingCount, lateStartMinutes, scopeDate, occurredAt]
   );
 
   return normalizeSystemEntry(result.rows[0]);

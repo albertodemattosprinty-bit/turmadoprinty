@@ -62,12 +62,18 @@ function getNextActionStatus(currentStatus) {
 }
 
 function normalizeAction(row) {
+  const startAtIso = toIso(row.start_at);
+  const startedAtIso = toIso(row.status_started_at);
+  const lateStartMinutes = startAtIso && startedAtIso
+    ? Math.max(0, Math.round((new Date(startedAtIso).getTime() - new Date(startAtIso).getTime()) / (60 * 1000)))
+    : 0;
+
   return {
     id: row.id,
     userId: row.user_id,
     title: row.title,
     assignee: normalizeAssignee(row.assignee),
-    startAt: toIso(row.start_at),
+    startAt: startAtIso,
     endAt: toIso(row.end_at),
     repeatGroupId: row.repeat_group_id || null,
     repeatRule: row.repeat_rule || "none",
@@ -76,7 +82,8 @@ function normalizeAction(row) {
     startedAt: toIso(row.status_started_at),
     completedAt: toIso(row.status_completed_at),
     statusUpdatedAt: toIso(row.status_updated_at),
-    createdAt: toIso(row.created_at)
+    createdAt: toIso(row.created_at),
+    lateStartMinutes
   };
 }
 
@@ -386,6 +393,27 @@ export async function updateUserActionStatus(userId, actionId) {
   let completedAt = action.completedAt;
 
   if (nextStatus === ACTION_STATUS_IN_PROGRESS) {
+    const inProgressConflict = await query(
+      `
+        select a.id, a.assignee
+        from actions a
+        join action_status_overrides o
+          on o.user_id = a.user_id
+         and o.action_id = a.id
+        where a.user_id = $1
+          and a.id <> $2
+          and lower(trim(a.title)) = lower(trim($3))
+          and coalesce(upper(o.status), 'PENDING') = 'IN_PROGRESS'
+          and lower(trim(coalesce(a.assignee, ''))) <> lower(trim(coalesce($4, '')))
+        limit 1
+      `,
+      [userId, action.id, action.title, action.assignee]
+    );
+
+    if (inProgressConflict.rows[0]) {
+      throw new Error("Essa tarefa ja esta em andamento para outro usuario.");
+    }
+
     startedAt = startedAt || nowIso;
     completedAt = null;
   } else if (nextStatus === ACTION_STATUS_COMPLETED) {

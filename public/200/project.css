@@ -483,6 +483,31 @@ svg {
   border-color: rgba(137, 255, 205, 0.62);
 }
 
+.task-row.task-delay-soft {
+  background: rgba(125, 88, 8, 0.72);
+  border-color: rgba(255, 219, 120, 0.7);
+}
+
+.task-row.task-delay-yellow {
+  background: rgba(191, 132, 13, 0.82);
+  border-color: rgba(255, 232, 153, 0.8);
+}
+
+.task-row.task-delay-orange {
+  background: rgba(202, 97, 18, 0.86);
+  border-color: rgba(255, 192, 136, 0.82);
+}
+
+.task-row.task-delay-red {
+  background: rgba(169, 30, 30, 0.9);
+  border-color: rgba(255, 160, 160, 0.84);
+}
+
+.task-row.task-delay-black {
+  background: rgba(0, 0, 0, 0.95);
+  border-color: rgba(190, 190, 190, 0.5);
+}
+
 .task-time {
   grid-column: 3;
   text-align: right;

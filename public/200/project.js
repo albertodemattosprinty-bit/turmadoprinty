@@ -185,6 +185,7 @@ let financeTimer = null;
 let platformMetricsTicker = null;
 let longPressTimer = null;
 let longPressHandledActionId = "";
+let actionsDelayTicker = null;
 let historyDeleteHoldTimer = null;
 let historyDeleteHoldInterval = null;
 let historyMediaRecorder = null;
@@ -444,6 +445,12 @@ function openModal(id) {
 
   if (id === "actionsModal") {
     void loadActions();
+    if (actionsDelayTicker) {
+      window.clearInterval(actionsDelayTicker);
+    }
+    actionsDelayTicker = window.setInterval(() => {
+      renderActions();
+    }, 30000);
   }
 
   if (id === "calendarModal") {
@@ -491,6 +498,11 @@ function closeModal(modal) {
     state.constitutionEditing = false;
     constitutionEditWrap.hidden = true;
     constitutionMessage.textContent = "";
+  }
+
+  if (modal.id === "actionsModal" && actionsDelayTicker) {
+    window.clearInterval(actionsDelayTicker);
+    actionsDelayTicker = null;
   }
 
   if (modal.id === "historyModal") {
@@ -751,8 +763,9 @@ function renderActions() {
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
+    const delayMinutes = getPendingDelayMinutes(action);
     const row = document.createElement("article");
-    row.className = `task-row${stateClass}`;
+    row.className = `task-row${stateClass}${getDelayClassByMinutes(delayMinutes)}`;
     row.dataset.actionId = action.id;
     row.setAttribute("role", "button");
     row.tabIndex = 0;
@@ -779,6 +792,50 @@ function getActionDurationMinutes(action) {
   }
 
   return Math.max(0, Math.round((end - start) / (60 * 1000)));
+}
+
+function getActionLateStartMinutes(action) {
+  if (Number.isFinite(Number(action?.lateStartMinutes))) {
+    return Math.max(0, Number(action.lateStartMinutes));
+  }
+  const startAt = new Date(action?.startAt).getTime();
+  const startedAt = new Date(action?.startedAt).getTime();
+  if (!Number.isFinite(startAt) || !Number.isFinite(startedAt)) {
+    return 0;
+  }
+  return Math.max(0, Math.round((startedAt - startAt) / (60 * 1000)));
+}
+
+function getPendingDelayMinutes(action) {
+  const status = normalizeActionStatus(action?.status);
+  if (status !== actionStatuses.pending) {
+    return 0;
+  }
+  const startAt = new Date(action?.startAt).getTime();
+  if (!Number.isFinite(startAt)) {
+    return 0;
+  }
+  const delta = Date.now() - startAt;
+  return delta > 0 ? Math.floor(delta / (60 * 1000)) : 0;
+}
+
+function getDelayClassByMinutes(minutes) {
+  if (minutes <= 0) {
+    return "";
+  }
+  if (minutes < 15) {
+    return " task-delay-soft";
+  }
+  if (minutes < 60) {
+    return " task-delay-yellow";
+  }
+  if (minutes < 120) {
+    return " task-delay-orange";
+  }
+  if (minutes < 240) {
+    return " task-delay-red";
+  }
+  return " task-delay-black";
 }
 
 function renderActionsProgress() {
@@ -852,6 +909,20 @@ async function toggleActionStatus(actionId) {
 
   if (!targetAction) {
     return;
+  }
+
+  const currentStatus = normalizeActionStatus(targetAction.status);
+  if (currentStatus === actionStatuses.pending) {
+    const okStart = window.confirm(`Você quer começar "${targetAction.title}" ?`);
+    if (!okStart) {
+      return;
+    }
+  }
+  if (currentStatus === actionStatuses.inProgress) {
+    const okEnd = window.confirm(`Você quer encerrar "${targetAction.title}" ?`);
+    if (!okEnd) {
+      return;
+    }
   }
 
   try {
@@ -1354,12 +1425,14 @@ function buildStatsRankingFromSummary() {
     const item = byAssignee[name] || { totalMinutes: 0, completedMinutes: 0 };
     const total = Number(item.totalMinutes || 0);
     const completed = Number(item.completedMinutes || 0);
+    const lateStartMinutes = Number(item.lateStartMinutes || 0);
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     const payload = {
       name,
       total,
       completed,
-      percent
+      percent,
+      lateStartMinutes
     };
 
     if (name === "Geral") {
@@ -1383,9 +1456,11 @@ function buildStatsRankingFromSummary() {
 }
 
 function renderStatsRanking() {
-  const general = state.statsGeneral || { percent: 0, completed: 0, total: 0 };
+  const general = state.statsGeneral || { percent: 0, completed: 0, total: 0, lateStartMinutes: 0 };
   statsGeneralAvatar.src = actionAvatarByAssignee.Geral;
-  statsGeneralDetail.textContent = `${general.percent}%`;
+  statsGeneralDetail.textContent = general.lateStartMinutes > 0
+    ? `${general.percent}% • atraso ${general.lateStartMinutes}m`
+    : `${general.percent}%`;
 
   if (!statsRankingList) {
     return;
@@ -1408,7 +1483,7 @@ function renderStatsRanking() {
       </div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${entry.percent}%</div>
+        <div class="task-assignee">${entry.lateStartMinutes > 0 ? `${entry.percent}% • atraso ${entry.lateStartMinutes}m` : `${entry.percent}%`}</div>
       </div>
     `;
     statsRankingList.appendChild(row);
@@ -1646,7 +1721,8 @@ async function pushSystemHistoryEvent(payload) {
         occurredAt: payload.occurredAt || new Date().toISOString(),
         percent: Number(payload.percent || 0),
         pendingCount: Number(payload.pendingCount || 0),
-        scopeDate: payload.scopeDate || null
+        scopeDate: payload.scopeDate || null,
+        lateStartMinutes: Number(payload.lateStartMinutes || 0)
       })
     });
     if (response?.event) {
@@ -1665,6 +1741,9 @@ function buildSystemMessage(entry) {
   const person = escapeHtml(entry.assignee || "Geral");
   const task = `<strong>${escapeHtml(entry.taskTitle || "Tarefa")}</strong>`;
   if (entry.type === "start") {
+    if (Number(entry.lateStartMinutes || 0) > 0) {
+      return `${person} começou ${task} com ${Number(entry.lateStartMinutes)} minutos de atraso`;
+    }
     return `${person} começou ${task}`;
   }
   if (entry.type === "pause") {
@@ -1832,7 +1911,8 @@ function registerSystemEventFromActionTransition(before, after) {
     type,
     assignee,
     taskTitle,
-    occurredAt: new Date().toISOString()
+    occurredAt: new Date().toISOString(),
+    lateStartMinutes: type === "start" ? getActionLateStartMinutes(after) : 0
   });
 }
 

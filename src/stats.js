@@ -172,7 +172,9 @@ async function buildStatsSummary(userId, range) {
             a.id,
             a.assignee,
             extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
-            coalesce(o.status, 'PENDING') as status
+            coalesce(o.status, 'PENDING') as status,
+            o.started_at,
+            a.start_at
           from actions a
           left join action_status_overrides o
             on o.user_id = a.user_id
@@ -184,7 +186,14 @@ async function buildStatsSummary(userId, range) {
         select
           assignee,
           coalesce(sum(minutes), 0)::bigint as total_minutes,
-          coalesce(sum(case when upper(status) = 'COMPLETED' then minutes else 0 end), 0)::bigint as completed_minutes
+          coalesce(sum(case when upper(status) = 'COMPLETED' then minutes else 0 end), 0)::bigint as completed_minutes,
+          coalesce(sum(
+            case
+              when started_at is null then 0
+              when started_at <= start_at then 0
+              else extract(epoch from (started_at - start_at)) / 60.0
+            end
+          ), 0)::bigint as late_start_minutes
         from action_status
         group by assignee
       `,
@@ -229,12 +238,14 @@ async function buildStatsSummary(userId, range) {
     const assignee = ASSIGNEES.includes(row.assignee) ? row.assignee : "Geral";
     byAssignee[assignee] = {
       totalMinutes: Number(row.total_minutes || 0),
-      completedMinutes: Number(row.completed_minutes || 0)
+      completedMinutes: Number(row.completed_minutes || 0),
+      lateStartMinutes: Number(row.late_start_minutes || 0)
     };
   }
 
   const totalMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.totalMinutes || 0), 0);
   const completedMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.completedMinutes || 0), 0);
+  const lateStartMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.lateStartMinutes || 0), 0);
 
   return {
     rangeKey: range.key,
@@ -242,6 +253,7 @@ async function buildStatsSummary(userId, range) {
     totals: {
       totalMinutes,
       completedMinutes,
+      lateStartMinutes,
       completionPercent: totalMinutes > 0 ? Math.round((completedMinutes / totalMinutes) * 100) : 0,
       incomeCents: Number(incomeResult.rows[0]?.income_cents || 0),
       expenseCents: Number(expenseResult.rows[0]?.expense_cents || 0),
