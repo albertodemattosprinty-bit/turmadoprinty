@@ -225,6 +225,8 @@ let financeTimer = null;
 let platformMetricsTicker = null;
 let longPressTimer = null;
 let longPressHandledActionId = "";
+let platformLongPressTimer = null;
+let platformLongPressHandledOccurrenceId = "";
 let actionsDelayTicker = null;
 let historyDeleteHoldTimer = null;
 let historyDeleteHoldInterval = null;
@@ -1399,6 +1401,22 @@ function endActionLongPress() {
   if (longPressTimer) {
     window.clearTimeout(longPressTimer);
     longPressTimer = null;
+  }
+}
+
+function beginPlatformLongPress(occurrenceId) {
+  if (platformLongPressTimer) {
+    window.clearTimeout(platformLongPressTimer);
+  }
+  platformLongPressTimer = window.setTimeout(() => {
+    platformLongPressHandledOccurrenceId = occurrenceId;
+  }, 500);
+}
+
+function endPlatformLongPress() {
+  if (platformLongPressTimer) {
+    window.clearTimeout(platformLongPressTimer);
+    platformLongPressTimer = null;
   }
 }
 
@@ -2946,10 +2964,41 @@ actionsList.addEventListener("click", async (event) => {
   await toggleActionStatus(actionId);
 });
 
+platformEntriesList?.addEventListener("pointerdown", (event) => {
+  const row = event.target.closest("[data-occurrence-id]");
+  if (!row) {
+    return;
+  }
+  beginPlatformLongPress(String(row.dataset.occurrenceId || ""));
+});
+
+platformEntriesList?.addEventListener("pointerup", endPlatformLongPress);
+platformEntriesList?.addEventListener("pointerleave", endPlatformLongPress);
+platformEntriesList?.addEventListener("pointercancel", endPlatformLongPress);
+
 platformEntriesList?.addEventListener("click", async (event) => {
+  const row = event.target.closest("[data-occurrence-id]");
+  const occurrenceId = String(row?.dataset?.occurrenceId || "").trim();
+  if (occurrenceId && platformLongPressHandledOccurrenceId === occurrenceId) {
+    platformLongPressHandledOccurrenceId = "";
+    const entryName = String(row?.dataset?.entryName || "lançamento");
+    const confirmedDelete = window.confirm(`Apagar este item de finanças?\n\n${entryName}`);
+    if (!confirmedDelete) {
+      return;
+    }
+    try {
+      await apiRequest(`/api/platform/occurrences/${encodeURIComponent(occurrenceId)}`, {
+        method: "DELETE"
+      });
+      await loadPlatformFinance();
+    } catch (error) {
+      platformEntriesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    }
+    return;
+  }
+
   const button = event.target.closest("[data-delete-platform-entry]");
   if (!button) {
-    const row = event.target.closest("[data-occurrence-id]");
     const status = String(row?.dataset?.status || "").trim().toUpperCase();
     if (row && (status === "DUE_TODAY" || status === "OVERDUE")) {
       const kind = String(row.dataset.kind || "").toUpperCase();

@@ -22,7 +22,7 @@ import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getSched
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createUserAction, deleteUserAction, ensureActionsSchema, listUserActions, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
-import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
+import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
@@ -4471,6 +4471,28 @@ const server = http.createServer(async (request, response) => {
       const entryId = decodeURIComponent(pathname.replace(/^\/api\/platform\/entries\/([^/]+)$/, "$1"));
       const result = await deletePlatformFinanceEntry(user.id, entryId);
 
+      sendJson(response, result.deleted ? 200 : 404, {
+        ok: Boolean(result.deleted),
+        deleted: result.deleted
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel excluir lancamento."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/platform\/occurrences\/[^/]+$/)) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const occurrenceId = decodeURIComponent(pathname.replace(/^\/api\/platform\/occurrences\/([^/]+)$/, "$1"));
+      const result = await deletePlatformOccurrence(user.id, occurrenceId);
       sendJson(response, result.deleted ? 200 : 404, {
         ok: Boolean(result.deleted),
         deleted: result.deleted

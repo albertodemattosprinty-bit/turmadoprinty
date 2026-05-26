@@ -490,6 +490,25 @@ export async function payPlatformOccurrence(userId, occurrenceId) {
   };
 }
 
+export async function deletePlatformOccurrence(userId, occurrenceId) {
+  await ensurePlatformFinanceSchema();
+  const id = String(occurrenceId || "").trim();
+  if (!id) {
+    throw new Error("Ocorrencia invalida.");
+  }
+  const result = await query(
+    `
+      delete from platform_finance_occurrences
+      where user_id = $1
+        and id = $2
+    `,
+    [userId, id]
+  );
+  return {
+    deleted: Number(result.rowCount || 0)
+  };
+}
+
 export async function summarizePlatformFinanceMonth(userId, focusDate) {
   const focus = parseIsoDate(focusDate, "Data de referencia");
   const monthStart = new Date(focus.getFullYear(), focus.getMonth(), 1);
