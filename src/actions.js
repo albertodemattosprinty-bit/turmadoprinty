@@ -395,23 +395,22 @@ export async function updateUserActionStatus(userId, actionId) {
   if (nextStatus === ACTION_STATUS_IN_PROGRESS) {
     const inProgressConflict = await query(
       `
-        select a.id, a.assignee
+        select a.id, a.assignee, a.title
         from actions a
         join action_status_overrides o
           on o.user_id = a.user_id
          and o.action_id = a.id
         where a.user_id = $1
           and a.id <> $2
-          and lower(trim(a.title)) = lower(trim($3))
           and coalesce(upper(o.status), 'PENDING') = 'IN_PROGRESS'
-          and lower(trim(coalesce(a.assignee, ''))) <> lower(trim(coalesce($4, '')))
+          and lower(trim(coalesce(a.assignee, ''))) = lower(trim(coalesce($3, '')))
         limit 1
       `,
-      [userId, action.id, action.title, action.assignee]
+      [userId, action.id, action.assignee]
     );
 
     if (inProgressConflict.rows[0]) {
-      throw new Error("Essa tarefa ja esta em andamento para outro usuario.");
+      throw new Error("Voce ja esta em outra tarefa.");
     }
 
     startedAt = startedAt || nowIso;
