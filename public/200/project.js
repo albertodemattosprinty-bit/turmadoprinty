@@ -1910,11 +1910,11 @@ function renderStatsGoals() {
   const totals = summary.totals || {};
   const recurringIncome = Number(state.platformBaseIncomeCents || 0);
 
-  const dailyPercent = safeGoalPercent(Number(totals.incomeCents || 0), Number(goals.dailyIncomeGoalCents || 0));
+  const dailyValue = Number(state.platformBalanceCents || 0);
   const monthlyPercent = safeGoalPercent(Number(totals.balanceCents || 0), Number(goals.monthlyBalanceGoalCents || 0));
   const recurringPercent = safeGoalPercent(recurringIncome, Number(goals.recurringIncomeGoalCents || 0));
 
-  statsDailyGoalProgress.textContent = `${dailyPercent}%`;
+  statsDailyGoalProgress.textContent = formatMoney(dailyValue);
   statsMonthlyGoalProgress.textContent = `${monthlyPercent}%`;
   statsRecurringGoalProgress.textContent = `${recurringPercent}%`;
 }
@@ -2000,15 +2000,17 @@ async function loadStatsSummary() {
   try {
     const scope = getActiveStatsScope();
     statsScopeLabel.textContent = scope.label;
-    const [summaryPayload, goalsPayload, platformPayload] = await Promise.all([
+    const [summaryPayload, goalsPayload, platformPayload, platformMonthPayload] = await Promise.all([
       apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`),
       apiRequest("/api/stats/goals"),
-      apiRequest("/api/finance/summary?period=total")
+      apiRequest("/api/finance/summary?period=total"),
+      apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`)
     ]);
 
     state.statsSummary = summaryPayload.summary || {};
     state.statsGoals = goalsPayload.goals || null;
     state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
+    state.platformBalanceCents = Number(platformMonthPayload?.summary?.balanceCents || state.platformBalanceCents);
     buildStatsRankingFromSummary();
     renderStatsGoals();
     renderStatsRanking();
@@ -2918,7 +2920,6 @@ actionsList.addEventListener("keydown", async (event) => {
 });
 
 handleSwipe(activeDateLabel, moveActiveDate);
-handleSwipe(actionsList, moveActiveDate);
 handleSwipe(financePeriodLabel, moveFinancePeriod);
 handleSwipe(financePeriodPicker, moveFinancePeriod);
 handleSwipe(wizardAssigneeLabel, moveWizardAssignee);

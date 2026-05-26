@@ -159,9 +159,11 @@ svg {
   border-radius: 0;
   background: transparent;
   min-height: auto;
-  min-height: 66px;
+  min-height: 84px;
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 4px;
   cursor: pointer;
   box-shadow: none;
   transition: transform 0.18s ease, opacity 0.18s ease;
@@ -187,6 +189,13 @@ svg {
   color: #fff;
   fill: currentColor;
   display: block;
+}
+
+.hub-label {
+  font-size: 0.8rem;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .home-datetime {
