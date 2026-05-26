@@ -511,6 +511,78 @@ async function apiRequest(path, options = {}) {
   return payload;
 }
 
+async function apiRequestWithTimeout(path, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await apiRequest(path, {
+      ...options,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("A interpretação demorou demais.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function inferFinanceEntryLocally(text) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    throw new Error("Sem texto para interpretar.");
+  }
+  const normalized = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const numberMatch = normalized.match(/(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/);
+  if (!numberMatch) {
+    throw new Error("Nao consegui identificar o valor.");
+  }
+  const numeric = Number(numberMatch[1].replace(/\./g, "").replace(/,/g, "."));
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw new Error("Nao consegui identificar o valor.");
+  }
+  const amountCents = Math.round(numeric * 100);
+
+  const isIncome = /\b(recebi|entrada|ganhei|vendi|pagaram|deposito|depositaram)\b/.test(normalized);
+  const kind = isIncome ? "INCOME" : "EXPENSE";
+  let category = kind === "INCOME" ? "Eventos" : "Alimentacao";
+  if (kind === "EXPENSE") {
+    if (/\b(gasolina|uber|mecanico|oficina|carro)\b/.test(normalized)) category = "Carro";
+    else if (/\b(render|openai|chatgpt|site|dominio|hospedagem|plataforma)\b/.test(normalized)) category = "Plataformas";
+    else if (/\b(luz|internet|gas|streaming|aluguel|pintura|reparo|casa)\b/.test(normalized)) category = "Servicos casa";
+    else if (/\b(viagem|pedagio|evento|led)\b/.test(normalized)) category = "Eventos";
+    else if (/\b(lazer|cinema|bar|show)\b/.test(normalized)) category = "Lazer";
+    else if (/\b(anuncio|trafego|ads)\b/.test(normalized)) category = "Anuncios";
+  } else {
+    if (/\b(site)\b/.test(normalized)) category = "Site";
+    else if (/\b(apoiador|apoio)\b/.test(normalized)) category = "Apoiadores";
+    else if (/\b(inscricao)\b/.test(normalized)) category = "Inscricoes";
+    else if (/\b(venda)\b/.test(normalized)) category = "Venda de ativo";
+  }
+
+  let name = "Lancamento";
+  if (/\b(carne|acougue)\b/.test(normalized)) name = "Carne";
+  else if (/\b(pao|padaria)\b/.test(normalized)) name = "Padaria";
+  else if (/\b(gasolina|combustivel)\b/.test(normalized)) name = "Combustivel";
+  else if (/\b(aluguel)\b/.test(normalized)) name = "Aluguel";
+  else if (/\b(internet)\b/.test(normalized)) name = "Internet";
+  else if (/\b(luz)\b/.test(normalized)) name = "Luz";
+
+  return {
+    name,
+    kind,
+    category,
+    amountCents,
+    recurrenceType: "SIMPLE",
+    recurrenceDayOfMonth: 1
+  };
+}
+
 function openModal(id) {
   const modal = document.getElementById(id);
 
@@ -1607,12 +1679,17 @@ function movePlatformDate(amount) {
 }
 
 async function createPlatformEntryFromVoiceInterpret(text) {
-  const interpreted = await apiRequest("/api/200/finance/interpret", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text })
-  });
-  const entry = interpreted?.entry;
+  let entry = null;
+  try {
+    const interpreted = await apiRequestWithTimeout("/api/200/finance/interpret", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    }, 12000);
+    entry = interpreted?.entry || null;
+  } catch (_error) {
+    entry = inferFinanceEntryLocally(text);
+  }
   if (!entry) {
     throw new Error("Sem interpretação.");
   }
@@ -1624,6 +1701,9 @@ async function createPlatformEntryFromVoiceInterpret(text) {
     }
   }
   const categoryLabel = String(entry.category || "").trim() || "Sem categoria";
+  if (financeVoiceStatus) {
+    financeVoiceStatus.textContent = "Aguardando confirmação...";
+  }
   const ok = await openFinanceEntryConfirm(entry, categoryLabel);
   if (!ok) {
     return;
