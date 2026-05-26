@@ -1641,7 +1641,11 @@ async function handleProject200FinanceInterpret(request, response) {
         ["inscricoes", "Inscricoes"],
         ["apoiadores", "Apoiadores"],
         ["site", "Site"],
-        ["venda de ativo", "Venda de ativo"]
+        ["venda de ativo", "Venda de ativo"],
+        ["direitos autorais", "Direitos autorais"],
+        ["autorais", "Direitos autorais"],
+        ["copyright", "Direitos autorais"],
+        ["royalties", "Direitos autorais"]
       ]);
       const expenseMap = new Map([
         ["alimentacao", "Alimentacao"],
@@ -1653,7 +1657,17 @@ async function handleProject200FinanceInterpret(request, response) {
         ["plataformas", "Plataformas"],
         ["plataforma", "Plataformas"],
         ["servicos casa", "Servicos casa"],
-        ["casa", "Servicos casa"]
+        ["casa", "Servicos casa"],
+        ["vestuario", "Vestuario"],
+        ["roupa", "Vestuario"],
+        ["saude", "Saude"],
+        ["remedio", "Saude"],
+        ["farmacia", "Saude"],
+        ["imprevistos", "Imprevistos"],
+        ["imprevisto", "Imprevistos"],
+        ["emprestimos e juros", "Emprestimos e Juros"],
+        ["emprestimo", "Emprestimos e Juros"],
+        ["juros", "Emprestimos e Juros"]
       ]);
       const map = kind === "INCOME" ? incomeMap : expenseMap;
       if (map.has(normalized)) {
@@ -1674,7 +1688,7 @@ async function handleProject200FinanceInterpret(request, response) {
       messages: [
         {
           role: "system",
-          content: "Interprete texto financeiro em pt-BR e responda APENAS JSON puro com campos: name, kind(INCOME|EXPENSE), category, amountCents, amount(optional), recurrenceType(SIMPLE|RECURRING), recurrenceDayOfMonth(optional). Regras obrigatorias: (1) se usuario falar 'dia X' ou 'todo dia X', use RECURRING e recurrenceDayOfMonth=X (1..31); (2) se recorrencia nao estiver explicita, use SIMPLE; (3) titulo minimalista e direto (max 25 chars). Categorias de saida permitidas: Alimentacao, Aluguel, Carro, Eventos, Servicos casa, Anuncios, Plataformas, Lazer. Categorias de entrada permitidas: Eventos, Inscricoes, Apoiadores, Site, Venda de ativo. Mapeamento: pao/comida/restaurante/mercado => Alimentacao; gasolina/uber/oficina => Carro; render/site/openai/chatgpt => Plataformas; luz/internet/gas/streaming/reparo/pintura/casa => Servicos casa (ou Aluguel quando for aluguel); viagens/pedagio/leds => Eventos ou Lazer conforme contexto. Se falar 'entrou/recebi/venda' tende a INCOME. Se falar 'gastei/paguei/comprei' tende a EXPENSE. Exemplo: 'gastei 10 reais de pao' => {name:'Padaria',kind:'EXPENSE',category:'Alimentacao',amountCents:1000,recurrenceType:'SIMPLE'}. Exemplo: '250 reais de luz todo dia 10' => {name:'Conta de luz',kind:'EXPENSE',category:'Servicos casa',amountCents:25000,recurrenceType:'RECURRING',recurrenceDayOfMonth:10}."
+          content: "Interprete texto financeiro em pt-BR e responda APENAS JSON puro com campos: name, kind(INCOME|EXPENSE), category, amountCents, amount(optional), recurrenceType(SIMPLE|RECURRING), recurrenceDayOfMonth(optional). Regras obrigatorias: (1) se usuario falar 'dia X' ou 'todo dia X', use RECURRING e recurrenceDayOfMonth=X (1..31); (2) se recorrencia nao estiver explicita, use SIMPLE; (3) titulo minimalista e direto (max 25 chars). Categorias de saida permitidas: Alimentacao, Aluguel, Carro, Eventos, Servicos casa, Anuncios, Plataformas, Lazer, Vestuario, Saude, Imprevistos, Emprestimos e Juros. Categorias de entrada permitidas: Eventos, Inscricoes, Apoiadores, Site, Venda de ativo, Direitos autorais. Mapeamento: pao/comida/restaurante/mercado => Alimentacao; gasolina/uber/oficina => Carro; render/site/openai/chatgpt => Plataformas; luz/internet/gas/streaming/reparo/pintura/casa => Servicos casa (ou Aluguel quando for aluguel); viagem/pedagio/leds => Eventos ou Lazer; roupa/camisa/sapato => Vestuario; medico/farmacia/remedio/exame => Saude; emergencia/imprevisto => Imprevistos; emprestimo/juros => Emprestimos e Juros; royalties/direitos autorais => Direitos autorais. Se falar 'entrou/recebi/venda' tende a INCOME. Se falar 'gastei/paguei/comprei' tende a EXPENSE. Exemplo: 'gastei 10 reais de pao' => {name:'Padaria',kind:'EXPENSE',category:'Alimentacao',amountCents:1000,recurrenceType:'SIMPLE'}. Exemplo: '250 reais de luz todo dia 10' => {name:'Conta de luz',kind:'EXPENSE',category:'Servicos casa',amountCents:25000,recurrenceType:'RECURRING',recurrenceDayOfMonth:10}."
         },
         { role: "user", content: text.slice(0, 1200) }
       ]

@@ -37,8 +37,8 @@ const actionAvatarByAssignee = {
   Thainan: "/200/avatars/thainan.png",
   Wilton: "/200/avatars/wilton.png"
 };
-const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo"];
-const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer"];
+const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo", "Direitos autorais"];
+const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer", "Vestuario", "Saude", "Imprevistos", "Emprestimos e Juros"];
 const platformCategoryIconByName = {
   Alimentacao: "/200/icons/alimentacao.svg",
   Aluguel: "/200/icons/aluguel.svg",
@@ -51,7 +51,12 @@ const platformCategoryIconByName = {
   Inscricoes: "/200/icons/inscricoes.svg",
   Apoiadores: "/200/icons/apoiadores.svg",
   Site: "/200/icons/site.svg",
-  "Venda de ativo": "/200/icons/venda-de-ativo.svg"
+  "Venda de ativo": "/200/icons/venda-de-ativo.svg",
+  "Direitos autorais": "/200/icons/direitos-autorais.svg",
+  Vestuario: "/200/icons/vestuario.svg",
+  Saude: "/200/icons/saude.svg",
+  Imprevistos: "/200/icons/imprevistos.svg",
+  "Emprestimos e Juros": "/200/icons/emprestimos-juros.svg"
 };
 const constitutionDefaultText = "O Projeto Família é o nosso principal e mais importante projeto, ele visa bem estar, segurança em um projeto contínuo de longo prazo, todos os envolvidos se comprometem a concluir de boa vontade as propostas descritas no projeto";
 const financePeriods = [
@@ -125,6 +130,7 @@ const platformWizardBackButton = document.getElementById("platformWizardBack");
 const platformWizardNextButton = document.getElementById("platformWizardNext");
 const platformWizardAiCreateButton = document.getElementById("platformWizardAiCreate");
 const platformNameInput = document.getElementById("platformName");
+const platformNameMicButton = document.getElementById("platformNameMicButton");
 const platformValueInput = document.getElementById("platformValue");
 const platformCategoryRow = document.getElementById("platformCategoryRow");
 const platformRecurrenceDayLabel = document.getElementById("platformRecurrenceDayLabel");
@@ -247,6 +253,12 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
+let platformNameMediaRecorder = null;
+let platformNameMediaStream = null;
+let platformNameAudioContext = null;
+let platformNameAudioAnalyser = null;
+let platformNameSpeechMonitorTimer = null;
+let platformNameLastSpeechAt = 0;
 
 const state = {
   activeOffset: 0,
@@ -603,6 +615,10 @@ function inferFinanceEntryLocally(text) {
   let category = kind === "INCOME" ? "Eventos" : "Alimentacao";
   if (kind === "EXPENSE") {
     if (/\b(gasolina|uber|mecanico|oficina|carro)\b/.test(normalized)) category = "Carro";
+    else if (/\b(roupa|camisa|calca|sapato|tenis|vestuario)\b/.test(normalized)) category = "Vestuario";
+    else if (/\b(medico|medica|consulta|exame|farmacia|remedio|saude)\b/.test(normalized)) category = "Saude";
+    else if (/\b(imprevisto|emergencia|quebrou|acidente)\b/.test(normalized)) category = "Imprevistos";
+    else if (/\b(emprestimo|juros|financiamento|parcela banco)\b/.test(normalized)) category = "Emprestimos e Juros";
     else if (/\b(render|openai|chatgpt|site|dominio|hospedagem|plataforma)\b/.test(normalized)) category = "Plataformas";
     else if (/\b(luz|internet|gas|streaming|aluguel|pintura|reparo|casa)\b/.test(normalized)) category = "Servicos casa";
     else if (/\b(viagem|pedagio|evento|led)\b/.test(normalized)) category = "Eventos";
@@ -610,6 +626,7 @@ function inferFinanceEntryLocally(text) {
     else if (/\b(anuncio|trafego|ads)\b/.test(normalized)) category = "Anuncios";
   } else {
     if (/\b(site)\b/.test(normalized)) category = "Site";
+    else if (/\b(autorais|royalt|direitos autorais|copyright)\b/.test(normalized)) category = "Direitos autorais";
     else if (/\b(apoiador|apoio)\b/.test(normalized)) category = "Apoiadores";
     else if (/\b(inscricao)\b/.test(normalized)) category = "Inscricoes";
     else if (/\b(venda)\b/.test(normalized)) category = "Venda de ativo";
@@ -2199,6 +2216,7 @@ function openPlatformWizard() {
 }
 
 function closePlatformWizard() {
+  stopPlatformNameMic();
   platformWizard.classList.remove("active");
   platformWizard.setAttribute("aria-hidden", "true");
 }
@@ -2712,6 +2730,104 @@ async function startHistoryMic() {
     stopHistoryMic();
   }
 }
+
+function stopPlatformNameMic() {
+  if (platformNameSpeechMonitorTimer) {
+    window.clearInterval(platformNameSpeechMonitorTimer);
+    platformNameSpeechMonitorTimer = null;
+  }
+  if (platformNameMediaRecorder && platformNameMediaRecorder.state !== "inactive") {
+    platformNameMediaRecorder.stop();
+  }
+  platformNameMediaRecorder = null;
+  platformNameAudioAnalyser = null;
+  if (platformNameAudioContext) {
+    platformNameAudioContext.close().catch(() => {});
+    platformNameAudioContext = null;
+  }
+  if (platformNameMediaStream) {
+    platformNameMediaStream.getTracks().forEach((track) => track.stop());
+    platformNameMediaStream = null;
+  }
+  platformNameMicButton?.classList.remove("mic-active");
+}
+
+async function startPlatformNameMic() {
+  if (platformNameMediaRecorder && platformNameMediaRecorder.state !== "inactive") {
+    stopPlatformNameMic();
+    platformWizardMessage.textContent = "Transcrevendo...";
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    platformNameMediaStream = stream;
+    platformNameAudioContext = new AudioContext();
+    const source = platformNameAudioContext.createMediaStreamSource(stream);
+    platformNameAudioAnalyser = platformNameAudioContext.createAnalyser();
+    platformNameAudioAnalyser.fftSize = 2048;
+    source.connect(platformNameAudioAnalyser);
+
+    const chunks = [];
+    platformNameMediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    platformNameMediaRecorder.ondataavailable = (event) => {
+      if (event.data?.size) {
+        chunks.push(event.data);
+      }
+    };
+    platformNameMediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (!blob.size) {
+        platformWizardMessage.textContent = "Sem áudio captado.";
+        return;
+      }
+      try {
+        const base64 = await blob.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
+        const transcribed = await apiRequest("/api/audio/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm", fileName: "platform-name.webm" })
+        });
+        const spoken = String(transcribed?.text || "").trim();
+        if (!spoken) {
+          platformWizardMessage.textContent = "Não consegui transcrever sua fala.";
+          return;
+        }
+        platformNameInput.value = spoken;
+        platformNameInput.dispatchEvent(new Event("input", { bubbles: true }));
+        platformWizardMessage.textContent = "Texto transcrito.";
+      } catch (error) {
+        platformWizardMessage.textContent = error instanceof Error ? error.message : "Falha na transcrição.";
+      }
+    };
+    platformNameMediaRecorder.start();
+    platformNameMicButton?.classList.add("mic-active");
+    platformWizardMessage.textContent = "Microfone ouvindo...";
+    platformNameLastSpeechAt = Date.now();
+    platformNameSpeechMonitorTimer = window.setInterval(() => {
+      if (!platformNameAudioAnalyser) {
+        return;
+      }
+      const buffer = new Uint8Array(platformNameAudioAnalyser.fftSize);
+      platformNameAudioAnalyser.getByteTimeDomainData(buffer);
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i += 1) {
+        const value = (buffer[i] - 128) / 128;
+        sum += value * value;
+      }
+      const rms = Math.sqrt(sum / buffer.length);
+      if (rms > 0.02) {
+        platformNameLastSpeechAt = Date.now();
+      }
+      if (Date.now() - platformNameLastSpeechAt >= 2000) {
+        platformWizardMessage.textContent = "Silêncio detectado. Transcrevendo...";
+        stopPlatformNameMic();
+      }
+    }, 120);
+  } catch (error) {
+    stopPlatformNameMic();
+    platformWizardMessage.textContent = error instanceof Error ? error.message : "Falha ao abrir microfone.";
+  }
+}
 function handleSwipe(element, callback) {
   if (!element) {
     return;
@@ -2768,6 +2884,9 @@ openActionWizardButton.addEventListener("click", () => {
 
 closeActionWizardButton.addEventListener("click", closeWizard);
 closePlatformWizardButton?.addEventListener("click", closePlatformWizard);
+platformNameMicButton?.addEventListener("click", () => {
+  void startPlatformNameMic();
+});
 
 wizardBackButton.addEventListener("click", () => {
   state.wizard.step = Math.max(1, state.wizard.step - 1);
