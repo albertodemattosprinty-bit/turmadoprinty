@@ -116,15 +116,8 @@ const platformBalanceValue = document.getElementById("platformBalanceValue");
 const togglePlatformBalanceButton = document.getElementById("togglePlatformBalance");
 const addPlatformBalanceButton = document.getElementById("addPlatformBalance");
 const openPlatformWizardButton = document.getElementById("openPlatformWizard");
-const openPlatformVoiceModalButton = document.getElementById("openPlatformVoiceModal");
 const platformWizard = document.getElementById("platformWizard");
 const closePlatformWizardButton = document.getElementById("closePlatformWizard");
-const platformVoiceModal = document.getElementById("platformVoiceModal");
-const closePlatformVoiceModalButton = document.getElementById("closePlatformVoiceModal");
-const platformVoiceStatus = document.getElementById("platformVoiceStatus");
-const platformVoiceLiveText = document.getElementById("platformVoiceLiveText");
-const platformVoiceClearButton = document.getElementById("platformVoiceClear");
-const platformVoiceCreateButton = document.getElementById("platformVoiceCreate");
 const platformForm = document.getElementById("platformForm");
 const platformWizardStepLabel = document.getElementById("platformWizardStepLabel");
 const platformWizardMessage = document.getElementById("platformWizardMessage");
@@ -252,9 +245,6 @@ let actionAudioAnalyser = null;
 let actionSpeechMonitorTimer = null;
 let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
-let platformVoiceRecognition = null;
-let platformVoiceFinalTranscript = "";
-let platformVoiceInterimTranscript = "";
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
 
@@ -721,7 +711,6 @@ function closeModal(modal) {
   }
   if (modal.id === "calendarModal") {
     closeFinanceEntryConfirm(false);
-    closePlatformVoiceModal();
   }
 }
 
@@ -2219,107 +2208,6 @@ function closePlatformWizard() {
   platformWizard.setAttribute("aria-hidden", "true");
 }
 
-function renderPlatformVoiceText() {
-  if (!platformVoiceLiveText) {
-    return;
-  }
-  const merged = [platformVoiceFinalTranscript, platformVoiceInterimTranscript].filter(Boolean).join(" ").trim();
-  platformVoiceLiveText.textContent = merged || "Fale algo como: comprei pão custou 10 conto.";
-}
-
-function stopPlatformVoiceCapture() {
-  if (!platformVoiceRecognition) {
-    return;
-  }
-  const recognition = platformVoiceRecognition;
-  platformVoiceRecognition = null;
-  try {
-    recognition.stop();
-  } catch (_error) {
-    // noop
-  }
-}
-
-function closePlatformVoiceModal() {
-  stopPlatformVoiceCapture();
-  platformVoiceModal?.classList.remove("active");
-  platformVoiceModal?.setAttribute("aria-hidden", "true");
-  document.querySelector(".finance-bottom-actions")?.classList.remove("swipe-active");
-}
-
-function openPlatformVoiceModal() {
-  platformVoiceFinalTranscript = "";
-  platformVoiceInterimTranscript = "";
-  renderPlatformVoiceText();
-  if (platformVoiceStatus) {
-    platformVoiceStatus.textContent = "Deslize para cima para começar.";
-  }
-  platformVoiceModal?.classList.add("active");
-  platformVoiceModal?.setAttribute("aria-hidden", "false");
-}
-
-function startPlatformVoiceCapture() {
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) {
-    if (platformVoiceStatus) {
-      platformVoiceStatus.textContent = "Reconhecimento de voz não disponível neste dispositivo.";
-    }
-    return;
-  }
-
-  stopPlatformVoiceCapture();
-  platformVoiceInterimTranscript = "";
-  renderPlatformVoiceText();
-
-  const recognition = new Recognition();
-  recognition.lang = "pt-BR";
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
-
-  recognition.onresult = (event) => {
-    let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      const result = event.results[i];
-      const part = String(result?.[0]?.transcript || "").trim();
-      if (!part) {
-        continue;
-      }
-      if (result.isFinal) {
-        platformVoiceFinalTranscript = `${platformVoiceFinalTranscript} ${part}`.trim();
-      } else {
-        interim = `${interim} ${part}`.trim();
-      }
-    }
-    platformVoiceInterimTranscript = interim;
-    renderPlatformVoiceText();
-  };
-
-  recognition.onerror = () => {
-    if (platformVoiceStatus) {
-      platformVoiceStatus.textContent = "Erro ao captar voz. Tente novamente.";
-    }
-    stopPlatformVoiceCapture();
-  };
-
-  recognition.onend = () => {
-    if (platformVoiceRecognition === recognition) {
-      platformVoiceRecognition = null;
-    }
-    platformVoiceInterimTranscript = "";
-    renderPlatformVoiceText();
-    if (platformVoiceStatus && platformVoiceFinalTranscript.trim()) {
-      platformVoiceStatus.textContent = "Texto captado. Toque em criar lançamento.";
-    }
-  };
-
-  platformVoiceRecognition = recognition;
-  recognition.start();
-  if (platformVoiceStatus) {
-    platformVoiceStatus.textContent = "Microfone ouvindo...";
-  }
-}
-
 function movePlatformRecurrenceDay(amount) {
   const current = Number(state.platformWizard.recurrenceDayOfMonth || 1);
   state.platformWizard.recurrenceDayOfMonth = ((current - 1 + amount + 31) % 31) + 1;
@@ -2835,26 +2723,17 @@ function handleSwipe(element, callback) {
   }
 
   let startX = 0;
-  let startY = 0;
 
   element.addEventListener("touchstart", (event) => {
     startX = event.changedTouches[0]?.clientX || 0;
-    startY = event.changedTouches[0]?.clientY || 0;
   }, { passive: true });
 
   element.addEventListener("touchend", (event) => {
     const endX = event.changedTouches[0]?.clientX || 0;
-    const endY = event.changedTouches[0]?.clientY || 0;
     const delta = endX - startX;
-    const deltaY = endY - startY;
-
-    if (Math.abs(deltaY) >= 56 && Math.abs(deltaY) > Math.abs(delta) && deltaY < 0) {
-      callback("up");
-      return;
-    }
 
     if (Math.abs(delta) >= 48) {
-      callback(delta > 0 ? "right" : "left");
+      callback(delta > 0 ? -1 : 1);
     }
   }, { passive: true });
 }
@@ -3151,42 +3030,11 @@ actionsList.addEventListener("keydown", async (event) => {
   await toggleActionStatus(row.dataset.actionId);
 });
 
-handleSwipe(activeDateLabel, (direction) => {
-  if (direction === "left" || direction === "right") {
-    moveActiveDate(direction === "right" ? -1 : 1);
-  }
-});
-handleSwipe(financePeriodLabel, (direction) => {
-  if (direction === "left" || direction === "right") {
-    moveFinancePeriod(direction === "right" ? -1 : 1);
-  }
-});
-handleSwipe(financePeriodPicker, (direction) => {
-  if (direction === "left" || direction === "right") {
-    moveFinancePeriod(direction === "right" ? -1 : 1);
-  }
-});
-handleSwipe(wizardAssigneeLabel, (direction) => {
-  if (direction === "left" || direction === "right") {
-    moveWizardAssignee(direction === "right" ? -1 : 1);
-  }
-});
-handleSwipe(financeDateLabel, (direction) => {
-  if (direction === "left" || direction === "right") {
-    movePlatformDate(direction === "right" ? -1 : 1);
-  }
-});
-handleSwipe(document.querySelector(".finance-bottom-actions"), (direction) => {
-  if (direction === "up") {
-    if (!getToken()) {
-      window.location.href = "/auth.html?next=/200";
-      return;
-    }
-    document.querySelector(".finance-bottom-actions")?.classList.add("swipe-active");
-    openPlatformVoiceModal();
-    startPlatformVoiceCapture();
-  }
-});
+handleSwipe(activeDateLabel, moveActiveDate);
+handleSwipe(financePeriodLabel, moveFinancePeriod);
+handleSwipe(financePeriodPicker, moveFinancePeriod);
+handleSwipe(wizardAssigneeLabel, moveWizardAssignee);
+handleSwipe(financeDateLabel, movePlatformDate);
 renderFinancePeriod();
 renderDateHeader();
 
@@ -3196,49 +3044,6 @@ openPlatformWizardButton?.addEventListener("click", () => {
     return;
   }
   openPlatformWizard();
-});
-openPlatformVoiceModalButton?.addEventListener("click", () => {
-  if (!getToken()) {
-    window.location.href = "/auth.html?next=/200";
-    return;
-  }
-  openPlatformVoiceModal();
-  startPlatformVoiceCapture();
-});
-closePlatformVoiceModalButton?.addEventListener("click", closePlatformVoiceModal);
-platformVoiceClearButton?.addEventListener("click", () => {
-  platformVoiceFinalTranscript = "";
-  platformVoiceInterimTranscript = "";
-  renderPlatformVoiceText();
-  if (platformVoiceStatus) {
-    platformVoiceStatus.textContent = "Texto limpo. Deslize para cima para ouvir novamente.";
-  }
-});
-platformVoiceCreateButton?.addEventListener("click", () => {
-  const text = [platformVoiceFinalTranscript, platformVoiceInterimTranscript].filter(Boolean).join(" ").trim();
-  if (!text) {
-    if (platformVoiceStatus) {
-      platformVoiceStatus.textContent = "Fale algo antes de criar.";
-    }
-    return;
-  }
-  if (platformVoiceStatus) {
-    platformVoiceStatus.textContent = "Interpretando e criando...";
-  }
-  void (async () => {
-    try {
-      stopPlatformVoiceCapture();
-      await createPlatformEntryFromVoiceInterpret(text);
-      if (platformVoiceStatus) {
-        platformVoiceStatus.textContent = "Lançamento criado com sucesso.";
-      }
-      closePlatformVoiceModal();
-    } catch (error) {
-      if (platformVoiceStatus) {
-        platformVoiceStatus.textContent = error instanceof Error ? error.message : "Falha ao criar lançamento.";
-      }
-    }
-  })();
 });
 closeFinanceEntryConfirmButton?.addEventListener("click", () => closeFinanceEntryConfirm(false));
 financeEntryConfirmCancel?.addEventListener("click", () => closeFinanceEntryConfirm(false));
@@ -3422,16 +3227,8 @@ document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));
 });
 
-handleSwipe(historyDateLabel, (direction) => {
-  if (direction === "left" || direction === "right") {
-    moveHistoryDate(direction === "right" ? -1 : 1);
-  }
-});
-handleSwipe(historyTimelineList, (direction) => {
-  if (direction === "left" || direction === "right") {
-    moveHistoryDate(direction === "right" ? -1 : 1);
-  }
-});
+handleSwipe(historyDateLabel, moveHistoryDate);
+handleSwipe(historyTimelineList, moveHistoryDate);
 startHomeDateTimeTicker();
 startRunningTaskTicker();
 
