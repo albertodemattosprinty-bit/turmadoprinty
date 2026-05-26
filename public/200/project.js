@@ -1370,7 +1370,7 @@ function renderPlatformEntries() {
     const isDebit = String(entry.kind || "").toUpperCase() !== "INCOME";
     const categoryName = String(entry.category || "").trim();
     const categoryIcon = platformCategoryIconByName[categoryName] || "/200/icons/financas.svg";
-    row.className = `task-row platform-entry-row ${kindClass} ${getPlatformStatusClass(entry)}`;
+    row.className = `platform-entry-row ${kindClass} ${getPlatformStatusClass(entry)}`.trim();
     row.dataset.occurrenceId = entry.id || "";
     row.dataset.status = String(entry.status || "").trim().toUpperCase();
     row.innerHTML = `
