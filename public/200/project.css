@@ -137,7 +137,7 @@ svg {
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.32));
-  margin-top: clamp(4px, 2vh, 16px);
+  margin-top: calc(clamp(4px, 2vh, 16px) + 30px);
 }
 
 @keyframes projectBgDrift {
@@ -179,6 +179,23 @@ svg {
   height: min(58px, 9vw);
   object-fit: contain;
   display: block;
+}
+
+.hub-icon-svg {
+  width: min(58px, 9vw);
+  height: min(58px, 9vw);
+  color: #fff;
+  fill: currentColor;
+  display: block;
+}
+
+.home-datetime {
+  margin: 6px 0 2px;
+  border-radius: 12px;
+  background: #fff;
+  color: #0a4ca5;
+  padding: 8px 14px;
+  font-weight: 800;
 }
 
 .workspace-modal {
@@ -1216,10 +1233,15 @@ svg {
 
   .home-top-logo {
     width: min(190px, 64vw);
-    margin-top: 2px;
+    margin-top: 32px;
   }
 
   .hub-icon-image {
+    width: min(64px, 16.8vw);
+    height: min(64px, 16.8vw);
+  }
+
+  .hub-icon-svg {
     width: min(64px, 16.8vw);
     height: min(64px, 16.8vw);
   }

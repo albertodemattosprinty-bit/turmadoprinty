@@ -204,6 +204,7 @@ const historyVoiceStatus = document.getElementById("historyVoiceStatus");
 const historyLiveText = document.getElementById("historyLiveText");
 const historyReadTitle = document.getElementById("historyReadTitle");
 const historyReadBody = document.getElementById("historyReadBody");
+const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -364,6 +365,26 @@ function formatTime(value) {
 function formatHourChip(value) {
   const date = new Date(value);
   return `${date.getHours()}h${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatHomeDateTime(now = new Date()) {
+  const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const day = now.getDate();
+  const month = months[now.getMonth()] || "";
+  const hour = now.getHours();
+  const minute = String(now.getMinutes()).padStart(2, "0");
+  return `${day} de ${month} | ${hour}h${minute}`;
+}
+
+function startHomeDateTimeTicker() {
+  if (!homeDateTimeLabel) {
+    return;
+  }
+  const render = () => {
+    homeDateTimeLabel.textContent = formatHomeDateTime(new Date());
+  };
+  render();
+  window.setInterval(render, 30000);
 }
 
 function formatMoney(cents) {
@@ -3088,6 +3109,7 @@ document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
 
 handleSwipe(historyDateLabel, moveHistoryDate);
 handleSwipe(historyTimelineList, moveHistoryDate);
+startHomeDateTimeTicker();
 
 
 
