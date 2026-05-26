@@ -1793,6 +1793,8 @@ function openHistoryTextComposer() {
   historyTextComposer.classList.add("active");
   historyTextComposer.setAttribute("aria-hidden", "false");
   historyVoiceStatus.textContent = "Aguardando gravação...";
+  historyMicButton?.classList.remove("mic-active");
+  historyMicButton?.classList.add("mic-idle");
   setHistoryTextStep(1);
   renderHistorySpeakerSelection();
   renderHistoryLiveText();
@@ -1878,7 +1880,8 @@ function stopHistoryMic() {
     historyMediaStream.getTracks().forEach((track) => track.stop());
     historyMediaStream = null;
   }
-  historyMicButton.textContent = "Iniciar microfone";
+  historyMicButton?.classList.remove("mic-active");
+  historyMicButton?.classList.add("mic-idle");
 }
 
 async function startHistoryMic() {
@@ -1928,7 +1931,8 @@ async function startHistoryMic() {
     };
     historyMediaRecorder.start();
     state.historyTextComposer.micActive = true;
-    historyMicButton.textContent = "Parar microfone";
+    historyMicButton?.classList.remove("mic-idle");
+    historyMicButton?.classList.add("mic-active");
     historyVoiceStatus.textContent = "Microfone ouvindo...";
     historyLastSpeechAt = Date.now();
     historySpeechMonitorTimer = window.setInterval(() => {
