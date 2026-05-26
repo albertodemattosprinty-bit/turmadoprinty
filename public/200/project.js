@@ -1675,42 +1675,6 @@ function openFinanceEntryConfirm(entry, categoryLabel) {
   });
 }
 
-function isLikelyDeleteCommand(text) {
-  const normalized = String(text || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-  return /\b(apagar|excluir|remover|limpar)\b/.test(normalized);
-}
-
-async function executeFinanceDeleteByVoiceCommand(text) {
-  const interpreted = await apiRequest("/api/200/finance/delete/interpret", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text })
-  });
-  const command = interpreted?.command;
-  if (!command || command.intent !== "DELETE") {
-    throw new Error("Não consegui entender o comando de exclusão.");
-  }
-  const confirmed = window.confirm(String(command.confirmationText || "Confirma apagar os lançamentos?"));
-  if (!confirmed) {
-    return { canceled: true };
-  }
-  const resultPayload = await apiRequest("/api/platform/entries/delete-by-filter", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: command.from,
-      to: command.to,
-      kind: command.kind
-    })
-  });
-  const deleted = Number(resultPayload?.result?.deleted || 0);
-  await loadPlatformFinance();
-  return { deleted };
-}
-
 function stopFinanceSpeechCapture() {
   if (financeSpeechMonitorTimer) {
     window.clearInterval(financeSpeechMonitorTimer);
@@ -1779,24 +1743,8 @@ async function startFinanceSpeechCapture() {
           return;
         }
         financeVoiceStatus.textContent = "Interpretando...";
-        if (isLikelyDeleteCommand(financeSpeechText)) {
-          try {
-            const result = await executeFinanceDeleteByVoiceCommand(financeSpeechText);
-            financeVoiceStatus.textContent = result?.canceled ? "Exclusão cancelada." : `Apagados: ${Number(result?.deleted || 0)}.`;
-            return;
-          } catch (_deleteError) {
-            await createPlatformEntryFromVoiceInterpret(financeSpeechText);
-            financeVoiceStatus.textContent = "Lançamento criado.";
-            return;
-          }
-        }
-        try {
-          await createPlatformEntryFromVoiceInterpret(financeSpeechText);
-          financeVoiceStatus.textContent = "Lançamento criado.";
-        } catch (_createError) {
-          const result = await executeFinanceDeleteByVoiceCommand(financeSpeechText);
-          financeVoiceStatus.textContent = result?.canceled ? "Exclusão cancelada." : `Apagados: ${Number(result?.deleted || 0)}.`;
-        }
+        await createPlatformEntryFromVoiceInterpret(financeSpeechText);
+        financeVoiceStatus.textContent = "Lançamento criado.";
       } catch (error) {
         financeVoiceStatus.textContent = error instanceof Error ? error.message : "Falha no processamento.";
       }

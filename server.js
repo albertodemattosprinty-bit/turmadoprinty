@@ -1673,102 +1673,6 @@ async function handleProject200FinanceInterpret(request, response) {
     });
   }
 }
-function getPeriodRangeByKey(periodKey) {
-  const now = new Date();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (periodKey === "today") {
-    return { from: today.toISOString(), to: tomorrow.toISOString() };
-  }
-
-  if (periodKey === "week") {
-    const weekday = today.getDay();
-    const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
-    const weekStart = new Date(today);
-    weekStart.setDate(weekStart.getDate() - daysSinceMonday);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    return { from: weekStart.toISOString(), to: weekEnd.toISOString() };
-  }
-
-  if (periodKey === "month") {
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    return { from: monthStart.toISOString(), to: nextMonth.toISOString() };
-  }
-
-  return { from: today.toISOString(), to: tomorrow.toISOString() };
-}
-
-async function handleProject200FinanceDeleteInterpret(request, response) {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    sendJson(response, 503, {
-      error: "OPENAI_API_KEY nao configurada.",
-      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
-    });
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, { error: error.message });
-    return;
-  }
-
-  const text = String(body?.text || "").trim();
-  if (!text) {
-    sendJson(response, 400, { error: "Texto ausente." });
-    return;
-  }
-
-  try {
-    const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
-    const completion = await createChatCompletion(apiKey, {
-      model,
-      temperature: 0.1,
-      messages: [
-        {
-          role: "system",
-          content: "Interprete pedido de limpeza financeira e responda JSON puro com: intent('DELETE'), periodKey('today'|'week'|'month'), kind('ALL'|'INCOME'|'EXPENSE'), confirmationText. Exemplos: 'apagar tudo de hoje' => today+ALL; 'apagar entradas dessa semana' => week+INCOME; 'apagar saídas do mês' => month+EXPENSE."
-        },
-        { role: "user", content: text.slice(0, 600) }
-      ]
-    });
-
-    const parsed = JSON.parse(extractChatCompletionText(completion));
-    const periodKeyRaw = String(parsed?.periodKey || "today").toLowerCase();
-    const periodKey = ["today", "week", "month"].includes(periodKeyRaw) ? periodKeyRaw : "today";
-    const kindRaw = String(parsed?.kind || "ALL").toUpperCase();
-    const kind = ["ALL", "INCOME", "EXPENSE"].includes(kindRaw) ? kindRaw : "ALL";
-    const range = getPeriodRangeByKey(periodKey);
-
-    sendJson(response, 200, {
-      ok: true,
-      command: {
-        intent: "DELETE",
-        periodKey,
-        kind,
-        from: range.from,
-        to: range.to,
-        confirmationText: String(parsed?.confirmationText || "Confirma apagar os lançamentos selecionados?")
-      },
-      model
-    });
-  } catch (error) {
-    sendJson(response, 500, {
-      error: "Nao foi possivel interpretar o comando de exclusão.",
-      details: error instanceof Error ? error.message : "Erro desconhecido."
-    });
-  }
-}
-
 async function handleProject200ActionInterpret(request, response) {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -3959,17 +3863,6 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleProject200FinanceInterpret(request, response);
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/finance/delete/interpret") {
-    const user = await requireAuth(request, response);
-
-    if (!user) {
-      return;
-    }
-
-    await handleProject200FinanceDeleteInterpret(request, response);
     return;
   }
 
