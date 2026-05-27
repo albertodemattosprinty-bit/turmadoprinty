@@ -219,9 +219,11 @@ const historyReadBody = document.getElementById("historyReadBody");
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
 const runningTaskName = document.getElementById("runningTaskName");
-const runningTaskProgressTrack = document.getElementById("runningTaskProgressTrack");
-const runningTaskProgressFill = document.getElementById("runningTaskProgressFill");
+const runningTaskProgressRing = document.getElementById("runningTaskProgressRing");
 const runningTaskPercent = document.getElementById("runningTaskPercent");
+const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft");
+const runningTaskNextName = document.getElementById("runningTaskNextName");
+const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -253,6 +255,7 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
+let pendingActionsAnchorId = "";
 let platformNameMediaRecorder = null;
 let platformNameMediaStream = null;
 let platformNameAudioContext = null;
@@ -354,20 +357,63 @@ function getRunningActionForSelectedProfile() {
   return list.find((action) => normalizeActionStatus(action?.status) === actionStatuses.inProgress) || null;
 }
 
-function getRunningActionProgressPercent(action) {
+function getRunningActionProgressState(action) {
   if (!action) {
-    return 0;
+    return { percent: 0, remainingMinutes: 0 };
   }
   const durationMinutes = getActionDurationMinutes(action);
   if (!durationMinutes) {
-    return 0;
+    return { percent: 0, remainingMinutes: 0 };
   }
   const startedAtMs = new Date(action?.startedAt || action?.startAt).getTime();
   if (!Number.isFinite(startedAtMs)) {
-    return 0;
+    return { percent: 0, remainingMinutes: durationMinutes };
   }
   const elapsedMinutes = Math.max(0, (Date.now() - startedAtMs) / (60 * 1000));
-  return Math.max(0, Math.min(100, Math.round((elapsedMinutes / durationMinutes) * 100)));
+  const percent = Math.max(0, Math.min(100, Math.round((elapsedMinutes / durationMinutes) * 100)));
+  const remainingMinutes = Math.max(0, Math.ceil(durationMinutes - elapsedMinutes));
+  return { percent, remainingMinutes };
+}
+
+function getNextActionForRunning(action) {
+  if (!action) {
+    return null;
+  }
+  const runningStartMs = new Date(action.startAt).getTime();
+  if (!Number.isFinite(runningStartMs)) {
+    return null;
+  }
+  const list = getVisibleActions()
+    .filter((item) => item.id !== action.id)
+    .filter((item) => normalizeActionStatus(item.status) === actionStatuses.pending)
+    .filter((item) => {
+      const startMs = new Date(item.startAt).getTime();
+      return Number.isFinite(startMs) && startMs > runningStartMs;
+    })
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  return list[0] || null;
+}
+
+function getLatestCompletedActionForSelectedProfile() {
+  return getVisibleActions()
+    .filter((item) => normalizeActionStatus(item.status) === actionStatuses.completed)
+    .sort((a, b) => {
+      const aTs = new Date(a.completedAt || a.statusUpdatedAt || a.endAt || 0).getTime();
+      const bTs = new Date(b.completedAt || b.statusUpdatedAt || b.endAt || 0).getTime();
+      return bTs - aTs;
+    })[0] || null;
+}
+
+function anchorToLastCompletedAction() {
+  const targetId = String(pendingActionsAnchorId || "").trim();
+  if (!targetId || !actionsList) {
+    return;
+  }
+  const row = actionsList.querySelector(`[data-action-id="${targetId}"]`);
+  if (!row) {
+    return;
+  }
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function renderHomeRunningTask() {
@@ -376,21 +422,26 @@ function renderHomeRunningTask() {
   if (openRunningTaskModalButton) {
     openRunningTaskModalButton.hidden = !hasRunning;
   }
-  if (!runningTaskName || !runningTaskProgressFill || !runningTaskPercent) {
+  if (!runningTaskName || !runningTaskProgressRing || !runningTaskPercent || !runningTaskMinutesLeft || !runningTaskNextName) {
     return;
   }
   if (!hasRunning) {
     runningTaskName.textContent = "Sem tarefa em execução.";
-    runningTaskProgressFill.style.width = "0%";
+    runningTaskProgressRing.style.strokeDashoffset = "301.59";
     runningTaskPercent.textContent = "0%";
-    runningTaskProgressTrack?.setAttribute("aria-valuenow", "0");
+    runningTaskMinutesLeft.textContent = "0 minutos restantes";
+    runningTaskNextName.textContent = "Legal essa é sua última tarefa";
     return;
   }
-  const percent = getRunningActionProgressPercent(action);
+  const { percent, remainingMinutes } = getRunningActionProgressState(action);
+  const circumference = 2 * Math.PI * 48;
+  const dashOffset = circumference * (1 - (percent / 100));
+  const nextAction = getNextActionForRunning(action);
   runningTaskName.textContent = String(action.title || "Tarefa");
-  runningTaskProgressFill.style.width = `${percent}%`;
+  runningTaskProgressRing.style.strokeDashoffset = String(dashOffset);
   runningTaskPercent.textContent = `${percent}%`;
-  runningTaskProgressTrack?.setAttribute("aria-valuenow", String(percent));
+  runningTaskMinutesLeft.textContent = `${remainingMinutes} minutos restantes`;
+  runningTaskNextName.textContent = nextAction ? String(nextAction.title || "Tarefa") : "Legal essa é sua última tarefa";
 }
 
 function isSameDate(a, b) {
@@ -459,7 +510,7 @@ function startRunningTaskTicker() {
   }
   runningTaskTicker = window.setInterval(() => {
     renderHomeRunningTask();
-  }, 15000);
+  }, 1000);
 }
 
 function formatMoney(cents) {
@@ -661,7 +712,12 @@ function openModal(id) {
   modal.setAttribute("aria-hidden", "false");
 
   if (id === "actionsModal") {
+    const latestDone = getLatestCompletedActionForSelectedProfile();
+    pendingActionsAnchorId = latestDone?.id || "";
     void loadActions();
+    window.setTimeout(() => {
+      anchorToLastCompletedAction();
+    }, 1000);
     if (actionsDelayTicker) {
       window.clearInterval(actionsDelayTicker);
     }
@@ -1160,6 +1216,10 @@ async function toggleActionStatus(actionId) {
 
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
     registerSystemEventFromActionTransition(targetAction, updated);
+    const nextStatus = normalizeActionStatus(updated?.status);
+    if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
+      pendingActionsAnchorId = updated?.id || "";
+    }
     renderActions();
   } catch (error) {
     window.alert(error instanceof Error ? error.message : "Nao foi possivel atualizar a tarefa.");
@@ -3280,6 +3340,24 @@ actionAiEditButton?.addEventListener("click", () => {
 actionAiApplyButton?.addEventListener("click", () => {
   applyPendingInterpretedActionAndContinue();
   actionVoiceStatus.textContent = "Dados aplicados.";
+});
+
+runningTaskFinalizeButton?.addEventListener("click", () => {
+  void (async () => {
+    const runningAction = getRunningActionForSelectedProfile();
+    if (!runningAction) {
+      return;
+    }
+    await toggleActionStatus(runningAction.id);
+    const after = state.actions.find((item) => item.id === runningAction.id);
+    if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
+      const modal = document.getElementById("runningTaskModal");
+      if (modal) {
+        closeModal(modal);
+      }
+      openModal("actionsModal");
+    }
+  })();
 });
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);
