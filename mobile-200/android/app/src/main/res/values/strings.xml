@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Projeto 200</string>
+    <string name="title_activity_main">Projeto 200</string>
+    <string name="package_name">com.turmadoprinty.project200</string>
+    <string name="custom_url_scheme">com.turmadoprinty.project200</string>
+</resources>

@@ -46,6 +46,9 @@ const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || "").trim
 const R2_PUBLIC_BASE_URL = (process.env.R2_PUBLIC_BASE_URL || CONTENT_BASE_URL).replace(/\/+$/, "");
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ADMIN_USERNAME = "rosemattos";
+const PROJECT_200_LOGIN_USERNAME = "RoseMattos";
+const PROJECT_200_COOKIE_NAME = "project200_access";
+const PROJECT_200_COOKIE_VALUE = "ok";
 const ALBUM_ZIP_FOLDER = "album-zips";
 const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
 
@@ -132,6 +135,26 @@ function applyCorsHeaders(request, response) {
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload, null, 2));
+}
+
+function parseCookies(headerValue) {
+  const cookies = {};
+  const raw = typeof headerValue === "string" ? headerValue : "";
+
+  for (const part of raw.split(";")) {
+    const [name, ...valueParts] = part.trim().split("=");
+    if (!name) {
+      continue;
+    }
+    cookies[name] = decodeURIComponent(valueParts.join("=") || "");
+  }
+
+  return cookies;
+}
+
+function hasProject200Access(request) {
+  const cookies = parseCookies(request.headers.cookie);
+  return cookies[PROJECT_200_COOKIE_NAME] === PROJECT_200_COOKIE_VALUE;
 }
 
 function sendSseEvent(response, eventName, payload) {
@@ -4770,10 +4793,39 @@ const server = http.createServer(async (request, response) => {
     }
   }
 
+  if (request.method === "POST" && pathname === "/api/200/login") {
+    let body = {};
+    try {
+      body = await readJsonBody(request);
+    } catch {
+      sendJson(response, 400, { error: "JSON invalido." });
+      return;
+    }
+
+    const username = typeof body?.username === "string" ? body.username.trim() : "";
+    if (username !== PROJECT_200_LOGIN_USERNAME) {
+      sendJson(response, 401, { error: "Acesso negado." });
+      return;
+    }
+
+    response.setHeader("Set-Cookie", `${PROJECT_200_COOKIE_NAME}=${PROJECT_200_COOKIE_VALUE}; Path=/200; Max-Age=2592000; HttpOnly; SameSite=Lax`);
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/logout") {
+    response.setHeader("Set-Cookie", `${PROJECT_200_COOKIE_NAME}=; Path=/200; Max-Age=0; HttpOnly; SameSite=Lax`);
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
   if (request.method === "GET" && (pathname === "/200" || pathname === "/200/")) {
-    const page200Path = path.join(publicDir, "200", "index.html");
-    if (existsSync(page200Path)) {
-      await serveStatic(response, page200Path);
+    const targetPath = hasProject200Access(request)
+      ? path.join(publicDir, "200", "index.html")
+      : path.join(publicDir, "200", "login.html");
+
+    if (existsSync(targetPath)) {
+      await serveStatic(response, targetPath);
       return;
     }
   }

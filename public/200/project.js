@@ -1217,6 +1217,9 @@ async function toggleActionStatus(actionId) {
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
+    if (currentStatus === actionStatuses.pending && nextStatus === actionStatuses.inProgress) {
+      openModal("runningTaskModal");
+    }
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
       pendingActionsAnchorId = updated?.id || "";
     }
