@@ -4273,7 +4273,8 @@ profileButtons.forEach((button) => {
     applySelectedProfile(profile);
     renderActions();
   });
-  button.addEventListener("pointerdown", () => {
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
     const profile = String(button.dataset.profile || "").trim();
     if (!profile) return;
     if (profileHoldTimer) window.clearTimeout(profileHoldTimer);
