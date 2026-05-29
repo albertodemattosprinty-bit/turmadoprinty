@@ -1,4 +1,4 @@
-import "./src/load-env.js";
+﻿import "./src/load-env.js";
 
 import { createReadStream, existsSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -53,7 +53,7 @@ const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
 const eduSongsDir = path.join(__dirname, "musicas Edu");
 const contextFilePath = path.join(__dirname, "contexto.txt");
-const contentDir = path.join(__dirname, "Conteúdo");
+const contentDir = path.join(__dirname, "ConteÃºdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
@@ -1538,7 +1538,7 @@ async function handleProject200TextOrganize(request, response) {
       messages: [
         {
           role: "system",
-          content: "Você organiza textos em pt-BR. Corrija apenas grafia/pontuação, sem mudar a ideia. Crie um título curto (até 60 chars). Responda JSON puro: {\"title\":\"...\",\"text\":\"...\"}."
+          content: "VocÃª organiza textos em pt-BR. Corrija apenas grafia/pontuaÃ§Ã£o, sem mudar a ideia. Crie um tÃ­tulo curto (atÃ© 60 chars). Responda JSON puro: {\"title\":\"...\",\"text\":\"...\"}."
         },
         {
           role: "user",
@@ -1763,7 +1763,7 @@ async function handleProject200ActionInterpret(request, response) {
       messages: [
         {
           role: "system",
-          content: "Interprete pedido de tarefa em pt-BR. Responda JSON puro com: title(max 25 chars, minimo possivel), startHour(0-23), startMinute(0-59), endHour(0-23), endMinute(0-59), repeatRule(none|daily|custom), repeatDays(array com 0=dom..6=sab), assignee(Rose|Alberto|Lucas|Thainan|Geral|\"\"), assigneeDetected(boolean). Se horario final nao ficar claro, infira pelo contexto da tarefa (ex: treino/caminhada tende a 60-120 min; higiene matinal 20-60 min; leitura/estudo 30-90 min), mantendo inicio e fim coerentes. Se ainda assim faltar horario: use proxima hora cheia e +1h no fim. Se pessoa nao for citada: assignee vazio e assigneeDetected false. Se texto disser todo dia: daily. Se citar dias da semana (ex: terça e quinta): custom com repeatDays. Se nao mencionar recorrencia: none."
+          content: "Interprete pedido de tarefa em pt-BR. Responda JSON puro com: title(max 25 chars, minimo possivel), startHour(0-23), startMinute(0-59), endHour(0-23), endMinute(0-59), repeatRule(none|daily|custom), repeatDays(array com 0=dom..6=sab), assignee(Rose|Alberto|Lucas|Thainan|Geral|\"\"), assigneeDetected(boolean). Se horario final nao ficar claro, infira pelo contexto da tarefa (ex: treino/caminhada tende a 60-120 min; higiene matinal 20-60 min; leitura/estudo 30-90 min), mantendo inicio e fim coerentes. Se ainda assim faltar horario: use proxima hora cheia e +1h no fim. Se pessoa nao for citada: assignee vazio e assigneeDetected false. Se texto disser todo dia: daily. Se citar dias da semana (ex: terÃ§a e quinta): custom com repeatDays. Se nao mencionar recorrencia: none."
         },
         { role: "user", content: text.slice(0, 1200) }
       ]
@@ -4151,17 +4151,40 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const username = String(requestUrl.searchParams.get("username") || "").trim();
+      const rawInput = String(requestUrl.searchParams.get("username") || "")
+        .normalize("NFC")
+        .replace(/\s+/gu, " ")
+        .trim();
 
-      if (!isValidUsername(username)) {
-        sendJson(response, 400, { error: "Nome de usuário inválido." });
+      if (!rawInput || rawInput.length < 2) {
+        sendJson(response, 400, { error: "Informe um nome de usuário válido." });
         return;
       }
 
-      const targetUser = await findUserByUsername(username);
+      const normalized = rawInput.toLocaleLowerCase("pt-BR");
+      const searchResult = await query(
+        `
+          select id, name, username, created_at
+          from users
+          where username = $1
+             or lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2
+             or username ilike $3
+             or name ilike $3
+          order by
+            case
+              when username = $1 then 0
+              when lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2 then 1
+              else 2
+            end,
+            created_at asc
+          limit 1
+        `,
+        [normalized, normalized, `%${rawInput}%`]
+      );
+      const targetUser = searchResult.rows[0] || null;
 
       if (!targetUser) {
-        sendJson(response, 404, { error: "Usuário não encontrado." });
+        sendJson(response, 404, { error: "Usuário não encontrado no banco principal." });
         return;
       }
 
@@ -4477,7 +4500,7 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel confirmar o lançamento."
+        error: error instanceof Error ? error.message : "Nao foi possivel confirmar o lanÃ§amento."
       });
     }
     return;
@@ -4549,7 +4572,7 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel apagar os lançamentos."
+        error: error instanceof Error ? error.message : "Nao foi possivel apagar os lanÃ§amentos."
       });
     }
     return;
@@ -4860,4 +4883,5 @@ const server = http.createServer(async (request, response) => {
 server.listen(PORT, () => {
   console.log(`Servidor online em http://localhost:${PORT}`);
 });
+
 
