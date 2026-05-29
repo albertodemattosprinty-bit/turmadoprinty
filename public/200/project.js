@@ -2,6 +2,8 @@
 
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
+const projectProfileLinksKey = "project_200_profile_links_v1";
+const projectProfileLockKey = "project_200_profile_lock_v1";
 const sleepConfigKey = "project_200_sleep_v1";
 const defaultSaldoGoalCents = 1000000;
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -88,7 +90,7 @@ const recurrenceDays = {
   weekdays: [1, 2, 3, 4, 5]
 };
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
-const selectableProfiles = ["project", "Alberto", "Rose", "Lucas", "Thainan"];
+const selectableProfiles = ["project", "Geral", "Alberto", "Rose", "Lucas", "Thainan"];
 const profileTintByName = {
   project: "linear-gradient(145deg, rgba(11, 61, 168, 0), rgba(31, 126, 231, 0))",
   Alberto: "linear-gradient(145deg, rgba(2, 27, 77, 0.7), rgba(11, 61, 168, 0.7))",
@@ -261,6 +263,12 @@ const project200LoginForm = document.getElementById("project200LoginForm");
 const project200Username = document.getElementById("project200Username");
 const project200Password = document.getElementById("project200Password");
 const project200LoginMessage = document.getElementById("project200LoginMessage");
+const profileLinkOverlay = document.getElementById("profileLinkOverlay");
+const profileLinkForm = document.getElementById("profileLinkForm");
+const profileLinkUsername = document.getElementById("profileLinkUsername");
+const profileLinkTargetLabel = document.getElementById("profileLinkTargetLabel");
+const profileLinkMessage = document.getElementById("profileLinkMessage");
+const profileLinkCancel = document.getElementById("profileLinkCancel");
 const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -307,6 +315,9 @@ let platformNameAudioAnalyser = null;
 let platformNameSpeechMonitorTimer = null;
 let platformNameLastSpeechAt = 0;
 let overlapCarouselTimer = null;
+let profileHoldTimer = null;
+let profileLongPressHandledProfile = "";
+let profileLinkTarget = "";
 
 const state = {
   activeOffset: 0,
@@ -333,6 +344,8 @@ const state = {
   historySystem: [],
   historyTexts: [],
   selectedProfile: "project",
+  profileLinks: {},
+  profileLock: "",
   historyOffset: 0,
   historyTextComposer: {
     step: 1,
@@ -379,11 +392,42 @@ function setToken(token) {
 }
 
 function readSelectedProfile() {
+  const locked = String(window.localStorage.getItem(projectProfileLockKey) || "").trim();
+  if (locked && selectableProfiles.includes(locked)) {
+    return locked;
+  }
   const saved = String(window.localStorage.getItem(projectProfileKey) || "project");
   return selectableProfiles.includes(saved) ? saved : "project";
 }
 
+function readProfileLinks() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(projectProfileLinksKey) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveProfileLinks() {
+  window.localStorage.setItem(projectProfileLinksKey, JSON.stringify(state.profileLinks || {}));
+}
+
+function renderProfileFooterVisibility() {
+  const lockedProfile = String(state.profileLock || "").trim();
+  profileButtons.forEach((button) => {
+    if (!lockedProfile) {
+      button.hidden = false;
+      return;
+    }
+    button.hidden = button.dataset.profile !== lockedProfile;
+  });
+}
+
 function applySelectedProfile(profile) {
+  if (state.profileLock && profile !== state.profileLock) {
+    return;
+  }
   const next = selectableProfiles.includes(profile) ? profile : "project";
   const nextTint = profileTintByName[next] || profileTintByName.project;
   const root = document.documentElement;
@@ -399,6 +443,7 @@ function applySelectedProfile(profile) {
   profileButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.profile === next);
   });
+  renderProfileFooterVisibility();
   renderHomeRunningTask();
 }
 
@@ -1621,6 +1666,37 @@ async function ensureProject200Session() {
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
     return false;
   }
+}
+
+async function lookupRealUser(username) {
+  const value = String(username || "").trim();
+  if (!value) {
+    throw new Error("Digite um nome de usuário.");
+  }
+  const payload = await apiRequest(`/api/200/users/lookup?username=${encodeURIComponent(value)}`);
+  return payload?.user || null;
+}
+
+function openProfileLinkOverlay(profile) {
+  profileLinkTarget = String(profile || "").trim();
+  if (!profileLinkTarget) return;
+  if (profileLinkTargetLabel) {
+    profileLinkTargetLabel.textContent = `Perfil selecionado: ${profileLinkTarget}`;
+  }
+  if (profileLinkMessage) {
+    profileLinkMessage.textContent = "";
+  }
+  if (profileLinkUsername) {
+    profileLinkUsername.value = "";
+  }
+  profileLinkOverlay?.classList.add("active");
+  profileLinkOverlay?.setAttribute("aria-hidden", "false");
+  window.setTimeout(() => profileLinkUsername?.focus(), 40);
+}
+
+function closeProfileLinkOverlay() {
+  profileLinkOverlay?.classList.remove("active");
+  profileLinkOverlay?.setAttribute("aria-hidden", "true");
 }
 
 function renderRepeatControls() {
@@ -4171,6 +4247,12 @@ historyTextForm?.addEventListener("submit", (event) => {
     }
   })();
 });
+state.profileLinks = readProfileLinks();
+state.profileLock = String(window.localStorage.getItem(projectProfileLockKey) || "").trim();
+if (state.profileLock && !selectableProfiles.includes(state.profileLock)) {
+  state.profileLock = "";
+  window.localStorage.removeItem(projectProfileLockKey);
+}
 applySelectedProfile(readSelectedProfile());
 void (async () => {
   const ok = await ensureProject200Session();
@@ -4183,9 +4265,71 @@ void (async () => {
 
 profileButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    applySelectedProfile(button.dataset.profile || "project");
+    const profile = String(button.dataset.profile || "project");
+    if (profileLongPressHandledProfile === profile) {
+      profileLongPressHandledProfile = "";
+      return;
+    }
+    applySelectedProfile(profile);
     renderActions();
   });
+  button.addEventListener("pointerdown", () => {
+    const profile = String(button.dataset.profile || "").trim();
+    if (!profile) return;
+    if (profileHoldTimer) window.clearTimeout(profileHoldTimer);
+    profileHoldTimer = window.setTimeout(() => {
+      profileLongPressHandledProfile = profile;
+      openProfileLinkOverlay(profile);
+    }, 500);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+    button.addEventListener(evt, () => {
+      if (profileHoldTimer) {
+        window.clearTimeout(profileHoldTimer);
+        profileHoldTimer = null;
+      }
+    });
+  });
+});
+
+profileLinkCancel?.addEventListener("click", closeProfileLinkOverlay);
+profileLinkForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const username = String(profileLinkUsername?.value || "").trim();
+  if (!profileLinkTarget) {
+    if (profileLinkMessage) profileLinkMessage.textContent = "Selecione um perfil.";
+    return;
+  }
+  if (!username) {
+    if (profileLinkMessage) profileLinkMessage.textContent = "Digite um nome de usuário.";
+    return;
+  }
+  if (profileLinkMessage) profileLinkMessage.textContent = "Validando...";
+  void (async () => {
+    try {
+      const foundUser = await lookupRealUser(username);
+      if (!foundUser?.username) {
+        throw new Error("Usuário não encontrado.");
+      }
+      state.profileLinks[profileLinkTarget] = {
+        username: String(foundUser.username || ""),
+        name: String(foundUser.name || foundUser.username || "")
+      };
+      saveProfileLinks();
+      state.profileLock = profileLinkTarget;
+      window.localStorage.setItem(projectProfileLockKey, state.profileLock);
+      applySelectedProfile(profileLinkTarget);
+      renderActions();
+      if (profileLinkMessage) profileLinkMessage.textContent = "Vínculo realizado com sucesso.";
+      window.setTimeout(() => {
+        closeProfileLinkOverlay();
+      }, 450);
+    } catch (error) {
+      if (profileLinkMessage) {
+        profileLinkMessage.textContent = error instanceof Error ? error.message : "Falha ao vincular.";
+      }
+    }
+  })();
 });
 
 project200LoginForm?.addEventListener("submit", (event) => {

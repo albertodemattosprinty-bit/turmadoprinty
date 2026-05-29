@@ -25,6 +25,19 @@
       <p id="project200LoginMessage" class="project-login-message"></p>
     </div>
   </section>
+  <section class="project-login-overlay" id="profileLinkOverlay" aria-hidden="true">
+    <div class="project-login-card">
+      <h2>Vincular Usuário</h2>
+      <p id="profileLinkTargetLabel">Perfil selecionado</p>
+      <form id="profileLinkForm">
+        <label for="profileLinkUsername">Nome de usuário</label>
+        <input id="profileLinkUsername" type="text" autocomplete="username" required />
+        <button type="submit" class="primary-btn">Vincular</button>
+        <button type="button" class="ghost-btn" id="profileLinkCancel">Cancelar</button>
+      </form>
+      <p id="profileLinkMessage" class="project-login-message"></p>
+    </div>
+  </section>
   <section class="workspace-modal simple-modal" id="sleepConfigModal" aria-hidden="true" aria-label="Horario do sono">
     <div class="finance-content running-task-content">
       <div style="display:grid;place-items:center;font-size:64px;color:#cde3ff;">🌙</div>
