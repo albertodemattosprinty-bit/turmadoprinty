@@ -2,6 +2,7 @@
 
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
+const sleepConfigKey = "project_200_sleep_v1";
 const defaultSaldoGoalCents = 1000000;
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const actionStatuses = {
@@ -79,6 +80,8 @@ const financePeriods = [
   { key: "month-12", label: "Dezembro" }
 ];
 const weekdayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
+const monthlyOrdinalLabels = ["Primeira", "Segunda", "Terceira", "Quarta", "Última"];
+const monthlyWeekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 const recurrenceDays = {
   none: [],
   daily: [0, 1, 2, 3, 4, 5, 6],
@@ -153,10 +156,18 @@ const wizardNextButton = document.getElementById("wizardNext");
 const wizardMessage = document.getElementById("wizardMessage");
 const taskTitle = document.getElementById("taskTitle");
 const wizardDateLabel = document.getElementById("wizardDateLabel");
-const wizardAssigneeLabel = document.getElementById("wizardAssigneeLabel");
 const repeatToggle = document.getElementById("repeatToggle");
 const repeatBox = document.getElementById("repeatBox");
 const weekdayRow = document.getElementById("weekdayRow");
+const repeatPeriodicBox = document.getElementById("repeatPeriodicBox");
+const periodicEveryLabel = document.getElementById("periodicEveryLabel");
+const avoidSaturdayInput = document.getElementById("avoidSaturday");
+const avoidSundayInput = document.getElementById("avoidSunday");
+const repeatMonthlyCustomBox = document.getElementById("repeatMonthlyCustomBox");
+const monthlyOrdinalLabel = document.getElementById("monthlyOrdinalLabel");
+const monthlyWeekdayLabel = document.getElementById("monthlyWeekdayLabel");
+const repeatModeButtons = document.getElementById("repeatModeButtons");
+const repeatModeBackButton = document.getElementById("repeatModeBackButton");
 const financeIntroTitle = document.getElementById("financeIntroTitle");
 const financePeriodPicker = document.getElementById("financePeriodPicker");
 const financePeriodPrev = document.getElementById("financePeriodPrev");
@@ -198,6 +209,8 @@ const actionAiConfirmEnd = document.getElementById("actionAiConfirmEnd");
 const actionAiConfirmDates = document.getElementById("actionAiConfirmDates");
 const actionAiEditButton = document.getElementById("actionAiEdit");
 const actionAiApplyButton = document.getElementById("actionAiApply");
+const actionAiEditDatesButton = document.getElementById("actionAiEditDates");
+const actionAiRenameMicButton = document.getElementById("actionAiRenameMic");
 const actionStatusWizard = document.getElementById("actionStatusWizard");
 const closeActionStatusWizardButton = document.getElementById("closeActionStatusWizard");
 const actionStatusOptionsStep = document.getElementById("actionStatusOptionsStep");
@@ -224,6 +237,28 @@ const runningTaskPercent = document.getElementById("runningTaskPercent");
 const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft");
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
+const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
+const dayDonePercent = document.getElementById("dayDonePercent");
+const dayDoneDelay = document.getElementById("dayDoneDelay");
+const sleepConfigModal = document.getElementById("sleepConfigModal");
+const sleepStartLabel = document.getElementById("sleepStartLabel");
+const sleepEndLabel = document.getElementById("sleepEndLabel");
+const saveSleepConfigBtn = document.getElementById("saveSleepConfigBtn");
+const overlapWizard = document.getElementById("overlapWizard");
+const closeOverlapWizard = document.getElementById("closeOverlapWizard");
+const overlapTaskTitle = document.getElementById("overlapTaskTitle");
+const overlapTaskRange = document.getElementById("overlapTaskRange");
+const overlapReplaceButton = document.getElementById("overlapReplaceButton");
+const overlapFreePrev = document.getElementById("overlapFreePrev");
+const overlapFreeNext = document.getElementById("overlapFreeNext");
+const overlapFreeStartLabel = document.getElementById("overlapFreeStartLabel");
+const overlapApplyFreeButton = document.getElementById("overlapApplyFreeButton");
+const overlapChangeTimeButton = document.getElementById("overlapChangeTimeButton");
+const project200LoginOverlay = document.getElementById("project200LoginOverlay");
+const project200LoginForm = document.getElementById("project200LoginForm");
+const project200Username = document.getElementById("project200Username");
+const project200Password = document.getElementById("project200Password");
+const project200LoginMessage = document.getElementById("project200LoginMessage");
 const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -256,12 +291,18 @@ let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
 let pendingActionsAnchorId = "";
+let runningCarryOverMinutes = 0;
+let actionsTimeTicker = null;
+let actionsTimeShowDuration = false;
+let timeButtonHoldTimer = null;
+let timeButtonHoldInterval = null;
 let platformNameMediaRecorder = null;
 let platformNameMediaStream = null;
 let platformNameAudioContext = null;
 let platformNameAudioAnalyser = null;
 let platformNameSpeechMonitorTimer = null;
 let platformNameLastSpeechAt = 0;
+let overlapCarouselTimer = null;
 
 const state = {
   activeOffset: 0,
@@ -298,11 +339,39 @@ const state = {
     micActive: false
   },
   platformWizard: buildInitialPlatformWizardState(),
-  wizard: buildInitialWizardState()
+  wizard: buildInitialWizardState(),
+  sleepConfig: { startHour: 23, startMinute: 0, endHour: 8, endMinute: 0 },
+  overlapResolver: null,
+  overlapItems: [],
+  overlapIndex: 0,
+  overlapCandidateStarts: [],
+  overlapCandidateIndex: 0
 };
+
+function loadSleepConfig() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(sleepConfigKey) || "{}");
+    state.sleepConfig.startHour = Number.isFinite(parsed.startHour) ? parsed.startHour : 23;
+    state.sleepConfig.startMinute = Number.isFinite(parsed.startMinute) ? parsed.startMinute : 0;
+    state.sleepConfig.endHour = Number.isFinite(parsed.endHour) ? parsed.endHour : 8;
+    state.sleepConfig.endMinute = Number.isFinite(parsed.endMinute) ? parsed.endMinute : 0;
+  } catch {}
+}
+
+function saveSleepConfig() {
+  window.localStorage.setItem(sleepConfigKey, JSON.stringify(state.sleepConfig));
+}
 
 function getToken() {
   return window.localStorage.getItem(tokenKey) || "";
+}
+
+function setToken(token) {
+  if (token) {
+    window.localStorage.setItem(tokenKey, token);
+  } else {
+    window.localStorage.removeItem(tokenKey);
+  }
 }
 
 function readSelectedProfile() {
@@ -357,6 +426,91 @@ function getRunningActionForSelectedProfile() {
   return list.find((action) => normalizeActionStatus(action?.status) === actionStatuses.inProgress) || null;
 }
 
+function buildActionTimelineEntries() {
+  const visibleActions = getVisibleActions()
+    .slice()
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  const entries = [];
+  const baseDate = dateFromOffset(state.activeOffset);
+  const dayStart = new Date(baseDate);
+  dayStart.setHours(8, 0, 0, 0);
+  const dayEnd = new Date(baseDate);
+  dayEnd.setHours(23, 59, 59, 999);
+  let cursor = dayStart.getTime();
+
+  const sleepStart = new Date(baseDate);
+  sleepStart.setHours(state.sleepConfig.startHour, state.sleepConfig.startMinute, 0, 0);
+  const sleepEnd = new Date(sleepStart);
+  sleepEnd.setDate(sleepEnd.getDate() + 1);
+  sleepEnd.setHours(state.sleepConfig.endHour, state.sleepConfig.endMinute, 0, 0);
+
+  for (const action of visibleActions) {
+    const startMs = new Date(action.startAt).getTime();
+    const endMs = new Date(action.endAt).getTime();
+    if (Number.isFinite(startMs) && startMs > cursor) {
+      entries.push({
+        kind: "free",
+        id: `free-${cursor}-${startMs}`,
+        startAt: new Date(cursor).toISOString(),
+        endAt: new Date(startMs).toISOString(),
+        title: "Tempo livre"
+      });
+    }
+    entries.push({ kind: "action", ...action });
+    if (Number.isFinite(endMs)) {
+      cursor = Math.max(cursor, endMs);
+    }
+  }
+
+  if (cursor < dayEnd.getTime()) {
+    entries.push({
+      kind: "free",
+      id: `free-${cursor}-${dayEnd.getTime()}`,
+      startAt: new Date(cursor).toISOString(),
+      endAt: new Date(dayEnd).toISOString(),
+      title: "Tempo livre"
+    });
+  }
+
+  const sleepStartClamped = Math.max(dayStart.getTime(), sleepStart.getTime());
+  const sleepEndClamped = Math.min(dayEnd.getTime(), sleepEnd.getTime());
+  if (sleepEndClamped > sleepStartClamped) {
+    entries.push({
+      kind: "sleep",
+      id: "sleep-fixed",
+      startAt: new Date(sleepStartClamped).toISOString(),
+      endAt: new Date(sleepEndClamped).toISOString(),
+      title: "Descanso"
+    });
+  }
+  const normalized = [];
+  const sleepEntry = entries.find((entry) => entry.kind === "sleep");
+  for (const entry of entries) {
+    if (entry.kind !== "free" || !sleepEntry) {
+      normalized.push(entry);
+      continue;
+    }
+    const freeStart = new Date(entry.startAt).getTime();
+    const freeEnd = new Date(entry.endAt).getTime();
+    const sleepStartMs = new Date(sleepEntry.startAt).getTime();
+    const sleepEndMs = new Date(sleepEntry.endAt).getTime();
+    if (freeEnd <= sleepStartMs || freeStart >= sleepEndMs) {
+      normalized.push(entry);
+      continue;
+    }
+    if (freeStart < sleepStartMs) {
+      normalized.push({ ...entry, id: `${entry.id}-a`, endAt: new Date(sleepStartMs).toISOString() });
+    }
+    if (freeEnd > sleepEndMs) {
+      normalized.push({ ...entry, id: `${entry.id}-b`, startAt: new Date(sleepEndMs).toISOString() });
+    }
+  }
+
+  return normalized
+    .filter((entry) => getActionDurationMinutes(entry) > 0)
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+}
+
 function getRunningActionProgressState(action) {
   if (!action) {
     return { percent: 0, remainingMinutes: 0 };
@@ -370,9 +524,22 @@ function getRunningActionProgressState(action) {
     return { percent: 0, remainingMinutes: durationMinutes };
   }
   const elapsedMinutes = Math.max(0, (Date.now() - startedAtMs) / (60 * 1000));
-  const percent = Math.max(0, Math.min(100, Math.round((elapsedMinutes / durationMinutes) * 100)));
-  const remainingMinutes = Math.max(0, Math.ceil(durationMinutes - elapsedMinutes));
-  return { percent, remainingMinutes };
+  const totalBudget = durationMinutes + Math.max(0, Number(runningCarryOverMinutes || 0));
+  const remainingBudget = Math.max(0, Math.ceil(totalBudget - elapsedMinutes));
+  const percent = totalBudget > 0 ? Math.max(0, Math.min(100, Math.round((elapsedMinutes / totalBudget) * 100))) : 0;
+  const startAtMs = new Date(action?.startAt).getTime();
+  const scheduleDeltaMinutes = Number.isFinite(startAtMs)
+    ? Math.round((startedAtMs - startAtMs) / (60 * 1000))
+    : 0;
+  return { percent, remainingMinutes: remainingBudget, elapsedMinutes, durationMinutes, scheduleDeltaMinutes };
+}
+
+function formatSignedDelay(minutesValue) {
+  const total = Math.abs(Number(minutesValue || 0));
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  const sign = Number(minutesValue || 0) >= 0 ? "-" : "+";
+  return `${sign}${hours} horas e ${String(minutes).padStart(2, "0")} minutos`;
 }
 
 function getNextActionForRunning(action) {
@@ -392,6 +559,21 @@ function getNextActionForRunning(action) {
     })
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   return list[0] || null;
+}
+
+function getNextTimelineEntryForRunning(action) {
+  if (!action) return null;
+  const currentStart = new Date(action.startAt).getTime();
+  if (!Number.isFinite(currentStart)) return null;
+  const timeline = buildActionTimelineEntries()
+    .filter((entry) => entry.kind === "free" || entry.kind === "sleep" || normalizeActionStatus(entry.status) === actionStatuses.pending)
+    .filter((entry) => {
+      if (entry.id === action.id) return false;
+      const start = new Date(entry.startAt).getTime();
+      return Number.isFinite(start) && start > currentStart;
+    })
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  return timeline[0] || null;
 }
 
 function getLatestCompletedActionForSelectedProfile() {
@@ -430,18 +612,41 @@ function renderHomeRunningTask() {
     runningTaskProgressRing.style.strokeDashoffset = "301.59";
     runningTaskPercent.textContent = "0%";
     runningTaskMinutesLeft.textContent = "0 minutos restantes";
+    runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     runningTaskNextName.textContent = "Legal essa é sua última tarefa";
     return;
   }
-  const { percent, remainingMinutes } = getRunningActionProgressState(action);
+  const { percent, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
   const circumference = 2 * Math.PI * 48;
   const dashOffset = circumference * (1 - (percent / 100));
-  const nextAction = getNextActionForRunning(action);
+  const nextAction = getNextTimelineEntryForRunning(action);
   runningTaskName.textContent = String(action.title || "Tarefa");
   runningTaskProgressRing.style.strokeDashoffset = String(dashOffset);
-  runningTaskPercent.textContent = `${percent}%`;
-  runningTaskMinutesLeft.textContent = `${remainingMinutes} minutos restantes`;
-  runningTaskNextName.textContent = nextAction ? String(nextAction.title || "Tarefa") : "Legal essa é sua última tarefa";
+  const estimatedRemaining = Math.max(0, Math.ceil(durationMinutes - elapsedMinutes));
+  const loopModePercent = Math.floor(Date.now() / 3000) % 2 === 0;
+  runningTaskPercent.textContent = loopModePercent ? `${percent}%` : `${estimatedRemaining}m`;
+  runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
+  runningTaskMinutesLeft.textContent = formatSignedDelay(scheduleDeltaMinutes);
+  if (scheduleDeltaMinutes >= 0) {
+    runningTaskMinutesLeft.classList.add("is-late");
+  } else {
+    runningTaskMinutesLeft.classList.add("is-early");
+  }
+  runningTaskNextName.textContent = nextAction
+    ? String(nextAction.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextAction))})` : (nextAction.title || "Tarefa"))
+    : "Legal essa é sua última tarefa";
+  if (runningTaskStartNextButton) {
+    runningTaskStartNextButton.hidden = true;
+  }
+}
+
+function getCompletionSummaryForSelectedProfile() {
+  const list = getVisibleActions();
+  const total = list.length;
+  const completed = list.filter((item) => normalizeActionStatus(item.status) === actionStatuses.completed).length;
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const late = list.reduce((sum, item) => sum + Math.max(0, getActionLateStartMinutes(item)), 0);
+  return { percent, late };
 }
 
 function isSameDate(a, b) {
@@ -481,6 +686,15 @@ function formatTime(value) {
 function formatHourChip(value) {
   const date = new Date(value);
   return `${date.getHours()}h${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatMinutesHuman(totalMinutesValue) {
+  const total = Math.max(0, Math.round(Number(totalMinutesValue) || 0));
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (hours <= 0) return `${total} minutos`;
+  if (minutes <= 0) return hours === 1 ? "1 hora" : `${hours} horas`;
+  return `${hours === 1 ? "1 hora" : `${hours} horas`} e ${minutes} minutos`;
 }
 
 function formatHomeDateTime(now = new Date()) {
@@ -543,7 +757,7 @@ function normalizeAssigneeName(value) {
 }
 
 function getWizardAssigneeName() {
-  return assigneeOptions[state.wizard.assigneeIndex] || "Geral";
+  return normalizeAssigneeName(state.selectedProfile === "project" ? "Geral" : state.selectedProfile);
 }
 
 function getActionAvatarPath(assignee) {
@@ -578,10 +792,14 @@ function buildInitialWizardState() {
   return {
     step: 1,
     dateOffset: 0,
-    assigneeIndex: 1,
     repeatOpen: false,
     repeatMode: "none",
     repeatDays: [],
+    periodicEveryDays: 2,
+    avoidSaturday: false,
+    avoidSunday: false,
+    monthlyOrdinalIndex: 0,
+    monthlyWeekdayIndex: 3,
     startHour: rounded.getHours(),
     startMinute: rounded.getMinutes() % 60,
     endHour: end.getHours(),
@@ -721,6 +939,7 @@ function openModal(id) {
     if (actionsDelayTicker) {
       window.clearInterval(actionsDelayTicker);
     }
+    startActionsTimeTicker();
     actionsDelayTicker = window.setInterval(() => {
       renderActions();
     }, 30000);
@@ -776,6 +995,10 @@ function closeModal(modal) {
   if (modal.id === "actionsModal" && actionsDelayTicker) {
     window.clearInterval(actionsDelayTicker);
     actionsDelayTicker = null;
+    if (actionsTimeTicker) {
+      window.clearInterval(actionsTimeTicker);
+      actionsTimeTicker = null;
+    }
     closeActionStatusWizard();
   }
 
@@ -1025,15 +1248,50 @@ function renderActions() {
     return;
   }
 
-  const visibleActions = getVisibleActions();
+  const timelineEntries = buildActionTimelineEntries();
 
-  if (!visibleActions.length) {
+  if (!timelineEntries.length) {
     actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse dia.</div>';
     renderActionsProgress();
     return;
   }
 
-  visibleActions.forEach((action) => {
+  timelineEntries.forEach((action) => {
+    const slotOwner = state.selectedProfile === "project" ? "Geral" : state.selectedProfile;
+    const slotAvatar = getActionAvatarPath(slotOwner);
+    if (action.kind === "sleep") {
+      const row = document.createElement("article");
+      row.className = "task-row task-sleep-slot";
+      row.dataset.sleepSlot = "1";
+      row.innerHTML = `
+        <img class="task-avatar" src="${slotAvatar}" alt="Descanso" loading="lazy" />
+        <div class="task-main">
+          <div class="task-title">Descanso</div>
+          <div class="task-assignee">${escapeHtml(String(slotOwner))}</div>
+        </div>
+        <div class="task-time">${formatHourChip(action.startAt)}</div>
+      `;
+      actionsList.appendChild(row);
+      return;
+    }
+    if (action.kind === "free") {
+      const duration = getActionDurationMinutes(action);
+      const row = document.createElement("article");
+      row.className = "task-row task-free-slot";
+      row.dataset.freeSlot = "1";
+      row.dataset.startIso = action.startAt;
+      row.dataset.endIso = action.endAt;
+      row.innerHTML = `
+        <img class="task-avatar" src="${slotAvatar}" alt="Tempo livre" loading="lazy" />
+        <div class="task-main">
+          <div class="task-title">Tempo livre</div>
+          <div class="task-assignee">${escapeHtml(String(slotOwner))}</div>
+        </div>
+        <div class="task-time" data-start-label="${formatHourChip(action.startAt)}" data-duration-label="${formatMinutesHuman(duration)}">${formatHourChip(action.startAt)}</div>
+      `;
+      actionsList.appendChild(row);
+      return;
+    }
     const status = normalizeActionStatus(action.status);
     const assignee = normalizeAssigneeName(action.assignee);
     const avatarPath = getActionAvatarPath(assignee);
@@ -1052,7 +1310,7 @@ function renderActions() {
         <div class="task-title">${escapeHtml(action.title)}</div>
         <div class="task-assignee">${escapeHtml(assignee)}</div>
       </div>
-      <div class="task-time">${formatHourChip(action.startAt)}</div>
+      <div class="task-time" data-start-label="${formatHourChip(action.startAt)}" data-duration-label="${formatMinutesHuman(getActionDurationMinutes(action))}">${formatHourChip(action.startAt)}</div>
     `;
     actionsList.appendChild(row);
   });
@@ -1239,16 +1497,15 @@ function openWizard(action = null) {
   state.wizard = buildInitialWizardState();
   if (action) {
     const startAt = new Date(action.startAt);
-    const endAt = new Date(action.endAt);
     const today = todayStart();
     const actionDay = new Date(startAt);
     actionDay.setHours(0, 0, 0, 0);
     state.wizard.dateOffset = Math.round((actionDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-    state.wizard.assigneeIndex = Math.max(0, assigneeOptions.indexOf(normalizeAssigneeName(action.assignee)));
     state.wizard.startHour = startAt.getHours();
     state.wizard.startMinute = startAt.getMinutes();
-    state.wizard.endHour = endAt.getHours();
-    state.wizard.endMinute = endAt.getMinutes();
+    const enforcedEnd = new Date(startAt.getTime() + 15 * 60 * 1000);
+    state.wizard.endHour = enforcedEnd.getHours();
+    state.wizard.endMinute = enforcedEnd.getMinutes();
     state.wizard.editingActionId = action.id;
     taskTitle.value = action.title || "";
   } else {
@@ -1274,7 +1531,7 @@ function closeWizard() {
 
 function renderWizard() {
   const { step } = state.wizard;
-  wizardStepLabel.textContent = `${step} de 5`;
+  wizardStepLabel.textContent = `${step} de 4`;
 
   document.querySelectorAll(".wizard-step").forEach((section) => {
     const isActive = Number(section.dataset.step) === step;
@@ -1282,22 +1539,88 @@ function renderWizard() {
   });
 
   wizardBackButton.style.visibility = step === 1 ? "hidden" : "visible";
-  wizardNextButton.textContent = step === 5 ? "Salvar" : "Continuar";
+  wizardNextButton.textContent = step === 4 ? "Salvar" : "Continuar";
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
-  wizardAssigneeLabel.textContent = getWizardAssigneeName();
   renderRepeatControls();
   renderTimePickers();
+}
+
+function startActionsTimeTicker() {
+  if (actionsTimeTicker) {
+    window.clearInterval(actionsTimeTicker);
+  }
+  actionsTimeTicker = window.setInterval(() => {
+    actionsTimeShowDuration = !actionsTimeShowDuration;
+    actionsList.querySelectorAll(".task-time").forEach((node) => {
+      const el = node;
+      const next = actionsTimeShowDuration ? el.dataset.durationLabel : el.dataset.startLabel;
+      el.classList.add("is-fading");
+      window.setTimeout(() => {
+        el.textContent = next || el.textContent;
+        el.classList.remove("is-fading");
+      }, 220);
+    });
+  }, 2000);
+}
+
+function renderSleepLabels() {
+  if (sleepStartLabel) {
+    sleepStartLabel.textContent = `${String(state.sleepConfig.startHour).padStart(2, "0")}:${String(state.sleepConfig.startMinute).padStart(2, "0")}`;
+  }
+  if (sleepEndLabel) {
+    sleepEndLabel.textContent = `${String(state.sleepConfig.endHour).padStart(2, "0")}:${String(state.sleepConfig.endMinute).padStart(2, "0")}`;
+  }
+}
+
+async function ensureProject200Session() {
+  const token = getToken();
+  if (!token) {
+    project200LoginOverlay?.classList.add("active");
+    project200LoginOverlay?.setAttribute("aria-hidden", "false");
+    return false;
+  }
+  try {
+    const response = await fetch(getApiUrl("/api/auth/me"), {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (!response.ok) {
+      setToken("");
+      project200LoginOverlay?.classList.add("active");
+      project200LoginOverlay?.setAttribute("aria-hidden", "false");
+      return false;
+    }
+    project200LoginOverlay?.classList.remove("active");
+    project200LoginOverlay?.setAttribute("aria-hidden", "true");
+    return true;
+  } catch {
+    project200LoginOverlay?.classList.add("active");
+    project200LoginOverlay?.setAttribute("aria-hidden", "false");
+    return false;
+  }
 }
 
 function renderRepeatControls() {
   repeatBox.hidden = !state.wizard.repeatOpen;
   repeatToggle.classList.toggle("active", state.wizard.repeatOpen);
+  if (repeatToggle) {
+    repeatToggle.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg><span>Personalizar</span>`;
+  }
 
   document.querySelectorAll("[data-repeat-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.repeatMode === state.wizard.repeatMode);
   });
+  const showingDetailMode = state.wizard.repeatMode === "periodic" || state.wizard.repeatMode === "monthly_custom";
+  if (repeatModeButtons) {
+    repeatModeButtons.hidden = showingDetailMode;
+  }
+  if (repeatModeBackButton) {
+    repeatModeBackButton.hidden = !showingDetailMode;
+  }
 
   weekdayRow.innerHTML = "";
+  weekdayRow.hidden = state.wizard.repeatMode !== "custom";
   weekdayLabels.forEach((label, index) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -1306,6 +1629,27 @@ function renderRepeatControls() {
     button.classList.toggle("active", state.wizard.repeatDays.includes(index));
     weekdayRow.appendChild(button);
   });
+  if (repeatPeriodicBox) {
+    repeatPeriodicBox.hidden = state.wizard.repeatMode !== "periodic";
+  }
+  if (periodicEveryLabel) {
+    periodicEveryLabel.textContent = `${state.wizard.periodicEveryDays} dias`;
+  }
+  if (avoidSaturdayInput) {
+    avoidSaturdayInput.checked = Boolean(state.wizard.avoidSaturday);
+  }
+  if (avoidSundayInput) {
+    avoidSundayInput.checked = Boolean(state.wizard.avoidSunday);
+  }
+  if (repeatMonthlyCustomBox) {
+    repeatMonthlyCustomBox.hidden = state.wizard.repeatMode !== "monthly_custom";
+  }
+  if (monthlyOrdinalLabel) {
+    monthlyOrdinalLabel.textContent = monthlyOrdinalLabels[state.wizard.monthlyOrdinalIndex] || monthlyOrdinalLabels[0];
+  }
+  if (monthlyWeekdayLabel) {
+    monthlyWeekdayLabel.textContent = monthlyWeekdayLabels[state.wizard.monthlyWeekdayIndex] || monthlyWeekdayLabels[3];
+  }
 }
 
 function renderTimePickers() {
@@ -1374,23 +1718,31 @@ function moveWizardDate(amount) {
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
 }
 
-function moveWizardAssignee(direction) {
-  const total = assigneeOptions.length;
-  state.wizard.assigneeIndex = (state.wizard.assigneeIndex + direction + total) % total;
-  wizardAssigneeLabel.textContent = getWizardAssigneeName();
-}
-
 function moveTime(type, unit, direction) {
   const prefix = type === "start" ? "start" : "end";
   const key = unit === "hour" ? `${prefix}Hour` : `${prefix}Minute`;
-  const max = unit === "hour" ? 24 : 12;
-  const step = unit === "hour" ? 1 : 5;
+  const max = unit === "hour" ? 24 : 60;
+  const step = 1;
   const current = state.wizard[key];
   const normalized = unit === "hour"
     ? (current + direction + max) % max
-    : ((((current / 5) + direction + max) % max) * step);
+    : (current + direction + max) % max;
 
   state.wizard[key] = normalized;
+  if (type === "start") {
+    const startDate = new Date();
+    startDate.setHours(state.wizard.startHour, state.wizard.startMinute, 0, 0);
+    const endDate = new Date(startDate.getTime() + 15 * 60 * 1000);
+    state.wizard.endHour = endDate.getHours();
+    state.wizard.endMinute = endDate.getMinutes();
+  }
+  if (type === "end") {
+    const startDate = new Date();
+    startDate.setHours(state.wizard.startHour, state.wizard.startMinute, 0, 0);
+    const endDate = new Date(startDate.getTime() + 15 * 60 * 1000);
+    state.wizard.endHour = endDate.getHours();
+    state.wizard.endMinute = endDate.getMinutes();
+  }
   renderTimePickers();
 }
 
@@ -1410,6 +1762,39 @@ function validateStep() {
   return true;
 }
 
+function moveTimeHoldFive(type, unit, direction) {
+  const prefix = type === "start" ? "start" : "end";
+  const key = unit === "hour" ? `${prefix}Hour` : `${prefix}Minute`;
+  if (unit !== "minute") {
+    moveTime(type, unit, direction);
+    return;
+  }
+  const current = Number(state.wizard[key] || 0);
+  const snapped = Math.ceil(current / 5) * 5;
+  const base = current % 5 === 0 ? current : snapped;
+  const next = (base + (5 * direction) + 60) % 60;
+  state.wizard[key] = next;
+  renderTimePickers();
+}
+
+function shiftPeriodicEveryDays(direction) {
+  const allowed = [2, 4, 6];
+  const currentIndex = Math.max(0, allowed.indexOf(state.wizard.periodicEveryDays));
+  const nextIndex = (currentIndex + direction + allowed.length) % allowed.length;
+  state.wizard.periodicEveryDays = allowed[nextIndex];
+  renderRepeatControls();
+}
+
+function shiftMonthlyOrdinal(direction) {
+  state.wizard.monthlyOrdinalIndex = (state.wizard.monthlyOrdinalIndex + direction + monthlyOrdinalLabels.length) % monthlyOrdinalLabels.length;
+  renderRepeatControls();
+}
+
+function shiftMonthlyWeekday(direction) {
+  state.wizard.monthlyWeekdayIndex = (state.wizard.monthlyWeekdayIndex + direction + monthlyWeekdayLabels.length) % monthlyWeekdayLabels.length;
+  renderRepeatControls();
+}
+
 function buildOccurrences() {
   const selectedDate = dateFromOffset(state.wizard.dateOffset);
   const firstStart = buildDateWithTime(selectedDate, state.wizard.startHour, state.wizard.startMinute);
@@ -1426,6 +1811,40 @@ function buildOccurrences() {
     ? state.wizard.repeatDays
     : recurrenceDays[state.wizard.repeatMode] || [];
   const occurrences = [];
+
+  if (state.wizard.repeatMode === "periodic") {
+    for (let index = 0; index < 180; index += Number(state.wizard.periodicEveryDays || 2)) {
+      const date = addDays(selectedDate, index);
+      if (state.wizard.avoidSaturday && date.getDay() === 6) continue;
+      if (state.wizard.avoidSunday && date.getDay() === 0) continue;
+      const startAt = buildDateWithTime(date, state.wizard.startHour, state.wizard.startMinute);
+      const endAt = buildDateWithTime(date, state.wizard.endHour, state.wizard.endMinute);
+      occurrences.push({ startAt: startAt.toISOString(), endAt: endAt.toISOString() });
+    }
+    return occurrences;
+  }
+
+  if (state.wizard.repeatMode === "monthly_custom") {
+    for (let monthOffset = 0; monthOffset < 12; monthOffset += 1) {
+      const base = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + monthOffset, 1);
+      const monthDays = [];
+      for (let day = 1; day <= 31; day += 1) {
+        const d = new Date(base.getFullYear(), base.getMonth(), day);
+        if (d.getMonth() !== base.getMonth()) break;
+        if (d.getDay() === state.wizard.monthlyWeekdayIndex) monthDays.push(d);
+      }
+      const picked = state.wizard.monthlyOrdinalIndex === 4
+        ? monthDays[monthDays.length - 1]
+        : monthDays[state.wizard.monthlyOrdinalIndex];
+      if (!picked) continue;
+      const startAt = buildDateWithTime(picked, state.wizard.startHour, state.wizard.startMinute);
+      const endAt = buildDateWithTime(picked, state.wizard.endHour, state.wizard.endMinute);
+      if (startAt >= firstStart) {
+        occurrences.push({ startAt: startAt.toISOString(), endAt: endAt.toISOString() });
+      }
+    }
+    return occurrences;
+  }
 
   for (let index = 0; index < 180; index += 1) {
     const date = addDays(selectedDate, index);
@@ -1446,6 +1865,86 @@ function buildOccurrences() {
   return occurrences;
 }
 
+function computeOverlapsForOccurrences(occurrences) {
+  const existing = getVisibleActions();
+  const collisions = [];
+  for (const item of occurrences) {
+    const startMs = new Date(item.startAt).getTime();
+    const endMs = new Date(item.endAt).getTime();
+    const hit = existing.filter((action) => {
+      if (state.wizard.editingActionId && action.id === state.wizard.editingActionId) return false;
+      const aStart = new Date(action.startAt).getTime();
+      const aEnd = new Date(action.endAt).getTime();
+      return aEnd > startMs && aStart < endMs;
+    });
+    collisions.push(...hit);
+  }
+  const uniq = new Map();
+  collisions.forEach((item) => {
+    if (!uniq.has(item.id)) uniq.set(item.id, item);
+  });
+  return [...uniq.values()].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+}
+
+function buildFreeStartCandidates(durationMinutes) {
+  const timeline = buildActionTimelineEntries();
+  return timeline
+    .filter((entry) => entry.kind === "free" && getActionDurationMinutes(entry) >= durationMinutes)
+    .map((entry) => entry.startAt);
+}
+
+function renderOverlapWizard() {
+  if (!overlapTaskTitle || !overlapTaskRange || !overlapFreeStartLabel) return;
+  if (!state.overlapItems.length) {
+    overlapTaskTitle.textContent = "Sem conflitos";
+    overlapTaskRange.textContent = "";
+  } else {
+    const item = state.overlapItems[state.overlapIndex % state.overlapItems.length];
+    overlapTaskTitle.textContent = String(item.title || "Tarefa");
+    overlapTaskRange.textContent = `${formatHourChip(item.startAt)} às ${formatHourChip(item.endAt)}`;
+  }
+  if (state.overlapCandidateStarts.length) {
+    const startIso = state.overlapCandidateStarts[state.overlapCandidateIndex % state.overlapCandidateStarts.length];
+    overlapFreeStartLabel.textContent = formatHourChip(startIso);
+  } else {
+    overlapFreeStartLabel.textContent = "Sem horário";
+  }
+}
+
+function openOverlapWizard(overlaps, occurrences) {
+  return new Promise((resolve) => {
+    state.overlapResolver = resolve;
+    state.overlapItems = overlaps;
+    state.overlapIndex = 0;
+    const first = occurrences[0];
+    const duration = first ? Math.max(1, getActionDurationMinutes(first)) : 15;
+    state.overlapCandidateStarts = buildFreeStartCandidates(duration);
+    state.overlapCandidateIndex = 0;
+    if (overlapCarouselTimer) window.clearInterval(overlapCarouselTimer);
+    overlapCarouselTimer = window.setInterval(() => {
+      if (state.overlapItems.length > 1) {
+        state.overlapIndex = (state.overlapIndex + 1) % state.overlapItems.length;
+        renderOverlapWizard();
+      }
+    }, 1000);
+    renderOverlapWizard();
+    overlapWizard?.classList.add("active");
+    overlapWizard?.setAttribute("aria-hidden", "false");
+  });
+}
+
+function closeOverlapWizardWith(payload) {
+  if (overlapCarouselTimer) {
+    window.clearInterval(overlapCarouselTimer);
+    overlapCarouselTimer = null;
+  }
+  overlapWizard?.classList.remove("active");
+  overlapWizard?.setAttribute("aria-hidden", "true");
+  const resolver = state.overlapResolver;
+  state.overlapResolver = null;
+  if (resolver) resolver(payload);
+}
+
 async function saveAction() {
   try {
     wizardMessage.textContent = "Salvando...";
@@ -1459,6 +1958,35 @@ async function saveAction() {
       : "/api/actions";
     const requestMethod = state.wizard.editingActionId ? "PATCH" : "POST";
 
+    let occurrences = buildOccurrences();
+    const overlaps = computeOverlapsForOccurrences(occurrences);
+    if (overlaps.length) {
+      const decision = await openOverlapWizard(overlaps, occurrences);
+      if (!decision || decision.type === "cancel") {
+        wizardMessage.textContent = "Ajuste o horário para continuar.";
+        return;
+      }
+      if (decision.type === "change_time") {
+        state.wizard.step = 3;
+        renderWizard();
+        return;
+      }
+      if (decision.type === "use_free" && decision.startAt) {
+        const start = new Date(decision.startAt);
+        state.wizard.startHour = start.getHours();
+        state.wizard.startMinute = start.getMinutes();
+        const end = new Date(start.getTime() + 15 * 60 * 1000);
+        state.wizard.endHour = end.getHours();
+        state.wizard.endMinute = end.getMinutes();
+        occurrences = buildOccurrences();
+      }
+      if (decision.type === "replace") {
+        for (const item of overlaps) {
+          await apiRequest(`/api/actions/${encodeURIComponent(item.id)}`, { method: "DELETE" });
+        }
+      }
+    }
+
     await apiRequest(requestPath, {
       method: requestMethod,
       headers: {
@@ -1469,7 +1997,7 @@ async function saveAction() {
         assignee: getWizardAssigneeName(),
         repeatRule,
         repeatDays,
-        occurrences: buildOccurrences()
+        occurrences: occurrences
       })
     });
 
@@ -1901,6 +2429,12 @@ function formatRepeatLabel(repeatRule, repeatDays) {
   if (repeatRule === "daily") {
     return "Diariamente";
   }
+  if (repeatRule === "periodic") {
+    return `A cada ${state.wizard.periodicEveryDays} dias`;
+  }
+  if (repeatRule === "monthly_custom") {
+    return `Toda ${monthlyOrdinalLabels[state.wizard.monthlyOrdinalIndex]} ${monthlyWeekdayLabels[state.wizard.monthlyWeekdayIndex]}`;
+  }
   if (repeatRule === "custom" && Array.isArray(repeatDays) && repeatDays.length) {
     const names = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
     return repeatDays.map((day) => names[day] || day).join(", ");
@@ -1942,10 +2476,6 @@ function applyInterpretedAction(entry) {
   state.wizard.repeatOpen = String(entry?.repeatRule || "none") !== "none";
   state.wizard.repeatMode = String(entry?.repeatRule || "none");
   state.wizard.repeatDays = Array.isArray(entry?.repeatDays) ? entry.repeatDays.map((day) => Number(day)).filter((day) => day >= 0 && day <= 6) : [];
-  if (entry?.assigneeDetected && entry?.assignee) {
-    const normalized = normalizeAssigneeName(entry.assignee);
-    state.wizard.assigneeIndex = Math.max(0, assigneeOptions.indexOf(normalized));
-  }
   renderWizard();
 }
 
@@ -1955,7 +2485,7 @@ function applyPendingInterpretedActionAndContinue() {
   }
   const entry = actionPendingAiPayload;
   applyInterpretedAction(entry);
-  state.wizard.step = entry?.assigneeDetected ? 2 : 5;
+  state.wizard.step = 2;
   renderWizard();
   hideActionAiConfirmation();
 }
@@ -2009,10 +2539,7 @@ async function startActionMic() {
         });
         actionPendingAiPayload = interpreted?.action || null;
         renderActionAiConfirmation(actionPendingAiPayload || {});
-        const parsedAssignee = interpreted?.action?.assigneeDetected
-          ? normalizeAssigneeName(interpreted?.action?.assignee)
-          : "não identificado";
-        actionVoiceStatus.textContent = `Tarefa pronta (${parsedAssignee}). Confirme abaixo.`;
+        actionVoiceStatus.textContent = "Tarefa pronta. Confirme abaixo.";
       } catch (error) {
         actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretação.";
       }
@@ -2961,7 +3488,7 @@ wizardNextButton.addEventListener("click", () => {
     return;
   }
 
-  if (state.wizard.step === 5) {
+  if (state.wizard.step === 4) {
     void saveAction();
     return;
   }
@@ -3027,17 +3554,60 @@ repeatToggle.addEventListener("click", () => {
   state.wizard.repeatOpen = !state.wizard.repeatOpen;
   renderRepeatControls();
 });
+repeatModeBackButton?.addEventListener("click", () => {
+  state.wizard.repeatMode = "none";
+  state.wizard.repeatDays = [];
+  renderRepeatControls();
+});
 
 document.querySelectorAll("[data-wizard-date]").forEach((button) => {
   button.addEventListener("click", () => moveWizardDate(Number(button.dataset.wizardDate)));
 });
 
-document.querySelectorAll("[data-wizard-assignee]").forEach((button) => {
-  button.addEventListener("click", () => moveWizardAssignee(Number(button.dataset.wizardAssignee)));
+document.querySelectorAll("[data-periodic-nav]").forEach((button) => {
+  button.addEventListener("click", () => shiftPeriodicEveryDays(Number(button.dataset.periodicNav)));
+});
+
+document.querySelectorAll("[data-monthly-ordinal-nav]").forEach((button) => {
+  button.addEventListener("click", () => shiftMonthlyOrdinal(Number(button.dataset.monthlyOrdinalNav)));
+});
+
+document.querySelectorAll("[data-monthly-weekday-nav]").forEach((button) => {
+  button.addEventListener("click", () => shiftMonthlyWeekday(Number(button.dataset.monthlyWeekdayNav)));
+});
+
+avoidSaturdayInput?.addEventListener("change", () => {
+  state.wizard.avoidSaturday = Boolean(avoidSaturdayInput.checked);
+});
+
+avoidSundayInput?.addEventListener("change", () => {
+  state.wizard.avoidSunday = Boolean(avoidSundayInput.checked);
 });
 
 document.querySelectorAll("[data-repeat-mode]").forEach((button) => {
   button.addEventListener("click", () => setRepeatMode(button.dataset.repeatMode));
+});
+
+closeOverlapWizard?.addEventListener("click", () => closeOverlapWizardWith({ type: "cancel" }));
+overlapReplaceButton?.addEventListener("click", () => closeOverlapWizardWith({ type: "replace" }));
+overlapChangeTimeButton?.addEventListener("click", () => closeOverlapWizardWith({ type: "change_time" }));
+overlapApplyFreeButton?.addEventListener("click", () => {
+  if (!state.overlapCandidateStarts.length) {
+    closeOverlapWizardWith({ type: "change_time" });
+    return;
+  }
+  const startAt = state.overlapCandidateStarts[state.overlapCandidateIndex % state.overlapCandidateStarts.length];
+  closeOverlapWizardWith({ type: "use_free", startAt });
+});
+overlapFreePrev?.addEventListener("click", () => {
+  if (!state.overlapCandidateStarts.length) return;
+  state.overlapCandidateIndex = (state.overlapCandidateIndex - 1 + state.overlapCandidateStarts.length) % state.overlapCandidateStarts.length;
+  renderOverlapWizard();
+});
+overlapFreeNext?.addEventListener("click", () => {
+  if (!state.overlapCandidateStarts.length) return;
+  state.overlapCandidateIndex = (state.overlapCandidateIndex + 1) % state.overlapCandidateStarts.length;
+  renderOverlapWizard();
 });
 
 document.querySelectorAll("[data-platform-kind]").forEach((button) => {
@@ -3094,6 +3664,36 @@ actionForm.addEventListener("click", (event) => {
   moveTime(button.dataset.time, button.dataset.unit, Number(button.dataset.dir));
 });
 
+actionForm.addEventListener("pointerdown", (event) => {
+  const button = event.target.closest("[data-time]");
+  if (!button) return;
+  const type = button.dataset.time;
+  const unit = button.dataset.unit;
+  const dir = Number(button.dataset.dir || 0);
+  if (!dir) return;
+  if (timeButtonHoldTimer) window.clearTimeout(timeButtonHoldTimer);
+  if (timeButtonHoldInterval) window.clearInterval(timeButtonHoldInterval);
+  timeButtonHoldTimer = window.setTimeout(() => {
+    moveTimeHoldFive(type, unit, dir);
+    timeButtonHoldInterval = window.setInterval(() => {
+      moveTimeHoldFive(type, unit, dir);
+    }, 500);
+  }, 500);
+});
+
+["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+  actionForm.addEventListener(evt, () => {
+    if (timeButtonHoldTimer) {
+      window.clearTimeout(timeButtonHoldTimer);
+      timeButtonHoldTimer = null;
+    }
+    if (timeButtonHoldInterval) {
+      window.clearInterval(timeButtonHoldInterval);
+      timeButtonHoldInterval = null;
+    }
+  });
+});
+
 actionForm.addEventListener("submit", (event) => {
   event.preventDefault();
 });
@@ -3101,6 +3701,15 @@ actionForm.addEventListener("submit", (event) => {
 actionsList.addEventListener("pointerdown", (event) => {
   const row = event.target.closest("[data-action-id]");
   if (!row) {
+    const sleepRow = event.target.closest("[data-sleep-slot]");
+    if (sleepRow) {
+      return;
+    }
+  }
+  if (!row) {
+    return;
+  }
+  if (row.dataset.freeSlot === "1") {
     return;
   }
   beginActionLongPress(row.dataset.actionId);
@@ -3111,8 +3720,17 @@ actionsList.addEventListener("pointerleave", endActionLongPress);
 actionsList.addEventListener("pointercancel", endActionLongPress);
 
 actionsList.addEventListener("click", async (event) => {
+  const sleepRow = event.target.closest("[data-sleep-slot]");
+  if (sleepRow) {
+    renderSleepLabels();
+    openModal("sleepConfigModal");
+    return;
+  }
   const row = event.target.closest("[data-action-id]");
   if (!row) {
+    return;
+  }
+  if (row.dataset.freeSlot === "1") {
     return;
   }
   const actionId = row.dataset.actionId;
@@ -3202,6 +3820,9 @@ actionsList.addEventListener("keydown", async (event) => {
   if (!row) {
     return;
   }
+  if (row.dataset.freeSlot === "1") {
+    return;
+  }
 
   event.preventDefault();
   await toggleActionStatus(row.dataset.actionId);
@@ -3210,7 +3831,6 @@ actionsList.addEventListener("keydown", async (event) => {
 handleSwipe(activeDateLabel, moveActiveDate);
 handleSwipe(financePeriodLabel, moveFinancePeriod);
 handleSwipe(financePeriodPicker, moveFinancePeriod);
-handleSwipe(wizardAssigneeLabel, moveWizardAssignee);
 handleSwipe(financeDateLabel, movePlatformDate);
 renderFinancePeriod();
 renderDateHeader();
@@ -3340,9 +3960,37 @@ actionAiEditButton?.addEventListener("click", () => {
   actionVoiceStatus.textContent = "Edite manualmente e continue.";
 });
 
+actionAiEditDatesButton?.addEventListener("click", () => {
+  state.wizard.step = 2;
+  hideActionAiConfirmation();
+  renderWizard();
+  actionVoiceStatus.textContent = "Edite as datas.";
+});
+
+actionAiRenameMicButton?.addEventListener("click", () => {
+  state.wizard.step = 1;
+  hideActionAiConfirmation();
+  renderWizard();
+  void startActionMic();
+});
+
 actionAiApplyButton?.addEventListener("click", () => {
   applyPendingInterpretedActionAndContinue();
   actionVoiceStatus.textContent = "Dados aplicados.";
+});
+
+document.querySelectorAll("[data-ai-time-nav]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const type = String(button.dataset.aiTimeNav || "start");
+    const dir = Number(button.dataset.dir || 0);
+    if (!dir) return;
+    moveTime(type, "minute", dir);
+    if (type === "start") {
+      actionAiConfirmStart.textContent = `${String(state.wizard.startHour).padStart(2, "0")}:${String(state.wizard.startMinute).padStart(2, "0")}`;
+    } else {
+      actionAiConfirmEnd.textContent = `${String(state.wizard.endHour).padStart(2, "0")}:${String(state.wizard.endMinute).padStart(2, "0")}`;
+    }
+  });
 });
 
 runningTaskFinalizeButton?.addEventListener("click", () => {
@@ -3351,16 +3999,69 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
     if (!runningAction) {
       return;
     }
+    const duration = getActionDurationMinutes(runningAction);
+    const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
+    const elapsed = Number.isFinite(startedAtMs) ? Math.max(0, (Date.now() - startedAtMs) / (60 * 1000)) : duration;
+    const bonusBefore = Math.max(0, Number(runningCarryOverMinutes || 0));
+    const remainingAfterBonus = Math.max(0, elapsed - bonusBefore);
+    const savedMinutes = Math.max(0, Math.floor(duration - remainingAfterBonus));
     await toggleActionStatus(runningAction.id);
     const after = state.actions.find((item) => item.id === runningAction.id);
     if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
-      const modal = document.getElementById("runningTaskModal");
-      if (modal) {
-        closeModal(modal);
+      const nextAction = getNextTimelineEntryForRunning(runningAction);
+      if (nextAction) {
+        runningCarryOverMinutes = savedMinutes;
+        runningTaskName.textContent = String(nextAction.kind === "free" ? "Tempo livre" : (nextAction.title || "Tarefa"));
+        const nextOfNext = nextAction.kind === "free" ? null : getNextTimelineEntryForRunning(nextAction);
+        runningTaskNextName.textContent = nextOfNext
+          ? String(nextOfNext.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextOfNext))})` : (nextOfNext.title || "Tarefa"))
+          : "Legal essa é sua última tarefa";
+        runningTaskMinutesLeft.textContent = `${runningCarryOverMinutes} min de saldo`;
+        runningTaskMinutesLeft.classList.toggle("is-bonus", runningCarryOverMinutes > 0);
+        if (runningTaskStartNextButton) {
+          runningTaskStartNextButton.hidden = false;
+          runningTaskStartNextButton.dataset.actionId = String(nextAction.id || "");
+          runningTaskStartNextButton.dataset.kind = String(nextAction.kind || "action");
+          runningTaskStartNextButton.dataset.startIso = String(nextAction.startAt || "");
+          runningTaskStartNextButton.dataset.endIso = String(nextAction.endAt || "");
+        }
+      } else {
+        const summary = getCompletionSummaryForSelectedProfile();
+        if (dayDonePercent) {
+          dayDonePercent.textContent = `${summary.percent}%`;
+        }
+        if (dayDoneDelay) {
+          dayDoneDelay.textContent = `Atraso: ${summary.late} min`;
+        }
+        openModal("dayDoneModal");
       }
-      openModal("actionsModal");
     }
   })();
+});
+
+runningTaskStartNextButton?.addEventListener("click", () => {
+  const kind = String(runningTaskStartNextButton.dataset.kind || "action");
+  if (kind === "free") {
+    const start = new Date(String(runningTaskStartNextButton.dataset.startIso || ""));
+    const end = new Date(String(runningTaskStartNextButton.dataset.endIso || ""));
+    openWizard();
+    if (Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())) {
+      const today = todayStart();
+      const day = new Date(start);
+      day.setHours(0, 0, 0, 0);
+      state.wizard.dateOffset = Math.round((day.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+      state.wizard.startHour = start.getHours();
+      state.wizard.startMinute = start.getMinutes();
+      state.wizard.endHour = end.getHours();
+      state.wizard.endMinute = end.getMinutes();
+      state.wizard.step = 1;
+      renderWizard();
+    }
+    return;
+  }
+  const actionId = String(runningTaskStartNextButton.dataset.actionId || "").trim();
+  if (!actionId) return;
+  void toggleActionStatus(actionId);
 });
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);
@@ -3405,11 +4106,14 @@ historyTextForm?.addEventListener("submit", (event) => {
   })();
 });
 applySelectedProfile(readSelectedProfile());
-if (getToken()) {
-  void loadActions();
-} else {
-  renderHomeRunningTask();
-}
+void (async () => {
+  const ok = await ensureProject200Session();
+  if (ok) {
+    await loadActions();
+  } else {
+    renderHomeRunningTask();
+  }
+})();
 
 profileButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -3417,6 +4121,71 @@ profileButtons.forEach((button) => {
     renderActions();
   });
 });
+
+project200LoginForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const username = String(project200Username?.value || "").trim();
+  const password = String(project200Password?.value || "");
+  if (!username || !password) {
+    if (project200LoginMessage) project200LoginMessage.textContent = "Preencha usuário e senha.";
+    return;
+  }
+  if (project200LoginMessage) project200LoginMessage.textContent = "Entrando...";
+  void (async () => {
+    try {
+      const response = await fetch(getApiUrl("/api/auth/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (!response.ok || !data?.token) {
+        throw new Error(data?.error || "Falha no login.");
+      }
+      setToken(String(data.token));
+      if (project200LoginMessage) project200LoginMessage.textContent = "Acesso liberado.";
+      project200LoginOverlay?.classList.remove("active");
+      project200LoginOverlay?.setAttribute("aria-hidden", "true");
+      await loadActions();
+    } catch (error) {
+      if (project200LoginMessage) {
+        project200LoginMessage.textContent = error instanceof Error ? error.message : "Falha no login.";
+      }
+    }
+  })();
+});
+
+document.querySelectorAll("[data-sleep-nav]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const target = String(button.dataset.sleepNav || "start");
+    const dir = Number(button.dataset.dir || 0);
+    const hourKey = target === "start" ? "startHour" : "endHour";
+    state.sleepConfig[hourKey] = (Number(state.sleepConfig[hourKey] || 0) + dir + 24) % 24;
+    renderSleepLabels();
+  });
+});
+
+saveSleepConfigBtn?.addEventListener("click", () => {
+  const baseDate = dateFromOffset(state.activeOffset);
+  const sleepStart = new Date(baseDate);
+  sleepStart.setHours(state.sleepConfig.startHour, state.sleepConfig.startMinute, 0, 0);
+  const sleepEnd = new Date(sleepStart);
+  sleepEnd.setDate(sleepEnd.getDate() + 1);
+  sleepEnd.setHours(state.sleepConfig.endHour, state.sleepConfig.endMinute, 0, 0);
+  const hasOverlap = getVisibleActions().some((action) => {
+    const start = new Date(action.startAt).getTime();
+    const end = new Date(action.endAt).getTime();
+    return end > sleepStart.getTime() && start < sleepEnd.getTime();
+  });
+  if (hasOverlap && !window.confirm("Esse horário de sono sobrepõe tarefas. Deseja continuar mesmo assim?")) {
+    return;
+  }
+  saveSleepConfig();
+  closeModal(sleepConfigModal);
+  renderActions();
+});
+
+loadSleepConfig();
 
 document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));

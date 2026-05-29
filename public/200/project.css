@@ -233,7 +233,52 @@ svg {
   align-items: stretch;
   text-align: left;
   gap: 12px;
+  transform: scale(1.4);
+  transform-origin: center;
 }
+
+.project-login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(145deg, rgba(20, 64, 196, 0.9), rgba(231, 81, 155, 0.85));
+}
+
+.project-login-overlay.active {
+  display: grid;
+}
+
+.project-login-card {
+  width: min(430px, 94vw);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(8, 20, 52, 0.5);
+  padding: 24px;
+  color: #fff;
+}
+
+.project-login-logo {
+  width: min(220px, 56vw);
+  display: block;
+  margin: 0 auto 10px;
+}
+
+.project-login-card h2 { margin: 0 0 6px; }
+.project-login-card p { margin: 0 0 12px; color: rgba(255,255,255,0.9); }
+.project-login-card label { display: block; margin: 10px 0 6px; font-weight: 700; }
+.project-login-card input {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 12px;
+  background: rgba(0,0,0,0.25);
+  color: #fff;
+  padding: 11px 12px;
+}
+.project-login-card button { width: 100%; margin-top: 14px; }
+.project-login-message { min-height: 22px; font-weight: 700; }
 
 .running-task-name {
   font-size: 1.12rem;
@@ -251,6 +296,18 @@ svg {
   color: var(--soft);
   font-weight: 700;
   font-size: 0.95rem;
+}
+.running-task-minutes.is-bonus {
+  color: #25ff63;
+  font-weight: 800;
+}
+.running-task-minutes.is-late {
+  color: #ff4d4f;
+  font-weight: 800;
+}
+.running-task-minutes.is-early {
+  color: #25ff63;
+  font-weight: 800;
 }
 
 .running-circle-wrap {
@@ -294,7 +351,7 @@ svg {
   place-items: center;
   font-weight: 800;
   color: #fff;
-  font-size: 1.15rem;
+  font-size: 2.3rem;
 }
 
 .running-task-next-label {
@@ -308,22 +365,17 @@ svg {
 
 .running-task-finalize-btn {
   margin-top: 4px;
-}
-
-.running-music-player {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: #22c55e;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
 }
-
-.running-station-btn {
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  border-radius: 10px;
-  min-height: 36px;
-  font-weight: 700;
+.running-task-start-btn {
+  margin-top: 4px;
 }
+
 
 .workspace-modal {
   position: fixed;
@@ -463,6 +515,7 @@ svg {
   align-items: center;
   justify-content: center;
   gap: 14px;
+  transform: translateY(-15px);
 }
 
 #actionsModal .actions-head,
@@ -593,6 +646,7 @@ svg {
   background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease, transform 120ms ease;
+  transform: translateY(-10px);
 }
 
 .platform-entry-row {
@@ -686,7 +740,7 @@ svg {
 }
 
 .task-row:hover {
-  transform: translateY(-1px);
+  transform: translateY(-11px);
 }
 
 .task-row.task-in-progress {
@@ -724,6 +778,27 @@ svg {
   border-color: rgba(190, 190, 190, 0.5);
 }
 
+.task-row.task-free-slot {
+  background: linear-gradient(135deg, rgba(47, 122, 231, 0.96), rgba(36, 97, 206, 0.96));
+  border-color: rgba(176, 215, 255, 0.88);
+}
+.task-row.task-free-slot .task-title,
+.task-row.task-free-slot .task-assignee,
+.task-row.task-free-slot .task-time {
+  color: #ffffff;
+}
+
+.task-row.task-sleep-slot {
+  background: linear-gradient(135deg, rgba(21, 41, 92, 0.96), rgba(14, 28, 74, 0.96));
+  border-color: rgba(138, 170, 255, 0.78);
+}
+
+.task-row.task-sleep-slot .task-title,
+.task-row.task-sleep-slot .task-assignee,
+.task-row.task-sleep-slot .task-time {
+  color: #dbe8ff;
+}
+
 .task-time {
   grid-column: 3;
   text-align: right;
@@ -732,6 +807,10 @@ svg {
   font-size: 0.92rem;
   font-weight: 800;
   color: var(--white);
+  transition: opacity 220ms ease;
+}
+.task-time.is-fading {
+  opacity: 0.18;
 }
 
 .task-main {
@@ -797,8 +876,8 @@ svg {
   height: 58px;
   border: 0;
   border-radius: 50%;
-  background: rgba(8, 31, 83, 0.7);
-  border: 1px solid var(--line);
+  background: rgba(17, 87, 204, 0.1);
+  border: 1px solid rgba(116, 182, 255, 0.92);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -821,19 +900,16 @@ svg {
   width: 100%;
   border: 0;
   border-radius: 10px;
-  padding: 4px 2px 0;
+  padding: 0;
   background: transparent;
   backdrop-filter: none;
   display: grid;
   gap: 6px;
+  transform: translateY(-10px);
 }
 
 .actions-progress-head {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 0.93rem;
+  display: none;
 }
 
 #actionsProgressMinutes {
@@ -845,7 +921,7 @@ svg {
   height: 8px;
   border-radius: 999px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.26);
+  border: 1px solid rgba(80, 210, 120, 0.9);
   overflow: hidden;
 }
 
@@ -853,7 +929,7 @@ svg {
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2d66d8, #39d68f);
+  background: linear-gradient(90deg, #34d399, #22c55e);
   transition: width 260ms ease;
 }
 
@@ -1009,13 +1085,13 @@ svg {
 }
 
 .wizard-panel {
-  width: min(640px, 100%);
-  min-height: min(580px, calc(100vh - 40px));
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  width: min(100%, 100vw);
+  min-height: 100vh;
+  border: 0;
+  border-radius: 0;
   background: rgba(7, 39, 102, 0.86);
   backdrop-filter: blur(12px);
-  padding: 18px;
+  padding: 20px;
   display: grid;
   grid-template-rows: auto 1fr;
 }
@@ -1080,15 +1156,18 @@ svg {
 }
 
 .repeat-toggle {
-  position: absolute;
-  right: 10px;
-  bottom: 4px;
-  width: 42px;
-  height: 42px;
-  border: 0;
-  border-radius: 50%;
+  position: static;
+  width: min(70vw, 420px);
+  min-height: 54px;
+  margin: 6px auto 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.18);
-  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  opacity: 0.85;
   cursor: pointer;
 }
 
@@ -1110,6 +1189,18 @@ svg {
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+#repeatModeButtons {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: min(70vw, 420px);
+  margin: 0 auto;
+}
+
+.repeat-mode-back {
+  width: min(70vw, 420px);
+  margin: 0 auto;
 }
 
 #platformCategoryRow {
@@ -1242,6 +1333,23 @@ svg {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.wizard-step[data-step="2"] ~ .wizard-actions {
+  display: grid;
+  justify-content: center;
+  gap: 10px;
+}
+
+.wizard-step[data-step="2"].active ~ .wizard-actions .ghost-btn,
+.wizard-step[data-step="2"].active ~ .wizard-actions .primary-btn {
+  width: min(70vw, 420px);
+  margin: 0 auto;
+}
+
+.wizard-step[data-step="2"].active ~ .wizard-actions .primary-btn {
+  background: #22c55e;
+  color: #fff;
 }
 
 .ghost-btn,
@@ -1489,13 +1597,16 @@ svg {
 }
 
 .wizard-ai-confirm {
-  margin-top: 10px;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 0;
   background: rgba(6, 24, 68, 0.55);
-  padding: 10px;
+  padding: 24px;
   display: grid;
-  gap: 6px;
+  gap: 10px;
+  overflow: auto;
 }
 
 .wizard-ai-confirm h3 {
@@ -1506,6 +1617,7 @@ svg {
 .wizard-ai-confirm p {
   margin: 0;
   color: var(--soft);
+  font-size: 1.18rem;
 }
 
 .wizard-ai-confirm-actions {
@@ -1513,6 +1625,55 @@ svg {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.repeat-periodic,
+.repeat-monthly-custom {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.overlap-panel {
+  background: rgba(7, 39, 102, 0.95);
+}
+
+.overlap-content {
+  text-align: center;
+  margin: 16px 0;
+}
+
+.overlap-title {
+  color: #ffe26a;
+  font-size: clamp(1.8rem, 6vw, 3.2rem);
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+
+.overlap-task {
+  color: #fff;
+  font-size: clamp(1.4rem, 4.5vw, 2.3rem);
+  font-weight: 800;
+  margin: 0 0 4px;
+}
+
+.overlap-time {
+  color: #fff;
+  font-size: clamp(1.2rem, 4vw, 2rem);
+  margin: 0;
+}
+
+.overlap-actions {
+  display: grid;
+  gap: 10px;
+  width: min(760px, 96vw);
+  margin: 0 auto;
+}
+
+.overlap-actions h4,
+.overlap-actions small {
+  margin: 0;
+  text-align: center;
 }
 
 #actionsModal .actions-progress-track {
