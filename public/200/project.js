@@ -3,7 +3,6 @@
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
 const projectProfileLinksKey = "project_200_profile_links_v1";
-const projectProfileLockKey = "project_200_profile_lock_v1";
 const sleepConfigKey = "project_200_sleep_v1";
 const defaultSaldoGoalCents = 1000000;
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -90,9 +89,8 @@ const recurrenceDays = {
   weekdays: [1, 2, 3, 4, 5]
 };
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
-const selectableProfiles = ["project", "Geral", "Alberto", "Rose", "Lucas", "Thainan"];
+const selectableProfiles = ["Rose", "Alberto", "Lucas", "Thainan"];
 const profileTintByName = {
-  project: "linear-gradient(145deg, rgba(11, 61, 168, 0), rgba(31, 126, 231, 0))",
   Alberto: "linear-gradient(145deg, rgba(2, 27, 77, 0.7), rgba(11, 61, 168, 0.7))",
   Rose: "linear-gradient(145deg, rgba(31, 78, 216, 0.7), rgba(234, 76, 137, 0.7))",
   Lucas: "linear-gradient(145deg, rgba(79, 195, 247, 0.7), rgba(212, 160, 23, 0.7))",
@@ -345,9 +343,10 @@ const state = {
   actions: [],
   historySystem: [],
   historyTexts: [],
-  selectedProfile: "project",
+  selectedProfile: "Rose",
   profileLinks: {},
   profileLock: "",
+  authUsername: "",
   historyOffset: 0,
   historyTextComposer: {
     step: 1,
@@ -394,12 +393,8 @@ function setToken(token) {
 }
 
 function readSelectedProfile() {
-  const locked = String(window.localStorage.getItem(projectProfileLockKey) || "").trim();
-  if (locked && selectableProfiles.includes(locked)) {
-    return locked;
-  }
-  const saved = String(window.localStorage.getItem(projectProfileKey) || "project");
-  return selectableProfiles.includes(saved) ? saved : "project";
+  const saved = String(window.localStorage.getItem(projectProfileKey) || "Rose");
+  return selectableProfiles.includes(saved) ? saved : "Rose";
 }
 
 function readProfileLinks() {
@@ -413,6 +408,16 @@ function readProfileLinks() {
 
 function saveProfileLinks() {
   window.localStorage.setItem(projectProfileLinksKey, JSON.stringify(state.profileLinks || {}));
+}
+
+function normalizeUsernameKey(value) {
+  return String(value || "").trim().toLocaleLowerCase("pt-BR");
+}
+
+function refreshProfileLockFromAuth() {
+  const key = normalizeUsernameKey(state.authUsername);
+  const lockedProfile = key ? String(state.profileLinks?.[key] || "").trim() : "";
+  state.profileLock = selectableProfiles.includes(lockedProfile) ? lockedProfile : "";
 }
 
 function renderProfileFooterVisibility() {
@@ -430,8 +435,8 @@ function applySelectedProfile(profile) {
   if (state.profileLock && profile !== state.profileLock) {
     return;
   }
-  const next = selectableProfiles.includes(profile) ? profile : "project";
-  const nextTint = profileTintByName[next] || profileTintByName.project;
+  const next = selectableProfiles.includes(profile) ? profile : "Rose";
+  const nextTint = profileTintByName[next] || profileTintByName.Rose;
   const root = document.documentElement;
   root.style.setProperty("--app-tint-next", nextTint);
   root.style.setProperty("--app-next-opacity", "1");
@@ -466,9 +471,6 @@ function dateFromOffset(offset) {
 }
 
 function getVisibleActions() {
-  if (state.selectedProfile === "project") {
-    return state.actions;
-  }
   return state.actions.filter((action) => normalizeAssigneeName(action.assignee) === state.selectedProfile);
 }
 
@@ -808,7 +810,7 @@ function normalizeAssigneeName(value) {
 }
 
 function getWizardAssigneeName() {
-  return normalizeAssigneeName(state.selectedProfile === "project" ? "Geral" : state.selectedProfile);
+  return normalizeAssigneeName(state.selectedProfile || "Rose");
 }
 
 function getActionAvatarPath(assignee) {
@@ -1309,7 +1311,7 @@ function renderActions() {
   }
 
   timelineEntries.forEach((action) => {
-    const slotOwner = state.selectedProfile === "project" ? "Geral" : state.selectedProfile;
+    const slotOwner = state.selectedProfile;
     const slotAvatar = getActionAvatarPath(slotOwner);
     if (action.kind === "sleep") {
       const row = document.createElement("article");
@@ -1654,16 +1656,26 @@ async function ensureProject200Session() {
         Authorization: `Bearer ${token}`
       }
     });
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       setToken("");
+      state.authUsername = "";
+      state.profileLock = "";
       project200LoginOverlay?.classList.add("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "false");
       return false;
+    }
+    state.authUsername = String(payload?.user?.username || "").trim();
+    refreshProfileLockFromAuth();
+    if (state.profileLock) {
+      applySelectedProfile(state.profileLock);
     }
     project200LoginOverlay?.classList.remove("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
     return true;
   } catch {
+    state.authUsername = "";
+    state.profileLock = "";
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
     return false;
@@ -4250,11 +4262,7 @@ historyTextForm?.addEventListener("submit", (event) => {
   })();
 });
 state.profileLinks = readProfileLinks();
-state.profileLock = String(window.localStorage.getItem(projectProfileLockKey) || "").trim();
-if (state.profileLock && !selectableProfiles.includes(state.profileLock)) {
-  state.profileLock = "";
-  window.localStorage.removeItem(projectProfileLockKey);
-}
+state.profileLock = "";
 applySelectedProfile(readSelectedProfile());
 void (async () => {
   const ok = await ensureProject200Session();
@@ -4274,7 +4282,7 @@ profileButtons.forEach((button) => {
     avatar.setAttribute("draggable", "false");
   }
   button.addEventListener("click", () => {
-    const profile = String(button.dataset.profile || "project");
+    const profile = String(button.dataset.profile || "Rose");
     if (profileLongPressHandledProfile === profile) {
       profileLongPressHandledProfile = "";
       return;
@@ -4334,14 +4342,13 @@ profileLinkForm?.addEventListener("submit", (event) => {
       if (!foundUser?.username) {
         throw new Error("Usuário não encontrado.");
       }
-      state.profileLinks[profileLinkTarget] = {
-        username: String(foundUser.username || ""),
-        name: String(foundUser.name || foundUser.username || "")
-      };
+      const linkedUsername = normalizeUsernameKey(foundUser.username);
+      state.profileLinks[linkedUsername] = profileLinkTarget;
       saveProfileLinks();
-      state.profileLock = profileLinkTarget;
-      window.localStorage.setItem(projectProfileLockKey, state.profileLock);
-      applySelectedProfile(profileLinkTarget);
+      refreshProfileLockFromAuth();
+      if (state.profileLock) {
+        applySelectedProfile(state.profileLock);
+      }
       renderActions();
       if (profileLinkMessage) profileLinkMessage.textContent = "Vínculo realizado com sucesso.";
       window.setTimeout(() => {
@@ -4376,6 +4383,11 @@ project200LoginForm?.addEventListener("submit", (event) => {
         throw new Error(data?.error || "Falha no login.");
       }
       setToken(String(data.token));
+      state.authUsername = String(data?.user?.username || "").trim();
+      refreshProfileLockFromAuth();
+      if (state.profileLock) {
+        applySelectedProfile(state.profileLock);
+      }
       if (project200LoginMessage) project200LoginMessage.textContent = "Acesso liberado.";
       project200LoginOverlay?.classList.remove("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
