@@ -317,6 +317,9 @@ let profileLongPressHandledProfile = "";
 let profileLinkTarget = "";
 let profilePressStartedAt = 0;
 let profilePressProfile = "";
+let sleepNavHoldTimer = null;
+let sleepNavHoldInterval = null;
+let sleepNavLongPressHandled = false;
 
 const state = {
   activeOffset: 0,
@@ -645,7 +648,7 @@ function renderHomeRunningTask() {
     runningTaskPercent.textContent = "0%";
     runningTaskMinutesLeft.textContent = "0 minutos restantes";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
-    runningTaskNextName.textContent = "Legal essa é sua última tarefa";
+    runningTaskNextName.textContent = "Próxima tarefa será exibida aqui";
     return;
   }
   const { percent, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
@@ -666,7 +669,7 @@ function renderHomeRunningTask() {
   }
   runningTaskNextName.textContent = nextAction
     ? String(nextAction.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextAction))})` : (nextAction.title || "Tarefa"))
-    : "Legal essa é sua última tarefa";
+    : "Descanso";
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
   }
@@ -1620,6 +1623,16 @@ function renderSleepLabels() {
   if (sleepEndLabel) {
     sleepEndLabel.textContent = `${String(state.sleepConfig.endHour).padStart(2, "0")}:${String(state.sleepConfig.endMinute).padStart(2, "0")}`;
   }
+}
+
+function moveSleepTime(target, deltaMinutes) {
+  const hourKey = target === "start" ? "startHour" : "endHour";
+  const minuteKey = target === "start" ? "startMinute" : "endMinute";
+  const currentTotal = (Number(state.sleepConfig[hourKey] || 0) * 60) + Number(state.sleepConfig[minuteKey] || 0);
+  const wrapped = ((currentTotal + deltaMinutes) % (24 * 60) + (24 * 60)) % (24 * 60);
+  state.sleepConfig[hourKey] = Math.floor(wrapped / 60);
+  state.sleepConfig[minuteKey] = wrapped % 60;
+  renderSleepLabels();
 }
 
 async function ensureProject200Session() {
@@ -3846,6 +3859,7 @@ actionsList.addEventListener("click", async (event) => {
   if (sleepRow) {
     renderSleepLabels();
     openModal("sleepConfigModal");
+    closeActionsModalWithFade();
     return;
   }
   const row = event.target.closest("[data-action-id]");
@@ -4134,10 +4148,10 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
       if (nextAction) {
         runningCarryOverMinutes = savedMinutes;
         runningTaskName.textContent = String(nextAction.kind === "free" ? "Tempo livre" : (nextAction.title || "Tarefa"));
-        const nextOfNext = nextAction.kind === "free" ? null : getNextTimelineEntryForRunning(nextAction);
+        const nextOfNext = getNextTimelineEntryForRunning(nextAction);
         runningTaskNextName.textContent = nextOfNext
           ? String(nextOfNext.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextOfNext))})` : (nextOfNext.title || "Tarefa"))
-          : "Legal essa é sua última tarefa";
+          : "Descanso";
         runningTaskMinutesLeft.textContent = `${runningCarryOverMinutes} min de saldo`;
         runningTaskMinutesLeft.classList.toggle("is-bonus", runningCarryOverMinutes > 0);
         if (runningTaskStartNextButton) {
@@ -4360,11 +4374,48 @@ project200LoginForm?.addEventListener("submit", (event) => {
 
 document.querySelectorAll("[data-sleep-nav]").forEach((button) => {
   button.addEventListener("click", () => {
+    if (sleepNavLongPressHandled) {
+      sleepNavLongPressHandled = false;
+      return;
+    }
     const target = String(button.dataset.sleepNav || "start");
     const dir = Number(button.dataset.dir || 0);
-    const hourKey = target === "start" ? "startHour" : "endHour";
-    state.sleepConfig[hourKey] = (Number(state.sleepConfig[hourKey] || 0) + dir + 24) % 24;
-    renderSleepLabels();
+    if (!dir) return;
+    moveSleepTime(target, dir * 5);
+  });
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    const target = String(button.dataset.sleepNav || "start");
+    const dir = Number(button.dataset.dir || 0);
+    if (!dir) return;
+    sleepNavLongPressHandled = false;
+    if (sleepNavHoldTimer) {
+      window.clearTimeout(sleepNavHoldTimer);
+      sleepNavHoldTimer = null;
+    }
+    if (sleepNavHoldInterval) {
+      window.clearInterval(sleepNavHoldInterval);
+      sleepNavHoldInterval = null;
+    }
+    sleepNavHoldTimer = window.setTimeout(() => {
+      sleepNavLongPressHandled = true;
+      moveSleepTime(target, dir * 60);
+      sleepNavHoldInterval = window.setInterval(() => {
+        moveSleepTime(target, dir * 60);
+      }, 600);
+    }, 500);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+    button.addEventListener(evt, () => {
+      if (sleepNavHoldTimer) {
+        window.clearTimeout(sleepNavHoldTimer);
+        sleepNavHoldTimer = null;
+      }
+      if (sleepNavHoldInterval) {
+        window.clearInterval(sleepNavHoldInterval);
+        sleepNavHoldInterval = null;
+      }
+    });
   });
 });
 
