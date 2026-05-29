@@ -318,6 +318,8 @@ let overlapCarouselTimer = null;
 let profileHoldTimer = null;
 let profileLongPressHandledProfile = "";
 let profileLinkTarget = "";
+let profilePressStartedAt = 0;
+let profilePressProfile = "";
 
 const state = {
   activeOffset: 0,
@@ -4264,6 +4266,13 @@ void (async () => {
 })();
 
 profileButtons.forEach((button) => {
+  button.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+  });
+  const avatar = button.querySelector("img");
+  if (avatar) {
+    avatar.setAttribute("draggable", "false");
+  }
   button.addEventListener("click", () => {
     const profile = String(button.dataset.profile || "project");
     if (profileLongPressHandledProfile === profile) {
@@ -4277,14 +4286,27 @@ profileButtons.forEach((button) => {
     event.preventDefault();
     const profile = String(button.dataset.profile || "").trim();
     if (!profile) return;
-    if (profileHoldTimer) window.clearTimeout(profileHoldTimer);
-    profileHoldTimer = window.setTimeout(() => {
+    profilePressStartedAt = Date.now();
+    profilePressProfile = profile;
+    if (profileHoldTimer) {
+      window.clearTimeout(profileHoldTimer);
+      profileHoldTimer = null;
+    }
+  });
+  button.addEventListener("pointerup", () => {
+    const heldMs = profilePressStartedAt ? (Date.now() - profilePressStartedAt) : 0;
+    const profile = profilePressProfile;
+    profilePressStartedAt = 0;
+    profilePressProfile = "";
+    if (heldMs >= 500 && profile) {
       profileLongPressHandledProfile = profile;
       openProfileLinkOverlay(profile);
-    }, 500);
+    }
   });
-  ["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+  ["pointerleave", "pointercancel"].forEach((evt) => {
     button.addEventListener(evt, () => {
+      profilePressStartedAt = 0;
+      profilePressProfile = "";
       if (profileHoldTimer) {
         window.clearTimeout(profileHoldTimer);
         profileHoldTimer = null;
