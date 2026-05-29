@@ -2,7 +2,6 @@
 
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
-const projectProfileLinksKey = "project_200_profile_links_v1";
 const sleepConfigKey = "project_200_sleep_v1";
 const defaultSaldoGoalCents = 1000000;
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -344,9 +343,7 @@ const state = {
   historySystem: [],
   historyTexts: [],
   selectedProfile: "Rose",
-  profileLinks: {},
   profileLock: "",
-  authUsername: "",
   historyOffset: 0,
   historyTextComposer: {
     step: 1,
@@ -397,26 +394,8 @@ function readSelectedProfile() {
   return selectableProfiles.includes(saved) ? saved : "Rose";
 }
 
-function readProfileLinks() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(projectProfileLinksKey) || "{}");
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveProfileLinks() {
-  window.localStorage.setItem(projectProfileLinksKey, JSON.stringify(state.profileLinks || {}));
-}
-
-function normalizeUsernameKey(value) {
-  return String(value || "").trim().toLocaleLowerCase("pt-BR");
-}
-
-function refreshProfileLockFromAuth() {
-  const key = normalizeUsernameKey(state.authUsername);
-  const lockedProfile = key ? String(state.profileLinks?.[key] || "").trim() : "";
+function refreshProfileLockFromAuth(authUser) {
+  const lockedProfile = String(authUser?.project200Profile || "").trim();
   state.profileLock = selectableProfiles.includes(lockedProfile) ? lockedProfile : "";
 }
 
@@ -1659,14 +1638,12 @@ async function ensureProject200Session() {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       setToken("");
-      state.authUsername = "";
       state.profileLock = "";
       project200LoginOverlay?.classList.add("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "false");
       return false;
     }
-    state.authUsername = String(payload?.user?.username || "").trim();
-    refreshProfileLockFromAuth();
+    refreshProfileLockFromAuth(payload?.user || null);
     if (state.profileLock) {
       applySelectedProfile(state.profileLock);
     }
@@ -1674,7 +1651,6 @@ async function ensureProject200Session() {
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
     return true;
   } catch {
-    state.authUsername = "";
     state.profileLock = "";
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
@@ -1682,13 +1658,13 @@ async function ensureProject200Session() {
   }
 }
 
-async function lookupRealUser(username) {
-  const value = String(username || "").trim();
-  if (!value) {
-    throw new Error("Digite um nome de usuário.");
-  }
-  const payload = await apiRequest(`/api/200/users/lookup?username=${encodeURIComponent(value)}`);
-  return payload?.user || null;
+async function createProfileLink(username, profile) {
+  const payload = await apiRequest("/api/200/profile-links", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, profile })
+  });
+  return payload?.link || null;
 }
 
 function openProfileLinkOverlay(profile) {
@@ -4261,7 +4237,6 @@ historyTextForm?.addEventListener("submit", (event) => {
     }
   })();
 });
-state.profileLinks = readProfileLinks();
 state.profileLock = "";
 applySelectedProfile(readSelectedProfile());
 void (async () => {
@@ -4338,17 +4313,11 @@ profileLinkForm?.addEventListener("submit", (event) => {
   if (profileLinkMessage) profileLinkMessage.textContent = "Validando...";
   void (async () => {
     try {
-      const foundUser = await lookupRealUser(username);
+      const foundUser = await createProfileLink(username, profileLinkTarget);
       if (!foundUser?.username) {
         throw new Error("Usuário não encontrado.");
       }
-      const linkedUsername = normalizeUsernameKey(foundUser.username);
-      state.profileLinks[linkedUsername] = profileLinkTarget;
-      saveProfileLinks();
-      refreshProfileLockFromAuth();
-      if (state.profileLock) {
-        applySelectedProfile(state.profileLock);
-      }
+      state.profileLock = "";
       renderActions();
       if (profileLinkMessage) profileLinkMessage.textContent = "Vínculo realizado com sucesso.";
       window.setTimeout(() => {
@@ -4383,8 +4352,7 @@ project200LoginForm?.addEventListener("submit", (event) => {
         throw new Error(data?.error || "Falha no login.");
       }
       setToken(String(data.token));
-      state.authUsername = String(data?.user?.username || "").trim();
-      refreshProfileLockFromAuth();
+      refreshProfileLockFromAuth(data?.user || null);
       if (state.profileLock) {
         applySelectedProfile(state.profileLock);
       }

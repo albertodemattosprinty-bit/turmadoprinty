@@ -558,9 +558,39 @@ function sanitizeUser(user) {
     contractorEventId: user.contractor_event_id || null,
     email: user.email,
     emailVerified: Boolean(user.email_verified),
+    project200Profile: user.project200_profile || null,
     createdAt: user.created_at,
     sessionExpiresAt: user.expires_at || null
   };
+}
+
+const PROJECT200_ALLOWED_PROFILES = new Set(["Rose", "Alberto", "Lucas", "Thainan"]);
+
+function normalizeProject200Profile(value) {
+  const input = String(value || "").trim();
+  return PROJECT200_ALLOWED_PROFILES.has(input) ? input : "";
+}
+
+async function ensureProject200ProfileLinksSchema() {
+  await query(`
+    create table if not exists project200_profile_links (
+      user_id uuid primary key references users(id) on delete cascade,
+      assigned_profile text not null,
+      assigned_by_user_id uuid references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  `);
+}
+
+async function getProject200AssignedProfile(userId) {
+  if (!userId) return "";
+  await ensureProject200ProfileLinksSchema();
+  const result = await query(
+    `select assigned_profile from project200_profile_links where user_id = $1 limit 1`,
+    [userId]
+  );
+  return normalizeProject200Profile(result.rows[0]?.assigned_profile || "");
 }
 
 function isValidUsername(username) {
@@ -1011,6 +1041,7 @@ async function ensurePaymentsReady(response) {
     await ensurePlatformFinanceSchema();
     await ensureStatsSchema();
     await ensureConstitutionSchema();
+    await ensureProject200ProfileLinksSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -4126,13 +4157,15 @@ const server = http.createServer(async (request, response) => {
       }
 
       const contractorState = await getUserContractorState(user.id);
+      const project200Profile = await getProject200AssignedProfile(user.id);
 
       sendJson(response, 200, {
         ok: true,
         user: sanitizeUser({
           ...user,
           is_contractor: contractorState.isContractor,
-          contractor_event_id: contractorState.contractorEventId
+          contractor_event_id: contractorState.contractorEventId,
+          project200_profile: project200Profile || null
         })
       });
     } catch (error) {
@@ -4199,6 +4232,88 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Erro ao buscar usuário."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/profile-links") {
+    try {
+      const authUser = await requireAuth(request, response);
+
+      if (!authUser) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const usernameInput = String(body.username || "")
+        .normalize("NFC")
+        .replace(/\s+/gu, " ")
+        .trim();
+      const assignedProfile = normalizeProject200Profile(body.profile);
+
+      if (!usernameInput || usernameInput.length < 2) {
+        sendJson(response, 400, { error: "Nome de usuário inválido." });
+        return;
+      }
+
+      if (!assignedProfile) {
+        sendJson(response, 400, { error: "Perfil inválido para vínculo." });
+        return;
+      }
+
+      const normalized = usernameInput.toLocaleLowerCase("pt-BR");
+      const searchResult = await query(
+        `
+          select id, name, username, created_at
+          from users
+          where username = $1
+             or lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2
+             or username ilike $3
+             or name ilike $3
+          order by
+            case
+              when username = $1 then 0
+              when lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2 then 1
+              else 2
+            end,
+            created_at asc
+          limit 1
+        `,
+        [normalized, normalized, `%${usernameInput}%`]
+      );
+      const targetUser = searchResult.rows[0] || null;
+
+      if (!targetUser) {
+        sendJson(response, 404, { error: "Usuário não encontrado no banco principal." });
+        return;
+      }
+
+      await ensureProject200ProfileLinksSchema();
+      await query(
+        `
+          insert into project200_profile_links (user_id, assigned_profile, assigned_by_user_id, created_at, updated_at)
+          values ($1, $2, $3, now(), now())
+          on conflict (user_id) do update
+          set assigned_profile = excluded.assigned_profile,
+              assigned_by_user_id = excluded.assigned_by_user_id,
+              updated_at = now()
+        `,
+        [targetUser.id, assignedProfile, authUser.id]
+      );
+
+      sendJson(response, 200, {
+        ok: true,
+        link: {
+          userId: targetUser.id,
+          username: targetUser.username,
+          name: targetUser.name || targetUser.username,
+          profile: assignedProfile
+        }
+      });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: error instanceof Error ? error.message : "Erro ao salvar vínculo."
       });
     }
     return;
