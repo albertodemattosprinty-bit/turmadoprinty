@@ -819,7 +819,7 @@ function buildInitialWizardState() {
   const rounded = new Date(now.getTime() + 10 * 60 * 1000);
   rounded.setMinutes(Math.ceil(rounded.getMinutes() / 5) * 5, 0, 0);
 
-  const end = new Date(rounded.getTime() + 60 * 60 * 1000);
+  const end = new Date(rounded.getTime() + 15 * 60 * 1000);
 
   return {
     step: 1,
@@ -1533,15 +1533,15 @@ function openWizard(action = null) {
   state.wizard = buildInitialWizardState();
   if (action) {
     const startAt = new Date(action.startAt);
+    const endAt = new Date(action.endAt);
     const today = todayStart();
     const actionDay = new Date(startAt);
     actionDay.setHours(0, 0, 0, 0);
     state.wizard.dateOffset = Math.round((actionDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
     state.wizard.startHour = startAt.getHours();
     state.wizard.startMinute = startAt.getMinutes();
-    const enforcedEnd = new Date(startAt.getTime() + 15 * 60 * 1000);
-    state.wizard.endHour = enforcedEnd.getHours();
-    state.wizard.endMinute = enforcedEnd.getMinutes();
+    state.wizard.endHour = endAt.getHours();
+    state.wizard.endMinute = endAt.getMinutes();
     state.wizard.editingActionId = action.id;
     taskTitle.value = action.title || "";
   } else {
@@ -1820,20 +1820,6 @@ function moveTime(type, unit, direction) {
     : (current + direction + max) % max;
 
   state.wizard[key] = normalized;
-  if (type === "start") {
-    const startDate = new Date();
-    startDate.setHours(state.wizard.startHour, state.wizard.startMinute, 0, 0);
-    const endDate = new Date(startDate.getTime() + 15 * 60 * 1000);
-    state.wizard.endHour = endDate.getHours();
-    state.wizard.endMinute = endDate.getMinutes();
-  }
-  if (type === "end") {
-    const startDate = new Date();
-    startDate.setHours(state.wizard.startHour, state.wizard.startMinute, 0, 0);
-    const endDate = new Date(startDate.getTime() + 15 * 60 * 1000);
-    state.wizard.endHour = endDate.getHours();
-    state.wizard.endMinute = endDate.getMinutes();
-  }
   renderTimePickers();
 }
 
@@ -2078,9 +2064,13 @@ async function saveAction() {
       }
       if (decision.type === "use_free" && decision.startAt) {
         const start = new Date(decision.startAt);
+        const firstOccurrence = occurrences[0];
+        const originalDurationMs = firstOccurrence
+          ? Math.max(60 * 1000, new Date(firstOccurrence.endAt).getTime() - new Date(firstOccurrence.startAt).getTime())
+          : 15 * 60 * 1000;
         state.wizard.startHour = start.getHours();
         state.wizard.startMinute = start.getMinutes();
-        const end = new Date(start.getTime() + 15 * 60 * 1000);
+        const end = new Date(start.getTime() + originalDurationMs);
         state.wizard.endHour = end.getHours();
         state.wizard.endMinute = end.getMinutes();
         occurrences = buildOccurrences();
