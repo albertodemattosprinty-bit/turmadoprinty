@@ -156,6 +156,7 @@ const wizardNextButton = document.getElementById("wizardNext");
 const wizardMessage = document.getElementById("wizardMessage");
 const taskTitle = document.getElementById("taskTitle");
 const wizardDateLabel = document.getElementById("wizardDateLabel");
+const wizardDatePickerWrap = document.getElementById("wizardDatePickerWrap");
 const repeatToggle = document.getElementById("repeatToggle");
 const repeatBox = document.getElementById("repeatBox");
 const weekdayRow = document.getElementById("weekdayRow");
@@ -238,6 +239,7 @@ const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft")
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
+const actionsModal = document.getElementById("actionsModal");
 const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
 const sleepConfigModal = document.getElementById("sleepConfigModal");
@@ -296,6 +298,8 @@ let actionsTimeTicker = null;
 let actionsTimeShowDuration = false;
 let timeButtonHoldTimer = null;
 let timeButtonHoldInterval = null;
+let periodicHoldTimer = null;
+let periodicHoldInterval = null;
 let platformNameMediaRecorder = null;
 let platformNameMediaStream = null;
 let platformNameAudioContext = null;
@@ -927,6 +931,7 @@ function openModal(id) {
   }
 
   modal.classList.add("active");
+  modal.classList.remove("is-fading-out");
   modal.setAttribute("aria-hidden", "false");
 
   if (id === "actionsModal") {
@@ -1477,6 +1482,9 @@ async function toggleActionStatus(actionId) {
     const nextStatus = normalizeActionStatus(updated?.status);
     if (currentStatus === actionStatuses.pending && nextStatus === actionStatuses.inProgress) {
       openModal("runningTaskModal");
+      window.setTimeout(() => {
+        closeActionsModalWithFade();
+      }, 600);
     }
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
       pendingActionsAnchorId = updated?.id || "";
@@ -1532,6 +1540,9 @@ function closeWizard() {
 function renderWizard() {
   const { step } = state.wizard;
   wizardStepLabel.textContent = `${step} de 4`;
+  if (actionForm) {
+    actionForm.dataset.step = String(step);
+  }
 
   document.querySelectorAll(".wizard-step").forEach((section) => {
     const isActive = Number(section.dataset.step) === step;
@@ -1543,6 +1554,17 @@ function renderWizard() {
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
   renderRepeatControls();
   renderTimePickers();
+}
+
+function closeActionsModalWithFade() {
+  if (!actionsModal || !actionsModal.classList.contains("active")) {
+    return;
+  }
+  actionsModal.classList.add("is-fading-out");
+  window.setTimeout(() => {
+    closeModal(actionsModal);
+    actionsModal.classList.remove("is-fading-out");
+  }, 500);
 }
 
 function startActionsTimeTicker() {
@@ -1612,6 +1634,9 @@ function renderRepeatControls() {
     button.classList.toggle("active", button.dataset.repeatMode === state.wizard.repeatMode);
   });
   const showingDetailMode = state.wizard.repeatMode === "periodic" || state.wizard.repeatMode === "monthly_custom";
+  if (wizardDatePickerWrap) {
+    wizardDatePickerWrap.hidden = Boolean(state.wizard.repeatOpen);
+  }
   if (repeatModeButtons) {
     repeatModeButtons.hidden = showingDetailMode;
   }
@@ -1633,7 +1658,7 @@ function renderRepeatControls() {
     repeatPeriodicBox.hidden = state.wizard.repeatMode !== "periodic";
   }
   if (periodicEveryLabel) {
-    periodicEveryLabel.textContent = `${state.wizard.periodicEveryDays} dias`;
+    periodicEveryLabel.textContent = `${state.wizard.periodicEveryDays} ${state.wizard.periodicEveryDays === 1 ? "dia" : "dias"}`;
   }
   if (avoidSaturdayInput) {
     avoidSaturdayInput.checked = Boolean(state.wizard.avoidSaturday);
@@ -1778,10 +1803,24 @@ function moveTimeHoldFive(type, unit, direction) {
 }
 
 function shiftPeriodicEveryDays(direction) {
-  const allowed = [2, 4, 6];
-  const currentIndex = Math.max(0, allowed.indexOf(state.wizard.periodicEveryDays));
-  const nextIndex = (currentIndex + direction + allowed.length) % allowed.length;
-  state.wizard.periodicEveryDays = allowed[nextIndex];
+  const next = Math.max(1, Math.min(180, Number(state.wizard.periodicEveryDays || 1) + direction));
+  state.wizard.periodicEveryDays = next;
+  renderRepeatControls();
+}
+
+function shiftPeriodicHoldTen(direction) {
+  const current = Math.max(1, Math.min(180, Number(state.wizard.periodicEveryDays || 1)));
+  let next = current;
+  if (direction > 0) {
+    const snappedUp = Math.ceil(current / 10) * 10;
+    const base = current % 10 === 0 ? current : snappedUp;
+    next = Math.min(180, base + 10);
+  } else {
+    const snappedDown = Math.floor(current / 10) * 10;
+    const base = current % 10 === 0 ? current : snappedDown;
+    next = Math.max(1, base - 10);
+  }
+  state.wizard.periodicEveryDays = next;
   renderRepeatControls();
 }
 
@@ -1813,7 +1852,7 @@ function buildOccurrences() {
   const occurrences = [];
 
   if (state.wizard.repeatMode === "periodic") {
-    for (let index = 0; index < 180; index += Number(state.wizard.periodicEveryDays || 2)) {
+    for (let index = 0; index < 180; index += Number(state.wizard.periodicEveryDays || 1)) {
       const date = addDays(selectedDate, index);
       if (state.wizard.avoidSaturday && date.getDay() === 6) continue;
       if (state.wizard.avoidSunday && date.getDay() === 0) continue;
@@ -3566,6 +3605,33 @@ document.querySelectorAll("[data-wizard-date]").forEach((button) => {
 
 document.querySelectorAll("[data-periodic-nav]").forEach((button) => {
   button.addEventListener("click", () => shiftPeriodicEveryDays(Number(button.dataset.periodicNav)));
+  button.addEventListener("pointerdown", () => {
+    const direction = Number(button.dataset.periodicNav || 0);
+    if (!direction) return;
+    if (periodicHoldTimer) window.clearTimeout(periodicHoldTimer);
+    if (periodicHoldInterval) window.clearInterval(periodicHoldInterval);
+    periodicHoldTimer = window.setTimeout(() => {
+      shiftPeriodicHoldTen(direction);
+      periodicHoldInterval = window.setInterval(() => {
+        shiftPeriodicHoldTen(direction);
+      }, 500);
+    }, 500);
+  });
+});
+
+["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+  document.querySelectorAll("[data-periodic-nav]").forEach((button) => {
+    button.addEventListener(evt, () => {
+      if (periodicHoldTimer) {
+        window.clearTimeout(periodicHoldTimer);
+        periodicHoldTimer = null;
+      }
+      if (periodicHoldInterval) {
+        window.clearInterval(periodicHoldInterval);
+        periodicHoldInterval = null;
+      }
+    });
+  });
 });
 
 document.querySelectorAll("[data-monthly-ordinal-nav]").forEach((button) => {

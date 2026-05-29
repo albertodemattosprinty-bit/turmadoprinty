@@ -182,7 +182,7 @@
 
           <section class="wizard-step" data-step="2">
             <span class="step-label">Data</span>
-            <div class="date-picker">
+            <div class="date-picker" id="wizardDatePickerWrap">
               <button class="circle-nav" type="button" data-wizard-date="-1" aria-label="Data anterior">
                 <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
               </button>
@@ -201,16 +201,16 @@
               <button type="button" class="ghost-btn repeat-mode-back" id="repeatModeBackButton" hidden>Voltar</button>
               <div class="repeat-periodic" id="repeatPeriodicBox" hidden>
                 <span>A cada:</span>
-                <button type="button" data-periodic-nav="-1">‹</button>
+                <button type="button" class="circle-nav" data-periodic-nav="-1" aria-label="Diminuir período"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button>
                 <strong id="periodicEveryLabel">2 dias</strong>
-                <button type="button" data-periodic-nav="1">›</button>
+                <button type="button" class="circle-nav" data-periodic-nav="1" aria-label="Aumentar período"><svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg></button>
                 <label><input type="checkbox" id="avoidSaturday" /> Evitar sábados</label>
                 <label><input type="checkbox" id="avoidSunday" /> Evitar domingos</label>
               </div>
               <div class="repeat-monthly-custom" id="repeatMonthlyCustomBox" hidden>
                 <div>Toda:</div>
-                <div><button type="button" data-monthly-ordinal-nav="-1">‹</button> <strong id="monthlyOrdinalLabel">Primeira</strong> <button type="button" data-monthly-ordinal-nav="1">›</button></div>
-                <div><button type="button" data-monthly-weekday-nav="-1">‹</button> <strong id="monthlyWeekdayLabel">Quarta-feira</strong> <button type="button" data-monthly-weekday-nav="1">›</button></div>
+                <div><button type="button" class="circle-nav" data-monthly-ordinal-nav="-1" aria-label="Voltar ordem"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button> <strong id="monthlyOrdinalLabel">Primeira</strong> <button type="button" class="circle-nav" data-monthly-ordinal-nav="1" aria-label="Avançar ordem"><svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg></button></div>
+                <div><button type="button" class="circle-nav" data-monthly-weekday-nav="-1" aria-label="Voltar dia"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button> <strong id="monthlyWeekdayLabel">Quarta-feira</strong> <button type="button" class="circle-nav" data-monthly-weekday-nav="1" aria-label="Avançar dia"><svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg></button></div>
                 <div>do mês</div>
               </div>
               <div class="weekday-row" id="weekdayRow" aria-label="Dias da semana"></div>
