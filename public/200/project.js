@@ -253,6 +253,12 @@ const postponeTimeLabel = document.getElementById("postponeTimeLabel");
 const postponeDayLabel = document.getElementById("postponeDayLabel");
 const postponeFeedback = document.getElementById("postponeFeedback");
 const confirmPostponeTask = document.getElementById("confirmPostponeTask");
+const postponeOnlyFree = document.getElementById("postponeOnlyFree");
+const postponeUseSleep = document.getElementById("postponeUseSleep");
+const postponeReplaceModal = document.getElementById("postponeReplaceModal");
+const closePostponeReplaceModal = document.getElementById("closePostponeReplaceModal");
+const postponeReplaceList = document.getElementById("postponeReplaceList");
+const confirmPostponeReplace = document.getElementById("confirmPostponeReplace");
 const sleepConfigModal = document.getElementById("sleepConfigModal");
 const sleepStartLabel = document.getElementById("sleepStartLabel");
 const sleepEndLabel = document.getElementById("sleepEndLabel");
@@ -386,7 +392,9 @@ const state = {
     dayOffset: 0,
     delayMinutes: 5,
     clockMinutes: 8 * 60,
-    timeTapTimestamps: []
+    timeTapTimestamps: [],
+    onlyFree: false,
+    useSleep: false
   }
 };
 
@@ -494,14 +502,20 @@ function buildActionTimelineEntries() {
   const dayStart = new Date(baseDate);
   dayStart.setHours(8, 0, 0, 0);
   const dayEnd = new Date(baseDate);
-  dayEnd.setHours(23, 59, 59, 999);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  dayEnd.setHours(7, 59, 59, 999);
   let cursor = dayStart.getTime();
 
   const sleepStart = new Date(baseDate);
+  if (state.sleepConfig.startHour < 8) {
+    sleepStart.setDate(sleepStart.getDate() + 1);
+  }
   sleepStart.setHours(state.sleepConfig.startHour, state.sleepConfig.startMinute, 0, 0);
   const sleepEnd = new Date(sleepStart);
-  sleepEnd.setDate(sleepEnd.getDate() + 1);
   sleepEnd.setHours(state.sleepConfig.endHour, state.sleepConfig.endMinute, 0, 0);
+  if (sleepEnd.getTime() <= sleepStart.getTime()) {
+    sleepEnd.setDate(sleepEnd.getDate() + 1);
+  }
 
   for (const action of visibleActions) {
     const startMs = new Date(action.startAt).getTime();
@@ -1806,6 +1820,11 @@ function closePostponeTaskModalView() {
   postponeTaskModal?.setAttribute("aria-hidden", "true");
 }
 
+function closePostponeReplaceModalView() {
+  postponeReplaceModal?.classList.remove("active");
+  postponeReplaceModal?.setAttribute("aria-hidden", "true");
+}
+
 function formatPostponeDayLabel(offset) {
   if (offset === 0) return "Hoje";
   if (offset === 1) return "Amanhã";
@@ -1850,17 +1869,44 @@ function getPostponeOverlaps(startAt, endAt, sourceActionId) {
     });
 }
 
+function resolvePostponeDraftWithFreeFit(draft) {
+  const nextDraft = { ...draft };
+  if (!state.postpone.onlyFree) {
+    return nextDraft;
+  }
+  const freeFit = buildActionTimelineEntries()
+    .filter((entry) => entry.kind === "free")
+    .map((entry) => ({ start: new Date(entry.startAt).getTime(), end: new Date(entry.endAt).getTime() }))
+    .find((slot) => slot.end - Math.max(slot.start, nextDraft.startAt.getTime()) >= nextDraft.durationMinutes * 60 * 1000);
+  if (!freeFit) {
+    return nextDraft;
+  }
+  const fittedStart = new Date(Math.max(freeFit.start, nextDraft.startAt.getTime()));
+  nextDraft.startAt = fittedStart;
+  nextDraft.endAt = new Date(fittedStart.getTime() + (nextDraft.durationMinutes * 60 * 1000));
+  return nextDraft;
+}
+
 function updatePostponeFeedback() {
-  const draft = getPostponeDraftAction();
+  const draftRaw = getPostponeDraftAction();
+  const draft = draftRaw ? resolvePostponeDraftWithFreeFit(draftRaw) : null;
   if (!draft || !postponeFeedback) return;
   const overlaps = getPostponeOverlaps(draft.startAt, draft.endAt, draft.targetAction.id);
   stopPostponeFeedbackCarousel();
   postponeFeedback.classList.remove("is-error");
   if (!overlaps.length) {
     postponeFeedback.textContent = `Disponível: inicia ${formatHourChip(draft.startAt.toISOString())}`;
+    if (confirmPostponeTask) {
+      confirmPostponeTask.classList.remove("is-replace");
+      confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 16.6 4.9 12.3l1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z"/></svg><span>Confirmar adiamento</span>';
+    }
     return;
   }
   postponeFeedback.classList.add("is-error");
+  if (confirmPostponeTask) {
+    confirmPostponeTask.classList.add("is-replace");
+    confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v2H4zm0 8h16v2H4zm0-4h16v2H4z"/></svg><span>Substituir</span>';
+  }
   let index = 0;
   const render = () => {
     const current = overlaps[index];
@@ -1927,9 +1973,63 @@ function openPostponeTaskModal(action) {
   state.postpone.delayMinutes = 5;
   state.postpone.clockMinutes = 8 * 60;
   state.postpone.timeTapTimestamps = [];
+  state.postpone.onlyFree = false;
+  state.postpone.useSleep = false;
+  if (postponeOnlyFree) postponeOnlyFree.checked = false;
+  if (postponeUseSleep) postponeUseSleep.checked = false;
   renderPostponeTaskModal();
   postponeTaskModal?.classList.add("active");
   postponeTaskModal?.setAttribute("aria-hidden", "false");
+}
+
+async function applyPostponeTaskConfirm({ allowReplace = false } = {}) {
+  const draftRaw = getPostponeDraftAction();
+  const draft = draftRaw ? resolvePostponeDraftWithFreeFit(draftRaw) : null;
+  if (!draft) {
+    closePostponeTaskModalView();
+    return;
+  }
+  const overlaps = getPostponeOverlaps(draft.startAt, draft.endAt, draft.targetAction.id);
+  if (overlaps.length && !allowReplace) {
+    if (postponeReplaceList) {
+      postponeReplaceList.textContent = overlaps.map((entry) => {
+        const label = entry.kind === "sleep" ? "Descanso" : formatActionTitleForDisplay(entry.title);
+        return `${label} (${formatHourChip(entry.startAt)}-${formatHourChip(entry.endAt)})`;
+      }).join(" | ");
+    }
+    postponeReplaceModal?.classList.add("active");
+    postponeReplaceModal?.setAttribute("aria-hidden", "false");
+    return;
+  }
+  if (allowReplace && overlaps.length) {
+    for (const entry of overlaps) {
+      if (entry.kind === "sleep") {
+        if (state.postpone.useSleep) {
+          const movedStart = new Date(draft.endAt);
+          state.sleepConfig.startHour = movedStart.getHours();
+          state.sleepConfig.startMinute = movedStart.getMinutes();
+          saveSleepConfig();
+        }
+        continue;
+      }
+      await apiRequest(`/api/actions/${encodeURIComponent(entry.id)}`, { method: "DELETE" });
+    }
+  }
+  const payload = {
+    title: draft.targetAction.title,
+    assignee: draft.targetAction.assignee || state.selectedProfile,
+    repeatRule: "none",
+    repeatDays: [],
+    occurrences: [{ startAt: draft.startAt.toISOString(), endAt: draft.endAt.toISOString() }]
+  };
+  await apiRequest("/api/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  closePostponeReplaceModalView();
+  closePostponeTaskModalView();
+  await loadActions();
 }
 
 async function patchActionTime(action, startAt, endAt) {
@@ -4646,28 +4746,22 @@ profileButtons.forEach((button) => {
 profileLinkCancel?.addEventListener("click", closeProfileLinkOverlay);
 closeStartDecisionModal?.addEventListener("click", () => closeStartDecisionModalWith("cancel"));
 closePostponeTaskModal?.addEventListener("click", closePostponeTaskModalView);
+closePostponeReplaceModal?.addEventListener("click", closePostponeReplaceModalView);
+postponeOnlyFree?.addEventListener("change", () => {
+  state.postpone.onlyFree = Boolean(postponeOnlyFree.checked);
+  renderPostponeTaskModal();
+});
+postponeUseSleep?.addEventListener("change", () => {
+  state.postpone.useSleep = Boolean(postponeUseSleep.checked);
+  renderPostponeTaskModal();
+});
+confirmPostponeReplace?.addEventListener("click", () => {
+  void applyPostponeTaskConfirm({ allowReplace: true });
+});
 confirmPostponeTask?.addEventListener("click", () => {
   void (async () => {
-    const draft = getPostponeDraftAction();
-    if (!draft) {
-      closePostponeTaskModalView();
-      return;
-    }
-    const payload = {
-      title: draft.targetAction.title,
-      assignee: draft.targetAction.assignee || state.selectedProfile,
-      repeatRule: "none",
-      repeatDays: [],
-      occurrences: [{ startAt: draft.startAt.toISOString(), endAt: draft.endAt.toISOString() }]
-    };
     try {
-      await apiRequest("/api/actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      closePostponeTaskModalView();
-      await loadActions();
+      await applyPostponeTaskConfirm({ allowReplace: false });
     } catch (error) {
       if (postponeFeedback) {
         postponeFeedback.classList.add("is-error");

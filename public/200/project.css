@@ -391,6 +391,23 @@ svg {
 #postponeTaskModal {
   z-index: 140;
 }
+#postponeReplaceModal {
+  z-index: 150;
+}
+
+#postponeTaskModal .date-picker {
+  transform: translateY(0) scale(0.75);
+  gap: 10px;
+}
+
+#postponeTaskModal .date-picker .circle-nav {
+  width: 34px;
+  height: 34px;
+}
+
+#postponeTaskModal .date-picker strong {
+  font-size: 1.1rem;
+}
 
 #postponeFeedback {
   background: rgba(30, 112, 240, 0.92);
@@ -400,6 +417,29 @@ svg {
 
 #postponeFeedback.is-error {
   background: rgba(204, 40, 40, 0.92);
+}
+
+.postpone-options {
+  display: grid;
+  gap: 8px;
+}
+
+.postpone-options label {
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+#confirmPostponeTask {
+  background: #16a34a;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+#confirmPostponeTask.is-replace {
+  background: #f97316;
 }
 
 .start-decision-actions {
