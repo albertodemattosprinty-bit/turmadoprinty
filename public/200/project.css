@@ -449,9 +449,16 @@ svg {
   margin: 8px auto 0;
 }
 
-#startDecisionTarget,
-#startDecisionCurrent {
+#startDecisionTarget {
   font-size: clamp(2.25rem, 6vw, 4rem);
+  line-height: 1.05;
+  white-space: normal;
+  max-width: 90%;
+  margin-inline: auto;
+}
+
+#startDecisionCurrent {
+  font-size: clamp(1.7rem, 4.5vw, 3rem);
   line-height: 1.05;
   white-space: normal;
   max-width: 90%;
@@ -464,6 +471,12 @@ svg {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: 100%;
+  min-height: 96px;
+  font-size: 1.3rem;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 .decision-btn-start { background: #16a34a; }
 .decision-btn-postpone { background: #f97316; }

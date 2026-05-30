@@ -388,6 +388,8 @@ const state = {
   overlapIndex: 0,
   overlapCandidateStarts: [],
   overlapCandidateIndex: 0,
+  serverNowMs: 0,
+  serverNowCapturedAtMs: 0,
   postpone: {
     actionId: "",
     dayOffset: 0,
@@ -487,6 +489,13 @@ function dateFromOffset(offset) {
 
 function getVisibleActions() {
   return state.actions.filter((action) => normalizeAssigneeName(action.assignee) === state.selectedProfile);
+}
+
+function getServerNowMs() {
+  if (Number.isFinite(state.serverNowMs) && state.serverNowMs > 0 && Number.isFinite(state.serverNowCapturedAtMs) && state.serverNowCapturedAtMs > 0) {
+    return state.serverNowMs + (Date.now() - state.serverNowCapturedAtMs);
+  }
+  return Date.now();
 }
 
 function getRunningActionForSelectedProfile() {
@@ -1534,6 +1543,11 @@ async function loadActions() {
   try {
     const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`);
     state.actions = payload.actions || [];
+    const parsedServerNow = new Date(payload?.serverNow || "").getTime();
+    if (Number.isFinite(parsedServerNow)) {
+      state.serverNowMs = parsedServerNow;
+      state.serverNowCapturedAtMs = Date.now();
+    }
     renderActions();
     registerDayCloseEventIfNeeded();
   } catch (error) {
@@ -1803,11 +1817,11 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     }
     if (startDecisionCurrent) {
       const targetStart = new Date(targetAction?.startAt || 0).getTime();
-      const currentStart = new Date(currentEntry?.startAt || 0).getTime();
-      const diffMinutes = (Number.isFinite(targetStart) && Number.isFinite(currentStart))
-        ? Math.round((targetStart - currentStart) / (60 * 1000))
+      const serverNow = getServerNowMs();
+      const diffMinutes = (Number.isFinite(targetStart) && Number.isFinite(serverNow))
+        ? Math.round((targetStart - serverNow) / (60 * 1000))
         : 0;
-      if (diffMinutes === 0) {
+      if (Math.abs(diffMinutes) <= 0) {
         if (startDecisionContextLabel) startDecisionContextLabel.textContent = "No horário";
         startDecisionCurrent.textContent = "Sem atraso";
       } else if (diffMinutes > 0) {

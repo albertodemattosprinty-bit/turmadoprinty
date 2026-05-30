@@ -4332,7 +4332,7 @@ const server = http.createServer(async (request, response) => {
         to: requestUrl.searchParams.get("to")
       });
 
-      sendJson(response, 200, { ok: true, actions });
+      sendJson(response, 200, { ok: true, actions, serverNow: new Date().toISOString() });
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel listar as acoes."
