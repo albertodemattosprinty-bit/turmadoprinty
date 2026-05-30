@@ -246,6 +246,13 @@ const closeStartDecisionModal = document.getElementById("closeStartDecisionModal
 const startDecisionTarget = document.getElementById("startDecisionTarget");
 const startDecisionCurrent = document.getElementById("startDecisionCurrent");
 const startDecisionActions = document.getElementById("startDecisionActions");
+const postponeTaskModal = document.getElementById("postponeTaskModal");
+const closePostponeTaskModal = document.getElementById("closePostponeTaskModal");
+const postponeTaskTitle = document.getElementById("postponeTaskTitle");
+const postponeTimeLabel = document.getElementById("postponeTimeLabel");
+const postponeDayLabel = document.getElementById("postponeDayLabel");
+const postponeFeedback = document.getElementById("postponeFeedback");
+const confirmPostponeTask = document.getElementById("confirmPostponeTask");
 const sleepConfigModal = document.getElementById("sleepConfigModal");
 const sleepStartLabel = document.getElementById("sleepStartLabel");
 const sleepEndLabel = document.getElementById("sleepEndLabel");
@@ -326,6 +333,10 @@ let sleepNavHoldTimer = null;
 let sleepNavHoldInterval = null;
 let sleepNavLongPressHandled = false;
 let startDecisionResolver = null;
+let postponeNavHoldTimer = null;
+let postponeNavHoldInterval = null;
+let postponeNavLongPressHandled = false;
+let postponeFeedbackCarouselTimer = null;
 
 const state = {
   activeOffset: 0,
@@ -369,7 +380,14 @@ const state = {
   overlapItems: [],
   overlapIndex: 0,
   overlapCandidateStarts: [],
-  overlapCandidateIndex: 0
+  overlapCandidateIndex: 0,
+  postpone: {
+    actionId: "",
+    dayOffset: 0,
+    delayMinutes: 5,
+    clockMinutes: 8 * 60,
+    timeTapTimestamps: []
+  }
 };
 
 function loadSleepConfig() {
@@ -622,6 +640,10 @@ function isGivenUpAction(action) {
   return title.includes("[DESISTIU]");
 }
 
+function formatActionTitleForDisplay(title) {
+  return String(title || "").replace(/\s*\[DESISTIU\]\s*/gi, "").trim() || "Tarefa";
+}
+
 function getEarliestPendingAction() {
   return getVisibleActions()
     .filter((item) => normalizeActionStatus(item.status) === actionStatuses.pending)
@@ -672,7 +694,7 @@ function renderHomeRunningTask() {
   const circumference = 2 * Math.PI * 48;
   const dashOffset = circumference * (1 - (percent / 100));
   const nextAction = getNextTimelineEntryForRunning(action);
-  runningTaskName.textContent = String(action.title || "Tarefa");
+  runningTaskName.textContent = formatActionTitleForDisplay(action.title);
   runningTaskProgressRing.style.strokeDashoffset = String(dashOffset);
   const estimatedRemaining = Math.max(0, Math.ceil(durationMinutes - elapsedMinutes));
   const loopModePercent = Math.floor(Date.now() / 3000) % 2 === 0;
@@ -685,7 +707,7 @@ function renderHomeRunningTask() {
     runningTaskMinutesLeft.classList.add("is-early");
   }
   runningTaskNextName.textContent = nextAction
-    ? String(nextAction.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextAction))})` : (nextAction.title || "Tarefa"))
+    ? String(nextAction.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextAction))})` : formatActionTitleForDisplay(nextAction.title))
     : "Descanso";
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
@@ -1362,7 +1384,7 @@ function renderActions() {
     row.innerHTML = `
       <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
-        <div class="task-title">${escapeHtml(action.title)}</div>
+        <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
         <div class="task-assignee task-duration"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm1 11.6V6h-2v7.4l5.2 3.1 1-1.7z"/></svg>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
       </div>
       <div class="task-time">${formatHourChip(action.startAt)}</div>
@@ -1519,9 +1541,7 @@ async function toggleActionStatus(actionId, options = {}) {
       return;
     }
     if (rootChoice === "postpone") {
-      openWizard(targetAction);
-      state.wizard.step = 2;
-      renderWizard();
+      openPostponeTaskModal(targetAction);
       return;
     }
     if (rootChoice === "remove") {
@@ -1748,14 +1768,14 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
   return new Promise((resolve) => {
     startDecisionResolver = resolve;
     if (startDecisionTarget) {
-      startDecisionTarget.textContent = String(targetAction?.title || "Tarefa");
+      startDecisionTarget.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
     }
     if (startDecisionCurrent) {
       startDecisionCurrent.textContent = String(currentEntry?.kind === "free"
         ? "Tempo livre"
         : currentEntry?.kind === "sleep"
           ? "Descanso"
-          : (currentEntry?.title || "Tarefa"));
+          : formatActionTitleForDisplay(currentEntry?.title || "Tarefa"));
     }
     if (startDecisionActions) {
       startDecisionActions.innerHTML = "";
@@ -1771,6 +1791,145 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     startDecisionModal?.classList.add("active");
     startDecisionModal?.setAttribute("aria-hidden", "false");
   });
+}
+
+function stopPostponeFeedbackCarousel() {
+  if (postponeFeedbackCarouselTimer) {
+    window.clearInterval(postponeFeedbackCarouselTimer);
+    postponeFeedbackCarouselTimer = null;
+  }
+}
+
+function closePostponeTaskModalView() {
+  stopPostponeFeedbackCarousel();
+  postponeTaskModal?.classList.remove("active");
+  postponeTaskModal?.setAttribute("aria-hidden", "true");
+}
+
+function formatPostponeDayLabel(offset) {
+  if (offset === 0) return "Hoje";
+  if (offset === 1) return "Amanhã";
+  return formatDateLabel(dateFromOffset(offset));
+}
+
+function formatClockFromMinutes(totalMinutes) {
+  const clamped = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function getPostponeDraftAction() {
+  const targetAction = state.actions.find((item) => item.id === state.postpone.actionId) || null;
+  if (!targetAction) return null;
+  const durationMinutes = Math.max(1, getActionDurationMinutes(targetAction));
+  const sourceStartMs = new Date(targetAction.startAt).getTime();
+  const baseDate = dateFromOffset(state.activeOffset + state.postpone.dayOffset);
+  let startAt;
+  if (state.postpone.dayOffset === 0) {
+    const safeBase = Number.isFinite(sourceStartMs) ? sourceStartMs : Date.now();
+    startAt = new Date(safeBase + (state.postpone.delayMinutes * 60 * 1000));
+  } else {
+    startAt = new Date(baseDate);
+    startAt.setHours(0, 0, 0, 0);
+    startAt = new Date(startAt.getTime() + (state.postpone.clockMinutes * 60 * 1000));
+  }
+  const endAt = new Date(startAt.getTime() + (durationMinutes * 60 * 1000));
+  return { targetAction, startAt, endAt, durationMinutes };
+}
+
+function getPostponeOverlaps(startAt, endAt, sourceActionId) {
+  const startMs = startAt.getTime();
+  const endMs = endAt.getTime();
+  return buildActionTimelineEntries()
+    .filter((entry) => entry.kind !== "free" && String(entry.id || "") !== String(sourceActionId || ""))
+    .filter((entry) => {
+      const entryStart = new Date(entry.startAt).getTime();
+      const entryEnd = new Date(entry.endAt).getTime();
+      return Number.isFinite(entryStart) && Number.isFinite(entryEnd) && entryEnd > startMs && entryStart < endMs;
+    });
+}
+
+function updatePostponeFeedback() {
+  const draft = getPostponeDraftAction();
+  if (!draft || !postponeFeedback) return;
+  const overlaps = getPostponeOverlaps(draft.startAt, draft.endAt, draft.targetAction.id);
+  stopPostponeFeedbackCarousel();
+  postponeFeedback.classList.remove("is-error");
+  if (!overlaps.length) {
+    postponeFeedback.textContent = `Disponível: inicia ${formatHourChip(draft.startAt.toISOString())}`;
+    return;
+  }
+  postponeFeedback.classList.add("is-error");
+  let index = 0;
+  const render = () => {
+    const current = overlaps[index];
+    const title = current.kind === "sleep" ? "Descanso" : formatActionTitleForDisplay(current.title);
+    postponeFeedback.textContent = `Sobrepondo ${title}`;
+    index = (index + 1) % overlaps.length;
+  };
+  render();
+  if (overlaps.length > 1) {
+    postponeFeedbackCarouselTimer = window.setInterval(render, 750);
+  }
+}
+
+function renderPostponeTaskModal() {
+  if (postponeTaskTitle) {
+    const targetAction = state.actions.find((item) => item.id === state.postpone.actionId);
+    postponeTaskTitle.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
+  }
+  if (postponeDayLabel) {
+    postponeDayLabel.textContent = formatPostponeDayLabel(state.postpone.dayOffset);
+  }
+  if (postponeTimeLabel) {
+    postponeTimeLabel.textContent = state.postpone.dayOffset === 0
+      ? `+${Math.max(0, state.postpone.delayMinutes)} minutos`
+      : formatClockFromMinutes(state.postpone.clockMinutes);
+  }
+  updatePostponeFeedback();
+}
+
+function movePostponeSelector(type, dir, hold = false) {
+  if (!dir) return;
+  if (type === "day") {
+    const previousOffset = state.postpone.dayOffset;
+    state.postpone.dayOffset = Math.max(0, state.postpone.dayOffset + dir);
+    if (previousOffset === 0 && state.postpone.dayOffset > 0) {
+      state.postpone.clockMinutes = 8 * 60;
+      state.postpone.timeTapTimestamps = [];
+    }
+    renderPostponeTaskModal();
+    return;
+  }
+  if (state.postpone.dayOffset === 0) {
+    const step = hold ? 10 : 5;
+    state.postpone.delayMinutes = Math.max(0, state.postpone.delayMinutes + (dir * step));
+  } else {
+    const step = hold ? 60 : 1;
+    state.postpone.clockMinutes = ((state.postpone.clockMinutes + (dir * step)) % (24 * 60) + (24 * 60)) % (24 * 60);
+    if (!hold) {
+      const now = Date.now();
+      state.postpone.timeTapTimestamps = state.postpone.timeTapTimestamps.filter((ts) => now - ts <= 1000);
+      state.postpone.timeTapTimestamps.push(now);
+      if (state.postpone.timeTapTimestamps.length >= 4) {
+        state.postpone.clockMinutes = ((state.postpone.clockMinutes + (dir * 6)) % (24 * 60) + (24 * 60)) % (24 * 60);
+        state.postpone.timeTapTimestamps = [];
+      }
+    }
+  }
+  renderPostponeTaskModal();
+}
+
+function openPostponeTaskModal(action) {
+  state.postpone.actionId = String(action?.id || "");
+  state.postpone.dayOffset = 0;
+  state.postpone.delayMinutes = 5;
+  state.postpone.clockMinutes = 8 * 60;
+  state.postpone.timeTapTimestamps = [];
+  renderPostponeTaskModal();
+  postponeTaskModal?.classList.add("active");
+  postponeTaskModal?.setAttribute("aria-hidden", "false");
 }
 
 async function patchActionTime(action, startAt, endAt) {
@@ -4329,10 +4488,10 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
       const nextAction = getNextTimelineEntryForRunning(runningAction);
       if (nextAction) {
         runningCarryOverMinutes = savedMinutes;
-        runningTaskName.textContent = String(nextAction.kind === "free" ? "Tempo livre" : (nextAction.title || "Tarefa"));
+        runningTaskName.textContent = String(nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title));
         const nextOfNext = getNextTimelineEntryForRunning(nextAction);
         runningTaskNextName.textContent = nextOfNext
-          ? String(nextOfNext.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextOfNext))})` : (nextOfNext.title || "Tarefa"))
+          ? String(nextOfNext.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextOfNext))})` : formatActionTitleForDisplay(nextOfNext.title))
           : "Descanso";
         runningTaskMinutesLeft.textContent = `${runningCarryOverMinutes} min de saldo`;
         runningTaskMinutesLeft.classList.toggle("is-bonus", runningCarryOverMinutes > 0);
@@ -4486,6 +4645,85 @@ profileButtons.forEach((button) => {
 
 profileLinkCancel?.addEventListener("click", closeProfileLinkOverlay);
 closeStartDecisionModal?.addEventListener("click", () => closeStartDecisionModalWith("cancel"));
+closePostponeTaskModal?.addEventListener("click", closePostponeTaskModalView);
+confirmPostponeTask?.addEventListener("click", () => {
+  void (async () => {
+    const draft = getPostponeDraftAction();
+    if (!draft) {
+      closePostponeTaskModalView();
+      return;
+    }
+    const payload = {
+      title: draft.targetAction.title,
+      assignee: draft.targetAction.assignee || state.selectedProfile,
+      repeatRule: "none",
+      repeatDays: [],
+      occurrences: [{ startAt: draft.startAt.toISOString(), endAt: draft.endAt.toISOString() }]
+    };
+    try {
+      await apiRequest("/api/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      closePostponeTaskModalView();
+      await loadActions();
+    } catch (error) {
+      if (postponeFeedback) {
+        postponeFeedback.classList.add("is-error");
+        postponeFeedback.textContent = error instanceof Error ? error.message : "Falha ao adiar tarefa.";
+      }
+    }
+  })();
+});
+
+document.querySelectorAll("[data-postpone-nav]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (postponeNavLongPressHandled) {
+      postponeNavLongPressHandled = false;
+      return;
+    }
+    const type = String(button.dataset.postponeNav || "time");
+    const dir = Number(button.dataset.dir || 0);
+    movePostponeSelector(type, dir, false);
+  });
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    const type = String(button.dataset.postponeNav || "time");
+    const dir = Number(button.dataset.dir || 0);
+    postponeNavLongPressHandled = false;
+    if (postponeNavHoldTimer) {
+      window.clearTimeout(postponeNavHoldTimer);
+      postponeNavHoldTimer = null;
+    }
+    if (postponeNavHoldInterval) {
+      window.clearInterval(postponeNavHoldInterval);
+      postponeNavHoldInterval = null;
+    }
+    postponeNavHoldTimer = window.setTimeout(() => {
+      postponeNavLongPressHandled = true;
+      if (type === "time") {
+        movePostponeSelector(type, dir, true);
+        postponeNavHoldInterval = window.setInterval(() => {
+          movePostponeSelector(type, dir, true);
+        }, 500);
+      }
+    }, 500);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+    button.addEventListener(evt, () => {
+      if (postponeNavHoldTimer) {
+        window.clearTimeout(postponeNavHoldTimer);
+        postponeNavHoldTimer = null;
+      }
+      if (postponeNavHoldInterval) {
+        window.clearInterval(postponeNavHoldInterval);
+        postponeNavHoldInterval = null;
+      }
+    });
+  });
+});
+
 profileLinkForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   const username = String(profileLinkUsername?.value || "").trim();

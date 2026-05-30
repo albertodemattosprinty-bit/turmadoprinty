@@ -388,6 +388,20 @@ svg {
   z-index: 120;
 }
 
+#postponeTaskModal {
+  z-index: 140;
+}
+
+#postponeFeedback {
+  background: rgba(30, 112, 240, 0.92);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+#postponeFeedback.is-error {
+  background: rgba(204, 40, 40, 0.92);
+}
+
 .start-decision-actions {
   display: grid;
   gap: 10px;
