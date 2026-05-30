@@ -449,6 +449,27 @@ svg {
   margin: 8px auto 0;
 }
 
+#startDecisionTarget,
+#startDecisionCurrent {
+  font-size: clamp(2.25rem, 6vw, 4rem);
+  line-height: 1.05;
+  white-space: normal;
+  max-width: 90%;
+  margin-inline: auto;
+}
+
+.decision-btn {
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.decision-btn-start { background: #16a34a; }
+.decision-btn-postpone { background: #f97316; }
+.decision-btn-remove { background: #dc2626; }
+.decision-btn-giveup { background: linear-gradient(160deg, #737373, #171717); }
+
 .task-row.task-free-expired {
   background: linear-gradient(135deg, rgba(18, 140, 82, 0.95), rgba(12, 103, 64, 0.95));
   border-color: rgba(141, 255, 202, 0.86);

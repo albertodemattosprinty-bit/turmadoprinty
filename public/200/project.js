@@ -244,6 +244,7 @@ const dayDoneDelay = document.getElementById("dayDoneDelay");
 const startDecisionModal = document.getElementById("startDecisionModal");
 const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
 const startDecisionTarget = document.getElementById("startDecisionTarget");
+const startDecisionContextLabel = document.getElementById("startDecisionContextLabel");
 const startDecisionCurrent = document.getElementById("startDecisionCurrent");
 const startDecisionActions = document.getElementById("startDecisionActions");
 const postponeTaskModal = document.getElementById("postponeTaskModal");
@@ -656,6 +657,22 @@ function isGivenUpAction(action) {
 
 function formatActionTitleForDisplay(title) {
   return String(title || "").replace(/\s*\[DESISTIU\]\s*/gi, "").trim() || "Tarefa";
+}
+
+function formatTitleTwoLines(title) {
+  const clean = formatActionTitleForDisplay(title);
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return escapeHtml(clean);
+  return `${escapeHtml(parts[0])}<br>${escapeHtml(parts.slice(1).join(" "))}`;
+}
+
+function formatDurationHuman(totalMinutes) {
+  const value = Math.max(0, Math.round(Number(totalMinutes || 0)));
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (hours > 0 && minutes > 0) return `${hours} hora${hours > 1 ? "s" : ""} e ${minutes} minutos`;
+  if (hours > 0) return `${hours} hora${hours > 1 ? "s" : ""}`;
+  return `${minutes} minutos`;
 }
 
 function getEarliestPendingAction() {
@@ -1782,22 +1799,44 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
   return new Promise((resolve) => {
     startDecisionResolver = resolve;
     if (startDecisionTarget) {
-      startDecisionTarget.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
+      startDecisionTarget.innerHTML = formatTitleTwoLines(targetAction?.title || "Tarefa");
     }
     if (startDecisionCurrent) {
-      startDecisionCurrent.textContent = String(currentEntry?.kind === "free"
-        ? "Tempo livre"
-        : currentEntry?.kind === "sleep"
-          ? "Descanso"
-          : formatActionTitleForDisplay(currentEntry?.title || "Tarefa"));
+      const targetStart = new Date(targetAction?.startAt || 0).getTime();
+      const currentStart = new Date(currentEntry?.startAt || 0).getTime();
+      const diffMinutes = (Number.isFinite(targetStart) && Number.isFinite(currentStart))
+        ? Math.round((targetStart - currentStart) / (60 * 1000))
+        : 0;
+      if (diffMinutes === 0) {
+        if (startDecisionContextLabel) startDecisionContextLabel.textContent = "No horário";
+        startDecisionCurrent.textContent = "Sem atraso";
+      } else if (diffMinutes > 0) {
+        if (startDecisionContextLabel) startDecisionContextLabel.textContent = "Adiantado";
+        startDecisionCurrent.textContent = formatDurationHuman(diffMinutes);
+      } else {
+        if (startDecisionContextLabel) startDecisionContextLabel.textContent = "Atrasado";
+        startDecisionCurrent.textContent = formatDurationHuman(Math.abs(diffMinutes));
+      }
     }
     if (startDecisionActions) {
       startDecisionActions.innerHTML = "";
       buttons.forEach((item) => {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = item.primary ? "primary-btn" : "ghost-btn";
-        btn.textContent = item.label;
+        const icons = {
+          start: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
+          postpone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm1 11.6V6h-2v7.4l5.2 3.1 1-1.7z"/></svg>',
+          remove: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21a2 2 0 0 1-2-2V7h14v12a2 2 0 0 1-2 2zm2-10v8h2v-8zm4 0v8h2v-8zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
+          give_up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h7v8l9-9-9-9v8H4z"/></svg>'
+        };
+        const classMap = {
+          start: "decision-btn decision-btn-start",
+          postpone: "decision-btn decision-btn-postpone",
+          remove: "decision-btn decision-btn-remove",
+          give_up: "decision-btn decision-btn-giveup"
+        };
+        btn.className = classMap[item.value] || (item.primary ? "primary-btn" : "ghost-btn");
+        btn.innerHTML = `${icons[item.value] || ""}<span>${escapeHtml(item.label)}</span>`;
         btn.addEventListener("click", () => closeStartDecisionModalWith(item.value));
         startDecisionActions.appendChild(btn);
       });
