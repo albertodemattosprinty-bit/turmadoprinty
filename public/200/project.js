@@ -1838,6 +1838,19 @@ function formatClockFromMinutes(totalMinutes) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+function formatPostponeDelayLabel(totalMinutes) {
+  const value = Math.max(0, Number(totalMinutes || 0));
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (hours > 0 && minutes > 0) {
+    return `+${hours} hora${hours > 1 ? "s" : ""} e ${minutes} minutos`;
+  }
+  if (hours > 0) {
+    return `+${hours} hora${hours > 1 ? "s" : ""}`;
+  }
+  return `+${minutes} minutos`;
+}
+
 function getPostponeDraftAction() {
   const targetAction = state.actions.find((item) => item.id === state.postpone.actionId) || null;
   if (!targetAction) return null;
@@ -1870,15 +1883,26 @@ function getPostponeOverlaps(startAt, endAt, sourceActionId) {
 }
 
 function resolvePostponeDraftWithFreeFit(draft) {
-  const nextDraft = { ...draft };
+  const nextDraft = { ...draft, fitFound: true };
   if (!state.postpone.onlyFree) {
     return nextDraft;
   }
+  const targetStart = new Date(nextDraft.startAt);
+  const dayStart = new Date(targetStart);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(targetStart);
+  dayEnd.setHours(23, 59, 59, 999);
   const freeFit = buildActionTimelineEntries()
     .filter((entry) => entry.kind === "free")
     .map((entry) => ({ start: new Date(entry.startAt).getTime(), end: new Date(entry.endAt).getTime() }))
+    .map((slot) => ({
+      start: Math.max(slot.start, dayStart.getTime()),
+      end: Math.min(slot.end, dayEnd.getTime())
+    }))
+    .filter((slot) => slot.end > slot.start)
     .find((slot) => slot.end - Math.max(slot.start, nextDraft.startAt.getTime()) >= nextDraft.durationMinutes * 60 * 1000);
   if (!freeFit) {
+    nextDraft.fitFound = false;
     return nextDraft;
   }
   const fittedStart = new Date(Math.max(freeFit.start, nextDraft.startAt.getTime()));
@@ -1894,9 +1918,20 @@ function updatePostponeFeedback() {
   const overlaps = getPostponeOverlaps(draft.startAt, draft.endAt, draft.targetAction.id);
   stopPostponeFeedbackCarousel();
   postponeFeedback.classList.remove("is-error");
+  if (!draft.fitFound) {
+    postponeFeedback.classList.add("is-error");
+    postponeFeedback.textContent = "Sem horários livres";
+    if (confirmPostponeTask) {
+      confirmPostponeTask.disabled = true;
+      confirmPostponeTask.classList.remove("is-replace");
+      confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg><span>Sem horários livres</span>';
+    }
+    return;
+  }
   if (!overlaps.length) {
     postponeFeedback.textContent = `Disponível: inicia ${formatHourChip(draft.startAt.toISOString())}`;
     if (confirmPostponeTask) {
+      confirmPostponeTask.disabled = false;
       confirmPostponeTask.classList.remove("is-replace");
       confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 16.6 4.9 12.3l1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z"/></svg><span>Confirmar adiamento</span>';
     }
@@ -1904,6 +1939,7 @@ function updatePostponeFeedback() {
   }
   postponeFeedback.classList.add("is-error");
   if (confirmPostponeTask) {
+    confirmPostponeTask.disabled = false;
     confirmPostponeTask.classList.add("is-replace");
     confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v2H4zm0 8h16v2H4zm0-4h16v2H4z"/></svg><span>Substituir</span>';
   }
@@ -1930,7 +1966,7 @@ function renderPostponeTaskModal() {
   }
   if (postponeTimeLabel) {
     postponeTimeLabel.textContent = state.postpone.dayOffset === 0
-      ? `+${Math.max(0, state.postpone.delayMinutes)} minutos`
+      ? formatPostponeDelayLabel(state.postpone.delayMinutes)
       : formatClockFromMinutes(state.postpone.clockMinutes);
   }
   updatePostponeFeedback();
@@ -1987,6 +2023,9 @@ async function applyPostponeTaskConfirm({ allowReplace = false } = {}) {
   const draft = draftRaw ? resolvePostponeDraftWithFreeFit(draftRaw) : null;
   if (!draft) {
     closePostponeTaskModalView();
+    return;
+  }
+  if (state.postpone.onlyFree && !draft.fitFound) {
     return;
   }
   const overlaps = getPostponeOverlaps(draft.startAt, draft.endAt, draft.targetAction.id);
