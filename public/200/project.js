@@ -617,6 +617,17 @@ function getNextTimelineEntryForRunning(action) {
   return timeline[0] || null;
 }
 
+function isGivenUpAction(action) {
+  const title = String(action?.title || "");
+  return title.includes("[DESISTIU]");
+}
+
+function getEarliestPendingAction() {
+  return getVisibleActions()
+    .filter((item) => normalizeActionStatus(item.status) === actionStatuses.pending)
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0] || null;
+}
+
 function getLatestCompletedActionForSelectedProfile() {
   return getVisibleActions()
     .filter((item) => normalizeActionStatus(item.status) === actionStatuses.completed)
@@ -684,7 +695,7 @@ function renderHomeRunningTask() {
 function getCompletionSummaryForSelectedProfile() {
   const list = getVisibleActions();
   const total = list.length;
-  const completed = list.filter((item) => normalizeActionStatus(item.status) === actionStatuses.completed).length;
+  const completed = list.filter((item) => normalizeActionStatus(item.status) === actionStatuses.completed && !isGivenUpAction(item)).length;
   const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
   const late = list.reduce((sum, item) => sum + Math.max(0, getActionLateStartMinutes(item)), 0);
   return { percent, late };
@@ -1341,9 +1352,10 @@ function renderActions() {
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
+    const gaveUpClass = isGivenUpAction(action) ? " task-gave-up" : "";
     const delayMinutes = getPendingDelayMinutes(action);
     const row = document.createElement("article");
-    row.className = `task-row${stateClass}${getDelayClassByMinutes(delayMinutes)}`;
+    row.className = `task-row${stateClass}${gaveUpClass}${getDelayClassByMinutes(delayMinutes)}`;
     row.dataset.actionId = action.id;
     row.setAttribute("role", "button");
     row.tabIndex = 0;
@@ -1429,7 +1441,7 @@ function renderActionsProgress() {
   const totalMinutes = visibleActions.reduce((sum, action) => sum + getActionDurationMinutes(action), 0);
   const completedMinutes = visibleActions.reduce((sum, action) => {
     const status = normalizeActionStatus(action.status);
-    if (status !== actionStatuses.completed) {
+    if (status !== actionStatuses.completed || isGivenUpAction(action)) {
       return sum;
     }
     return sum + getActionDurationMinutes(action);
@@ -1493,31 +1505,62 @@ async function toggleActionStatus(actionId, options = {}) {
 
   const currentStatus = normalizeActionStatus(targetAction.status);
   if (currentStatus === actionStatuses.pending && !options.skipDecision) {
-    const nowMs = Date.now();
+    const rootChoice = await openStartDecisionModal(
+      targetAction,
+      getEarliestPendingAction() || targetAction,
+      [
+        { label: "Iniciar", value: "start", primary: true },
+        { label: "Adiar", value: "postpone" },
+        { label: "Remover", value: "remove" },
+        { label: "Desistir", value: "give_up" }
+      ]
+    );
+    if (!rootChoice || rootChoice === "cancel") {
+      return;
+    }
+    if (rootChoice === "postpone") {
+      openWizard(targetAction);
+      state.wizard.step = 2;
+      renderWizard();
+      return;
+    }
+    if (rootChoice === "remove") {
+      await apiRequest(`/api/actions/${encodeURIComponent(targetAction.id)}`, { method: "DELETE" });
+      await loadActions();
+      return;
+    }
+    if (rootChoice === "give_up") {
+      await markActionAsGivenUp(targetAction);
+      await loadActions();
+      return;
+    }
+
+    const referenceAction = getEarliestPendingAction();
+    const referenceMs = referenceAction ? new Date(referenceAction.startAt).getTime() : Date.now();
     const targetStartMs = new Date(targetAction.startAt).getTime();
     const targetEndMs = new Date(targetAction.endAt).getTime();
-    if (Number.isFinite(targetStartMs) && nowMs < targetStartMs) {
-      const currentEntry = getCurrentTimelineEntry(nowMs, targetAction.id);
+    if (referenceAction && referenceAction.id !== targetAction.id && Number.isFinite(targetStartMs) && Number.isFinite(referenceMs) && targetStartMs > referenceMs) {
+      const currentEntry = getCurrentTimelineEntry(referenceMs, targetAction.id) || referenceAction;
       if (currentEntry) {
         const buttons = [];
         const durationMs = Math.max(60 * 1000, targetEndMs - targetStartMs);
         if (currentEntry.kind === "free") {
           const freeEndMs = new Date(currentEntry.endAt).getTime();
-          if (freeEndMs - nowMs >= durationMs) {
+          if (freeEndMs - referenceMs >= durationMs) {
             buttons.push({ label: "Encaixar no horário livre", value: "fit_free", primary: true });
           } else {
             buttons.push({ label: "Usar tempo livre", value: "use_free", primary: true });
           }
           buttons.push({ label: "Adiantar tarefa", value: "advance" });
-          buttons.push({ label: "Fechar", value: "cancel" });
+          buttons.push({ label: "Voltar", value: "cancel" });
         } else if (currentEntry.kind === "sleep") {
           buttons.push({ label: "Usar descanso", value: "use_sleep", primary: true });
           buttons.push({ label: "Adiantar tarefa", value: "advance" });
-          buttons.push({ label: "Fechar", value: "cancel" });
+          buttons.push({ label: "Voltar", value: "cancel" });
         } else {
           buttons.push({ label: "Substituir", value: "swap", primary: true });
           buttons.push({ label: `Cumprir tarefa "${String(currentEntry.title || "atual")}"`, value: "do_current" });
-          buttons.push({ label: "Fechar", value: "cancel" });
+          buttons.push({ label: "Voltar", value: "cancel" });
         }
         const decision = await openStartDecisionModal(targetAction, currentEntry, buttons);
         if (!decision || decision === "cancel") {
@@ -1536,18 +1579,14 @@ async function toggleActionStatus(actionId, options = {}) {
           return;
         }
         if (decision === "advance" || decision === "fit_free" || decision === "use_free" || decision === "use_sleep") {
-          const now = new Date();
-          const startAt = now.toISOString();
-          const endAt = new Date(now.getTime() + durationMs).toISOString();
+          const baseStart = new Date(referenceMs);
+          const startAt = baseStart.toISOString();
+          const endAt = new Date(baseStart.getTime() + durationMs).toISOString();
           await patchActionTime(targetAction, startAt, endAt);
           await loadActions();
           return await toggleActionStatus(targetAction.id, { skipDecision: true });
         }
       }
-    }
-    const okStart = window.confirm(`Você quer começar "${targetAction.title}" ?`);
-    if (!okStart) {
-      return;
     }
   }
   if (currentStatus === actionStatuses.inProgress) {
@@ -1746,6 +1785,36 @@ async function patchActionTime(action, startAt, endAt) {
       occurrences: [{ startAt, endAt }]
     })
   });
+}
+
+async function patchActionFull(action, next) {
+  await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: next.title,
+      assignee: next.assignee,
+      repeatRule: next.repeatRule || "none",
+      repeatDays: Array.isArray(next.repeatDays) ? next.repeatDays : [],
+      occurrences: [{ startAt: next.startAt, endAt: next.endAt }]
+    })
+  });
+}
+
+async function markActionAsGivenUp(action) {
+  const nextTitle = isGivenUpAction(action) ? String(action.title || "Tarefa") : `${String(action.title || "Tarefa")} [DESISTIU]`;
+  await patchActionFull(action, {
+    ...action,
+    title: nextTitle
+  });
+  let current = normalizeActionStatus(action.status);
+  if (current === actionStatuses.pending) {
+    await apiRequest(`/api/actions/${encodeURIComponent(action.id)}/status`, { method: "PATCH" });
+    current = actionStatuses.inProgress;
+  }
+  if (current === actionStatuses.inProgress) {
+    await apiRequest(`/api/actions/${encodeURIComponent(action.id)}/status`, { method: "PATCH" });
+  }
 }
 
 async function ensureProject200Session() {
