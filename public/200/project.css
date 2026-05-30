@@ -379,6 +379,23 @@ svg {
   margin-top: 4px;
 }
 
+.start-decision-content {
+  transform: none;
+  width: min(900px, 96vw);
+}
+
+.start-decision-actions {
+  display: grid;
+  gap: 10px;
+  width: min(520px, 90vw);
+  margin: 8px auto 0;
+}
+
+.task-row.task-free-expired {
+  background: linear-gradient(135deg, rgba(18, 140, 82, 0.95), rgba(12, 103, 64, 0.95));
+  border-color: rgba(141, 255, 202, 0.86);
+}
+
 
 .workspace-modal {
   position: fixed;
@@ -820,6 +837,7 @@ svg {
   min-width: 0;
   display: grid;
   gap: 4px;
+  padding-left: 15px;
 }
 
 .task-title {
@@ -964,6 +982,17 @@ svg {
   text-overflow: ellipsis;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.98);
+}
+
+.task-assignee.task-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-assignee.task-duration svg {
+  width: 14px;
+  height: 14px;
 }
 
 .stats-general-card {

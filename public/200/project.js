@@ -241,6 +241,11 @@ const runningTaskStartNextButton = document.getElementById("runningTaskStartNext
 const actionsModal = document.getElementById("actionsModal");
 const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
+const startDecisionModal = document.getElementById("startDecisionModal");
+const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
+const startDecisionTarget = document.getElementById("startDecisionTarget");
+const startDecisionCurrent = document.getElementById("startDecisionCurrent");
+const startDecisionActions = document.getElementById("startDecisionActions");
 const sleepConfigModal = document.getElementById("sleepConfigModal");
 const sleepStartLabel = document.getElementById("sleepStartLabel");
 const sleepEndLabel = document.getElementById("sleepEndLabel");
@@ -320,6 +325,7 @@ let profilePressProfile = "";
 let sleepNavHoldTimer = null;
 let sleepNavHoldInterval = null;
 let sleepNavLongPressHandled = false;
+let startDecisionResolver = null;
 
 const state = {
   activeOffset: 0,
@@ -1312,8 +1318,9 @@ function renderActions() {
     }
     if (action.kind === "free") {
       const duration = getActionDurationMinutes(action);
+      const ended = Date.now() >= new Date(action.endAt).getTime();
       const row = document.createElement("article");
-      row.className = "task-row task-free-slot";
+      row.className = `task-row task-free-slot${ended ? " task-free-expired" : ""}`;
       row.dataset.freeSlot = "1";
       row.dataset.startIso = action.startAt;
       row.dataset.endIso = action.endAt;
@@ -1323,7 +1330,7 @@ function renderActions() {
           <div class="task-title">Tempo livre</div>
           <div class="task-assignee">${escapeHtml(String(slotOwner))}</div>
         </div>
-        <div class="task-time" data-start-label="${formatHourChip(action.startAt)}" data-duration-label="${formatMinutesHuman(duration)}">${formatHourChip(action.startAt)}</div>
+        <div class="task-time">${formatHourChip(action.startAt)}</div>
       `;
       actionsList.appendChild(row);
       return;
@@ -1344,9 +1351,9 @@ function renderActions() {
       <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
         <div class="task-title">${escapeHtml(action.title)}</div>
-        <div class="task-assignee">${escapeHtml(assignee)}</div>
+        <div class="task-assignee task-duration"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm1 11.6V6h-2v7.4l5.2 3.1 1-1.7z"/></svg>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
       </div>
-      <div class="task-time" data-start-label="${formatHourChip(action.startAt)}" data-duration-label="${formatMinutesHuman(getActionDurationMinutes(action))}">${formatHourChip(action.startAt)}</div>
+      <div class="task-time">${formatHourChip(action.startAt)}</div>
     `;
     actionsList.appendChild(row);
   });
@@ -1471,7 +1478,7 @@ async function loadActions() {
   renderHomeRunningTask();
 }
 
-async function toggleActionStatus(actionId) {
+async function toggleActionStatus(actionId, options = {}) {
   const targetId = String(actionId || "").trim();
 
   if (!targetId) {
@@ -1485,7 +1492,59 @@ async function toggleActionStatus(actionId) {
   }
 
   const currentStatus = normalizeActionStatus(targetAction.status);
-  if (currentStatus === actionStatuses.pending) {
+  if (currentStatus === actionStatuses.pending && !options.skipDecision) {
+    const nowMs = Date.now();
+    const targetStartMs = new Date(targetAction.startAt).getTime();
+    const targetEndMs = new Date(targetAction.endAt).getTime();
+    if (Number.isFinite(targetStartMs) && nowMs < targetStartMs) {
+      const currentEntry = getCurrentTimelineEntry(nowMs, targetAction.id);
+      if (currentEntry) {
+        const buttons = [];
+        const durationMs = Math.max(60 * 1000, targetEndMs - targetStartMs);
+        if (currentEntry.kind === "free") {
+          const freeEndMs = new Date(currentEntry.endAt).getTime();
+          if (freeEndMs - nowMs >= durationMs) {
+            buttons.push({ label: "Encaixar no horário livre", value: "fit_free", primary: true });
+          } else {
+            buttons.push({ label: "Usar tempo livre", value: "use_free", primary: true });
+          }
+          buttons.push({ label: "Adiantar tarefa", value: "advance" });
+          buttons.push({ label: "Fechar", value: "cancel" });
+        } else if (currentEntry.kind === "sleep") {
+          buttons.push({ label: "Usar descanso", value: "use_sleep", primary: true });
+          buttons.push({ label: "Adiantar tarefa", value: "advance" });
+          buttons.push({ label: "Fechar", value: "cancel" });
+        } else {
+          buttons.push({ label: "Substituir", value: "swap", primary: true });
+          buttons.push({ label: `Cumprir tarefa "${String(currentEntry.title || "atual")}"`, value: "do_current" });
+          buttons.push({ label: "Fechar", value: "cancel" });
+        }
+        const decision = await openStartDecisionModal(targetAction, currentEntry, buttons);
+        if (!decision || decision === "cancel") {
+          return;
+        }
+        if (decision === "do_current" && currentEntry?.id) {
+          await toggleActionStatus(currentEntry.id, { skipDecision: true });
+          return;
+        }
+        if (decision === "swap" && currentEntry?.id && currentEntry.kind !== "free" && currentEntry.kind !== "sleep") {
+          const swapStart = targetAction.startAt;
+          const swapEnd = targetAction.endAt;
+          await patchActionTime(targetAction, currentEntry.startAt, currentEntry.endAt);
+          await patchActionTime(currentEntry, swapStart, swapEnd);
+          await loadActions();
+          return;
+        }
+        if (decision === "advance" || decision === "fit_free" || decision === "use_free" || decision === "use_sleep") {
+          const now = new Date();
+          const startAt = now.toISOString();
+          const endAt = new Date(now.getTime() + durationMs).toISOString();
+          await patchActionTime(targetAction, startAt, endAt);
+          await loadActions();
+          return await toggleActionStatus(targetAction.id, { skipDecision: true });
+        }
+      }
+    }
     const okStart = window.confirm(`Você quer começar "${targetAction.title}" ?`);
     if (!okStart) {
       return;
@@ -1601,19 +1660,8 @@ function closeActionsModalWithFade() {
 function startActionsTimeTicker() {
   if (actionsTimeTicker) {
     window.clearInterval(actionsTimeTicker);
+    actionsTimeTicker = null;
   }
-  actionsTimeTicker = window.setInterval(() => {
-    actionsTimeShowDuration = !actionsTimeShowDuration;
-    actionsList.querySelectorAll(".task-time").forEach((node) => {
-      const el = node;
-      const next = actionsTimeShowDuration ? el.dataset.durationLabel : el.dataset.startLabel;
-      el.classList.add("is-fading");
-      window.setTimeout(() => {
-        el.textContent = next || el.textContent;
-        el.classList.remove("is-fading");
-      }, 220);
-    });
-  }, 2000);
 }
 
 function renderSleepLabels() {
@@ -1633,6 +1681,71 @@ function moveSleepTime(target, deltaMinutes) {
   state.sleepConfig[hourKey] = Math.floor(wrapped / 60);
   state.sleepConfig[minuteKey] = wrapped % 60;
   renderSleepLabels();
+}
+
+function getCurrentTimelineEntry(nowMs, exceptId = "") {
+  const timeline = buildActionTimelineEntries().filter((entry) => {
+    if (exceptId && entry.id === exceptId) return false;
+    if (entry.kind === "free" || entry.kind === "sleep") return true;
+    const status = normalizeActionStatus(entry.status);
+    return status === actionStatuses.pending || status === actionStatuses.inProgress;
+  });
+  return timeline.find((entry) => {
+    const start = new Date(entry.startAt).getTime();
+    const end = new Date(entry.endAt).getTime();
+    return Number.isFinite(start) && Number.isFinite(end) && nowMs >= start && nowMs < end;
+  }) || null;
+}
+
+function closeStartDecisionModalWith(value) {
+  startDecisionModal?.classList.remove("active");
+  startDecisionModal?.setAttribute("aria-hidden", "true");
+  const resolver = startDecisionResolver;
+  startDecisionResolver = null;
+  if (resolver) resolver(value);
+}
+
+function openStartDecisionModal(targetAction, currentEntry, buttons) {
+  return new Promise((resolve) => {
+    startDecisionResolver = resolve;
+    if (startDecisionTarget) {
+      startDecisionTarget.textContent = String(targetAction?.title || "Tarefa");
+    }
+    if (startDecisionCurrent) {
+      startDecisionCurrent.textContent = String(currentEntry?.kind === "free"
+        ? "Tempo livre"
+        : currentEntry?.kind === "sleep"
+          ? "Descanso"
+          : (currentEntry?.title || "Tarefa"));
+    }
+    if (startDecisionActions) {
+      startDecisionActions.innerHTML = "";
+      buttons.forEach((item) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = item.primary ? "primary-btn" : "ghost-btn";
+        btn.textContent = item.label;
+        btn.addEventListener("click", () => closeStartDecisionModalWith(item.value));
+        startDecisionActions.appendChild(btn);
+      });
+    }
+    startDecisionModal?.classList.add("active");
+    startDecisionModal?.setAttribute("aria-hidden", "false");
+  });
+}
+
+async function patchActionTime(action, startAt, endAt) {
+  await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: action.title,
+      assignee: action.assignee,
+      repeatRule: action.repeatRule || "none",
+      repeatDays: Array.isArray(action.repeatDays) ? action.repeatDays : [],
+      occurrences: [{ startAt, endAt }]
+    })
+  });
 }
 
 async function ensureProject200Session() {
@@ -4303,6 +4416,7 @@ profileButtons.forEach((button) => {
 });
 
 profileLinkCancel?.addEventListener("click", closeProfileLinkOverlay);
+closeStartDecisionModal?.addEventListener("click", () => closeStartDecisionModalWith("cancel"));
 profileLinkForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   const username = String(profileLinkUsername?.value || "").trim();
