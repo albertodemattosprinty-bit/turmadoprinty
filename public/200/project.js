@@ -122,6 +122,11 @@ const runningMusicStationSeeds = {
     "Hidden Temple Map (2).mp3", "Hidden Temple Map (3).mp3", "Jungle Treasure Chase.mp3", "Jungle Treasure Chase (1).mp3",
     "Jungle Treasure Run.mp3", "Jungle Treasure Run (1).mp3", "Jungle Treasure Run (2).mp3", "Jungle Treasure Run (3).mp3",
     "Jungle Treasure Run (4).mp3", "Jungle Treasure Run (5).mp3", "Jungle Treasure Run (6).mp3", "Jungle Treasure Trail (1).mp3"
+  ],
+  Energy: [
+    "3 minutes",
+    "5 minutes",
+    "10 minutes"
   ]
 };
 
@@ -269,10 +274,9 @@ const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeBu
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
-const runningPlayerPrev = document.getElementById("runningPlayerPrev");
+const runningPlayerStationPrev = document.getElementById("runningPlayerStationPrev");
+const runningPlayerStationNext = document.getElementById("runningPlayerStationNext");
 const runningPlayerPlay = document.getElementById("runningPlayerPlay");
-const runningPlayerNext = document.getElementById("runningPlayerNext");
-const runningPlayerProgress = document.getElementById("runningPlayerProgress");
 const actionsModal = document.getElementById("actionsModal");
 const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
@@ -632,7 +636,14 @@ function buildActionTimelineEntries() {
     }
   }
 
-  return normalized
+  const withoutFreeAfterSleep = normalized.filter((entry) => {
+    if (entry.kind !== "free" || !sleepEntry) return true;
+    const freeStart = new Date(entry.startAt).getTime();
+    const sleepStartMs = new Date(sleepEntry.startAt).getTime();
+    return Number.isFinite(freeStart) && Number.isFinite(sleepStartMs) && freeStart < sleepStartMs;
+  });
+
+  return withoutFreeAfterSleep
     .filter((entry) => getActionDurationMinutes(entry) > 0)
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 }
@@ -727,6 +738,22 @@ function formatDurationHuman(totalMinutes) {
   return `${minutes} minutos`;
 }
 
+function formatMinutesCompact(totalMinutes) {
+  const value = Math.max(0, Math.round(Number(totalMinutes || 0)));
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes} min`;
+  if (hours > 0) return `${hours}h`;
+  return `${minutes} min`;
+}
+
+function getSleepDurationMinutesForDay() {
+  const start = (Number(state.sleepConfig.startHour || 0) * 60) + Number(state.sleepConfig.startMinute || 0);
+  const end = (Number(state.sleepConfig.endHour || 0) * 60) + Number(state.sleepConfig.endMinute || 0);
+  const full = 24 * 60;
+  return ((end - start) + full) % full || full;
+}
+
 function getEarliestPendingAction() {
   return getVisibleActions()
     .filter((item) => normalizeActionStatus(item.status) === actionStatuses.pending)
@@ -771,7 +798,9 @@ function renderHomeRunningTask() {
     runningTaskMinutesLeft.textContent = "0 minutos restantes";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     const nextPending = getEarliestPendingAction();
-    runningTaskNextName.textContent = nextPending ? formatActionTitleForDisplay(nextPending.title) : "Descanso";
+    runningTaskNextName.innerHTML = nextPending
+      ? `${escapeHtml(formatActionTitleForDisplay(nextPending.title))}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextPending)))}</small>`
+      : `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
     if (runningTaskStartNextButton) {
       runningTaskStartNextButton.hidden = !nextPending;
@@ -796,9 +825,12 @@ function renderHomeRunningTask() {
   } else {
     runningTaskMinutesLeft.classList.add("is-early");
   }
-  runningTaskNextName.textContent = nextAction
-    ? String(nextAction.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextAction))})` : formatActionTitleForDisplay(nextAction.title))
-    : "Descanso";
+  if (nextAction) {
+    const nextLabel = nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title);
+    runningTaskNextName.innerHTML = `${escapeHtml(nextLabel)}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextAction)))}</small>`;
+  } else {
+    runningTaskNextName.innerHTML = `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
+  }
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
@@ -806,13 +838,34 @@ function renderHomeRunningTask() {
 }
 
 async function loadRunningMusicStations() {
-  const seededStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => ({
-    name,
-    tracks: files.map((fileName) => ({
-      name: fileName.replace(/\.mp3$/i, ""),
-      url: `${musicBaseUrl}/${encodeURIComponent(name)}/${encodeURIComponent(fileName)}`
-    }))
-  }));
+  const seededStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => {
+    if (name === "Energy") {
+      return {
+        name,
+        tracks: [
+          {
+            name: "3 minutes",
+            url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/3%20minutes.m4a"
+          },
+          {
+            name: "5 minutes",
+            url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/5%20minutes.m4a"
+          },
+          {
+            name: "10 minutes",
+            url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/10%20minutes.m4a"
+          }
+        ]
+      };
+    }
+    return {
+      name,
+      tracks: files.map((fileName) => ({
+        name: fileName.replace(/\.mp3$/i, ""),
+        url: `${musicBaseUrl}/${encodeURIComponent(name)}/${encodeURIComponent(fileName)}`
+      }))
+    };
+  });
   state.runningPlayer.stations = seededStations;
   try {
     const payload = await apiRequest("/api/200/music/stations");
@@ -1556,7 +1609,8 @@ function renderActions() {
     const gaveUpClass = isGivenUpAction(action) ? " task-gave-up" : "";
     const delayMinutes = getPendingDelayMinutes(action);
     const row = document.createElement("article");
-    row.className = `task-row${stateClass}${gaveUpClass}${getDelayClassByMinutes(delayMinutes)}`;
+    const cleanPendingClass = (status === actionStatuses.pending && delayMinutes <= 0) ? " task-pending-clean" : "";
+    row.className = `task-row${stateClass}${gaveUpClass}${getDelayClassByMinutes(delayMinutes)}${cleanPendingClass}`;
     row.dataset.actionId = action.id;
     row.setAttribute("role", "button");
     row.tabIndex = 0;
@@ -1748,33 +1802,25 @@ async function toggleActionStatus(actionId, options = {}) {
       if (currentEntry) {
         const buttons = [];
         const durationMs = Math.max(60 * 1000, targetEndMs - targetStartMs);
-        if (currentEntry.kind === "free") {
-          const freeEndMs = new Date(currentEntry.endAt).getTime();
-          if (freeEndMs - referenceMs >= durationMs) {
-            buttons.push({ label: "Encaixar no horário livre", value: "fit_free", primary: true });
-          } else {
-            buttons.push({ label: "Usar tempo livre", value: "use_free", primary: true });
-          }
-          buttons.push({ label: "Adiantar tarefa", value: "advance" });
-          buttons.push({ label: "Voltar", value: "cancel" });
-        } else if (currentEntry.kind === "sleep") {
-          buttons.push({ label: "Usar descanso", value: "use_sleep", primary: true });
-          buttons.push({ label: "Adiantar tarefa", value: "advance" });
-          buttons.push({ label: "Voltar", value: "cancel" });
-        } else {
-          buttons.push({ label: "Substituir", value: "swap", primary: true });
-          buttons.push({ label: `Cumprir tarefa "${String(currentEntry.title || "atual")}"`, value: "do_current" });
-          buttons.push({ label: "Voltar", value: "cancel" });
-        }
+        buttons.push({ label: `Iniciar "${formatActionTitleForDisplay(targetAction.title)}"`, value: "start_chosen", primary: true });
+        buttons.push({ label: `Substituir por "${currentEntry.kind === "free" ? "Tempo livre" : currentEntry.kind === "sleep" ? "Descanso" : formatActionTitleForDisplay(currentEntry.title || "Tarefa esperada")}"`, value: "swap" });
+        buttons.push({ label: `Cumprir "${currentEntry.kind === "free" ? "Tempo livre" : currentEntry.kind === "sleep" ? "Descanso" : formatActionTitleForDisplay(currentEntry.title || "Tarefa esperada")}"`, value: "do_current" });
+        buttons.push({ label: "", value: "cancel" });
         const decision = await openStartDecisionModal(targetAction, currentEntry, buttons);
         if (!decision || decision === "cancel") {
           return;
         }
+        if (decision === "start_chosen") {
+          return await toggleActionStatus(targetAction.id, { skipDecision: true });
+        }
         if (decision === "do_current" && currentEntry?.id) {
+          if (currentEntry.kind !== "action") {
+            return;
+          }
           await toggleActionStatus(currentEntry.id, { skipDecision: true });
           return;
         }
-        if (decision === "swap" && currentEntry?.id && currentEntry.kind !== "free" && currentEntry.kind !== "sleep") {
+        if (decision === "swap" && currentEntry?.id && currentEntry.kind === "action") {
           const swapStart = targetAction.startAt;
           const swapEnd = targetAction.endAt;
           await patchActionTime(targetAction, currentEntry.startAt, currentEntry.endAt);
@@ -1782,13 +1828,13 @@ async function toggleActionStatus(actionId, options = {}) {
           await loadActions();
           return;
         }
-        if (decision === "advance" || decision === "fit_free" || decision === "use_free" || decision === "use_sleep") {
+        if (decision === "swap" && (currentEntry.kind === "free" || currentEntry.kind === "sleep")) {
           const baseStart = new Date(referenceMs);
           const startAt = baseStart.toISOString();
           const endAt = new Date(baseStart.getTime() + durationMs).toISOString();
           await patchActionTime(targetAction, startAt, endAt);
           await loadActions();
-          return await toggleActionStatus(targetAction.id, { skipDecision: true });
+          return;
         }
       }
     }
@@ -1978,18 +2024,28 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
         btn.type = "button";
         const icons = {
           start: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
+          start_chosen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
           postpone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm1 11.6V6h-2v7.4l5.2 3.1 1-1.7z"/></svg>',
           remove: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21a2 2 0 0 1-2-2V7h14v12a2 2 0 0 1-2 2zm2-10v8h2v-8zm4 0v8h2v-8zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
-          give_up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h7v8l9-9-9-9v8H4z"/></svg>'
+          give_up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h7v8l9-9-9-9v8H4z"/></svg>',
+          swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3 1.4-1.4L22 8l-5.6 5.4L15 12l3-3H7zm10 10H6l3 3-1.4 1.4L2 16l5.6-5.4L9 12l-3 3h11z"/></svg>',
+          do_current: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
+          cancel: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 6-6 1.4 1.4L9.8 11H18v2H9.8l3.6 3.6L12 18z"/></svg>'
         };
         const classMap = {
           start: "decision-btn decision-btn-start",
+          start_chosen: "decision-btn decision-btn-start",
           postpone: "decision-btn decision-btn-postpone",
           remove: "decision-btn decision-btn-remove",
-          give_up: "decision-btn decision-btn-giveup"
+          give_up: "decision-btn decision-btn-giveup",
+          swap: "decision-btn decision-btn-postpone",
+          do_current: "decision-btn decision-btn-start",
+          cancel: "decision-btn decision-btn-back"
         };
         btn.className = classMap[item.value] || (item.primary ? "primary-btn" : "ghost-btn");
-        btn.innerHTML = `${icons[item.value] || ""}<span>${escapeHtml(item.label)}</span>`;
+        btn.innerHTML = item.value === "cancel"
+          ? `${icons[item.value] || ""}`
+          : `${icons[item.value] || ""}<span>${escapeHtml(item.label)}</span>`;
         btn.addEventListener("click", () => closeStartDecisionModalWith(item.value));
         startDecisionActions.appendChild(btn);
       });
@@ -4821,9 +4877,12 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
         runningCarryOverMinutes = savedMinutes;
         runningTaskName.textContent = String(nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title));
         const nextOfNext = getNextTimelineEntryForRunning(nextAction);
-        runningTaskNextName.textContent = nextOfNext
-          ? String(nextOfNext.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextOfNext))})` : formatActionTitleForDisplay(nextOfNext.title))
-          : "Descanso";
+        if (nextOfNext) {
+          const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
+          runningTaskNextName.innerHTML = `${escapeHtml(nextLabel)}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextOfNext)))}</small>`;
+        } else {
+          runningTaskNextName.innerHTML = `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
+        }
         runningTaskMinutesLeft.textContent = `${runningCarryOverMinutes} min de saldo`;
         runningTaskMinutesLeft.classList.toggle("is-bonus", runningCarryOverMinutes > 0);
         if (runningTaskStartNextButton) {
@@ -4854,13 +4913,8 @@ runningTaskStartNextButton?.addEventListener("click", () => {
 });
 
 runningPlayerPlay?.addEventListener("click", toggleRunningPlayPause);
-runningPlayerPrev?.addEventListener("click", () => moveRunningTrack(-1));
-runningPlayerNext?.addEventListener("click", () => moveRunningTrack(1));
-runningPlayerProgress?.addEventListener("input", () => {
-  if (!runningAudio || !Number.isFinite(runningAudio.duration) || runningAudio.duration <= 0) return;
-  const pct = Math.max(0, Math.min(100, Number(runningPlayerProgress.value || 0)));
-  runningAudio.currentTime = (runningAudio.duration * pct) / 100;
-});
+runningPlayerStationPrev?.addEventListener("click", () => moveRunningStation(-1));
+runningPlayerStationNext?.addEventListener("click", () => moveRunningStation(1));
 if (runningAudio) {
   runningAudio.addEventListener("ended", () => {
     moveRunningTrack(1);
@@ -5195,15 +5249,6 @@ void loadRunningMusicStations();
 if (runningMusicProgressTicker) {
   window.clearInterval(runningMusicProgressTicker);
 }
-runningMusicProgressTicker = window.setInterval(() => {
-  if (!runningAudio || !runningPlayerProgress) return;
-  if (!Number.isFinite(runningAudio.duration) || runningAudio.duration <= 0) {
-    runningPlayerProgress.value = "0";
-    return;
-  }
-  const pct = Math.max(0, Math.min(100, (runningAudio.currentTime / runningAudio.duration) * 100));
-  runningPlayerProgress.value = String(pct);
-}, 300);
 
 
 

@@ -370,6 +370,13 @@ svg {
 .running-task-next {
   font-weight: 800;
 }
+.running-task-next small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+}
 
 .running-task-finalize-btn {
   margin-top: 4px;
@@ -393,11 +400,18 @@ svg {
 .running-player {
   margin-top: 8px;
   width: min(560px, 92vw);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid transparent;
   border-radius: 14px;
   padding: 8px 10px;
-  background: rgba(11, 25, 54, 0.45);
-  backdrop-filter: blur(4px);
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.running-player-station-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .running-player-station {
@@ -415,7 +429,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   margin-top: 4px;
 }
 
@@ -435,10 +449,10 @@ svg {
   height: 36px;
   background: rgba(37, 99, 235, 0.9);
 }
-
-#runningPlayerProgress {
-  width: 100%;
-  margin-top: 6px;
+.running-player-station-nav {
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .start-decision-content {
@@ -544,6 +558,13 @@ svg {
 .decision-btn-postpone { background: #f97316; }
 .decision-btn-remove { background: #dc2626; }
 .decision-btn-giveup { background: linear-gradient(160deg, #737373, #171717); }
+.decision-btn-back {
+  width: 56px;
+  min-height: 56px;
+  border-radius: 999px;
+  justify-self: center;
+  background: rgba(220, 38, 38, 0.95);
+}
 
 .task-row.task-free-expired {
   background: linear-gradient(135deg, rgba(18, 140, 82, 0.95), rgba(12, 103, 64, 0.95));
@@ -965,6 +986,21 @@ svg {
 .task-row.task-free-slot .task-assignee,
 .task-row.task-free-slot .task-time {
   color: #ffffff;
+}
+
+.task-row.task-pending-clean {
+  background: #fff;
+  border-color: rgba(30, 41, 59, 0.14);
+}
+.task-row.task-pending-clean .task-title {
+  color: #123a86;
+}
+.task-row.task-pending-clean .task-assignee,
+.task-row.task-pending-clean .task-time {
+  background: linear-gradient(90deg, #0f172a, #1e3a8a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .task-row.task-sleep-slot {
