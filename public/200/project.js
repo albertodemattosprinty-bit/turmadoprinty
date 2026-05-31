@@ -95,7 +95,6 @@ const profileTintByName = {
   Lucas: "linear-gradient(145deg, rgba(79, 195, 247, 0.7), rgba(212, 160, 23, 0.7))",
   Thainan: "linear-gradient(145deg, rgba(0, 184, 169, 0.7), rgba(138, 92, 255, 0.7))"
 };
-const musicBaseUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music";
 const runningMusicStationSeeds = {
   Calm: [
     "Untitled (1).mp3", "Untitled (2).mp3", "Untitled (16).mp3", "Untitled (17).mp3",
@@ -964,44 +963,60 @@ function renderHomeRunningTask() {
 }
 
 async function loadRunningMusicStations() {
-  const seededStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => {
+  const fallbackStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => {
     if (name === "Energy") {
       return {
         name,
         tracks: [
           {
-            name: "3 minutes",
+            name: "Energy 03",
             url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/3%20minutes.m4a"
           },
           {
-            name: "5 minutes",
+            name: "Energy 05",
             url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/5%20minutes.m4a"
           },
           {
-            name: "10 minutes",
+            name: "Energy 10",
             url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/10%20minutes.m4a"
           }
         ]
       };
     }
+    const prefix = name;
     return {
       name,
-      tracks: files.map((fileName) => ({
-        name: fileName.replace(/\.mp3$/i, ""),
-        url: `${musicBaseUrl}/${encodeURIComponent(name)}/${encodeURIComponent(fileName)}`
+      tracks: files.map((fileName, index) => ({
+        name: `${prefix} ${String(index + 1).padStart(2, "0")}`,
+        url: `https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/${encodeURIComponent(name)}/${encodeURIComponent(fileName)}`
       }))
     };
   });
-  state.runningPlayer.stations = seededStations;
+
+  state.runningPlayer.stations = fallbackStations;
+  try {
+    const radioResponse = await fetch("/200/radio-stations.json", { cache: "no-store" });
+    if (radioResponse.ok) {
+      const radioData = await radioResponse.json();
+      const radioStations = Array.isArray(radioData?.stations) ? radioData.stations : [];
+      const validLocalStations = radioStations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
+      if (validLocalStations.length) {
+        state.runningPlayer.stations = validLocalStations;
+      }
+    }
+  } catch {
+    // keep fallback stations
+  }
+
   try {
     const payload = await apiRequest("/api/200/music/stations");
     const stations = Array.isArray(payload?.stations) ? payload.stations : [];
     const validStations = stations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
-    if (validStations.length) {
+    if (validStations.length && !state.runningPlayer.stations.length) {
       state.runningPlayer.stations = validStations;
     }
   } catch {
-    // keep seeded stations
+    // keep local/fallback stations
   }
   const jungleIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").toLowerCase() === "jungle");
   state.runningPlayer.stationIndex = jungleIndex >= 0 ? jungleIndex : 0;
