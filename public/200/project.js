@@ -302,6 +302,8 @@ const runningTaskNextLabel = runningTaskModalElement?.querySelector(".running-ta
 const runningTaskNextIcon = document.getElementById("runningTaskNextIcon");
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
+const runningTaskRestoreButton = document.getElementById("runningTaskRestoreButton");
+const runningTaskGiveUpButton = document.getElementById("runningTaskGiveUpButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
@@ -968,6 +970,8 @@ function renderHomeRunningTask() {
       runningTaskNextIcon.src = nextPending ? getTimelineEntryIconPath(nextPending) : "/200/icons/lua.svg";
     }
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
+    if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
+    if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
     if (runningTaskStartNextButton) {
       runningTaskStartNextButton.hidden = !nextPending;
       runningTaskStartNextButton.dataset.actionId = String(nextPending?.id || "");
@@ -976,6 +980,7 @@ function renderHomeRunningTask() {
     return;
   }
   const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
+  applyRunningStationForCategory(action.categoryId);
   setRunningIdleVisualState(false);
   if (runningTaskNextLabel) {
     runningTaskNextLabel.classList.add("running-fade");
@@ -1023,6 +1028,8 @@ function renderHomeRunningTask() {
     }
   }
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
+  if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = false;
+  if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = false;
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
   }
@@ -1304,6 +1311,32 @@ function getTimelineEntryIconPath(entry) {
   if (entry.kind === "free") return "/200/icons/agenda.svg";
   const cat = getTaskCategoryIconPath(entry.categoryId);
   return cat || "/200/icons/agenda.svg";
+}
+
+function getStationNameForCategory(categoryId) {
+  const id = String(categoryId || "").trim().toLowerCase();
+  if (id === "fe_espiritualidade" || id === "saude") {
+    return "Frequency";
+  }
+  if (id === "exercicios" || id === "casa") {
+    return "Energy";
+  }
+  return "";
+}
+
+function applyRunningStationForCategory(categoryId) {
+  const stationName = getStationNameForCategory(categoryId);
+  if (!stationName || !Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) return;
+  const index = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").toLowerCase() === stationName.toLowerCase());
+  if (index < 0 || index === state.runningPlayer.stationIndex) return;
+  state.runningPlayer.stationIndex = index;
+  state.runningPlayer.trackIndex = 0;
+  primeRunningTrackBuffer();
+  if (state.runningPlayer.isPlaying) {
+    playRunningTrack();
+  } else {
+    renderRunningMusicPlayer();
+  }
 }
 
 function buildDateWithTime(date, hour, minute) {
@@ -2104,7 +2137,7 @@ async function toggleActionStatus(actionId, options = {}) {
       }
     }
   }
-  if (currentStatus === actionStatuses.inProgress) {
+  if (currentStatus === actionStatuses.inProgress && !options.skipEndConfirm) {
     const okEnd = window.confirm(`Você quer encerrar "${targetAction.title}" ?`);
     if (!okEnd) {
       return;
@@ -5263,7 +5296,7 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
     const bonusBefore = Math.max(0, Number(runningCarryOverMinutes || 0));
     const remainingAfterBonus = Math.max(0, elapsed - bonusBefore);
     const savedMinutes = Math.max(0, Math.floor(duration - remainingAfterBonus));
-    await toggleActionStatus(runningAction.id);
+    await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
     const after = state.actions.find((item) => item.id === runningAction.id);
     if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
       const nextAction = getNextTimelineEntryForRunning(runningAction);
@@ -5311,6 +5344,31 @@ runningTaskStartNextButton?.addEventListener("click", () => {
   const actionId = String(runningTaskStartNextButton.dataset.actionId || "").trim();
   if (!actionId) return;
   void toggleActionStatus(actionId, { skipDecision: true });
+});
+
+runningTaskRestoreButton?.addEventListener("click", () => {
+  void (async () => {
+    const runningAction = getRunningActionForSelectedProfile();
+    if (!runningAction) return;
+    try {
+      await restoreActionToPending(String(runningAction.id || ""));
+      delete state.runningLocalStarts[String(runningAction.id || "")];
+      startRunningTaskTicker();
+    } catch {}
+  })();
+});
+
+runningTaskGiveUpButton?.addEventListener("click", () => {
+  void (async () => {
+    const runningAction = getRunningActionForSelectedProfile();
+    if (!runningAction) return;
+    try {
+      await markActionAsGivenUp(runningAction);
+      delete state.runningLocalStarts[String(runningAction.id || "")];
+      await loadActions();
+      startRunningTaskTicker();
+    } catch {}
+  })();
 });
 
 runningPlayerPlay?.addEventListener("click", toggleRunningPlayPause);

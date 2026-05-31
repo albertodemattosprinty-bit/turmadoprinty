@@ -307,6 +307,7 @@ body.project-no-select textarea {
   justify-content: center;
   gap: 10px;
   transform: translateY(25px);
+  min-height: 64px;
 }
 
 .running-task-category-icon {
@@ -319,13 +320,12 @@ body.project-no-select textarea {
 .running-task-name {
   font-size: 1.12rem;
   font-weight: 800;
-  line-height: 1.14;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
   overflow: hidden;
   text-wrap: balance;
-  min-height: 2.3em;
+  min-height: 1.8em;
 }
 
 #runningTaskModal .running-task-name {
@@ -438,7 +438,7 @@ body.project-no-select textarea {
   color: #fef3a3;
   font-weight: 700;
   font-size: 0.8rem;
-  margin-top: -2px;
+  margin-top: -12px;
   text-align: center;
   width: 100%;
   transition: opacity 500ms ease, transform 500ms ease;
@@ -474,23 +474,6 @@ body.project-no-select textarea {
   flex: 0 0 auto;
 }
 
-.running-task-finalize-btn {
-  margin-top: -2px;
-  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
-  color: #fff !important;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.running-task-start-btn {
-  background: #1d4ed8 !important;
-  color: #fff !important;
-}
-.running-task-finalize-btn svg,
-.running-task-finalize-btn path {
-  fill: #fff;
-}
 .running-task-start-btn {
   margin-top: 4px;
   background: #1d4ed8;
@@ -545,8 +528,8 @@ body.project-no-select textarea {
   gap: 14px;
   margin-top: 2px;
   position: absolute;
-  top: 14px;
-  left: 0;
+  top: 2px;
+  left: 2px;
   z-index: 6;
 }
 
@@ -595,9 +578,46 @@ body.project-no-select textarea {
   place-items: center;
   z-index: 2;
 }
-.running-circle-toggle-left { top: 22px; }
-.running-circle-toggle-right { bottom: 22px; }
+.running-circle-toggle-left { top: 42px; }
+.running-circle-toggle-right { bottom: 37px; }
+.running-circle-toggle-left svg { width: 1.2em; height: 1.2em; }
+.running-circle-toggle-right svg { width: 1.1em; height: 1.1em; }
 .running-circle-toggle.active { opacity: 1; }
+
+.running-task-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: -2px;
+}
+
+.running-task-circle-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.running-task-circle-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.running-task-restore-btn {
+  background: linear-gradient(145deg, #3a3a3a, #0f0f0f);
+}
+
+.running-task-finalize-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.running-task-giveup-btn {
+  background: linear-gradient(145deg, #5d5d5d, #1e1e1e);
+}
 
 .running-fade {
   transition: opacity 500ms ease, transform 500ms ease;
