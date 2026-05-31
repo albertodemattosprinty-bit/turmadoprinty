@@ -291,6 +291,7 @@ const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
 const runningTaskName = document.getElementById("runningTaskName");
+const runningTaskCategoryIcon = document.getElementById("runningTaskCategoryIcon");
 const runningTaskProgressRing = document.getElementById("runningTaskProgressRing");
 const runningTaskPercent = document.getElementById("runningTaskPercent");
 const runningCircleWrap = runningTaskModalElement?.querySelector(".running-circle-wrap");
@@ -298,6 +299,7 @@ const runningModeTimeBtn = document.getElementById("runningModeTimeBtn");
 const runningModePercentBtn = document.getElementById("runningModePercentBtn");
 const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft");
 const runningTaskNextLabel = runningTaskModalElement?.querySelector(".running-task-next-label");
+const runningTaskNextIcon = document.getElementById("runningTaskNextIcon");
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
@@ -942,6 +944,9 @@ function renderHomeRunningTask() {
   }
   if (!hasRunning) {
     runningTaskName.textContent = "Próxima tarefa";
+    if (runningTaskCategoryIcon) {
+      runningTaskCategoryIcon.hidden = true;
+    }
     runningTaskProgressRing.style.strokeDashoffset = "301.59";
     runningTaskPercent.textContent = "";
     runningTaskMinutesLeft.textContent = "";
@@ -955,6 +960,9 @@ function renderHomeRunningTask() {
     runningTaskNextName.innerHTML = nextPending
       ? `${escapeHtml(formatActionTitleForDisplay(nextPending.title))}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextPending)))}</small>`
       : `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
+    if (runningTaskNextIcon) {
+      runningTaskNextIcon.src = nextPending ? getTimelineEntryIconPath(nextPending) : "/200/icons/lua.svg";
+    }
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
     if (runningTaskStartNextButton) {
       runningTaskStartNextButton.hidden = !nextPending;
@@ -973,6 +981,13 @@ function renderHomeRunningTask() {
   const dashOffset = circumference * (1 - (percent / 100));
   const nextAction = getNextTimelineEntryForRunning(action);
   runningTaskName.textContent = formatActionTitleForDisplay(action.title);
+  if (runningTaskCategoryIcon) {
+    const currentIcon = getTaskCategoryIconPath(action.categoryId);
+    runningTaskCategoryIcon.hidden = !currentIcon;
+    if (currentIcon) {
+      runningTaskCategoryIcon.src = currentIcon;
+    }
+  }
   runningTaskProgressRing.style.strokeDashoffset = String(dashOffset);
   const remainingSeconds = Math.max(0, Math.round((durationMinutes - elapsedMinutes) * 60));
   const estimatedRemaining = Math.max(0, Math.ceil(remainingSeconds / 60));
@@ -995,8 +1010,14 @@ function renderHomeRunningTask() {
   if (nextAction) {
     const nextLabel = nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title);
     runningTaskNextName.innerHTML = `${escapeHtml(nextLabel)}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextAction)))}</small>`;
+    if (runningTaskNextIcon) {
+      runningTaskNextIcon.src = getTimelineEntryIconPath(nextAction);
+    }
   } else {
     runningTaskNextName.innerHTML = `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
+    if (runningTaskNextIcon) {
+      runningTaskNextIcon.src = "/200/icons/lua.svg";
+    }
   }
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
   if (runningTaskStartNextButton) {
@@ -1272,6 +1293,14 @@ function getTaskCategoryIconPath(categoryId) {
 function getTaskCategoryName(categoryId) {
   const normalized = String(categoryId || "").trim().toLowerCase();
   return taskCategoryMap.get(normalized)?.name || "";
+}
+
+function getTimelineEntryIconPath(entry) {
+  if (!entry) return "/200/icons/agenda.svg";
+  if (entry.kind === "sleep") return "/200/icons/lua.svg";
+  if (entry.kind === "free") return "/200/icons/agenda.svg";
+  const cat = getTaskCategoryIconPath(entry.categoryId);
+  return cat || "/200/icons/agenda.svg";
 }
 
 function buildDateWithTime(date, hour, minute) {
@@ -5221,12 +5250,19 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
       if (nextAction) {
         runningCarryOverMinutes = savedMinutes;
         runningTaskName.textContent = String(nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title));
+        if (runningTaskCategoryIcon) {
+          const currentIcon = getTimelineEntryIconPath(nextAction);
+          runningTaskCategoryIcon.hidden = !currentIcon;
+          if (currentIcon) runningTaskCategoryIcon.src = currentIcon;
+        }
         const nextOfNext = getNextTimelineEntryForRunning(nextAction);
         if (nextOfNext) {
           const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
           runningTaskNextName.innerHTML = `${escapeHtml(nextLabel)}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextOfNext)))}</small>`;
+          if (runningTaskNextIcon) runningTaskNextIcon.src = getTimelineEntryIconPath(nextOfNext);
         } else {
           runningTaskNextName.innerHTML = `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
+          if (runningTaskNextIcon) runningTaskNextIcon.src = "/200/icons/lua.svg";
         }
         runningTaskMinutesLeft.textContent = `${runningCarryOverMinutes} min de saldo`;
         runningTaskMinutesLeft.classList.toggle("is-bonus", runningCarryOverMinutes > 0);

@@ -301,6 +301,20 @@ body.project-no-select textarea {
 .project-login-card button { width: 100%; margin-top: 14px; }
 .project-login-message { min-height: 22px; font-weight: 700; }
 
+.running-task-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.running-task-category-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
 .running-task-name {
   font-size: 1.12rem;
   font-weight: 800;
@@ -316,6 +330,7 @@ body.project-no-select textarea {
 #runningTaskModal .running-task-name {
   margin-top: 8px;
   transform: translateY(25px);
+  font-size: 1.57rem;
 }
 
 .running-task-minutes {
@@ -439,6 +454,21 @@ body.project-no-select textarea {
   font-size: 0.72rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.8);
+}
+
+.running-task-next-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.running-task-next-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  flex: 0 0 auto;
 }
 
 .running-task-finalize-btn {
