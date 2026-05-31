@@ -253,6 +253,10 @@ body.project-no-select textarea {
   transform-origin: center;
 }
 
+#runningTaskModal .running-task-content.is-idle-layout {
+  min-height: 72vh;
+}
+
 .project-login-overlay {
   position: fixed;
   inset: 0;
@@ -399,7 +403,7 @@ body.project-no-select textarea {
   gap: 2px;
   font-weight: 700;
   color: #fff;
-  font-size: 2.65rem;
+  font-size: 2.92rem;
   white-space: nowrap;
 }
 .running-task-unit {
@@ -418,6 +422,7 @@ body.project-no-select textarea {
   font-weight: 700;
   font-size: 0.8rem;
   margin-top: -2px;
+  transition: opacity 500ms ease, transform 500ms ease;
 }
 
 .running-task-next {
@@ -425,6 +430,7 @@ body.project-no-select textarea {
   line-height: 1.08;
   min-height: 0;
   margin-top: -2px;
+  transition: opacity 500ms ease, transform 500ms ease;
 }
 .running-task-next small {
   display: block;
@@ -505,8 +511,9 @@ body.project-no-select textarea {
   gap: 14px;
   margin-top: 2px;
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: -52px;
+  left: 0;
+  z-index: 6;
 }
 
 .running-player-btn {
@@ -521,9 +528,12 @@ body.project-no-select textarea {
 }
 
 .running-player-play {
-  width: 30px;
-  height: 30px;
-  background: transparent;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(7, 32, 88, 0.72);
+  color: #fff;
 }
 .running-player-station-nav {
   width: 24px;
@@ -551,8 +561,8 @@ body.project-no-select textarea {
   place-items: center;
   z-index: 2;
 }
-.running-circle-toggle-left { left: -34px; }
-.running-circle-toggle-right { right: -34px; }
+.running-circle-toggle-left { left: -24px; }
+.running-circle-toggle-right { right: -24px; }
 .running-circle-toggle.active { opacity: 1; }
 
 .running-fade {
@@ -563,6 +573,25 @@ body.project-no-select textarea {
   opacity: 0;
   transform: translateY(8px);
   pointer-events: none;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next-label {
+  margin-top: 70px;
+  text-align: center;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next {
+  text-align: center;
+  font-size: 1.08rem;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-start-btn {
+  align-self: center;
+  margin-top: 8px;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-player {
+  margin-top: auto;
 }
 
 .start-decision-content {

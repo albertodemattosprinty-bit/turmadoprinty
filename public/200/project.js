@@ -387,6 +387,9 @@ let sleepNavLongPressHandled = false;
 let startDecisionResolver = null;
 const runningAudio = typeof Audio !== "undefined" ? new Audio() : null;
 const runningMinuteCueAudio = typeof Audio !== "undefined" ? new Audio() : null;
+if (runningAudio) {
+  runningAudio.preload = "auto";
+}
 let runningMusicProgressTicker = null;
 const runningMinuteCueMap = new Map([
   [180, "0001.mp3"], [175, "0002.mp3"], [170, "0003.mp3"], [165, "0004.mp3"], [160, "0005.mp3"],
@@ -803,6 +806,17 @@ function setRunningIdleVisualState(isIdle) {
   toggle(runningCircleWrap, isIdle);
   toggle(runningModePercentBtn, isIdle);
   toggle(runningModeTimeBtn, isIdle);
+  runningTaskModalElement?.querySelector(".running-task-content")?.classList.toggle("is-idle-layout", isIdle);
+}
+
+function primeRunningTrackBuffer() {
+  if (!runningAudio) return;
+  const track = getCurrentRunningTrack();
+  if (!track?.url) return;
+  if (runningAudio.src !== track.url) {
+    runningAudio.src = track.url;
+    runningAudio.load();
+  }
 }
 
 function fadeAudioVolume(audio, target, durationMs) {
@@ -1022,6 +1036,7 @@ async function loadRunningMusicStations() {
   state.runningPlayer.stationIndex = jungleIndex >= 0 ? jungleIndex : 0;
   state.runningPlayer.trackIndex = 0;
   renderRunningMusicPlayer();
+  primeRunningTrackBuffer();
 }
 
 function getCurrentRunningTrack() {
@@ -1092,6 +1107,7 @@ function moveRunningStation(delta) {
   if (!len) return;
   state.runningPlayer.stationIndex = (state.runningPlayer.stationIndex + delta + len) % len;
   state.runningPlayer.trackIndex = 0;
+  primeRunningTrackBuffer();
   playRunningTrack();
 }
 
