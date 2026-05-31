@@ -991,12 +991,11 @@ function renderHomeRunningTask() {
   runningTaskProgressRing.style.strokeDashoffset = String(dashOffset);
   const remainingSeconds = Math.max(0, Math.round((durationMinutes - elapsedMinutes) * 60));
   const estimatedRemaining = Math.max(0, Math.ceil(remainingSeconds / 60));
-  const autoShowPercent = Math.floor(Date.now() / 3000) % 2 === 0;
   const showPercent = state.runningCenterMode === "percent"
     ? true
     : state.runningCenterMode === "time"
       ? false
-      : autoShowPercent;
+      : false;
   runningTaskPercent.innerHTML = formatRunningCenter(percent, percentPrecise, estimatedRemaining, remainingSeconds, showPercent);
   updateRunningCenterModeButtons(showPercent ? "percent" : "time");
   void tryPlayRunningMinuteCue(String(action.id || ""), estimatedRemaining);
@@ -1509,6 +1508,11 @@ function openModal(id) {
       await loadHistoryFromApi();
       renderHistory();
     })();
+  }
+
+  if (id === "runningTaskModal") {
+    startRunningTaskTicker();
+    renderHomeRunningTask();
   }
 }
 
