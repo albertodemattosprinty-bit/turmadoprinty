@@ -295,6 +295,11 @@ svg {
   min-height: 2.3em;
 }
 
+#runningTaskModal .running-task-name {
+  margin-top: 12px;
+  transform: translateY(20px);
+}
+
 .running-task-minutes {
   color: var(--soft);
   font-weight: 700;

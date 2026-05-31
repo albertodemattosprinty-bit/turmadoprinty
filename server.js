@@ -196,7 +196,7 @@ function getR2Client() {
 }
 
 async function listProject200MusicStations() {
-  const prefix = "turmadoprinty/Music/";
+  const prefix = "Music/";
   const fallbackStations = [
     { name: "Estação 1", tracks: [] },
     { name: "Estação 2", tracks: [] },
