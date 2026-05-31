@@ -500,7 +500,8 @@ const state = {
     actionId: "",
     played: new Set()
   },
-  runningCenterMode: "auto"
+  runningCenterMode: "auto",
+  runningLocalStarts: {}
 };
 
 function loadSleepConfig() {
@@ -711,7 +712,10 @@ function getRunningActionProgressState(action) {
   if (!durationMinutes) {
     return { percent: 0, remainingMinutes: 0 };
   }
-  const startedAtMs = new Date(action?.startedAt || action?.startAt).getTime();
+  const localStartedAtMs = Number(state.runningLocalStarts?.[String(action?.id || "")] || 0);
+  const startedAtMs = Number.isFinite(localStartedAtMs) && localStartedAtMs > 0
+    ? localStartedAtMs
+    : new Date(action?.startedAt || action?.startAt).getTime();
   if (!Number.isFinite(startedAtMs)) {
     return { percent: 0, remainingMinutes: durationMinutes };
   }
@@ -1988,6 +1992,15 @@ async function loadActions() {
   try {
     const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`);
     state.actions = payload.actions || [];
+    const nextRunningLocalStarts = {};
+    state.actions.forEach((action) => {
+      if (normalizeActionStatus(action?.status) !== actionStatuses.inProgress) return;
+      const fromApi = new Date(action?.startedAt || action?.startAt).getTime();
+      if (Number.isFinite(fromApi)) {
+        nextRunningLocalStarts[String(action.id || "")] = fromApi;
+      }
+    });
+    state.runningLocalStarts = nextRunningLocalStarts;
     const parsedServerNow = new Date(payload?.serverNow || "").getTime();
     if (Number.isFinite(parsedServerNow)) {
       state.serverNowMs = parsedServerNow;
@@ -2112,14 +2125,17 @@ async function toggleActionStatus(actionId, options = {}) {
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
     if (currentStatus === actionStatuses.pending && nextStatus === actionStatuses.inProgress) {
+      state.runningLocalStarts[String(targetId)] = Date.now();
       openModal("runningTaskModal");
       window.setTimeout(() => {
         closeActionsModalWithFade();
       }, 600);
     }
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
+      delete state.runningLocalStarts[String(targetId)];
       pendingActionsAnchorId = updated?.id || "";
     }
+    startRunningTaskTicker();
     renderActions();
   } catch (error) {
     window.alert(error instanceof Error ? error.message : "Nao foi possivel atualizar a tarefa.");
