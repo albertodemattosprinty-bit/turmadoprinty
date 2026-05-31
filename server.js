@@ -1918,6 +1918,97 @@ async function handleProject200ActionInterpret(request, response) {
   }
 }
 
+const PROJECT200_TASK_CATEGORIES = [
+  { id: "fe_espiritualidade", name: "Fé e espiritualidade" },
+  { id: "sono", name: "Sono" },
+  { id: "alimentacao", name: "Alimentação" },
+  { id: "hidratacao", name: "Hidratação" },
+  { id: "estudo", name: "Estudo" },
+  { id: "financeiro", name: "Financeiro" },
+  { id: "trabalho", name: "Trabalho" },
+  { id: "casa", name: "Casa" },
+  { id: "lazer", name: "Lazer" },
+  { id: "exercicios", name: "Exercícios" },
+  { id: "saude", name: "Saúde" },
+  { id: "social", name: "Social" },
+  { id: "familia", name: "Família" },
+  { id: "higiene", name: "Higiene" },
+  { id: "digital", name: "Digital" }
+];
+
+function inferProject200CategoryLocally(title) {
+  const normalized = String(title || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const pick = (id) => PROJECT200_TASK_CATEGORIES.find((item) => item.id === id) || PROJECT200_TASK_CATEGORIES[0];
+  if (/\b(agua|hidrata|garrafa|beber)\b/.test(normalized)) return pick("hidratacao");
+  if (/\b(dormir|sono|cochilar|acordar|descanso)\b/.test(normalized)) return pick("sono");
+  if (/\b(cafe|almoco|jantar|comida|refeicao|lanche|cozinhar)\b/.test(normalized)) return pick("alimentacao");
+  if (/\b(estudar|estudo|ler|leitura|curso|aula|revisao)\b/.test(normalized)) return pick("estudo");
+  if (/\b(fatura|conta|pix|pagar|orcamento|invest|finance|dinheiro)\b/.test(normalized)) return pick("financeiro");
+  if (/\b(reuniao|projeto|cliente|entrega|trabalho|task)\b/.test(normalized)) return pick("trabalho");
+  if (/\b(arrumar|limpar|lavar|cozinha|quarto|banheiro|casa)\b/.test(normalized)) return pick("casa");
+  if (/\b(filme|serie|jogo|lazer|passeio)\b/.test(normalized)) return pick("lazer");
+  if (/\b(treino|academia|corrida|caminhada|alongamento|exercicio)\b/.test(normalized)) return pick("exercicios");
+  if (/\b(medico|consulta|exame|remedio|saude|terapia)\b/.test(normalized)) return pick("saude");
+  if (/\b(amigo|social|evento|encontro)\b/.test(normalized)) return pick("social");
+  if (/\b(familia|filho|filha|pai|mae|esposa|marido)\b/.test(normalized)) return pick("familia");
+  if (/\b(escovar|banho|higiene|barba|cabelo|dente)\b/.test(normalized)) return pick("higiene");
+  if (/\b(celular|email|digital|backup|senha|app|notificacao)\b/.test(normalized)) return pick("digital");
+  if (/\b(orar|oracao|biblia|espiritual|igreja)\b/.test(normalized)) return pick("fe_espiritualidade");
+  return pick("trabalho");
+}
+
+async function handleProject200ActionCategorize(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+  const title = String(body?.title || "").trim();
+  if (title.length < 2) {
+    sendJson(response, 400, { error: "Título ausente." });
+    return;
+  }
+
+  if (!apiKey) {
+    const local = inferProject200CategoryLocally(title);
+    sendJson(response, 200, { ok: true, category: local, model: "local-fallback" });
+    return;
+  }
+
+  try {
+    const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+    const completion = await createChatCompletion(apiKey, {
+      model,
+      temperature: 0,
+      messages: [
+        {
+          role: "system",
+          content: `Classifique o título de tarefa em UMA categoria. Responda JSON puro: {"categoryId":"...","categoryName":"..."}. Categorias válidas: ${PROJECT200_TASK_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
+        },
+        { role: "user", content: title.slice(0, 180) }
+      ]
+    });
+    const raw = extractChatCompletionText(completion);
+    const parsed = JSON.parse(raw);
+    const categoryId = String(parsed?.categoryId || "").trim().toLowerCase();
+    const hit = PROJECT200_TASK_CATEGORIES.find((item) => item.id === categoryId) || inferProject200CategoryLocally(title);
+    sendJson(response, 200, {
+      ok: true,
+      category: hit,
+      model
+    });
+  } catch {
+    const local = inferProject200CategoryLocally(title);
+    sendJson(response, 200, { ok: true, category: local, model: "local-fallback" });
+  }
+}
+
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -4019,6 +4110,15 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleProject200ActionInterpret(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/actions/categorize") {
+    const user = await requireAuth(request, response);
+    if (!user) {
+      return;
+    }
+    await handleProject200ActionCategorize(request, response);
     return;
   }
 

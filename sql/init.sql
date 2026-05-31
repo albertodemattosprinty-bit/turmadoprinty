@@ -170,6 +170,7 @@ create table if not exists actions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references users(id) on delete cascade,
   title text not null,
+  category_id text not null default '',
   start_at timestamptz not null,
   end_at timestamptz not null,
   repeat_group_id uuid,

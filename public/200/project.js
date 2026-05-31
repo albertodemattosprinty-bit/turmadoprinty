@@ -38,6 +38,24 @@ const actionAvatarByAssignee = {
   Thainan: "/200/avatars/thainan.png",
   Wilton: "/200/avatars/wilton.png"
 };
+const taskCategoryDefinitions = [
+  { id: "fe_espiritualidade", name: "Fé e espiritualidade" },
+  { id: "sono", name: "Sono" },
+  { id: "alimentacao", name: "Alimentação" },
+  { id: "hidratacao", name: "Hidratação" },
+  { id: "estudo", name: "Estudo" },
+  { id: "financeiro", name: "Financeiro" },
+  { id: "trabalho", name: "Trabalho" },
+  { id: "casa", name: "Casa" },
+  { id: "lazer", name: "Lazer" },
+  { id: "exercicios", name: "Exercícios" },
+  { id: "saude", name: "Saúde" },
+  { id: "social", name: "Social" },
+  { id: "familia", name: "Família" },
+  { id: "higiene", name: "Higiene" },
+  { id: "digital", name: "Digital" }
+];
+const taskCategoryMap = new Map(taskCategoryDefinitions.map((item) => [item.id, item]));
 const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo", "Direitos autorais"];
 const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer", "Vestuario", "Saude", "Imprevistos", "Emprestimos e Juros"];
 const platformCategoryIconByName = {
@@ -187,6 +205,12 @@ const wizardBackButton = document.getElementById("wizardBack");
 const wizardNextButton = document.getElementById("wizardNext");
 const wizardMessage = document.getElementById("wizardMessage");
 const taskTitle = document.getElementById("taskTitle");
+const actionCategoryTrigger = document.getElementById("actionCategoryTrigger");
+const actionCategoryPreviewIcon = document.getElementById("actionCategoryPreviewIcon");
+const actionCategoryPreviewLabel = document.getElementById("actionCategoryPreviewLabel");
+const actionCategoryModal = document.getElementById("actionCategoryModal");
+const closeActionCategoryModal = document.getElementById("closeActionCategoryModal");
+const actionCategoryGrid = document.getElementById("actionCategoryGrid");
 const wizardDateLabel = document.getElementById("wizardDateLabel");
 const wizardDatePickerWrap = document.getElementById("wizardDatePickerWrap");
 const repeatToggle = document.getElementById("repeatToggle");
@@ -363,6 +387,8 @@ let actionStatusTargetId = "";
 let runningTaskTicker = null;
 let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
+let actionCategoryInterpretTimer = null;
+let actionCategoryTargetActionId = "";
 let actionsTimeTicker = null;
 let actionsTimeShowDuration = false;
 let timeButtonHoldTimer = null;
@@ -1235,6 +1261,17 @@ function getActionAvatarPath(assignee) {
   return actionAvatarByAssignee[assignee] || actionAvatarByAssignee.Geral;
 }
 
+function getTaskCategoryIconPath(categoryId) {
+  const normalized = String(categoryId || "").trim().toLowerCase();
+  if (!normalized) return "";
+  return `/200/category-icons/${normalized}.svg`;
+}
+
+function getTaskCategoryName(categoryId) {
+  const normalized = String(categoryId || "").trim().toLowerCase();
+  return taskCategoryMap.get(normalized)?.name || "";
+}
+
 function buildDateWithTime(date, hour, minute) {
   const next = new Date(date);
   next.setHours(hour, minute, 0, 0);
@@ -1275,6 +1312,8 @@ function buildInitialWizardState() {
     startMinute: rounded.getMinutes() % 60,
     endHour: end.getHours(),
     endMinute: end.getMinutes(),
+    categoryId: "",
+    categoryName: "",
     editingActionId: null
   };
 }
@@ -1767,7 +1806,8 @@ function renderActions() {
     }
     const status = normalizeActionStatus(action.status);
     const assignee = normalizeAssigneeName(action.assignee);
-    const avatarPath = getActionAvatarPath(assignee);
+    const categoryIconPath = getTaskCategoryIconPath(action.categoryId);
+    const avatarPath = categoryIconPath || getActionAvatarPath(assignee);
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
@@ -1780,7 +1820,7 @@ function renderActions() {
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.innerHTML = `
-      <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
+      <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(categoryIconPath ? `Categoria ${getTaskCategoryName(action.categoryId)}` : `Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
         <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
         <div class="task-assignee task-duration"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm1 11.6V6h-2v7.4l5.2 3.1 1-1.7z"/></svg>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
@@ -2058,6 +2098,8 @@ function openWizard(action = null) {
     state.wizard.startMinute = startAt.getMinutes();
     state.wizard.endHour = endAt.getHours();
     state.wizard.endMinute = endAt.getMinutes();
+    state.wizard.categoryId = String(action.categoryId || "").trim().toLowerCase();
+    state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
     state.wizard.editingActionId = action.id;
     taskTitle.value = action.title || "";
   } else {
@@ -2074,11 +2116,75 @@ function openWizard(action = null) {
 function closeWizard() {
   stopActionMic();
   hideActionAiConfirmation();
+  closeModal("actionCategoryModal");
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
   actionWizard.classList.remove("active");
   actionWizard.setAttribute("aria-hidden", "true");
+}
+
+function renderActionCategoryPicker() {
+  const selectedId = String(state.wizard.categoryId || "").trim().toLowerCase();
+  const selectedName = getTaskCategoryName(selectedId);
+  const selectedIcon = getTaskCategoryIconPath(selectedId);
+  const profileAvatar = getActionAvatarPath(getWizardAssigneeName());
+  if (actionCategoryPreviewIcon) {
+    actionCategoryPreviewIcon.src = selectedIcon || profileAvatar;
+    actionCategoryPreviewIcon.alt = selectedName || "Avatar do usuário";
+  }
+  if (actionCategoryPreviewLabel) {
+    actionCategoryPreviewLabel.textContent = selectedName || "Categoria automática";
+  }
+}
+
+function renderActionCategoryModal() {
+  if (!actionCategoryGrid) return;
+  const selectedId = String(state.wizard.categoryId || "").trim().toLowerCase();
+  actionCategoryGrid.innerHTML = "";
+  taskCategoryDefinitions.forEach((category) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "category-item-btn";
+    button.dataset.categoryId = category.id;
+    button.classList.toggle("active", category.id === selectedId);
+    button.innerHTML = `<img src="${getTaskCategoryIconPath(category.id)}" alt="${escapeHtml(category.name)}" loading="lazy" /><span>${escapeHtml(category.name)}</span>`;
+    actionCategoryGrid.appendChild(button);
+  });
+}
+
+async function interpretActionCategoryFromTitle(titleText) {
+  const title = String(titleText || "").trim();
+  if (title.length < 2) return;
+  try {
+    const payload = await apiRequest("/api/200/actions/categorize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title })
+    });
+    const categoryId = String(payload?.category?.id || "").trim().toLowerCase();
+    if (!categoryId || taskTitle.value.trim() !== title) return;
+    state.wizard.categoryId = categoryId;
+    state.wizard.categoryName = String(payload?.category?.name || getTaskCategoryName(categoryId));
+    renderActionCategoryPicker();
+    renderActionCategoryModal();
+  } catch {}
+}
+
+async function saveActionCategory(actionId, categoryId) {
+  const action = state.actions.find((item) => String(item.id) === String(actionId));
+  if (!action) return;
+  await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: action.title,
+      assignee: action.assignee,
+      categoryId,
+      occurrences: [{ startAt: action.startAt, endAt: action.endAt }]
+    })
+  });
+  await loadActions();
 }
 
 function renderWizard() {
@@ -2096,6 +2202,7 @@ function renderWizard() {
   wizardBackButton.style.visibility = step === 1 ? "hidden" : "visible";
   wizardNextButton.textContent = step === 4 ? "Salvar" : "Continuar";
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
+  renderActionCategoryPicker();
   renderRepeatControls();
   renderTimePickers();
 }
@@ -2996,6 +3103,7 @@ async function saveAction() {
       body: JSON.stringify({
         title: taskTitle.value.trim(),
         assignee: getWizardAssigneeName(),
+        categoryId: String(state.wizard.categoryId || "").trim().toLowerCase(),
         repeatRule,
         repeatDays,
         occurrences: occurrences
@@ -3470,6 +3578,8 @@ function hideActionAiConfirmation() {
 
 function applyInterpretedAction(entry) {
   taskTitle.value = String(entry?.title || "").trim().slice(0, 80);
+  state.wizard.categoryId = String(entry?.categoryId || state.wizard.categoryId || "").trim().toLowerCase();
+  state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
   state.wizard.startHour = Math.max(0, Math.min(23, Number(entry?.startHour || state.wizard.startHour)));
   state.wizard.startMinute = Math.max(0, Math.min(55, Math.round(Number(entry?.startMinute || state.wizard.startMinute) / 5) * 5));
   state.wizard.endHour = Math.max(0, Math.min(23, Number(entry?.endHour || state.wizard.endHour)));
@@ -3477,6 +3587,8 @@ function applyInterpretedAction(entry) {
   state.wizard.repeatOpen = String(entry?.repeatRule || "none") !== "none";
   state.wizard.repeatMode = String(entry?.repeatRule || "none");
   state.wizard.repeatDays = Array.isArray(entry?.repeatDays) ? entry.repeatDays.map((day) => Number(day)).filter((day) => day >= 0 && day <= 6) : [];
+  renderActionCategoryPicker();
+  void interpretActionCategoryFromTitle(taskTitle.value);
   renderWizard();
 }
 
@@ -4474,6 +4586,40 @@ openActionWizardButton.addEventListener("click", () => {
 });
 
 closeActionWizardButton.addEventListener("click", closeWizard);
+closeActionCategoryModal?.addEventListener("click", () => closeModal("actionCategoryModal"));
+actionCategoryTrigger?.addEventListener("click", () => {
+  actionCategoryTargetActionId = "";
+  renderActionCategoryModal();
+  openModal("actionCategoryModal");
+});
+actionCategoryGrid?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-category-id]");
+  if (!button) return;
+  state.wizard.categoryId = String(button.dataset.categoryId || "").trim().toLowerCase();
+  state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
+  renderActionCategoryPicker();
+  renderActionCategoryModal();
+  closeModal("actionCategoryModal");
+  if (actionCategoryTargetActionId) {
+    void saveActionCategory(actionCategoryTargetActionId, state.wizard.categoryId);
+    actionCategoryTargetActionId = "";
+  }
+});
+taskTitle?.addEventListener("input", () => {
+  if (actionCategoryInterpretTimer) {
+    window.clearTimeout(actionCategoryInterpretTimer);
+  }
+  const title = taskTitle.value.trim();
+  if (!title) {
+    state.wizard.categoryId = "";
+    state.wizard.categoryName = "";
+    renderActionCategoryPicker();
+    return;
+  }
+  actionCategoryInterpretTimer = window.setTimeout(() => {
+    void interpretActionCategoryFromTitle(title);
+  }, 320);
+});
 closePlatformWizardButton?.addEventListener("click", closePlatformWizard);
 platformNameMicButton?.addEventListener("click", () => {
   void startPlatformNameMic();
@@ -4760,6 +4906,17 @@ actionsList.addEventListener("click", async (event) => {
     return;
   }
   if (row.dataset.freeSlot === "1") {
+    return;
+  }
+  const clickedAvatar = event.target.closest(".task-avatar");
+  if (clickedAvatar) {
+    const action = state.actions.find((item) => String(item.id) === String(row.dataset.actionId));
+    state.wizard.categoryId = String(action?.categoryId || "").trim().toLowerCase();
+    state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
+    actionCategoryTargetActionId = String(row.dataset.actionId || "");
+    renderActionCategoryPicker();
+    renderActionCategoryModal();
+    openModal("actionCategoryModal");
     return;
   }
   const actionId = row.dataset.actionId;

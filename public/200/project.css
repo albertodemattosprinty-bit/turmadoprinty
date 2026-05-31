@@ -1521,6 +1521,54 @@ body.project-no-select textarea {
   color: #fff;
 }
 
+.category-picker-trigger {
+  width: min(460px, 100%);
+  margin: 6px auto 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 16px;
+  background: rgba(8, 31, 83, 0.32);
+  color: #fff;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-picker-trigger .task-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-height: 60vh;
+  overflow: auto;
+  padding-top: 6px;
+}
+
+.category-item-btn {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(8, 31, 83, 0.32);
+  color: #fff;
+  padding: 10px 6px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.category-item-btn img {
+  width: 34px;
+  height: 34px;
+}
+
+.category-item-btn.active {
+  border-color: rgba(120, 255, 168, 0.95);
+  background: rgba(13, 120, 60, 0.36);
+}
+
 .wizard-step {
   display: none;
   min-height: 320px;

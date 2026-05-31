@@ -8,6 +8,7 @@ const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
 const DEFAULT_ASSIGNEE = "Geral";
 const ALLOWED_ASSIGNEES = new Set(["Rose", "Geral", "Alberto", "Lucas", "Thainan"]);
+const DEFAULT_CATEGORY_ID = "";
 
 function toIso(value) {
   if (!value) {
@@ -47,6 +48,12 @@ function normalizeAssignee(value) {
   throw new Error("Pessoa da tarefa invalida.");
 }
 
+function normalizeCategoryId(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return DEFAULT_CATEGORY_ID;
+  return raw.replace(/[^a-z0-9_]/g, "");
+}
+
 function getNextActionStatus(currentStatus) {
   const normalized = normalizeActionStatus(currentStatus);
 
@@ -73,6 +80,7 @@ function normalizeAction(row) {
     userId: row.user_id,
     title: row.title,
     assignee: normalizeAssignee(row.assignee),
+    categoryId: normalizeCategoryId(row.category_id),
     startAt: startAtIso,
     endAt: toIso(row.end_at),
     repeatGroupId: row.repeat_group_id || null,
@@ -123,6 +131,7 @@ export async function ensureActionsSchema() {
     );
   `);
   await query(`alter table actions add column if not exists assignee text not null default '${DEFAULT_ASSIGNEE}';`);
+  await query("alter table actions add column if not exists category_id text not null default '';");
 
   await query("create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);");
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");
@@ -160,6 +169,7 @@ async function getUserActionById(userId, actionId) {
         a.user_id,
         a.title,
         a.assignee,
+        a.category_id,
         a.start_at,
         a.end_at,
         a.repeat_group_id,
@@ -201,6 +211,7 @@ export async function listUserActions(userId, { from, to }) {
         a.user_id,
         a.title,
         a.assignee,
+        a.category_id,
         a.start_at,
         a.end_at,
         a.repeat_group_id,
@@ -231,6 +242,7 @@ export async function createUserAction(userId, payload) {
 
   const title = String(payload?.title || "").trim();
   const assignee = normalizeAssignee(payload?.assignee);
+  const categoryId = normalizeCategoryId(payload?.categoryId);
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
@@ -281,11 +293,12 @@ export async function createUserAction(userId, payload) {
   const repeatGroupId = occurrences.length > 1 || repeatRule !== "none" ? crypto.randomUUID() : null;
   const values = [];
   const placeholders = occurrences.map((occurrence, index) => {
-    const offset = index * 8;
+    const offset = index * 9;
     values.push(
       userId,
       title,
       assignee,
+      categoryId,
       occurrence.startAt.toISOString(),
       occurrence.endAt.toISOString(),
       repeatGroupId,
@@ -293,14 +306,14 @@ export async function createUserAction(userId, payload) {
       JSON.stringify(repeatDays)
     );
 
-    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}::jsonb)`;
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}::jsonb)`;
   });
 
   const result = await query(
     `
-      insert into actions (user_id, title, assignee, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
+      insert into actions (user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
       values ${placeholders.join(", ")}
-      returning id, user_id, title, assignee, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
+      returning id, user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
     `,
     values
   );
@@ -318,6 +331,7 @@ export async function updateUserAction(userId, actionId, payload) {
 
   const title = String(payload?.title || "").trim();
   const assignee = normalizeAssignee(payload?.assignee);
+  const categoryId = normalizeCategoryId(payload?.categoryId || action?.categoryId);
   const occurrence = Array.isArray(payload?.occurrences) && payload.occurrences.length
     ? payload.occurrences[0]
     : { startAt: payload?.startAt, endAt: payload?.endAt };
@@ -357,13 +371,14 @@ export async function updateUserAction(userId, actionId, payload) {
       update actions
       set title = $3,
           assignee = $4,
-          start_at = $5::timestamptz,
-          end_at = $6::timestamptz
+          category_id = $5,
+          start_at = $6::timestamptz,
+          end_at = $7::timestamptz
       where user_id = $1
         and id = $2
       returning id
     `,
-    [userId, action.id, title, assignee, startAt.toISOString(), endAt.toISOString()]
+    [userId, action.id, title, assignee, categoryId, startAt.toISOString(), endAt.toISOString()]
   );
 
   if (!result.rows[0]) {
