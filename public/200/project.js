@@ -95,6 +95,35 @@ const profileTintByName = {
   Lucas: "linear-gradient(145deg, rgba(79, 195, 247, 0.7), rgba(212, 160, 23, 0.7))",
   Thainan: "linear-gradient(145deg, rgba(0, 184, 169, 0.7), rgba(138, 92, 255, 0.7))"
 };
+const musicBaseUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music";
+const runningMusicStationSeeds = {
+  Calm: [
+    "Untitled (1).mp3", "Untitled (2).mp3", "Untitled (16).mp3", "Untitled (17).mp3",
+    "Untitled (18).mp3", "Untitled (19).mp3", "Untitled (20).mp3", "Untitled (21).mp3",
+    "Untitled (22).mp3", "Untitled (23).mp3", "Untitled (24).mp3", "Untitled (25).mp3",
+    "Untitled (26).mp3", "Untitled (27).mp3", "Untitled (28).mp3", "Untitled (29).mp3",
+    "Untitled (30).mp3", "Untitled (31).mp3", "Untitled (32).mp3", "Untitled (33).mp3",
+    "Untitled (34).mp3", "Untitled (35).mp3"
+  ],
+  Frequency: [
+    "432Hz Tides.mp3", "432Hz Tides (1).mp3", "Bamboo Breathing.mp3", "Bamboo Breathing (1).mp3",
+    "Bamboo Frequency.mp3", "Bamboo Frequency (1).mp3", "Bamboo Heartstrings.mp3", "Bamboo Heartstrings (1).mp3",
+    "Honeyed Silence.mp3", "Honeyed Silence (1).mp3", "Saffron Hum.mp3", "Saffron Hum (1).mp3",
+    "Serenity Era.mp3", "Serenity Era (1).mp3", "Serenity Field.mp3", "Serenity Horizon.mp3",
+    "Serenity Horizon (1).mp3", "Stone Hum.mp3", "Stone Hum (1).mp3", "World In Peace.mp3"
+  ],
+  Fun: [
+    "Baby Jesus.mp3", "Baby Jesus (1).mp3", "Cradle Mercy (2).mp3", "Cradle Mercy (3).mp3",
+    "Cradle Peace.mp3", "Cradle Peace (1).mp3", "Gentle Amen (2).mp3", "Gentle Amen (3).mp3",
+    "Lullaby Mercy (2).mp3", "Lullaby Mercy (3).mp3", "Mercy Cradle.mp3", "Mercy Cradle (1).mp3",
+    "Milk-White Mercy.mp3", "Milk-White Mercy (1).mp3", "Tin Can Orchestra.mp3", "Tin Can Orchestra (1).mp3"
+  ],
+  Jungle: [
+    "Hidden Temple Map (2).mp3", "Hidden Temple Map (3).mp3", "Jungle Treasure Chase.mp3", "Jungle Treasure Chase (1).mp3",
+    "Jungle Treasure Run.mp3", "Jungle Treasure Run (1).mp3", "Jungle Treasure Run (2).mp3", "Jungle Treasure Run (3).mp3",
+    "Jungle Treasure Run (4).mp3", "Jungle Treasure Run (5).mp3", "Jungle Treasure Run (6).mp3", "Jungle Treasure Trail (1).mp3"
+  ]
+};
 
 const activeDateLabel = document.getElementById("activeDateLabel");
 const actionsAuthAlert = document.getElementById("actionsAuthAlert");
@@ -777,13 +806,26 @@ function renderHomeRunningTask() {
 }
 
 async function loadRunningMusicStations() {
+  const seededStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => ({
+    name,
+    tracks: files.map((fileName) => ({
+      name: fileName.replace(/\.mp3$/i, ""),
+      url: `${musicBaseUrl}/${encodeURIComponent(name)}/${encodeURIComponent(fileName)}`
+    }))
+  }));
+  state.runningPlayer.stations = seededStations;
   try {
     const payload = await apiRequest("/api/200/music/stations");
     const stations = Array.isArray(payload?.stations) ? payload.stations : [];
-    state.runningPlayer.stations = stations.filter((s) => Array.isArray(s?.tracks));
+    const validStations = stations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
+    if (validStations.length) {
+      state.runningPlayer.stations = validStations;
+    }
   } catch {
-    state.runningPlayer.stations = [];
+    // keep seeded stations
   }
+  state.runningPlayer.stationIndex = 0;
+  state.runningPlayer.trackIndex = 0;
   renderRunningMusicPlayer();
 }
 
