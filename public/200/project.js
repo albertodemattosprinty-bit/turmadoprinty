@@ -238,6 +238,12 @@ const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft")
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
+const runningPlayerStation = document.getElementById("runningPlayerStation");
+const runningPlayerTrack = document.getElementById("runningPlayerTrack");
+const runningPlayerPrev = document.getElementById("runningPlayerPrev");
+const runningPlayerPlay = document.getElementById("runningPlayerPlay");
+const runningPlayerNext = document.getElementById("runningPlayerNext");
+const runningPlayerProgress = document.getElementById("runningPlayerProgress");
 const actionsModal = document.getElementById("actionsModal");
 const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
@@ -340,6 +346,8 @@ let sleepNavHoldTimer = null;
 let sleepNavHoldInterval = null;
 let sleepNavLongPressHandled = false;
 let startDecisionResolver = null;
+const runningAudio = typeof Audio !== "undefined" ? new Audio() : null;
+let runningMusicProgressTicker = null;
 let postponeNavHoldTimer = null;
 let postponeNavHoldInterval = null;
 let postponeNavLongPressHandled = false;
@@ -398,6 +406,12 @@ const state = {
     timeTapTimestamps: [],
     onlyFree: false,
     useSleep: false
+  },
+  runningPlayer: {
+    stations: [],
+    stationIndex: 0,
+    trackIndex: 0,
+    isPlaying: false
   }
 };
 
@@ -727,7 +741,14 @@ function renderHomeRunningTask() {
     runningTaskPercent.textContent = "0%";
     runningTaskMinutesLeft.textContent = "0 minutos restantes";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
-    runningTaskNextName.textContent = "Próxima tarefa será exibida aqui";
+    const nextPending = getEarliestPendingAction();
+    runningTaskNextName.textContent = nextPending ? formatActionTitleForDisplay(nextPending.title) : "Descanso";
+    if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
+    if (runningTaskStartNextButton) {
+      runningTaskStartNextButton.hidden = !nextPending;
+      runningTaskStartNextButton.dataset.actionId = String(nextPending?.id || "");
+      runningTaskStartNextButton.dataset.kind = "action";
+    }
     return;
   }
   const { percent, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
@@ -749,9 +770,85 @@ function renderHomeRunningTask() {
   runningTaskNextName.textContent = nextAction
     ? String(nextAction.kind === "free" ? `Tempo livre (${formatMinutesHuman(getActionDurationMinutes(nextAction))})` : formatActionTitleForDisplay(nextAction.title))
     : "Descanso";
+  if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
   }
+}
+
+async function loadRunningMusicStations() {
+  try {
+    const payload = await apiRequest("/api/200/music/stations");
+    const stations = Array.isArray(payload?.stations) ? payload.stations : [];
+    state.runningPlayer.stations = stations.filter((s) => Array.isArray(s?.tracks));
+  } catch {
+    state.runningPlayer.stations = [];
+  }
+  renderRunningMusicPlayer();
+}
+
+function getCurrentRunningTrack() {
+  const station = state.runningPlayer.stations[state.runningPlayer.stationIndex];
+  if (!station || !Array.isArray(station.tracks) || !station.tracks.length) return null;
+  return station.tracks[state.runningPlayer.trackIndex] || station.tracks[0];
+}
+
+function renderRunningMusicPlayer() {
+  const station = state.runningPlayer.stations[state.runningPlayer.stationIndex] || null;
+  const track = getCurrentRunningTrack();
+  if (runningPlayerStation) runningPlayerStation.textContent = String(station?.name || "Estação");
+  if (runningPlayerTrack) runningPlayerTrack.textContent = String(track?.name || "Sem música");
+  if (runningPlayerPlay) {
+    runningPlayerPlay.innerHTML = state.runningPlayer.isPlaying
+      ? '<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>'
+      : '<svg viewBox="0 0 24 24"><path d="m8 5 12 7-12 7z"/></svg>';
+  }
+}
+
+function playRunningTrack() {
+  const track = getCurrentRunningTrack();
+  if (!runningAudio || !track?.url) return;
+  runningAudio.src = track.url;
+  runningAudio.play().then(() => {
+    state.runningPlayer.isPlaying = true;
+    renderRunningMusicPlayer();
+  }).catch(() => {});
+}
+
+function toggleRunningPlayPause() {
+  if (!runningAudio) return;
+  const track = getCurrentRunningTrack();
+  if (!track?.url) return;
+  if (!runningAudio.src || runningAudio.src !== track.url) {
+    playRunningTrack();
+    return;
+  }
+  if (runningAudio.paused) {
+    runningAudio.play().then(() => {
+      state.runningPlayer.isPlaying = true;
+      renderRunningMusicPlayer();
+    }).catch(() => {});
+    return;
+  }
+  runningAudio.pause();
+  state.runningPlayer.isPlaying = false;
+  renderRunningMusicPlayer();
+}
+
+function moveRunningTrack(delta) {
+  const station = state.runningPlayer.stations[state.runningPlayer.stationIndex];
+  if (!station || !Array.isArray(station.tracks) || !station.tracks.length) return;
+  const len = station.tracks.length;
+  state.runningPlayer.trackIndex = (state.runningPlayer.trackIndex + delta + len) % len;
+  playRunningTrack();
+}
+
+function moveRunningStation(delta) {
+  const len = state.runningPlayer.stations.length;
+  if (!len) return;
+  state.runningPlayer.stationIndex = (state.runningPlayer.stationIndex + delta + len) % len;
+  state.runningPlayer.trackIndex = 0;
+  playRunningTrack();
 }
 
 function getCompletionSummaryForSelectedProfile() {
@@ -4688,7 +4785,7 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
         runningTaskMinutesLeft.textContent = `${runningCarryOverMinutes} min de saldo`;
         runningTaskMinutesLeft.classList.toggle("is-bonus", runningCarryOverMinutes > 0);
         if (runningTaskStartNextButton) {
-          runningTaskStartNextButton.hidden = false;
+          runningTaskStartNextButton.hidden = nextAction.kind !== "action";
           runningTaskStartNextButton.dataset.actionId = String(nextAction.id || "");
           runningTaskStartNextButton.dataset.kind = String(nextAction.kind || "action");
           runningTaskStartNextButton.dataset.startIso = String(nextAction.startAt || "");
@@ -4709,29 +4806,25 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
 });
 
 runningTaskStartNextButton?.addEventListener("click", () => {
-  const kind = String(runningTaskStartNextButton.dataset.kind || "action");
-  if (kind === "free") {
-    const start = new Date(String(runningTaskStartNextButton.dataset.startIso || ""));
-    const end = new Date(String(runningTaskStartNextButton.dataset.endIso || ""));
-    openWizard();
-    if (Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())) {
-      const today = todayStart();
-      const day = new Date(start);
-      day.setHours(0, 0, 0, 0);
-      state.wizard.dateOffset = Math.round((day.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-      state.wizard.startHour = start.getHours();
-      state.wizard.startMinute = start.getMinutes();
-      state.wizard.endHour = end.getHours();
-      state.wizard.endMinute = end.getMinutes();
-      state.wizard.step = 1;
-      renderWizard();
-    }
-    return;
-  }
   const actionId = String(runningTaskStartNextButton.dataset.actionId || "").trim();
   if (!actionId) return;
-  void toggleActionStatus(actionId);
+  void toggleActionStatus(actionId, { skipDecision: true });
 });
+
+runningPlayerPlay?.addEventListener("click", toggleRunningPlayPause);
+runningPlayerPrev?.addEventListener("click", () => moveRunningTrack(-1));
+runningPlayerNext?.addEventListener("click", () => moveRunningTrack(1));
+runningPlayerProgress?.addEventListener("input", () => {
+  if (!runningAudio || !Number.isFinite(runningAudio.duration) || runningAudio.duration <= 0) return;
+  const pct = Math.max(0, Math.min(100, Number(runningPlayerProgress.value || 0)));
+  runningAudio.currentTime = (runningAudio.duration * pct) / 100;
+});
+if (runningAudio) {
+  runningAudio.addEventListener("ended", () => {
+    moveRunningTrack(1);
+  });
+}
+handleSwipe(runningPlayerTrack, (amount) => moveRunningStation(amount > 0 ? -1 : 1));
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);
 historyDeleteWordButton?.addEventListener("pointerdown", startDeleteHold);
@@ -5056,6 +5149,19 @@ handleSwipe(historyDateLabel, moveHistoryDate);
 handleSwipe(historyTimelineList, moveHistoryDate);
 startHomeDateTimeTicker();
 startRunningTaskTicker();
+void loadRunningMusicStations();
+if (runningMusicProgressTicker) {
+  window.clearInterval(runningMusicProgressTicker);
+}
+runningMusicProgressTicker = window.setInterval(() => {
+  if (!runningAudio || !runningPlayerProgress) return;
+  if (!Number.isFinite(runningAudio.duration) || runningAudio.duration <= 0) {
+    runningPlayerProgress.value = "0";
+    return;
+  }
+  const pct = Math.max(0, Math.min(100, (runningAudio.currentTime / runningAudio.duration) * 100));
+  runningPlayerProgress.value = String(pct);
+}, 300);
 
 
 

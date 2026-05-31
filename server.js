@@ -7,7 +7,7 @@ import http from "node:http";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
@@ -193,6 +193,63 @@ function getR2Client() {
   }
 
   return r2Client;
+}
+
+async function listProject200MusicStations() {
+  const prefix = "turmadoprinty/Music/";
+  const fallbackStations = [
+    { name: "Estação 1", tracks: [] },
+    { name: "Estação 2", tracks: [] },
+    { name: "Estação 3", tracks: [] },
+    { name: "Estação 4", tracks: [] }
+  ];
+  try {
+    const client = getR2Client();
+    const result = await client.send(new ListObjectsV2Command({
+      Bucket: R2_BUCKET_NAME,
+      Prefix: prefix
+    }));
+    const objects = Array.isArray(result?.Contents) ? result.Contents : [];
+    const grouped = new Map();
+    for (const item of objects) {
+      const key = String(item?.Key || "");
+      if (!key || key.endsWith("/")) continue;
+      const relative = key.slice(prefix.length);
+      if (!relative) continue;
+      const parts = relative.split("/").filter(Boolean);
+      const stationName = parts.length > 1 ? parts[0] : "Estação 1";
+      const fileName = parts[parts.length - 1];
+      const trackNameRaw = fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Faixa";
+      if (!grouped.has(stationName)) grouped.set(stationName, []);
+      grouped.get(stationName).push({
+        key,
+        name: trackNameRaw,
+        url: buildAlbumZipPublicUrlFromKey(key)
+      });
+    }
+    const stations = Array.from(grouped.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
+      .map(([name, tracks]) => {
+        const totals = tracks.reduce((map, track) => {
+          map.set(track.name, Number(map.get(track.name) || 0) + 1);
+          return map;
+        }, new Map());
+        const nameCount = new Map();
+        const renamed = tracks.map((track) => {
+          const clean = track.name;
+          const count = Number(nameCount.get(clean) || 0) + 1;
+          nameCount.set(clean, count);
+          return {
+            name: Number(totals.get(clean) || 0) > 1 ? `${clean} (${count})` : clean,
+            url: track.url
+          };
+        });
+        return { name, tracks: renamed };
+      });
+    return stations.length ? stations : fallbackStations;
+  } catch {
+    return fallbackStations;
+  }
 }
 
 async function readApiResponse(response) {
@@ -4358,6 +4415,18 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel carregar historico."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/music/stations") {
+    try {
+      const stations = await listProject200MusicStations();
+      sendJson(response, 200, { ok: true, stations });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar as estacoes."
       });
     }
     return;
