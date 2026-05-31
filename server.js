@@ -1919,7 +1919,7 @@ async function handleProject200ActionInterpret(request, response) {
 }
 
 const PROJECT200_TASK_CATEGORIES = [
-  { id: "fe_espiritualidade", name: "Fé e espiritualidade" },
+  { id: "fe_espiritualidade", name: "Fé" },
   { id: "sono", name: "Sono" },
   { id: "alimentacao", name: "Alimentação" },
   { id: "hidratacao", name: "Hidratação" },

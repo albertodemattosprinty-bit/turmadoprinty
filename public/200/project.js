@@ -39,7 +39,7 @@ const actionAvatarByAssignee = {
   Wilton: "/200/avatars/wilton.png"
 };
 const taskCategoryDefinitions = [
-  { id: "fe_espiritualidade", name: "Fé e espiritualidade" },
+  { id: "fe_espiritualidade", name: "Fé" },
   { id: "sono", name: "Sono" },
   { id: "alimentacao", name: "Alimentação" },
   { id: "hidratacao", name: "Hidratação" },
@@ -211,6 +211,7 @@ const actionCategoryPreviewLabel = document.getElementById("actionCategoryPrevie
 const actionCategoryModal = document.getElementById("actionCategoryModal");
 const closeActionCategoryModal = document.getElementById("closeActionCategoryModal");
 const actionCategoryGrid = document.getElementById("actionCategoryGrid");
+const confirmActionCategoryModal = document.getElementById("confirmActionCategoryModal");
 const wizardDateLabel = document.getElementById("wizardDateLabel");
 const wizardDatePickerWrap = document.getElementById("wizardDatePickerWrap");
 const repeatToggle = document.getElementById("repeatToggle");
@@ -389,6 +390,7 @@ let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
 let actionCategoryTargetActionId = "";
+let actionCategorySelectionId = "";
 let actionsTimeTicker = null;
 let actionsTimeShowDuration = false;
 let timeButtonHoldTimer = null;
@@ -2140,7 +2142,7 @@ function renderActionCategoryPicker() {
 
 function renderActionCategoryModal() {
   if (!actionCategoryGrid) return;
-  const selectedId = String(state.wizard.categoryId || "").trim().toLowerCase();
+  const selectedId = String(actionCategorySelectionId || state.wizard.categoryId || "").trim().toLowerCase();
   actionCategoryGrid.innerHTML = "";
   taskCategoryDefinitions.forEach((category) => {
     const button = document.createElement("button");
@@ -4589,16 +4591,21 @@ closeActionWizardButton.addEventListener("click", closeWizard);
 closeActionCategoryModal?.addEventListener("click", () => closeModal("actionCategoryModal"));
 actionCategoryTrigger?.addEventListener("click", () => {
   actionCategoryTargetActionId = "";
+  actionCategorySelectionId = String(state.wizard.categoryId || "").trim().toLowerCase();
   renderActionCategoryModal();
   openModal("actionCategoryModal");
 });
 actionCategoryGrid?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-category-id]");
   if (!button) return;
-  state.wizard.categoryId = String(button.dataset.categoryId || "").trim().toLowerCase();
+  actionCategorySelectionId = String(button.dataset.categoryId || "").trim().toLowerCase();
+  renderActionCategoryModal();
+});
+confirmActionCategoryModal?.addEventListener("click", () => {
+  if (!actionCategorySelectionId) return;
+  state.wizard.categoryId = String(actionCategorySelectionId || "").trim().toLowerCase();
   state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
   renderActionCategoryPicker();
-  renderActionCategoryModal();
   closeModal("actionCategoryModal");
   if (actionCategoryTargetActionId) {
     void saveActionCategory(actionCategoryTargetActionId, state.wizard.categoryId);
@@ -4913,6 +4920,7 @@ actionsList.addEventListener("click", async (event) => {
     const action = state.actions.find((item) => String(item.id) === String(row.dataset.actionId));
     state.wizard.categoryId = String(action?.categoryId || "").trim().toLowerCase();
     state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
+    actionCategorySelectionId = String(state.wizard.categoryId || "").trim().toLowerCase();
     actionCategoryTargetActionId = String(row.dataset.actionId || "");
     renderActionCategoryPicker();
     renderActionCategoryModal();

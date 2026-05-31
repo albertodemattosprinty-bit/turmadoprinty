@@ -1569,6 +1569,11 @@ body.project-no-select textarea {
   background: rgba(13, 120, 60, 0.36);
 }
 
+#confirmActionCategoryModal {
+  width: min(460px, 100%);
+  margin: 6px auto 0;
+}
+
 .wizard-step {
   display: none;
   min-height: 320px;
