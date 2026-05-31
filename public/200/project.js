@@ -265,10 +265,15 @@ const historyReadTitle = document.getElementById("historyReadTitle");
 const historyReadBody = document.getElementById("historyReadBody");
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
+const runningTaskModalElement = document.getElementById("runningTaskModal");
 const runningTaskName = document.getElementById("runningTaskName");
 const runningTaskProgressRing = document.getElementById("runningTaskProgressRing");
 const runningTaskPercent = document.getElementById("runningTaskPercent");
+const runningCircleWrap = runningTaskModalElement?.querySelector(".running-circle-wrap");
+const runningModeTimeBtn = document.getElementById("runningModeTimeBtn");
+const runningModePercentBtn = document.getElementById("runningModePercentBtn");
 const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft");
+const runningTaskNextLabel = runningTaskModalElement?.querySelector(".running-task-next-label");
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
@@ -276,7 +281,9 @@ const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
 const runningPlayerStationPrev = document.getElementById("runningPlayerStationPrev");
 const runningPlayerStationNext = document.getElementById("runningPlayerStationNext");
+const runningPlayerPrev = document.getElementById("runningPlayerPrev");
 const runningPlayerPlay = document.getElementById("runningPlayerPlay");
+const runningPlayerNext = document.getElementById("runningPlayerNext");
 const actionsModal = document.getElementById("actionsModal");
 const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
@@ -380,7 +387,18 @@ let sleepNavHoldInterval = null;
 let sleepNavLongPressHandled = false;
 let startDecisionResolver = null;
 const runningAudio = typeof Audio !== "undefined" ? new Audio() : null;
+const runningMinuteCueAudio = typeof Audio !== "undefined" ? new Audio() : null;
 let runningMusicProgressTicker = null;
+const runningMinuteCueMap = new Map([
+  [180, "0001.mp3"], [175, "0002.mp3"], [170, "0003.mp3"], [165, "0004.mp3"], [160, "0005.mp3"],
+  [155, "0006.mp3"], [150, "0007.mp3"], [145, "0008.mp3"], [140, "0009.mp3"], [135, "0010.mp3"],
+  [130, "0011.mp3"], [125, "0012.mp3"], [120, "0013.mp3"], [115, "0014.mp3"], [110, "0015.mp3"],
+  [105, "0016.mp3"], [100, "0017.mp3"], [95, "0018.mp3"], [90, "0019.mp3"], [85, "0020.mp3"],
+  [80, "0021.mp3"], [75, "0022.mp3"], [70, "0023.mp3"], [65, "0024.mp3"], [60, "0025.mp3"],
+  [55, "0026.mp3"], [50, "0027.mp3"], [45, "0028.mp3"], [40, "0029.mp3"], [35, "0030.mp3"],
+  [30, "0031.mp3"], [25, "0032.mp3"], [20, "0033.mp3"], [15, "0034.mp3"], [10, "0035.mp3"],
+  [5, "0036.mp3"], [3, "0037.mp3"], [1, "0038.mp3"]
+]);
 let postponeNavHoldTimer = null;
 let postponeNavHoldInterval = null;
 let postponeNavLongPressHandled = false;
@@ -445,7 +463,12 @@ const state = {
     stationIndex: 0,
     trackIndex: 0,
     isPlaying: false
-  }
+  },
+  runningMinuteCue: {
+    actionId: "",
+    played: new Set()
+  },
+  runningCenterMode: "auto"
 };
 
 function loadSleepConfig() {
@@ -664,11 +687,12 @@ function getRunningActionProgressState(action) {
   const totalBudget = durationMinutes + Math.max(0, Number(runningCarryOverMinutes || 0));
   const remainingBudget = Math.max(0, Math.ceil(totalBudget - elapsedMinutes));
   const percent = totalBudget > 0 ? Math.max(0, Math.min(100, Math.round((elapsedMinutes / totalBudget) * 100))) : 0;
+  const percentPrecise = totalBudget > 0 ? Math.max(0, Math.min(100, (elapsedMinutes / totalBudget) * 100)) : 0;
   const startAtMs = new Date(action?.startAt).getTime();
   const scheduleDeltaMinutes = Number.isFinite(startAtMs)
     ? Math.round((startedAtMs - startAtMs) / (60 * 1000))
     : 0;
-  return { percent, remainingMinutes: remainingBudget, elapsedMinutes, durationMinutes, scheduleDeltaMinutes };
+  return { percent, percentPrecise, remainingMinutes: remainingBudget, elapsedMinutes, durationMinutes, scheduleDeltaMinutes };
 }
 
 function formatSignedDelay(minutesValue) {
@@ -747,6 +771,90 @@ function formatMinutesCompact(totalMinutes) {
   return `${minutes} min`;
 }
 
+function formatRunningCenter(percent, percentPrecise, remainingMinutes, remainingSeconds, showPercent) {
+  if (showPercent) {
+    const safe = Number.isFinite(percentPrecise) ? Math.max(0, Math.min(100, percentPrecise)) : Number(percent || 0);
+    const formatted = safe.toFixed(1);
+    const [whole, decimal] = formatted.split(".");
+    return `${whole}<span class="running-task-decimal">.${decimal}</span><span class="running-task-unit">%</span>`;
+  }
+  const totalSec = Math.max(0, Math.round(Number(remainingSeconds || 0)));
+  if (totalSec >= 3600) {
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    return `${h}<span class="running-task-decimal">:${String(m).padStart(2, "0")}</span>`;
+  }
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}<span class="running-task-decimal">:${String(s).padStart(2, "0")}</span>`;
+}
+
+function updateRunningCenterModeButtons(mode) {
+  if (runningModePercentBtn) runningModePercentBtn.classList.toggle("active", mode === "percent");
+  if (runningModeTimeBtn) runningModeTimeBtn.classList.toggle("active", mode === "time");
+}
+
+function setRunningIdleVisualState(isIdle) {
+  const toggle = (el, hide) => {
+    if (!el) return;
+    el.classList.add("running-fade");
+    el.classList.toggle("is-hidden", hide);
+  };
+  toggle(runningTaskMinutesLeft, isIdle);
+  toggle(runningCircleWrap, isIdle);
+  toggle(runningModePercentBtn, isIdle);
+  toggle(runningModeTimeBtn, isIdle);
+}
+
+function fadeAudioVolume(audio, target, durationMs) {
+  if (!audio) return Promise.resolve();
+  const start = Number(audio.volume ?? 1);
+  const delta = target - start;
+  if (Math.abs(delta) < 0.001 || durationMs <= 0) {
+    audio.volume = Math.max(0, Math.min(1, target));
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - started;
+      const ratio = Math.max(0, Math.min(1, elapsed / durationMs));
+      audio.volume = Math.max(0, Math.min(1, start + (delta * ratio)));
+      if (ratio >= 1) {
+        window.clearInterval(timer);
+        resolve();
+      }
+    }, 40);
+  });
+}
+
+async function tryPlayRunningMinuteCue(actionId, remainingMinutes) {
+  if (!runningMinuteCueAudio || !actionId) return;
+  const minuteKey = Math.ceil(Number(remainingMinutes || 0));
+  const file = runningMinuteCueMap.get(minuteKey);
+  if (!file) return;
+  if (state.runningMinuteCue.actionId !== actionId) {
+    state.runningMinuteCue.actionId = actionId;
+    state.runningMinuteCue.played = new Set();
+  }
+  if (state.runningMinuteCue.played.has(minuteKey)) return;
+  state.runningMinuteCue.played.add(minuteKey);
+  const baseVolume = runningAudio ? Number(runningAudio.volume || 1) : 1;
+  try {
+    if (runningAudio && !runningAudio.paused) {
+      await fadeAudioVolume(runningAudio, Math.max(0.1, baseVolume * 0.25), 1500);
+    }
+    runningMinuteCueAudio.src = `/200/minutes/${file}`;
+    runningMinuteCueAudio.currentTime = 0;
+    await runningMinuteCueAudio.play();
+    runningMinuteCueAudio.onended = async () => {
+      if (runningAudio && !runningAudio.paused) {
+        await fadeAudioVolume(runningAudio, baseVolume, 1500);
+      }
+    };
+  } catch {}
+}
+
 function getSleepDurationMinutesForDay() {
   const start = (Number(state.sleepConfig.startHour || 0) * 60) + Number(state.sleepConfig.startMinute || 0);
   const end = (Number(state.sleepConfig.endHour || 0) * 60) + Number(state.sleepConfig.endMinute || 0);
@@ -792,11 +900,16 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
-    runningTaskName.textContent = "Sem tarefa em execução.";
+    runningTaskName.textContent = "Próxima tarefa";
     runningTaskProgressRing.style.strokeDashoffset = "301.59";
-    runningTaskPercent.textContent = "0%";
-    runningTaskMinutesLeft.textContent = "0 minutos restantes";
+    runningTaskPercent.textContent = "";
+    runningTaskMinutesLeft.textContent = "";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
+    setRunningIdleVisualState(true);
+    if (runningTaskNextLabel) {
+      runningTaskNextLabel.classList.add("running-fade");
+      runningTaskNextLabel.classList.add("is-hidden");
+    }
     const nextPending = getEarliestPendingAction();
     runningTaskNextName.innerHTML = nextPending
       ? `${escapeHtml(formatActionTitleForDisplay(nextPending.title))}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextPending)))}</small>`
@@ -809,15 +922,28 @@ function renderHomeRunningTask() {
     }
     return;
   }
-  const { percent, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
+  const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
+  setRunningIdleVisualState(false);
+  if (runningTaskNextLabel) {
+    runningTaskNextLabel.classList.add("running-fade");
+    runningTaskNextLabel.classList.remove("is-hidden");
+  }
   const circumference = 2 * Math.PI * 48;
   const dashOffset = circumference * (1 - (percent / 100));
   const nextAction = getNextTimelineEntryForRunning(action);
   runningTaskName.textContent = formatActionTitleForDisplay(action.title);
   runningTaskProgressRing.style.strokeDashoffset = String(dashOffset);
-  const estimatedRemaining = Math.max(0, Math.ceil(durationMinutes - elapsedMinutes));
-  const loopModePercent = Math.floor(Date.now() / 3000) % 2 === 0;
-  runningTaskPercent.textContent = loopModePercent ? `${percent}%` : `${estimatedRemaining}m`;
+  const remainingSeconds = Math.max(0, Math.round((durationMinutes - elapsedMinutes) * 60));
+  const estimatedRemaining = Math.max(0, Math.ceil(remainingSeconds / 60));
+  const autoShowPercent = Math.floor(Date.now() / 3000) % 2 === 0;
+  const showPercent = state.runningCenterMode === "percent"
+    ? true
+    : state.runningCenterMode === "time"
+      ? false
+      : autoShowPercent;
+  runningTaskPercent.innerHTML = formatRunningCenter(percent, percentPrecise, estimatedRemaining, remainingSeconds, showPercent);
+  updateRunningCenterModeButtons(showPercent ? "percent" : "time");
+  void tryPlayRunningMinuteCue(String(action.id || ""), estimatedRemaining);
   runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
   runningTaskMinutesLeft.textContent = formatSignedDelay(scheduleDeltaMinutes);
   if (scheduleDeltaMinutes >= 0) {
@@ -877,7 +1003,8 @@ async function loadRunningMusicStations() {
   } catch {
     // keep seeded stations
   }
-  state.runningPlayer.stationIndex = 0;
+  const jungleIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").toLowerCase() === "jungle");
+  state.runningPlayer.stationIndex = jungleIndex >= 0 ? jungleIndex : 0;
   state.runningPlayer.trackIndex = 0;
   renderRunningMusicPlayer();
 }
@@ -928,6 +1055,13 @@ function toggleRunningPlayPause() {
   runningAudio.pause();
   state.runningPlayer.isPlaying = false;
   renderRunningMusicPlayer();
+}
+
+function ensureRunningAudioOnTouch() {
+  if (state.runningPlayer.isPlaying) return;
+  const hasTrack = Boolean(getCurrentRunningTrack()?.url);
+  if (!hasTrack) return;
+  playRunningTrack();
 }
 
 function moveRunningTrack(delta) {
@@ -4913,14 +5047,41 @@ runningTaskStartNextButton?.addEventListener("click", () => {
 });
 
 runningPlayerPlay?.addEventListener("click", toggleRunningPlayPause);
+runningModePercentBtn?.addEventListener("click", () => {
+  state.runningCenterMode = state.runningCenterMode === "percent" ? "auto" : "percent";
+  renderHomeRunningTask();
+});
+runningModeTimeBtn?.addEventListener("click", () => {
+  state.runningCenterMode = state.runningCenterMode === "time" ? "auto" : "time";
+  renderHomeRunningTask();
+});
 runningPlayerStationPrev?.addEventListener("click", () => moveRunningStation(-1));
 runningPlayerStationNext?.addEventListener("click", () => moveRunningStation(1));
+runningPlayerPrev?.addEventListener("click", () => moveRunningTrack(-1));
+runningPlayerNext?.addEventListener("click", () => moveRunningTrack(1));
 if (runningAudio) {
   runningAudio.addEventListener("ended", () => {
     moveRunningTrack(1);
   });
 }
 handleSwipe(runningPlayerTrack, (amount) => moveRunningStation(amount > 0 ? -1 : 1));
+handleSwipe(runningTaskModalElement, (amount) => moveRunningStation(amount > 0 ? -1 : 1));
+runningTaskModalElement?.addEventListener("pointerdown", ensureRunningAudioOnTouch, { passive: true });
+
+document.body.classList.add("project-no-select");
+const isEditableTarget = (target) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+document.addEventListener("copy", (event) => {
+  if (isEditableTarget(event.target)) return;
+  event.preventDefault();
+});
+document.addEventListener("cut", (event) => {
+  if (isEditableTarget(event.target)) return;
+  event.preventDefault();
+});
+document.addEventListener("selectstart", (event) => {
+  if (isEditableTarget(event.target)) return;
+  event.preventDefault();
+});
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);
 historyDeleteWordButton?.addEventListener("pointerdown", startDeleteHold);
