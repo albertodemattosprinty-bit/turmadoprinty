@@ -1484,10 +1484,22 @@ function openModal(id) {
 }
 
 function closeModal(modal) {
+  if (typeof modal === "string") {
+    modal = document.getElementById(modal);
+  }
+  if (!modal) {
+    return;
+  }
   modal.classList.remove("active");
   modal.setAttribute("aria-hidden", "true");
-  closeWizard();
-  closePlatformWizard();
+  if (modal.id === "actionWizard") {
+    closeWizard();
+    return;
+  }
+  if (modal.id === "platformWizard") {
+    closePlatformWizard();
+    return;
+  }
 
   if (modal.id === "financeModal" && financeTimer) {
     window.clearTimeout(financeTimer);
@@ -2118,7 +2130,10 @@ function openWizard(action = null) {
 function closeWizard() {
   stopActionMic();
   hideActionAiConfirmation();
-  closeModal("actionCategoryModal");
+  if (actionCategoryModal) {
+    actionCategoryModal.classList.remove("active");
+    actionCategoryModal.setAttribute("aria-hidden", "true");
+  }
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
@@ -4588,7 +4603,7 @@ openActionWizardButton.addEventListener("click", () => {
 });
 
 closeActionWizardButton.addEventListener("click", closeWizard);
-closeActionCategoryModal?.addEventListener("click", () => closeModal("actionCategoryModal"));
+closeActionCategoryModal?.addEventListener("click", () => closeModal(actionCategoryModal));
 actionCategoryTrigger?.addEventListener("click", () => {
   actionCategoryTargetActionId = "";
   actionCategorySelectionId = String(state.wizard.categoryId || "").trim().toLowerCase();
@@ -4606,7 +4621,7 @@ confirmActionCategoryModal?.addEventListener("click", () => {
   state.wizard.categoryId = String(actionCategorySelectionId || "").trim().toLowerCase();
   state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
   renderActionCategoryPicker();
-  closeModal("actionCategoryModal");
+  closeModal(actionCategoryModal);
   if (actionCategoryTargetActionId) {
     void saveActionCategory(actionCategoryTargetActionId, state.wizard.categoryId);
     actionCategoryTargetActionId = "";
