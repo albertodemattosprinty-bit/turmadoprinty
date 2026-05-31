@@ -251,6 +251,7 @@ body.project-no-select textarea {
   gap: 12px;
   transform: scale(1.4);
   transform-origin: center;
+  position: relative;
 }
 
 #runningTaskModal .running-task-content.is-idle-layout {
@@ -511,7 +512,7 @@ body.project-no-select textarea {
   gap: 14px;
   margin-top: 2px;
   position: absolute;
-  top: -52px;
+  top: 14px;
   left: 0;
   z-index: 6;
 }
@@ -549,8 +550,8 @@ body.project-no-select textarea {
 
 .running-circle-toggle {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 50%;
+  transform: translateX(-50%);
   width: 30px;
   height: 30px;
   border: none;
@@ -561,8 +562,8 @@ body.project-no-select textarea {
   place-items: center;
   z-index: 2;
 }
-.running-circle-toggle-left { left: -24px; }
-.running-circle-toggle-right { right: -24px; }
+.running-circle-toggle-left { top: 22px; }
+.running-circle-toggle-right { bottom: 22px; }
 .running-circle-toggle.active { opacity: 1; }
 
 .running-fade {
@@ -575,10 +576,7 @@ body.project-no-select textarea {
   pointer-events: none;
 }
 
-#runningTaskModal .running-task-content.is-idle-layout .running-task-next-label {
-  margin-top: 70px;
-  text-align: center;
-}
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next-label { text-align: center; }
 
 #runningTaskModal .running-task-content.is-idle-layout .running-task-next {
   text-align: center;
@@ -592,6 +590,25 @@ body.project-no-select textarea {
 
 #runningTaskModal .running-task-content.is-idle-layout .running-player {
   margin-top: auto;
+}
+
+.running-next-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-height: 0;
+  max-height: none;
+  text-align: left;
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-next-panel {
+  justify-content: center;
+  align-items: center;
+  min-height: 40vh;
+  max-height: 40vh;
+  text-align: center;
 }
 
 .start-decision-content {
