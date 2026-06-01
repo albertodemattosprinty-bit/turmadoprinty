@@ -2009,6 +2009,110 @@ async function handleProject200ActionCategorize(request, response) {
   }
 }
 
+async function handleMiniLessonPlanGenerate(request, response) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const theme = String(body?.theme || "").trim();
+  const selectedBlocks = Array.isArray(body?.selectedBlocks) ? body.selectedBlocks : [];
+  const normalizedBlocks = selectedBlocks
+    .map((item) => ({
+      name: String(item?.name || "").trim(),
+      minutes: Number(item?.minutes || 0)
+    }))
+    .filter((item) => item.name);
+
+  const blocks = normalizedBlocks.length
+    ? normalizedBlocks.slice(0, 12)
+    : [
+      { name: "Abertura", minutes: 5 },
+      { name: "Historia biblica", minutes: 12 },
+      { name: "Aplicacao pratica", minutes: 10 },
+      { name: "Oracao final", minutes: 5 }
+    ];
+
+  response.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive"
+  });
+
+  sendSseEvent(response, "status", {
+    stage: "start",
+    message: "Gerando plano por blocos..."
+  });
+
+  const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+  const themePrompt = theme || "aula infantil cristã";
+
+  try {
+    for (let i = 0; i < blocks.length; i += 1) {
+      const block = blocks[i];
+      const durationHint = Number.isFinite(block.minutes) && block.minutes > 0 ? block.minutes : 8;
+      const completion = await createChatCompletion(apiKey, {
+        model,
+        temperature: 0.5,
+        max_completion_tokens: 420,
+        messages: [
+          {
+            role: "system",
+            content: "Você escreve blocos de plano de aula cristão infantil em pt-BR. Gere um texto prático, acolhedor e fiel à Bíblia, sem julgamento. Responda APENAS JSON puro: {\"title\":\"...\",\"content\":\"...\"}. O campo content deve ter entre 220 e 650 caracteres."
+          },
+          {
+            role: "user",
+            content: `Tema central: ${themePrompt}\nBloco: ${block.name}\nTempo previsto: ${durationHint} minutos.\nEscreva orientações claras para o professor conduzir este bloco.`
+          }
+        ]
+      });
+
+      const raw = extractChatCompletionText(completion);
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = null;
+      }
+
+      const sectionTitle = String(parsed?.title || block.name).trim() || block.name;
+      const sectionContent = String(parsed?.content || raw || "")
+        .trim()
+        .slice(0, 900);
+
+      sendSseEvent(response, "section", {
+        index: i,
+        total: blocks.length,
+        title: sectionTitle,
+        blockName: block.name,
+        minutes: durationHint,
+        content: sectionContent
+      });
+    }
+
+    sendSseEvent(response, "done", { ok: true, model });
+    response.end();
+  } catch (error) {
+    sendSseEvent(response, "error", {
+      message: error instanceof Error ? error.message : "Falha ao gerar plano."
+    });
+    response.end();
+  }
+}
+
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -4119,6 +4223,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
     await handleProject200ActionCategorize(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/mini/aulas/gerar") {
+    await handleMiniLessonPlanGenerate(request, response);
     return;
   }
 
