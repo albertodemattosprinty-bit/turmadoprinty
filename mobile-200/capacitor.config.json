@@ -1,9 +1,5 @@
 ﻿{
   "appId": "com.turmadoprinty.project200",
   "appName": "Projeto 200",
-  "webDir": "www",
-  "server": {
-    "url": "https://www.turmadoprinty.com.br/200",
-    "allowNavigation": ["www.turmadoprinty.com.br", "turmadoprinty.com.br"]
-  }
+  "webDir": "www"
 }

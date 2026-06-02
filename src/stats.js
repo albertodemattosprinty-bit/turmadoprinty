@@ -1,6 +1,7 @@
 import { query } from "./db.js";
 
 const ASSIGNEES = ["Geral", "Rose", "Alberto", "Lucas", "Thainan"];
+const DEFAULT_SALDO_GOAL_CENTS = 1000000;
 
 function startOfDay(date) {
   const value = new Date(date);
@@ -91,8 +92,9 @@ export async function getStatsGoals(userId) {
     [userId]
   );
   const row = result.rows[0] || {};
+  const saldoGoal = Math.max(0, Number(row.daily_income_goal_cents || 0)) || DEFAULT_SALDO_GOAL_CENTS;
   return {
-    dailyIncomeGoalCents: Number(row.daily_income_goal_cents || 0),
+    dailyIncomeGoalCents: saldoGoal,
     monthlyBalanceGoalCents: Number(row.monthly_balance_goal_cents || 0),
     recurringIncomeGoalCents: Number(row.recurring_income_goal_cents || 0)
   };

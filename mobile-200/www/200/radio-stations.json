@@ -1,0 +1,321 @@
+{
+  "stations": [
+    {
+      "name": "Calm",
+      "tracks": [
+        {
+          "name": "Quiet Place",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(1).mp3"
+        },
+        {
+          "name": "Soft Breeze",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(2).mp3"
+        },
+        {
+          "name": "Silent River",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(16).mp3"
+        },
+        {
+          "name": "Warm Horizon",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(17).mp3"
+        },
+        {
+          "name": "Gentle Light",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(18).mp3"
+        },
+        {
+          "name": "Velvet Sky",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(19).mp3"
+        },
+        {
+          "name": "Ocean Whisper",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(20).mp3"
+        },
+        {
+          "name": "Still Morning",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(21).mp3"
+        },
+        {
+          "name": "Calm Valley",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(22).mp3"
+        },
+        {
+          "name": "Peaceful Path",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(23).mp3"
+        },
+        {
+          "name": "Blue Serenity",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(24).mp3"
+        },
+        {
+          "name": "Moon Garden",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(25).mp3"
+        },
+        {
+          "name": "Tender Clouds",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(26).mp3"
+        },
+        {
+          "name": "Mellow Tide",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(27).mp3"
+        },
+        {
+          "name": "Dream Meadow",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(28).mp3"
+        },
+        {
+          "name": "Luna Flow",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(29).mp3"
+        },
+        {
+          "name": "Sweet Silence",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(30).mp3"
+        },
+        {
+          "name": "Zen Harbor",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(31).mp3"
+        },
+        {
+          "name": "Cozy Dusk",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(32).mp3"
+        },
+        {
+          "name": "Golden Rest",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(33).mp3"
+        },
+        {
+          "name": "Pure Tranquility",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(34).mp3"
+        },
+        {
+          "name": "Harmony Field",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(35).mp3"
+        }
+      ]
+    },
+    {
+      "name": "Frequency",
+      "tracks": [
+        {
+          "name": "Crystal Pulse",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/432Hz%20Tides.mp3"
+        },
+        {
+          "name": "Bamboo Echo",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/432Hz%20Tides%20(1).mp3"
+        },
+        {
+          "name": "Solar Frequency",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Bamboo%20Breathing.mp3"
+        },
+        {
+          "name": "Deep Resonance",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Bamboo%20Breathing%20(1).mp3"
+        },
+        {
+          "name": "Healing Wave",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Bamboo%20Frequency.mp3"
+        },
+        {
+          "name": "Amber Tone",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Bamboo%20Frequency%20(1).mp3"
+        },
+        {
+          "name": "Inner Signal",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Bamboo%20Heartstrings.mp3"
+        },
+        {
+          "name": "Lotus Vibe",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Bamboo%20Heartstrings%20(1).mp3"
+        },
+        {
+          "name": "Aura Stream",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Honeyed%20Silence.mp3"
+        },
+        {
+          "name": "Frequency Bloom",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Honeyed%20Silence%20(1).mp3"
+        },
+        {
+          "name": "Temple Resonance",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Saffron%20Hum.mp3"
+        },
+        {
+          "name": "Calm Circuit",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Saffron%20Hum%20(1).mp3"
+        },
+        {
+          "name": "Serenity Pulse",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Serenity%20Era.mp3"
+        },
+        {
+          "name": "Sacred Tone",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Serenity%20Era%20(1).mp3"
+        },
+        {
+          "name": "Mind Balance",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Serenity%20Field.mp3"
+        },
+        {
+          "name": "Quiet Frequency",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Serenity%20Horizon.mp3"
+        },
+        {
+          "name": "Earth Hum",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Serenity%20Horizon%20(1).mp3"
+        },
+        {
+          "name": "Breath Signal",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Stone%20Hum.mp3"
+        },
+        {
+          "name": "Pure Hz",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/Stone%20Hum%20(1).mp3"
+        },
+        {
+          "name": "Peace Frequency",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Frequency/World%20In%20Peace.mp3"
+        }
+      ]
+    },
+    {
+      "name": "Fun",
+      "tracks": [
+        {
+          "name": "Happy Steps",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Baby%20Jesus.mp3"
+        },
+        {
+          "name": "Joy Parade",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Baby%20Jesus%20(1).mp3"
+        },
+        {
+          "name": "Sunny Smile",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Cradle%20Mercy%20(2).mp3"
+        },
+        {
+          "name": "Playful Spark",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Cradle%20Mercy%20(3).mp3"
+        },
+        {
+          "name": "Bright Giggles",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Cradle%20Peace.mp3"
+        },
+        {
+          "name": "Magic Bounce",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Cradle%20Peace%20(1).mp3"
+        },
+        {
+          "name": "Tiny Celebration",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Gentle%20Amen%20(2).mp3"
+        },
+        {
+          "name": "Color Run",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Gentle%20Amen%20(3).mp3"
+        },
+        {
+          "name": "Cheerful Beat",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Lullaby%20Mercy%20(2).mp3"
+        },
+        {
+          "name": "Wonder Jump",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Lullaby%20Mercy%20(3).mp3"
+        },
+        {
+          "name": "Candy Rhythm",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Mercy%20Cradle.mp3"
+        },
+        {
+          "name": "Lighthearted Loop",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Mercy%20Cradle%20(1).mp3"
+        },
+        {
+          "name": "Friendly Groove",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Milk-White%20Mercy.mp3"
+        },
+        {
+          "name": "Sweet Motion",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Milk-White%20Mercy%20(1).mp3"
+        },
+        {
+          "name": "Sparkle Party",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Tin%20Can%20Orchestra.mp3"
+        },
+        {
+          "name": "Good Mood Ride",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Fun/Tin%20Can%20Orchestra%20(1).mp3"
+        }
+      ]
+    },
+    {
+      "name": "Jungle",
+      "tracks": [
+        {
+          "name": "The Adventure",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Hidden%20Temple%20Map%20(2).mp3"
+        },
+        {
+          "name": "Hidden Trail",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Hidden%20Temple%20Map%20(3).mp3"
+        },
+        {
+          "name": "Treasure Route",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Chase.mp3"
+        },
+        {
+          "name": "Forest Escape",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Chase%20(1).mp3"
+        },
+        {
+          "name": "Wild Compass",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Run.mp3"
+        },
+        {
+          "name": "Temple Runway",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Run%20(1).mp3"
+        },
+        {
+          "name": "Mystic Vines",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Run%20(2).mp3"
+        },
+        {
+          "name": "Safari Pulse",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Run%20(3).mp3"
+        },
+        {
+          "name": "Jungle Echo",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Run%20(4).mp3"
+        },
+        {
+          "name": "Explorer Sprint",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Run%20(5).mp3"
+        },
+        {
+          "name": "Ancient Path",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Run%20(6).mp3"
+        },
+        {
+          "name": "Rainforest Quest",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Jungle/Jungle%20Treasure%20Trail%20(1).mp3"
+        }
+      ]
+    },
+    {
+      "name": "Energy",
+      "tracks": [
+        {
+          "name": "3 minutes",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/3%20minutes.m4a"
+        },
+        {
+          "name": "5 minutes",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/5%20minutes.m4a"
+        },
+        {
+          "name": "10 minutes",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/De%20repente%20m%C3%A3e/10%20minutes.m4a"
+        }
+      ]
+    }
+  ]
+}

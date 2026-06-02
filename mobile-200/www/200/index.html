@@ -1,0 +1,765 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Projeto 200</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/200/project.css" />
+</head>
+<body>
+  <section class="project-login-overlay" id="project200LoginOverlay" aria-hidden="true">
+    <div class="project-login-card">
+      <img class="project-login-logo" src="/200/avatars/familyplan.png" alt="Projeto 200" />
+      <h2>Entrar no Projeto 200</h2>
+      <p>Use seu usuário e senha do Turma do Printy.</p>
+      <form id="project200LoginForm">
+        <label for="project200Username">Usuário</label>
+        <input id="project200Username" type="text" autocomplete="username" required />
+        <label for="project200Password">Senha</label>
+        <input id="project200Password" type="password" autocomplete="current-password" required />
+        <button type="submit" class="primary-btn">Entrar</button>
+      </form>
+      <p id="project200LoginMessage" class="project-login-message"></p>
+    </div>
+  </section>
+  <section class="project-login-overlay" id="profileLinkOverlay" aria-hidden="true">
+    <div class="project-login-card">
+      <h2>Vincular Usuário</h2>
+      <p id="profileLinkTargetLabel">Perfil selecionado</p>
+      <form id="profileLinkForm">
+        <label for="profileLinkUsername">Nome de usuário</label>
+        <input id="profileLinkUsername" type="text" autocomplete="username" required />
+        <button type="submit" class="primary-btn">Vincular</button>
+        <button type="button" class="ghost-btn" id="profileLinkCancel">Cancelar</button>
+      </form>
+      <p id="profileLinkMessage" class="project-login-message"></p>
+    </div>
+  </section>
+  <section class="workspace-modal simple-modal" id="sleepConfigModal" aria-hidden="true" aria-label="Horario do sono">
+    <div class="finance-content running-task-content">
+      <div style="display:grid;place-items:center;font-size:64px;color:#cde3ff;">🌙</div>
+      <div class="running-task-name">Horário do sono</div>
+      <div class="date-picker">
+        <button class="circle-nav" type="button" data-sleep-nav="start" data-dir="-1">‹</button>
+        <strong id="sleepStartLabel">23:00</strong>
+        <button class="circle-nav" type="button" data-sleep-nav="start" data-dir="1">›</button>
+      </div>
+      <div class="date-picker">
+        <button class="circle-nav" type="button" data-sleep-nav="end" data-dir="-1">‹</button>
+        <strong id="sleepEndLabel">08:00</strong>
+        <button class="circle-nav" type="button" data-sleep-nav="end" data-dir="1">›</button>
+      </div>
+      <button class="primary-btn running-task-finalize-btn" id="saveSleepConfigBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 16.6 4.9 12.3l1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z"/></svg><span>Aprovar</span></button>
+    </div>
+  </section>
+  <main class="project-shell">
+    <img class="home-top-logo" src="/200/avatars/familyplan.png" alt="Logo geral" />
+    <section class="project-hub" aria-label="Projeto 200">
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="actionsModal" aria-label="Ações">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        <span class="hub-label">Ações</span>
+      </button>
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="constitutionModal" aria-label="Constituição">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 3v5h4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span class="hub-label">Constituição</span>
+      </button>
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="financeModal" aria-label="Plataforma">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="7" cy="8" r="1"/></svg>
+        <span class="hub-label">Plataforma</span>
+      </button>
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="calendarModal" aria-label="Finanças">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v10M8 10.5c0-1.2 1.8-2.2 4-2.2s4 1 4 2.2-1.8 2.2-4 2.2-4 1-4 2.2 1.8 2.2 4 2.2 4-1 4-2.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span class="hub-label">Financeiro</span>
+      </button>
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="statsModal" aria-label="Estatísticas">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 9.5 8H5l3.5 3-1.5 5L12 13l5 3-1.5-5L19 8h-4.5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 20h8" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span class="hub-label">Estatísticas</span>
+      </button>
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="historyModal" aria-label="Histórico">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span class="hub-label">Histórico</span>
+      </button>
+    </section>
+    <section class="home-datetime" aria-label="Data e horário atual">
+      <span id="homeDateTimeLabel">--</span>
+    </section>
+    <button class="home-running-btn" id="openRunningTaskModal" type="button" data-open-modal="runningTaskModal" aria-label="Tarefa em execução" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <section class="profile-selector profile-footer" aria-label="Usuários">
+      <button class="profile-chip" type="button" data-profile="Alberto" aria-label="Alberto">
+        <img class="task-avatar" src="/200/avatars/alberto.png" alt="Alberto" />
+      </button>
+      <button class="profile-chip active" type="button" data-profile="Rose" aria-label="Rose">
+        <img class="task-avatar" src="/200/avatars/rose.png" alt="Rose" />
+      </button>
+      <button class="profile-chip" type="button" data-profile="Lucas" aria-label="Lucas">
+        <img class="task-avatar" src="/200/avatars/lucas.png" alt="Lucas" />
+      </button>
+      <button class="profile-chip" type="button" data-profile="Thainan" aria-label="Thainan">
+        <img class="task-avatar" src="/200/avatars/thainan.png" alt="Thainan" />
+      </button>
+    </section>
+  </main>
+
+  <section class="workspace-modal simple-modal" id="runningTaskModal" aria-hidden="true" aria-label="Tarefa em execução">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <div class="finance-content running-task-content">
+      <div class="running-task-title-row">
+        <img class="running-task-category-icon" id="runningTaskCategoryIcon" src="/200/category-icons/trabalho.svg" alt="Categoria atual" hidden />
+        <div class="running-task-name" id="runningTaskName">Sem tarefa em execução.</div>
+      </div>
+      <div class="running-task-minutes" id="runningTaskMinutesLeft">0 minutos restantes</div>
+      <div class="running-circle-wrap">
+        <button class="running-circle-toggle running-circle-toggle-left" id="runningModePercentBtn" type="button" aria-label="Mostrar porcentagem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h3V9H4zm6 0h3V5h-3zm6 0h3V12h-3z"/></svg>
+        </button>
+        <svg class="running-progress-ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="running-progress-ring-bg" cx="60" cy="60" r="48"></circle>
+          <circle class="running-progress-ring-fill" id="runningTaskProgressRing" cx="60" cy="60" r="48"></circle>
+        </svg>
+        <div class="running-task-percent" id="runningTaskPercent">0%</div>
+        <button class="running-circle-toggle running-circle-toggle-right" id="runningModeTimeBtn" type="button" aria-label="Mostrar tempo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
+        </button>
+      </div>
+      <div class="running-next-panel" id="runningNextPanel">
+        <div class="running-task-next-label">Próxima tarefa</div>
+        <div class="running-task-next-row">
+          <img class="running-task-next-icon" id="runningTaskNextIcon" src="/200/icons/agenda.svg" alt="Categoria próxima tarefa" />
+          <div class="running-task-next" id="runningTaskNextName">Descanso</div>
+        </div>
+        <button class="ghost-btn running-task-start-btn" type="button" id="runningTaskStartNextButton" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg><span>Iniciar tarefa</span></button>
+      </div>
+      <div class="running-task-actions">
+        <button class="running-task-circle-btn running-task-restore-btn" type="button" id="runningTaskRestoreButton" aria-label="Cancelar atividade"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 7.1 16.9 5.7 12 10.6 7.1 5.7 5.7 7.1 10.6 12l-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z"/></svg></button>
+        <button class="running-task-circle-btn running-task-finalize-btn" type="button" id="runningTaskFinalizeButton" aria-label="Concluir atividade"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 16.6 4.9 12.3l1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z"/></svg></button>
+        <button class="running-task-circle-btn running-task-giveup-btn" type="button" id="runningTaskGiveUpButton" aria-label="Desistir da atividade"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      <div class="running-player" id="runningMiniPlayer">
+        <div class="running-player-station" id="runningPlayerStation">Estação 1</div>
+        <div class="running-player-track-wrap">
+          <button type="button" class="running-player-btn running-player-track-nav" id="runningPlayerPrev" aria-label="Música anterior"><svg viewBox="0 0 24 24"><path d="M15.4 18.6 8.8 12l6.6-6.6L14 4l-8 8 8 8z"/></svg></button>
+          <div class="running-player-track" id="runningPlayerTrack">Sem música</div>
+          <button type="button" class="running-player-btn running-player-track-nav" id="runningPlayerNext" aria-label="Próxima música"><svg viewBox="0 0 24 24"><path d="m8.6 18.6 1.4 1.4 8-8-8-8-1.4 1.4 6.6 6.6z"/></svg></button>
+        </div>
+        <div class="running-player-controls">
+          <button type="button" class="running-player-btn running-player-play" id="runningPlayerPlay" aria-label="Play/Pause"><svg viewBox="0 0 24 24"><path d="m8 5 12 7-12 7z"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="workspace-modal simple-modal" id="dayDoneModal" aria-hidden="true" aria-label="Resumo do dia">
+    <div class="finance-content running-task-content">
+      <div class="running-task-name">Você concluiu suas tarefas do dia</div>
+      <div class="running-task-percent" id="dayDonePercent">0%</div>
+      <div class="running-task-minutes" id="dayDoneDelay">Atraso: 0 min</div>
+      <button class="primary-btn running-task-finalize-btn" type="button" data-close-modal>Fechar</button>
+    </div>
+  </section>
+  <section class="workspace-modal simple-modal" id="startDecisionModal" aria-hidden="true" aria-label="Decisão de início">
+    <button class="modal-close" type="button" id="closeStartDecisionModal" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <div class="finance-content running-task-content start-decision-content">
+      <div class="running-task-name">Você está iniciando</div>
+      <div class="running-task-next" id="startDecisionTarget">Tarefa X</div>
+      <div class="running-task-minutes" id="startDecisionContextLabel">No horário</div>
+      <div class="running-task-next" id="startDecisionCurrent">Sem atraso</div>
+      <div class="start-decision-actions" id="startDecisionActions"></div>
+    </div>
+  </section>
+  <section class="workspace-modal simple-modal" id="postponeTaskModal" aria-hidden="true" aria-label="Adiar tarefa">
+    <button class="modal-close" type="button" id="closePostponeTaskModal" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <div class="finance-content running-task-content start-decision-content">
+      <div class="running-task-name">Adiar tarefa</div>
+      <div class="running-task-next" id="postponeTaskTitle">Tarefa</div>
+      <div class="date-picker">
+        <button class="circle-nav" type="button" data-postpone-nav="time" data-dir="-1">‹</button>
+        <strong id="postponeTimeLabel">+5 minutos</strong>
+        <button class="circle-nav" type="button" data-postpone-nav="time" data-dir="1">›</button>
+      </div>
+      <div class="date-picker">
+        <button class="circle-nav" type="button" data-postpone-nav="day" data-dir="-1">‹</button>
+        <strong id="postponeDayLabel">Hoje</strong>
+        <button class="circle-nav" type="button" data-postpone-nav="day" data-dir="1">›</button>
+      </div>
+      <div class="postpone-options">
+        <label><input type="checkbox" id="postponeOnlyFree" /> Mostrar somente horários livres</label>
+        <label><input type="checkbox" id="postponeUseSleep" /> Usar descanso</label>
+      </div>
+      <div id="postponeFeedback" class="auth-alert">Horário disponível</div>
+      <div class="start-decision-actions">
+        <button class="primary-btn" type="button" id="confirmPostponeTask"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 16.6 4.9 12.3l1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z"/></svg><span>Confirmar adiamento</span></button>
+      </div>
+    </div>
+  </section>
+  <section class="workspace-modal simple-modal" id="postponeReplaceModal" aria-hidden="true" aria-label="Confirmar substituição">
+    <button class="modal-close" type="button" id="closePostponeReplaceModal" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <div class="finance-content running-task-content start-decision-content">
+      <div class="running-task-name">Confirmar substituição</div>
+      <div class="running-task-minutes">Estas tarefas serão substituídas:</div>
+      <div class="running-task-next" id="postponeReplaceList">-</div>
+      <div class="start-decision-actions">
+        <button class="primary-btn" type="button" id="confirmPostponeReplace"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v2H4zm0 8h16v2H4zm0-4h16v2H4z"/></svg><span>Substituir</span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="workspace-modal" id="actionsModal" aria-hidden="true" aria-label="AçÃµes">
+    <div class="actions-app">
+      <header class="actions-head">
+        <button class="circle-nav" type="button" data-day-nav="-1" aria-label="Data anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <button class="date-title" type="button" id="activeDateLabel">Hoje</button>
+          <button class="circle-nav" type="button" data-day-nav="1" aria-label="Próxima data">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+        </button>
+      </header>
+
+      <div class="auth-alert" id="actionsAuthAlert" hidden>
+        <span>Entre na sua conta para salvar a agenda.</span>
+        <a href="/auth.html?next=/200">Entrar</a>
+      </div>
+
+      <div class="actions-list" id="actionsList" aria-live="polite"></div>
+      <footer class="actions-progress" id="actionsProgress" hidden>
+        <div class="actions-progress-head">
+          <strong id="actionsProgressLabel">0% concluido</strong>
+          <span id="actionsProgressMinutes">0/0 min</span>
+        </div>
+        <div class="actions-progress-track" role="progressbar" aria-label="Progresso diario de tarefas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="actions-progress-fill" id="actionsProgressFill"></div>
+        </div>
+      </footer>
+      <div class="actions-side-actions">
+        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openActionWizard" aria-label="Adicionar tarefa">
+          <img src="/200/icons/add.svg" alt="" aria-hidden="true" />
+        </button>
+        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar ações">
+          <img src="/200/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <div class="action-wizard" id="actionWizard" aria-hidden="true">
+      <div class="wizard-panel">
+        <header class="wizard-head">
+          <span id="wizardStepLabel">1 de 4</span>
+          <button class="wizard-close" type="button" id="closeActionWizard" aria-label="Fechar etapa">
+            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+          </button>
+        </header>
+
+        <form id="actionForm">
+          <section class="wizard-step active" data-step="1">
+            <label class="step-label" for="taskTitle">Titulo da Tarefa</label>
+            <input id="taskTitle" class="text-field" name="title" autocomplete="off" maxlength="80" />
+            <button class="category-picker-trigger" type="button" id="actionCategoryTrigger" aria-label="Selecionar categoria">
+              <img class="task-avatar" id="actionCategoryPreviewIcon" src="/200/avatars/rose.png" alt="Categoria da tarefa" />
+              <span id="actionCategoryPreviewLabel">Categoria automática</span>
+            </button>
+            <div class="action-voice-tools">
+              <button class="history-icon-btn mic-idle" type="button" id="actionMicButton" aria-label="Falar tarefa">
+                <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-3.07A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0z"/></svg>
+              </button>
+              <span class="history-voice-status action-voice-status" id="actionVoiceStatus">Toque no microfone para criar por voz.</span>
+            </div>
+          </section>
+
+          <section class="wizard-step" data-step="2">
+            <span class="step-label step-label-with-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v2h6V2h2v2h3v18H4V4zm11 6H6v12h12zM8 11h3v3H8zm5 0h3v3h-3z" fill="currentColor"/></svg>
+              <span>Data</span>
+            </span>
+            <div class="date-picker" id="wizardDatePickerWrap">
+              <button class="circle-nav" type="button" data-wizard-date="-1" aria-label="Data anterior">
+                <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+              </button>
+              <strong id="wizardDateLabel">Hoje</strong>
+              <button class="circle-nav" type="button" data-wizard-date="1" aria-label="Próxima data">
+                <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+              </button>
+            </div>
+
+            <div class="repeat-box" id="repeatBox" hidden>
+              <div class="repeat-presets" id="repeatModeButtons">
+                <button type="button" data-repeat-mode="daily">Diariamente</button>
+                <button type="button" data-repeat-mode="periodic">Periodico</button>
+                <button type="button" data-repeat-mode="monthly_custom">Personalizado</button>
+              </div>
+              <button type="button" class="ghost-btn repeat-mode-back" id="repeatModeBackButton" hidden>Voltar</button>
+              <div class="repeat-periodic" id="repeatPeriodicBox" hidden>
+                <span>A cada:</span>
+                <div class="repeat-control-row">
+                  <button type="button" class="circle-nav" data-periodic-nav="-1" aria-label="Diminuir período"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button>
+                  <strong id="periodicEveryLabel">2 dias</strong>
+                  <button type="button" class="circle-nav" data-periodic-nav="1" aria-label="Aumentar período"><svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg></button>
+                </div>
+                <label><input type="checkbox" id="avoidSaturday" /> Evitar sábados</label>
+                <label><input type="checkbox" id="avoidSunday" /> Evitar domingos</label>
+              </div>
+              <div class="repeat-monthly-custom" id="repeatMonthlyCustomBox" hidden>
+                <div>Toda:</div>
+                <div class="repeat-control-row"><button type="button" class="circle-nav" data-monthly-ordinal-nav="-1" aria-label="Voltar ordem"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button> <strong id="monthlyOrdinalLabel">Primeira</strong> <button type="button" class="circle-nav" data-monthly-ordinal-nav="1" aria-label="Avançar ordem"><svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg></button></div>
+                <div class="repeat-control-row"><button type="button" class="circle-nav" data-monthly-weekday-nav="-1" aria-label="Voltar dia"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button> <strong id="monthlyWeekdayLabel">Quarta-feira</strong> <button type="button" class="circle-nav" data-monthly-weekday-nav="1" aria-label="Avançar dia"><svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg></button></div>
+                <div>do mês</div>
+              </div>
+              <div class="weekday-row" id="weekdayRow" aria-label="Dias da semana"></div>
+            </div>
+
+            <button class="repeat-toggle" type="button" id="repeatToggle" aria-label="Editar repetição">
+              <svg viewBox="0 0 24 24"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg>
+              <span>Personalizar</span>
+            </button>
+          </section>
+
+          <section class="wizard-step" data-step="3">
+            <span class="step-label">Horario inicio</span>
+            <div class="time-picker" data-time-picker="start"></div>
+          </section>
+
+          <section class="wizard-step" data-step="4">
+            <span class="step-label">Horario fim</span>
+            <div class="time-picker" data-time-picker="end"></div>
+          </section>
+
+          <p class="wizard-message" id="wizardMessage" role="status"></p>
+
+          <section class="wizard-ai-confirm" id="actionAiConfirm" hidden>
+            <h3>Confirmação da tarefa</h3>
+            <p><strong>Título:</strong> <span id="actionAiConfirmTitle">-</span></p>
+            <p><strong>Horário:</strong> <button type="button" data-ai-time-nav="start" data-dir="-1">‹</button> <span id="actionAiConfirmStart">-</span> <button type="button" data-ai-time-nav="start" data-dir="1">›</button></p>
+            <p><strong>Horário final:</strong> <button type="button" data-ai-time-nav="end" data-dir="-1">‹</button> <span id="actionAiConfirmEnd">-</span> <button type="button" data-ai-time-nav="end" data-dir="1">›</button></p>
+            <p><strong>Datas selecionadas:</strong> <span id="actionAiConfirmDates">-</span> <button type="button" id="actionAiEditDates">Editar data</button></p>
+            <div class="wizard-ai-confirm-actions">
+              <button class="ghost-btn" type="button" id="actionAiEdit">Editar manualmente</button>
+              <button class="ghost-btn" type="button" id="actionAiRenameMic">Renomear com voz</button>
+              <button class="primary-btn" type="button" id="actionAiApply">Confirmar</button>
+            </div>
+          </section>
+
+          <footer class="wizard-actions">
+            <button class="ghost-btn" type="button" id="wizardBack">Voltar</button>
+            <button class="primary-btn" type="button" id="wizardNext">Continuar</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+    <div class="action-wizard" id="actionCategoryModal" aria-hidden="true">
+      <div class="wizard-panel">
+        <header class="wizard-head">
+          <span>Escolher categoria</span>
+          <button class="wizard-close" type="button" id="closeActionCategoryModal" aria-label="Fechar">
+            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+          </button>
+        </header>
+        <div class="category-grid" id="actionCategoryGrid"></div>
+        <div class="wizard-actions">
+          <button class="primary-btn" type="button" id="confirmActionCategoryModal">Confirmar categoria</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-wizard" id="overlapWizard" aria-hidden="true">
+      <div class="wizard-panel overlap-panel">
+        <header class="wizard-head">
+          <span>Conflito de horário</span>
+          <button class="wizard-close" type="button" id="closeOverlapWizard" aria-label="Fechar">
+            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+          </button>
+        </header>
+        <div class="overlap-content">
+          <p class="overlap-title">Está sobrepondo</p>
+          <p class="overlap-task" id="overlapTaskTitle">Tarefa</p>
+          <p class="overlap-time" id="overlapTaskRange">07:00 às 09:00</p>
+        </div>
+        <div class="overlap-actions">
+          <button class="primary-btn" type="button" id="overlapReplaceButton">Substituir</button>
+          <small>Isso substitui totalmente as atividades indicadas</small>
+          <h4>Escolher um horário livre</h4>
+          <div class="date-picker overlap-picker">
+            <button class="circle-nav" type="button" id="overlapFreePrev">‹</button>
+            <strong id="overlapFreeStartLabel">--:--</strong>
+            <button class="circle-nav" type="button" id="overlapFreeNext">›</button>
+          </div>
+          <button class="ghost-btn" type="button" id="overlapApplyFreeButton">Usar horário livre</button>
+          <button class="ghost-btn" type="button" id="overlapChangeTimeButton">Mudar horário</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-wizard" id="actionStatusWizard" aria-hidden="true">
+      <div class="wizard-panel">
+        <header class="wizard-head">
+          <span id="actionStatusWizardTitle">Tarefa em andamento</span>
+          <button class="wizard-close" type="button" id="closeActionStatusWizard" aria-label="Fechar">
+            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+          </button>
+        </header>
+
+        <div id="actionStatusOptionsStep">
+          <p class="wizard-message" id="actionStatusWizardMessage">Escolha uma ação para a tarefa em andamento.</p>
+          <div class="wizard-actions">
+            <button class="ghost-btn" type="button" id="actionRestoreButton">Restaurar</button>
+            <button class="primary-btn" type="button" id="actionManualFinishButton">Finalizar manual</button>
+          </div>
+        </div>
+
+        <div id="actionStatusManualStep" hidden>
+          <label class="step-label" for="manualStartTime">Horário de início</label>
+          <input id="manualStartTime" class="text-field" type="time" step="300" />
+          <label class="step-label" for="manualEndTime">Horário de fim</label>
+          <input id="manualEndTime" class="text-field" type="time" step="300" />
+          <p class="wizard-message" id="actionStatusManualMessage"></p>
+          <div class="wizard-actions">
+            <button class="ghost-btn" type="button" id="actionManualBackButton">Voltar</button>
+            <button class="primary-btn" type="button" id="actionManualSaveButton">Salvar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="workspace-modal" id="constitutionModal" aria-hidden="true" aria-label="Constituição">
+    <div class="constitution-app">
+      <header class="actions-head">
+        <button class="circle-nav" type="button" data-constitution-nav="-1" aria-label="Versão anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <button class="date-title" type="button" id="constitutionVersionLabel">Versão 1</button>
+        <button class="circle-nav" type="button" data-constitution-nav="1" aria-label="Próxima versão">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+        </button>
+      </header>
+
+      <div class="auth-alert" id="constitutionAuthAlert" hidden>
+        <span>Entre na sua conta para editar e aprovar versões da constituição.</span>
+        <a href="/auth.html?next=/200">Entrar</a>
+      </div>
+
+      <article class="constitution-text-wrap">
+        <p class="constitution-text" id="constitutionTextView"></p>
+      </article>
+
+      <div class="constitution-edit" id="constitutionEditWrap" hidden>
+        <textarea id="constitutionEditor" class="text-field constitution-editor" maxlength="6000"></textarea>
+        <div class="constitution-edit-actions">
+          <button class="ghost-btn" type="button" id="cancelConstitutionEdit">Cancelar</button>
+          <button class="primary-btn" type="button" id="saveConstitutionEdit">Salvar nova versão</button>
+        </div>
+      </div>
+
+      <section class="constitution-avatars" id="constitutionAvatars">
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Rose" aria-label="Rose">
+          <img class="task-avatar" src="/200/avatars/rose.png" alt="Rose" />
+        </button>
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Alberto" aria-label="Alberto">
+          <img class="task-avatar" src="/200/avatars/alberto.png" alt="Alberto" />
+        </button>
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Lucas" aria-label="Lucas">
+          <img class="task-avatar" src="/200/avatars/lucas.png" alt="Lucas" />
+        </button>
+        <button class="constitution-avatar-btn" type="button" data-constitution-approver="Thainan" aria-label="Thainan">
+          <img class="task-avatar" src="/200/avatars/thainan.png" alt="Thainan" />
+        </button>
+      </section>
+
+      <p class="wizard-message" id="constitutionMessage" role="status"></p>
+
+      <div class="actions-side-actions">
+        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openConstitutionEdit" aria-label="Editar constituição">
+          <svg viewBox="0 0 24 24"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg>
+        </button>
+        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar constituição">
+          <img src="/200/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal finance-modal" id="financeModal" aria-hidden="true" aria-label="Plataforma">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <div class="finance-content">
+      <h1 id="financeIntroTitle">Plataforma</h1>
+      <div class="finance-period-picker" id="financePeriodPicker" hidden>
+        <button class="circle-nav" type="button" id="financePeriodPrev" aria-label="Periodo anterior">‹</button>
+        <span class="finance-period-label" id="financePeriodLabel">Total</span>
+        <button class="circle-nav" type="button" id="financePeriodNext" aria-label="Proximo periodo">›</button>
+      </div>
+      <div class="finance-dashboard" id="financeDashboard" hidden>
+        <article class="finance-metric">
+          <span id="financeSalesLabel">Total de vendas</span>
+          <strong id="financeTotalSales">R$ 0,00</strong>
+        </article>
+        <article class="finance-metric">
+          <span>Assinantes atuais</span>
+          <strong id="financeSubscribers">0</strong>
+        </article>
+        <article class="finance-metric">
+          <span>Renda mensal</span>
+          <strong id="financeMonthlyRevenue">R$ 0,00</strong>
+        </article>
+      </div>
+      <p class="finance-status" id="financeStatus" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="workspace-modal" id="calendarModal" aria-hidden="true" aria-label="Finanças">
+    <div class="actions-app">
+      <header class="actions-head">
+        <button class="circle-nav" type="button" data-finance-day-nav="-1" aria-label="Data anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <button class="date-title" type="button" id="financeDateLabel">Hoje</button>
+        <button class="circle-nav" type="button" data-finance-day-nav="1" aria-label="Próxima data">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+        </button>
+        <div class="finance-head-balance">
+          <button class="balance-visibility" type="button" id="togglePlatformBalance" aria-label="Ocultar saldo">*</button>
+          <strong id="platformBalanceValue">R$ 0,00</strong>
+          <button class="ghost-btn" type="button" id="addPlatformBalance">+</button>
+        </div>
+      </header>
+
+      <div class="finance-overview">
+        <article class="finance-metric finance-rotating-card" id="platformExpenseCard">
+          <span class="finance-metric-title"><img src="/200/icons/saidas.svg" alt="" aria-hidden="true" />Saídas</span>
+          <strong id="platformMonthlyExpense">R$ 0,00</strong>
+        </article>
+        <article class="finance-metric finance-rotating-card" id="platformIncomeCard" hidden>
+          <span class="finance-metric-title"><img src="/200/icons/entradas.svg" alt="" aria-hidden="true" />Entradas</span>
+          <strong id="platformMonthlyIncome">R$ 0,00</strong>
+        </article>
+        <article class="finance-metric finance-rotating-card" id="platformSaldoCard" hidden>
+          <span class="finance-metric-title"><img src="/200/icons/plataforma.svg" alt="" aria-hidden="true" />Saldo</span>
+          <strong id="platformRealizedBalance">R$ 0,00</strong>
+        </article>
+      </div>
+
+      <div class="actions-list" id="platformEntriesList" aria-live="polite"></div>
+      <div class="finance-bottom-actions">
+        <button class="icon-action-btn" type="button" id="openPlatformWizard" aria-label="Adicionar lançamento">
+          <img src="/200/icons/add.svg" alt="" aria-hidden="true" />
+        </button>
+        <button class="icon-action-btn" type="button" data-close-modal aria-label="Fechar finanças">
+          <img src="/200/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <div class="action-wizard" id="platformWizard" aria-hidden="true">
+      <div class="wizard-panel">
+        <header class="wizard-head">
+          <span id="platformWizardStepLabel">1 de 4</span>
+          <button class="wizard-close" type="button" id="closePlatformWizard" aria-label="Fechar etapa">
+            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+          </button>
+        </header>
+
+        <form id="platformForm">
+          <section class="wizard-step active" data-platform-step="1">
+            <label class="step-label" for="platformName">Nome</label>
+            <div class="platform-name-field-wrap">
+              <input id="platformName" class="text-field platform-name-field" name="name" autocomplete="off" maxlength="90" />
+              <button type="button" class="platform-name-mic-btn" id="platformNameMicButton" aria-label="Falar nome do lançamento">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m6-4a1 1 0 0 1 2 0 8 8 0 0 1-7 7.94V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.06A8 8 0 0 1 4 11a1 1 0 1 1 2 0 6 6 0 0 0 12 0"/></svg>
+              </button>
+            </div>
+            <div class="repeat-presets">
+              <button type="button" data-platform-kind="INCOME" class="active">Entrada</button>
+              <button type="button" data-platform-kind="EXPENSE">Saída</button>
+            </div>
+            <div class="repeat-presets" id="platformCategoryRow"></div>
+          </section>
+
+          <section class="wizard-step" data-platform-step="2">
+            <span class="step-label">Valor</span>
+            <input id="platformValue" class="text-field" name="value" autocomplete="off" inputmode="decimal" placeholder="0,00" />
+          </section>
+
+          <section class="wizard-step" data-platform-step="3">
+            <span class="step-label">Simples ou Recorrente</span>
+            <div class="repeat-presets">
+              <button type="button" data-platform-recurrence="SIMPLE" class="active">Simples</button>
+              <button type="button" data-platform-recurrence="RECURRING">Recorrente</button>
+            </div>
+          </section>
+
+          <section class="wizard-step" data-platform-step="4">
+            <span class="step-label">Dia do mês</span>
+            <div class="date-picker">
+              <button class="circle-nav" type="button" data-platform-day="-1" aria-label="Dia anterior">
+                <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+              </button>
+              <strong id="platformRecurrenceDayLabel">1</strong>
+              <button class="circle-nav" type="button" data-platform-day="1" aria-label="Próximo dia">
+                <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+              </button>
+            </div>
+          </section>
+
+          <p class="wizard-message" id="platformWizardMessage" role="status"></p>
+
+          <footer class="wizard-actions">
+            <button class="ghost-btn" type="button" id="platformWizardBack">Voltar</button>
+            <button class="primary-btn" type="button" id="platformWizardAiCreate">Criar</button>
+            <button class="primary-btn" type="button" id="platformWizardNext">Continuar</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="workspace-modal" id="statsModal" aria-hidden="true" aria-label="Estatísticas">
+    <div class="actions-app">
+      <header class="actions-head">
+        <button class="circle-nav" type="button" data-stats-scope-nav="-1" aria-label="Escopo anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <button class="date-title" type="button" id="statsScopeLabel">Geral</button>
+        <button class="circle-nav" type="button" data-stats-scope-nav="1" aria-label="Próximo escopo">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+        </button>
+      </header>
+
+      <section class="finance-overview" id="statsGeneralGoals">
+        <article class="finance-metric">
+          <span>Saldo</span>
+          <strong id="statsDailyGoalProgress">0%</strong>
+        </article>
+        <article class="finance-metric">
+          <span>Meta mensal</span>
+          <strong id="statsMonthlyGoalProgress">0%</strong>
+        </article>
+        <article class="finance-metric">
+          <span>Meta recorrente</span>
+          <strong id="statsRecurringGoalProgress">0%</strong>
+        </article>
+      </section>
+
+      <div class="actions-list">
+        <article class="task-row stats-general-card" id="statsGeneralCard">
+          <div class="stats-avatar-wrap">
+            <img class="task-avatar" id="statsGeneralAvatar" src="/200/avatars/familyplan.png" alt="Avatar geral" />
+          </div>
+          <div class="task-main">
+            <div class="task-title">Geral</div>
+            <div class="task-assignee" id="statsGeneralDetail">0%</div>
+          </div>
+        </article>
+        <div id="statsRankingList"></div>
+      </div>
+      <div class="actions-side-actions stats-side-actions">
+        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="editStatsGoals" aria-label="Editar metas">
+          <img src="/200/icons/star.svg" alt="" aria-hidden="true" />
+        </button>
+        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar estatísticas">
+          <img src="/200/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <div class="action-wizard" id="financeEntryConfirmWizard" aria-hidden="true">
+      <div class="wizard-panel">
+        <header class="wizard-head">
+          <span>Confirmar lançamento</span>
+          <button class="wizard-close" type="button" id="closeFinanceEntryConfirm" aria-label="Fechar">
+            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+          </button>
+        </header>
+        <div class="task-row platform-entry-row" id="financeEntryConfirmCard">
+          <div class="task-title" id="financeEntryConfirmName">-</div>
+          <div class="platform-entry-value" id="financeEntryConfirmValue">R$ 0,00</div>
+        </div>
+        <p class="wizard-message" id="financeEntryConfirmMeta">-</p>
+        <div class="wizard-actions">
+          <button class="ghost-btn" type="button" id="financeEntryConfirmCancel">Cancelar</button>
+          <button class="primary-btn" type="button" id="financeEntryConfirmApply">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="workspace-modal" id="historyModal" aria-hidden="true" aria-label="Histórico">
+    <div class="actions-app history-app">
+      <header class="actions-head">
+        <button class="circle-nav" type="button" data-history-day-nav="-1" aria-label="Dia anterior">
+          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+        </button>
+        <button class="date-title" type="button" id="historyDateLabel">Hoje</button>
+        <button class="circle-nav" type="button" data-history-day-nav="1" aria-label="Próximo dia">
+          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
+        </button>
+      </header>
+      <div class="history-panels" id="historyTimelineList"></div>
+      <div class="actions-side-actions history-footer-actions">
+        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openHistoryTextComposer" aria-label="Novo texto">
+          <img src="/200/icons/add.svg" alt="" aria-hidden="true" />
+        </button>
+        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar histórico">
+          <img src="/200/icons/close.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+      <section class="action-wizard" id="historyTextComposer" aria-hidden="true">
+        <div class="wizard-panel">
+          <header class="wizard-head">
+            <span id="historyTextStepLabel">1 de 2</span>
+            <button class="wizard-close" type="button" id="closeHistoryTextComposer" aria-label="Fechar">
+              <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
+            </button>
+          </header>
+          <form id="historyTextForm">
+            <section class="wizard-step active" data-history-text-step="1">
+              <label class="step-label">Quem está falando?</label>
+              <div class="history-avatar-grid" id="historyTextAvatarGrid">
+                <button class="history-avatar-btn" type="button" data-history-speaker="Rose"><img class="task-avatar" src="/200/avatars/rose.png" alt="Rose" /><span>Rose</span></button>
+                <button class="history-avatar-btn" type="button" data-history-speaker="Alberto"><img class="task-avatar" src="/200/avatars/alberto.png" alt="Alberto" /><span>Alberto</span></button>
+                <button class="history-avatar-btn" type="button" data-history-speaker="Lucas"><img class="task-avatar" src="/200/avatars/lucas.png" alt="Lucas" /><span>Lucas</span></button>
+                <button class="history-avatar-btn" type="button" data-history-speaker="Thainan"><img class="task-avatar" src="/200/avatars/thainan.png" alt="Thainan" /><span>Thainan</span></button>
+              </div>
+            </section>
+            <section class="wizard-step" data-history-text-step="2">
+              <label class="step-label">Fale com o microfone</label>
+              <div class="history-voice-actions">
+                <button type="button" class="history-icon-btn mic-idle" id="historyMicButton" aria-label="Microfone">
+                  <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 1 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11z"/></svg>
+                </button>
+                <button type="button" class="history-icon-btn" id="historyDeleteWordButton" aria-label="Apagar palavra">
+                  <svg viewBox="0 0 24 24"><path d="M22 3H7L2 12l5 9h15V3zM9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59 17.59 17 14 13.41 10.41 17z"/></svg>
+                </button>
+                <button type="button" class="history-icon-btn history-icon-danger" id="historyClearTextButton" aria-label="Apagar tudo">
+                  <svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h5v2H3V5h5l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h10l-1 11H8L7 9z"/></svg>
+                </button>
+              </div>
+              <div class="history-voice-status" id="historyVoiceStatus">Aguardando gravação...</div>
+              <div class="history-live-text" id="historyLiveText"></div>
+            </section>
+            <footer class="wizard-actions">
+              <button class="ghost-btn" type="button" id="historyTextBack">Voltar</button>
+              <button class="primary-btn" type="submit" id="historyTextNext">Continuar</button>
+            </footer>
+          </form>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal" id="historyReadModal" aria-hidden="true" aria-label="Leitura do histórico">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg></button>
+    <div class="finance-content history-read-content">
+      <h2 id="historyReadTitle">Título</h2>
+      <div id="historyReadBody" class="history-read-body"></div>
+    </div>
+  </section>
+
+  <script type="module" src="/200/project.js?v=20260529-linkfix"></script>
+  <script src='/speech-input-kit.js'></script>
+</body>
+</html>
+
+
+
+

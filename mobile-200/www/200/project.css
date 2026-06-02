@@ -402,7 +402,7 @@ body.project-no-select textarea {
   stroke: #24d166;
   stroke-width: 5;
   stroke-linecap: round;
-  stroke-dasharray: 301.59 301.59;
+  stroke-dasharray: 301.59;
   stroke-dashoffset: 301.59;
   transition: stroke-dashoffset 0.35s ease;
 }
@@ -643,42 +643,6 @@ body.project-no-select textarea {
 
 #runningTaskModal .running-task-content.is-idle-layout .running-player {
   margin-top: auto;
-}
-
-#runningTaskModal .running-task-content.is-completion-layout {
-  min-height: 72vh;
-  justify-content: center;
-  align-items: center;
-  gap: 0;
-}
-
-#runningTaskModal .running-task-content.is-completion-layout .running-task-title-row,
-#runningTaskModal .running-task-content.is-completion-layout .running-task-minutes,
-#runningTaskModal .running-task-content.is-completion-layout .running-next-panel,
-#runningTaskModal .running-task-content.is-completion-layout .running-task-actions,
-#runningTaskModal .running-task-content.is-completion-layout .running-player,
-#runningTaskModal .running-task-content.is-completion-layout .running-circle-toggle {
-  display: none !important;
-}
-
-#runningTaskModal .running-task-content.is-completion-layout .running-circle-wrap {
-  width: 236px;
-  height: 236px;
-  margin: 0 auto;
-}
-
-#runningTaskModal .running-task-content.is-completion-layout .running-progress-ring {
-  width: 236px;
-  height: 236px;
-  animation: none;
-}
-
-#runningTaskModal .running-task-content.is-completion-layout .running-progress-ring-fill {
-  transition: none;
-}
-
-#runningTaskModal .running-task-content.is-completion-layout .running-task-percent {
-  font-size: 3.2rem;
 }
 
 .running-next-panel {

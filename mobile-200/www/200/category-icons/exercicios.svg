@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="exercicios">
+  <circle cx="32" cy="32" r="30" fill="#111111"/>
+  <rect x="12" y="25" width="8" height="14" rx="2" fill="#ffffff"/>
+  <rect x="44" y="25" width="8" height="14" rx="2" fill="#ffffff"/>
+  <rect x="20" y="29" width="24" height="6" rx="2" fill="#ffffff"/>
+  <path d="M8 27h4M8 31h4M8 35h4M52 27h4M52 31h4M52 35h4" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+</svg>

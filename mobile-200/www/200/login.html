@@ -1,0 +1,28 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Projeto 200 - Acesso</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/200/login.css" />
+</head>
+<body>
+  <main class="login-shell">
+    <img class="login-logo" src="/200/avatars/familyplan.png" alt="Projeto 200" />
+    <section class="login-card" aria-label="Login da pagina 200">
+      <h1>Acesso da página 200</h1>
+      <p>Digite o nome autorizado para continuar.</p>
+      <form id="loginForm" novalidate>
+        <label for="usernameInput">Nome de acesso</label>
+        <input id="usernameInput" name="username" type="text" autocomplete="off" placeholder="RoseMattos" required />
+        <button type="submit">Entrar</button>
+      </form>
+      <p id="loginMessage" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <script src="/200/login.js" defer></script>
+</body>
+</html>

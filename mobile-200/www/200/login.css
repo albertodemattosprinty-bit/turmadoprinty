@@ -1,0 +1,54 @@
+﻿:root {
+  --bg-a: #0b3da8;
+  --bg-b: #1f7ee7;
+  --white: #ffffff;
+  --card-bg: rgba(6, 29, 83, 0.42);
+  --line: rgba(255, 255, 255, 0.22);
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; margin: 0; }
+body {
+  font-family: "Exo 2", sans-serif;
+  color: var(--white);
+  background-image: linear-gradient(145deg, var(--bg-a), var(--bg-b));
+}
+.login-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  gap: 20px;
+  padding: 24px;
+}
+.login-logo {
+  width: min(240px, 62vw);
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.3));
+}
+.login-card {
+  width: min(420px, 92vw);
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 22px;
+  backdrop-filter: blur(10px);
+}
+h1 { margin: 0 0 6px; font-size: 1.45rem; }
+p { margin: 0 0 14px; color: rgba(255, 255, 255, 0.88); }
+label { display: block; margin-bottom: 8px; font-weight: 600; }
+input, button { width: 100%; font: inherit; border-radius: 12px; }
+input {
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--white);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+button {
+  border: 0;
+  background: #24d166;
+  color: #07381f;
+  font-weight: 800;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+#loginMessage { min-height: 22px; margin-top: 10px; font-weight: 600; }
