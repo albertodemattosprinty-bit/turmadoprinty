@@ -235,6 +235,12 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   pointer-events: none;
 }
 
+body.modal-open .project-shell {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .running-task-content {
   align-items: stretch;
   text-align: left;

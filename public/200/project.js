@@ -1977,6 +1977,7 @@ function openModal(id) {
   modal.classList.add("active");
   modal.classList.remove("is-fading-out");
   modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
 
   if (id === "actionsModal") {
     const latestDone = getLatestCompletedActionForSelectedProfile();
@@ -2080,6 +2081,9 @@ function closeModal(modal) {
   }
   if (modal.id === "runningConfirmModal") {
     state.runningConfirm.action = null;
+  }
+  if (!document.querySelector(".workspace-modal.active")) {
+    document.body.classList.remove("modal-open");
   }
 }
 
