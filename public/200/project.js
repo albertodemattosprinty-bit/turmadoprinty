@@ -437,6 +437,7 @@ const RUNNING_COMPLETION_HOLD_MS = 1000;
 const RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS = 2000;
 const RUNNING_NEXT_METRIC_PROGRESS_MS = 1500;
 const RUNNING_NEXT_METRIC_PUNCTUALITY_MS = 2500;
+const RUNNING_STATUS_ROTATION_MS = 2000;
 if (runningAudio) {
   runningAudio.preload = "auto";
 }
@@ -802,6 +803,29 @@ function formatSignedDelay(minutesValue) {
   return `${hours} hora${hours === 1 ? "" : "s"} e ${String(minutes).padStart(2, "0")} minutos ${suffix}`;
 }
 
+function renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes) {
+  if (!runningTaskMinutesLeft) {
+    return;
+  }
+  const showPunctuality = Math.floor(getServerNowMs() / RUNNING_STATUS_ROTATION_MS) % 2 === 0;
+  runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
+  clearInlineTone(runningTaskMinutesLeft);
+  if (showPunctuality) {
+    runningTaskMinutesLeft.textContent = `Pontualidade ${punctualitySummary.punctualityPercent}%`;
+    applyPunctualityTone(runningTaskMinutesLeft, punctualitySummary.punctualityPercent);
+    return;
+  }
+  const numericDelay = Number(scheduleDeltaMinutes || 0);
+  runningTaskMinutesLeft.textContent = formatSignedDelay(numericDelay);
+  if (numericDelay > 0) {
+    runningTaskMinutesLeft.classList.add("is-late");
+  } else if (numericDelay < 0) {
+    runningTaskMinutesLeft.classList.add("is-early");
+  } else {
+    runningTaskMinutesLeft.classList.add("is-bonus");
+  }
+}
+
 function getNextActionForRunning(action) {
   if (!action) {
     return null;
@@ -943,6 +967,11 @@ function applyPunctualityTone(element, percent) {
   const strong = `rgba(${red}, ${green}, ${blue}, 0.92)`;
   const soft = `rgba(${red}, ${green}, ${blue}, 0.58)`;
   element.style.background = `linear-gradient(90deg, ${strong}, ${soft})`;
+}
+
+function clearInlineTone(element) {
+  if (!element) return;
+  element.style.background = "";
 }
 
 function clampPercent(value) {
@@ -1496,9 +1525,7 @@ function renderHomeRunningTask() {
     void playRunningEndBellCue(runningActionId);
   }
   const punctualitySummary = getCompletionSummaryForSelectedProfile();
-  runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
-  runningTaskMinutesLeft.textContent = `Pontualidade ${punctualitySummary.punctualityPercent}%`;
-  applyPunctualityTone(runningTaskMinutesLeft, punctualitySummary.punctualityPercent);
+  renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes);
   if (nextAction) {
     const nextLabel = nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
@@ -1655,7 +1682,17 @@ function getCompletionSummaryForSelectedProfile() {
   }, 0);
   const percentPrecise = totalMinutes > 0 ? clampPercent((completedMinutes / totalMinutes) * 100) : 0;
   const percent = Math.round(percentPrecise);
-  const late = list.reduce((sum, item) => sum + Math.max(0, getActionLateStartMinutes(item)), 0);
+  const nowMs = getServerNowMs();
+  const late = list.reduce((sum, item) => {
+    if (normalizeActionStatus(item.status) === actionStatuses.completed || isGivenUpAction(item)) {
+      return sum;
+    }
+    const endAtMs = new Date(item.endAt).getTime();
+    if (!Number.isFinite(endAtMs) || endAtMs > nowMs) {
+      return sum;
+    }
+    return sum + getActionDurationMinutes(item);
+  }, 0);
   const punctualityPrecise = getPunctualityPercentFromLateMinutes(late);
   const punctualityPercent = Math.round(punctualityPrecise);
   return { percent, percentPrecise, late, completedMinutes, totalMinutes, punctualityPrecise, punctualityPercent };
@@ -2628,10 +2665,9 @@ async function toggleActionStatus(actionId, options = {}) {
     }
   }
   if (currentStatus === actionStatuses.inProgress && !options.skipEndConfirm) {
-    const okEnd = window.confirm(`Você quer encerrar "${targetAction.title}" ?`);
-    if (!okEnd) {
-      return;
-    }
+    openModal("runningTaskModal");
+    closeActionsModalWithFade();
+    return;
   }
 
   try {

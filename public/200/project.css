@@ -2242,6 +2242,18 @@ body.start-decision-open .home-running-btn {
   right: 12px;
 }
 
+#actionsModal .actions-side-btn-right {
+  border: 0;
+  background: transparent;
+}
+
+#actionsModal .actions-side-btn-right svg {
+  width: 34px;
+  height: 34px;
+  color: #ffffff;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+}
+
 .stats-side-actions .actions-side-btn-left,
 .stats-side-actions .actions-side-btn-right {
   top: 6px;
