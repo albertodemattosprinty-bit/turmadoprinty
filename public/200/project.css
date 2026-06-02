@@ -1086,7 +1086,7 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   display: grid;
   align-content: start;
   gap: 10px;
-  padding: 2px 0 10px;
+  padding: 17px 0 10px;
 }
 
 #calendarModal .actions-list {
@@ -1105,7 +1105,7 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   align-items: center;
   gap: 8px;
   padding: 12px 8px 12px 12px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 8px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.18));
   cursor: pointer;
@@ -1199,8 +1199,8 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   height: 52px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.08);
+  border: 0;
+  background: transparent;
 }
 
 .task-row:hover {
@@ -1208,13 +1208,11 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 }
 
 .task-row.task-in-progress {
-  background: linear-gradient(90deg, rgba(8, 36, 105, 0.72), rgba(23, 74, 171, 0.94));
-  border-color: rgba(130, 181, 255, 0.62);
+  background: linear-gradient(90deg, rgba(23, 74, 171, 0.94), rgba(8, 36, 105, 0.72));
 }
 
 .task-row.task-completed {
-  background: linear-gradient(90deg, rgba(16, 118, 72, 0.70), rgba(32, 170, 103, 0.92));
-  border-color: rgba(137, 255, 205, 0.62);
+  background: linear-gradient(90deg, rgba(32, 170, 103, 0.92), rgba(16, 118, 72, 0.70));
 }
 
 .task-row.task-gave-up {
@@ -1224,36 +1222,30 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 
 .task-row.task-delay-soft {
   background: linear-gradient(90deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.03) calc((1 - var(--delay-progress, 0)) * 100%),
-    rgba(255, 219, 120, 0.72) 100%
+    rgba(255, 219, 120, 0.72) 0%,
+    rgba(255, 219, 120, 0.72) calc(var(--delay-progress, 0) * 100%),
+    rgba(255, 255, 255, 0.03) 100%
   );
-  border-color: rgba(255, 219, 120, 0.7);
 }
 
 .task-row.task-delay-yellow {
-  background: linear-gradient(90deg, rgba(191, 132, 13, 0.72), rgba(255, 214, 61, 0.92));
-  border-color: rgba(255, 232, 153, 0.8);
+  background: linear-gradient(90deg, rgba(255, 214, 61, 0.92), rgba(191, 132, 13, 0.72));
 }
 
 .task-row.task-delay-orange {
-  background: linear-gradient(90deg, rgba(202, 97, 18, 0.72), rgba(255, 151, 45, 0.92));
-  border-color: rgba(255, 192, 136, 0.82);
+  background: linear-gradient(90deg, rgba(255, 151, 45, 0.92), rgba(202, 97, 18, 0.72));
 }
 
 .task-row.task-delay-red {
-  background: linear-gradient(90deg, rgba(169, 30, 30, 0.72), rgba(226, 59, 59, 0.94));
-  border-color: rgba(255, 160, 160, 0.84);
+  background: linear-gradient(90deg, rgba(226, 59, 59, 0.94), rgba(169, 30, 30, 0.72));
 }
 
 .task-row.task-delay-black {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.85), rgba(26, 26, 26, 0.98));
-  border-color: rgba(190, 190, 190, 0.5);
+  background: linear-gradient(90deg, rgba(26, 26, 26, 0.98), rgba(0, 0, 0, 0.85));
 }
 
 .task-row.task-free-slot {
-  background: linear-gradient(135deg, rgba(47, 122, 231, 0.96), rgba(36, 97, 206, 0.96));
-  border-color: rgba(176, 215, 255, 0.88);
+  background: linear-gradient(90deg, rgba(36, 97, 206, 0.96), rgba(47, 122, 231, 0.96));
 }
 .task-row.task-free-slot .task-title,
 .task-row.task-free-slot .task-assignee,
@@ -1263,7 +1255,6 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 
 .task-row.task-pending-clean {
   background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.26);
   box-shadow: none;
 }
 .task-row.task-pending-clean .task-title {
@@ -1278,8 +1269,7 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 }
 
 .task-row.task-sleep-slot {
-  background: linear-gradient(90deg, rgba(10, 14, 24, 0.98), rgba(5, 8, 16, 0.98));
-  border-color: rgba(95, 120, 180, 0.62);
+  background: linear-gradient(90deg, rgba(5, 8, 16, 0.98), rgba(10, 14, 24, 0.98));
 }
 
 .task-row.task-sleep-slot .task-title,
@@ -1292,11 +1282,24 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   grid-column: 3;
   text-align: right;
   justify-self: end;
-  margin-right: -1px;
+  margin-right: 10px;
   font-size: 0.92rem;
   font-weight: 800;
   color: var(--white);
   transition: opacity 220ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.task-time::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.74;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M12 1a1 1 0 0 0-1 1v10.2l-4.1 2.9a1 1 0 1 0 1.2 1.6l4.4-3.1a1 1 0 0 0 .4-.8V2a1 1 0 0 0-1-1Z'/%3E%3Cpath d='M19.5 4.5a1 1 0 0 0-1.4 0L12 10.6V12l7.5-7.5a1 1 0 0 0 0-1.4Z'/%3E%3C/svg%3E");
 }
 .task-time.is-fading {
   opacity: 0.18;
@@ -1386,16 +1389,7 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 }
 
 .actions-progress {
-  position: static;
-  width: 100%;
-  border: 0;
-  border-radius: 10px;
-  padding: 0;
-  background: transparent;
-  backdrop-filter: none;
-  display: grid;
-  gap: 6px;
-  transform: translateY(-10px);
+  display: none;
 }
 
 .actions-progress-head {
@@ -2099,8 +2093,7 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   }
 
   .actions-progress {
-    width: calc(100% - 24px);
-    bottom: 86px;
+    display: none;
   }
 
   .finance-bottom-actions {
