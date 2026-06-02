@@ -153,6 +153,72 @@ export async function ensureActionsSchema() {
   `);
   await query("create index if not exists idx_action_status_overrides_repeat_group on action_status_overrides(user_id, repeat_group_id);");
   await query("create index if not exists idx_action_status_overrides_status on action_status_overrides(user_id, status);");
+
+  await query(`
+    create table if not exists project200_runtime_state (
+      user_id uuid primary key references users(id) on delete cascade,
+      action_id uuid,
+      action_title text,
+      event_type text not null,
+      started_at timestamptz,
+      occurred_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  `);
+  await query("create index if not exists idx_project200_runtime_state_user_time on project200_runtime_state(user_id, updated_at desc);");
+}
+
+function normalizeRuntimeState(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    userId: row.user_id,
+    actionId: row.action_id || null,
+    actionTitle: row.action_title || null,
+    eventType: row.event_type || "start",
+    startedAt: toIso(row.started_at),
+    occurredAt: toIso(row.occurred_at) || toIso(row.updated_at)
+  };
+}
+
+export async function upsertProject200RuntimeState(userId, payload = {}) {
+  await ensureActionsSchema();
+  const actionId = String(payload?.actionId || "").trim() || null;
+  const actionTitle = String(payload?.actionTitle || "").trim() || null;
+  const eventType = String(payload?.eventType || "start").trim().toLowerCase() || "start";
+  const startedAt = toIso(payload?.startedAt);
+  const occurredAt = toIso(payload?.occurredAt) || new Date().toISOString();
+
+  const result = await query(
+    `
+      insert into project200_runtime_state (
+        user_id, action_id, action_title, event_type, started_at, occurred_at
+      )
+      values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+      on conflict (user_id) do update
+        set action_id = excluded.action_id,
+            action_title = excluded.action_title,
+            event_type = excluded.event_type,
+            started_at = excluded.started_at,
+            occurred_at = excluded.occurred_at,
+            updated_at = now()
+      returning *
+    `,
+    [userId, actionId, actionTitle, eventType, startedAt, occurredAt]
+  );
+
+  return normalizeRuntimeState(result.rows[0]);
+}
+
+export async function getProject200RuntimeState(userId) {
+  await ensureActionsSchema();
+  const result = await query(
+    `select * from project200_runtime_state where user_id = $1 limit 1`,
+    [userId]
+  );
+  return normalizeRuntimeState(result.rows[0]);
 }
 
 async function getUserActionById(userId, actionId) {
@@ -430,9 +496,23 @@ export async function updateUserActionStatus(userId, actionId) {
 
     startedAt = startedAt || nowIso;
     completedAt = null;
+    await upsertProject200RuntimeState(userId, {
+      actionId: action.id,
+      actionTitle: action.title,
+      eventType: "start",
+      startedAt,
+      occurredAt: nowIso
+    });
   } else if (nextStatus === ACTION_STATUS_COMPLETED) {
     startedAt = startedAt || nowIso;
     completedAt = completedAt || nowIso;
+    await upsertProject200RuntimeState(userId, {
+      actionId: action.id,
+      actionTitle: action.title,
+      eventType: "complete",
+      startedAt,
+      occurredAt: nowIso
+    });
   }
 
   await query(
@@ -503,6 +583,13 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
       `,
       [userId, action.id, action.repeatGroupId, ACTION_STATUS_PENDING]
     );
+    await upsertProject200RuntimeState(userId, {
+      actionId: action.id,
+      actionTitle: action.title,
+      eventType: "abort",
+      startedAt: null,
+      occurredAt: new Date().toISOString()
+    });
     return getUserActionById(userId, action.id);
   }
 
@@ -539,6 +626,13 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
       `,
       [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedAt, completedAt]
     );
+    await upsertProject200RuntimeState(userId, {
+      actionId: action.id,
+      actionTitle: action.title,
+      eventType: "complete",
+      startedAt,
+      occurredAt: completedAt
+    });
     return getUserActionById(userId, action.id);
   }
 

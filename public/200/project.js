@@ -318,6 +318,7 @@ const runningPlayerPrev = document.getElementById("runningPlayerPrev");
 const runningPlayerNext = document.getElementById("runningPlayerNext");
 const runningMiniPlayer = document.getElementById("runningMiniPlayer");
 const actionsModal = document.getElementById("actionsModal");
+const runtimeStateEndpoint = "/api/200/runtime-state";
 const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
 const startDecisionModal = document.getElementById("startDecisionModal");
@@ -559,6 +560,7 @@ const state = {
   runningConfirm: {
     action: null
   },
+  runtimeState: null,
   runningCenterMode: "auto",
   runningLocalStarts: {}
 };
@@ -1009,7 +1011,7 @@ function setRunningIdleVisualState(isIdle) {
 }
 
 function setRunningHomeVisibility(isVisible) {
-  document.body.classList.toggle("running-task-active", !isVisible);
+  void isVisible;
 }
 
 function wait(ms) {
@@ -1452,9 +1454,6 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
-    if (!document.body.classList.contains("actions-modal-open")) {
-      setRunningHomeVisibility(true);
-    }
     runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Próxima tarefa");
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
@@ -1485,7 +1484,6 @@ function renderHomeRunningTask() {
     }
     return;
   }
-  setRunningHomeVisibility(false);
   const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
   const runningActionId = String(action.id || "");
   if (state.runningEndBell.actionId !== runningActionId) {
@@ -2003,7 +2001,6 @@ function openModal(id) {
   if (id === "actionsModal") {
     const latestDone = getLatestCompletedActionForSelectedProfile();
     pendingActionsAnchorId = latestDone?.id || "";
-    document.body.classList.add("actions-modal-open");
     void loadActions();
     window.setTimeout(() => {
       anchorToLastCompletedAction();
@@ -2090,7 +2087,6 @@ function closeModal(modal) {
       actionsTimeTicker = null;
     }
     closeActionStatusWizard();
-    document.body.classList.remove("actions-modal-open");
   }
 
   if (modal.id === "historyModal") {
@@ -2535,6 +2531,17 @@ async function loadActions() {
     if (Number.isFinite(parsedServerNow)) {
       state.serverNowMs = parsedServerNow;
       state.serverNowCapturedAtMs = Date.now();
+    }
+    try {
+      const runtimePayload = await apiRequest(runtimeStateEndpoint);
+      state.runtimeState = runtimePayload?.runtimeState || null;
+      const runtimeActionId = String(state.runtimeState?.actionId || "").trim();
+      const runtimeStartedAt = new Date(state.runtimeState?.startedAt || "").getTime();
+      if (runtimeActionId && Number.isFinite(runtimeStartedAt) && runtimeStartedAt > 0) {
+        state.runningLocalStarts[runtimeActionId] = runtimeStartedAt;
+      }
+    } catch {
+      state.runtimeState = null;
     }
     renderActions();
     registerDayCloseEventIfNeeded();
@@ -5909,6 +5916,8 @@ async function performRunningRestore(runningAction) {
     await restoreActionToPending(String(runningAction.id || ""));
     delete state.runningLocalStarts[String(runningAction.id || "")];
     startRunningTaskTicker();
+    closeRunningTaskModalWithFade();
+    window.setTimeout(() => openModal("actionsModal"), 500);
   } catch {}
 }
 
@@ -5926,6 +5935,8 @@ async function performRunningGiveUp(runningAction) {
     delete state.runningLocalStarts[String(runningAction.id || "")];
     await loadActions();
     startRunningTaskTicker();
+    closeRunningTaskModalWithFade();
+    window.setTimeout(() => openModal("actionsModal"), 500);
   } catch {}
 }
 
