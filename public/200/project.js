@@ -2649,9 +2649,7 @@ async function toggleActionStatus(actionId, options = {}) {
       resetRunningCompletionState();
       state.runningLocalStarts[String(targetId)] = Date.now();
       openModal("runningTaskModal");
-      window.setTimeout(() => {
-        closeActionsModalWithFade();
-      }, 600);
+      closeActionsModalWithFade();
     }
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
       delete state.runningLocalStarts[String(targetId)];
