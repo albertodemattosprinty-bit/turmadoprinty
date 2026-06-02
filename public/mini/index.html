@@ -37,6 +37,20 @@
     .deck { border-radius: 22px; border: 1px solid var(--border); padding: 12px 10px; display: grid; grid-template-columns: 1fr 40px; gap: 10px; overflow: hidden; }
     .rows { display: grid; grid-template-rows: repeat(6, 1fr); gap: 8px; min-height: 0; }
     .card { min-height: 8vh; border-radius: 14px; padding: 8px 10px; color: #fff; position: relative; overflow: hidden; display: grid; align-content: center; }
+    .card.with-icon {
+      grid-template-columns: 54px 1fr 54px;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-icon-lg {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: rgba(255,255,255,.2);
+      border: 1px solid rgba(255,255,255,.25);
+    }
+    .card-center { min-width: 0; }
     .card h4 { margin: 0; font-size: 17px; line-height: 1.08; }
     .card p { margin: 4px 0 0; font-size: 13px; opacity: .95; }
     .card .side-actions { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; }
@@ -74,6 +88,21 @@
     .examples { font-size: 13px; min-height: 20px; opacity: .94; }
     .ai-output { background: rgba(255,255,255,.14); border-radius: 16px; padding: 12px; overflow-y: auto; }
     .ai-block { border-radius: 12px; padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,.12); }
+    .ai-head {
+      display: grid;
+      grid-template-columns: 30px 1fr 30px;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .ai-icon-sm {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,.3);
+      background: rgba(255,255,255,.2);
+    }
     .ai-block h3 { margin: 0 0 4px; font-size: 17px; }
     .ai-block p { margin: 0; font-size: 13px; line-height: 1.4; }
     .ai-actions { display: flex; gap: 8px; }
@@ -137,6 +166,17 @@
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
+    const iconBase = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%ADcones/";
+
+    function iconUrlById(id) {
+      const safe = Math.max(1, Math.min(48, Number(id) || 1));
+      return `${iconBase}${String(safe).padStart(2, "0")}.png`;
+    }
+
+    function iconUrlByName(name) {
+      const idx = baseBlocks.findIndex((b) => b.name === name);
+      return iconUrlById((idx >= 0 ? idx + 1 : 1));
+    }
 
     function toHoursText(m){ if(m<60)return m+" minutos"; const h=Math.floor(m/60),r=m%60; return r?`${h} horas e ${r} minutos`:`${h} horas`; }
     function page(list, idx){ return list.slice(idx*pageSize, idx*pageSize+pageSize); }
@@ -144,13 +184,13 @@
     function renderPool(){
       const pages=Math.max(1,Math.ceil(baseBlocks.length/pageSize)); state.poolPage=Math.max(0,Math.min(state.poolPage,pages-1));
       $("poolPage").textContent=`${state.poolPage+1} / ${pages}`; $("poolCounter").textContent=String(baseBlocks.length);
-      $("poolRows").innerHTML=""; page(baseBlocks,state.poolPage).forEach((b)=>{ const c=document.createElement("button"); c.className="card"; c.style.border="0"; c.style.background=b.gradient; c.innerHTML=`<h4>${b.name}</h4>`; c.onclick=()=>openMinute(b); $("poolRows").appendChild(c); });
+      $("poolRows").innerHTML=""; page(baseBlocks,state.poolPage).forEach((b)=>{ const c=document.createElement("button"); c.className="card with-icon"; c.style.border="0"; c.style.background=b.gradient; const icon=iconUrlById(b.id); c.innerHTML=`<img class='card-icon-lg' src='${icon}' alt='${b.name}'><div class='card-center'><h4>${b.name}</h4></div><img class='card-icon-lg' src='${icon}' alt='${b.name}'>`; c.onclick=()=>openMinute(b); $("poolRows").appendChild(c); });
       $("poolLine").innerHTML=""; for(let i=0;i<6;i++){ const s=document.createElement("div"); s.className="seg"; s.style.flex="1"; s.style.background="#e9eef9"; $("poolLine").appendChild(s);}    }
 
     function renderSelected(){
       const pages=Math.max(1,Math.ceil(state.selected.length/pageSize)); state.selectedPage=Math.max(0,Math.min(state.selectedPage,pages-1));
       $("selPage").textContent=`${state.selectedPage+1} / ${pages}`; $("selectedRows").innerHTML="";
-      page(state.selected,state.selectedPage).forEach((it,localIdx)=>{ const c=document.createElement("div"); c.className="card"; c.style.background=it.gradient; c.innerHTML=`<h4>${it.name}</h4><p>${toHoursText(it.minutes)}</p><div class='side-actions'><button class='mini-ic' data-edit='${it.uid}'><svg viewBox='0 0 24 24'><path d='M3 17.25V21h3.75l11-11.03-3.75-3.75L3 17.25zm17.71-10.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 2-1.66z'/></svg></button><button class='mini-ic' data-del='${it.uid}'><svg viewBox='0 0 24 24'><path d='M6 7h12l-1 13H7L6 7zm3-3h6l1 2H8l1-2z'/></svg></button></div>`; $("selectedRows").appendChild(c); });
+      page(state.selected,state.selectedPage).forEach((it,localIdx)=>{ const c=document.createElement("div"); c.className="card with-icon"; c.style.background=it.gradient; const icon=iconUrlById(it.id); c.innerHTML=`<img class='card-icon-lg' src='${icon}' alt='${it.name}'><div class='card-center'><h4>${it.name}</h4><p>${toHoursText(it.minutes)}</p></div><img class='card-icon-lg' src='${icon}' alt='${it.name}'><div class='side-actions'><button class='mini-ic' data-edit='${it.uid}'><svg viewBox='0 0 24 24'><path d='M3 17.25V21h3.75l11-11.03-3.75-3.75L3 17.25zm17.71-10.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 2-1.66z'/></svg></button><button class='mini-ic' data-del='${it.uid}'><svg viewBox='0 0 24 24'><path d='M6 7h12l-1 13H7L6 7zm3-3h6l1 2H8l1-2z'/></svg></button></div>`; $("selectedRows").appendChild(c); });
       const total=state.selected.reduce((s,i)=>s+i.minutes,0); $("totalLabel").textContent=`${toHoursText(total)} total`;
       $("timeline").innerHTML=""; const safe=Math.max(total,1); state.selected.forEach((i)=>{const seg=document.createElement("div"); seg.className="seg"; seg.style.height=(i.minutes/safe*100)+"%"; seg.style.background=i.gradient; $("timeline").appendChild(seg);});
       $("selectedRows").querySelectorAll("[data-del]").forEach((b)=>b.onclick=()=>{ state.selected=state.selected.filter(x=>String(x.uid)!==b.dataset.del); renderSelected(); });
@@ -224,7 +264,9 @@
             const b = document.createElement("article");
             b.className = "ai-block";
             b.style.background = gradients[idx % gradients.length];
-            b.innerHTML = `<h3>${data.title || data.blockName || "Bloco"}</h3><p>${data.content || ""}</p>`;
+            const blockRef = data.blockName || data.title || "Bloco";
+            const icon = iconUrlByName(blockRef);
+            b.innerHTML = `<div class='ai-head'><img class='ai-icon-sm' src='${icon}' alt='${blockRef}'><h3>${data.title || data.blockName || "Bloco"}</h3><img class='ai-icon-sm' src='${icon}' alt='${blockRef}'></div><p>${data.content || ""}</p>`;
             out.appendChild(b);
             out.scrollTop = out.scrollHeight;
           }
