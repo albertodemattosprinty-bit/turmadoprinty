@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="/200/project.css" />
 </head>
 <body>
+  <video class="app-background-video" autoplay muted loop playsinline webkit-playsinline preload="auto" aria-hidden="true">
+    <source src="/200/background.mp4" type="video/mp4" />
+  </video>
   <section class="project-login-overlay" id="project200LoginOverlay" aria-hidden="true">
     <div class="project-login-card">
       <img class="project-login-logo" src="/200/avatars/familyplan.png" alt="Projeto 200" />
@@ -125,6 +128,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
         </button>
       </div>
+      <div class="running-completion-label" id="runningCompletionLabel"></div>
       <div class="running-next-panel" id="runningNextPanel">
         <div class="running-task-next-label">Próxima tarefa</div>
         <div class="running-task-next-row">
@@ -154,7 +158,7 @@
     <div class="finance-content running-task-content">
       <div class="running-task-name">Você concluiu suas tarefas do dia</div>
       <div class="running-task-percent" id="dayDonePercent">0%</div>
-      <div class="running-task-minutes" id="dayDoneDelay">Atraso: 0 min</div>
+      <div class="running-task-minutes" id="dayDoneDelay">Pontualidade: 100%</div>
       <button class="primary-btn running-task-finalize-btn" type="button" data-close-modal>Fechar</button>
     </div>
   </section>

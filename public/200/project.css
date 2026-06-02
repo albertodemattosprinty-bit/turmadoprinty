@@ -10,9 +10,6 @@
   --warn: #ffe26a;
   --danger: #ff6f8a;
   --ink: #06346d;
-  --app-tint-current: linear-gradient(145deg, rgba(11, 61, 168, 0.7), rgba(31, 126, 231, 0.7));
-  --app-tint-next: linear-gradient(145deg, rgba(11, 61, 168, 0.7), rgba(31, 126, 231, 0.7));
-  --app-next-opacity: 0;
 }
 
 * {
@@ -33,33 +30,20 @@ body {
 body {
   font-family: "Exo 2", sans-serif;
   color: #123b73;
-  background-image: url("/200/home-bg-clouds.jpg");
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center center;
-  background-attachment: fixed;
+  background: #030712;
   overflow: hidden;
   position: relative;
 }
 
-body::before,
-body::after {
-  content: "";
+.app-background-video {
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
-  z-index: -1;
-}
-
-body::before {
-  background-image: var(--app-tint-current);
-  opacity: 1;
-}
-
-body::after {
-  background-image: var(--app-tint-next);
-  opacity: var(--app-next-opacity);
-  transition: opacity 1500ms ease;
+  z-index: -2;
+  filter: saturate(1.02) contrast(1.04) brightness(0.78);
 }
 
 button,
@@ -423,6 +407,17 @@ body.project-no-select textarea {
   font-size: 2.92rem;
   white-space: nowrap;
 }
+
+.running-completion-label {
+  display: none;
+  min-height: 1.4em;
+  margin-top: 10px;
+  text-align: center;
+  color: #fef3a3;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
 .running-task-unit {
   font-size: 0.6em;
   margin-left: 2px;
@@ -678,6 +673,10 @@ body.project-no-select textarea {
   display: none !important;
 }
 
+#runningTaskModal .running-task-content.is-completion-layout .running-completion-label {
+  display: block;
+}
+
 #runningTaskModal .running-task-content.is-completion-layout .running-circle-wrap {
   width: 236px;
   height: 236px;
@@ -840,11 +839,8 @@ body.project-no-select textarea {
   z-index: 20;
   display: none;
   color: var(--white);
-  background-image: var(--app-tint-current), url("/200/home-bg-clouds.jpg");
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center center;
-  background-attachment: fixed;
+  background: rgba(5, 11, 24, 0.54);
+  backdrop-filter: blur(5px);
 }
 
 .workspace-modal.active {

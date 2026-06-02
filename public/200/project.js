@@ -107,12 +107,6 @@ const recurrenceDays = {
 };
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
 const selectableProfiles = ["Rose", "Alberto", "Lucas", "Thainan"];
-const profileTintByName = {
-  Alberto: "linear-gradient(145deg, rgba(2, 27, 77, 0.7), rgba(11, 61, 168, 0.7))",
-  Rose: "linear-gradient(145deg, rgba(31, 78, 216, 0.7), rgba(234, 76, 137, 0.7))",
-  Lucas: "linear-gradient(145deg, rgba(79, 195, 247, 0.7), rgba(212, 160, 23, 0.7))",
-  Thainan: "linear-gradient(145deg, rgba(0, 184, 169, 0.7), rgba(138, 92, 255, 0.7))"
-};
 const runningMusicStationSeeds = {
   Calm: [
     "Untitled (1).mp3", "Untitled (2).mp3", "Untitled (16).mp3", "Untitled (17).mp3",
@@ -296,6 +290,7 @@ const runningTaskCategoryIcon = document.getElementById("runningTaskCategoryIcon
 const runningTaskProgressRing = document.getElementById("runningTaskProgressRing");
 const runningTaskPercent = document.getElementById("runningTaskPercent");
 const runningCircleWrap = runningTaskModalElement?.querySelector(".running-circle-wrap");
+const runningCompletionLabel = document.getElementById("runningCompletionLabel");
 const runningModeTimeBtn = document.getElementById("runningModeTimeBtn");
 const runningModePercentBtn = document.getElementById("runningModePercentBtn");
 const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft");
@@ -426,11 +421,13 @@ const runningAudio = typeof Audio !== "undefined" ? new Audio() : null;
 const runningMinuteCueAudio = typeof Audio !== "undefined" ? new Audio() : null;
 const runningSuccessAudio = typeof Audio !== "undefined" ? new Audio("/200/5star.mp3") : null;
 const runningEndBellAudio = typeof Audio !== "undefined" ? new Audio("/200/bicycleBell.ogg") : null;
+const runningPunctualityUpAudio = typeof Audio !== "undefined" ? new Audio("/200/coin-punctuality.mp3") : null;
+const runningPunctualityDownAudio = typeof Audio !== "undefined" ? new Audio("/200/pause-punctuality.mp3") : null;
 const RUNNING_RING_RADIUS = 48;
 const RUNNING_RING_CIRCUMFERENCE = 2 * Math.PI * RUNNING_RING_RADIUS;
 const RUNNING_RING_FULL_OFFSET = -0.8;
 const RUNNING_COMPLETION_ANIMATION_MS = 1200;
-const RUNNING_COMPLETION_HOLD_MS = 1200;
+const RUNNING_COMPLETION_HOLD_MS = 1000;
 if (runningAudio) {
   runningAudio.preload = "auto";
 }
@@ -439,6 +436,12 @@ if (runningSuccessAudio) {
 }
 if (runningEndBellAudio) {
   runningEndBellAudio.preload = "auto";
+}
+if (runningPunctualityUpAudio) {
+  runningPunctualityUpAudio.preload = "auto";
+}
+if (runningPunctualityDownAudio) {
+  runningPunctualityDownAudio.preload = "auto";
 }
 let runningMusicProgressTicker = null;
 const runningMinuteCueMap = new Map([
@@ -527,13 +530,17 @@ const state = {
   runningCompletion: {
     active: false,
     phase: "idle",
+    metric: "progress",
     fromPercent: 0,
     toPercent: 0,
     displayPercent: 0,
+    label: "",
     nextAction: null,
     nextOfNext: null,
     savedMinutes: 0,
     lateMinutes: 0,
+    punctualityFrom: 100,
+    punctualityTo: 100,
     timeoutIds: [],
     rafId: 0
   },
@@ -593,14 +600,6 @@ function applySelectedProfile(profile) {
     return;
   }
   const next = selectableProfiles.includes(profile) ? profile : "Rose";
-  const nextTint = profileTintByName[next] || profileTintByName.Rose;
-  const root = document.documentElement;
-  root.style.setProperty("--app-tint-next", nextTint);
-  root.style.setProperty("--app-next-opacity", "1");
-  window.setTimeout(() => {
-    root.style.setProperty("--app-tint-current", nextTint);
-    root.style.setProperty("--app-next-opacity", "0");
-  }, 1500);
   state.selectedProfile = next;
   document.body.dataset.profile = next;
   window.localStorage.setItem(projectProfileKey, next);
@@ -889,6 +888,11 @@ function setRunningNextDisplay(name, totalMinutes) {
   }
 }
 
+function getPunctualityPercentFromLateMinutes(lateMinutesValue) {
+  const lateMinutes = Math.max(0, Number(lateMinutesValue || 0));
+  return clampPercent(100 - (lateMinutes / 5));
+}
+
 function clampPercent(value) {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
@@ -983,13 +987,20 @@ function resetRunningCompletionState() {
   clearRunningCompletionTimers();
   state.runningCompletion.active = false;
   state.runningCompletion.phase = "idle";
+  state.runningCompletion.metric = "progress";
   state.runningCompletion.fromPercent = 0;
   state.runningCompletion.toPercent = 0;
   state.runningCompletion.displayPercent = 0;
+  state.runningCompletion.label = "";
   state.runningCompletion.nextAction = null;
   state.runningCompletion.nextOfNext = null;
   state.runningCompletion.savedMinutes = 0;
   state.runningCompletion.lateMinutes = 0;
+  state.runningCompletion.punctualityFrom = 100;
+  state.runningCompletion.punctualityTo = 100;
+  if (runningCompletionLabel) {
+    runningCompletionLabel.textContent = "";
+  }
   setRunningCompletionVisualState(false);
 }
 
@@ -1024,6 +1035,9 @@ function renderRunningCompletionCelebration() {
   if (runningTaskListButton) runningTaskListButton.hidden = true;
   if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
   if (runningTaskStartNextButton) runningTaskStartNextButton.hidden = true;
+  if (runningCompletionLabel) {
+    runningCompletionLabel.textContent = String(state.runningCompletion.label || "");
+  }
   updateRunningCenterModeButtons("percent");
   setRunningRingPercent(state.runningCompletion.displayPercent);
   runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.displayPercent, 2);
@@ -1104,6 +1118,26 @@ async function playRunningSuccessCue() {
   } catch {}
 }
 
+async function playRunningPunctualityIntroCue() {
+  if (!runningPunctualityUpAudio) return;
+  try {
+    runningPunctualityUpAudio.pause();
+    runningPunctualityUpAudio.currentTime = 0;
+    runningPunctualityUpAudio.volume = Math.min(1, Number(runningAudio?.volume || 1) || 1);
+    await runningPunctualityUpAudio.play();
+  } catch {}
+}
+
+async function playRunningPunctualityDownCue() {
+  if (!runningPunctualityDownAudio) return;
+  try {
+    runningPunctualityDownAudio.pause();
+    runningPunctualityDownAudio.currentTime = 0;
+    runningPunctualityDownAudio.volume = Math.min(1, Number(runningAudio?.volume || 1) || 1);
+    await runningPunctualityDownAudio.play();
+  } catch {}
+}
+
 async function playRunningEndBellCue(actionId) {
   if (!runningEndBellAudio || !actionId) return;
   if (state.runningEndBell.actionId === actionId && state.runningEndBell.played) {
@@ -1140,30 +1174,69 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
   clearRunningCompletionTimers();
   state.runningCompletion.active = true;
   state.runningCompletion.phase = "celebration";
+  state.runningCompletion.metric = "progress";
   state.runningCompletion.fromPercent = clampPercent(fromPercent);
   state.runningCompletion.toPercent = clampPercent(toPercent);
   state.runningCompletion.displayPercent = clampPercent(fromPercent);
+  state.runningCompletion.label = "";
   state.runningCompletion.nextAction = buildTimelineEntrySnapshot(nextAction);
   state.runningCompletion.nextOfNext = buildTimelineEntrySnapshot(nextOfNext);
   state.runningCompletion.savedMinutes = Math.max(0, Math.round(Number(savedMinutes || 0)));
   state.runningCompletion.lateMinutes = Math.max(0, Math.round(Number(summary?.late || 0)));
+  state.runningCompletion.punctualityFrom = clampPercent(Number(summary?.punctualityBefore ?? 100));
+  state.runningCompletion.punctualityTo = clampPercent(Number(summary?.punctualityAfter ?? 100));
   renderRunningCompletionCelebration();
   void playRunningSuccessCue();
   animateRunningCompletionProgress(fromPercent, toPercent, RUNNING_COMPLETION_ANIMATION_MS);
   queueRunningCompletionTimeout(() => {
-    if (state.runningCompletion.nextAction) {
-      state.runningCompletion.phase = "next";
-      renderHomeRunningTask();
+    state.runningCompletion.phase = "punctuality";
+    state.runningCompletion.metric = "punctuality";
+    state.runningCompletion.label = "+ Pontualidade";
+    state.runningCompletion.fromPercent = state.runningCompletion.punctualityFrom;
+    state.runningCompletion.toPercent = state.runningCompletion.punctualityTo;
+    state.runningCompletion.displayPercent = state.runningCompletion.punctualityFrom;
+    renderRunningCompletionCelebration();
+    void playRunningPunctualityIntroCue();
+    const punctualityChanged = Math.abs(state.runningCompletion.punctualityTo - state.runningCompletion.punctualityFrom) > 0.001;
+    if (punctualityChanged) {
+      void playRunningPunctualityDownCue();
+      animateRunningCompletionProgress(
+        state.runningCompletion.punctualityFrom,
+        state.runningCompletion.punctualityTo,
+        RUNNING_COMPLETION_ANIMATION_MS
+      );
+      queueRunningCompletionTimeout(() => {
+        if (state.runningCompletion.nextAction) {
+          state.runningCompletion.phase = "next";
+          renderHomeRunningTask();
+          return;
+        }
+        resetRunningCompletionState();
+        if (dayDonePercent) {
+          dayDonePercent.textContent = `${Math.round(Number(summary?.percent || 0))}%`;
+        }
+        if (dayDoneDelay) {
+          dayDoneDelay.textContent = `Pontualidade: ${Math.round(Number(summary?.punctualityAfter ?? 100))}%`;
+        }
+        openModal("dayDoneModal");
+      }, RUNNING_COMPLETION_ANIMATION_MS);
       return;
     }
-    resetRunningCompletionState();
-    if (dayDonePercent) {
-      dayDonePercent.textContent = `${Math.round(Number(summary?.percent || 0))}%`;
-    }
-    if (dayDoneDelay) {
-      dayDoneDelay.textContent = `Atraso: ${Math.round(Number(summary?.late || 0))} min`;
-    }
-    openModal("dayDoneModal");
+    queueRunningCompletionTimeout(() => {
+      if (state.runningCompletion.nextAction) {
+        state.runningCompletion.phase = "next";
+        renderHomeRunningTask();
+        return;
+      }
+      resetRunningCompletionState();
+      if (dayDonePercent) {
+        dayDonePercent.textContent = `${Math.round(Number(summary?.percent || 0))}%`;
+      }
+      if (dayDoneDelay) {
+        dayDoneDelay.textContent = `Pontualidade: ${Math.round(Number(summary?.punctualityAfter ?? 100))}%`;
+      }
+      openModal("dayDoneModal");
+    }, RUNNING_COMPLETION_HOLD_MS);
   }, RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS);
 }
 
@@ -1346,11 +1419,12 @@ function renderHomeRunningTask() {
   if (remainingSeconds <= 0) {
     void playRunningEndBellCue(runningActionId);
   }
+  const punctualitySummary = getCompletionSummaryForSelectedProfile();
   runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
-  runningTaskMinutesLeft.textContent = formatSignedDelay(scheduleDeltaMinutes);
-  if (scheduleDeltaMinutes > 0) {
+  runningTaskMinutesLeft.textContent = `Pontualidade ${punctualitySummary.punctualityPercent}%`;
+  if (punctualitySummary.punctualityPercent < 100) {
     runningTaskMinutesLeft.classList.add("is-late");
-  } else if (scheduleDeltaMinutes < 0) {
+  } else {
     runningTaskMinutesLeft.classList.add("is-early");
   }
   if (nextAction) {
@@ -1511,7 +1585,9 @@ function getCompletionSummaryForSelectedProfile() {
   const percentPrecise = totalMinutes > 0 ? clampPercent((completedMinutes / totalMinutes) * 100) : 0;
   const percent = Math.round(percentPrecise);
   const late = list.reduce((sum, item) => sum + Math.max(0, getActionLateStartMinutes(item)), 0);
-  return { percent, percentPrecise, late, completedMinutes, totalMinutes };
+  const punctualityPrecise = getPunctualityPercentFromLateMinutes(late);
+  const punctualityPercent = Math.round(punctualityPrecise);
+  return { percent, percentPrecise, late, completedMinutes, totalMinutes, punctualityPrecise, punctualityPercent };
 }
 
 function isSameDate(a, b) {
@@ -5643,7 +5719,11 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
         nextAction,
         nextOfNext,
         savedMinutes: runningCarryOverMinutes,
-        summary
+        summary: {
+          ...summary,
+          punctualityBefore: beforeSummary.punctualityPrecise,
+          punctualityAfter: summary.punctualityPrecise
+        }
       });
       return;
     }
