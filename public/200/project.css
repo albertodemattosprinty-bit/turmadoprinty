@@ -305,33 +305,33 @@ body.project-no-select textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 0;
   transform: translateY(25px);
   min-height: 64px;
 }
 
 .running-task-category-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  flex: 0 0 auto;
+  display: none !important;
 }
 
 .running-task-name {
   font-size: 1.12rem;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.04;
   display: flex;
   align-items: center;
+  justify-content: center;
   overflow: hidden;
   text-wrap: balance;
-  min-height: 1.8em;
+  min-height: 2.2em;
+  text-align: center;
+  width: min(320px, 84vw);
 }
 
 #runningTaskModal .running-task-name {
   margin-top: 0;
   transform: none;
-  font-size: 1.57rem;
+  font-size: 1.26rem;
 }
 
 .running-task-minutes {
@@ -448,30 +448,30 @@ body.project-no-select textarea {
   font-weight: 800;
   line-height: 1.08;
   min-height: 0;
-  margin-top: -2px;
+  margin-top: -1px;
   transition: opacity 500ms ease, transform 500ms ease;
+  text-align: center;
 }
-.running-task-next small {
-  display: block;
-  margin-top: 2px;
-  font-size: 0.72rem;
+
+.running-task-next-time {
+  font-size: 0.78rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.82);
+  text-align: center;
+  margin-top: 4px;
+  transition: opacity 500ms ease, transform 500ms ease;
 }
 
 .running-task-next-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  gap: 10px;
+  gap: 1px;
   text-align: center;
 }
 
 .running-task-next-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  flex: 0 0 auto;
+  display: none !important;
 }
 
 .running-task-start-btn {
@@ -522,15 +522,7 @@ body.project-no-select textarea {
 }
 
 .running-player-controls {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 14px;
-  margin-top: 2px;
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  z-index: 6;
+  display: none;
 }
 
 .running-player-btn {
@@ -588,35 +580,60 @@ body.project-no-select textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-top: -2px;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: nowrap;
 }
 
 .running-task-circle-btn {
-  width: 46px;
-  height: 46px;
+  width: 41px;
+  height: 41px;
   border-radius: 999px;
   border: 0;
   display: grid;
   place-items: center;
   color: #fff;
+  flex: 0 0 auto;
 }
 
 .running-task-circle-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+}
+
+.running-task-list-btn,
+.running-task-restore-btn,
+.running-task-giveup-btn,
+.running-task-music-btn {
+  transform: scale(0.9);
 }
 
 .running-task-restore-btn {
-  background: linear-gradient(145deg, #3a3a3a, #0f0f0f);
+  background: linear-gradient(145deg, #15306b, #08142f);
+}
+
+.running-task-list-btn {
+  background: linear-gradient(145deg, #6fd1ff, #2b8dff);
 }
 
 .running-task-finalize-btn {
   background: linear-gradient(135deg, #22c55e, #16a34a);
+  width: 46px;
+  height: 46px;
+}
+
+.running-task-finalize-btn svg {
+  width: 24px;
+  height: 24px;
 }
 
 .running-task-giveup-btn {
-  background: linear-gradient(145deg, #5d5d5d, #1e1e1e);
+  background: linear-gradient(145deg, #505762, #1e232d);
+  color: #d9dee7;
+}
+
+.running-task-music-btn {
+  background: linear-gradient(145deg, #ffb14f, #ef6b24);
 }
 
 .running-fade {

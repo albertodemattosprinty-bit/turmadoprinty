@@ -300,12 +300,14 @@ const runningModeTimeBtn = document.getElementById("runningModeTimeBtn");
 const runningModePercentBtn = document.getElementById("runningModePercentBtn");
 const runningTaskMinutesLeft = document.getElementById("runningTaskMinutesLeft");
 const runningTaskNextLabel = runningTaskModalElement?.querySelector(".running-task-next-label");
-const runningTaskNextIcon = document.getElementById("runningTaskNextIcon");
 const runningTaskNextName = document.getElementById("runningTaskNextName");
+const runningTaskNextTime = document.getElementById("runningTaskNextTime");
 const runningNextPanel = document.getElementById("runningNextPanel");
+const runningTaskListButton = document.getElementById("runningTaskListButton");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const runningTaskRestoreButton = document.getElementById("runningTaskRestoreButton");
 const runningTaskGiveUpButton = document.getElementById("runningTaskGiveUpButton");
+const runningTaskMusicButton = document.getElementById("runningTaskMusicButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
 const runningTaskActionsWrap = runningTaskModalElement?.querySelector(".running-task-actions");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
@@ -313,7 +315,6 @@ const runningPlayerTrack = document.getElementById("runningPlayerTrack");
 const runningPlayerStationPrev = document.getElementById("runningPlayerStationPrev");
 const runningPlayerStationNext = document.getElementById("runningPlayerStationNext");
 const runningPlayerPrev = document.getElementById("runningPlayerPrev");
-const runningPlayerPlay = document.getElementById("runningPlayerPlay");
 const runningPlayerNext = document.getElementById("runningPlayerNext");
 const runningMiniPlayer = document.getElementById("runningMiniPlayer");
 const actionsModal = document.getElementById("actionsModal");
@@ -768,11 +769,21 @@ function getRunningActionProgressState(action) {
 }
 
 function formatSignedDelay(minutesValue) {
-  const total = Math.abs(Number(minutesValue || 0));
+  const numeric = Number(minutesValue || 0);
+  const total = Math.abs(Math.round(numeric));
+  if (total <= 0) {
+    return "No horário";
+  }
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  const sign = Number(minutesValue || 0) >= 0 ? "-" : "+";
-  return `${sign}${hours} horas e ${String(minutes).padStart(2, "0")} minutos`;
+  const suffix = numeric >= 0 ? "atrasado" : "adiantado";
+  if (hours <= 0) {
+    return `${minutes} minuto${minutes === 1 ? "" : "s"} ${suffix}`;
+  }
+  if (minutes <= 0) {
+    return `${hours} hora${hours === 1 ? "" : "s"} ${suffix}`;
+  }
+  return `${hours} hora${hours === 1 ? "" : "s"} e ${String(minutes).padStart(2, "0")} minutos ${suffix}`;
 }
 
 function getNextActionForRunning(action) {
@@ -825,6 +836,32 @@ function formatTitleTwoLines(title) {
   return `${escapeHtml(parts[0])}<br>${escapeHtml(parts.slice(1).join(" "))}`;
 }
 
+function formatRunningTaskTitleMarkup(title) {
+  const clean = formatActionTitleForDisplay(title);
+  if (clean.length <= 16) {
+    return escapeHtml(clean);
+  }
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) {
+    const midpoint = Math.ceil(clean.length / 2);
+    return `${escapeHtml(clean.slice(0, midpoint))}<br>${escapeHtml(clean.slice(midpoint).trim())}`;
+  }
+  let bestIndex = 1;
+  let bestDiff = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < words.length; index += 1) {
+    const first = words.slice(0, index).join(" ");
+    const second = words.slice(index).join(" ");
+    const diff = Math.abs(first.length - second.length);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestIndex = index;
+    }
+  }
+  const firstLine = words.slice(0, bestIndex).join(" ");
+  const secondLine = words.slice(bestIndex).join(" ");
+  return `${escapeHtml(firstLine)}<br>${escapeHtml(secondLine)}`;
+}
+
 function formatDurationHuman(totalMinutes) {
   const value = Math.max(0, Math.round(Number(totalMinutes || 0)));
   const hours = Math.floor(value / 60);
@@ -841,6 +878,15 @@ function formatMinutesCompact(totalMinutes) {
   if (hours > 0 && minutes > 0) return `${hours}h ${minutes} min`;
   if (hours > 0) return `${hours}h`;
   return `${minutes} min`;
+}
+
+function setRunningNextDisplay(name, totalMinutes) {
+  if (runningTaskNextName) {
+    runningTaskNextName.innerHTML = escapeHtml(name || "Tarefa");
+  }
+  if (runningTaskNextTime) {
+    runningTaskNextTime.textContent = totalMinutes > 0 ? formatMinutesCompact(totalMinutes) : "Tempo";
+  }
 }
 
 function clampPercent(value) {
@@ -965,19 +1011,18 @@ function renderRunningCompletionCelebration() {
   }
   setRunningCompletionVisualState(true);
   setRunningIdleVisualState(false);
-  runningTaskName.textContent = "";
+  runningTaskName.innerHTML = "";
   runningTaskMinutesLeft.textContent = "";
   runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
-  runningTaskNextName.innerHTML = "";
+  setRunningNextDisplay("", 0);
   if (runningTaskCategoryIcon) {
     runningTaskCategoryIcon.hidden = true;
-  }
-  if (runningTaskNextIcon) {
-    runningTaskNextIcon.src = "/200/icons/agenda.svg";
   }
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
   if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
+  if (runningTaskListButton) runningTaskListButton.hidden = true;
+  if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
   if (runningTaskStartNextButton) runningTaskStartNextButton.hidden = true;
   updateRunningCenterModeButtons("percent");
   setRunningRingPercent(state.runningCompletion.displayPercent);
@@ -991,13 +1036,9 @@ function renderRunningCompletionNextView() {
   }
   setRunningCompletionVisualState(false);
   setRunningIdleVisualState(false);
-  runningTaskName.textContent = String(nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title));
+  runningTaskName.innerHTML = formatRunningTaskTitleMarkup(nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title));
   if (runningTaskCategoryIcon) {
-    const currentIcon = getTimelineEntryIconPath(nextAction);
-    runningTaskCategoryIcon.hidden = !currentIcon;
-    if (currentIcon) {
-      runningTaskCategoryIcon.src = currentIcon;
-    }
+    runningTaskCategoryIcon.hidden = true;
   }
   setRunningRingPercent(state.runningCompletion.toPercent);
   runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.toPercent, 2);
@@ -1009,12 +1050,12 @@ function renderRunningCompletionNextView() {
   const nextOfNext = state.runningCompletion.nextOfNext;
   if (nextOfNext) {
     const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
-    runningTaskNextName.innerHTML = `${escapeHtml(nextLabel)}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextOfNext)))}</small>`;
-    if (runningTaskNextIcon) runningTaskNextIcon.src = getTimelineEntryIconPath(nextOfNext);
+    setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextOfNext));
   } else {
-    runningTaskNextName.innerHTML = `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
-    if (runningTaskNextIcon) runningTaskNextIcon.src = "/200/icons/lua.svg";
+    setRunningNextDisplay("Descanso", getSleepDurationMinutesForDay());
   }
+  if (runningTaskListButton) runningTaskListButton.hidden = false;
+  if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
   if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
@@ -1244,7 +1285,7 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
-    runningTaskName.textContent = "Próxima tarefa";
+    runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Próxima tarefa");
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
     }
@@ -1258,12 +1299,12 @@ function renderHomeRunningTask() {
       runningTaskNextLabel.classList.add("is-hidden");
     }
     const nextPending = getEarliestPendingAction();
-    runningTaskNextName.innerHTML = nextPending
-      ? `${escapeHtml(formatActionTitleForDisplay(nextPending.title))}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextPending)))}</small>`
-      : `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
-    if (runningTaskNextIcon) {
-      runningTaskNextIcon.src = nextPending ? getTimelineEntryIconPath(nextPending) : "/200/icons/lua.svg";
-    }
+    setRunningNextDisplay(
+      nextPending ? formatActionTitleForDisplay(nextPending.title) : "Descanso",
+      nextPending ? getActionDurationMinutes(nextPending) : getSleepDurationMinutesForDay()
+    );
+    if (runningTaskListButton) runningTaskListButton.hidden = false;
+    if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
     if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
     if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
@@ -1287,13 +1328,9 @@ function renderHomeRunningTask() {
     runningTaskNextLabel.classList.remove("is-hidden");
   }
   const nextAction = getNextTimelineEntryForRunning(action);
-  runningTaskName.textContent = formatActionTitleForDisplay(action.title);
+  runningTaskName.innerHTML = formatRunningTaskTitleMarkup(action.title);
   if (runningTaskCategoryIcon) {
-    const currentIcon = getTaskCategoryIconPath(action.categoryId);
-    runningTaskCategoryIcon.hidden = !currentIcon;
-    if (currentIcon) {
-      runningTaskCategoryIcon.src = currentIcon;
-    }
+    runningTaskCategoryIcon.hidden = true;
   }
   setRunningRingPercent(percent);
   const remainingSeconds = Math.max(0, Math.round((durationMinutes - elapsedMinutes) * 60));
@@ -1311,23 +1348,19 @@ function renderHomeRunningTask() {
   }
   runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
   runningTaskMinutesLeft.textContent = formatSignedDelay(scheduleDeltaMinutes);
-  if (scheduleDeltaMinutes >= 0) {
+  if (scheduleDeltaMinutes > 0) {
     runningTaskMinutesLeft.classList.add("is-late");
-  } else {
+  } else if (scheduleDeltaMinutes < 0) {
     runningTaskMinutesLeft.classList.add("is-early");
   }
   if (nextAction) {
     const nextLabel = nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title);
-    runningTaskNextName.innerHTML = `${escapeHtml(nextLabel)}<br><small>${escapeHtml(formatMinutesCompact(getActionDurationMinutes(nextAction)))}</small>`;
-    if (runningTaskNextIcon) {
-      runningTaskNextIcon.src = getTimelineEntryIconPath(nextAction);
-    }
+    setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
   } else {
-    runningTaskNextName.innerHTML = `Descanso<br><small>${escapeHtml(formatMinutesCompact(getSleepDurationMinutesForDay()))}</small>`;
-    if (runningTaskNextIcon) {
-      runningTaskNextIcon.src = "/200/icons/lua.svg";
-    }
+    setRunningNextDisplay("Descanso", getSleepDurationMinutesForDay());
   }
+  if (runningTaskListButton) runningTaskListButton.hidden = false;
+  if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = false;
   if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = false;
@@ -1410,11 +1443,6 @@ function renderRunningMusicPlayer() {
   const track = getCurrentRunningTrack();
   if (runningPlayerStation) runningPlayerStation.textContent = String(station?.name || "Estação");
   if (runningPlayerTrack) runningPlayerTrack.textContent = String(track?.name || "Sem música");
-  if (runningPlayerPlay) {
-    runningPlayerPlay.innerHTML = state.runningPlayer.isPlaying
-      ? '<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>'
-      : '<svg viewBox="0 0 24 24"><path d="m8 5 12 7-12 7z"/></svg>';
-  }
 }
 
 function playRunningTrack() {
@@ -5635,6 +5663,8 @@ runningTaskRestoreButton?.addEventListener("click", () => {
   void (async () => {
     const runningAction = getRunningActionForSelectedProfile();
     if (!runningAction) return;
+    const confirmed = window.confirm(`Desfazer a tarefa "${formatActionTitleForDisplay(runningAction.title)}" e voltar para pendente?`);
+    if (!confirmed) return;
     try {
       await restoreActionToPending(String(runningAction.id || ""));
       delete state.runningLocalStarts[String(runningAction.id || "")];
@@ -5656,7 +5686,11 @@ runningTaskGiveUpButton?.addEventListener("click", () => {
   })();
 });
 
-runningPlayerPlay?.addEventListener("click", toggleRunningPlayPause);
+runningTaskListButton?.addEventListener("click", () => {
+  closeModal(runningTaskModalElement);
+  openModal("actionsModal");
+});
+runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
 runningModePercentBtn?.addEventListener("click", () => {
   state.runningCenterMode = state.runningCenterMode === "percent" ? "auto" : "percent";
   renderHomeRunningTask();
