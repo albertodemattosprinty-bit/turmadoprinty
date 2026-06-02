@@ -241,6 +241,12 @@ body.modal-open .project-shell {
   pointer-events: none;
 }
 
+body.start-decision-open #actionsModal .actions-app {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .running-task-content {
   align-items: stretch;
   text-align: left;

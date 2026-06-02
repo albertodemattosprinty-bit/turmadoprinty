@@ -2912,6 +2912,7 @@ function getCurrentTimelineEntry(nowMs, exceptId = "") {
 function closeStartDecisionModalWith(value) {
   startDecisionModal?.classList.remove("active");
   startDecisionModal?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("start-decision-open");
   const resolver = startDecisionResolver;
   startDecisionResolver = null;
   if (!document.querySelector(".workspace-modal.active")) {
@@ -2978,6 +2979,7 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     }
     startDecisionModal?.classList.add("active");
     startDecisionModal?.setAttribute("aria-hidden", "false");
+    document.body.classList.add("start-decision-open");
     document.body.classList.add("modal-open");
   });
 }
