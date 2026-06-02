@@ -621,6 +621,51 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   height: 24px;
 }
 
+.running-confirm-content {
+  width: min(460px, calc(100% - 28px));
+  gap: 14px;
+}
+
+.running-confirm-title {
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  font-weight: 800;
+  color: #fff;
+}
+
+.running-confirm-name {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.running-confirm-buttons {
+  display: grid;
+  gap: 10px;
+  width: min(260px, 100%);
+}
+
+.running-confirm-primary,
+.running-confirm-back {
+  width: 100%;
+  min-height: 48px;
+}
+
+.running-confirm-primary.is-desistir,
+.running-confirm-primary.is-abortar {
+  background: linear-gradient(145deg, #0b1020, #05070d);
+  color: #fff;
+}
+
+.running-confirm-primary.is-concluir {
+  background: linear-gradient(145deg, #18b35d, #0f7f42);
+  color: #fff;
+}
+
+.running-confirm-back {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
 .running-task-giveup-btn {
   background: linear-gradient(145deg, #505762, #1e232d);
   color: #d9dee7;
@@ -856,6 +901,16 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 
 .workspace-modal.active {
   display: block;
+}
+
+#actionsModal.workspace-modal {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+#actionsModal .actions-app {
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .modal-close,
@@ -1107,7 +1162,7 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   padding: 12px 8px 12px 12px;
   border: 0;
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.18));
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.00) 100%);
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease, transform 120ms ease;
   transform: translateY(-10px);
@@ -1208,11 +1263,11 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 }
 
 .task-row.task-in-progress {
-  background: linear-gradient(90deg, rgba(23, 74, 171, 0.94), rgba(8, 36, 105, 0.72));
+  background: linear-gradient(90deg, rgba(23, 74, 171, 0.94) 0%, rgba(23, 74, 171, 0.94) 50%, rgba(23, 74, 171, 0.00) 100%);
 }
 
 .task-row.task-completed {
-  background: linear-gradient(90deg, rgba(32, 170, 103, 0.92), rgba(16, 118, 72, 0.70));
+  background: linear-gradient(90deg, rgba(32, 170, 103, 0.92) 0%, rgba(32, 170, 103, 0.92) 50%, rgba(32, 170, 103, 0.00) 100%);
 }
 
 .task-row.task-gave-up {
@@ -1223,29 +1278,29 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 .task-row.task-delay-soft {
   background: linear-gradient(90deg,
     rgba(255, 219, 120, 0.72) 0%,
-    rgba(255, 219, 120, 0.72) calc(var(--delay-progress, 0) * 100%),
-    rgba(255, 255, 255, 0.03) 100%
+    rgba(255, 219, 120, 0.72) 50%,
+    rgba(255, 219, 120, 0.00) 100%
   );
 }
 
 .task-row.task-delay-yellow {
-  background: linear-gradient(90deg, rgba(255, 214, 61, 0.92), rgba(191, 132, 13, 0.72));
+  background: linear-gradient(90deg, rgba(255, 214, 61, 0.92) 0%, rgba(255, 214, 61, 0.92) 50%, rgba(255, 214, 61, 0.00) 100%);
 }
 
 .task-row.task-delay-orange {
-  background: linear-gradient(90deg, rgba(255, 151, 45, 0.92), rgba(202, 97, 18, 0.72));
+  background: linear-gradient(90deg, rgba(255, 151, 45, 0.92) 0%, rgba(255, 151, 45, 0.92) 50%, rgba(255, 151, 45, 0.00) 100%);
 }
 
 .task-row.task-delay-red {
-  background: linear-gradient(90deg, rgba(226, 59, 59, 0.94), rgba(169, 30, 30, 0.72));
+  background: linear-gradient(90deg, rgba(226, 59, 59, 0.94) 0%, rgba(226, 59, 59, 0.94) 50%, rgba(226, 59, 59, 0.00) 100%);
 }
 
 .task-row.task-delay-black {
-  background: linear-gradient(90deg, rgba(26, 26, 26, 0.98), rgba(0, 0, 0, 0.85));
+  background: linear-gradient(90deg, rgba(26, 26, 26, 0.98) 0%, rgba(26, 26, 26, 0.98) 50%, rgba(26, 26, 26, 0.00) 100%);
 }
 
 .task-row.task-free-slot {
-  background: linear-gradient(90deg, rgba(36, 97, 206, 0.96), rgba(47, 122, 231, 0.96));
+  background: linear-gradient(90deg, rgba(36, 97, 206, 0.96) 0%, rgba(36, 97, 206, 0.96) 50%, rgba(36, 97, 206, 0.00) 100%);
 }
 .task-row.task-free-slot .task-title,
 .task-row.task-free-slot .task-assignee,
@@ -1269,7 +1324,7 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
 }
 
 .task-row.task-sleep-slot {
-  background: linear-gradient(90deg, rgba(5, 8, 16, 0.98), rgba(10, 14, 24, 0.98));
+  background: linear-gradient(90deg, rgba(5, 8, 16, 0.98) 0%, rgba(5, 8, 16, 0.98) 50%, rgba(5, 8, 16, 0.00) 100%);
 }
 
 .task-row.task-sleep-slot .task-title,

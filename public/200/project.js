@@ -304,6 +304,11 @@ const runningTaskRestoreButton = document.getElementById("runningTaskRestoreButt
 const runningTaskGiveUpButton = document.getElementById("runningTaskGiveUpButton");
 const runningTaskMusicButton = document.getElementById("runningTaskMusicButton");
 const runningTaskStartNextButton = document.getElementById("runningTaskStartNextButton");
+const runningConfirmModal = document.getElementById("runningConfirmModal");
+const runningConfirmTitle = document.getElementById("runningConfirmTitle");
+const runningConfirmName = document.getElementById("runningConfirmName");
+const runningConfirmPrimaryButton = document.getElementById("runningConfirmPrimaryButton");
+const runningConfirmBackButton = document.getElementById("runningConfirmBackButton");
 const runningTaskActionsWrap = runningTaskModalElement?.querySelector(".running-task-actions");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
@@ -428,6 +433,7 @@ const RUNNING_RING_CIRCUMFERENCE = 2 * Math.PI * RUNNING_RING_RADIUS;
 const RUNNING_RING_FULL_OFFSET = -0.8;
 const RUNNING_COMPLETION_ANIMATION_MS = 1200;
 const RUNNING_COMPLETION_HOLD_MS = 1000;
+const RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS = 2000;
 const RUNNING_NEXT_METRIC_PROGRESS_MS = 1500;
 const RUNNING_NEXT_METRIC_PUNCTUALITY_MS = 2500;
 if (runningAudio) {
@@ -549,6 +555,9 @@ const state = {
     nextMetricMode: "progress",
     timeoutIds: [],
     rafId: 0
+  },
+  runningConfirm: {
+    action: null
   },
   runningCenterMode: "auto",
   runningLocalStarts: {}
@@ -1266,7 +1275,7 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
           dayDoneDelay.textContent = `Pontualidade: ${Math.round(Number(summary?.punctualityAfter ?? 100))}%`;
         }
         openModal("dayDoneModal");
-      }, RUNNING_COMPLETION_ANIMATION_MS);
+      }, RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS);
       return;
     }
     queueRunningCompletionTimeout(() => {
@@ -2055,6 +2064,9 @@ function closeModal(modal) {
   if (modal.id === "runningTaskModal") {
     setRunningHomeVisibility(true);
   }
+  if (modal.id === "runningConfirmModal") {
+    state.runningConfirm.action = null;
+  }
 }
 
 function getActiveConstitutionVersion() {
@@ -2791,6 +2803,41 @@ function closeRunningTaskModalWithFade() {
     closeModal(runningTaskModalElement);
     runningTaskModalElement.classList.remove("is-fading-out");
   }, 500);
+}
+
+function closeRunningConfirmModal() {
+  state.runningConfirm.action = null;
+  if (runningConfirmModal) {
+    closeModal(runningConfirmModal);
+  }
+}
+
+function openRunningConfirmModal(kind, action, onConfirm) {
+  if (!runningConfirmModal || !runningConfirmTitle || !runningConfirmName || !runningConfirmPrimaryButton || !runningConfirmBackButton) {
+    return;
+  }
+  state.runningConfirm.action = typeof onConfirm === "function" ? onConfirm : null;
+  const titleMap = {
+    giveup: "Desistir?",
+    abort: "Abortar?",
+    finalize: "Concluir?"
+  };
+  const buttonMap = {
+    giveup: "Desistir",
+    abort: "Abortar",
+    finalize: "Concluir"
+  };
+  const classMap = {
+    giveup: "is-desistir",
+    abort: "is-abortar",
+    finalize: "is-concluir"
+  };
+  runningConfirmTitle.textContent = titleMap[kind] || "Desistir?";
+  runningConfirmName.textContent = String(action?.title || "Nome da tarefa");
+  runningConfirmPrimaryButton.textContent = buttonMap[kind] || "Desistir";
+  runningConfirmPrimaryButton.className = `primary-btn running-confirm-primary ${classMap[kind] || "is-desistir"}`;
+  runningConfirmBackButton.textContent = "Voltar";
+  openModal("runningConfirmModal");
 }
 
 function startActionsTimeTicker() {
@@ -5760,52 +5807,56 @@ document.querySelectorAll("[data-ai-time-nav]").forEach((button) => {
   });
 });
 
+async function performRunningFinalize(runningAction) {
+  const beforeSummary = getCompletionSummaryForSelectedProfile();
+  const duration = getActionDurationMinutes(runningAction);
+  const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
+  const elapsed = Number.isFinite(startedAtMs) ? Math.max(0, (Date.now() - startedAtMs) / (60 * 1000)) : duration;
+  const bonusBefore = Math.max(0, Number(runningCarryOverMinutes || 0));
+  const remainingAfterBonus = Math.max(0, elapsed - bonusBefore);
+  const savedMinutes = Math.max(0, Math.floor(duration - remainingAfterBonus));
+  clearRunningCompletionTimers();
+  state.runningCompletion.active = true;
+  state.runningCompletion.phase = "celebration";
+  state.runningCompletion.metric = "progress";
+  state.runningCompletion.fromPercent = beforeSummary.percentPrecise;
+  state.runningCompletion.toPercent = beforeSummary.percentPrecise;
+  state.runningCompletion.displayPercent = beforeSummary.percentPrecise;
+  state.runningCompletion.label = "Progresso";
+  renderRunningCompletionCelebration();
+  await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
+  const after = state.actions.find((item) => item.id === runningAction.id);
+  if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
+    const nextAction = getNextTimelineEntryForRunning(runningAction);
+    const nextOfNext = nextAction ? getNextTimelineEntryForRunning(nextAction) : null;
+    const summary = getCompletionSummaryForSelectedProfile();
+    runningCarryOverMinutes = savedMinutes;
+    startRunningCompletionTransition({
+      fromPercent: beforeSummary.percentPrecise,
+      toPercent: summary.percentPrecise,
+      nextAction,
+      nextOfNext,
+      savedMinutes: runningCarryOverMinutes,
+      summary: {
+        ...summary,
+        punctualityBefore: beforeSummary.punctualityPrecise,
+        punctualityAfter: summary.punctualityPrecise
+      }
+    });
+    return;
+  }
+  resetRunningCompletionState();
+  renderHomeRunningTask();
+}
+
 runningTaskFinalizeButton?.addEventListener("click", () => {
-  void (async () => {
-    const runningAction = getRunningActionForSelectedProfile();
-    if (!runningAction) {
-      return;
-    }
-    const beforeSummary = getCompletionSummaryForSelectedProfile();
-    const duration = getActionDurationMinutes(runningAction);
-    const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
-    const elapsed = Number.isFinite(startedAtMs) ? Math.max(0, (Date.now() - startedAtMs) / (60 * 1000)) : duration;
-    const bonusBefore = Math.max(0, Number(runningCarryOverMinutes || 0));
-    const remainingAfterBonus = Math.max(0, elapsed - bonusBefore);
-    const savedMinutes = Math.max(0, Math.floor(duration - remainingAfterBonus));
-    clearRunningCompletionTimers();
-    state.runningCompletion.active = true;
-    state.runningCompletion.phase = "celebration";
-    state.runningCompletion.metric = "progress";
-    state.runningCompletion.fromPercent = beforeSummary.percentPrecise;
-    state.runningCompletion.toPercent = beforeSummary.percentPrecise;
-    state.runningCompletion.displayPercent = beforeSummary.percentPrecise;
-    state.runningCompletion.label = "Progresso";
-    renderRunningCompletionCelebration();
-    await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
-    const after = state.actions.find((item) => item.id === runningAction.id);
-    if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
-      const nextAction = getNextTimelineEntryForRunning(runningAction);
-      const nextOfNext = nextAction ? getNextTimelineEntryForRunning(nextAction) : null;
-      const summary = getCompletionSummaryForSelectedProfile();
-      runningCarryOverMinutes = savedMinutes;
-      startRunningCompletionTransition({
-        fromPercent: beforeSummary.percentPrecise,
-        toPercent: summary.percentPrecise,
-        nextAction,
-        nextOfNext,
-        savedMinutes: runningCarryOverMinutes,
-        summary: {
-          ...summary,
-          punctualityBefore: beforeSummary.punctualityPrecise,
-          punctualityAfter: summary.punctualityPrecise
-        }
-      });
-      return;
-    }
-    resetRunningCompletionState();
-    renderHomeRunningTask();
-  })();
+  const runningAction = getRunningActionForSelectedProfile();
+  if (!runningAction) {
+    return;
+  }
+  openRunningConfirmModal("finalize", runningAction, () => {
+    void performRunningFinalize(runningAction);
+  });
 });
 
 runningTaskStartNextButton?.addEventListener("click", () => {
@@ -5815,31 +5866,37 @@ runningTaskStartNextButton?.addEventListener("click", () => {
   void toggleActionStatus(actionId, { skipDecision: true });
 });
 
+async function performRunningRestore(runningAction) {
+  try {
+    await restoreActionToPending(String(runningAction.id || ""));
+    delete state.runningLocalStarts[String(runningAction.id || "")];
+    startRunningTaskTicker();
+  } catch {}
+}
+
 runningTaskRestoreButton?.addEventListener("click", () => {
-  void (async () => {
-    const runningAction = getRunningActionForSelectedProfile();
-    if (!runningAction) return;
-    const confirmed = window.confirm(`Desfazer a tarefa "${formatActionTitleForDisplay(runningAction.title)}" e voltar para pendente?`);
-    if (!confirmed) return;
-    try {
-      await restoreActionToPending(String(runningAction.id || ""));
-      delete state.runningLocalStarts[String(runningAction.id || "")];
-      startRunningTaskTicker();
-    } catch {}
-  })();
+  const runningAction = getRunningActionForSelectedProfile();
+  if (!runningAction) return;
+  openRunningConfirmModal("abort", runningAction, () => {
+    void performRunningRestore(runningAction);
+  });
 });
 
+async function performRunningGiveUp(runningAction) {
+  try {
+    await markActionAsGivenUp(runningAction);
+    delete state.runningLocalStarts[String(runningAction.id || "")];
+    await loadActions();
+    startRunningTaskTicker();
+  } catch {}
+}
+
 runningTaskGiveUpButton?.addEventListener("click", () => {
-  void (async () => {
-    const runningAction = getRunningActionForSelectedProfile();
-    if (!runningAction) return;
-    try {
-      await markActionAsGivenUp(runningAction);
-      delete state.runningLocalStarts[String(runningAction.id || "")];
-      await loadActions();
-      startRunningTaskTicker();
-    } catch {}
-  })();
+  const runningAction = getRunningActionForSelectedProfile();
+  if (!runningAction) return;
+  openRunningConfirmModal("giveup", runningAction, () => {
+    void performRunningGiveUp(runningAction);
+  });
 });
 
 runningTaskListButton?.addEventListener("click", () => {
@@ -5849,6 +5906,15 @@ runningTaskListButton?.addEventListener("click", () => {
   }, 500);
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
+runningConfirmPrimaryButton?.addEventListener("click", () => {
+  const action = state.runningConfirm.action;
+  const callback = action;
+  closeRunningConfirmModal();
+  if (typeof callback === "function") {
+    callback();
+  }
+});
+runningConfirmBackButton?.addEventListener("click", closeRunningConfirmModal);
 runningModePercentBtn?.addEventListener("click", () => {
   state.runningCenterMode = state.runningCenterMode === "percent" ? "auto" : "percent";
   renderHomeRunningTask();
