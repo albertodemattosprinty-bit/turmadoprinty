@@ -913,6 +913,36 @@ function getPunctualityPercentFromLateMinutes(lateMinutesValue) {
   return clampPercent(100 - (lateMinutes / 5));
 }
 
+function getPunctualityTone(percent) {
+  const points = [
+    { percent: 100, color: [34, 197, 94] },
+    { percent: 80, color: [59, 130, 246] },
+    { percent: 60, color: [234, 179, 8] },
+    { percent: 40, color: [249, 115, 22] },
+    { percent: 0, color: [239, 68, 68] }
+  ];
+  const safe = clampPercent(percent);
+  if (safe >= 100) return points[0].color;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const upper = points[index];
+    const lower = points[index + 1];
+    if (safe <= upper.percent && safe >= lower.percent) {
+      const span = upper.percent - lower.percent || 1;
+      const ratio = (safe - lower.percent) / span;
+      return upper.color.map((component, colorIndex) => Math.round(lower.color[colorIndex] + ((component - lower.color[colorIndex]) * ratio)));
+    }
+  }
+  return points[points.length - 1].color;
+}
+
+function applyPunctualityTone(element, percent) {
+  if (!element) return;
+  const [red, green, blue] = getPunctualityTone(percent);
+  const strong = `rgba(${red}, ${green}, ${blue}, 0.92)`;
+  const soft = `rgba(${red}, ${green}, ${blue}, 0.58)`;
+  element.style.background = `linear-gradient(90deg, ${strong}, ${soft})`;
+}
+
 function clampPercent(value) {
   const numeric = Number(value || 0);
   if (!Number.isFinite(numeric)) return 0;
@@ -1075,6 +1105,9 @@ function renderRunningCompletionCelebration() {
   runningTaskPercent.innerHTML = state.runningCompletion.metric === "punctuality"
     ? formatWholePercentMarkup(state.runningCompletion.displayPercent)
     : formatPercentMarkup(state.runningCompletion.displayPercent, 2);
+  if (state.runningCompletion.metric === "punctuality") {
+    applyPunctualityTone(runningCompletionLabel, state.runningCompletion.displayPercent);
+  }
 }
 
 function renderRunningNextMetric(mode = "progress") {
@@ -1086,6 +1119,9 @@ function renderRunningNextMetric(mode = "progress") {
     runningTaskMinutesLeft.textContent = metricMode === "punctuality"
       ? "Pontualidade"
       : "Progresso";
+  }
+  if (metricMode === "punctuality") {
+    applyPunctualityTone(runningTaskMinutesLeft, state.runningCompletion.punctualityValue);
   }
   setRunningRingPercent(metricMode === "punctuality" ? state.runningCompletion.punctualityValue : state.runningCompletion.progressValue);
   if (runningTaskPercent) {
@@ -1273,6 +1309,7 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
         }
         if (dayDoneDelay) {
           dayDoneDelay.textContent = `Pontualidade: ${Math.round(Number(summary?.punctualityAfter ?? 100))}%`;
+          applyPunctualityTone(dayDoneDelay, summary?.punctualityAfter ?? 100);
         }
         openModal("dayDoneModal");
       }, RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS);
@@ -1290,6 +1327,7 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
       }
       if (dayDoneDelay) {
         dayDoneDelay.textContent = `Pontualidade: ${Math.round(Number(summary?.punctualityAfter ?? 100))}%`;
+        applyPunctualityTone(dayDoneDelay, summary?.punctualityAfter ?? 100);
       }
       openModal("dayDoneModal");
     }, RUNNING_COMPLETION_HOLD_MS);
@@ -1414,7 +1452,9 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
-    setRunningHomeVisibility(true);
+    if (!document.body.classList.contains("actions-modal-open")) {
+      setRunningHomeVisibility(true);
+    }
     runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Próxima tarefa");
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
@@ -1480,11 +1520,7 @@ function renderHomeRunningTask() {
   const punctualitySummary = getCompletionSummaryForSelectedProfile();
   runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
   runningTaskMinutesLeft.textContent = `Pontualidade ${punctualitySummary.punctualityPercent}%`;
-  if (punctualitySummary.punctualityPercent < 100) {
-    runningTaskMinutesLeft.classList.add("is-late");
-  } else {
-    runningTaskMinutesLeft.classList.add("is-early");
-  }
+  applyPunctualityTone(runningTaskMinutesLeft, punctualitySummary.punctualityPercent);
   if (nextAction) {
     const nextLabel = nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
@@ -1967,6 +2003,7 @@ function openModal(id) {
   if (id === "actionsModal") {
     const latestDone = getLatestCompletedActionForSelectedProfile();
     pendingActionsAnchorId = latestDone?.id || "";
+    document.body.classList.add("actions-modal-open");
     void loadActions();
     window.setTimeout(() => {
       anchorToLastCompletedAction();
@@ -2053,6 +2090,7 @@ function closeModal(modal) {
       actionsTimeTicker = null;
     }
     closeActionStatusWizard();
+    document.body.classList.remove("actions-modal-open");
   }
 
   if (modal.id === "historyModal") {
