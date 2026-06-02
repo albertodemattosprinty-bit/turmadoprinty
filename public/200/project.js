@@ -969,6 +969,10 @@ function setRunningIdleVisualState(isIdle) {
   runningTaskContent?.classList.toggle("is-idle-layout", isIdle);
 }
 
+function setRunningHomeVisibility(isVisible) {
+  document.body.classList.toggle("running-task-active", !isVisible);
+}
+
 function wait(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
@@ -1053,6 +1057,7 @@ function renderRunningCompletionCelebration() {
   if (runningTaskListButton) runningTaskListButton.hidden = true;
   if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
   if (runningTaskStartNextButton) runningTaskStartNextButton.hidden = true;
+  setRunningHomeVisibility(false);
   if (runningCompletionLabel) {
     runningCompletionLabel.textContent = String(state.runningCompletion.label || "");
   }
@@ -1119,6 +1124,7 @@ function renderRunningCompletionNextView() {
     runningTaskStartNextButton.dataset.startIso = String(nextAction.startAt || "");
     runningTaskStartNextButton.dataset.endIso = String(nextAction.endAt || "");
   }
+  setRunningHomeVisibility(false);
 }
 
 function animateRunningCompletionProgress(fromPercent, toPercent, durationMs) {
@@ -1399,6 +1405,7 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
+    setRunningHomeVisibility(true);
     runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Próxima tarefa");
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
@@ -1429,6 +1436,7 @@ function renderHomeRunningTask() {
     }
     return;
   }
+  setRunningHomeVisibility(false);
   const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
   const runningActionId = String(action.id || "");
   if (state.runningEndBell.actionId !== runningActionId) {
@@ -1540,8 +1548,7 @@ async function loadRunningMusicStations() {
   } catch {
     // keep local/fallback stations
   }
-  const jungleIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").toLowerCase() === "jungle");
-  state.runningPlayer.stationIndex = jungleIndex >= 0 ? jungleIndex : 0;
+  state.runningPlayer.stationIndex = 0;
   state.runningPlayer.trackIndex = 0;
   renderRunningMusicPlayer();
   primeRunningTrackBuffer();
@@ -1777,18 +1784,7 @@ function getStationNameForCategory(categoryId) {
 }
 
 function applyRunningStationForCategory(categoryId) {
-  const stationName = getStationNameForCategory(categoryId);
-  if (!stationName || !Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) return;
-  const index = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").toLowerCase() === stationName.toLowerCase());
-  if (index < 0 || index === state.runningPlayer.stationIndex) return;
-  state.runningPlayer.stationIndex = index;
-  state.runningPlayer.trackIndex = 0;
-  primeRunningTrackBuffer();
-  if (state.runningPlayer.isPlaying) {
-    playRunningTrack();
-  } else {
-    renderRunningMusicPlayer();
-  }
+  void categoryId;
 }
 
 function buildDateWithTime(date, hour, minute) {
@@ -2000,6 +1996,7 @@ function openModal(id) {
   }
 
   if (id === "runningTaskModal") {
+    setRunningHomeVisibility(false);
     startRunningTaskTicker();
     renderHomeRunningTask();
   }
@@ -2054,6 +2051,9 @@ function closeModal(modal) {
   }
   if (modal.id === "calendarModal") {
     closeFinanceEntryConfirm(false);
+  }
+  if (modal.id === "runningTaskModal") {
+    setRunningHomeVisibility(true);
   }
 }
 
@@ -2352,6 +2352,11 @@ function renderActions() {
     const row = document.createElement("article");
     const cleanPendingClass = (status === actionStatuses.pending && delayMinutes <= 0) ? " task-pending-clean" : "";
     row.className = `task-row${stateClass}${gaveUpClass}${getDelayClassByMinutes(delayMinutes)}${cleanPendingClass}`;
+    if (delayMinutes > 0 && delayMinutes <= 5) {
+      row.style.setProperty("--delay-progress", String(Math.max(0, Math.min(1, delayMinutes / 5))));
+    } else {
+      row.style.removeProperty("--delay-progress");
+    }
     row.dataset.actionId = action.id;
     row.setAttribute("role", "button");
     row.tabIndex = 0;
@@ -2410,16 +2415,16 @@ function getDelayClassByMinutes(minutes) {
   if (minutes <= 0) {
     return "";
   }
-  if (minutes < 15) {
+  if (minutes <= 5) {
     return " task-delay-soft";
   }
-  if (minutes < 60) {
+  if (minutes <= 20) {
     return " task-delay-yellow";
   }
-  if (minutes < 120) {
+  if (minutes <= 60) {
     return " task-delay-orange";
   }
-  if (minutes < 240) {
+  if (minutes <= 180) {
     return " task-delay-red";
   }
   return " task-delay-black";
@@ -2716,16 +2721,33 @@ async function interpretActionCategoryFromTitle(titleText) {
 async function saveActionCategory(actionId, categoryId) {
   const action = state.actions.find((item) => String(item.id) === String(actionId));
   if (!action) return;
-  await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, {
+  const shouldCascade = String(action.repeatRule || "none") !== "none";
+  const matchKey = shouldCascade
+    ? JSON.stringify({
+        title: String(action.title || "").trim().toLowerCase(),
+        assignee: String(action.assignee || "").trim().toLowerCase(),
+        repeatRule: String(action.repeatRule || "none"),
+        repeatDays: JSON.stringify(Array.isArray(action.repeatDays) ? action.repeatDays : [])
+      })
+    : "";
+  const targets = shouldCascade
+    ? state.actions.filter((item) => JSON.stringify({
+      title: String(item.title || "").trim().toLowerCase(),
+      assignee: String(item.assignee || "").trim().toLowerCase(),
+      repeatRule: String(item.repeatRule || "none"),
+      repeatDays: JSON.stringify(Array.isArray(item.repeatDays) ? item.repeatDays : [])
+    }) === matchKey)
+    : [action];
+  await Promise.all(targets.map((item) => apiRequest(`/api/actions/${encodeURIComponent(item.id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      title: action.title,
-      assignee: action.assignee,
+      title: item.title,
+      assignee: item.assignee,
       categoryId,
-      occurrences: [{ startAt: action.startAt, endAt: action.endAt }]
+      occurrences: [{ startAt: item.startAt, endAt: item.endAt }]
     })
-  });
+  })));
   await loadActions();
 }
 
@@ -2757,6 +2779,17 @@ function closeActionsModalWithFade() {
   window.setTimeout(() => {
     closeModal(actionsModal);
     actionsModal.classList.remove("is-fading-out");
+  }, 500);
+}
+
+function closeRunningTaskModalWithFade() {
+  if (!runningTaskModalElement || !runningTaskModalElement.classList.contains("active")) {
+    return;
+  }
+  runningTaskModalElement.classList.add("is-fading-out");
+  window.setTimeout(() => {
+    closeModal(runningTaskModalElement);
+    runningTaskModalElement.classList.remove("is-fading-out");
   }, 500);
 }
 
@@ -5810,8 +5843,10 @@ runningTaskGiveUpButton?.addEventListener("click", () => {
 });
 
 runningTaskListButton?.addEventListener("click", () => {
-  closeModal(runningTaskModalElement);
-  openModal("actionsModal");
+  closeRunningTaskModalWithFade();
+  window.setTimeout(() => {
+    openModal("actionsModal");
+  }, 500);
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
 runningModePercentBtn?.addEventListener("click", () => {
@@ -5833,7 +5868,6 @@ if (runningAudio) {
 }
 handleSwipe(runningPlayerTrack, (amount) => moveRunningStation(amount > 0 ? -1 : 1));
 handleSwipe(runningTaskModalElement, (amount) => moveRunningStation(amount > 0 ? -1 : 1));
-runningTaskModalElement?.addEventListener("pointerdown", ensureRunningAudioOnTouch, { passive: true });
 
 document.body.classList.add("project-no-select");
 const isEditableTarget = (target) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
