@@ -2053,70 +2053,54 @@ async function handleMiniLessonPlanGenerate(request, response) {
     : blocks.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
   const durationText = durationMinutes > 0 ? `${durationMinutes} minutos` : "a definir";
 
-  response.writeHead(200, {
-    "Content-Type": "text/event-stream; charset=utf-8",
-    "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive"
-  });
-
-  sendSseEvent(response, "status", {
-    stage: "start",
-    message: "Gerando plano por blocos..."
-  });
-
   const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
   const themePrompt = theme || "aula infantil cristã";
 
   try {
-    for (let i = 0; i < blocks.length; i += 1) {
-      const block = blocks[i];
-      const durationHint = Number.isFinite(block.minutes) && block.minutes > 0 ? block.minutes : 8;
-      const completion = await createChatCompletion(apiKey, {
-        model,
-        temperature: 0.5,
-        max_completion_tokens: 420,
-        messages: [
-          {
-            role: "system",
-            content: "Crie uma aula cristã infantil sobre [TEMA], baseada em [TEXTO BÍBLICO], para crianças de [IDADE], com duração de [TEMPO]. Escreva com tom leve, humano, cristão, acolhedor e prático, como um amigo experiente ajudando um professor voluntário de igreja. Não escreva como manual frio. Use sugestões naturais como 'você pode dizer', 'convide as crianças', 'uma ideia simples é', 'faça com calma' e 'se a turma estiver agitada'. Evite linguagem repetitiva, pesada, moralista, acusatória ou automática. Não use medo, culpa, pressão emocional ou experiências espirituais forçadas. A aula deve transmitir o amor de Deus, a fé, a graça, o cuidado, a verdade bíblica e o exemplo de Jesus com sensibilidade infantil. Estruture a aula em: 1. Título; 2. Versículo base; 3. Ideia central; 4. Objetivo; 5. Materiais; 6. Boas-vindas; 7. Quebra-gelo; 8. Louvor; 9. História bíblica; 10. Conversa com as crianças; 11. Atividade prática; 12. Aplicação para a vida; 13. Desafio da semana; 14. Oração final; 15. Dica pastoral para o professor. Em cada etapa, inclua: objetivo; sugestão prática; fala pronta para o professor; pergunta simples para as crianças; transição suave. Mantenha fidelidade bíblica, criatividade, linguagem simples e aplicação prática para o dia a dia da criança. Responda APENAS JSON puro: {\"title\":\"...\",\"content\":\"...\"}. O campo content deve ter entre 220 e 650 caracteres e ser focado no bloco solicitado."
-          },
-          {
-            role: "user",
-            content: `Tema: ${themePrompt}\nTexto bíblico: ${bibleText}\nIdade: ${age}\nTempo total da aula: ${durationText}\nBloco da vez: ${block.name}\nTempo do bloco: ${durationHint} minutos.\nEscreva orientações claras para o professor conduzir este bloco e manter continuidade com os demais.`
-          }
-        ]
-      });
+    const contextText = "Planejamento de aula para o Ministerio Infantil e um cuidado de amor: ambiente seguro, previsivel e acolhedor; foco no discipulado; estrutura simples em blocos; planejamento semanal/mensal com leveza; adequacao por idade; uso pratico de recursos simples.";
+    const stageNames = blocks.map((b) => b.name);
+    const completion = await createChatCompletion(apiKey, {
+      model,
+      temperature: 0.5,
+      max_completion_tokens: 2200,
+      messages: [
+        {
+          role: "system",
+          content: "Crie uma aula crista infantil sobre [TEMA], baseada em [TEXTO BIBLICO], para criancas de [IDADE], com duracao de [TEMPO]. Escreva com tom leve, humano, cristao, acolhedor e pratico. Evite tom frio, moralista ou de culpa. Use linguagem simples e aplicacao para o dia a dia. Regras: (1) nao invente titulos de etapas; (2) voce deve escrever somente o conteudo de cada etapa recebida; (3) mantenha fidelidade biblica e foco no amor de Deus. Responda APENAS JSON puro no formato: {\"mainTitle\":\"...\",\"sections\":[{\"content\":\"...\"}]}. sections deve ter a mesma quantidade e ordem das etapas recebidas."
+        },
+        {
+          role: "user",
+          content: `Contexto adicional: ${contextText}\nTema: ${themePrompt}\nTexto biblico: ${bibleText}\nIdade: ${age}\nTempo total: ${durationText}\nEtapas (ordem obrigatoria): ${stageNames.join(" | ")}\nPara cada etapa escreva de 350 a 900 caracteres com objetivo, sugestao pratica, fala pronta do professor, pergunta simples para criancas e transicao suave.`
+        }
+      ]
+    });
 
-      const raw = extractChatCompletionText(completion);
-      let parsed = null;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        parsed = null;
-      }
-
-      const sectionTitle = String(parsed?.title || block.name).trim() || block.name;
-      const sectionContent = String(parsed?.content || raw || "")
-        .trim()
-        .slice(0, 900);
-
-      sendSseEvent(response, "section", {
-        index: i,
-        total: blocks.length,
-        title: sectionTitle,
-        blockName: block.name,
-        minutes: durationHint,
-        content: sectionContent
-      });
+    const raw = extractChatCompletionText(completion);
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
     }
 
-    sendSseEvent(response, "done", { ok: true, model });
-    response.end();
-  } catch (error) {
-    sendSseEvent(response, "error", {
-      message: error instanceof Error ? error.message : "Falha ao gerar plano."
+    const mainTitle = String(parsed?.mainTitle || `Plano de Aula: ${themePrompt}`).trim();
+    const sections = Array.isArray(parsed?.sections) ? parsed.sections : [];
+    const normalized = stageNames.map((name, index) => ({
+      title: name,
+      content: String(sections[index]?.content || "").trim() || `Conteudo para ${name}.`
+    }));
+
+    sendJson(response, 200, {
+      ok: true,
+      model,
+      mainTitle,
+      sections: normalized
     });
-    response.end();
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Falha ao gerar plano.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
   }
 }
 

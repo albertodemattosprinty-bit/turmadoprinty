@@ -89,6 +89,15 @@
     .examples { font-size: 13px; min-height: 20px; opacity: .94; }
     .ai-output { background: rgba(255,255,255,.14); border-radius: 16px; padding: 12px; overflow-y: auto; }
     .ai-block { border-radius: 12px; padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,.12); }
+    .ai-single {
+      background: linear-gradient(155deg, #2a77ff, #1e47b8);
+      color: #fff;
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .ai-single h1 { margin: 0 0 8px; font-size: 24px; }
+    .ai-single h2 { margin: 12px 0 6px; font-size: 17px; }
+    .ai-single p { margin: 0; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
     .ai-head {
       display: grid;
       grid-template-columns: 30px 1fr;
@@ -249,13 +258,11 @@
     $("ageDown").onclick = () => { state.age = Math.max(6, state.age - 1); $("ageValue").textContent = String(state.age); };
     $("ageUp").onclick = () => { state.age = Math.min(14, state.age + 1); $("ageValue").textContent = String(state.age); };
 
-    async function streamMiniPlan(prompt) {
-      const out = $("aiOutput");
+    async function generateMiniPlan(prompt) {
       const response = await fetch("/api/mini/aulas/gerar", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Accept": "text/event-stream"
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           theme: prompt,
@@ -267,51 +274,11 @@
         })
       });
 
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         const text = await response.text();
         throw new Error(text || "Falha ao gerar plano.");
       }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split("\n\n");
-        buffer = events.pop() || "";
-
-        for (const evt of events) {
-          const lines = evt.split("\n");
-          let eventName = "message";
-          let dataText = "";
-          for (const line of lines) {
-            if (line.startsWith("event:")) eventName = line.slice(6).trim();
-            if (line.startsWith("data:")) dataText += line.slice(5).trim();
-          }
-          if (!dataText) continue;
-          let data;
-          try { data = JSON.parse(dataText); } catch { continue; }
-
-          if (eventName === "section") {
-            const idx = out.querySelectorAll(".ai-block").length;
-            const b = document.createElement("article");
-            b.className = "ai-block";
-            b.style.background = gradients[idx % gradients.length];
-            const blockRef = data.blockName || data.title || "Bloco";
-            const icon = iconUrlByName(blockRef);
-            b.innerHTML = `<div class='ai-head'><img class='ai-icon-sm' src='${icon}' alt='${blockRef}'><h3>${data.title || data.blockName || "Bloco"}</h3></div><p>${data.content || ""}</p>`;
-            out.appendChild(b);
-            out.scrollTop = out.scrollHeight;
-          }
-
-          if (eventName === "error") {
-            throw new Error(data?.message || "Erro ao gerar plano.");
-          }
-        }
-      }
+      return response.json();
     }
 
     $("generateAi").onclick = async () => {
@@ -320,11 +287,23 @@
       out.innerHTML = "";
       const loading = document.createElement("article");
       loading.className = "ai-block";
-      loading.innerHTML = "<h3>Gerando...</h3><p>Montando blocos do plano em tempo real.</p>";
+      loading.innerHTML = "<h3>Gerando...</h3><p>Montando plano completo.</p>";
       out.appendChild(loading);
       try {
-        await streamMiniPlan(prompt);
-        loading.remove();
+        const payload = await generateMiniPlan(prompt);
+        const sections = Array.isArray(payload?.sections) ? payload.sections : [];
+        const card = document.createElement("article");
+        card.className = "ai-single";
+        const safeTitle = payload?.mainTitle || "Plano de Aula";
+        const html = [`<h1>${safeTitle}</h1>`];
+        sections.forEach((s) => {
+          const sectionTitle = s?.title || "Etapa";
+          const sectionContent = s?.content || "";
+          html.push(`<h2>${sectionTitle}</h2><p>${sectionContent}</p>`);
+        });
+        card.innerHTML = html.join("");
+        out.innerHTML = "";
+        out.appendChild(card);
       } catch (error) {
         loading.innerHTML = `<h3>Falha</h3><p>${error instanceof Error ? error.message : "Erro desconhecido."}</p>`;
       }
