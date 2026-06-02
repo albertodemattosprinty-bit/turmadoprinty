@@ -2914,6 +2914,9 @@ function closeStartDecisionModalWith(value) {
   startDecisionModal?.setAttribute("aria-hidden", "true");
   const resolver = startDecisionResolver;
   startDecisionResolver = null;
+  if (!document.querySelector(".workspace-modal.active")) {
+    document.body.classList.remove("modal-open");
+  }
   if (resolver) resolver(value);
 }
 
@@ -2975,6 +2978,7 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     }
     startDecisionModal?.classList.add("active");
     startDecisionModal?.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
   });
 }
 
@@ -2989,11 +2993,17 @@ function closePostponeTaskModalView() {
   stopPostponeFeedbackCarousel();
   postponeTaskModal?.classList.remove("active");
   postponeTaskModal?.setAttribute("aria-hidden", "true");
+  if (!document.querySelector(".workspace-modal.active")) {
+    document.body.classList.remove("modal-open");
+  }
 }
 
 function closePostponeReplaceModalView() {
   postponeReplaceModal?.classList.remove("active");
   postponeReplaceModal?.setAttribute("aria-hidden", "true");
+  if (!document.querySelector(".workspace-modal.active")) {
+    document.body.classList.remove("modal-open");
+  }
 }
 
 function formatPostponeDayLabel(offset) {
