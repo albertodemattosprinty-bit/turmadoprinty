@@ -2029,6 +2029,9 @@ async function handleMiniLessonPlanGenerate(request, response) {
   }
 
   const theme = String(body?.theme || "").trim();
+  const bibleText = String(body?.bibleText || "").trim() || "a definir";
+  const age = Math.max(6, Math.min(14, Number(body?.age || 6)));
+  const durationMinutesInput = Number(body?.durationMinutes || 0);
   const selectedBlocks = Array.isArray(body?.selectedBlocks) ? body.selectedBlocks : [];
   const normalizedBlocks = selectedBlocks
     .map((item) => ({
@@ -2045,6 +2048,10 @@ async function handleMiniLessonPlanGenerate(request, response) {
       { name: "Aplicacao pratica", minutes: 10 },
       { name: "Oracao final", minutes: 5 }
     ];
+  const durationMinutes = durationMinutesInput > 0
+    ? durationMinutesInput
+    : blocks.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
+  const durationText = durationMinutes > 0 ? `${durationMinutes} minutos` : "a definir";
 
   response.writeHead(200, {
     "Content-Type": "text/event-stream; charset=utf-8",
@@ -2071,11 +2078,11 @@ async function handleMiniLessonPlanGenerate(request, response) {
         messages: [
           {
             role: "system",
-            content: "Você escreve blocos de plano de aula cristão infantil em pt-BR. Gere um texto prático, acolhedor e fiel à Bíblia, sem julgamento. Responda APENAS JSON puro: {\"title\":\"...\",\"content\":\"...\"}. O campo content deve ter entre 220 e 650 caracteres."
+            content: "Crie uma aula cristã infantil sobre [TEMA], baseada em [TEXTO BÍBLICO], para crianças de [IDADE], com duração de [TEMPO]. Escreva com tom leve, humano, cristão, acolhedor e prático, como um amigo experiente ajudando um professor voluntário de igreja. Não escreva como manual frio. Use sugestões naturais como 'você pode dizer', 'convide as crianças', 'uma ideia simples é', 'faça com calma' e 'se a turma estiver agitada'. Evite linguagem repetitiva, pesada, moralista, acusatória ou automática. Não use medo, culpa, pressão emocional ou experiências espirituais forçadas. A aula deve transmitir o amor de Deus, a fé, a graça, o cuidado, a verdade bíblica e o exemplo de Jesus com sensibilidade infantil. Estruture a aula em: 1. Título; 2. Versículo base; 3. Ideia central; 4. Objetivo; 5. Materiais; 6. Boas-vindas; 7. Quebra-gelo; 8. Louvor; 9. História bíblica; 10. Conversa com as crianças; 11. Atividade prática; 12. Aplicação para a vida; 13. Desafio da semana; 14. Oração final; 15. Dica pastoral para o professor. Em cada etapa, inclua: objetivo; sugestão prática; fala pronta para o professor; pergunta simples para as crianças; transição suave. Mantenha fidelidade bíblica, criatividade, linguagem simples e aplicação prática para o dia a dia da criança. Responda APENAS JSON puro: {\"title\":\"...\",\"content\":\"...\"}. O campo content deve ter entre 220 e 650 caracteres e ser focado no bloco solicitado."
           },
           {
             role: "user",
-            content: `Tema central: ${themePrompt}\nBloco: ${block.name}\nTempo previsto: ${durationHint} minutos.\nEscreva orientações claras para o professor conduzir este bloco.`
+            content: `Tema: ${themePrompt}\nTexto bíblico: ${bibleText}\nIdade: ${age}\nTempo total da aula: ${durationText}\nBloco da vez: ${block.name}\nTempo do bloco: ${durationHint} minutos.\nEscreva orientações claras para o professor conduzir este bloco e manter continuidade com os demais.`
           }
         ]
       });

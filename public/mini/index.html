@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mini</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@700;800&display=swap');
     :root {
       color-scheme: only light;
       --text: #1a1a1a;
@@ -30,15 +31,15 @@
     .icon-ball svg { width: 28px; height: 28px; fill: #fff; }
     .g-red { background: var(--g-red); } .g-blue { background: var(--g-blue); } .g-purple { background: var(--g-purple); } .g-gold { background: var(--g-gold); } .g-navy { background: var(--g-navy); }
 
-    .immersive { position: fixed; inset: 0; background: #fff; z-index: 20; transform: translateY(100%); opacity: 0; pointer-events: none; transition: transform .26s ease, opacity .2s ease; display: grid; grid-template-rows: auto 60vh auto 10vh; padding: 14px 12px 8px; }
+    .immersive { position: fixed; inset: 0; background: #fff; z-index: 20; transform: translateY(100%); opacity: 0; pointer-events: none; transition: transform .26s ease, opacity .2s ease; display: grid; grid-template-rows: auto 70vh auto 10vh; padding: 8px 12px 8px; }
     .immersive.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
     .modal-head { text-align: center; }
-    .modal-head h2 { margin: 0; font-size: 20px; }
+    .modal-head h2 { margin: 0; font-size: 27px; font-family: "Open Sans", sans-serif; font-weight: 800; background: linear-gradient(145deg, #5ba9ff, #2f57d7); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .deck { border-radius: 22px; border: 1px solid var(--border); padding: 12px 10px; display: grid; grid-template-columns: 1fr 40px; gap: 10px; overflow: hidden; }
     .rows { display: grid; grid-template-rows: repeat(6, 1fr); gap: 8px; min-height: 0; }
     .card { min-height: 8vh; border-radius: 14px; padding: 8px 10px; color: #fff; position: relative; overflow: hidden; display: grid; align-content: center; }
     .card.with-icon {
-      grid-template-columns: 54px 1fr 54px;
+      grid-template-columns: 54px 1fr;
       align-items: center;
       gap: 8px;
     }
@@ -90,10 +91,33 @@
     .ai-block { border-radius: 12px; padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,.12); }
     .ai-head {
       display: grid;
-      grid-template-columns: 30px 1fr 30px;
+      grid-template-columns: 30px 1fr;
       align-items: center;
       gap: 8px;
       margin-bottom: 4px;
+    }
+    .inline-age {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.18);
+      border-radius: 12px;
+      padding: 8px 10px;
+    }
+    .inline-age b {
+      font-size: 26px;
+      min-width: 28px;
+      text-align: center;
+    }
+    .age-arrow {
+      border: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.24);
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
     }
     .ai-icon-sm {
       width: 28px;
@@ -123,7 +147,7 @@
   </main>
 
   <section id="aulasModal" class="immersive">
-    <header class="modal-head"><h2>Cronograma de Aulas</h2></header>
+    <header class="modal-head"><h2>Planejar Aula</h2></header>
     <div class="deck"><div><div id="selectedRows" class="rows"></div><div class="pager"><button id="selPrev" class="pill-btn">&#8249;</button><span id="selPage">1 / 1</span><button id="selNext" class="pill-btn">&#8250;</button></div></div><div id="timeline" class="timeline"></div></div>
     <div class="total-time"><small id="totalLabel">0 minutos total</small></div>
     <footer class="footer-actions">
@@ -150,6 +174,13 @@
   <section id="aiModal" class="ai-modal">
     <h1>O que vamos ensinar<br>nessa aula?</h1>
     <div class="hint">Plano amigavel cristao com blocos prontos (modelo 4.1 instant).</div>
+    <div class="inline-age">
+      <span>Idade</span>
+      <button id="ageDown" class="age-arrow" type="button">&#8249;</button>
+      <b id="ageValue">6</b>
+      <button id="ageUp" class="age-arrow" type="button">&#8250;</button>
+      <span>anos</span>
+    </div>
     <textarea id="aiPrompt" class="ai-input" placeholder="Quero ensinar perdão com a história de José"></textarea>
     <div id="aiExamples" class="examples"></div>
     <div id="aiOutput" class="ai-output"></div>
@@ -160,7 +191,7 @@
     const gradients = ["linear-gradient(145deg,#ff9a5c,#f5d74f)","linear-gradient(145deg,#ffa874,#ff8052)","linear-gradient(145deg,#ffda5a,#ffb84d)","linear-gradient(145deg,#ffd94f,#ffb100)","linear-gradient(145deg,#ff8b79,#ff5f4a)","linear-gradient(145deg,#d183ff,#8f67ff)","linear-gradient(145deg,#70cbff,#4f8aff)","linear-gradient(145deg,#5e72ff,#3751df)"];
     const names = ["Check-in","Entrega de cracha","Boas-vindas","Chamada","Quebra-gelo","Abertura","Hino oficial","Oracao inicial","Louvor","Louvor com gestos","Versiculo do dia","Memorizacao biblica","Introducao do tema","Historia com tema","Historia biblica","Mensagem","Aplicacao pratica","Oracao apos mensagem","Pedidos de oracao","Teatro","Fantoches","Encenacao rapida","Ilustracao visual","Video curto","Desenho ou filme","Explicar dinamica","Dinamica","Explicar jogo","Jogo","Desafio","Atividade impressa","Atividade manual","Atividade em grupo","Perguntas e respostas","Quiz biblico","Revisao da aula","Fazer em casa","Explicar projeto","Projeto em andamento","Ensaio","Apresentacao","Aniversarios","Momento oferta","Oracao da oferta","Lanche","Hora da foto","Oracao final","Check-out"];
     const baseBlocks = names.map((n, i) => ({ id: i + 1, name: n, gradient: gradients[i % gradients.length] }));
-    const state = { selected: [], poolPage: 0, selectedPage: 0, currentPick: null, currentMinutes: 5 };
+    const state = { selected: [], poolPage: 0, selectedPage: 0, currentPick: null, currentMinutes: 5, age: 6 };
     const examples = ["Quero ensinar perdão com a história de José","Quero ensinar como obedecer com a história de Jonas","Quero ensinar a ouvir a voz de Deus com Samuel"];
     let exIndex = 0;
 
@@ -184,13 +215,13 @@
     function renderPool(){
       const pages=Math.max(1,Math.ceil(baseBlocks.length/pageSize)); state.poolPage=Math.max(0,Math.min(state.poolPage,pages-1));
       $("poolPage").textContent=`${state.poolPage+1} / ${pages}`; $("poolCounter").textContent=String(baseBlocks.length);
-      $("poolRows").innerHTML=""; page(baseBlocks,state.poolPage).forEach((b)=>{ const c=document.createElement("button"); c.className="card with-icon"; c.style.border="0"; c.style.background=b.gradient; const icon=iconUrlById(b.id); c.innerHTML=`<img class='card-icon-lg' src='${icon}' alt='${b.name}'><div class='card-center'><h4>${b.name}</h4></div><img class='card-icon-lg' src='${icon}' alt='${b.name}'>`; c.onclick=()=>openMinute(b); $("poolRows").appendChild(c); });
+      $("poolRows").innerHTML=""; page(baseBlocks,state.poolPage).forEach((b)=>{ const c=document.createElement("button"); c.className="card with-icon"; c.style.border="0"; c.style.background=b.gradient; const icon=iconUrlById(b.id); c.innerHTML=`<img class='card-icon-lg' src='${icon}' alt='${b.name}'><div class='card-center'><h4>${b.name}</h4></div>`; c.onclick=()=>openMinute(b); $("poolRows").appendChild(c); });
       $("poolLine").innerHTML=""; for(let i=0;i<6;i++){ const s=document.createElement("div"); s.className="seg"; s.style.flex="1"; s.style.background="#e9eef9"; $("poolLine").appendChild(s);}    }
 
     function renderSelected(){
       const pages=Math.max(1,Math.ceil(state.selected.length/pageSize)); state.selectedPage=Math.max(0,Math.min(state.selectedPage,pages-1));
       $("selPage").textContent=`${state.selectedPage+1} / ${pages}`; $("selectedRows").innerHTML="";
-      page(state.selected,state.selectedPage).forEach((it,localIdx)=>{ const c=document.createElement("div"); c.className="card with-icon"; c.style.background=it.gradient; const icon=iconUrlById(it.id); c.innerHTML=`<img class='card-icon-lg' src='${icon}' alt='${it.name}'><div class='card-center'><h4>${it.name}</h4><p>${toHoursText(it.minutes)}</p></div><img class='card-icon-lg' src='${icon}' alt='${it.name}'><div class='side-actions'><button class='mini-ic' data-edit='${it.uid}'><svg viewBox='0 0 24 24'><path d='M3 17.25V21h3.75l11-11.03-3.75-3.75L3 17.25zm17.71-10.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 2-1.66z'/></svg></button><button class='mini-ic' data-del='${it.uid}'><svg viewBox='0 0 24 24'><path d='M6 7h12l-1 13H7L6 7zm3-3h6l1 2H8l1-2z'/></svg></button></div>`; $("selectedRows").appendChild(c); });
+      page(state.selected,state.selectedPage).forEach((it,localIdx)=>{ const c=document.createElement("div"); c.className="card with-icon"; c.style.background=it.gradient; const icon=iconUrlById(it.id); c.innerHTML=`<img class='card-icon-lg' src='${icon}' alt='${it.name}'><div class='card-center'><h4>${it.name}</h4><p>${toHoursText(it.minutes)}</p></div><div class='side-actions'><button class='mini-ic' data-edit='${it.uid}'><svg viewBox='0 0 24 24'><path d='M3 17.25V21h3.75l11-11.03-3.75-3.75L3 17.25zm17.71-10.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 2-1.66z'/></svg></button><button class='mini-ic' data-del='${it.uid}'><svg viewBox='0 0 24 24'><path d='M6 7h12l-1 13H7L6 7zm3-3h6l1 2H8l1-2z'/></svg></button></div>`; $("selectedRows").appendChild(c); });
       const total=state.selected.reduce((s,i)=>s+i.minutes,0); $("totalLabel").textContent=`${toHoursText(total)} total`;
       $("timeline").innerHTML=""; const safe=Math.max(total,1); state.selected.forEach((i)=>{const seg=document.createElement("div"); seg.className="seg"; seg.style.height=(i.minutes/safe*100)+"%"; seg.style.background=i.gradient; $("timeline").appendChild(seg);});
       $("selectedRows").querySelectorAll("[data-del]").forEach((b)=>b.onclick=()=>{ state.selected=state.selected.filter(x=>String(x.uid)!==b.dataset.del); renderSelected(); });
@@ -215,6 +246,8 @@
 
     $("openAi").onclick=()=>{ $("aiModal").classList.add("show"); if(!$("aiPrompt").value) $("aiPrompt").value=examples[0]; };
     $("closeAi").onclick=()=>$("aiModal").classList.remove("show");
+    $("ageDown").onclick = () => { state.age = Math.max(6, state.age - 1); $("ageValue").textContent = String(state.age); };
+    $("ageUp").onclick = () => { state.age = Math.min(14, state.age + 1); $("ageValue").textContent = String(state.age); };
 
     async function streamMiniPlan(prompt) {
       const out = $("aiOutput");
@@ -226,6 +259,9 @@
         },
         body: JSON.stringify({
           theme: prompt,
+          bibleText: "a definir pelo professor",
+          age: state.age,
+          durationMinutes: state.selected.reduce((s, item) => s + Number(item.minutes || 0), 0),
           selectedBlocks: state.selected.map((item) => ({ name: item.name, minutes: item.minutes })),
           model: "gpt-4.1-instant"
         })
@@ -266,7 +302,7 @@
             b.style.background = gradients[idx % gradients.length];
             const blockRef = data.blockName || data.title || "Bloco";
             const icon = iconUrlByName(blockRef);
-            b.innerHTML = `<div class='ai-head'><img class='ai-icon-sm' src='${icon}' alt='${blockRef}'><h3>${data.title || data.blockName || "Bloco"}</h3><img class='ai-icon-sm' src='${icon}' alt='${blockRef}'></div><p>${data.content || ""}</p>`;
+            b.innerHTML = `<div class='ai-head'><img class='ai-icon-sm' src='${icon}' alt='${blockRef}'><h3>${data.title || data.blockName || "Bloco"}</h3></div><p>${data.content || ""}</p>`;
             out.appendChild(b);
             out.scrollTop = out.scrollHeight;
           }
