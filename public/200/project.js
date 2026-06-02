@@ -428,6 +428,8 @@ const RUNNING_RING_CIRCUMFERENCE = 2 * Math.PI * RUNNING_RING_RADIUS;
 const RUNNING_RING_FULL_OFFSET = -0.8;
 const RUNNING_COMPLETION_ANIMATION_MS = 1200;
 const RUNNING_COMPLETION_HOLD_MS = 1000;
+const RUNNING_NEXT_METRIC_PROGRESS_MS = 1500;
+const RUNNING_NEXT_METRIC_PUNCTUALITY_MS = 2500;
 if (runningAudio) {
   runningAudio.preload = "auto";
 }
@@ -444,6 +446,7 @@ if (runningPunctualityDownAudio) {
   runningPunctualityDownAudio.preload = "auto";
 }
 let runningMusicProgressTicker = null;
+let runningNextMetricTimer = null;
 const runningMinuteCueMap = new Map([
   [180, "0001.mp3"], [175, "0002.mp3"], [170, "0003.mp3"], [165, "0004.mp3"], [160, "0005.mp3"],
   [155, "0006.mp3"], [150, "0007.mp3"], [145, "0008.mp3"], [140, "0009.mp3"], [135, "0010.mp3"],
@@ -541,6 +544,9 @@ const state = {
     lateMinutes: 0,
     punctualityFrom: 100,
     punctualityTo: 100,
+    progressValue: 0,
+    punctualityValue: 100,
+    nextMetricMode: "progress",
     timeoutIds: [],
     rafId: 0
   },
@@ -888,6 +894,11 @@ function setRunningNextDisplay(name, totalMinutes) {
   }
 }
 
+function formatWholePercentMarkup(value) {
+  const safe = clampPercent(value);
+  return `${Math.round(safe)}<span class="running-task-unit">%</span>`;
+}
+
 function getPunctualityPercentFromLateMinutes(lateMinutesValue) {
   const lateMinutes = Math.max(0, Number(lateMinutesValue || 0));
   return clampPercent(100 - (lateMinutes / 5));
@@ -968,6 +979,10 @@ function clearRunningCompletionTimers() {
   const timeoutIds = Array.isArray(state.runningCompletion.timeoutIds) ? state.runningCompletion.timeoutIds : [];
   timeoutIds.forEach((timerId) => window.clearTimeout(timerId));
   state.runningCompletion.timeoutIds = [];
+  if (runningNextMetricTimer) {
+    window.clearTimeout(runningNextMetricTimer);
+    runningNextMetricTimer = null;
+  }
   if (state.runningCompletion.rafId) {
     window.cancelAnimationFrame(state.runningCompletion.rafId);
     state.runningCompletion.rafId = 0;
@@ -998,6 +1013,9 @@ function resetRunningCompletionState() {
   state.runningCompletion.lateMinutes = 0;
   state.runningCompletion.punctualityFrom = 100;
   state.runningCompletion.punctualityTo = 100;
+  state.runningCompletion.progressValue = 0;
+  state.runningCompletion.punctualityValue = 100;
+  state.runningCompletion.nextMetricMode = "progress";
   if (runningCompletionLabel) {
     runningCompletionLabel.textContent = "";
   }
@@ -1040,7 +1058,34 @@ function renderRunningCompletionCelebration() {
   }
   updateRunningCenterModeButtons("percent");
   setRunningRingPercent(state.runningCompletion.displayPercent);
-  runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.displayPercent, 2);
+  runningTaskPercent.innerHTML = state.runningCompletion.metric === "punctuality"
+    ? formatWholePercentMarkup(state.runningCompletion.displayPercent)
+    : formatPercentMarkup(state.runningCompletion.displayPercent, 2);
+}
+
+function renderRunningNextMetric(mode = "progress") {
+  const metricMode = mode === "punctuality" ? "punctuality" : "progress";
+  state.runningCompletion.nextMetricMode = metricMode;
+  if (runningTaskMinutesLeft) {
+    runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
+    runningTaskMinutesLeft.classList.add(metricMode === "punctuality" ? "is-early" : "is-bonus");
+    runningTaskMinutesLeft.textContent = metricMode === "punctuality"
+      ? "Pontualidade"
+      : "Progresso";
+  }
+  setRunningRingPercent(metricMode === "punctuality" ? state.runningCompletion.punctualityValue : state.runningCompletion.progressValue);
+  if (runningTaskPercent) {
+    runningTaskPercent.innerHTML = metricMode === "punctuality"
+      ? formatWholePercentMarkup(state.runningCompletion.punctualityValue)
+      : formatPercentMarkup(state.runningCompletion.progressValue, 2);
+  }
+  if (runningNextMetricTimer) {
+    window.clearTimeout(runningNextMetricTimer);
+    runningNextMetricTimer = null;
+  }
+  runningNextMetricTimer = window.setTimeout(() => {
+    renderRunningNextMetric(metricMode === "punctuality" ? "progress" : "punctuality");
+  }, metricMode === "punctuality" ? RUNNING_NEXT_METRIC_PUNCTUALITY_MS : RUNNING_NEXT_METRIC_PROGRESS_MS);
 }
 
 function renderRunningCompletionNextView() {
@@ -1054,13 +1099,7 @@ function renderRunningCompletionNextView() {
   if (runningTaskCategoryIcon) {
     runningTaskCategoryIcon.hidden = true;
   }
-  setRunningRingPercent(state.runningCompletion.toPercent);
-  runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.toPercent, 2);
-  runningTaskMinutesLeft.classList.remove("is-late", "is-early");
-  runningTaskMinutesLeft.classList.toggle("is-bonus", state.runningCompletion.savedMinutes > 0);
-  runningTaskMinutesLeft.textContent = state.runningCompletion.savedMinutes > 0
-    ? `${state.runningCompletion.savedMinutes} min de saldo`
-    : "Tarefa concluída";
+  renderRunningNextMetric("progress");
   const nextOfNext = state.runningCompletion.nextOfNext;
   if (nextOfNext) {
     const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
@@ -1183,15 +1222,17 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
   state.runningCompletion.nextOfNext = buildTimelineEntrySnapshot(nextOfNext);
   state.runningCompletion.savedMinutes = Math.max(0, Math.round(Number(savedMinutes || 0)));
   state.runningCompletion.lateMinutes = Math.max(0, Math.round(Number(summary?.late || 0)));
+  state.runningCompletion.progressValue = clampPercent(toPercent);
   state.runningCompletion.punctualityFrom = clampPercent(Number(summary?.punctualityBefore ?? 100));
   state.runningCompletion.punctualityTo = clampPercent(Number(summary?.punctualityAfter ?? 100));
+  state.runningCompletion.punctualityValue = state.runningCompletion.punctualityTo;
   renderRunningCompletionCelebration();
   void playRunningSuccessCue();
   animateRunningCompletionProgress(fromPercent, toPercent, RUNNING_COMPLETION_ANIMATION_MS);
   queueRunningCompletionTimeout(() => {
     state.runningCompletion.phase = "punctuality";
     state.runningCompletion.metric = "punctuality";
-    state.runningCompletion.label = "+ Pontualidade";
+    state.runningCompletion.label = "Pontualidade";
     state.runningCompletion.fromPercent = state.runningCompletion.punctualityFrom;
     state.runningCompletion.toPercent = state.runningCompletion.punctualityTo;
     state.runningCompletion.displayPercent = state.runningCompletion.punctualityFrom;
@@ -2318,7 +2359,7 @@ function renderActions() {
       <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(categoryIconPath ? `Categoria ${getTaskCategoryName(action.categoryId)}` : `Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
         <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
-        <div class="task-assignee task-duration"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm1 11.6V6h-2v7.4l5.2 3.1 1-1.7z"/></svg>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
+        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
       </div>
       <div class="task-time">${formatHourChip(action.startAt)}</div>
     `;
@@ -5702,9 +5743,11 @@ runningTaskFinalizeButton?.addEventListener("click", () => {
     clearRunningCompletionTimers();
     state.runningCompletion.active = true;
     state.runningCompletion.phase = "celebration";
+    state.runningCompletion.metric = "progress";
     state.runningCompletion.fromPercent = beforeSummary.percentPrecise;
     state.runningCompletion.toPercent = beforeSummary.percentPrecise;
     state.runningCompletion.displayPercent = beforeSummary.percentPrecise;
+    state.runningCompletion.label = "Progresso";
     renderRunningCompletionCelebration();
     await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
     const after = state.actions.find((item) => item.id === runningAction.id);
