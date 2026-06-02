@@ -2068,6 +2068,7 @@ function closeModal(modal) {
       actionsTimeTicker = null;
     }
     closeActionStatusWizard();
+    document.body.classList.remove("task-starting");
   }
 
   if (modal.id === "historyModal") {
@@ -2081,6 +2082,7 @@ function closeModal(modal) {
   }
   if (modal.id === "runningConfirmModal") {
     state.runningConfirm.action = null;
+    document.body.classList.remove("running-confirm-open");
   }
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
@@ -2658,6 +2660,7 @@ async function toggleActionStatus(actionId, options = {}) {
     startRunningTaskTicker();
     renderActions();
   } catch (error) {
+    document.body.classList.remove("task-starting");
     window.alert(error instanceof Error ? error.message : "Nao foi possivel atualizar a tarefa.");
     renderActions();
   }
@@ -2834,6 +2837,7 @@ function closeRunningTaskModalWithFade() {
 
 function closeRunningConfirmModal() {
   state.runningConfirm.action = null;
+  document.body.classList.remove("running-confirm-open");
   if (runningConfirmModal) {
     closeModal(runningConfirmModal);
   }
@@ -2864,6 +2868,7 @@ function openRunningConfirmModal(kind, action, onConfirm) {
   runningConfirmPrimaryButton.textContent = buttonMap[kind] || "Desistir";
   runningConfirmPrimaryButton.className = `primary-btn running-confirm-primary ${classMap[kind] || "is-desistir"}`;
   runningConfirmBackButton.textContent = "Voltar";
+  document.body.classList.add("running-confirm-open");
   openModal("runningConfirmModal");
 }
 
@@ -2911,6 +2916,9 @@ function closeStartDecisionModalWith(value) {
   startDecisionModal?.classList.remove("active");
   startDecisionModal?.setAttribute("aria-hidden", "true");
   document.body.classList.remove("start-decision-open");
+  if (["start", "start_chosen", "do_current"].includes(String(value || ""))) {
+    document.body.classList.add("task-starting");
+  }
   const resolver = startDecisionResolver;
   startDecisionResolver = null;
   if (!document.querySelector(".workspace-modal.active")) {

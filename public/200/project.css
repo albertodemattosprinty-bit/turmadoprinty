@@ -247,6 +247,13 @@ body.start-decision-open #actionsModal .actions-app {
   pointer-events: none;
 }
 
+body.task-starting #actionsModal .actions-app,
+body.running-confirm-open #runningTaskModal .running-task-content {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 body.start-decision-open .home-top-logo,
 body.start-decision-open .project-hub,
 body.start-decision-open .home-datetime,
