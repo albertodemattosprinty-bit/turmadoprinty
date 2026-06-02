@@ -107,12 +107,6 @@ const recurrenceDays = {
 };
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
 const selectableProfiles = ["Rose", "Alberto", "Lucas", "Thainan"];
-const profileTintByName = {
-  Alberto: "linear-gradient(145deg, rgba(2, 27, 77, 0.7), rgba(11, 61, 168, 0.7))",
-  Rose: "linear-gradient(145deg, rgba(31, 78, 216, 0.7), rgba(234, 76, 137, 0.7))",
-  Lucas: "linear-gradient(145deg, rgba(79, 195, 247, 0.7), rgba(212, 160, 23, 0.7))",
-  Thainan: "linear-gradient(145deg, rgba(0, 184, 169, 0.7), rgba(138, 92, 255, 0.7))"
-};
 const runningMusicStationSeeds = {
   Calm: [
     "Untitled (1).mp3", "Untitled (2).mp3", "Untitled (16).mp3", "Untitled (17).mp3",
@@ -558,14 +552,6 @@ function applySelectedProfile(profile) {
     return;
   }
   const next = selectableProfiles.includes(profile) ? profile : "Rose";
-  const nextTint = profileTintByName[next] || profileTintByName.Rose;
-  const root = document.documentElement;
-  root.style.setProperty("--app-tint-next", nextTint);
-  root.style.setProperty("--app-next-opacity", "1");
-  window.setTimeout(() => {
-    root.style.setProperty("--app-tint-current", nextTint);
-    root.style.setProperty("--app-next-opacity", "0");
-  }, 1500);
   state.selectedProfile = next;
   document.body.dataset.profile = next;
   window.localStorage.setItem(projectProfileKey, next);
