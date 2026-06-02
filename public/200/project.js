@@ -1294,28 +1294,8 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
     const punctualityChanged = Math.abs(state.runningCompletion.punctualityTo - state.runningCompletion.punctualityFrom) > 0.001;
     if (punctualityChanged) {
       void playRunningPunctualityDownCue();
-      animateRunningCompletionProgress(
-        state.runningCompletion.punctualityFrom,
-        state.runningCompletion.punctualityTo,
-        RUNNING_COMPLETION_ANIMATION_MS
-      );
-      queueRunningCompletionTimeout(() => {
-        if (state.runningCompletion.nextAction) {
-          state.runningCompletion.phase = "next";
-          renderHomeRunningTask();
-          return;
-        }
-        resetRunningCompletionState();
-        if (dayDonePercent) {
-          dayDonePercent.textContent = `${Math.round(Number(summary?.percent || 0))}%`;
-        }
-        if (dayDoneDelay) {
-          dayDoneDelay.textContent = `Pontualidade: ${Math.round(Number(summary?.punctualityAfter ?? 100))}%`;
-          applyPunctualityTone(dayDoneDelay, summary?.punctualityAfter ?? 100);
-        }
-        openModal("dayDoneModal");
-      }, RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS);
-      return;
+      state.runningCompletion.displayPercent = state.runningCompletion.punctualityTo;
+      renderRunningCompletionCelebration();
     }
     queueRunningCompletionTimeout(() => {
       if (state.runningCompletion.nextAction) {
@@ -1332,7 +1312,7 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
         applyPunctualityTone(dayDoneDelay, summary?.punctualityAfter ?? 100);
       }
       openModal("dayDoneModal");
-    }, RUNNING_COMPLETION_HOLD_MS);
+    }, RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS);
   }, RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS);
 }
 

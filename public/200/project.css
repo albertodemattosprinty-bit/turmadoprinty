@@ -895,22 +895,20 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   z-index: 20;
   display: none;
   color: var(--white);
-  background: rgba(5, 11, 24, 0.54);
-  backdrop-filter: blur(5px);
+  background: rgba(5, 11, 24, 0.24);
+  backdrop-filter: blur(3px);
+}
+
+.workspace-modal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(3, 7, 18, 0.44), rgba(3, 7, 18, 0.24));
+  pointer-events: none;
 }
 
 .workspace-modal.active {
   display: block;
-}
-
-#actionsModal.workspace-modal {
-  background: transparent;
-  backdrop-filter: none;
-}
-
-#actionsModal .actions-app {
-  background: transparent;
-  backdrop-filter: none;
 }
 
 .modal-close,
@@ -960,6 +958,12 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   place-items: center;
   gap: 22px;
   text-align: center;
+  position: relative;
+  z-index: 1;
+  background: rgba(8, 20, 52, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(8px);
 }
 
 .finance-dashboard {
@@ -1026,6 +1030,12 @@ body.running-task-active .project-shell > :not(.home-running-btn) {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 10px;
+  position: relative;
+  z-index: 1;
+  background: rgba(8, 20, 52, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(8px);
 }
 
 .actions-head,
