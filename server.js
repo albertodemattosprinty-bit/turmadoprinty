@@ -16,6 +16,8 @@ import { deleteUserById, dismissAdminUserMessage, ensureAdminUsersSchema, getAct
 import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
+import { appendMiniChatMessages, createMiniChat, getMiniChatById, listMiniChats } from "./src/mini-chats.js";
+import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
@@ -750,6 +752,32 @@ async function requireAdmin(request, response) {
   if (!isAdminUser(user)) {
     sendJson(response, 403, { error: "Acesso restrito ao administrador." });
     return null;
+  }
+
+  return user;
+}
+
+async function getOptionalAuthUser(request) {
+  if (!hasDatabase()) {
+    return null;
+  }
+
+  const token = parseBearerToken(request.headers.authorization);
+
+  if (!token) {
+    return null;
+  }
+
+  const user = await findUserBySessionToken(token);
+
+  if (!user) {
+    return null;
+  }
+
+  try {
+    await touchUserPresence(user.id);
+  } catch {
+    // Presenca nao deve bloquear requests opcionais.
   }
 
   return user;
@@ -2032,6 +2060,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
   const bibleText = String(body?.bibleText || "").trim() || "a definir";
   const age = Math.max(6, Math.min(14, Number(body?.age || 6)));
   const durationMinutesInput = Number(body?.durationMinutes || 0);
+  const chatId = String(body?.chatId || "").trim();
   const selectedBlocks = Array.isArray(body?.selectedBlocks) ? body.selectedBlocks : [];
   const normalizedBlocks = selectedBlocks
     .map((item) => ({
@@ -2055,10 +2084,32 @@ async function handleMiniLessonPlanGenerate(request, response) {
 
   const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
   const themePrompt = theme || "aula infantil cristã";
+  const authUser = await getOptionalAuthUser(request);
 
   try {
-    const contextText = "Planejamento de aula para o Ministerio Infantil e um cuidado de amor: ambiente seguro, previsivel e acolhedor; foco no discipulado; estrutura simples em blocos; planejamento semanal/mensal com leveza; adequacao por idade; uso pratico de recursos simples.";
     const stageNames = blocks.map((b) => b.name);
+    let chatMemory = "";
+
+    if (authUser && chatId) {
+      const chat = await getMiniChatById(authUser.id, chatId).catch(() => null);
+      if (chat) {
+        chatMemory = chat.messages
+          .slice(-12)
+          .map((message) => `${message.role === "assistant" ? "IA" : "Usuario"}: ${String(message.content || "").slice(0, 240)}`)
+          .join(" | ");
+      }
+    }
+
+    const system = buildMiniSystemPrompt({
+      modeKey: "project",
+      plannerContext: MINI_MINISTRY_CONTEXT,
+      chatMemory,
+      theme: themePrompt,
+      bibleText,
+      age,
+      durationText,
+      extraInstructions: "Crie a resposta como um plano completo e acolhedor para professores voluntarios. Não crie novos titulos de etapa; use apenas as etapas recebidas."
+    });
     const completion = await createChatCompletion(apiKey, {
       model,
       temperature: 0.5,
@@ -2066,11 +2117,11 @@ async function handleMiniLessonPlanGenerate(request, response) {
       messages: [
         {
           role: "system",
-          content: "Crie uma aula crista infantil sobre [TEMA], baseada em [TEXTO BIBLICO], para criancas de [IDADE], com duracao de [TEMPO]. Escreva com tom leve, humano, cristao, acolhedor e pratico. Evite tom frio, moralista ou de culpa. Use linguagem simples e aplicacao para o dia a dia. Regras: (1) nao invente titulos de etapas; (2) voce deve escrever somente o conteudo de cada etapa recebida; (3) mantenha fidelidade biblica e foco no amor de Deus. Responda APENAS JSON puro no formato: {\"mainTitle\":\"...\",\"sections\":[{\"content\":\"...\"}]}. sections deve ter a mesma quantidade e ordem das etapas recebidas."
+          content: system
         },
         {
           role: "user",
-          content: `Contexto adicional: ${contextText}\nTema: ${themePrompt}\nTexto biblico: ${bibleText}\nIdade: ${age}\nTempo total: ${durationText}\nEtapas (ordem obrigatoria): ${stageNames.join(" | ")}\nPara cada etapa escreva de 350 a 900 caracteres com objetivo, sugestao pratica, fala pronta do professor, pergunta simples para criancas e transicao suave.`
+          content: `Etapas (ordem obrigatoria): ${stageNames.join(" | ")}\nRetorne cada secao com 350 a 900 caracteres, com objetivo, sugestao pratica, fala pronta do professor, pergunta simples para criancas e transicao suave.`
         }
       ]
     });
@@ -2099,6 +2150,192 @@ async function handleMiniLessonPlanGenerate(request, response) {
   } catch (error) {
     sendJson(response, 500, {
       error: "Falha ao gerar plano.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
+function createMiniChatTitleFromMessage(message) {
+  const cleaned = String(message || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return "Novo chat";
+  }
+
+  return cleaned.slice(0, 32).replace(/[.!?]+$/g, "") || "Novo chat";
+}
+
+async function buildMiniChatCompletionPrompt({ user, chat, modeKey, message, extraContext = "" }) {
+  const recentMessages = Array.isArray(chat?.messages) ? chat.messages.slice(-12) : [];
+  const chatMemory = recentMessages
+    .map((item) => `${item.role === "assistant" ? "IA" : "Usuario"}: ${String(item.content || "").slice(0, 240)}`)
+    .join(" | ");
+
+  return buildMiniSystemPrompt({
+    modeKey,
+    chatMemory,
+    plannerContext: MINI_MINISTRY_CONTEXT,
+    responseStyle: "",
+    callName: "",
+    ministryRole: "Lider",
+    ministryDream: "",
+    extraInstructions: [
+      "A conversa pertence ao MINI da Turma do Printy e pode ser reaproveitada no planejador de aulas quando fizer sentido.",
+      "Se o usuario trouxer tema, idade, texto biblico, atividades ou ideias, considere isso como contexto disponivel para futuras aulas.",
+      extraContext
+    ].filter(Boolean).join(" ")
+  });
+}
+
+async function handleMiniChatsListRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const chats = await listMiniChats(user.id, 30);
+    sendJson(response, 200, { ok: true, chats });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar chats."
+    });
+  }
+}
+
+async function handleMiniChatsCreateRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const chat = await createMiniChat(user.id, {
+      title: body?.title || "Novo chat",
+      messages: Array.isArray(body?.messages) ? body.messages : []
+    });
+    sendJson(response, 201, { ok: true, chat });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel criar chat."
+    });
+  }
+}
+
+async function handleMiniChatDetailRequest(request, response, chatId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const chat = await getMiniChatById(user.id, chatId);
+    if (!chat) {
+      sendJson(response, 404, { error: "Chat nao encontrado." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, chat });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar chat."
+    });
+  }
+}
+
+async function handleMiniChatMessageRequest(request, response, chatId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const message = String(body?.message || "").trim();
+  if (!message) {
+    sendJson(response, 400, { error: "Mensagem ausente." });
+    return;
+  }
+
+  const modeKey = String(body?.mode || "fast").trim();
+  const selectedMode = {
+    fast: { model: "gpt-4.1-nano", instantModel: "gpt-4.1-nano", maxCompletionTokens: 260 },
+    think: { model: "gpt-4.1-mini", instantModel: "gpt-4.1-nano", maxCompletionTokens: 700 },
+    project: { model: "gpt-5-mini", instantModel: "gpt-4.1-mini", maxCompletionTokens: 2600 }
+  }[modeKey] || { model: OPENAI_MODEL, instantModel: OPENAI_INSTANT_MODEL, maxCompletionTokens: DEFAULT_FINAL_MAX_COMPLETION_TOKENS };
+
+  try {
+    let chat = chatId ? await getMiniChatById(user.id, chatId) : null;
+    if (!chat) {
+      chat = await createMiniChat(user.id, { title: createMiniChatTitleFromMessage(message) });
+    }
+
+    const userEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
+    const currentMessages = [...(chat.messages || [])].slice(-24);
+    const system = await buildMiniChatCompletionPrompt({
+      user,
+      chat: { ...chat, messages: currentMessages },
+      modeKey,
+      message
+    });
+
+    const completion = await createChatCompletion(apiKey, {
+      model: selectedMode.instantModel || selectedMode.model,
+      temperature: 0.6,
+      max_completion_tokens: selectedMode.maxCompletionTokens,
+      messages: [
+        { role: "system", content: system },
+        ...currentMessages
+          .filter((item) => item.role === "user" || item.role === "assistant")
+          .map((item) => ({
+            role: item.role,
+            content: String(item.content || "")
+          })),
+        { role: "user", content: message }
+      ]
+    });
+
+    const replyText = extractChatCompletionText(completion).trim();
+    const assistantEntry = { role: "assistant", content: replyText, createdAt: new Date().toISOString() };
+    const nextMessages = [...currentMessages, assistantEntry];
+    const nextChat = await appendMiniChatMessages(user.id, chat.id, [userEntry, assistantEntry], {
+      title: chat.title === "Novo chat" ? createMiniChatTitleFromMessage(message) : chat.title,
+      lastMessageAt: new Date().toISOString()
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      model: selectedMode.instantModel || selectedMode.model,
+      chat: nextChat,
+      replyText
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Falha ao gerar resposta do MINI.",
       details: error instanceof Error ? error.message : "Erro desconhecido."
     });
   }
@@ -4219,6 +4456,28 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/mini/aulas/gerar") {
     await handleMiniLessonPlanGenerate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/mini/chats") {
+    await handleMiniChatsListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/mini/chats") {
+    await handleMiniChatsCreateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/api/mini/chats/")) {
+    const chatId = decodeURIComponent(pathname.replace("/api/mini/chats/", ""));
+    await handleMiniChatDetailRequest(request, response, chatId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/mini/chats/") && pathname.endsWith("/messages")) {
+    const chatId = decodeURIComponent(pathname.replace("/api/mini/chats/", "").replace(/\/messages$/, ""));
+    await handleMiniChatMessageRequest(request, response, chatId);
     return;
   }
 

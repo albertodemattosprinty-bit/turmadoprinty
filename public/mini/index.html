@@ -69,8 +69,8 @@
     .round-action svg { width: 26px; height: 26px; fill: #fff; }
     .plus { background: var(--g-ok); } .close { background: var(--g-danger); } .edit { background: var(--g-edit); } .star { background: var(--g-star); }
 
-    .step-modal, .ai-modal { position: fixed; inset: 0; z-index: 35; transform: scale(.96); opacity: 0; pointer-events: none; transition: .18s ease; }
-    .step-modal.show, .ai-modal.show { transform: scale(1); opacity: 1; pointer-events: auto; }
+    .step-modal, .ai-modal, .create-modal { position: fixed; inset: 0; z-index: 35; transform: scale(.96); opacity: 0; pointer-events: none; transition: .18s ease; }
+    .step-modal.show, .ai-modal.show, .create-modal.show { transform: scale(1); opacity: 1; pointer-events: auto; }
     .step-modal { background: #fff; display: grid; grid-template-rows: auto 1fr auto; padding: 20px 14px 14px; }
     .step-title { text-align: center; font-size: 18px; font-weight: 700; }
     .minute-pick { display: grid; place-items: center; gap: 8px; }
@@ -141,6 +141,142 @@
     .ai-actions { display: flex; gap: 8px; }
     .ai-actions button { flex: 1; border: 0; border-radius: 12px; height: 46px; color: #fff; font-weight: 700; cursor: pointer; }
     .ai-secondary { background: rgba(255,255,255,.24); } .ai-primary { background: #3ad878; }
+
+    .create-modal {
+      background: linear-gradient(160deg, #1d5ce6 0%, #2b73ff 34%, #4a86ff 58%, #1e57be 100%);
+      color: #fff;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 10px;
+      padding: 14px;
+      overflow: hidden;
+    }
+    .create-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .create-head h2 {
+      margin: 0;
+      font-family: "Open Sans", sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1.05;
+      color: #fff;
+      background: none;
+    }
+    .create-hint {
+      font-size: 13px;
+      opacity: .92;
+      max-width: 42ch;
+    }
+    .create-chat-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .create-chat-strip::-webkit-scrollbar,
+    .create-thread::-webkit-scrollbar,
+    .create-input-shell textarea::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    .create-chat-chip {
+      flex: 0 0 auto;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,.13);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .create-chat-chip.active {
+      background: rgba(255,255,255,.24);
+      box-shadow: 0 10px 20px rgba(0,0,0,.14);
+    }
+    .create-thread {
+      overflow-y: auto;
+      scrollbar-width: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 10px 2px;
+    }
+    .mini-message {
+      max-width: min(90%, 620px);
+      border-radius: 22px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,.11);
+      border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(6px);
+      box-shadow: none;
+    }
+    .mini-message.user {
+      align-self: flex-end;
+      background: rgba(255,255,255,.18);
+    }
+    .mini-message.assistant {
+      align-self: flex-start;
+    }
+    .mini-message-role {
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      opacity: .8;
+      margin-bottom: 4px;
+    }
+    .mini-message-text {
+      font-size: 14px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .create-input-shell {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 20px;
+      padding: 12px;
+    }
+    .create-input-shell textarea {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: #fff;
+      resize: none;
+      min-height: 52px;
+      max-height: 140px;
+      font-size: 15px;
+      line-height: 1.4;
+      outline: none;
+      scrollbar-width: none;
+    }
+    .create-input-shell textarea::placeholder {
+      color: rgba(255,255,255,.75);
+    }
+    .create-send {
+      border: 0;
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.24);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 10px 20px rgba(0,0,0,.14);
+    }
+    .create-send svg { width: 24px; height: 24px; fill: #fff; }
+    .create-status {
+      font-size: 12px;
+      opacity: .92;
+      min-height: 16px;
+    }
   </style>
 </head>
 <body>
@@ -196,6 +332,23 @@
     <div class="ai-actions"><button id="closeAi" class="ai-secondary" type="button">Fechar</button><button id="generateAi" class="ai-primary" type="button">Gerar Plano</button></div>
   </section>
 
+  <section id="createModal" class="create-modal">
+    <div class="create-head">
+      <div>
+        <h2>Converse com a IA</h2>
+        <div class="create-hint">Sua conversa fica salva no Postgres e pode alimentar o planejador de aulas do MINI.</div>
+      </div>
+      <button id="closeCreate" class="round-action close" type="button" aria-label="Fechar chat"><svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg></button>
+    </div>
+    <div id="miniChatStrip" class="create-chat-strip"></div>
+    <div id="miniChatThread" class="create-thread"></div>
+    <form id="miniChatForm" class="create-input-shell">
+      <textarea id="miniChatInput" placeholder="Escreva sua ideia, dúvida ou plano..." rows="1"></textarea>
+      <button id="miniChatSend" class="create-send" type="submit" aria-label="Enviar mensagem"><svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.1 2-12.1 2z"/></svg></button>
+    </form>
+    <div id="miniChatStatus" class="create-status"></div>
+  </section>
+
   <script>
     const gradients = ["linear-gradient(145deg,#ff9a5c,#f5d74f)","linear-gradient(145deg,#ffa874,#ff8052)","linear-gradient(145deg,#ffda5a,#ffb84d)","linear-gradient(145deg,#ffd94f,#ffb100)","linear-gradient(145deg,#ff8b79,#ff5f4a)","linear-gradient(145deg,#d183ff,#8f67ff)","linear-gradient(145deg,#70cbff,#4f8aff)","linear-gradient(145deg,#5e72ff,#3751df)"];
     const names = ["Check-in","Entrega de cracha","Boas-vindas","Chamada","Quebra-gelo","Abertura","Hino oficial","Oracao inicial","Louvor","Louvor com gestos","Versiculo do dia","Memorizacao biblica","Introducao do tema","Historia com tema","Historia biblica","Mensagem","Aplicacao pratica","Oracao apos mensagem","Pedidos de oracao","Teatro","Fantoches","Encenacao rapida","Ilustracao visual","Video curto","Desenho ou filme","Explicar dinamica","Dinamica","Explicar jogo","Jogo","Desafio","Atividade impressa","Atividade manual","Atividade em grupo","Perguntas e respostas","Quiz biblico","Revisao da aula","Fazer em casa","Explicar projeto","Projeto em andamento","Ensaio","Apresentacao","Aniversarios","Momento oferta","Oracao da oferta","Lanche","Hora da foto","Oracao final","Check-out"];
@@ -203,10 +356,14 @@
     const state = { selected: [], poolPage: 0, selectedPage: 0, currentPick: null, currentMinutes: 5, age: 6 };
     const examples = ["Quero ensinar perdão com a história de José","Quero ensinar como obedecer com a história de Jonas","Quero ensinar a ouvir a voz de Deus com Samuel"];
     let exIndex = 0;
+    let activeMiniChatId = "";
+    let miniChats = [];
+    let typingTimer = null;
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
     const iconBase = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%ADcones/";
+    const miniSessionKey = "turma_do_printy_token";
 
     function iconUrlById(id) {
       const safe = Math.max(1, Math.min(48, Number(id) || 1));
@@ -220,6 +377,128 @@
 
     function toHoursText(m){ if(m<60)return m+" minutos"; const h=Math.floor(m/60),r=m%60; return r?`${h} horas e ${r} minutos`:`${h} horas`; }
     function page(list, idx){ return list.slice(idx*pageSize, idx*pageSize+pageSize); }
+    function getMiniToken(){ return window.localStorage.getItem(miniSessionKey) || ""; }
+    function setMiniStatus(text){ $("miniChatStatus").textContent = text || ""; }
+    function scrollMiniChatToBottom(){ const thread = $("miniChatThread"); if (thread) thread.scrollTop = thread.scrollHeight; }
+    function escapeText(value){
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    async function apiMini(path, options = {}) {
+      const headers = Object.assign({}, options.headers || {});
+      const token = getMiniToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      if (options.body && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+      const response = await fetch(path, { ...options, headers });
+      return response;
+    }
+
+    function renderMiniChatChip(chat) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `create-chat-chip${chat.id === activeMiniChatId ? " active" : ""}`;
+      button.textContent = chat.title || "Novo chat";
+      button.onclick = () => openMiniChat(chat.id);
+      return button;
+    }
+
+    function renderMiniChatThread(chat) {
+      const thread = $("miniChatThread");
+      thread.innerHTML = "";
+      const messages = Array.isArray(chat?.messages) ? chat.messages : [];
+      messages.forEach((message) => {
+        const card = document.createElement("article");
+        card.className = `mini-message ${message.role === "assistant" ? "assistant" : "user"}`;
+        card.innerHTML = `
+          <div class="mini-message-role">${message.role === "assistant" ? "IA" : "Você"}</div>
+          <div class="mini-message-text">${escapeText(message.content)}</div>
+        `;
+        thread.appendChild(card);
+      });
+      scrollMiniChatToBottom();
+    }
+
+    async function loadMiniChats(syncThread = true) {
+      const response = await apiMini("/api/mini/chats");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao carregar chats.");
+      }
+      miniChats = Array.isArray(payload.chats) ? payload.chats : [];
+      if (!activeMiniChatId && miniChats[0]) {
+        activeMiniChatId = miniChats[0].id;
+      }
+      const strip = $("miniChatStrip");
+      strip.innerHTML = "";
+      miniChats.slice(0, 10).forEach((chat) => strip.appendChild(renderMiniChatChip(chat)));
+      if (syncThread && activeMiniChatId) {
+        const active = miniChats.find((item) => item.id === activeMiniChatId);
+        if (active) {
+          renderMiniChatThread(active);
+        }
+      }
+    }
+
+    async function createMiniChatIfNeeded() {
+      if (activeMiniChatId) {
+        return activeMiniChatId;
+      }
+
+      const response = await apiMini("/api/mini/chats", {
+        method: "POST",
+        body: JSON.stringify({ title: "Novo chat" })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao criar chat.");
+      }
+      activeMiniChatId = payload.chat?.id || "";
+      await loadMiniChats();
+      return activeMiniChatId;
+    }
+
+    async function openMiniChat(chatId) {
+      activeMiniChatId = chatId;
+      await loadMiniChats();
+      const active = miniChats.find((item) => item.id === chatId);
+      if (active) {
+        renderMiniChatThread(active);
+      }
+    }
+
+    function appendMiniTypingMessage(text) {
+      const thread = $("miniChatThread");
+      const card = document.createElement("article");
+      card.className = "mini-message assistant";
+      card.innerHTML = `
+        <div class="mini-message-role">IA</div>
+        <div class="mini-message-text"></div>
+      `;
+      const target = card.querySelector(".mini-message-text");
+      thread.appendChild(card);
+      scrollMiniChatToBottom();
+
+      let index = 0;
+      clearInterval(typingTimer);
+      typingTimer = setInterval(() => {
+        index += 1;
+        target.textContent = text.slice(0, index);
+        scrollMiniChatToBottom();
+        if (index >= text.length) {
+          clearInterval(typingTimer);
+          typingTimer = null;
+        }
+      }, 50);
+    }
 
     function renderPool(){
       const pages=Math.max(1,Math.ceil(baseBlocks.length/pageSize)); state.poolPage=Math.max(0,Math.min(state.poolPage,pages-1));
@@ -253,24 +532,42 @@
     function setExample(){ $("aiExamples").textContent = examples[exIndex % examples.length]; exIndex += 1; }
     setExample(); setInterval(setExample, 1200);
 
+    $("openCreate").onclick = async () => {
+      $("createModal").classList.add("show");
+      setMiniStatus(getMiniToken() ? "Carregando suas conversas..." : "Entre no Explore para salvar seus chats no Postgres.");
+      try {
+        if (!getMiniToken()) {
+          miniChats = [];
+          $("miniChatStrip").innerHTML = "";
+          $("miniChatThread").innerHTML = "";
+          return;
+        }
+        await loadMiniChats(true);
+        if (!activeMiniChatId) {
+          await createMiniChatIfNeeded();
+        }
+      } catch (error) {
+        setMiniStatus(error instanceof Error ? error.message : "Erro ao carregar chats.");
+      }
+    };
+    $("closeCreate").onclick=()=>$("createModal").classList.remove("show");
+
     $("openAi").onclick=()=>{ $("aiModal").classList.add("show"); if(!$("aiPrompt").value) $("aiPrompt").value=examples[0]; };
     $("closeAi").onclick=()=>$("aiModal").classList.remove("show");
     $("ageDown").onclick = () => { state.age = Math.max(6, state.age - 1); $("ageValue").textContent = String(state.age); };
     $("ageUp").onclick = () => { state.age = Math.min(14, state.age + 1); $("ageValue").textContent = String(state.age); };
 
     async function generateMiniPlan(prompt) {
-      const response = await fetch("/api/mini/aulas/gerar", {
+      const response = await apiMini("/api/mini/aulas/gerar", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
         body: JSON.stringify({
           theme: prompt,
           bibleText: "a definir pelo professor",
           age: state.age,
           durationMinutes: state.selected.reduce((s, item) => s + Number(item.minutes || 0), 0),
           selectedBlocks: state.selected.map((item) => ({ name: item.name, minutes: item.minutes })),
-          model: "gpt-4.1-instant"
+          model: "gpt-4.1-instant",
+          chatId: activeMiniChatId || ""
         })
       });
 
@@ -308,6 +605,63 @@
         loading.innerHTML = `<h3>Falha</h3><p>${error instanceof Error ? error.message : "Erro desconhecido."}</p>`;
       }
     };
+
+    $("miniChatForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = $("miniChatInput");
+      const message = input.value.trim();
+      if (!message) {
+        return;
+      }
+
+      if (!getMiniToken()) {
+        setMiniStatus("Entre no Explore para salvar o chat no Postgres.");
+        return;
+      }
+
+      try {
+        setMiniStatus("Pensando...");
+        if (!activeMiniChatId) {
+          await createMiniChatIfNeeded();
+        }
+
+        const thread = $("miniChatThread");
+        const userCard = document.createElement("article");
+        userCard.className = "mini-message user";
+        userCard.innerHTML = `<div class="mini-message-role">Você</div><div class="mini-message-text">${escapeText(message)}</div>`;
+        thread.appendChild(userCard);
+        scrollMiniChatToBottom();
+
+        input.value = "";
+        input.style.height = "auto";
+
+        const response = await apiMini(`/api/mini/chats/${activeMiniChatId}/messages`, {
+          method: "POST",
+          body: JSON.stringify({
+            message,
+            mode: "project"
+          })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao conversar com a IA.");
+        }
+
+        activeMiniChatId = payload.chat?.id || activeMiniChatId;
+        await loadMiniChats(false);
+        appendMiniTypingMessage(payload.replyText || "");
+        setMiniStatus("");
+      } catch (error) {
+        setMiniStatus(error instanceof Error ? error.message : "Erro desconhecido.");
+      }
+    });
+
+    $("miniChatInput").addEventListener("input", () => {
+      const input = $("miniChatInput");
+      input.style.height = "auto";
+      input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+    });
   </script>
 </body>
 </html>
