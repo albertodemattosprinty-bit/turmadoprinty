@@ -122,6 +122,9 @@ export async function ensureActionsSchema() {
       id uuid primary key default gen_random_uuid(),
       user_id uuid not null references users(id) on delete cascade,
       title text not null,
+      music_station_name text,
+      music_track_name text,
+      music_track_url text,
       start_at timestamptz not null,
       end_at timestamptz not null,
       repeat_group_id uuid,
@@ -385,6 +388,33 @@ export async function createUserAction(userId, payload) {
   );
 
   return result.rows.map(normalizeAction);
+}
+
+export async function setActionMusicDefaultByTitle(userId, title, payload = {}) {
+  await ensureActionsSchema();
+
+  const safeTitle = String(title || "").trim();
+  const stationName = String(payload?.stationName || "").trim() || null;
+  const trackName = String(payload?.trackName || "").trim() || null;
+  const trackUrl = String(payload?.trackUrl || "").trim() || null;
+
+  if (!safeTitle || !trackUrl) {
+    return 0;
+  }
+
+  const result = await query(
+    `
+      update actions
+         set music_station_name = $3,
+             music_track_name = $4,
+             music_track_url = $5
+       where user_id = $1
+         and title = $2
+    `,
+    [userId, safeTitle, stationName, trackName, trackUrl]
+  );
+
+  return Number(result.rowCount || 0);
 }
 
 export async function updateUserAction(userId, actionId, payload) {

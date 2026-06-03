@@ -312,11 +312,21 @@ const runningConfirmBackButton = document.getElementById("runningConfirmBackButt
 const runningTaskActionsWrap = runningTaskModalElement?.querySelector(".running-task-actions");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
+const runningPlayerTitleButton = document.getElementById("runningPlayerTitleButton");
+const runningPlayerShuffle = document.getElementById("runningPlayerShuffle");
+const runningPlayerRepeat = document.getElementById("runningPlayerRepeat");
+const runningPlayerFavorite = document.getElementById("runningPlayerFavorite");
+const runningPlayerDefault = document.getElementById("runningPlayerDefault");
 const runningPlayerStationPrev = document.getElementById("runningPlayerStationPrev");
 const runningPlayerStationNext = document.getElementById("runningPlayerStationNext");
 const runningPlayerPrev = document.getElementById("runningPlayerPrev");
 const runningPlayerNext = document.getElementById("runningPlayerNext");
 const runningMiniPlayer = document.getElementById("runningMiniPlayer");
+const runningMusicListModal = document.getElementById("runningMusicListModal");
+const runningMusicListBack = document.getElementById("runningMusicListBack");
+const runningMusicListStation = document.getElementById("runningMusicListStation");
+const runningMusicListTrack = document.getElementById("runningMusicListTrack");
+const runningMusicListItems = document.getElementById("runningMusicListItems");
 const actionsModal = document.getElementById("actionsModal");
 const runtimeStateEndpoint = "/api/200/runtime-state";
 const dayDonePercent = document.getElementById("dayDonePercent");
@@ -527,8 +537,14 @@ const state = {
   runningPlayer: {
     stations: [],
     stationIndex: 0,
-    trackIndex: 0,
-    isPlaying: false
+    playOrderUrls: [],
+    playOrderIndex: 0,
+    isPlaying: false,
+    shuffleEnabled: false,
+    repeatEnabled: false,
+    favoriteTrackUrls: new Set(),
+    defaultTrackByTaskTitle: new Map(),
+    currentTaskTitle: ""
   },
   runningMinuteCue: {
     actionId: "",
@@ -789,18 +805,17 @@ function formatSignedDelay(minutesValue) {
   const numeric = Number(minutesValue || 0);
   const total = Math.abs(Math.round(numeric));
   if (total <= 0) {
-    return "No horário";
+    return "0 minutos";
   }
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  const suffix = numeric >= 0 ? "atrasado" : "adiantado";
   if (hours <= 0) {
-    return `${minutes} minuto${minutes === 1 ? "" : "s"} ${suffix}`;
+    return `${minutes} minuto${minutes === 1 ? "" : "s"}`;
   }
   if (minutes <= 0) {
-    return `${hours} hora${hours === 1 ? "" : "s"} ${suffix}`;
+    return `${hours} hora${hours === 1 ? "" : "s"}`;
   }
-  return `${hours} hora${hours === 1 ? "" : "s"} e ${String(minutes).padStart(2, "0")} minutos ${suffix}`;
+  return `${hours} hora${hours === 1 ? "" : "s"} e ${String(minutes).padStart(2, "0")} minutos`;
 }
 
 function renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes) {
@@ -1455,6 +1470,7 @@ function renderHomeRunningTask() {
   }
   setRunningCompletionVisualState(false);
   const action = getRunningActionForSelectedProfile();
+  state.runningPlayer.currentTaskTitle = String(action?.title || "").trim();
   const hasRunning = Boolean(action);
   if (openRunningTaskModalButton) {
     openRunningTaskModalButton.hidden = !hasRunning;
@@ -1491,6 +1507,7 @@ function renderHomeRunningTask() {
       runningTaskStartNextButton.dataset.actionId = String(nextPending?.id || "");
       runningTaskStartNextButton.dataset.kind = "action";
     }
+    renderRunningMusicPlayer();
     return;
   }
   const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
@@ -1540,9 +1557,12 @@ function renderHomeRunningTask() {
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
   }
+  renderRunningMusicPlayer();
 }
 
 async function loadRunningMusicStations() {
+  const previousTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
+  const previousStationName = String(getCurrentRunningStation()?.name || "").trim();
   const fallbackStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => {
     if (name === "Energy") {
       return {
@@ -1574,6 +1594,8 @@ async function loadRunningMusicStations() {
   });
 
   state.runningPlayer.stations = fallbackStations;
+  state.runningPlayer.favoriteTrackUrls = new Set();
+  state.runningPlayer.defaultTrackByTaskTitle = new Map();
   try {
     const radioResponse = await fetch("/200/radio-stations.json", { cache: "no-store" });
     if (radioResponse.ok) {
@@ -1598,77 +1620,414 @@ async function loadRunningMusicStations() {
   } catch {
     // keep local/fallback stations
   }
-  state.runningPlayer.stationIndex = 0;
-  state.runningPlayer.trackIndex = 0;
+  const preferredStationIndex = previousStationName
+    ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
+    : -1;
+  if (preferredStationIndex >= 0) {
+    state.runningPlayer.stationIndex = preferredStationIndex;
+  } else {
+    state.runningPlayer.stationIndex = 0;
+  }
+  syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
+
+  try {
+    const payload = await apiRequest("/api/200/music/stations");
+    const stations = Array.isArray(payload?.stations) ? payload.stations : [];
+    if (stations.length) {
+      state.runningPlayer.stations = stations;
+      state.runningPlayer.favoriteTrackUrls = new Set(Array.isArray(payload?.preferences?.favoriteTrackUrls) ? payload.preferences.favoriteTrackUrls : []);
+      state.runningPlayer.defaultTrackByTaskTitle = new Map(
+        Array.isArray(payload?.preferences?.defaults)
+          ? payload.preferences.defaults
+            .map((item) => [String(item?.taskTitle || "").trim(), String(item?.trackUrl || "").trim()])
+            .filter(([taskTitle, trackUrl]) => taskTitle && trackUrl)
+          : Object.entries(payload?.preferences?.defaultTrackByTaskTitle || {}).map(([taskTitle, trackUrl]) => [String(taskTitle || "").trim(), String(trackUrl || "").trim()]).filter(([taskTitle, trackUrl]) => taskTitle && trackUrl)
+      );
+      const refreshedStationIndex = previousStationName
+        ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
+        : -1;
+      state.runningPlayer.stationIndex = refreshedStationIndex >= 0 ? refreshedStationIndex : 0;
+      syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
+    }
+  } catch {
+    // keep local/fallback stations
+  }
+
   renderRunningMusicPlayer();
   primeRunningTrackBuffer();
 }
 
+function getCurrentRunningStation() {
+  return state.runningPlayer.stations[state.runningPlayer.stationIndex] || null;
+}
+
+function getRunningFavoriteSet() {
+  return state.runningPlayer.favoriteTrackUrls instanceof Set
+    ? state.runningPlayer.favoriteTrackUrls
+    : new Set();
+}
+
+function getRunningDisplayedTracks(station = getCurrentRunningStation()) {
+  const tracks = Array.isArray(station?.tracks) ? station.tracks : [];
+  const favoriteSet = getRunningFavoriteSet();
+  return [...tracks].sort((left, right) => {
+    const leftFavorite = favoriteSet.has(String(left?.url || "").trim());
+    const rightFavorite = favoriteSet.has(String(right?.url || "").trim());
+    if (leftFavorite !== rightFavorite) {
+      return leftFavorite ? -1 : 1;
+    }
+    return String(left?.name || "").localeCompare(String(right?.name || ""), "pt-BR");
+  });
+}
+
+function shuffleRunningTracks(tracks) {
+  const list = [...tracks];
+  for (let index = list.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [list[index], list[swapIndex]] = [list[swapIndex], list[index]];
+  }
+  return list;
+}
+
+function buildRunningPlayOrder(station = getCurrentRunningStation()) {
+  const tracks = Array.isArray(station?.tracks) ? station.tracks : [];
+  const favoriteSet = getRunningFavoriteSet();
+  const favorites = tracks.filter((track) => favoriteSet.has(String(track?.url || "").trim()));
+  const others = tracks.filter((track) => !favoriteSet.has(String(track?.url || "").trim()));
+
+  if (!tracks.length) {
+    return [];
+  }
+
+  if (!state.runningPlayer.shuffleEnabled) {
+    return getRunningDisplayedTracks(station).map((track) => String(track?.url || "").trim()).filter(Boolean);
+  }
+
+  const shuffledFavorites = shuffleRunningTracks(favorites);
+  const shuffledOthers = shuffleRunningTracks(others);
+  const playOrder = [];
+  let favoriteIndex = 0;
+  let otherIndex = 0;
+
+  while (favoriteIndex < shuffledFavorites.length || otherIndex < shuffledOthers.length) {
+    if (favoriteIndex < shuffledFavorites.length) {
+      playOrder.push(shuffledFavorites[favoriteIndex++]);
+    }
+    if (otherIndex < shuffledOthers.length) {
+      playOrder.push(shuffledOthers[otherIndex++]);
+    }
+  }
+
+  if (!playOrder.length) {
+    playOrder.push(...tracks);
+  }
+
+  return playOrder.map((track) => String(track?.url || "").trim()).filter(Boolean);
+}
+
+function syncRunningMusicOrder({ preserveTrackUrl = "" } = {}) {
+  const station = getCurrentRunningStation();
+  const orderedUrls = buildRunningPlayOrder(station);
+  state.runningPlayer.playOrderUrls = orderedUrls;
+
+  const currentTrackUrl = String(preserveTrackUrl || getCurrentRunningTrack()?.url || orderedUrls[0] || "").trim();
+  const nextIndex = orderedUrls.findIndex((url) => url === currentTrackUrl);
+  state.runningPlayer.playOrderIndex = nextIndex >= 0 ? nextIndex : 0;
+}
+
 function getCurrentRunningTrack() {
-  const station = state.runningPlayer.stations[state.runningPlayer.stationIndex];
-  if (!station || !Array.isArray(station.tracks) || !station.tracks.length) return null;
-  return station.tracks[state.runningPlayer.trackIndex] || station.tracks[0];
+  const station = getCurrentRunningStation();
+  const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
+  const currentUrl = String(orderedUrls[state.runningPlayer.playOrderIndex] || orderedUrls[0] || "").trim();
+  if (!station || !Array.isArray(station.tracks) || !station.tracks.length || !currentUrl) return null;
+  return station.tracks.find((track) => String(track?.url || "").trim() === currentUrl) || station.tracks[0];
+}
+
+function isRunningTrackFavorite(track) {
+  return getRunningFavoriteSet().has(String(track?.url || "").trim());
+}
+
+function isRunningTrackDefaultForCurrentTask(track) {
+  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+  if (!taskTitle) {
+    return false;
+  }
+  return String(state.runningPlayer.defaultTrackByTaskTitle.get(taskTitle) || "").trim() === String(track?.url || "").trim();
 }
 
 function renderRunningMusicPlayer() {
-  const station = state.runningPlayer.stations[state.runningPlayer.stationIndex] || null;
+  const station = getCurrentRunningStation();
   const track = getCurrentRunningTrack();
-  if (runningPlayerStation) runningPlayerStation.textContent = String(station?.name || "Estação");
-  if (runningPlayerTrack) runningPlayerTrack.textContent = String(track?.name || "Sem música");
+
+  if (runningPlayerStation) {
+    runningPlayerStation.textContent = String(station?.name || "Estação");
+  }
+
+  if (runningPlayerTrack) {
+    runningPlayerTrack.textContent = String(track?.name || "Sem música");
+  }
+
+  if (runningPlayerTitleButton) {
+    runningPlayerTitleButton.classList.toggle("is-empty", !track);
+  }
+
+  const trackIsFavorite = Boolean(track && isRunningTrackFavorite(track));
+  const trackIsDefault = Boolean(track && isRunningTrackDefaultForCurrentTask(track));
+
+  runningPlayerShuffle?.classList.toggle("active", Boolean(state.runningPlayer.shuffleEnabled));
+  runningPlayerRepeat?.classList.toggle("active", Boolean(state.runningPlayer.repeatEnabled));
+  runningPlayerFavorite?.classList.toggle("active", trackIsFavorite);
+  runningPlayerFavorite?.classList.toggle("is-favorite", trackIsFavorite);
+  runningPlayerDefault?.classList.toggle("active", trackIsDefault);
+  runningPlayerDefault?.classList.toggle("is-default", trackIsDefault);
+  runningPlayerFavorite?.classList.toggle("is-disabled", !track?.url);
+  runningPlayerDefault?.classList.toggle("is-disabled", !track?.url || !String(state.runningPlayer.currentTaskTitle || "").trim());
+
+  if (runningMusicListStation) {
+    runningMusicListStation.textContent = String(station?.name || "Estação");
+  }
+  if (runningMusicListTrack) {
+    runningMusicListTrack.textContent = track ? `Tocando: ${track.name}` : "Selecione uma música";
+  }
+
+  if (runningMusicListModal?.classList.contains("active")) {
+    renderRunningMusicList();
+  }
 }
 
-function playRunningTrack() {
-  const track = getCurrentRunningTrack();
+function ensureRunningAudioLoopState() {
+  if (runningAudio) {
+    runningAudio.loop = Boolean(state.runningPlayer.repeatEnabled);
+  }
+}
+
+async function playRunningTrack(trackUrl = "") {
+  const station = getCurrentRunningStation();
+  const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
+  const targetUrl = String(trackUrl || orderedUrls[state.runningPlayer.playOrderIndex] || orderedUrls[0] || "").trim();
+  const track = station?.tracks?.find((item) => String(item?.url || "").trim() === targetUrl) || null;
   if (!runningAudio || !track?.url) return;
+
+  const nextIndex = orderedUrls.findIndex((url) => url === targetUrl);
+  if (nextIndex >= 0) {
+    state.runningPlayer.playOrderIndex = nextIndex;
+  }
+
   runningAudio.src = track.url;
-  runningAudio.play().then(() => {
+  ensureRunningAudioLoopState();
+  try {
+    await runningAudio.play();
     state.runningPlayer.isPlaying = true;
     renderRunningMusicPlayer();
-  }).catch(() => {});
+    renderRunningMusicList();
+  } catch {}
 }
 
-function toggleRunningPlayPause() {
+async function toggleRunningPlayPause() {
   if (!runningAudio) return;
   const track = getCurrentRunningTrack();
   if (!track?.url) return;
   if (!runningAudio.src || runningAudio.src !== track.url) {
-    playRunningTrack();
+    await playRunningTrack(track.url);
     return;
   }
   if (runningAudio.paused) {
-    runningAudio.play().then(() => {
+    try {
+      ensureRunningAudioLoopState();
+      await runningAudio.play();
       state.runningPlayer.isPlaying = true;
       renderRunningMusicPlayer();
-    }).catch(() => {});
+      renderRunningMusicList();
+    } catch {}
     return;
   }
   runningAudio.pause();
   state.runningPlayer.isPlaying = false;
   renderRunningMusicPlayer();
+  renderRunningMusicList();
 }
 
 function ensureRunningAudioOnTouch() {
   if (state.runningPlayer.isPlaying) return;
   const hasTrack = Boolean(getCurrentRunningTrack()?.url);
   if (!hasTrack) return;
-  playRunningTrack();
+  void playRunningTrack();
 }
 
-function moveRunningTrack(delta) {
-  const station = state.runningPlayer.stations[state.runningPlayer.stationIndex];
-  if (!station || !Array.isArray(station.tracks) || !station.tracks.length) return;
-  const len = station.tracks.length;
-  state.runningPlayer.trackIndex = (state.runningPlayer.trackIndex + delta + len) % len;
-  playRunningTrack();
+async function moveRunningTrack(delta) {
+  const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
+  if (!orderedUrls.length) return;
+  const len = orderedUrls.length;
+  state.runningPlayer.playOrderIndex = (state.runningPlayer.playOrderIndex + delta + len) % len;
+  await playRunningTrack(orderedUrls[state.runningPlayer.playOrderIndex]);
 }
 
-function moveRunningStation(delta) {
+async function moveRunningStation(delta) {
   const len = state.runningPlayer.stations.length;
   if (!len) return;
+  const currentTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
   state.runningPlayer.stationIndex = (state.runningPlayer.stationIndex + delta + len) % len;
-  state.runningPlayer.trackIndex = 0;
-  primeRunningTrackBuffer();
-  playRunningTrack();
+  syncRunningMusicOrder({ preserveTrackUrl: "" });
+  const currentStation = getCurrentRunningStation();
+  const firstUrl = String(currentStation?.tracks?.[0]?.url || "").trim();
+  await playRunningTrack(currentTrackUrl && currentStation?.tracks?.some((track) => String(track?.url || "").trim() === currentTrackUrl)
+    ? currentTrackUrl
+    : firstUrl);
+}
+
+function renderRunningMusicList() {
+  if (!runningMusicListItems) {
+    return;
+  }
+
+  const station = getCurrentRunningStation();
+  const track = getCurrentRunningTrack();
+  const tracks = getRunningDisplayedTracks(station);
+  const currentTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+  const defaultTrackUrl = currentTaskTitle
+    ? String(state.runningPlayer.defaultTrackByTaskTitle.get(currentTaskTitle) || "").trim()
+    : "";
+
+  if (!tracks.length) {
+    runningMusicListItems.innerHTML = '<div class="empty-state">Nenhuma música disponível nesta estação.</div>';
+    return;
+  }
+
+  runningMusicListItems.innerHTML = tracks.map((item) => {
+    const isCurrent = Boolean(track && String(track.url || "").trim() === String(item.url || "").trim());
+    const isFavorite = isRunningTrackFavorite(item);
+    const isDefault = Boolean(defaultTrackUrl && String(item.url || "").trim() === defaultTrackUrl);
+    return `
+      <button class="running-music-track-row${isCurrent ? " is-current" : ""}${isFavorite ? " is-favorite" : ""}${isDefault ? " is-default" : ""}" type="button" data-track-url="${escapeHtml(String(item.url || ""))}" data-track-name="${escapeHtml(String(item.name || ""))}" data-track-station="${escapeHtml(String(station?.name || ""))}">
+        <span class="running-music-track-waveform" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </span>
+        <span class="running-music-track-main">
+          <strong>${escapeHtml(String(item.name || "Faixa"))}</strong>
+          <span>${escapeHtml(String(station?.name || "Estação"))}</span>
+        </span>
+        <span class="running-music-track-actions" aria-hidden="true">
+          <svg class="running-music-track-heart" viewBox="0 0 24 24"><path d="M12 21.35 10.55 20C5.4 15.4 2 12.4 2 8.5A5.5 5.5 0 0 1 7.5 3C9.24 3 10.92 3.81 12 5.08 13.08 3.81 14.76 3 16.5 3A5.5 5.5 0 0 1 22 8.5c0 3.9-3.4 6.9-8.55 11.5z"/></svg>
+          <svg class="running-music-track-default" viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
+        </span>
+      </button>
+    `;
+  }).join("");
+
+  runningMusicListItems.querySelectorAll(".running-music-track-row").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const trackUrl = String(button.dataset.trackUrl || "").trim();
+      if (!trackUrl) {
+        return;
+      }
+      const stationName = String(button.dataset.trackStation || "").trim();
+      const currentStation = getCurrentRunningStation();
+      const targetStation = currentStation && String(currentStation.name || "").trim() === stationName ? currentStation : null;
+      const targetTrack = targetStation?.tracks?.find((item) => String(item?.url || "").trim() === trackUrl) || null;
+      if (!targetTrack) {
+        return;
+      }
+      state.runningPlayer.playOrderUrls = buildRunningPlayOrder(targetStation);
+      state.runningPlayer.playOrderIndex = Math.max(0, state.runningPlayer.playOrderUrls.findIndex((url) => url === trackUrl));
+      await playRunningTrack(trackUrl);
+      renderRunningMusicPlayer();
+    });
+  });
+
+  const currentRow = runningMusicListItems.querySelector(".running-music-track-row.is-current");
+  currentRow?.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+function openRunningMusicListModal() {
+  if (!runningMusicListModal) {
+    return;
+  }
+  renderRunningMusicList();
+  runningMusicListModal.classList.add("active");
+  runningMusicListModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("running-music-list-open");
+}
+
+function closeRunningMusicListModal() {
+  if (!runningMusicListModal) {
+    return;
+  }
+  runningMusicListModal.classList.remove("active");
+  runningMusicListModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("running-music-list-open");
+}
+
+async function toggleRunningTrackFavorite() {
+  const track = getCurrentRunningTrack();
+  const station = getCurrentRunningStation();
+  if (!track?.url || !station) {
+    return;
+  }
+
+  const favorite = !isRunningTrackFavorite(track);
+  try {
+    const payload = await apiRequest("/api/200/music/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stationName: station.name,
+        trackName: track.name,
+        trackUrl: track.url,
+        favorite
+      })
+    });
+
+    state.runningPlayer.favoriteTrackUrls = new Set(Array.isArray(payload?.preferences?.favoriteTrackUrls) ? payload.preferences.favoriteTrackUrls : []);
+    syncRunningMusicOrder({ preserveTrackUrl: track.url });
+    renderRunningMusicPlayer();
+    renderRunningMusicList();
+    if (favorite) {
+      showFloatingNotice("Música adicionada aos favoritos.");
+    } else {
+      showFloatingNotice("Música removida dos favoritos.");
+    }
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar favorito.");
+  }
+}
+
+async function setRunningTrackAsDefault() {
+  const track = getCurrentRunningTrack();
+  const station = getCurrentRunningStation();
+  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+
+  if (!track?.url || !station) {
+    return;
+  }
+
+  if (!taskTitle) {
+    showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
+    return;
+  }
+
+  try {
+    const payload = await apiRequest("/api/200/music/default", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        taskTitle,
+        stationName: station.name,
+        trackName: track.name,
+        trackUrl: track.url
+      })
+    });
+
+    state.runningPlayer.defaultTrackByTaskTitle = new Map(
+      Array.isArray(payload?.preferences?.defaults)
+        ? payload.preferences.defaults.map((item) => [String(item?.taskTitle || "").trim(), String(item?.trackUrl || "").trim()]).filter(([title, url]) => title && url)
+        : Object.entries(payload?.preferences?.defaultTrackByTaskTitle || {}).map(([title, url]) => [String(title || "").trim(), String(url || "").trim()]).filter(([title, url]) => title && url)
+    );
+    renderRunningMusicPlayer();
+    renderRunningMusicList();
+    showFloatingNotice("Música definida como padrão.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
+  }
 }
 
 function getCompletionSummaryForSelectedProfile() {
@@ -1683,19 +2042,36 @@ function getCompletionSummaryForSelectedProfile() {
   const percentPrecise = totalMinutes > 0 ? clampPercent((completedMinutes / totalMinutes) * 100) : 0;
   const percent = Math.round(percentPrecise);
   const nowMs = getServerNowMs();
-  const late = list.reduce((sum, item) => {
-    if (normalizeActionStatus(item.status) === actionStatuses.completed || isGivenUpAction(item)) {
-      return sum;
+  const dueActions = list.filter((item) => {
+    if (isGivenUpAction(item)) {
+      return false;
     }
     const endAtMs = new Date(item.endAt).getTime();
-    if (!Number.isFinite(endAtMs) || endAtMs > nowMs) {
+    return Number.isFinite(endAtMs) && endAtMs <= nowMs;
+  });
+  const expectedDueMinutes = dueActions.reduce((sum, item) => sum + getActionDurationMinutes(item), 0);
+  const completedDueMinutes = dueActions.reduce((sum, item) => {
+    if (normalizeActionStatus(item.status) !== actionStatuses.completed) {
       return sum;
     }
     return sum + getActionDurationMinutes(item);
   }, 0);
-  const punctualityPrecise = getPunctualityPercentFromLateMinutes(late);
+  const late = Math.max(0, expectedDueMinutes - completedDueMinutes);
+  const punctualityPrecise = expectedDueMinutes > 0
+    ? clampPercent((completedDueMinutes / expectedDueMinutes) * 100)
+    : 100;
   const punctualityPercent = Math.round(punctualityPrecise);
-  return { percent, percentPrecise, late, completedMinutes, totalMinutes, punctualityPrecise, punctualityPercent };
+  return {
+    percent,
+    percentPrecise,
+    late,
+    completedMinutes,
+    totalMinutes,
+    expectedDueMinutes,
+    completedDueMinutes,
+    punctualityPrecise,
+    punctualityPercent
+  };
 }
 
 function isSameDate(a, b) {
@@ -2115,6 +2491,7 @@ function closeModal(modal) {
     closeFinanceEntryConfirm(false);
   }
   if (modal.id === "runningTaskModal") {
+    closeRunningMusicListModal();
     setRunningHomeVisibility(true);
   }
   if (modal.id === "runningConfirmModal") {
@@ -2864,6 +3241,7 @@ function closeRunningTaskModalWithFade() {
   if (!runningTaskModalElement || !runningTaskModalElement.classList.contains("active")) {
     return;
   }
+  closeRunningMusicListModal();
   runningTaskModalElement.classList.add("is-fading-out");
   window.setTimeout(() => {
     closeModal(runningTaskModalElement);
@@ -5987,12 +6365,31 @@ runningTaskGiveUpButton?.addEventListener("click", () => {
 });
 
 runningTaskListButton?.addEventListener("click", () => {
-  closeRunningTaskModalWithFade();
-  window.setTimeout(() => {
-    openModal("actionsModal");
-  }, 500);
+  openRunningMusicListModal();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
+runningPlayerTitleButton?.addEventListener("click", openRunningMusicListModal);
+runningMusicListBack?.addEventListener("click", closeRunningMusicListModal);
+runningPlayerShuffle?.addEventListener("click", () => {
+  state.runningPlayer.shuffleEnabled = !state.runningPlayer.shuffleEnabled;
+  const currentTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
+  syncRunningMusicOrder({ preserveTrackUrl: currentTrackUrl });
+  renderRunningMusicPlayer();
+  renderRunningMusicList();
+  void primeRunningTrackBuffer();
+});
+runningPlayerRepeat?.addEventListener("click", () => {
+  state.runningPlayer.repeatEnabled = !state.runningPlayer.repeatEnabled;
+  ensureRunningAudioLoopState();
+  renderRunningMusicPlayer();
+  renderRunningMusicList();
+});
+runningPlayerFavorite?.addEventListener("click", () => {
+  void toggleRunningTrackFavorite();
+});
+runningPlayerDefault?.addEventListener("click", () => {
+  void setRunningTrackAsDefault();
+});
 runningConfirmPrimaryButton?.addEventListener("click", () => {
   const action = state.runningConfirm.action;
   const callback = action;
@@ -6010,17 +6407,16 @@ runningModeTimeBtn?.addEventListener("click", () => {
   state.runningCenterMode = state.runningCenterMode === "time" ? "auto" : "time";
   renderHomeRunningTask();
 });
-runningPlayerStationPrev?.addEventListener("click", () => moveRunningStation(-1));
-runningPlayerStationNext?.addEventListener("click", () => moveRunningStation(1));
-runningPlayerPrev?.addEventListener("click", () => moveRunningTrack(-1));
-runningPlayerNext?.addEventListener("click", () => moveRunningTrack(1));
 if (runningAudio) {
   runningAudio.addEventListener("ended", () => {
-    moveRunningTrack(1);
+    if (state.runningPlayer.repeatEnabled) {
+      return;
+    }
+    void moveRunningTrack(1);
   });
 }
-handleSwipe(runningPlayerTrack, (amount) => moveRunningStation(amount > 0 ? -1 : 1));
-handleSwipe(runningTaskModalElement, (amount) => moveRunningStation(amount > 0 ? -1 : 1));
+handleSwipe(runningPlayerTrack, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
+handleSwipe(runningTaskModalElement, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
 
 document.body.classList.add("project-no-select");
 const isEditableTarget = (target) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;

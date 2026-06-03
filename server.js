@@ -23,11 +23,12 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { createUserAction, deleteUserAction, ensureActionsSchema, getProject200RuntimeState, listUserActions, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
+import { createUserAction, deleteUserAction, ensureActionsSchema, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
+import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -4899,11 +4900,79 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/200/music/stations") {
     try {
+      const user = await getOptionalAuthUser(request);
       const stations = await listProject200MusicStations();
-      sendJson(response, 200, { ok: true, stations });
+      if (user) {
+        await ensureProject200MusicSchema();
+        const personalized = await getProject200MusicStationsForUser({ userId: user.id, stations });
+        sendJson(response, 200, { ok: true, ...personalized });
+        return;
+      }
+      sendJson(response, 200, { ok: true, stations, preferences: { favoriteTrackUrls: [], defaults: [] } });
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel carregar as estacoes."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/music/favorites") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const result = await toggleProject200MusicFavorite({
+        userId: user.id,
+        stationName: body.stationName,
+        trackName: body.trackName,
+        trackUrl: body.trackUrl,
+        favorite: body.favorite
+      });
+
+      const stations = await listProject200MusicStations();
+      const personalized = await getProject200MusicStationsForUser({ userId: user.id, stations });
+      sendJson(response, 200, { ok: true, ...personalized, favoriteTrackUrls: result.favoriteTrackUrls });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar favorito."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/music/default") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const result = await setProject200MusicTaskDefault({
+        userId: user.id,
+        taskTitle: body.taskTitle,
+        stationName: body.stationName,
+        trackName: body.trackName,
+        trackUrl: body.trackUrl
+      });
+      await setActionMusicDefaultByTitle(user.id, body.taskTitle, {
+        stationName: body.stationName,
+        trackName: body.trackName,
+        trackUrl: body.trackUrl
+      });
+
+      const stations = await listProject200MusicStations();
+      const personalized = await getProject200MusicStationsForUser({ userId: user.id, stations });
+      sendJson(response, 200, { ok: true, ...personalized, defaults: result.defaults });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar o padrão."
       });
     }
     return;
