@@ -540,23 +540,24 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-title-button {
-  min-width: min(340px, 100%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(7, 32, 88, 0.34);
-  border-radius: 16px;
-  padding: 8px 14px;
+  min-width: min(238px, 100%);
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
   display: grid;
-  gap: 2px;
+  gap: 0;
   align-items: center;
   text-align: center;
   color: #fff;
   cursor: pointer;
+  appearance: none;
 }
 
 .running-player-title-button:hover,
 .running-player-title-button:focus-visible {
-  border-color: rgba(255, 255, 255, 0.34);
-  background: rgba(7, 32, 88, 0.48);
+  border: 0;
+  background: transparent;
   outline: none;
 }
 

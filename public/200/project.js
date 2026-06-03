@@ -1739,7 +1739,10 @@ function getCurrentRunningTrack() {
   const station = getCurrentRunningStation();
   const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
   const currentUrl = String(orderedUrls[state.runningPlayer.playOrderIndex] || orderedUrls[0] || "").trim();
-  if (!station || !Array.isArray(station.tracks) || !station.tracks.length || !currentUrl) return null;
+  if (!station || !Array.isArray(station.tracks) || !station.tracks.length) return null;
+  if (!currentUrl) {
+    return station.tracks[0];
+  }
   return station.tracks.find((track) => String(track?.url || "").trim() === currentUrl) || station.tracks[0];
 }
 
@@ -1757,14 +1760,14 @@ function isRunningTrackDefaultForCurrentTask(track) {
 
 function renderRunningMusicPlayer() {
   const station = getCurrentRunningStation();
-  const track = getCurrentRunningTrack();
+  const track = getCurrentRunningTrack() || station?.tracks?.[0] || null;
 
   if (runningPlayerStation) {
     runningPlayerStation.textContent = String(station?.name || "Estação");
   }
 
   if (runningPlayerTrack) {
-    runningPlayerTrack.textContent = String(track?.name || "Sem música");
+    runningPlayerTrack.textContent = String(track?.name || "");
   }
 
   if (runningPlayerTitleButton) {
