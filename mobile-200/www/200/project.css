@@ -512,7 +512,7 @@ body.start-decision-open .home-running-btn {
   width: min(560px, 92vw);
   border: 1px solid transparent;
   border-radius: 14px;
-  padding: 8px 10px;
+  padding: 10px 62px 12px;
   background: transparent;
   backdrop-filter: none;
   position: relative;
@@ -540,7 +540,8 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-title-button {
-  min-width: min(238px, 100%);
+  min-width: min(238px, calc(100% - 160px));
+  max-width: calc(100% - 160px);
   border: 0;
   background: transparent;
   border-radius: 0;
@@ -576,6 +577,32 @@ body.start-decision-open .home-running-btn {
   place-items: center;
   cursor: pointer;
   flex: 0 0 auto;
+  position: absolute;
+  z-index: 2;
+}
+
+.running-player-control-left {
+  left: 12px;
+}
+
+.running-player-control-right {
+  right: 12px;
+}
+
+#runningPlayerShuffle {
+  top: calc(50% - 22px);
+}
+
+#runningPlayerRepeat {
+  top: calc(50% + 22px);
+}
+
+#runningPlayerFavorite {
+  top: calc(50% - 22px);
+}
+
+#runningPlayerDefault {
+  top: calc(50% + 22px);
 }
 
 .running-player-control svg {
