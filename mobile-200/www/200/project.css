@@ -551,14 +551,23 @@ body.start-decision-open .home-running-btn {
   border: 0;
   background: transparent;
   border-radius: 0;
-  padding: 0;
+  padding: 0 2px;
   display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
   gap: 2px;
   align-items: center;
   text-align: center;
   color: #fff;
-  justify-items: center;
+  justify-items: stretch;
   align-content: center;
+}
+
+.running-player-title-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  align-items: center;
+  justify-items: center;
 }
 
 .running-player-title-button:hover,
@@ -637,6 +646,34 @@ body.start-decision-open .home-running-btn {
 
 .running-player-control.is-disabled {
   opacity: 0.38;
+  pointer-events: none;
+}
+
+.running-player-track-nav {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.74);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.running-player-track-nav svg {
+  width: 14px;
+  height: 14px;
+}
+
+.running-player-track-nav:hover,
+.running-player-track-nav:focus-visible {
+  color: #fff;
+  outline: none;
+}
+
+.running-player-track-nav.is-disabled {
+  opacity: 0.32;
   pointer-events: none;
 }
 
@@ -2478,6 +2515,40 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   .workspace-modal {
     background-attachment: fixed;
     background-size: cover;
+  }
+
+  .running-player {
+    width: min(560px, 94vw);
+    min-height: 52px;
+  }
+
+  .running-player-control svg {
+    width: clamp(15px, 4vw, 18px);
+    height: clamp(15px, 4vw, 18px);
+  }
+
+  .running-player-title-button {
+    grid-template-columns: 18px minmax(0, 1fr) 18px;
+    padding: 0 1px;
+    gap: 1px;
+  }
+
+  .running-player-track-nav {
+    width: 18px;
+    height: 18px;
+  }
+
+  .running-player-track-nav svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .running-player-station {
+    font-size: 0.7rem;
+  }
+
+  .running-player-track {
+    font-size: 0.86rem;
   }
 
   .project-shell {

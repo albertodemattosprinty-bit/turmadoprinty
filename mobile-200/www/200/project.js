@@ -1811,6 +1811,8 @@ function renderRunningMusicPlayer() {
   const station = getCurrentRunningStation();
   const track = getCurrentRunningTrack() || station?.tracks?.[0] || null;
   const stationIsDefault = isRunningStationDefaultForCurrentTask(station);
+  const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
+  const hasTrackNavigation = orderedUrls.length > 1;
 
   if (runningPlayerStation) {
     runningPlayerStation.textContent = String(station?.name || "Estação");
@@ -1835,6 +1837,8 @@ function renderRunningMusicPlayer() {
   runningPlayerDefault?.classList.toggle("is-default", hasAnyDefault);
   runningPlayerFavorite?.classList.toggle("is-disabled", !track?.url);
   runningPlayerDefault?.classList.toggle("is-disabled", !station?.name || !String(state.runningPlayer.currentTaskTitle || "").trim());
+  runningPlayerPrev?.classList.toggle("is-disabled", !hasTrackNavigation);
+  runningPlayerNext?.classList.toggle("is-disabled", !hasTrackNavigation);
 
   if (runningMusicListStation) {
     runningMusicListStation.textContent = String(station?.name || "Estação");
@@ -6522,6 +6526,12 @@ runningTaskListButton?.addEventListener("click", () => {
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
 runningPlayerList?.addEventListener("click", openRunningMusicListModal);
+runningPlayerPrev?.addEventListener("click", () => {
+  void moveRunningTrack(-1);
+});
+runningPlayerNext?.addEventListener("click", () => {
+  void moveRunningTrack(1);
+});
 runningMusicListBack?.addEventListener("click", closeRunningMusicListModal);
 runningPlayerRepeat?.addEventListener("click", () => {
   state.runningPlayer.repeatEnabled = !state.runningPlayer.repeatEnabled;
