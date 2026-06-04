@@ -199,13 +199,38 @@ function getR2Client() {
 }
 
 async function listProject200MusicStations() {
+  try {
+    const radioStationsPath = path.join(__dirname, "public", "200", "radio-stations.json");
+    const radioStationsRaw = await readFile(radioStationsPath, "utf8");
+    const radioStationsData = JSON.parse(radioStationsRaw);
+    const radioStations = Array.isArray(radioStationsData?.stations) ? radioStationsData.stations : [];
+    const validStations = radioStations
+      .filter((station) => Array.isArray(station?.tracks) && station.tracks.length > 0)
+      .map((station) => ({
+        name: String(station?.name || "").trim() || "Estação",
+        tracks: station.tracks
+          .filter((track) => String(track?.url || "").trim())
+          .map((track) => ({
+            name: String(track?.name || "Faixa").trim() || "Faixa",
+            url: String(track?.url || "").trim()
+          }))
+      }));
+    if (validStations.length) {
+      return validStations;
+    }
+  } catch {
+    // Fall through to R2-based discovery.
+  }
+
   const prefix = "Music/";
   const fallbackStations = [
     { name: "Estação 1", tracks: [] },
     { name: "Estação 2", tracks: [] },
     { name: "Estação 3", tracks: [] },
-    { name: "Estação 4", tracks: [] }
+    { name: "Estação 4", tracks: [] },
+    { name: "Estação 5", tracks: [] }
   ];
+
   try {
     const client = getR2Client();
     const result = await client.send(new ListObjectsV2Command({
