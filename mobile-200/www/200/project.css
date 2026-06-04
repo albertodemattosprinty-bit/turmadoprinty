@@ -578,8 +578,8 @@ body.start-decision-open .home-running-btn {
   min-height: 100%;
   border-radius: 0;
   border: 0;
-  border-inline-end: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border-inline-end: 0;
+  background: transparent;
   color: #fff;
   display: grid;
   place-items: center;
@@ -594,7 +594,7 @@ body.start-decision-open .home-running-btn {
 
 .running-player-control-right {
   grid-row: 1;
-  border-inline-start: 1px solid rgba(255, 255, 255, 0.08);
+  border-inline-start: 0;
   border-inline-end: 0;
 }
 
@@ -624,7 +624,7 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-control.active {
-  background: rgba(255, 255, 255, 0.12);
+  background: transparent;
 }
 
 .running-player-control.is-favorite {
@@ -698,6 +698,12 @@ body.start-decision-open .home-running-btn {
 
 .running-music-default-close {
   width: 100%;
+}
+
+.running-music-default-choice-copy {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.86rem;
 }
 
 .running-player-play {
@@ -873,8 +879,14 @@ body.start-decision-open .home-running-btn {
 }
 
 body.running-music-list-open #runningTaskModal .running-task-content {
-  filter: blur(18px) saturate(0.72);
-  opacity: 0.22;
+  filter: blur(22px) saturate(0.72);
+  opacity: 0.2;
+  transform: scale(0.985);
+}
+
+body.running-player-overlay-open #runningTaskModal .running-task-content {
+  filter: blur(22px) saturate(0.72);
+  opacity: 0.2;
   transform: scale(0.985);
 }
 

@@ -334,6 +334,10 @@ const runningMusicDefaultStationName = document.getElementById("runningMusicDefa
 const runningMusicDefaultTrackName = document.getElementById("runningMusicDefaultTrackName");
 const runningMusicDefaultStationHint = document.getElementById("runningMusicDefaultStationHint");
 const runningMusicDefaultTrackHint = document.getElementById("runningMusicDefaultTrackHint");
+const runningMusicDefaultChoiceModal = document.getElementById("runningMusicDefaultChoiceModal");
+const runningMusicDefaultChoiceCopy = document.getElementById("runningMusicDefaultChoiceCopy");
+const runningMusicDefaultRedefineButton = document.getElementById("runningMusicDefaultRedefineButton");
+const runningMusicDefaultExecuteButton = document.getElementById("runningMusicDefaultExecuteButton");
 const actionsModal = document.getElementById("actionsModal");
 const runtimeStateEndpoint = "/api/200/runtime-state";
 const dayDonePercent = document.getElementById("dayDonePercent");
@@ -1069,6 +1073,15 @@ function wait(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function updateRunningPlayerOverlayState() {
+  const hasOverlay = [
+    runningMusicListModal,
+    runningMusicDefaultModal,
+    runningMusicDefaultChoiceModal
+  ].some((modal) => modal?.classList.contains("active"));
+  document.body.classList.toggle("running-player-overlay-open", hasOverlay);
 }
 
 function clearRunningCompletionTimers() {
@@ -1988,6 +2001,7 @@ function openRunningMusicListModal() {
   runningMusicListModal.classList.add("active");
   runningMusicListModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("running-music-list-open");
+  updateRunningPlayerOverlayState();
 }
 
 function closeRunningMusicListModal() {
@@ -1997,6 +2011,7 @@ function closeRunningMusicListModal() {
   runningMusicListModal.classList.remove("active");
   runningMusicListModal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("running-music-list-open");
+  updateRunningPlayerOverlayState();
 }
 
 async function toggleRunningTrackFavorite() {
@@ -2060,7 +2075,66 @@ function openRunningMusicDefaultModal() {
     runningMusicDefaultTrackHint.innerHTML = `música padrão para<br>${escapeHtml(taskTitle)}`;
   }
 
+  closeModal("runningMusicDefaultChoiceModal");
   openModal("runningMusicDefaultModal");
+}
+
+function openRunningMusicDefaultChoiceModal() {
+  const station = getCurrentRunningStation();
+  const preference = getRunningDefaultPreferenceForCurrentTask();
+  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+
+  if (!station?.name || !preference || !taskTitle) {
+    openRunningMusicDefaultModal();
+    return;
+  }
+
+  if (runningMusicDefaultChoiceCopy) {
+    runningMusicDefaultChoiceCopy.innerHTML = preference.mode === "station"
+      ? `Padrão salvo: estação <strong>${escapeHtml(preference.stationName || "Estação")}</strong><br>para ${escapeHtml(taskTitle)}`
+      : `Padrão salvo: música <strong>${escapeHtml(preference.trackName || "Música")}</strong><br>para ${escapeHtml(taskTitle)}`;
+  }
+
+  openModal("runningMusicDefaultChoiceModal");
+}
+
+async function executeRunningTaskDefaultPreference() {
+  const preference = getRunningDefaultPreferenceForCurrentTask();
+  if (!preference) {
+    openRunningMusicDefaultModal();
+    return;
+  }
+
+  let nextStationIndex = -1;
+  let targetTrackUrl = "";
+
+  if (preference.mode === "station") {
+    nextStationIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === String(preference.stationName || "").trim());
+  } else {
+    nextStationIndex = state.runningPlayer.stations.findIndex((station) =>
+      Array.isArray(station?.tracks) && station.tracks.some((track) => String(track?.url || "").trim() === String(preference.trackUrl || "").trim())
+    );
+    targetTrackUrl = String(preference.trackUrl || "").trim();
+  }
+
+  if (nextStationIndex < 0) {
+    showFloatingNotice("Nao encontrei o padrão salvo para esta tarefa.");
+    return;
+  }
+
+  state.runningPlayer.stationIndex = nextStationIndex;
+  syncRunningMusicOrder({ preserveTrackUrl: targetTrackUrl });
+  const station = getCurrentRunningStation();
+  const fallbackTrackUrl = String(station?.tracks?.[0]?.url || "").trim();
+  const finalTrackUrl = targetTrackUrl || fallbackTrackUrl;
+  renderRunningMusicPlayer();
+  renderRunningMusicList();
+  closeModal("runningMusicDefaultChoiceModal");
+  if (finalTrackUrl) {
+    await playRunningTrack(finalTrackUrl);
+  } else {
+    primeRunningTrackBuffer();
+  }
 }
 
 async function saveRunningTaskDefault(mode = "track") {
@@ -2097,7 +2171,6 @@ async function saveRunningTaskDefault(mode = "track") {
     });
 
     state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
-    applyRunningTaskDefaultSelection();
     renderRunningMusicPlayer();
     renderRunningMusicList();
     closeModal("runningMusicDefaultModal");
@@ -2514,6 +2587,8 @@ function openModal(id) {
     startRunningTaskTicker();
     renderHomeRunningTask();
   }
+
+  updateRunningPlayerOverlayState();
 }
 
 function closeModal(modal) {
@@ -2578,6 +2653,7 @@ function closeModal(modal) {
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
   }
+  updateRunningPlayerOverlayState();
 }
 
 function getActiveConstitutionVersion() {
@@ -6457,6 +6533,10 @@ runningPlayerFavorite?.addEventListener("click", () => {
   void toggleRunningTrackFavorite();
 });
 runningPlayerDefault?.addEventListener("click", () => {
+  if (getRunningDefaultPreferenceForCurrentTask()) {
+    openRunningMusicDefaultChoiceModal();
+    return;
+  }
   openRunningMusicDefaultModal();
 });
 runningMusicDefaultStationButton?.addEventListener("click", () => {
@@ -6464,6 +6544,10 @@ runningMusicDefaultStationButton?.addEventListener("click", () => {
 });
 runningMusicDefaultTrackButton?.addEventListener("click", () => {
   void saveRunningTaskDefault("track");
+});
+runningMusicDefaultRedefineButton?.addEventListener("click", openRunningMusicDefaultModal);
+runningMusicDefaultExecuteButton?.addEventListener("click", () => {
+  void executeRunningTaskDefaultPreference();
 });
 runningConfirmPrimaryButton?.addEventListener("click", () => {
   const action = state.runningConfirm.action;
