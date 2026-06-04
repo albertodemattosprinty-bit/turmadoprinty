@@ -558,7 +558,8 @@ const state = {
     favoriteTrackUrls: new Set(),
     hiddenTrackUrls: new Set(),
     defaultPreferenceByTaskTitle: new Map(),
-    currentTaskTitle: ""
+    currentTaskTitle: "",
+    defaultAppliedActionId: ""
   },
   runningMinuteCue: {
     actionId: "",
@@ -1448,7 +1449,11 @@ function renderHomeRunningTask() {
   setRunningCompletionVisualState(false);
   const action = getRunningActionForSelectedProfile();
   state.runningPlayer.currentTaskTitle = String(action?.title || "").trim();
-  applyRunningTaskDefaultSelection(action);
+  const runningActionId = String(action?.id || "").trim();
+  if (runningActionId && state.runningPlayer.defaultAppliedActionId !== runningActionId) {
+    applyRunningTaskDefaultSelection(action);
+    state.runningPlayer.defaultAppliedActionId = runningActionId;
+  }
   const hasRunning = Boolean(action);
   if (openRunningTaskModalButton) {
     openRunningTaskModalButton.hidden = !hasRunning;
@@ -1457,6 +1462,7 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
+    state.runningPlayer.defaultAppliedActionId = "";
     runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Próxima tarefa");
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
@@ -1489,7 +1495,6 @@ function renderHomeRunningTask() {
     return;
   }
   const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
-  const runningActionId = String(action.id || "");
   if (state.runningEndBell.actionId !== runningActionId) {
     state.runningEndBell.actionId = runningActionId;
     state.runningEndBell.played = false;
