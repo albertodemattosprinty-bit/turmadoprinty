@@ -508,20 +508,23 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player {
-  margin-top: -17px;
-  width: min(560px, 92vw);
-  border: 1px solid transparent;
-  border-radius: 14px;
+  margin-top: 0;
+  width: 100%;
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
   padding: 0;
   background: transparent;
   backdrop-filter: none;
   position: relative;
   display: grid;
-  grid-template-columns: 10% 10% minmax(0, 60%) 10% 10%;
+  grid-template-columns: minmax(0, 10%) minmax(0, 10%) minmax(0, 60%) minmax(0, 10%) minmax(0, 10%);
   align-items: stretch;
   justify-items: stretch;
-  min-height: clamp(56px, 10vw, 76px);
+  height: clamp(58px, 10vh, 84px);
+  min-height: 58px;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .running-player-station {
@@ -551,15 +554,16 @@ body.start-decision-open .home-running-btn {
   border: 0;
   background: transparent;
   border-radius: 0;
-  padding: 0 2px;
+  padding: 0;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 24px;
-  gap: 2px;
+  grid-template-columns: minmax(0, 12%) minmax(0, 1fr) minmax(0, 12%);
+  gap: 0;
   align-items: center;
   text-align: center;
   color: #fff;
   justify-items: stretch;
   align-content: center;
+  box-sizing: border-box;
 }
 
 .running-player-title-copy {
@@ -595,6 +599,7 @@ body.start-decision-open .home-running-btn {
   cursor: pointer;
   padding: 0;
   transition: background 180ms ease, color 180ms ease, opacity 180ms ease;
+  box-sizing: border-box;
 }
 
 .running-player-control-left {
@@ -628,8 +633,8 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-control svg {
-  width: 22px;
-  height: 22px;
+  width: clamp(16px, 3.8vw, 22px);
+  height: clamp(16px, 3.8vw, 22px);
 }
 
 .running-player-control.active {
@@ -650,8 +655,9 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-track-nav {
-  width: 24px;
-  height: 24px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
   border: 0;
   background: transparent;
   color: rgba(255, 255, 255, 0.74);
@@ -662,8 +668,8 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-track-nav svg {
-  width: 14px;
-  height: 14px;
+  width: clamp(10px, 2.8vw, 14px);
+  height: clamp(10px, 2.8vw, 14px);
 }
 
 .running-player-track-nav:hover,
@@ -750,18 +756,6 @@ body.start-decision-open .home-running-btn {
   border: 1px solid rgba(255, 255, 255, 0.38);
   background: rgba(7, 32, 88, 0.72);
   color: #fff;
-}
-.running-player-station-nav {
-  width: 24px;
-  height: 24px;
-  background: transparent;
-  display: none;
-}
-.running-player-track-nav {
-  width: 24px;
-  height: 24px;
-  background: transparent;
-  display: none;
 }
 
 .running-circle-toggle {
@@ -953,7 +947,8 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 }
 
 .running-music-list-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
   align-items: center;
   gap: 12px;
 }
@@ -978,18 +973,14 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 .running-music-list-title-wrap {
   display: grid;
-  gap: 2px;
+  gap: 0;
   color: #fff;
+  text-align: center;
 }
 
 .running-music-list-title-wrap strong {
   font-size: clamp(1.2rem, 4.4vw, 1.9rem);
   line-height: 1.1;
-}
-
-.running-music-list-title-wrap span {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.88rem;
 }
 
 .running-music-list {
@@ -1013,6 +1004,20 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   cursor: pointer;
   transition: transform 180ms ease, opacity 180ms ease, border-color 180ms ease, background 180ms ease;
   opacity: 0.6;
+}
+
+.running-music-track-row[role="button"] {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.running-music-track-row.is-hidden-track {
+  opacity: 0.3;
+}
+
+.running-music-track-row.is-hidden-track:hover,
+.running-music-track-row.is-hidden-track:focus-visible,
+.running-music-track-row.is-hidden-track.is-current {
+  opacity: 0.3;
 }
 
 .running-music-track-row:hover,
@@ -1098,6 +1103,27 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 .running-music-track-actions svg {
   width: 16px;
   height: 16px;
+}
+
+.running-music-track-hide {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.running-music-track-hide svg {
+  width: 16px;
+  height: 16px;
+}
+
+.running-music-track-row.is-hidden-track .running-music-track-hide {
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .running-music-track-actions .running-music-track-heart {
@@ -2518,29 +2544,30 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   }
 
   .running-player {
-    width: min(560px, 94vw);
-    min-height: 52px;
+    width: 100%;
+    height: clamp(56px, 10vh, 74px);
+    min-height: 56px;
   }
 
   .running-player-control svg {
-    width: clamp(15px, 4vw, 18px);
-    height: clamp(15px, 4vw, 18px);
+    width: clamp(14px, 4vw, 18px);
+    height: clamp(14px, 4vw, 18px);
   }
 
   .running-player-title-button {
-    grid-template-columns: 18px minmax(0, 1fr) 18px;
-    padding: 0 1px;
-    gap: 1px;
+    grid-template-columns: minmax(0, 14%) minmax(0, 1fr) minmax(0, 14%);
+    padding: 0;
+    gap: 0;
   }
 
   .running-player-track-nav {
-    width: 18px;
-    height: 18px;
+    width: 100%;
+    height: 100%;
   }
 
   .running-player-track-nav svg {
-    width: 11px;
-    height: 11px;
+    width: 10px;
+    height: 10px;
   }
 
   .running-player-station {
