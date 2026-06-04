@@ -460,7 +460,7 @@ body.start-decision-open .home-running-btn {
   gap: 2px;
   font-weight: 700;
   color: #fff;
-  font-size: clamp(3rem, 8vw, 4.2rem);
+  font-size: clamp(4.5rem, 12vw, 6.3rem);
   white-space: nowrap;
 }
 
@@ -804,8 +804,8 @@ body.start-decision-open .home-running-btn {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: 30px;
-  height: 30px;
+  width: 52px;
+  height: 52px;
   border: none;
   background: transparent;
   color: #fff;
@@ -814,10 +814,10 @@ body.start-decision-open .home-running-btn {
   place-items: center;
   z-index: 2;
 }
-.running-circle-toggle-left { top: 42px; }
-.running-circle-toggle-right { bottom: 37px; }
-.running-circle-toggle-left svg { width: 1.2em; height: 1.2em; }
-.running-circle-toggle-right svg { width: 1.1em; height: 1.1em; }
+.running-circle-toggle-left { top: 67px; }
+.running-circle-toggle-right { bottom: 62px; }
+.running-circle-toggle-left svg { width: 2.04em; height: 2.04em; }
+.running-circle-toggle-right svg { width: 1.87em; height: 1.87em; }
 .running-circle-toggle.active { opacity: 1; }
 
 .running-task-actions {
