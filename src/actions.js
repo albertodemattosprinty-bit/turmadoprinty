@@ -138,6 +138,9 @@ export async function ensureActionsSchema() {
       created_at timestamptz not null default now()
     );
   `);
+  await query("alter table actions add column if not exists music_station_name text;");
+  await query("alter table actions add column if not exists music_track_name text;");
+  await query("alter table actions add column if not exists music_track_url text;");
   await query("alter table actions add column if not exists music_default_mode text not null default 'track';");
   await query(`alter table actions add column if not exists assignee text not null default '${DEFAULT_ASSIGNEE}';`);
   await query("alter table actions add column if not exists category_id text not null default '';");
