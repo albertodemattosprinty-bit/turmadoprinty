@@ -267,14 +267,12 @@ body.start-decision-open .home-running-btn {
 .running-task-content {
   width: min(680px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
-  min-height: min(92dvh, 860px);
-  height: min(92dvh, 860px);
+  min-height: calc(100dvh - 24px);
+  height: calc(100dvh - 24px);
   display: grid;
-  grid-template-rows: 10% 40% 15% 15% 10% 10%;
-  justify-items: stretch;
-  align-items: stretch;
+  grid-template-rows: 10fr 40fr 15fr 15fr 10fr 10fr;
+  place-items: stretch;
   align-content: stretch;
-  align-items: stretch;
   text-align: left;
   gap: 0;
   transform: none;
@@ -282,10 +280,13 @@ body.start-decision-open .home-running-btn {
   position: relative;
   margin: 0 auto;
   box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
 }
 
 #runningTaskModal .running-task-content.is-idle-layout {
-  min-height: min(92dvh, 860px);
+  min-height: calc(100dvh - 24px);
+  height: calc(100dvh - 24px);
 }
 
 .running-task-content > * {
@@ -344,7 +345,8 @@ body.start-decision-open .home-running-btn {
   min-height: 0;
   grid-row: 1;
   width: 100%;
-  align-self: center;
+  height: 100%;
+  align-self: stretch;
 }
 
 .running-task-category-icon {
@@ -369,7 +371,7 @@ body.start-decision-open .home-running-btn {
 #runningTaskModal .running-task-name {
   margin-top: 0;
   transform: none;
-  font-size: clamp(1.34rem, 3.2vw, 1.92rem);
+  font-size: clamp(1.45rem, 4vw, 2.18rem);
 }
 
 .running-task-minutes {
@@ -384,7 +386,8 @@ body.start-decision-open .home-running-btn {
   justify-self: center;
   background: rgba(255, 255, 255, 0.18);
   grid-row: 5;
-  max-width: min(92vw, 420px);
+  width: min(92%, 440px);
+  max-width: min(92vw, 440px);
   text-align: center;
 }
 .running-task-minutes::before {
@@ -408,16 +411,17 @@ body.start-decision-open .home-running-btn {
 
 .running-circle-wrap {
   position: relative;
-  width: 188px;
-  height: 188px;
+  width: min(84%, 340px);
+  aspect-ratio: 1;
+  height: auto;
   align-self: center;
   justify-self: center;
   grid-row: 2;
 }
 
 .running-progress-ring {
-  width: 188px;
-  height: 188px;
+  width: 100%;
+  height: 100%;
   display: block;
   transform: rotate(-90deg);
   animation: runningRingRotate 6000ms linear infinite;
@@ -456,7 +460,7 @@ body.start-decision-open .home-running-btn {
   gap: 2px;
   font-weight: 700;
   color: #fff;
-  font-size: 2.92rem;
+  font-size: clamp(3rem, 8vw, 4.2rem);
   white-space: nowrap;
 }
 
@@ -485,7 +489,7 @@ body.start-decision-open .home-running-btn {
 .running-task-next-label {
   color: #fef3a3;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   margin-top: 0;
   text-align: center;
   width: 100%;
@@ -499,10 +503,11 @@ body.start-decision-open .home-running-btn {
   margin-top: -1px;
   transition: opacity 500ms ease, transform 500ms ease;
   text-align: center;
+  font-size: clamp(1.2rem, 4vw, 1.9rem);
 }
 
 .running-task-next-time {
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.82);
   text-align: center;
@@ -522,9 +527,10 @@ body.start-decision-open .home-running-btn {
   grid-row: 3;
   width: 100%;
   display: grid;
+  height: 100%;
   align-content: center;
   justify-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .running-task-next-icon {
@@ -555,16 +561,16 @@ body.start-decision-open .home-running-btn {
   grid-template-columns: minmax(0, 10%) minmax(0, 10%) minmax(0, 60%) minmax(0, 10%) minmax(0, 10%);
   align-items: stretch;
   justify-items: stretch;
-  height: clamp(58px, 10vh, 84px);
-  min-height: 58px;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
   grid-row: 6;
-  align-self: center;
+  align-self: stretch;
 }
 
 .running-player-station {
-  font-size: 0.76rem;
+  font-size: clamp(0.88rem, 2.6vw, 1.08rem);
   opacity: 0.92;
   color: rgba(255, 255, 255, 0.92);
   white-space: nowrap;
@@ -573,7 +579,7 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-track {
-  font-size: 0.94rem;
+  font-size: clamp(1.15rem, 3.6vw, 1.55rem);
   font-weight: 800;
   min-height: 18px;
   text-align: center;
@@ -669,8 +675,8 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-control svg {
-  width: clamp(16px, 3.8vw, 22px);
-  height: clamp(16px, 3.8vw, 22px);
+  width: clamp(20px, 5vw, 30px);
+  height: clamp(20px, 5vw, 30px);
 }
 
 .running-player-control.active {
@@ -704,8 +710,8 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-player-track-nav svg {
-  width: clamp(10px, 2.8vw, 14px);
-  height: clamp(10px, 2.8vw, 14px);
+  width: clamp(14px, 3.4vw, 18px);
+  height: clamp(14px, 3.4vw, 18px);
 }
 
 .running-player-track-nav:hover,
@@ -818,17 +824,18 @@ body.start-decision-open .home-running-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 14px;
   margin-top: 0;
   flex-wrap: nowrap;
   grid-row: 4;
   width: 100%;
-  align-self: center;
+  height: 100%;
+  align-self: stretch;
 }
 
 .running-task-circle-btn {
-  width: 41px;
-  height: 41px;
+  width: clamp(52px, 8.8vw, 76px);
+  height: clamp(52px, 8.8vw, 76px);
   border-radius: 999px;
   border: 0;
   display: grid;
@@ -838,8 +845,8 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-task-circle-btn svg {
-  width: 20px;
-  height: 20px;
+  width: clamp(24px, 4.4vw, 32px);
+  height: clamp(24px, 4.4vw, 32px);
 }
 
 .running-task-list-btn,
@@ -1226,21 +1233,17 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 }
 
 .running-next-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: stretch;
   min-height: 0;
   max-height: none;
-  text-align: left;
+  text-align: center;
   transition: opacity 500ms ease, transform 500ms ease;
 }
 
 #runningTaskModal .running-task-content.is-idle-layout .running-next-panel {
   justify-content: center;
   align-items: center;
-  min-height: 40vh;
-  max-height: 40vh;
+  min-height: 0;
+  max-height: none;
   text-align: center;
 }
 
@@ -2591,13 +2594,12 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   .running-task-content {
     width: min(100%, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
-    min-height: min(94dvh, 820px);
-    height: min(94dvh, 820px);
+    min-height: calc(100dvh - 16px);
+    height: calc(100dvh - 16px);
   }
 
   .running-circle-wrap {
-    width: min(188px, 48vw);
-    height: min(188px, 48vw);
+    width: min(92%, 320px);
   }
 
   .running-progress-ring {
@@ -2606,13 +2608,13 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   }
 
   .running-task-next {
-    font-size: 1rem;
+    font-size: clamp(1.05rem, 4.8vw, 1.45rem);
   }
 
   .running-task-next-time,
   .running-task-next-label,
   .running-task-minutes {
-    font-size: 0.76rem;
+    font-size: 0.82rem;
   }
 
   .running-player-control svg {
