@@ -265,12 +265,16 @@ body.start-decision-open .home-running-btn {
 }
 
 .running-task-content {
+  width: min(680px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
   align-items: stretch;
   text-align: left;
   gap: 12px;
-  transform: scale(1.4);
+  transform: none;
   transform-origin: center;
   position: relative;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 #runningTaskModal .running-task-content.is-idle-layout {
@@ -2547,6 +2551,11 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
     width: 100%;
     height: clamp(56px, 10vh, 74px);
     min-height: 56px;
+  }
+
+  .running-task-content {
+    width: min(100%, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
   }
 
   .running-player-control svg {
