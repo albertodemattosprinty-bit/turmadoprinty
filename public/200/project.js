@@ -338,8 +338,6 @@ const runningMusicDefaultChoiceModal = document.getElementById("runningMusicDefa
 const runningMusicDefaultChoiceCopy = document.getElementById("runningMusicDefaultChoiceCopy");
 const runningMusicDefaultRedefineButton = document.getElementById("runningMusicDefaultRedefineButton");
 const runningMusicDefaultExecuteButton = document.getElementById("runningMusicDefaultExecuteButton");
-let runningFavoriteHoldTimer = null;
-let runningFavoriteHoldHandled = false;
 const actionsModal = document.getElementById("actionsModal");
 const runtimeStateEndpoint = "/api/200/runtime-state";
 const dayDonePercent = document.getElementById("dayDonePercent");
@@ -1798,6 +1796,53 @@ function syncRunningMusicOrder({ preserveTrackUrl = "" } = {}) {
   state.runningPlayer.playOrderIndex = nextIndex >= 0 ? nextIndex : 0;
 }
 
+function normalizeRunningTrackUrl(url = "") {
+  const safeUrl = String(url || "").trim();
+  if (!safeUrl) {
+    return "";
+  }
+  try {
+    return new URL(safeUrl, window.location.origin).href;
+  } catch {
+    return safeUrl;
+  }
+}
+
+function findRunningTrackByUrl(trackUrl = "", preferredStation = null) {
+  const normalizedTargetUrl = normalizeRunningTrackUrl(trackUrl);
+  if (!normalizedTargetUrl) {
+    return null;
+  }
+
+  const candidateStations = [];
+  if (preferredStation) {
+    candidateStations.push(preferredStation);
+  }
+  candidateStations.push(...(Array.isArray(state.runningPlayer.stations) ? state.runningPlayer.stations : []).filter((station) => station !== preferredStation));
+
+  for (const station of candidateStations) {
+    const tracks = Array.isArray(station?.tracks) ? station.tracks : [];
+    const track = tracks.find((item) => normalizeRunningTrackUrl(item?.url) === normalizedTargetUrl);
+    if (track) {
+      return { station, track };
+    }
+  }
+
+  return null;
+}
+
+function getRunningPlaybackState() {
+  const station = getCurrentRunningStation();
+  const currentTrack = getCurrentRunningTrack();
+  const audioUrl = normalizeRunningTrackUrl(runningAudio?.currentSrc || runningAudio?.src || "");
+  const match = findRunningTrackByUrl(audioUrl, station);
+  return {
+    station: match?.station || station,
+    track: match?.track || currentTrack || station?.tracks?.[0] || null,
+    audioUrl
+  };
+}
+
 function getCurrentRunningTrack() {
   const station = getCurrentRunningStation();
   const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
@@ -1834,11 +1879,13 @@ function isRunningStationDefaultForCurrentTask(station = getCurrentRunningStatio
 }
 
 function renderRunningMusicPlayer() {
-  const station = getCurrentRunningStation();
-  const track = getCurrentRunningTrack() || station?.tracks?.[0] || null;
+  const playback = getRunningPlaybackState();
+  const station = playback.station || getCurrentRunningStation();
+  const track = playback.track || station?.tracks?.[0] || null;
   const stationIsDefault = isRunningStationDefaultForCurrentTask(station);
   const orderedUrls = Array.isArray(state.runningPlayer.playOrderUrls) ? state.runningPlayer.playOrderUrls : [];
   const hasTrackNavigation = orderedUrls.length > 1;
+  const isPlaying = Boolean(runningAudio && !runningAudio.paused && track?.url && normalizeRunningTrackUrl(runningAudio.currentSrc || runningAudio.src || "") === normalizeRunningTrackUrl(track.url));
 
   if (runningPlayerStation) {
     runningPlayerStation.textContent = String(station?.name || "Estação");
@@ -1856,7 +1903,15 @@ function renderRunningMusicPlayer() {
   const trackIsDefault = Boolean(track && isRunningTrackDefaultForCurrentTask(track));
   const hasAnyDefault = trackIsDefault || stationIsDefault;
 
-  runningPlayerRepeat?.classList.toggle("active", Boolean(state.runningPlayer.repeatEnabled));
+  runningPlayerRepeat?.classList.toggle("active", isPlaying);
+  runningPlayerRepeat?.classList.toggle("is-playing", isPlaying);
+  runningPlayerRepeat?.classList.toggle("is-disabled", !track?.url);
+  runningPlayerRepeat?.setAttribute("aria-label", isPlaying ? "Pausar música" : "Reproduzir música");
+  if (runningPlayerRepeat) {
+    runningPlayerRepeat.innerHTML = isPlaying
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z" fill="currentColor"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z" fill="currentColor"/></svg>';
+  }
   runningPlayerFavorite?.classList.toggle("active", trackIsFavorite);
   runningPlayerFavorite?.classList.toggle("is-favorite", trackIsFavorite);
   runningPlayerDefault?.classList.toggle("active", hasAnyDefault);
@@ -1905,9 +1960,9 @@ async function playRunningTrack(trackUrl = "") {
 
 async function toggleRunningPlayPause() {
   if (!runningAudio) return;
-  const track = getCurrentRunningTrack();
+  const track = getRunningPlaybackState().track || getCurrentRunningTrack();
   if (!track?.url) return;
-  if (!runningAudio.src || runningAudio.src !== track.url) {
+  if (!runningAudio.src || normalizeRunningTrackUrl(runningAudio.src) !== normalizeRunningTrackUrl(track.url)) {
     await playRunningTrack(track.url);
     return;
   }
@@ -1961,7 +2016,7 @@ function renderRunningMusicList() {
   }
 
   const station = getCurrentRunningStation();
-  const track = getCurrentRunningTrack();
+  const track = getRunningPlaybackState().track || getCurrentRunningTrack();
   const tracks = getRunningDisplayedTracks(station);
   const preference = getRunningDefaultPreferenceForCurrentTask();
   const defaultTrackUrl = preference?.mode === "track" ? String(preference.trackUrl || "").trim() : "";
@@ -6613,39 +6668,8 @@ runningPlayerNext?.addEventListener("click", () => {
   void moveRunningTrack(1);
 });
 runningMusicListBack?.addEventListener("click", closeRunningMusicListModal);
-runningPlayerRepeat?.addEventListener("click", () => {
-  state.runningPlayer.repeatEnabled = !state.runningPlayer.repeatEnabled;
-  ensureRunningAudioLoopState();
-  renderRunningMusicPlayer();
-  renderRunningMusicList();
-});
-runningPlayerFavorite?.addEventListener("pointerdown", () => {
-  if (runningFavoriteHoldTimer) {
-    window.clearTimeout(runningFavoriteHoldTimer);
-  }
-  runningFavoriteHoldHandled = false;
-  runningFavoriteHoldTimer = window.setTimeout(() => {
-    runningFavoriteHoldTimer = null;
-    const track = getCurrentRunningTrack();
-    if (track && isRunningTrackFavorite(track)) {
-      runningFavoriteHoldHandled = true;
-      void toggleRunningTrackFavorite();
-    }
-  }, 500);
-});
-["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
-  runningPlayerFavorite?.addEventListener(eventName, () => {
-    if (runningFavoriteHoldTimer) {
-      window.clearTimeout(runningFavoriteHoldTimer);
-      runningFavoriteHoldTimer = null;
-    }
-  });
-});
+runningPlayerRepeat?.addEventListener("click", toggleRunningPlayPause);
 runningPlayerFavorite?.addEventListener("click", () => {
-  if (runningFavoriteHoldHandled) {
-    runningFavoriteHoldHandled = false;
-    return;
-  }
   void toggleRunningTrackFavorite();
 });
 runningPlayerDefault?.addEventListener("click", () => {

@@ -267,9 +267,16 @@ body.start-decision-open .home-running-btn {
 .running-task-content {
   width: min(680px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
+  min-height: min(92dvh, 860px);
+  height: min(92dvh, 860px);
+  display: grid;
+  grid-template-rows: 10% 40% 15% 15% 10% 10%;
+  justify-items: stretch;
+  align-items: stretch;
+  align-content: stretch;
   align-items: stretch;
   text-align: left;
-  gap: 12px;
+  gap: 0;
   transform: none;
   transform-origin: center;
   position: relative;
@@ -278,7 +285,11 @@ body.start-decision-open .home-running-btn {
 }
 
 #runningTaskModal .running-task-content.is-idle-layout {
-  min-height: 72vh;
+  min-height: min(92dvh, 860px);
+}
+
+.running-task-content > * {
+  min-height: 0;
 }
 
 .project-login-overlay {
@@ -329,8 +340,11 @@ body.start-decision-open .home-running-btn {
   align-items: center;
   justify-content: center;
   gap: 0;
-  transform: translateY(25px);
-  min-height: 64px;
+  transform: none;
+  min-height: 0;
+  grid-row: 1;
+  width: 100%;
+  align-self: center;
 }
 
 .running-task-category-icon {
@@ -346,27 +360,32 @@ body.start-decision-open .home-running-btn {
   justify-content: center;
   overflow: hidden;
   text-wrap: balance;
-  min-height: 2.2em;
+  min-height: 0;
   text-align: center;
-  width: min(320px, 84vw);
+  width: 100%;
+  max-width: min(560px, 92vw);
 }
 
 #runningTaskModal .running-task-name {
   margin-top: 0;
   transform: none;
-  font-size: 1.26rem;
+  font-size: clamp(1.34rem, 3.2vw, 1.92rem);
 }
 
 .running-task-minutes {
   color: #ffffff;
   font-weight: 700;
   font-size: 0.9rem;
-  margin-top: 6px;
+  margin-top: 0;
   border-radius: 999px;
-  padding: 2px 10px;
+  padding: 8px 14px;
   display: inline-block;
   align-self: center;
+  justify-self: center;
   background: rgba(255, 255, 255, 0.18);
+  grid-row: 5;
+  max-width: min(92vw, 420px);
+  text-align: center;
 }
 .running-task-minutes::before {
   content: none;
@@ -392,6 +411,8 @@ body.start-decision-open .home-running-btn {
   width: 188px;
   height: 188px;
   align-self: center;
+  justify-self: center;
+  grid-row: 2;
 }
 
 .running-progress-ring {
@@ -465,7 +486,7 @@ body.start-decision-open .home-running-btn {
   color: #fef3a3;
   font-weight: 700;
   font-size: 0.8rem;
-  margin-top: -12px;
+  margin-top: 0;
   text-align: center;
   width: 100%;
   transition: opacity 500ms ease, transform 500ms ease;
@@ -495,6 +516,15 @@ body.start-decision-open .home-running-btn {
   justify-content: center;
   gap: 1px;
   text-align: center;
+}
+
+.running-next-panel {
+  grid-row: 3;
+  width: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
 }
 
 .running-task-next-icon {
@@ -529,6 +559,8 @@ body.start-decision-open .home-running-btn {
   min-height: 58px;
   overflow: hidden;
   box-sizing: border-box;
+  grid-row: 6;
+  align-self: center;
 }
 
 .running-player-station {
@@ -787,8 +819,11 @@ body.start-decision-open .home-running-btn {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 2px;
+  margin-top: 0;
   flex-wrap: nowrap;
+  grid-row: 4;
+  width: 100%;
+  align-self: center;
 }
 
 .running-task-circle-btn {
@@ -906,11 +941,11 @@ body.start-decision-open .home-running-btn {
 
 #runningTaskModal .running-task-content.is-idle-layout .running-task-start-btn {
   align-self: center;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 #runningTaskModal .running-task-content.is-idle-layout .running-player {
-  margin-top: auto;
+  margin-top: 0;
 }
 
 body.running-music-list-open #runningTaskModal .running-task-content {
@@ -2556,6 +2591,28 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   .running-task-content {
     width: min(100%, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
+    min-height: min(94dvh, 820px);
+    height: min(94dvh, 820px);
+  }
+
+  .running-circle-wrap {
+    width: min(188px, 48vw);
+    height: min(188px, 48vw);
+  }
+
+  .running-progress-ring {
+    width: 100%;
+    height: 100%;
+  }
+
+  .running-task-next {
+    font-size: 1rem;
+  }
+
+  .running-task-next-time,
+  .running-task-next-label,
+  .running-task-minutes {
+    font-size: 0.76rem;
   }
 
   .running-player-control svg {
