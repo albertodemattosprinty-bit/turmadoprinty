@@ -12,6 +12,10 @@ function normalizeTrackName(value) {
   return normalizeText(value) || "Faixa";
 }
 
+function normalizeDefaultMode(value) {
+  return normalizeText(value).toLowerCase() === "station" ? "station" : "track";
+}
+
 function normalizeStationName(value) {
   return normalizeText(value) || "Estação";
 }
@@ -40,6 +44,7 @@ export async function ensureProject200MusicSchema() {
       id uuid primary key default gen_random_uuid(),
       user_id uuid not null references users(id) on delete cascade,
       task_title text not null,
+      default_mode text not null default 'track',
       station_name text not null,
       track_name text not null,
       track_url text not null,
@@ -48,6 +53,7 @@ export async function ensureProject200MusicSchema() {
       unique (user_id, task_title)
     );
   `);
+  await query("alter table project200_music_task_defaults add column if not exists default_mode text not null default 'track';");
   await query("create index if not exists idx_project200_music_task_defaults_user_time on project200_music_task_defaults(user_id, updated_at desc);");
 }
 
@@ -67,7 +73,7 @@ export async function getProject200MusicPreferences(userId) {
       [userId]
     ),
     query(
-      `select task_title, station_name, track_name, track_url from project200_music_task_defaults where user_id = $1 order by updated_at desc`,
+      `select task_title, default_mode, station_name, track_name, track_url from project200_music_task_defaults where user_id = $1 order by updated_at desc`,
       [userId]
     )
   ]);
@@ -76,10 +82,11 @@ export async function getProject200MusicPreferences(userId) {
     favoriteTrackUrls: favoritesResult.rows.map((row) => normalizeTrackUrl(row.track_url)).filter(Boolean),
     defaults: defaultsResult.rows.map((row) => ({
       taskTitle: normalizeTaskTitle(row.task_title),
+      mode: normalizeDefaultMode(row.default_mode),
       stationName: normalizeStationName(row.station_name),
-      trackName: normalizeTrackName(row.track_name),
+      trackName: normalizeText(row.track_name),
       trackUrl: normalizeTrackUrl(row.track_url)
-    })).filter((row) => row.taskTitle && row.trackUrl)
+    })).filter((row) => row.taskTitle && (row.mode === "station" ? row.stationName : row.trackUrl))
   };
 }
 
@@ -111,7 +118,7 @@ export async function getProject200MusicStationsForUser({ userId = null, station
 
   const preferences = await getProject200MusicPreferences(userId);
   const favoriteSet = new Set(preferences.favoriteTrackUrls);
-  const defaultTrackByTaskTitle = new Map(preferences.defaults.map((item) => [item.taskTitle, item.trackUrl]));
+  const defaultTrackByTaskTitle = new Map(preferences.defaults.map((item) => [item.taskTitle, item]));
 
   return {
     stations: normalizedStations.map((station) => {
@@ -120,7 +127,7 @@ export async function getProject200MusicStationsForUser({ userId = null, station
       const orderedTracks = sortTracksWithFavoritesFirst(tracks, favoriteSet).map((track) => {
         const trackUrl = normalizeTrackUrl(track?.url);
         const taskTitles = preferences.defaults
-          .filter((entry) => entry.trackUrl === trackUrl)
+          .filter((entry) => entry.mode === "track" && entry.trackUrl === trackUrl)
           .map((entry) => entry.taskTitle);
 
         return {
@@ -155,7 +162,7 @@ export async function toggleProject200MusicFavorite({ userId, stationName, track
   const safeTrackUrl = normalizeTrackUrl(trackUrl);
   const shouldFavorite = Boolean(favorite);
 
-  if (!safeTrackUrl) {
+  if (safeMode === "track" && !safeTrackUrl) {
     throw new Error("Escolha uma música válida.");
   }
 
@@ -188,21 +195,22 @@ export async function toggleProject200MusicFavorite({ userId, stationName, track
   };
 }
 
-export async function setProject200MusicTaskDefault({ userId, taskTitle, stationName, trackName, trackUrl }) {
+export async function setProject200MusicTaskDefault({ userId, taskTitle, mode, stationName, trackName, trackUrl }) {
   if (!userId) {
     throw new Error("Entre na conta para salvar o padrão.");
   }
 
   const safeTaskTitle = normalizeTaskTitle(taskTitle);
+  const safeMode = normalizeDefaultMode(mode);
   const safeStationName = normalizeStationName(stationName);
-  const safeTrackName = normalizeTrackName(trackName);
+  const safeTrackName = normalizeText(trackName);
   const safeTrackUrl = normalizeTrackUrl(trackUrl);
 
   if (!safeTaskTitle) {
     throw new Error("Informe o nome da tarefa atual.");
   }
 
-  if (!safeTrackUrl) {
+  if (safeMode === "track" && !safeTrackUrl) {
     throw new Error("Escolha uma música válida.");
   }
 
@@ -210,15 +218,16 @@ export async function setProject200MusicTaskDefault({ userId, taskTitle, station
 
   await query(
     `
-      insert into project200_music_task_defaults (user_id, task_title, station_name, track_name, track_url)
-      values ($1, $2, $3, $4, $5)
+      insert into project200_music_task_defaults (user_id, task_title, default_mode, station_name, track_name, track_url)
+      values ($1, $2, $3, $4, $5, $6)
       on conflict (user_id, task_title) do update
-        set station_name = excluded.station_name,
+        set default_mode = excluded.default_mode,
+            station_name = excluded.station_name,
             track_name = excluded.track_name,
             track_url = excluded.track_url,
             updated_at = now()
     `,
-    [userId, safeTaskTitle, safeStationName, safeTrackName, safeTrackUrl]
+    [userId, safeTaskTitle, safeMode, safeStationName, safeTrackName, safeTrackUrl]
   );
 
   return {

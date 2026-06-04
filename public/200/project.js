@@ -313,7 +313,7 @@ const runningTaskActionsWrap = runningTaskModalElement?.querySelector(".running-
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
 const runningPlayerTitleButton = document.getElementById("runningPlayerTitleButton");
-const runningPlayerShuffle = document.getElementById("runningPlayerShuffle");
+const runningPlayerList = document.getElementById("runningPlayerList");
 const runningPlayerRepeat = document.getElementById("runningPlayerRepeat");
 const runningPlayerFavorite = document.getElementById("runningPlayerFavorite");
 const runningPlayerDefault = document.getElementById("runningPlayerDefault");
@@ -327,6 +327,13 @@ const runningMusicListBack = document.getElementById("runningMusicListBack");
 const runningMusicListStation = document.getElementById("runningMusicListStation");
 const runningMusicListTrack = document.getElementById("runningMusicListTrack");
 const runningMusicListItems = document.getElementById("runningMusicListItems");
+const runningMusicDefaultModal = document.getElementById("runningMusicDefaultModal");
+const runningMusicDefaultStationButton = document.getElementById("runningMusicDefaultStationButton");
+const runningMusicDefaultTrackButton = document.getElementById("runningMusicDefaultTrackButton");
+const runningMusicDefaultStationName = document.getElementById("runningMusicDefaultStationName");
+const runningMusicDefaultTrackName = document.getElementById("runningMusicDefaultTrackName");
+const runningMusicDefaultStationHint = document.getElementById("runningMusicDefaultStationHint");
+const runningMusicDefaultTrackHint = document.getElementById("runningMusicDefaultTrackHint");
 const actionsModal = document.getElementById("actionsModal");
 const runtimeStateEndpoint = "/api/200/runtime-state";
 const dayDonePercent = document.getElementById("dayDonePercent");
@@ -543,7 +550,7 @@ const state = {
     shuffleEnabled: false,
     repeatEnabled: false,
     favoriteTrackUrls: new Set(),
-    defaultTrackByTaskTitle: new Map(),
+    defaultPreferenceByTaskTitle: new Map(),
     currentTaskTitle: ""
   },
   runningMinuteCue: {
@@ -1148,40 +1155,9 @@ function renderRunningCompletionCelebration() {
   }
   updateRunningCenterModeButtons("percent");
   setRunningRingPercent(state.runningCompletion.displayPercent);
-  runningTaskPercent.innerHTML = state.runningCompletion.metric === "punctuality"
-    ? formatWholePercentMarkup(state.runningCompletion.displayPercent)
-    : formatPercentMarkup(state.runningCompletion.displayPercent, 2);
-  if (state.runningCompletion.metric === "punctuality") {
-    applyPunctualityTone(runningCompletionLabel, state.runningCompletion.displayPercent);
-  }
-}
-
-function renderRunningNextMetric(mode = "progress") {
-  const metricMode = mode === "punctuality" ? "punctuality" : "progress";
-  state.runningCompletion.nextMetricMode = metricMode;
-  if (runningTaskMinutesLeft) {
-    runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
-    runningTaskMinutesLeft.classList.add(metricMode === "punctuality" ? "is-early" : "is-bonus");
-    runningTaskMinutesLeft.textContent = metricMode === "punctuality"
-      ? "Pontualidade"
-      : "Progresso";
-  }
-  if (metricMode === "punctuality") {
-    applyPunctualityTone(runningTaskMinutesLeft, state.runningCompletion.punctualityValue);
-  }
-  setRunningRingPercent(metricMode === "punctuality" ? state.runningCompletion.punctualityValue : state.runningCompletion.progressValue);
   if (runningTaskPercent) {
-    runningTaskPercent.innerHTML = metricMode === "punctuality"
-      ? formatWholePercentMarkup(state.runningCompletion.punctualityValue)
-      : formatPercentMarkup(state.runningCompletion.progressValue, 2);
+    runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.displayPercent, 2);
   }
-  if (runningNextMetricTimer) {
-    window.clearTimeout(runningNextMetricTimer);
-    runningNextMetricTimer = null;
-  }
-  runningNextMetricTimer = window.setTimeout(() => {
-    renderRunningNextMetric(metricMode === "punctuality" ? "progress" : "punctuality");
-  }, metricMode === "punctuality" ? RUNNING_NEXT_METRIC_PUNCTUALITY_MS : RUNNING_NEXT_METRIC_PROGRESS_MS);
 }
 
 function renderRunningCompletionNextView() {
@@ -1195,7 +1171,15 @@ function renderRunningCompletionNextView() {
   if (runningTaskCategoryIcon) {
     runningTaskCategoryIcon.hidden = true;
   }
-  renderRunningNextMetric("progress");
+  if (runningTaskMinutesLeft) {
+    runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
+    runningTaskMinutesLeft.classList.add("is-bonus");
+    runningTaskMinutesLeft.textContent = "Próxima";
+  }
+  setRunningRingPercent(state.runningCompletion.progressValue);
+  if (runningTaskPercent) {
+    runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.progressValue, 2);
+  }
   const nextOfNext = state.runningCompletion.nextOfNext;
   if (nextOfNext) {
     const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
@@ -1320,43 +1304,20 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
   state.runningCompletion.savedMinutes = Math.max(0, Math.round(Number(savedMinutes || 0)));
   state.runningCompletion.lateMinutes = Math.max(0, Math.round(Number(summary?.late || 0)));
   state.runningCompletion.progressValue = clampPercent(toPercent);
-  state.runningCompletion.punctualityFrom = clampPercent(Number(summary?.punctualityBefore ?? 100));
-  state.runningCompletion.punctualityTo = clampPercent(Number(summary?.punctualityAfter ?? 100));
-  state.runningCompletion.punctualityValue = state.runningCompletion.punctualityTo;
   renderRunningCompletionCelebration();
   void playRunningSuccessCue();
   animateRunningCompletionProgress(fromPercent, toPercent, RUNNING_COMPLETION_ANIMATION_MS);
   queueRunningCompletionTimeout(() => {
-    state.runningCompletion.phase = "punctuality";
-    state.runningCompletion.metric = "punctuality";
-    state.runningCompletion.label = "Pontualidade";
-    state.runningCompletion.fromPercent = state.runningCompletion.punctualityFrom;
-    state.runningCompletion.toPercent = state.runningCompletion.punctualityTo;
-    state.runningCompletion.displayPercent = state.runningCompletion.punctualityFrom;
-    renderRunningCompletionCelebration();
-    void playRunningPunctualityIntroCue();
-    const punctualityChanged = Math.abs(state.runningCompletion.punctualityTo - state.runningCompletion.punctualityFrom) > 0.001;
-    if (punctualityChanged) {
-      void playRunningPunctualityDownCue();
-      state.runningCompletion.displayPercent = state.runningCompletion.punctualityTo;
-      renderRunningCompletionCelebration();
+    if (state.runningCompletion.nextAction) {
+      state.runningCompletion.phase = "next";
+      renderHomeRunningTask();
+      return;
     }
-    queueRunningCompletionTimeout(() => {
-      if (state.runningCompletion.nextAction) {
-        state.runningCompletion.phase = "next";
-        renderHomeRunningTask();
-        return;
-      }
-      resetRunningCompletionState();
-      if (dayDonePercent) {
-        dayDonePercent.textContent = `${Math.round(Number(summary?.percent || 0))}%`;
-      }
-      if (dayDoneDelay) {
-        dayDoneDelay.textContent = `Pontualidade: ${Math.round(Number(summary?.punctualityAfter ?? 100))}%`;
-        applyPunctualityTone(dayDoneDelay, summary?.punctualityAfter ?? 100);
-      }
-      openModal("dayDoneModal");
-    }, RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS);
+    resetRunningCompletionState();
+    if (dayDonePercent) {
+      dayDonePercent.textContent = `${Math.round(Number(summary?.percent || 0))}%`;
+    }
+    openModal("dayDoneModal");
   }, RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS);
 }
 
@@ -1471,6 +1432,7 @@ function renderHomeRunningTask() {
   setRunningCompletionVisualState(false);
   const action = getRunningActionForSelectedProfile();
   state.runningPlayer.currentTaskTitle = String(action?.title || "").trim();
+  applyRunningTaskDefaultSelection(action);
   const hasRunning = Boolean(action);
   if (openRunningTaskModalButton) {
     openRunningTaskModalButton.hidden = !hasRunning;
@@ -1595,7 +1557,7 @@ async function loadRunningMusicStations() {
 
   state.runningPlayer.stations = fallbackStations;
   state.runningPlayer.favoriteTrackUrls = new Set();
-  state.runningPlayer.defaultTrackByTaskTitle = new Map();
+  state.runningPlayer.defaultPreferenceByTaskTitle = new Map();
   try {
     const radioResponse = await fetch("/200/radio-stations.json", { cache: "no-store" });
     if (radioResponse.ok) {
@@ -1636,13 +1598,7 @@ async function loadRunningMusicStations() {
     if (stations.length) {
       state.runningPlayer.stations = stations;
       state.runningPlayer.favoriteTrackUrls = new Set(Array.isArray(payload?.preferences?.favoriteTrackUrls) ? payload.preferences.favoriteTrackUrls : []);
-      state.runningPlayer.defaultTrackByTaskTitle = new Map(
-        Array.isArray(payload?.preferences?.defaults)
-          ? payload.preferences.defaults
-            .map((item) => [String(item?.taskTitle || "").trim(), String(item?.trackUrl || "").trim()])
-            .filter(([taskTitle, trackUrl]) => taskTitle && trackUrl)
-          : Object.entries(payload?.preferences?.defaultTrackByTaskTitle || {}).map(([taskTitle, trackUrl]) => [String(taskTitle || "").trim(), String(trackUrl || "").trim()]).filter(([taskTitle, trackUrl]) => taskTitle && trackUrl)
-      );
+      state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
       const refreshedStationIndex = previousStationName
         ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
         : -1;
@@ -1654,6 +1610,7 @@ async function loadRunningMusicStations() {
   }
 
   renderRunningMusicPlayer();
+  applyRunningTaskDefaultSelection();
   primeRunningTrackBuffer();
 }
 
@@ -1665,6 +1622,77 @@ function getRunningFavoriteSet() {
   return state.runningPlayer.favoriteTrackUrls instanceof Set
     ? state.runningPlayer.favoriteTrackUrls
     : new Set();
+}
+
+function buildRunningDefaultPreferenceMap(preferences = {}) {
+  const defaults = Array.isArray(preferences?.defaults)
+    ? preferences.defaults
+    : Object.entries(preferences?.defaultTrackByTaskTitle || {}).map(([taskTitle, value]) => {
+      if (value && typeof value === "object") {
+        return { taskTitle, ...value };
+      }
+      return { taskTitle, mode: "track", trackUrl: value };
+    });
+  return new Map(defaults
+    .map((item) => {
+      const taskTitle = String(item?.taskTitle || "").trim();
+      const mode = String(item?.mode || "track").trim() === "station" ? "station" : "track";
+      const stationName = String(item?.stationName || "").trim();
+      const trackName = String(item?.trackName || "").trim();
+      const trackUrl = String(item?.trackUrl || "").trim();
+      if (!taskTitle) {
+        return null;
+      }
+      if (mode === "station" && !stationName) {
+        return null;
+      }
+      if (mode === "track" && !trackUrl) {
+        return null;
+      }
+      return [taskTitle, { mode, stationName, trackName, trackUrl }];
+    })
+    .filter(Boolean));
+}
+
+function getRunningDefaultPreferenceForTaskTitle(taskTitle = "") {
+  const safeTaskTitle = String(taskTitle || "").trim();
+  if (!safeTaskTitle) {
+    return null;
+  }
+  const map = state.runningPlayer.defaultPreferenceByTaskTitle;
+  if (!(map instanceof Map)) {
+    return null;
+  }
+  return map.get(safeTaskTitle) || null;
+}
+
+function getRunningDefaultPreferenceForCurrentTask() {
+  return getRunningDefaultPreferenceForTaskTitle(state.runningPlayer.currentTaskTitle);
+}
+
+function applyRunningTaskDefaultSelection(action = getRunningActionForSelectedProfile()) {
+  const taskTitle = String(action?.title || state.runningPlayer.currentTaskTitle || "").trim();
+  const preference = getRunningDefaultPreferenceForTaskTitle(taskTitle);
+  if (!preference || !Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) {
+    return;
+  }
+
+  if (preference.mode === "station") {
+    const stationIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === preference.stationName);
+    if (stationIndex >= 0) {
+      state.runningPlayer.stationIndex = stationIndex;
+      syncRunningMusicOrder({ preserveTrackUrl: "" });
+    }
+    return;
+  }
+
+  const stationIndex = state.runningPlayer.stations.findIndex((station) =>
+    Array.isArray(station?.tracks) && station.tracks.some((track) => String(track?.url || "").trim() === preference.trackUrl)
+  );
+  if (stationIndex >= 0) {
+    state.runningPlayer.stationIndex = stationIndex;
+    syncRunningMusicOrder({ preserveTrackUrl: preference.trackUrl });
+  }
 }
 
 function getRunningDisplayedTracks(station = getCurrentRunningStation()) {
@@ -1751,16 +1779,25 @@ function isRunningTrackFavorite(track) {
 }
 
 function isRunningTrackDefaultForCurrentTask(track) {
-  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
-  if (!taskTitle) {
+  const preference = getRunningDefaultPreferenceForCurrentTask();
+  if (!preference || preference.mode !== "track") {
     return false;
   }
-  return String(state.runningPlayer.defaultTrackByTaskTitle.get(taskTitle) || "").trim() === String(track?.url || "").trim();
+  return String(preference.trackUrl || "").trim() === String(track?.url || "").trim();
+}
+
+function isRunningStationDefaultForCurrentTask(station = getCurrentRunningStation()) {
+  const preference = getRunningDefaultPreferenceForCurrentTask();
+  if (!preference || preference.mode !== "station") {
+    return false;
+  }
+  return String(preference.stationName || "").trim() === String(station?.name || "").trim();
 }
 
 function renderRunningMusicPlayer() {
   const station = getCurrentRunningStation();
   const track = getCurrentRunningTrack() || station?.tracks?.[0] || null;
+  const stationIsDefault = isRunningStationDefaultForCurrentTask(station);
 
   if (runningPlayerStation) {
     runningPlayerStation.textContent = String(station?.name || "Estação");
@@ -1776,15 +1813,15 @@ function renderRunningMusicPlayer() {
 
   const trackIsFavorite = Boolean(track && isRunningTrackFavorite(track));
   const trackIsDefault = Boolean(track && isRunningTrackDefaultForCurrentTask(track));
+  const hasAnyDefault = trackIsDefault || stationIsDefault;
 
-  runningPlayerShuffle?.classList.toggle("active", Boolean(state.runningPlayer.shuffleEnabled));
   runningPlayerRepeat?.classList.toggle("active", Boolean(state.runningPlayer.repeatEnabled));
   runningPlayerFavorite?.classList.toggle("active", trackIsFavorite);
   runningPlayerFavorite?.classList.toggle("is-favorite", trackIsFavorite);
-  runningPlayerDefault?.classList.toggle("active", trackIsDefault);
-  runningPlayerDefault?.classList.toggle("is-default", trackIsDefault);
+  runningPlayerDefault?.classList.toggle("active", hasAnyDefault);
+  runningPlayerDefault?.classList.toggle("is-default", hasAnyDefault);
   runningPlayerFavorite?.classList.toggle("is-disabled", !track?.url);
-  runningPlayerDefault?.classList.toggle("is-disabled", !track?.url || !String(state.runningPlayer.currentTaskTitle || "").trim());
+  runningPlayerDefault?.classList.toggle("is-disabled", !station?.name || !String(state.runningPlayer.currentTaskTitle || "").trim());
 
   if (runningMusicListStation) {
     runningMusicListStation.textContent = String(station?.name || "Estação");
@@ -1886,10 +1923,9 @@ function renderRunningMusicList() {
   const station = getCurrentRunningStation();
   const track = getCurrentRunningTrack();
   const tracks = getRunningDisplayedTracks(station);
-  const currentTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
-  const defaultTrackUrl = currentTaskTitle
-    ? String(state.runningPlayer.defaultTrackByTaskTitle.get(currentTaskTitle) || "").trim()
-    : "";
+  const preference = getRunningDefaultPreferenceForCurrentTask();
+  const defaultTrackUrl = preference?.mode === "track" ? String(preference.trackUrl || "").trim() : "";
+  const defaultStationName = preference?.mode === "station" ? String(preference.stationName || "").trim() : "";
 
   if (!tracks.length) {
     runningMusicListItems.innerHTML = '<div class="empty-state">Nenhuma música disponível nesta estação.</div>';
@@ -1899,7 +1935,10 @@ function renderRunningMusicList() {
   runningMusicListItems.innerHTML = tracks.map((item) => {
     const isCurrent = Boolean(track && String(track.url || "").trim() === String(item.url || "").trim());
     const isFavorite = isRunningTrackFavorite(item);
-    const isDefault = Boolean(defaultTrackUrl && String(item.url || "").trim() === defaultTrackUrl);
+    const isDefault = Boolean(
+      (defaultTrackUrl && String(item.url || "").trim() === defaultTrackUrl)
+      || (defaultStationName && String(station?.name || "").trim() === defaultStationName)
+    );
     return `
       <button class="running-music-track-row${isCurrent ? " is-current" : ""}${isFavorite ? " is-favorite" : ""}${isDefault ? " is-default" : ""}" type="button" data-track-url="${escapeHtml(String(item.url || ""))}" data-track-name="${escapeHtml(String(item.name || ""))}" data-track-station="${escapeHtml(String(station?.name || ""))}">
         <span class="running-music-track-waveform" aria-hidden="true">
@@ -1994,12 +2033,12 @@ async function toggleRunningTrackFavorite() {
   }
 }
 
-async function setRunningTrackAsDefault() {
+function openRunningMusicDefaultModal() {
   const track = getCurrentRunningTrack();
   const station = getCurrentRunningStation();
   const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
 
-  if (!track?.url || !station) {
+  if (!station?.name) {
     return;
   }
 
@@ -2008,26 +2047,61 @@ async function setRunningTrackAsDefault() {
     return;
   }
 
+  if (runningMusicDefaultStationName) {
+    runningMusicDefaultStationName.textContent = String(station.name || "Estação");
+  }
+  if (runningMusicDefaultTrackName) {
+    runningMusicDefaultTrackName.textContent = String(track?.name || "Música atual");
+  }
+  if (runningMusicDefaultStationHint) {
+    runningMusicDefaultStationHint.innerHTML = `estação padrão para<br>${escapeHtml(taskTitle)}`;
+  }
+  if (runningMusicDefaultTrackHint) {
+    runningMusicDefaultTrackHint.innerHTML = `música padrão para<br>${escapeHtml(taskTitle)}`;
+  }
+
+  openModal("runningMusicDefaultModal");
+}
+
+async function saveRunningTaskDefault(mode = "track") {
+  const track = getCurrentRunningTrack();
+  const station = getCurrentRunningStation();
+  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+
+  if (!station?.name) {
+    return;
+  }
+
+  if (!taskTitle) {
+    showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
+    return;
+  }
+
+  const safeMode = mode === "station" ? "station" : "track";
+  if (safeMode === "track" && !track?.url) {
+    showFloatingNotice("Escolha uma música válida.");
+    return;
+  }
+
   try {
     const payload = await apiRequest("/api/200/music/default", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        mode: safeMode,
         taskTitle,
         stationName: station.name,
-        trackName: track.name,
-        trackUrl: track.url
+        trackName: safeMode === "track" ? track?.name : "",
+        trackUrl: safeMode === "track" ? track?.url : ""
       })
     });
 
-    state.runningPlayer.defaultTrackByTaskTitle = new Map(
-      Array.isArray(payload?.preferences?.defaults)
-        ? payload.preferences.defaults.map((item) => [String(item?.taskTitle || "").trim(), String(item?.trackUrl || "").trim()]).filter(([title, url]) => title && url)
-        : Object.entries(payload?.preferences?.defaultTrackByTaskTitle || {}).map(([title, url]) => [String(title || "").trim(), String(url || "").trim()]).filter(([title, url]) => title && url)
-    );
+    state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
+    applyRunningTaskDefaultSelection();
     renderRunningMusicPlayer();
     renderRunningMusicList();
-    showFloatingNotice("Música definida como padrão.");
+    closeModal("runningMusicDefaultModal");
+    showFloatingNotice(safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão.");
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
   }
@@ -6368,19 +6442,11 @@ runningTaskGiveUpButton?.addEventListener("click", () => {
 });
 
 runningTaskListButton?.addEventListener("click", () => {
-  openRunningMusicListModal();
+  closeRunningTaskModalWithFade();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
-runningPlayerTitleButton?.addEventListener("click", openRunningMusicListModal);
+runningPlayerList?.addEventListener("click", openRunningMusicListModal);
 runningMusicListBack?.addEventListener("click", closeRunningMusicListModal);
-runningPlayerShuffle?.addEventListener("click", () => {
-  state.runningPlayer.shuffleEnabled = !state.runningPlayer.shuffleEnabled;
-  const currentTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
-  syncRunningMusicOrder({ preserveTrackUrl: currentTrackUrl });
-  renderRunningMusicPlayer();
-  renderRunningMusicList();
-  void primeRunningTrackBuffer();
-});
 runningPlayerRepeat?.addEventListener("click", () => {
   state.runningPlayer.repeatEnabled = !state.runningPlayer.repeatEnabled;
   ensureRunningAudioLoopState();
@@ -6391,7 +6457,13 @@ runningPlayerFavorite?.addEventListener("click", () => {
   void toggleRunningTrackFavorite();
 });
 runningPlayerDefault?.addEventListener("click", () => {
-  void setRunningTrackAsDefault();
+  openRunningMusicDefaultModal();
+});
+runningMusicDefaultStationButton?.addEventListener("click", () => {
+  void saveRunningTaskDefault("station");
+});
+runningMusicDefaultTrackButton?.addEventListener("click", () => {
+  void saveRunningTaskDefault("track");
 });
 runningConfirmPrimaryButton?.addEventListener("click", () => {
   const action = state.runningConfirm.action;

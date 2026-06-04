@@ -81,6 +81,10 @@ function normalizeAction(row) {
     title: row.title,
     assignee: normalizeAssignee(row.assignee),
     categoryId: normalizeCategoryId(row.category_id),
+    musicDefaultMode: String(row.music_default_mode || "").trim() === "station" ? "station" : "track",
+    musicStationName: String(row.music_station_name || "").trim(),
+    musicTrackName: String(row.music_track_name || "").trim(),
+    musicTrackUrl: String(row.music_track_url || "").trim(),
     startAt: startAtIso,
     endAt: toIso(row.end_at),
     repeatGroupId: row.repeat_group_id || null,
@@ -122,6 +126,7 @@ export async function ensureActionsSchema() {
       id uuid primary key default gen_random_uuid(),
       user_id uuid not null references users(id) on delete cascade,
       title text not null,
+      music_default_mode text not null default 'track',
       music_station_name text,
       music_track_name text,
       music_track_url text,
@@ -133,6 +138,7 @@ export async function ensureActionsSchema() {
       created_at timestamptz not null default now()
     );
   `);
+  await query("alter table actions add column if not exists music_default_mode text not null default 'track';");
   await query(`alter table actions add column if not exists assignee text not null default '${DEFAULT_ASSIGNEE}';`);
   await query("alter table actions add column if not exists category_id text not null default '';");
 
@@ -237,6 +243,10 @@ async function getUserActionById(userId, actionId) {
         a.id,
         a.user_id,
         a.title,
+        a.music_default_mode,
+        a.music_station_name,
+        a.music_track_name,
+        a.music_track_url,
         a.assignee,
         a.category_id,
         a.start_at,
@@ -279,6 +289,10 @@ export async function listUserActions(userId, { from, to }) {
         a.id,
         a.user_id,
         a.title,
+        a.music_default_mode,
+        a.music_station_name,
+        a.music_track_name,
+        a.music_track_url,
         a.assignee,
         a.category_id,
         a.start_at,
@@ -394,24 +408,26 @@ export async function setActionMusicDefaultByTitle(userId, title, payload = {}) 
   await ensureActionsSchema();
 
   const safeTitle = String(title || "").trim();
+  const defaultMode = String(payload?.mode || "").trim().toLowerCase() === "station" ? "station" : "track";
   const stationName = String(payload?.stationName || "").trim() || null;
   const trackName = String(payload?.trackName || "").trim() || null;
   const trackUrl = String(payload?.trackUrl || "").trim() || null;
 
-  if (!safeTitle || !trackUrl) {
+  if (!safeTitle || !stationName || (defaultMode === "track" && !trackUrl)) {
     return 0;
   }
 
   const result = await query(
     `
       update actions
-         set music_station_name = $3,
-             music_track_name = $4,
-             music_track_url = $5
+         set music_default_mode = $3,
+             music_station_name = $4,
+             music_track_name = $5,
+             music_track_url = $6
        where user_id = $1
          and title = $2
     `,
-    [userId, safeTitle, stationName, trackName, trackUrl]
+    [userId, safeTitle, defaultMode, stationName, trackName, trackUrl]
   );
 
   return Number(result.rowCount || 0);

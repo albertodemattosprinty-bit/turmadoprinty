@@ -4982,11 +4982,13 @@ const server = http.createServer(async (request, response) => {
       const result = await setProject200MusicTaskDefault({
         userId: user.id,
         taskTitle: body.taskTitle,
+        mode: body.mode,
         stationName: body.stationName,
         trackName: body.trackName,
         trackUrl: body.trackUrl
       });
       await setActionMusicDefaultByTitle(user.id, body.taskTitle, {
+        mode: body.mode,
         stationName: body.stationName,
         trackName: body.trackName,
         trackUrl: body.trackUrl
