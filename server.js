@@ -2150,13 +2150,14 @@ async function handleMiniLessonPlanGenerate(request, response) {
       age,
       durationText,
       extraInstructions: [
-        "Crie uma resposta unica e consolidada, nao dividida por blocos.",
-        "Interprete todos os blocos da aula na ordem recebida e transforme isso em um texto corrido e bem amarrado.",
-        "O resultado deve ter cerca de 4000 caracteres, com minimo de 3200 e maximo de 4500, em portugues do Brasil.",
-        "Inclua contexto da aula, dicas praticas para o professor, orientacoes de condução, transicoes naturais entre os blocos e uma visao geral da aula.",
-        "Nao repita o nome de cada bloco como se fossem seções separadas.",
-        "Se precisar usar subtitulos, use no maximo 2 ou 3 títulos curtos dentro do texto, mas prefira um texto corrido.",
-        "Responda em JSON puro com as chaves mainTitle e content."
+        "Crie uma resposta unica e consolidada, mas organizada em partes coerentes com os blocos escolhidos.",
+        "Interprete todos os blocos da aula na ordem recebida e transforme isso em uma narrativa fluida com introducao geral, transicoes naturais e aplicacao pratica.",
+        "O resultado deve ter cerca de 4000 caracteres no total, com minimo de 3200 e maximo de 4500, em portugues do Brasil.",
+        "A resposta deve ter uma introducao curta que conecte todos os blocos e depois uma lista de partes, uma para cada bloco recebido.",
+        "Cada parte deve ter titulo curto, o tempo do bloco, e um texto que continua a mesma linha pedagogica da aula sem parecer uma resposta solta.",
+        "Não trate os blocos como cards independentes; faça o texto soar como uma aula unica, mesmo quando estiver dividido visualmente por partes.",
+        "Responda em JSON puro com as chaves mainTitle, intro e parts.",
+        "Cada item de parts deve ser um objeto com title, minutes e content."
       ].join(" ")
     });
     const completion = await createChatCompletion(apiKey, {
@@ -2188,14 +2189,23 @@ async function handleMiniLessonPlanGenerate(request, response) {
     }
 
     const mainTitle = String(parsed?.mainTitle || `Plano de Aula: ${themePrompt}`).trim();
-    const content = String(parsed?.content || "").trim() ||
-      `Plano de Aula: ${themePrompt}\n\nOs blocos programados foram: ${stageNames.join(", ")}.`;
+    const intro = String(parsed?.intro || "").trim();
+    const parts = Array.isArray(parsed?.parts) ? parsed.parts : [];
+    const normalizedParts = stageNames.map((name, index) => {
+      const source = parts[index] || {};
+      return {
+        title: String(source?.title || name).trim() || name,
+        minutes: Number(source?.minutes || blocks[index]?.minutes || 0) || Number(blocks[index]?.minutes || 0) || 0,
+        content: String(source?.content || "").trim() || `Conteudo para ${name}.`
+      };
+    });
 
     sendJson(response, 200, {
       ok: true,
       model,
       mainTitle,
-      content
+      intro,
+      parts: normalizedParts
     });
   } catch (error) {
     sendJson(response, 500, {
