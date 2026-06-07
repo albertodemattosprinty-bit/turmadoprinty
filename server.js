@@ -2124,6 +2124,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
   const model = normalizeMiniInstantModel(body?.instantModel || body?.model) || OPENAI_INSTANT_MODEL || "gpt-4.1-mini";
   const themePrompt = theme || "aula infantil cristã";
   const authUser = await getOptionalAuthUser(request);
+  const sharedContext = await getContextPrompt();
 
   try {
     const stageNames = blocks.map((b) => b.name);
@@ -2141,6 +2142,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
 
     const system = buildMiniSystemPrompt({
       modeKey: "project",
+      sharedContext,
       plannerContext: MINI_MINISTRY_CONTEXT,
       chatMemory,
       theme: themePrompt,
@@ -2211,10 +2213,12 @@ async function buildMiniChatCompletionPrompt({ user, chat, modeKey, message, ext
   const chatMemory = recentMessages
     .map((item) => `${item.role === "assistant" ? "IA" : "Usuario"}: ${String(item.content || "").slice(0, 240)}`)
     .join(" | ");
+  const sharedContext = await getContextPrompt();
 
   return buildMiniSystemPrompt({
     modeKey,
     chatMemory,
+    sharedContext,
     plannerContext: MINI_MINISTRY_CONTEXT,
     responseStyle: "",
     callName: "",

@@ -24,6 +24,7 @@ export function buildMiniSystemPrompt({
   ministryDream = "",
   responseStyle = "",
   chatMemory = "",
+  sharedContext = "",
   plannerContext = "",
   age = null,
   bibleText = "",
@@ -71,6 +72,10 @@ export function buildMiniSystemPrompt({
 
   if (chatMemory) {
     parts.push(`Memoria recente da conversa do MINI: ${chatMemory}.`);
+  }
+
+  if (sharedContext) {
+    parts.push(`Contexto compartilhado da Turma do Printy: ${sharedContext}.`);
   }
 
   if (plannerContext) {
