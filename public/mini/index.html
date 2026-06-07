@@ -22,8 +22,73 @@
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
-    body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", sans-serif; color: var(--text); background: #fff; }
-    .app { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 18px 16px 26px; }
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 18% 18%, rgba(112, 177, 255, .42) 0, rgba(112, 177, 255, .16) 18%, rgba(112, 177, 255, 0) 42%),
+        radial-gradient(circle at 84% 20%, rgba(255, 228, 145, .42) 0, rgba(255, 228, 145, .18) 18%, rgba(255, 228, 145, 0) 40%),
+        radial-gradient(circle at 50% 82%, rgba(255, 172, 222, .34) 0, rgba(255, 172, 222, .14) 20%, rgba(255, 172, 222, 0) 44%),
+        linear-gradient(180deg, #f8fbff 0%, #fffdf8 55%, #fff5fb 100%);
+      background-size: 140% 140%, 140% 140%, 140% 140%, 100% 100%;
+      background-position: 0% 0%, 100% 0%, 50% 100%, 0 0;
+      overflow: hidden;
+      position: relative;
+      isolation: isolate;
+    }
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: -18vmax;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: 50%;
+      filter: blur(32px) saturate(130%);
+      opacity: .75;
+      transform: translate3d(0, 0, 0);
+      will-change: transform, opacity, background-position;
+    }
+    body::before {
+      background:
+        radial-gradient(circle at 30% 30%, rgba(91, 167, 255, .38) 0, rgba(91, 167, 255, .16) 18%, rgba(91, 167, 255, 0) 54%),
+        radial-gradient(circle at 72% 26%, rgba(255, 225, 145, .35) 0, rgba(255, 225, 145, .14) 16%, rgba(255, 225, 145, 0) 52%),
+        radial-gradient(circle at 50% 72%, rgba(255, 166, 221, .30) 0, rgba(255, 166, 221, .12) 18%, rgba(255, 166, 221, 0) 55%);
+      animation: miniBgDrift 26s ease-in-out infinite alternate;
+    }
+    body::after {
+      inset: -10vmax;
+      opacity: .42;
+      background:
+        linear-gradient(120deg, rgba(255, 255, 255, .32) 0%, rgba(255, 255, 255, 0) 34%, rgba(255, 255, 255, .22) 58%, rgba(255, 255, 255, 0) 82%),
+        linear-gradient(300deg, rgba(144, 196, 255, .18) 0%, rgba(255, 236, 171, .13) 46%, rgba(255, 198, 231, .16) 100%);
+      mix-blend-mode: soft-light;
+      animation: miniBgShine 18s ease-in-out infinite alternate;
+    }
+    @keyframes miniBgDrift {
+      0% {
+        transform: translate3d(-2%, -1%, 0) scale(1);
+      }
+      50% {
+        transform: translate3d(2%, 1.5%, 0) scale(1.06);
+      }
+      100% {
+        transform: translate3d(-1.5%, 2%, 0) scale(1.02);
+      }
+    }
+    @keyframes miniBgShine {
+      0% {
+        transform: translate3d(-1%, 0, 0) rotate(-4deg) scale(1);
+      }
+      50% {
+        transform: translate3d(1.5%, -1%, 0) rotate(2deg) scale(1.04);
+      }
+      100% {
+        transform: translate3d(-0.5%, 1.5%, 0) rotate(-1deg) scale(1.02);
+      }
+    }
+    .app { position: relative; z-index: 1; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 18px 16px 26px; }
     .mini-logo { width: min(88vw, 460px); max-height: 35vh; object-fit: contain; }
     .actions-5 { width: min(88vw, 460px); display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
     .icon-chip { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 6px; color: #30333c; font-size: 12px; }
@@ -82,65 +147,256 @@
     .step-actions button { flex: 1; border: 0; border-radius: 14px; height: 50px; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
     .btn-cancel { background: #ff7360; } .btn-apply { background: #26b35e; }
 
-    .ai-modal { background: linear-gradient(160deg, #6f39e5, #9a57f6 55%, #5f2ccd); color: #fff; padding: 18px 14px 12px; display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 10px; }
-    .ai-modal h1 { margin: 0; font-size: 26px; line-height: 1.1; }
-    .ai-modal .hint { font-size: 13px; opacity: .95; }
-    .ai-input { width: 100%; border: 0; border-radius: 14px; padding: 14px; font-size: 15px; min-height: 76px; resize: none; color: #2d1f55; }
-    .examples { font-size: 13px; min-height: 20px; opacity: .94; }
-    .ai-output { background: rgba(255,255,255,.14); border-radius: 16px; padding: 12px; overflow-y: auto; }
-    .ai-block { border-radius: 12px; padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,.12); }
+    .ai-modal {
+      background: linear-gradient(160deg, #6438df 0%, #8b57f2 48%, #244fc4 100%);
+      color: #fff;
+      padding: 18px 14px 12px;
+      display: grid;
+      grid-template-rows: auto auto auto auto 1fr auto;
+      gap: 10px;
+      overflow: hidden;
+    }
+    .ai-modal h1 {
+      margin: 0;
+      font-family: "Open Sans", sans-serif;
+      font-size: 30px;
+      line-height: 1.04;
+      font-weight: 800;
+      text-align: center;
+      color: #fff;
+      text-shadow: 0 10px 28px rgba(0, 0, 0, .14);
+    }
+    .ai-modal .hint {
+      font-size: 13px;
+      opacity: .94;
+      text-align: center;
+      max-width: 44ch;
+      margin: 0 auto;
+    }
+    .ai-stage-shell {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      min-height: 0;
+    }
+    .ai-stage {
+      display: grid;
+      gap: 12px;
+      align-content: center;
+      min-height: 0;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 24px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 44px rgba(18, 11, 72, .16);
+    }
+    .ai-stage[hidden] { display: none !important; }
+    .ai-stage-title {
+      font-family: "Open Sans", sans-serif;
+      font-size: 20px;
+      line-height: 1.12;
+      font-weight: 800;
+      text-align: center;
+      color: rgba(255,255,255,.96);
+    }
+    .ai-stage-subtitle {
+      font-family: "Open Sans", sans-serif;
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: center;
+      opacity: .5;
+      margin-top: -4px;
+    }
+    .ai-field-label {
+      margin: 0;
+      font-family: "Open Sans", sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      text-align: center;
+      color: rgba(255,255,255,.5);
+      line-height: 1.2;
+    }
+    .ai-age-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding-top: 4px;
+    }
+    .ai-age-display {
+      min-width: 112px;
+      text-align: center;
+      font-family: "Open Sans", sans-serif;
+      font-size: 74px;
+      line-height: .95;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.03em;
+    }
+    .ai-age-arrow {
+      border: 0;
+      width: 58px;
+      height: 58px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.16);
+      color: #fff;
+      font-size: 34px;
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(0, 0, 0, .12);
+    }
+    .ai-theme-box {
+      display: grid;
+      gap: 12px;
+    }
+    .ai-theme-box textarea {
+      width: 100%;
+      border: 0;
+      border-radius: 18px;
+      padding: 16px;
+      font-family: "Open Sans", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #2d1f55;
+      min-height: 112px;
+      resize: none;
+      background: rgba(255,255,255,.96);
+      outline: none;
+      box-shadow: 0 18px 36px rgba(10, 10, 24, .16);
+    }
+    .ai-theme-box textarea::placeholder {
+      color: rgba(45, 31, 85, .55);
+    }
+    .ai-examples {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+    .examples {
+      font-family: "Open Sans", sans-serif;
+      font-size: 13px;
+      min-height: 20px;
+      opacity: .76;
+      text-align: center;
+    }
+    .ai-progress-stage {
+      display: grid;
+      gap: 14px;
+      align-items: center;
+      justify-items: center;
+      padding: 8px 4px 4px;
+      text-align: center;
+    }
+    .ai-spinner {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      border: 7px solid rgba(255,255,255,.18);
+      border-top-color: rgba(255,255,255,.95);
+      border-right-color: rgba(255,255,255,.65);
+      animation: aiSpin 1.05s linear infinite;
+      box-shadow: 0 12px 30px rgba(0,0,0,.16);
+    }
+    .ai-progress-title {
+      font-family: "Open Sans", sans-serif;
+      font-size: 20px;
+      line-height: 1.15;
+      font-weight: 800;
+      color: #fff;
+    }
+    .ai-progress-label {
+      font-family: "Open Sans", sans-serif;
+      font-size: 13px;
+      opacity: .8;
+      min-height: 18px;
+    }
+    .ai-progress-bar {
+      width: min(100%, 420px);
+      height: 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+    .ai-progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #fff4a8 0%, #ffd6a6 34%, #ffb8d8 68%, #a8d7ff 100%);
+      transition: width .28s ease;
+    }
+    .ai-progress-percent {
+      font-family: "Open Sans", sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+    .ai-progress-stages {
+      display: grid;
+      gap: 8px;
+      width: min(100%, 460px);
+      margin-top: 2px;
+    }
+    .ai-progress-stage-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      font-family: "Open Sans", sans-serif;
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.1);
+      color: rgba(255,255,255,.86);
+    }
+    .ai-progress-stage-item.active {
+      background: rgba(255,255,255,.2);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(0,0,0,.12);
+    }
+    .ai-result {
+      background: rgba(255,255,255,.14);
+      border-radius: 18px;
+      padding: 12px;
+      overflow-y: auto;
+      max-height: min(38vh, 360px);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+    .ai-result[hidden] { display: none !important; }
     .ai-single {
       background: linear-gradient(155deg, #2a77ff, #1e47b8);
       color: #fff;
       border-radius: 14px;
       padding: 14px;
     }
-    .ai-single h1 { margin: 0 0 8px; font-size: 24px; }
-    .ai-single h2 { margin: 12px 0 6px; font-size: 17px; }
-    .ai-single p { margin: 0; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
-    .ai-head {
-      display: grid;
-      grid-template-columns: 30px 1fr;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-    .inline-age {
+    .ai-single h1 { margin: 0 0 10px; font-size: 24px; }
+    .ai-single p { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+    .ai-actions {
       display: flex;
-      align-items: center;
       gap: 8px;
-      background: rgba(255,255,255,.18);
-      border-radius: 12px;
-      padding: 8px 10px;
+      align-items: center;
     }
-    .inline-age b {
-      font-size: 26px;
-      min-width: 28px;
-      text-align: center;
-    }
-    .age-arrow {
+    .ai-actions button {
+      flex: 1;
       border: 0;
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      background: rgba(255,255,255,.24);
+      border-radius: 14px;
+      height: 48px;
       color: #fff;
-      font-size: 22px;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
       cursor: pointer;
     }
-    .ai-icon-sm {
-      width: 28px;
-      height: 28px;
-      border-radius: 8px;
-      object-fit: cover;
-      border: 1px solid rgba(255,255,255,.3);
-      background: rgba(255,255,255,.2);
+    .ai-secondary { background: rgba(255,255,255,.20); }
+    .ai-primary { background: #3ad878; }
+    .ai-secondary:disabled,
+    .ai-primary:disabled {
+      opacity: .55;
+      cursor: default;
     }
-    .ai-block h3 { margin: 0 0 4px; font-size: 17px; }
-    .ai-block p { margin: 0; font-size: 13px; line-height: 1.4; }
-    .ai-actions { display: flex; gap: 8px; }
-    .ai-actions button { flex: 1; border: 0; border-radius: 12px; height: 46px; color: #fff; font-weight: 700; cursor: pointer; }
-    .ai-secondary { background: rgba(255,255,255,.24); } .ai-primary { background: #3ad878; }
+    @keyframes aiSpin {
+      to { transform: rotate(360deg); }
+    }
 
     .create-modal {
       background: linear-gradient(160deg, #1d5ce6 0%, #2b73ff 34%, #4a86ff 58%, #1e57be 100%);
@@ -316,20 +572,57 @@
     <div class="step-actions"><button id="cancelMinute" class="btn-cancel" type="button">Cancelar</button><button id="applyMinute" class="btn-apply" type="button">Adicionar</button></div>
   </section>
 
-  <section id="aiModal" class="ai-modal">
-    <h1>O que vamos ensinar<br>nessa aula?</h1>
-    <div class="hint">Plano amigavel cristao com blocos prontos (modelo 4.1 instant).</div>
-    <div class="inline-age">
-      <span>Idade</span>
-      <button id="ageDown" class="age-arrow" type="button">&#8249;</button>
-      <b id="ageValue">6</b>
-      <button id="ageUp" class="age-arrow" type="button">&#8250;</button>
-      <span>anos</span>
+  <section id="aiModal" class="ai-modal" data-step="1">
+    <h1>Planejar Aula</h1>
+    <div class="hint">Vamos montar sua aula em etapas, com um fluxo suave e guiado.</div>
+
+    <div class="ai-stage-shell">
+      <div id="aiStage1" class="ai-stage">
+        <div class="ai-stage-title">Etapa 1</div>
+        <div class="ai-field-label">Qual a idade da sua turma?</div>
+        <div class="ai-age-row">
+          <button id="ageDown" class="ai-age-arrow" type="button" aria-label="Diminuir idade">&#8249;</button>
+          <div id="ageValue" class="ai-age-display">6</div>
+          <button id="ageUp" class="ai-age-arrow" type="button" aria-label="Aumentar idade">&#8250;</button>
+        </div>
+        <div class="ai-stage-subtitle">Use as setas para ajustar a faixa etária com precisão.</div>
+      </div>
+
+      <div id="aiStage2" class="ai-stage" hidden>
+        <div class="ai-stage-title">Etapa 2</div>
+        <div class="ai-field-label">Qual o tema de hoje?</div>
+        <div class="ai-theme-box">
+          <textarea id="aiPrompt" class="ai-input" placeholder="Ex.: Quero ensinar perdão com a história de José"></textarea>
+          <div id="aiExamples" class="examples"></div>
+        </div>
+        <div class="ai-stage-subtitle">Escreva o tema principal e o contexto que você quer ensinar.</div>
+      </div>
+
+      <div id="aiStage3" class="ai-stage ai-progress-stage" hidden>
+        <div class="ai-spinner" aria-hidden="true"></div>
+        <div class="ai-progress-title">Montando seu planejamento</div>
+        <div id="aiProgressLabel" class="ai-progress-label">Entendendo ideias</div>
+        <div class="ai-progress-bar" aria-label="Progresso da criação">
+          <div id="aiProgressFill" class="ai-progress-fill"></div>
+        </div>
+        <div id="aiProgressPercent" class="ai-progress-percent">0%</div>
+        <div class="ai-progress-stages" aria-hidden="true">
+          <div id="aiStageItem0" class="ai-progress-stage-item active"><span>Entendendo ideias</span><span>20%</span></div>
+          <div id="aiStageItem1" class="ai-progress-stage-item"><span>Consultando a bíblia</span><span>40%</span></div>
+          <div id="aiStageItem2" class="ai-progress-stage-item"><span>Criando esboço</span><span>60%</span></div>
+          <div id="aiStageItem3" class="ai-progress-stage-item"><span>Afinando os detalhes</span><span>80%</span></div>
+          <div id="aiStageItem4" class="ai-progress-stage-item"><span>Finalizando</span><span>100%</span></div>
+        </div>
+      </div>
     </div>
-    <textarea id="aiPrompt" class="ai-input" placeholder="Quero ensinar perdão com a história de José"></textarea>
-    <div id="aiExamples" class="examples"></div>
-    <div id="aiOutput" class="ai-output"></div>
-    <div class="ai-actions"><button id="closeAi" class="ai-secondary" type="button">Fechar</button><button id="generateAi" class="ai-primary" type="button">Gerar Plano</button></div>
+
+    <div id="aiOutput" class="ai-result" hidden></div>
+
+    <div class="ai-actions">
+      <button id="closeAi" class="ai-secondary" type="button">Fechar</button>
+      <button id="aiBack" class="ai-secondary" type="button">Voltar</button>
+      <button id="generateAi" class="ai-primary" type="button">Continuar</button>
+    </div>
   </section>
 
   <section id="createModal" class="create-modal">
@@ -354,11 +647,23 @@
     const names = ["Check-in","Entrega de cracha","Boas-vindas","Chamada","Quebra-gelo","Abertura","Hino oficial","Oracao inicial","Louvor","Louvor com gestos","Versiculo do dia","Memorizacao biblica","Introducao do tema","Historia com tema","Historia biblica","Mensagem","Aplicacao pratica","Oracao apos mensagem","Pedidos de oracao","Teatro","Fantoches","Encenacao rapida","Ilustracao visual","Video curto","Desenho ou filme","Explicar dinamica","Dinamica","Explicar jogo","Jogo","Desafio","Atividade impressa","Atividade manual","Atividade em grupo","Perguntas e respostas","Quiz biblico","Revisao da aula","Fazer em casa","Explicar projeto","Projeto em andamento","Ensaio","Apresentacao","Aniversarios","Momento oferta","Oracao da oferta","Lanche","Hora da foto","Oracao final","Check-out"];
     const baseBlocks = names.map((n, i) => ({ id: i + 1, name: n, gradient: gradients[i % gradients.length] }));
     const state = { selected: [], poolPage: 0, selectedPage: 0, currentPick: null, currentMinutes: 5, age: 6 };
+    const aiWizardStages = [
+      { label: "Entendendo ideias", percent: 20 },
+      { label: "Consultando a bíblia", percent: 40 },
+      { label: "Criando esboço", percent: 60 },
+      { label: "Afinando os detalhes", percent: 80 },
+      { label: "Finalizando", percent: 100 }
+    ];
     const examples = ["Quero ensinar perdão com a história de José","Quero ensinar como obedecer com a história de Jonas","Quero ensinar a ouvir a voz de Deus com Samuel"];
     let exIndex = 0;
     let activeMiniChatId = "";
     let miniChats = [];
     let typingTimer = null;
+    let aiWizardStep = 1;
+    let aiProgressTimer = null;
+    let aiProgressValue = 0;
+    let aiIsGenerating = false;
+    let aiHasResult = false;
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
@@ -380,6 +685,87 @@
     function getMiniToken(){ return window.localStorage.getItem(miniSessionKey) || ""; }
     function setMiniStatus(text){ $("miniChatStatus").textContent = text || ""; }
     function scrollMiniChatToBottom(){ const thread = $("miniChatThread"); if (thread) thread.scrollTop = thread.scrollHeight; }
+    function getAiStageIndexForProgress(progress) {
+      if (progress >= 100) return 4;
+      if (progress >= 80) return 3;
+      if (progress >= 60) return 2;
+      if (progress >= 40) return 1;
+      return 0;
+    }
+    function updateAiStageIndicators(progress) {
+      aiWizardStages.forEach((stage, index) => {
+        const el = $(`aiStageItem${index}`);
+        if (!el) return;
+        el.classList.toggle("active", index === getAiStageIndexForProgress(progress));
+      });
+    }
+    function updateAiProgress(progress) {
+      aiProgressValue = Math.max(0, Math.min(100, Math.round(progress)));
+      const fill = $("aiProgressFill");
+      const percent = $("aiProgressPercent");
+      const label = $("aiProgressLabel");
+      if (fill) fill.style.width = `${aiProgressValue}%`;
+      if (percent) percent.textContent = `${aiProgressValue}%`;
+      const stageIndex = getAiStageIndexForProgress(aiProgressValue);
+      if (label) label.textContent = aiWizardStages[stageIndex]?.label || aiWizardStages[0].label;
+      updateAiStageIndicators(aiProgressValue);
+    }
+    function clearAiProgressTimer() {
+      if (aiProgressTimer) {
+        clearInterval(aiProgressTimer);
+        aiProgressTimer = null;
+      }
+    }
+    function startAiProgressLoop() {
+      clearAiProgressTimer();
+      updateAiProgress(0);
+      const checkpoints = [8, 18, 31, 44, 58, 72, 84, 92];
+      let index = 0;
+      aiProgressTimer = setInterval(() => {
+        if (index >= checkpoints.length) {
+          clearAiProgressTimer();
+          return;
+        }
+        updateAiProgress(checkpoints[index]);
+        index += 1;
+      }, 420);
+    }
+    function setAiWizardStep(step, keepResultVisible = false) {
+      aiWizardStep = Math.max(1, Math.min(3, Number(step) || 1));
+      const stage1 = $("aiStage1");
+      const stage2 = $("aiStage2");
+      const stage3 = $("aiStage3");
+      const result = $("aiOutput");
+      const back = $("aiBack");
+      const next = $("generateAi");
+      if (stage1) stage1.hidden = aiWizardStep !== 1;
+      if (stage2) stage2.hidden = aiWizardStep !== 2;
+      if (stage3) stage3.hidden = aiWizardStep !== 3;
+      if (result && !keepResultVisible) {
+        result.hidden = true;
+      }
+      if (back) back.hidden = aiWizardStep === 1;
+      if (next) next.textContent = aiWizardStep === 2 ? "Gerar Plano" : "Continuar";
+      if (stage3) {
+        stage3.hidden = aiWizardStep !== 3;
+      }
+    }
+    function resetAiWizard() {
+      clearAiProgressTimer();
+      aiIsGenerating = false;
+      aiHasResult = false;
+      updateAiProgress(0);
+      setAiWizardStep(1);
+      const result = $("aiOutput");
+      if (result) {
+        result.hidden = true;
+        result.innerHTML = "";
+      }
+      const back = $("aiBack");
+      const next = $("generateAi");
+      if (back) back.disabled = false;
+      if (next) next.disabled = false;
+    }
     function escapeText(value){
       return String(value || "")
         .replace(/&/g, "&amp;")
@@ -555,8 +941,18 @@
     }
     $("closeCreate").onclick=()=>$("createModal").classList.remove("show");
 
-    $("openAi").onclick=()=>{ $("aiModal").classList.add("show"); if(!$("aiPrompt").value) $("aiPrompt").value=examples[0]; };
-    $("closeAi").onclick=()=>$("aiModal").classList.remove("show");
+    $("openAi").onclick=()=>{
+      $("aiModal").classList.add("show");
+      if (!$("aiPrompt").value) {
+        $("aiPrompt").value = examples[0];
+      }
+      resetAiWizard();
+    };
+    $("closeAi").onclick=()=>{
+      clearAiProgressTimer();
+      aiIsGenerating = false;
+      $("aiModal").classList.remove("show");
+    };
     $("ageDown").onclick = () => { state.age = Math.max(6, state.age - 1); $("ageValue").textContent = String(state.age); };
     $("ageUp").onclick = () => { state.age = Math.min(14, state.age + 1); $("ageValue").textContent = String(state.age); };
 
@@ -582,25 +978,92 @@
       return response.json();
     }
 
+    $("aiBack").onclick = () => {
+      if (aiIsGenerating) {
+        return;
+      }
+      if (aiHasResult) {
+        aiHasResult = false;
+        const result = $("aiOutput");
+        if (result) {
+          result.hidden = true;
+        }
+      }
+      setAiWizardStep(Math.max(1, aiWizardStep - 1));
+    };
+
     $("generateAi").onclick = async () => {
-      const prompt = $("aiPrompt").value.trim();
-      const out = $("aiOutput");
-      out.innerHTML = "";
-      const loading = document.createElement("article");
-      loading.className = "ai-block";
-      loading.innerHTML = "<h3>Gerando...</h3><p>Montando plano completo.</p>";
-      out.appendChild(loading);
-      try {
-        const payload = await generateMiniPlan(prompt);
-        const card = document.createElement("article");
-        card.className = "ai-single";
-        const safeTitle = payload?.mainTitle || "Plano de Aula";
-        const content = String(payload?.content || "").trim() || "A IA nao retornou um texto consolidado.";
-        card.innerHTML = `<h1>${safeTitle}</h1><p>${escapeText(content)}</p>`;
-        out.innerHTML = "";
-        out.appendChild(card);
-      } catch (error) {
-        loading.innerHTML = `<h3>Falha</h3><p>${error instanceof Error ? error.message : "Erro desconhecido."}</p>`;
+      if (aiIsGenerating) {
+        return;
+      }
+
+      if (aiWizardStep === 1) {
+        if (aiHasResult) {
+          aiHasResult = false;
+          const result = $("aiOutput");
+          if (result) {
+            result.hidden = true;
+          }
+        }
+        setAiWizardStep(2);
+        return;
+      }
+
+      if (aiWizardStep === 2) {
+        const prompt = $("aiPrompt").value.trim();
+        if (!prompt) {
+          $("aiPrompt").focus();
+          return;
+        }
+
+        aiIsGenerating = true;
+        setAiWizardStep(3);
+        const result = $("aiOutput");
+        if (result) {
+          result.hidden = true;
+          result.innerHTML = "";
+        }
+        const back = $("aiBack");
+        const next = $("generateAi");
+        if (back) back.disabled = true;
+        if (next) next.disabled = true;
+
+        startAiProgressLoop();
+        try {
+          const payload = await generateMiniPlan(prompt);
+          updateAiProgress(100);
+          clearAiProgressTimer();
+          const card = document.createElement("article");
+          card.className = "ai-single";
+          const safeTitle = payload?.mainTitle || "Plano de Aula";
+          const content = String(payload?.content || "").trim() || "A IA nao retornou um texto consolidado.";
+          card.innerHTML = `<h1>${escapeText(safeTitle)}</h1><p>${escapeText(content)}</p>`;
+          if (result) {
+            result.innerHTML = "";
+            result.appendChild(card);
+            result.hidden = false;
+          }
+          aiIsGenerating = false;
+          aiHasResult = true;
+          if (back) back.disabled = false;
+          if (next) next.disabled = false;
+          next.textContent = "Gerar Plano";
+          setAiWizardStep(2, true);
+        } catch (error) {
+          clearAiProgressTimer();
+          aiIsGenerating = false;
+          aiHasResult = false;
+          if (back) back.disabled = false;
+          if (next) next.disabled = false;
+          updateAiProgress(0);
+          setAiWizardStep(2);
+          const result = $("aiOutput");
+          if (result) {
+            result.hidden = false;
+            result.innerHTML = `<article class="ai-single"><h1>Falha</h1><p>${escapeText(error instanceof Error ? error.message : "Erro desconhecido.")}</p></article>`;
+          }
+        }
+        return;
       }
     };
 
