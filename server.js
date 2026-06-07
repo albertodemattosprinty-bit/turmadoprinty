@@ -343,6 +343,19 @@ function getFinalModel(body) {
   return requested || OPENAI_MODEL;
 }
 
+function normalizeMiniInstantModel(value) {
+  const requested = String(value || "").trim();
+  if (!requested) {
+    return "";
+  }
+
+  if (requested === "gpt-4.1-instant") {
+    return "gpt-4.1-mini";
+  }
+
+  return requested;
+}
+
 function getPositiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -2108,7 +2121,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
     : blocks.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
   const durationText = durationMinutes > 0 ? `${durationMinutes} minutos` : "a definir";
 
-  const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+  const model = normalizeMiniInstantModel(body?.instantModel || body?.model) || OPENAI_INSTANT_MODEL || "gpt-4.1-mini";
   const themePrompt = theme || "aula infantil cristã";
   const authUser = await getOptionalAuthUser(request);
 
