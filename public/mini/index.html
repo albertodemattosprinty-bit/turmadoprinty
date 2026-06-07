@@ -388,7 +388,8 @@
       grid-template-columns: 34px 1fr;
       gap: 10px;
       align-items: start;
-      padding-top: 4px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,.10);
     }
     .ai-plan-icon {
       width: 30px;
@@ -401,19 +402,28 @@
     }
     .ai-plan-body {
       display: grid;
-      gap: 4px;
+      gap: 6px;
+      min-width: 0;
+    }
+    .ai-plan-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
       min-width: 0;
     }
     .ai-plan-title {
       margin: 0;
       font-family: "Open Sans", sans-serif;
-      font-size: 17px;
+      font-size: 16px;
       line-height: 1.2;
       font-weight: 800;
       color: #fff;
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .ai-plan-text {
-      margin: 0;
+      margin: 0 0 2px;
       font-size: 14px;
       line-height: 1.55;
       opacity: .96;
@@ -427,6 +437,8 @@
       font-size: 12px;
       font-weight: 700;
       opacity: .86;
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
     .ai-plan-time svg {
       width: 14px;
@@ -1101,8 +1113,14 @@
           clearAiProgressTimer();
           const safeTitle = payload?.mainTitle || "Plano de Aula";
           const intro = String(payload?.intro || "").trim();
-          const parts = Array.isArray(payload?.parts) ? payload.parts : [];
           const sourceBlocks = state.selected.length ? state.selected : [];
+          const rawParts = Array.isArray(payload?.parts) ? payload.parts : [];
+          const rawContent = String(payload?.content || "").trim();
+          const parts = rawParts.length ? rawParts : (rawContent ? rawContent.split(/\n{2,}/).map((chunk, index) => ({
+            title: sourceBlocks[index]?.name || `Parte ${index + 1}`,
+            minutes: sourceBlocks[index]?.minutes || 0,
+            content: chunk.trim()
+          })) : []);
           const planHtml = [];
           planHtml.push(`<h1>${escapeText(safeTitle)}</h1>`);
           if (intro) {
@@ -1112,15 +1130,17 @@
             const blockName = sourceBlocks[index]?.name || part?.title || "Bloco";
             const icon = iconUrlByName(blockName);
             const title = String(part?.title || blockName).trim() || blockName;
-            const text = String(part?.content || "").trim();
+            const text = String(part?.content || "").trim() || rawContent || "Conteúdo em processamento.";
             const minutes = Number(part?.minutes || sourceBlocks[index]?.minutes || 0) || 0;
             planHtml.push(`
               <div class="ai-plan-part">
                 <img class="ai-plan-icon" src="${escapeText(icon)}" alt="${escapeText(blockName)}">
                 <div class="ai-plan-body">
-                  <p class="ai-plan-title"><strong>${escapeText(title)}</strong></p>
+                  <div class="ai-plan-line">
+                    <p class="ai-plan-title"><strong>${escapeText(title)}</strong></p>
+                    <div class="ai-plan-time">${getClockSvg()}<span>${minutes} min</span></div>
+                  </div>
                   <p class="ai-plan-text">${escapeText(text)}</p>
-                  <div class="ai-plan-time">${getClockSvg()}<span>${minutes} min</span></div>
                 </div>
               </div>
             `);
