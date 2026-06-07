@@ -592,17 +592,11 @@
       out.appendChild(loading);
       try {
         const payload = await generateMiniPlan(prompt);
-        const sections = Array.isArray(payload?.sections) ? payload.sections : [];
         const card = document.createElement("article");
         card.className = "ai-single";
         const safeTitle = payload?.mainTitle || "Plano de Aula";
-        const html = [`<h1>${safeTitle}</h1>`];
-        sections.forEach((s) => {
-          const sectionTitle = s?.title || "Etapa";
-          const sectionContent = s?.content || "";
-          html.push(`<h2>${sectionTitle}</h2><p>${sectionContent}</p>`);
-        });
-        card.innerHTML = html.join("");
+        const content = String(payload?.content || "").trim() || "A IA nao retornou um texto consolidado.";
+        card.innerHTML = `<h1>${safeTitle}</h1><p>${escapeText(content)}</p>`;
         out.innerHTML = "";
         out.appendChild(card);
       } catch (error) {

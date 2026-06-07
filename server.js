@@ -2121,7 +2121,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
     : blocks.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
   const durationText = durationMinutes > 0 ? `${durationMinutes} minutos` : "a definir";
 
-  const model = normalizeMiniInstantModel(body?.instantModel || body?.model) || OPENAI_INSTANT_MODEL || "gpt-4.1-mini";
+  const model = "gpt-5.1";
   const themePrompt = theme || "aula infantil cristã";
   const authUser = await getOptionalAuthUser(request);
   const sharedContext = await getContextPrompt();
@@ -2149,12 +2149,24 @@ async function handleMiniLessonPlanGenerate(request, response) {
       bibleText,
       age,
       durationText,
-      extraInstructions: "Crie a resposta como um plano completo e acolhedor para professores voluntarios. Não crie novos titulos de etapa; use apenas as etapas recebidas."
+      extraInstructions: [
+        "Crie uma resposta unica e consolidada, nao dividida por blocos.",
+        "Interprete todos os blocos da aula na ordem recebida e transforme isso em um texto corrido e bem amarrado.",
+        "O resultado deve ter cerca de 4000 caracteres, com minimo de 3200 e maximo de 4500, em portugues do Brasil.",
+        "Inclua contexto da aula, dicas praticas para o professor, orientacoes de condução, transicoes naturais entre os blocos e uma visao geral da aula.",
+        "Nao repita o nome de cada bloco como se fossem seções separadas.",
+        "Se precisar usar subtitulos, use no maximo 2 ou 3 títulos curtos dentro do texto, mas prefira um texto corrido.",
+        "Responda em JSON puro com as chaves mainTitle e content."
+      ].join(" ")
     });
     const completion = await createChatCompletion(apiKey, {
       model,
-      temperature: 0.5,
-      max_completion_tokens: 2200,
+      reasoning_effort: "none",
+      temperature: 0.35,
+      max_completion_tokens: 1800,
+      response_format: {
+        type: "json_object"
+      },
       messages: [
         {
           role: "system",
@@ -2162,7 +2174,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
         },
         {
           role: "user",
-          content: `Etapas (ordem obrigatoria): ${stageNames.join(" | ")}\nRetorne cada secao com 350 a 900 caracteres, com objetivo, sugestao pratica, fala pronta do professor, pergunta simples para criancas e transicao suave.`
+          content: `Blocos programados (ordem obrigatoria): ${stageNames.join(" | ")}\nEscreva uma unica reflexao/plano de aula consolidado a partir desses blocos, sem separar por bloco.`
         }
       ]
     });
@@ -2176,17 +2188,14 @@ async function handleMiniLessonPlanGenerate(request, response) {
     }
 
     const mainTitle = String(parsed?.mainTitle || `Plano de Aula: ${themePrompt}`).trim();
-    const sections = Array.isArray(parsed?.sections) ? parsed.sections : [];
-    const normalized = stageNames.map((name, index) => ({
-      title: name,
-      content: String(sections[index]?.content || "").trim() || `Conteudo para ${name}.`
-    }));
+    const content = String(parsed?.content || "").trim() ||
+      `Plano de Aula: ${themePrompt}\n\nOs blocos programados foram: ${stageNames.join(", ")}.`;
 
     sendJson(response, 200, {
       ok: true,
       model,
       mainTitle,
-      sections: normalized
+      content
     });
   } catch (error) {
     sendJson(response, 500, {
