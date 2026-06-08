@@ -599,139 +599,374 @@
     }
 
     .create-modal {
-      background: linear-gradient(160deg, #1d5ce6 0%, #2b73ff 34%, #4a86ff 58%, #1e57be 100%);
-      color: #fff;
+      position: fixed;
+      inset: 0;
+      z-index: 50;
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
-      gap: 10px;
-      padding: 14px;
+      grid-template-columns: 399px 1fr;
+      background: #fff;
+      color: #111;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    .create-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .create-sidebar {
+      position: relative;
+      width: 399px;
+      border-right: 1px solid rgb(199, 199, 199);
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }
-    .create-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .create-head h2 {
-      margin: 0;
-      font-family: "Open Sans", sans-serif;
-      font-size: 24px;
-      font-weight: 800;
-      line-height: 1.05;
+    .create-sidebar-head {
+      background-color: #1b91cf;
       color: #fff;
-      background: none;
+      height: 66px;
+      line-height: 66px;
+      padding: 0 22px 0 22px;
+      position: relative;
+      flex: 0 0 auto;
     }
-    .create-hint {
-      font-size: 13px;
-      opacity: .92;
-      max-width: 42ch;
+    .create-sidebar-head img {
+      height: 44px;
+      position: absolute;
+      left: 11px;
+      top: 11px;
+      background-color: #1b91cf;
+      border-radius: 10%;
     }
-    .create-chat-strip {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
+    .create-sidebar-head h1 {
+      margin: 0 0 0 44px;
+      color: #ffffff;
+      font-size: 18px;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
+    }
+    .create-fab {
+      width: 44px;
+      height: 44px;
+      background-color: #1b91cf;
+      border: 0;
+      border-radius: 50%;
+      box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.3);
+      font-size: 36px;
+      color: white;
+      text-align: center;
+      line-height: 44px;
+      position: absolute;
+      top: 44px;
+      right: 22px;
+      cursor: pointer;
+    }
+    .create-sidebar-list {
+      flex: 1 1 auto;
+      overflow-y: auto;
       scrollbar-width: none;
-      padding-bottom: 2px;
+      background: #fff;
     }
-    .create-chat-strip::-webkit-scrollbar,
+    .create-sidebar-list::-webkit-scrollbar,
     .create-thread::-webkit-scrollbar,
     .create-input-shell textarea::-webkit-scrollbar {
       width: 0;
       height: 0;
     }
-    .create-chat-chip {
-      flex: 0 0 auto;
-      border: 0;
-      border-radius: 999px;
-      padding: 10px 12px;
-      background: rgba(255,255,255,.13);
-      color: #fff;
+    .create-sidebar-list h2 {
+      color: #1b91cf;
       font-size: 12px;
-      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: bold;
+      margin: 22px 22px 11px 11px;
+      background: none;
     }
-    .create-chat-chip.active {
-      background: rgba(255,255,255,.24);
-      box-shadow: 0 10px 20px rgba(0,0,0,.14);
+    .create-chat-list {
+      display: block;
+    }
+    .create-chat-item {
+      box-sizing: border-box;
+      padding: 22px;
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      background-color: #fff;
+      border: 0;
+      width: 100%;
+      text-align: left;
+    }
+    .create-chat-item.selected {
+      background-color: #f0f0f0;
+      border-right: 3px solid #1b91cf;
+    }
+    .create-chat-item:hover {
+      background-color: #f0f0f0;
+    }
+    .create-chat-icon {
+      width: 20px;
+      height: 20px;
+      color: #666666;
+      flex: 0 0 auto;
+    }
+    .create-chat-name {
+      font-size: 16px;
+      margin: 0px 22px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      flex: 1 1 auto;
+      color: #111;
+      white-space: nowrap;
+    }
+    .create-chat-meta {
+      font-size: 12px;
+      color: #666666;
+      flex: 0 0 auto;
+    }
+    .create-panel {
+      display: grid;
+      grid-template-rows: auto 1fr auto auto;
+      overflow: hidden;
+      background: #fff;
+    }
+    .create-panel-head {
+      background-color: #1b91cf;
+      color: white;
+      height: 66px;
+      line-height: 66px;
+      padding: 0px 22px 0px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .create-panel-head h2 {
+      margin: 0;
+      font-family: "Open Sans", sans-serif;
+      font-size: 18px;
+      color: #ffffff;
+      font-weight: 800;
+      text-transform: none;
+      letter-spacing: 0;
+      background: none;
+    }
+    .create-back {
+      width: 44px;
+      height: 44px;
+      background-color: #1b91cf;
+      border: 0;
+      border-radius: 50%;
+      box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.3);
+      font-size: 36px;
+      color: white;
+      text-align: center;
+      line-height: 44px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+    .create-back svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+    .create-panel-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .create-list-toggle {
+      width: 44px;
+      height: 44px;
+      background-color: #1b91cf;
+      border: 0;
+      border-radius: 50%;
+      box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.3);
+      color: white;
+      cursor: pointer;
+      display: none;
+      place-items: center;
+      padding: 0;
+    }
+    .create-list-toggle svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
     }
     .create-thread {
+      box-sizing: border-box;
+      padding: 22px;
+      height: calc(100vh - 2 * 66px);
+      width: 100%;
       overflow-y: auto;
-      scrollbar-width: none;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding: 10px 2px;
+      background: #fff;
     }
-    .mini-message {
-      max-width: min(90%, 620px);
-      border-radius: 22px;
-      padding: 12px 14px;
-      background: rgba(255,255,255,.11);
-      border: 1px solid rgba(255,255,255,.14);
-      backdrop-filter: blur(6px);
-      box-shadow: none;
+    .message {
+      margin-bottom: 22px;
+      max-width: 75%;
     }
-    .mini-message.user {
-      align-self: flex-end;
-      background: rgba(255,255,255,.18);
+    .message-wrapper {
+      display: flex;
+      align-items: flex-end;
     }
-    .mini-message.assistant {
-      align-self: flex-start;
+    .message-content {
+      padding: 11px;
+      margin: 0px 11px;
+      text-align: left;
     }
-    .mini-message-role {
-      font-size: 10px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      opacity: .8;
-      margin-bottom: 4px;
+    .incoming-message .message-content {
+      border-radius: 20px 20px 20px 5px;
+      background-color: #f0f0f0;
     }
-    .mini-message-text {
+    .outgoing-message .message-content {
+      background-color: #1b91cf;
+      border-radius: 20px 20px 5px 20px;
+      color: white;
+    }
+    .message-content h3 {
+      font-size: 14px;
+      color: #1b91cf;
+      margin-bottom: 11px;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
+    }
+    .message-content p {
       font-size: 14px;
       line-height: 1.45;
       white-space: pre-wrap;
     }
+    .mini-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #cfd7e8;
+      flex: 0 0 auto;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.7);
+    }
+    .outgoing-message {
+      align-self: flex-end;
+      text-align: right;
+    }
+    .outgoing-message .message-wrapper {
+      justify-content: flex-end;
+    }
+    .incoming-message .timestamp {
+      margin-left: 44px;
+    }
+    .outgoing-message .timestamp {
+      margin-right: 44px;
+    }
+    .timestamp {
+      font-size: 12px;
+      color: #666666;
+      display: block;
+      margin-top: 6px;
+    }
     .create-input-shell {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: end;
-      background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.16);
-      border-radius: 20px;
-      padding: 12px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 66px;
+      position: relative;
+      background-color: #f0f0f0;
+      padding: 0 22px;
+      gap: 14px;
     }
     .create-input-shell textarea {
-      width: 100%;
-      border: 0;
-      background: transparent;
-      color: #fff;
+      flex: 1 1 auto;
+      height: 44px;
+      margin: 0;
+      padding: 0 11px;
+      border: none;
+      border-radius: 11px;
+      font-size: 12px;
       resize: none;
-      min-height: 52px;
-      max-height: 140px;
-      font-size: 15px;
-      line-height: 1.4;
+      background: #fff;
+      color: #111;
       outline: none;
       scrollbar-width: none;
     }
     .create-input-shell textarea::placeholder {
-      color: rgba(255,255,255,.75);
+      color: #666666;
     }
     .create-send {
+      color: #1b91cf;
+      cursor: pointer;
       border: 0;
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
-      background: rgba(255,255,255,.24);
-      color: #fff;
+      background: transparent;
+      width: 44px;
+      height: 44px;
       display: grid;
       place-items: center;
-      box-shadow: 0 10px 20px rgba(0,0,0,.14);
+      flex: 0 0 auto;
     }
-    .create-send svg { width: 24px; height: 24px; fill: #fff; }
+    .create-send svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
     .create-status {
+      box-sizing: border-box;
+      min-height: 22px;
+      padding: 0 22px 10px;
+      color: rgba(0,0,0,.7);
       font-size: 12px;
-      opacity: .92;
-      min-height: 16px;
+      background: #f0f0f0;
+    }
+    @media (max-width: 900px) {
+      .create-modal {
+        grid-template-columns: 1fr;
+      }
+      .create-sidebar {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: min(82vw, 340px);
+        transform: translateX(-100%);
+        transition: transform .22s ease;
+        z-index: 3;
+        box-shadow: 16px 0 40px rgba(0,0,0,.18);
+      }
+      .create-modal.show-chats .create-sidebar {
+        transform: translateX(0);
+      }
+      .create-panel {
+        position: relative;
+        z-index: 1;
+      }
+      .create-list-toggle {
+        display: grid;
+      }
+      .create-sidebar-head {
+        padding-right: 76px;
+      }
+      .create-panel-head h2 {
+        max-width: calc(100% - 104px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .create-thread {
+        padding: 18px 16px;
+        height: calc(100vh - 2 * 66px);
+      }
+      .message {
+        max-width: 88%;
+      }
+      .create-input-shell {
+        padding: 0 12px;
+      }
+      .create-status {
+        padding: 0 12px 10px;
+      }
     }
   </style>
 </head>
@@ -821,20 +1056,38 @@
   </section>
 
   <section id="createModal" class="create-modal">
-    <div class="create-head">
-      <div>
-        <h2>Converse com a IA</h2>
-        <div class="create-hint">Sua conversa fica salva no Postgres e pode alimentar o planejador de aulas do MINI.</div>
+    <aside class="create-sidebar">
+      <div class="create-sidebar-head">
+        <img class="create-sidebar-logo" src="/mini/mini.png" alt="Mini" />
+        <h1>chats | app</h1>
       </div>
-      <button id="closeCreate" class="round-action close" type="button" aria-label="Fechar chat"><svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg></button>
-    </div>
-    <div id="miniChatStrip" class="create-chat-strip"></div>
-    <div id="miniChatThread" class="create-thread"></div>
-    <form id="miniChatForm" class="create-input-shell">
-      <textarea id="miniChatInput" placeholder="Escreva sua ideia, dúvida ou plano..." rows="1"></textarea>
-      <button id="miniChatSend" class="create-send" type="submit" aria-label="Enviar mensagem"><svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.1 2-12.1 2z"/></svg></button>
-    </form>
-    <div id="miniChatStatus" class="create-status"></div>
+      <button id="newMiniChat" class="create-fab" type="button" aria-label="Novo chat">+</button>
+      <div class="create-sidebar-list">
+        <h2>Chats</h2>
+        <div id="miniChatStrip" class="create-chat-list"></div>
+      </div>
+    </aside>
+    <section class="create-panel">
+      <div class="create-panel-head">
+        <h2 id="miniChatTitle">Novo chat</h2>
+        <div class="create-panel-actions">
+          <button id="toggleMiniChats" class="create-list-toggle" type="button" aria-label="Abrir chats salvos">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
+          </button>
+          <button id="closeCreate" class="create-back" type="button" aria-label="Fechar chat">
+            <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="miniChatThread" class="create-thread"></div>
+      <form id="miniChatForm" class="create-input-shell">
+        <textarea id="miniChatInput" placeholder="Escreva sua ideia, dúvida ou plano..." rows="1"></textarea>
+        <button id="miniChatSend" class="create-send" type="submit" aria-label="Enviar mensagem">
+          <svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.1 2-12.1 2z"/></svg>
+        </button>
+      </form>
+      <div id="miniChatStatus" class="create-status"></div>
+    </section>
   </section>
 
   <section id="miniPlansModal" class="mini-plans-modal" aria-hidden="true">
@@ -1008,6 +1261,51 @@
 
     function getTrashSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4zm1 6h2v8h-2zm4 0h2v8h-2zM7 9h2v8H7zm-1 11h12l1-13H5z"/></svg>`;
+    }
+
+    function getMiniChatIconSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C7.59 3 4 5.91 4 9.5c0 1.98 1.02 3.74 2.72 4.92L6 18l3.78-1.98c.7.16 1.42.24 2.22.24 4.41 0 8-2.91 8-6.5S16.41 3 12 3zm-3 7h6v1.5H9V10zm0-2.5h10V9H9V7.5zm0 5H16V14H9v-1.5z"/></svg>`;
+    }
+
+    function formatMiniChatTimestamp(value) {
+      if (!value) {
+        return "";
+      }
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "";
+      }
+
+      const now = new Date();
+      const sameDay = date.toDateString() === now.toDateString();
+      if (sameDay) {
+        return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      }
+
+      return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+    }
+
+    function setMiniChatHeader(chat) {
+      const title = $("miniChatTitle");
+      if (!title) {
+        return;
+      }
+      title.textContent = chat?.title || "Novo chat";
+    }
+
+    function openMiniChatsPanel() {
+      const modal = $("createModal");
+      if (modal) {
+        modal.classList.add("show-chats");
+      }
+    }
+
+    function closeMiniChatsPanel() {
+      const modal = $("createModal");
+      if (modal) {
+        modal.classList.remove("show-chats");
+      }
     }
 
     function getMiniPlannerDraft() {
@@ -1380,8 +1678,12 @@
     function renderMiniChatChip(chat) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `create-chat-chip${chat.id === activeMiniChatId ? " active" : ""}`;
-      button.textContent = chat.title || "Novo chat";
+      button.className = `create-chat-item${chat.id === activeMiniChatId ? " selected" : ""}`;
+      button.innerHTML = `
+        ${getMiniChatIconSvg()}
+        <span class="create-chat-name">${escapeText(chat.title || "Novo chat")}</span>
+        <span class="create-chat-meta">${escapeText(formatMiniChatTimestamp(chat.lastMessageAt || chat.updatedAt || chat.createdAt))}</span>
+      `;
       button.onclick = () => openMiniChat(chat.id);
       return button;
     }
@@ -1390,13 +1692,31 @@
       const thread = $("miniChatThread");
       thread.innerHTML = "";
       const messages = Array.isArray(chat?.messages) ? chat.messages : [];
+      setMiniChatHeader(chat);
       messages.forEach((message) => {
+        const createdAt = message.createdAt ? formatMiniChatTimestamp(message.createdAt) : "";
         const card = document.createElement("article");
-        card.className = `mini-message ${message.role === "assistant" ? "assistant" : "user"}`;
-        card.innerHTML = `
-          <div class="mini-message-role">${message.role === "assistant" ? "IA" : "Você"}</div>
-          <div class="mini-message-text">${escapeText(message.content)}</div>
-        `;
+        card.className = `message ${message.role === "assistant" ? "incoming-message" : "outgoing-message"}`;
+        card.innerHTML = message.role === "assistant"
+          ? `
+            <div class="message-wrapper">
+              <div class="mini-avatar" aria-hidden="true"></div>
+              <div class="message-content">
+                <h3>IA</h3>
+                <p>${escapeText(message.content)}</p>
+              </div>
+            </div>
+            ${createdAt ? `<span class="timestamp">${escapeText(createdAt)}</span>` : ""}
+          `
+          : `
+            <div class="message-wrapper">
+              <div class="message-content">
+                <p>${escapeText(message.content)}</p>
+              </div>
+              <div class="mini-avatar" aria-hidden="true"></div>
+            </div>
+            ${createdAt ? `<span class="timestamp">${escapeText(createdAt)}</span>` : ""}
+          `;
         thread.appendChild(card);
       });
       scrollMiniChatToBottom();
@@ -1441,6 +1761,21 @@
       return activeMiniChatId;
     }
 
+    async function createFreshMiniChat() {
+      const response = await apiMini("/api/mini/chats", {
+        method: "POST",
+        body: JSON.stringify({ title: "Novo chat" })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao criar chat.");
+      }
+      activeMiniChatId = payload.chat?.id || "";
+      await loadMiniChats(true);
+      closeMiniChatsPanel();
+      return activeMiniChatId;
+    }
+
     async function openMiniChat(chatId) {
       activeMiniChatId = chatId;
       await loadMiniChats();
@@ -1448,31 +1783,7 @@
       if (active) {
         renderMiniChatThread(active);
       }
-    }
-
-    function appendMiniTypingMessage(text) {
-      const thread = $("miniChatThread");
-      const card = document.createElement("article");
-      card.className = "mini-message assistant";
-      card.innerHTML = `
-        <div class="mini-message-role">IA</div>
-        <div class="mini-message-text"></div>
-      `;
-      const target = card.querySelector(".mini-message-text");
-      thread.appendChild(card);
-      scrollMiniChatToBottom();
-
-      let index = 0;
-      clearInterval(typingTimer);
-      typingTimer = setInterval(() => {
-        index += 1;
-        target.textContent = text.slice(0, index);
-        scrollMiniChatToBottom();
-        if (index >= text.length) {
-          clearInterval(typingTimer);
-          typingTimer = null;
-        }
-      }, 50);
+      closeMiniChatsPanel();
     }
 
     function renderPool(){
@@ -1511,6 +1822,7 @@
     if (openCreateBtn) {
       openCreateBtn.onclick = async () => {
         $("createModal").classList.add("show");
+        closeMiniChatsPanel();
         setMiniStatus(getMiniToken() ? "Carregando suas conversas..." : "Entre no Explore para salvar seus chats no Postgres.");
         try {
           if (!getMiniToken()) {
@@ -1528,7 +1840,29 @@
         }
       };
     }
-    $("closeCreate").onclick=()=>$("createModal").classList.remove("show");
+    $("closeCreate").onclick=()=>{
+      $("createModal").classList.remove("show");
+      closeMiniChatsPanel();
+    };
+    $("toggleMiniChats").onclick=() => {
+      const modal = $("createModal");
+      if (!modal) {
+        return;
+      }
+      modal.classList.toggle("show-chats");
+    };
+    $("newMiniChat").onclick = async () => {
+      if (!getMiniToken()) {
+        setMiniStatus("Entre no Explore para salvar novos chats no Postgres.");
+        return;
+      }
+      try {
+        await createFreshMiniChat();
+        setMiniStatus("Novo chat criado.");
+      } catch (error) {
+        setMiniStatus(error instanceof Error ? error.message : "Falha ao criar chat.");
+      }
+    };
 
     $("openAi").onclick = () => {
       $("aiModal").classList.add("show");
@@ -1735,8 +2069,7 @@
         }
 
         activeMiniChatId = payload.chat?.id || activeMiniChatId;
-        await loadMiniChats(false);
-        appendMiniTypingMessage(payload.replyText || "");
+        await loadMiniChats(true);
         setMiniStatus("");
       } catch (error) {
         setMiniStatus(error instanceof Error ? error.message : "Erro desconhecido.");

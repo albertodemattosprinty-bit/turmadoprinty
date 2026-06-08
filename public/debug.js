@@ -955,7 +955,6 @@ function stopAssistantSpeech() {
 function buildResponseStylePrompt(modeKey) {
   const settings = getUserChatSettings();
   const parts = [
-    "Responda de modo respeitoso, aberto e 100% neutro, sem inserir religiao por conta propria.",
     "Entregue somente o que foi pedido, sem oferecer proximos passos, extras ou sugestoes nao solicitadas.",
     "Mantenha etica, respeito e amizade.",
     "Se a pergunta for minima ou basica, responda no mesmo tom e na mesma proporcao.",

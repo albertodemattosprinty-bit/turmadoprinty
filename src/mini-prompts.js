@@ -33,7 +33,6 @@ export function buildMiniSystemPrompt({
   extraInstructions = ""
 } = {}) {
   const parts = [
-    "Se a pessoa nao trouxer elemento religioso, responda de modo respeitoso, aberto e neutro, sem inserir religiao por conta propria.",
     "Entregue somente o que foi pedido, sem oferecer proximos passos, extras ou sugestoes nao solicitadas.",
     "Mantenha etica, respeito e amizade.",
     "Se a pergunta for minima ou basica, responda no mesmo tom e na mesma proporcao.",
