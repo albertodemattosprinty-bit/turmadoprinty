@@ -2154,12 +2154,12 @@ async function handleMiniLessonPlanGenerate(request, response) {
         "Crie uma resposta unica e consolidada, mas organizada em partes coerentes com os blocos escolhidos.",
         "Interprete todos os blocos da aula na ordem recebida e transforme isso em uma narrativa fluida com introducao geral, transicoes naturais e aplicacao pratica.",
         "O resultado deve ter cerca de 4000 caracteres no total, com minimo de 3200 e maximo de 4500, em portugues do Brasil.",
-        "A resposta deve ter uma introducao curta que conecte todos os blocos e depois uma lista de partes, uma para cada bloco recebido.",
-        "Cada parte deve ter titulo curto, o tempo do bloco, e um texto que continua a mesma linha pedagogica da aula sem parecer uma resposta solta.",
-        "Não trate os blocos como cards independentes; faça o texto soar como uma aula unica, mesmo quando estiver dividido visualmente por partes.",
+        "A resposta deve ter uma introducao curta que conecte todos os blocos e depois um texto principal em 3 a 5 paragrafos, cada um com um subtitulo simples e claro.",
+        "Cada paragrafo deve conversar com o tempo do bloco e com o contexto da aula, sem soar como uma lista de cards.",
+        "Não trate os blocos como cards independentes; faça o texto soar como uma aula unica, coesa e legível.",
         "Responda em JSON puro com as chaves mainTitle, intro, content e parts.",
-        "O campo content deve conter o texto consolidado completo da aula. Use intro como abertura curta e parts para distribuir visualmente esse mesmo texto pelos blocos.",
-        "Cada item de parts deve ser um objeto com title, minutes e content."
+        "O campo content deve conter o texto consolidado completo da aula em paragrafos.",
+        "Se quiser, parts pode repetir esses paragrafos para compatibilidade, mas o front vai priorizar content."
       ].join(" ")
     });
     const completion = await createChatCompletion(apiKey, {
