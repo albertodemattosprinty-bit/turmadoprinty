@@ -629,6 +629,51 @@ function extractChatCompletionText(payload) {
   return texts.join("\n\n").trim();
 }
 
+function extractJsonObjectText(text) {
+  const clean = String(text || "").trim();
+  if (!clean) {
+    return "";
+  }
+
+  if (clean.startsWith("{") && clean.endsWith("}")) {
+    return clean;
+  }
+
+  const firstBrace = clean.indexOf("{");
+  const lastBrace = clean.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return clean.slice(firstBrace, lastBrace + 1).trim();
+  }
+
+  return clean;
+}
+
+function parseStructuredJsonText(text) {
+  const clean = String(text || "").trim();
+  if (!clean) {
+    return null;
+  }
+
+  const candidates = [clean];
+  const extracted = extractJsonObjectText(clean);
+  if (extracted && extracted !== clean) {
+    candidates.push(extracted);
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Try next candidate.
+    }
+  }
+
+  return null;
+}
+
 async function readJsonBody(request) {
   const raw = await readTextBody(request);
 
@@ -2162,13 +2207,41 @@ async function handleMiniLessonPlanGenerate(request, response) {
         "Se quiser, parts pode repetir esses paragrafos para compatibilidade, mas o front vai priorizar content."
       ].join(" ")
     });
+    const lessonPlanJsonSchema = {
+      name: "mini_lesson_plan",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["mainTitle", "intro", "content", "parts"],
+        properties: {
+          mainTitle: { type: "string" },
+          intro: { type: "string" },
+          content: { type: "string" },
+          parts: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["title", "minutes", "content"],
+              properties: {
+                title: { type: "string" },
+                minutes: { type: "integer" },
+                content: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+    };
     const completion = await createChatCompletion(apiKey, {
       model,
       reasoning_effort: "none",
       temperature: 0.35,
       max_completion_tokens: 1800,
       response_format: {
-        type: "json_object"
+        type: "json_schema",
+        json_schema: lessonPlanJsonSchema
       },
       messages: [
         {
@@ -2183,19 +2256,14 @@ async function handleMiniLessonPlanGenerate(request, response) {
     });
 
     const raw = extractChatCompletionText(completion);
-    let parsed = null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      parsed = null;
-    }
+    const parsed = parseStructuredJsonText(raw);
 
     const mainTitle = String(parsed?.mainTitle || `Plano de Aula: ${themePrompt}`).trim();
     const intro = String(parsed?.intro || "").trim();
     const consolidatedContent = String(parsed?.content || "").trim();
     const parts = Array.isArray(parsed?.parts) ? parsed.parts : [];
     const plainOutput = [consolidatedContent, intro, ...parts.map((item) => String(item?.content || "").trim())].filter(Boolean).join("\n\n").trim();
-    const seedText = consolidatedContent || plainOutput || intro;
+    const seedText = consolidatedContent || plainOutput || intro || raw;
     const splitSeedText = (text, count) => {
       const clean = String(text || "").trim();
       if (!clean || count <= 0) {
@@ -2220,10 +2288,11 @@ async function handleMiniLessonPlanGenerate(request, response) {
     };
     const normalizedParts = stageNames.map((name, index) => {
       const source = parts[index] || {};
+      const fallbackChunk = splitSeedText(seedText, stageNames.length)[index] || "";
       return {
         title: String(source?.title || name).trim() || name,
         minutes: Number(source?.minutes || blocks[index]?.minutes || 0) || Number(blocks[index]?.minutes || 0) || 0,
-        content: String(source?.content || "").trim() || splitSeedText(seedText, stageNames.length)[index] || seedText || `Conteudo para ${name}.`
+        content: String(source?.content || "").trim() || fallbackChunk || seedText
       };
     });
 
@@ -2231,7 +2300,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
 
     const balancedParts = normalizedParts.map((part, index) => {
       const ownContent = String(part.content || "").trim();
-      if (ownContent && ownContent !== `Conteudo para ${part.title}.`) {
+      if (ownContent) {
         return part;
       }
 
@@ -2242,15 +2311,16 @@ async function handleMiniLessonPlanGenerate(request, response) {
       };
     });
 
-    const hasAnyRealPartContent = balancedParts.some((part) => String(part.content || "").trim() && !String(part.content || "").startsWith("Conteudo para "));
+    const hasAnyRealPartContent = balancedParts.some((part) => String(part.content || "").trim());
     const finalParts = hasAnyRealPartContent ? balancedParts : normalizedParts;
+    const finalContent = consolidatedContent || raw || [intro, ...finalParts.map((item) => String(item?.content || "").trim())].filter(Boolean).join("\n\n").trim();
 
     sendJson(response, 200, {
       ok: true,
       model,
       mainTitle,
       intro,
-      content: consolidatedContent || [intro, ...finalParts.map((item) => String(item?.content || "").trim())].filter(Boolean).join("\n\n").trim(),
+      content: finalContent,
       parts: finalParts
     });
   } catch (error) {
