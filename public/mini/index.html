@@ -739,6 +739,10 @@
       gap: 14px;
       align-content: start;
     }
+    .courses-list-view[hidden],
+    .course-reader-view[hidden] {
+      display: none !important;
+    }
     .courses-empty {
       min-height: 100%;
       display: grid;
@@ -815,17 +819,36 @@
       opacity: .88;
       font-weight: 700;
     }
-    .course-card-progress {
+    .course-card-action {
       align-self: flex-start;
-      padding: 10px 12px;
-      border-radius: 16px;
+      width: 52px;
+      height: 52px;
+      border: 0;
+      border-radius: 50%;
       background: rgba(255,255,255,.18);
-      font-size: 14px;
-      font-weight: 800;
-      white-space: nowrap;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+    .course-card-action svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
     }
     .course-reader-view {
       padding: 28px 24px;
+    }
+    .course-reader-loading {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      opacity: .88;
+      padding: 24px;
     }
     .course-page-shell {
       max-width: 960px;
@@ -1310,7 +1333,7 @@
         width: 100%;
         height: 170px;
       }
-      .course-card-progress {
+      .course-card-action {
         justify-self: flex-start;
       }
       .course-reader-view {
@@ -1641,6 +1664,9 @@
       if (footer) {
         footer.textContent = text || "";
       }
+    }
+    function getDownloadSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5zm7-18v12.17l3.59-3.58L17 12l-5 5-5-5 1.41-1.41L11 14.17V2z"/></svg>`;
     }
     function getAiStageIndexForProgress(progress) {
       if (progress >= 100) return 4;
@@ -2471,20 +2497,32 @@
         const pagesRead = Number(course?.progress?.pagesRead || 0) || 0;
         const totalPages = Math.max(Number(course?.pageCount || 1) || 1, 1);
         return `
-          <button class="course-card" type="button" data-course-id="${escapeAttr(course.id)}">
+          <div class="course-card" role="button" tabindex="0" data-course-id="${escapeAttr(course.id)}">
             ${buildMiniCourseCover(course)}
             <div class="course-card-body">
               <h3 class="course-card-title">${escapeText(course.title)}</h3>
               <div class="course-card-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
             </div>
-            <div class="course-card-progress">${pagesRead ? `${pagesRead}/${totalPages}` : `${totalPages} min`}</div>
-          </button>
+            <button class="course-card-action" type="button" data-download-course-id="${escapeAttr(course.id)}" aria-label="Baixar curso">${getDownloadSvg()}</button>
+          </div>
         `;
       }).join("");
 
       listView.querySelectorAll("[data-course-id]").forEach((button) => {
         button.onclick = async () => {
           await openMiniCourseById(button.getAttribute("data-course-id") || "");
+        };
+        button.onkeydown = async (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            await openMiniCourseById(button.getAttribute("data-course-id") || "");
+          }
+        };
+      });
+      listView.querySelectorAll("[data-download-course-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          await downloadMiniCourse(button.getAttribute("data-download-course-id") || "");
         };
       });
 
@@ -2537,6 +2575,20 @@
       `;
       readerView.scrollTop = 0;
 
+      updateMiniCoursesHeader();
+      updateMiniCoursesFooter();
+    }
+
+    function renderMiniCourseReaderLoading() {
+      const listView = $("coursesListView");
+      const readerView = $("courseReaderView");
+      if (!listView || !readerView) {
+        return;
+      }
+      listView.hidden = true;
+      readerView.hidden = false;
+      readerView.innerHTML = `<div class="course-reader-loading">Abrindo o conteúdo do curso...</div>`;
+      readerView.scrollTop = 0;
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
     }
@@ -2641,6 +2693,14 @@
       }
 
       try {
+        currentMiniCourse = {
+          title: "Carregando curso",
+          pageCount: 1,
+          pages: [],
+          progress: { currentPage: 1, pagesRead: 1 }
+        };
+        currentMiniCoursePage = 1;
+        renderMiniCourseReaderLoading();
         const token = getMiniToken();
         const path = token ? `/api/mini/courses/${encodeURIComponent(safeCourseId)}/start` : `/api/mini/courses/${encodeURIComponent(safeCourseId)}`;
         const response = await apiMini(path, {
@@ -2669,6 +2729,30 @@
         setCourseFooterStatus(error instanceof Error ? error.message : "Erro ao abrir o curso.");
         renderMiniCoursesList();
       }
+    }
+
+    async function downloadMiniCourse(courseId) {
+      const safeCourseId = String(courseId || "").trim();
+      if (!safeCourseId) {
+        return;
+      }
+
+      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao baixar curso.");
+      }
+
+      const course = payload?.course || {};
+      const blob = new Blob([JSON.stringify(course, null, 2)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${String(course.title || "curso-mini").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || "curso-mini"}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     }
 
     async function persistMiniCourseProgress(nextPage) {
