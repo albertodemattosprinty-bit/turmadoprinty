@@ -902,13 +902,13 @@
     }
     .course-word {
       opacity: 0;
-      animation: courseWordFade .5s ease forwards;
+      animation: courseWordFade .33s ease forwards;
       white-space: pre-wrap;
     }
     .course-step-item {
       opacity: 0;
       transform: translateY(10px);
-      transition: opacity .5s ease, transform .5s ease;
+      transition: opacity .33s ease, transform .33s ease;
     }
     .course-step-item.is-visible {
       opacity: 1;
@@ -1376,12 +1376,19 @@
       .course-reader-view {
         padding: 18px 16px;
       }
+      .course-page-kicker {
+        font-size: 17px;
+      }
       .course-page-title {
-        font-size: 26px;
+        font-size: 34px;
       }
       .course-page-paragraph,
       .course-page-bullets {
-        font-size: 16px;
+        font-size: 21px;
+      }
+      .course-page-row strong,
+      .course-page-row span {
+        font-size: 21px;
       }
       .course-page-row {
         grid-template-columns: 1fr;
@@ -2668,17 +2675,17 @@
             span.className = "course-word";
             span.textContent = `${word}${index < words.length - 1 ? " " : ""}`;
             node.appendChild(span);
-          }, textDelay + (index * 250));
+          }, textDelay + (index * 167));
         });
 
-        textDelay += (words.length * 250) + 250;
+        textDelay += (words.length * 167) + 167;
       });
 
       stepNodes.forEach((node, index) => {
         node.classList.remove("is-visible");
         scheduleMiniCourseAnimation(() => {
           node.classList.add("is-visible");
-        }, textDelay + (index * 2000));
+        }, textDelay + (index * 1333));
       });
     }
 
