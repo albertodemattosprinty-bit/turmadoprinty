@@ -2157,7 +2157,8 @@ async function handleMiniLessonPlanGenerate(request, response) {
         "A resposta deve ter uma introducao curta que conecte todos os blocos e depois uma lista de partes, uma para cada bloco recebido.",
         "Cada parte deve ter titulo curto, o tempo do bloco, e um texto que continua a mesma linha pedagogica da aula sem parecer uma resposta solta.",
         "Não trate os blocos como cards independentes; faça o texto soar como uma aula unica, mesmo quando estiver dividido visualmente por partes.",
-        "Responda em JSON puro com as chaves mainTitle, intro e parts.",
+        "Responda em JSON puro com as chaves mainTitle, intro, content e parts.",
+        "O campo content deve conter o texto consolidado completo da aula. Use intro como abertura curta e parts para distribuir visualmente esse mesmo texto pelos blocos.",
         "Cada item de parts deve ser um objeto com title, minutes e content."
       ].join(" ")
     });
@@ -2191,20 +2192,42 @@ async function handleMiniLessonPlanGenerate(request, response) {
 
     const mainTitle = String(parsed?.mainTitle || `Plano de Aula: ${themePrompt}`).trim();
     const intro = String(parsed?.intro || "").trim();
+    const consolidatedContent = String(parsed?.content || "").trim();
     const parts = Array.isArray(parsed?.parts) ? parsed.parts : [];
-    const plainOutput = [intro, ...parts.map((item) => String(item?.content || "").trim())].filter(Boolean).join("\n\n").trim();
+    const plainOutput = [consolidatedContent, intro, ...parts.map((item) => String(item?.content || "").trim())].filter(Boolean).join("\n\n").trim();
+    const seedText = consolidatedContent || plainOutput || intro;
+    const splitSeedText = (text, count) => {
+      const clean = String(text || "").trim();
+      if (!clean || count <= 0) {
+        return [];
+      }
+      const paragraphChunks = clean.split(/\n{2,}/).map((chunk) => chunk.trim()).filter(Boolean);
+      if (paragraphChunks.length > 1) {
+        return paragraphChunks;
+      }
+      const sentences = clean.match(/[^.!?]+[.!?]?/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [clean];
+      const bucketSize = Math.max(1, Math.ceil(sentences.length / count));
+      const buckets = [];
+      for (let index = 0; index < count; index += 1) {
+        const start = index * bucketSize;
+        const end = start + bucketSize;
+        const chunk = sentences.slice(start, end).join(" ").trim();
+        if (chunk) {
+          buckets.push(chunk);
+        }
+      }
+      return buckets.length ? buckets : [clean];
+    };
     const normalizedParts = stageNames.map((name, index) => {
       const source = parts[index] || {};
       return {
         title: String(source?.title || name).trim() || name,
         minutes: Number(source?.minutes || blocks[index]?.minutes || 0) || Number(blocks[index]?.minutes || 0) || 0,
-        content: String(source?.content || "").trim() || `Conteudo para ${name}.`
+        content: String(source?.content || "").trim() || splitSeedText(seedText, stageNames.length)[index] || seedText || `Conteudo para ${name}.`
       };
     });
 
-    const fallbackChunks = plainOutput
-      ? plainOutput.split(/\n{2,}/).map((chunk) => chunk.trim()).filter(Boolean)
-      : [];
+    const fallbackChunks = splitSeedText(seedText, stageNames.length);
 
     const balancedParts = normalizedParts.map((part, index) => {
       const ownContent = String(part.content || "").trim();
@@ -2227,6 +2250,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
       model,
       mainTitle,
       intro,
+      content: consolidatedContent || [intro, ...finalParts.map((item) => String(item?.content || "").trim())].filter(Boolean).join("\n\n").trim(),
       parts: finalParts
     });
   } catch (error) {
