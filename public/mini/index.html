@@ -2567,7 +2567,11 @@
         miniCoursesError = error instanceof Error ? error.message : "Falha ao carregar cursos.";
       } finally {
         miniCoursesLoading = false;
-        renderMiniCoursesList();
+        if (currentMiniCourse) {
+          renderMiniCourseReader();
+        } else {
+          renderMiniCoursesList();
+        }
       }
     }
 
