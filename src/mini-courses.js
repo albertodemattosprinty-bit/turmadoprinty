@@ -367,13 +367,13 @@ export async function updateMiniCourseProgress(userId, courseId, nextPage) {
   const result = await query(
     `
       insert into mini_course_progress (user_id, course_id, current_page, pages_read, started_at, updated_at, completed_at)
-      values ($1, $2, $3, $3, now(), now(), case when $3 >= $4 then now() else null end)
+      values ($1, $2, $3::smallint, $3::smallint, now(), now(), case when $3::smallint >= $4::smallint then now() else null end)
       on conflict (user_id, course_id)
       do update set
-        current_page = $3,
-        pages_read = greatest(mini_course_progress.pages_read, $3),
+        current_page = $3::smallint,
+        pages_read = greatest(mini_course_progress.pages_read, $3::smallint),
         completed_at = case
-          when greatest(mini_course_progress.pages_read, $3) >= $4 then coalesce(mini_course_progress.completed_at, now())
+          when greatest(mini_course_progress.pages_read, $3::smallint) >= $4::smallint then coalesce(mini_course_progress.completed_at, now())
           else mini_course_progress.completed_at
         end,
         updated_at = now()
