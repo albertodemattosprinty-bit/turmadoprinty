@@ -56,6 +56,34 @@ function normalizePageKind(value) {
   return "text";
 }
 
+function normalizeQuizQuestions(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((item, index) => {
+      const options = Array.isArray(item?.options)
+        ? item.options.map((option) => String(option || "").trim()).filter(Boolean).slice(0, 4)
+        : [];
+      const correctIndex = Math.max(0, Math.min(options.length - 1, Number(item?.correctIndex || 0) || 0));
+
+      if (options.length !== 4) {
+        return null;
+      }
+
+      return {
+        id: String(item?.id || `q${index + 1}`).trim() || `q${index + 1}`,
+        question: String(item?.question || "").trim(),
+        options,
+        correctIndex,
+        explanation: String(item?.explanation || "").trim()
+      };
+    })
+    .filter((item) => item && item.question && item.options.length === 4)
+    .slice(0, 10);
+}
+
 function normalizeCoursePages(raw) {
   if (!Array.isArray(raw)) {
     return [];
@@ -107,6 +135,7 @@ function normalizeProgress(row, pageCount = 0) {
 
 function normalizeCourse(row) {
   const pages = normalizeCoursePages(row.pages || []);
+  const quizQuestions = normalizeQuizQuestions(row.quiz_questions || []);
   const pageCount = Math.max(1, Number(row.page_count || pages.length || 1) || pages.length || 1);
 
   return {
@@ -118,10 +147,18 @@ function normalizeCourse(row) {
     coverImageUrl: row.cover_image_url || "",
     coverImagePrompt: row.cover_image_prompt || "",
     pages,
+    quizQuestions,
+    hasQuiz: quizQuestions.length > 0,
     createdByUserId: row.created_by_user_id || null,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
-    progress: normalizeProgress(row, pageCount)
+    progress: normalizeProgress(row, pageCount),
+    quizResult: {
+      bestScore: Number(row.quiz_best_score || 0) || 0,
+      lastScore: Number(row.quiz_last_score || 0) || 0,
+      attemptsCount: Number(row.quiz_attempts_count || 0) || 0,
+      updatedAt: toIso(row.quiz_updated_at)
+    }
   };
 }
 
@@ -154,6 +191,7 @@ export async function ensureMiniCoursesSchema() {
       page_count smallint not null default 1,
       duration_minutes smallint not null default 1,
       pages jsonb not null default '[]'::jsonb,
+      quiz_questions jsonb not null default '[]'::jsonb,
       cover_image_url text not null default '',
       cover_image_prompt text not null default '',
       created_by_user_id uuid references users(id) on delete set null,
@@ -161,6 +199,7 @@ export async function ensureMiniCoursesSchema() {
       updated_at timestamptz not null default now()
     );
   `);
+  await query("alter table mini_courses add column if not exists quiz_questions jsonb not null default '[]'::jsonb;");
 
   await query(`
     create table if not exists mini_course_progress (
@@ -177,6 +216,21 @@ export async function ensureMiniCoursesSchema() {
 
   await query("create index if not exists idx_mini_courses_updated_at on mini_courses(updated_at desc, created_at desc);");
   await query("create index if not exists idx_mini_course_progress_user_updated_at on mini_course_progress(user_id, updated_at desc);");
+  await query(`
+    create table if not exists mini_course_quiz_results (
+      user_id uuid not null references users(id) on delete cascade,
+      course_id uuid not null references mini_courses(id) on delete cascade,
+      best_score numeric(4,1) not null default 0,
+      last_score numeric(4,1) not null default 0,
+      best_correct_answers smallint not null default 0,
+      last_correct_answers smallint not null default 0,
+      total_questions smallint not null default 10,
+      attempts_count integer not null default 0,
+      updated_at timestamptz not null default now(),
+      primary key (user_id, course_id)
+    );
+  `);
+  await query("create index if not exists idx_mini_course_quiz_results_user_updated_at on mini_course_quiz_results(user_id, updated_at desc);");
 
   await query(`
     create table if not exists mini_course_jobs (
@@ -215,6 +269,7 @@ export async function listMiniCourses(userId = "") {
           c.page_count,
           c.duration_minutes,
           c.pages,
+          c.quiz_questions,
           c.cover_image_url,
           c.cover_image_prompt,
           c.created_by_user_id,
@@ -224,11 +279,18 @@ export async function listMiniCourses(userId = "") {
           p.pages_read,
           p.started_at,
           p.completed_at,
-          p.updated_at as progress_updated_at
+          p.updated_at as progress_updated_at,
+          q.best_score as quiz_best_score,
+          q.last_score as quiz_last_score,
+          q.attempts_count as quiz_attempts_count,
+          q.updated_at as quiz_updated_at
         from mini_courses c
         left join mini_course_progress p
           on p.course_id = c.id
          and p.user_id = $1
+        left join mini_course_quiz_results q
+          on q.course_id = c.id
+         and q.user_id = $1
         order by c.updated_at desc, c.created_at desc
       `,
       [safeUserId]
@@ -242,6 +304,7 @@ export async function listMiniCourses(userId = "") {
           c.page_count,
           c.duration_minutes,
           c.pages,
+          c.quiz_questions,
           c.cover_image_url,
           c.cover_image_prompt,
           c.created_by_user_id,
@@ -251,7 +314,11 @@ export async function listMiniCourses(userId = "") {
           null::smallint as pages_read,
           null::timestamptz as started_at,
           null::timestamptz as completed_at,
-          null::timestamptz as progress_updated_at
+          null::timestamptz as progress_updated_at,
+          null::numeric as quiz_best_score,
+          null::numeric as quiz_last_score,
+          null::integer as quiz_attempts_count,
+          null::timestamptz as quiz_updated_at
         from mini_courses c
         order by c.updated_at desc, c.created_at desc
       `
@@ -276,6 +343,7 @@ export async function getMiniCourseById(courseId, userId = "") {
           c.page_count,
           c.duration_minutes,
           c.pages,
+          c.quiz_questions,
           c.cover_image_url,
           c.cover_image_prompt,
           c.created_by_user_id,
@@ -285,11 +353,18 @@ export async function getMiniCourseById(courseId, userId = "") {
           p.pages_read,
           p.started_at,
           p.completed_at,
-          p.updated_at as progress_updated_at
+          p.updated_at as progress_updated_at,
+          q.best_score as quiz_best_score,
+          q.last_score as quiz_last_score,
+          q.attempts_count as quiz_attempts_count,
+          q.updated_at as quiz_updated_at
         from mini_courses c
         left join mini_course_progress p
           on p.course_id = c.id
          and p.user_id = $2
+        left join mini_course_quiz_results q
+          on q.course_id = c.id
+         and q.user_id = $2
         where c.id = $1
         limit 1
       `,
@@ -304,6 +379,7 @@ export async function getMiniCourseById(courseId, userId = "") {
           c.page_count,
           c.duration_minutes,
           c.pages,
+          c.quiz_questions,
           c.cover_image_url,
           c.cover_image_prompt,
           c.created_by_user_id,
@@ -313,7 +389,11 @@ export async function getMiniCourseById(courseId, userId = "") {
           null::smallint as pages_read,
           null::timestamptz as started_at,
           null::timestamptz as completed_at,
-          null::timestamptz as progress_updated_at
+          null::timestamptz as progress_updated_at,
+          null::numeric as quiz_best_score,
+          null::numeric as quiz_last_score,
+          null::integer as quiz_attempts_count,
+          null::timestamptz as quiz_updated_at
         from mini_courses c
         where c.id = $1
         limit 1
@@ -331,11 +411,12 @@ export async function getMiniCourseById(courseId, userId = "") {
   });
 }
 
-export async function createMiniCourse({ title, context, pages, coverImageUrl = "", coverImagePrompt = "", createdByUserId = null } = {}) {
+export async function createMiniCourse({ title, context, pages, quizQuestions = [], coverImageUrl = "", coverImagePrompt = "", createdByUserId = null } = {}) {
   await ensureMiniCoursesSchema();
   const safeTitle = String(title || "Curso MINI").trim() || "Curso MINI";
   const safeContext = String(context || "").trim();
   const normalizedPages = normalizeCoursePages(pages || []);
+  const normalizedQuizQuestions = normalizeQuizQuestions(quizQuestions || []);
   const pageCount = Math.max(1, normalizedPages.length || 1);
   const durationMinutes = pageCount;
   const result = await query(
@@ -346,13 +427,14 @@ export async function createMiniCourse({ title, context, pages, coverImageUrl = 
         page_count,
         duration_minutes,
         pages,
+        quiz_questions,
         cover_image_url,
         cover_image_prompt,
         created_by_user_id,
         created_at,
         updated_at
       )
-      values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, now(), now())
+      values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, now(), now())
       returning *
     `,
     [
@@ -361,6 +443,7 @@ export async function createMiniCourse({ title, context, pages, coverImageUrl = 
       pageCount,
       durationMinutes,
       JSON.stringify(normalizedPages),
+      JSON.stringify(normalizedQuizQuestions),
       String(coverImageUrl || "").trim(),
       String(coverImagePrompt || "").trim().slice(0, 1000),
       createdByUserId
@@ -368,6 +451,23 @@ export async function createMiniCourse({ title, context, pages, coverImageUrl = 
   );
 
   return normalizeCourse(result.rows[0]);
+}
+
+export async function updateMiniCourseQuiz(courseId, quizQuestions = []) {
+  await ensureMiniCoursesSchema();
+  const normalizedQuizQuestions = normalizeQuizQuestions(quizQuestions || []);
+  const result = await query(
+    `
+      update mini_courses
+      set
+        quiz_questions = $2::jsonb,
+        updated_at = now()
+      where id = $1
+      returning *
+    `,
+    [courseId, JSON.stringify(normalizedQuizQuestions)]
+  );
+  return result.rows[0] ? normalizeCourse(result.rows[0]) : null;
 }
 
 export async function createMiniCourseJob({ title, context, requestedModel = "gpt-5.1", requestedPageCount = 8, createdByUserId } = {}) {
@@ -557,6 +657,49 @@ export async function deleteMiniCourse(courseId) {
     [courseId]
   );
   return Boolean(result.rowCount);
+}
+
+export async function saveMiniCourseQuizResult(userId, courseId, { correctAnswers = 0, totalQuestions = 10 } = {}) {
+  await ensureMiniCoursesSchema();
+  const total = Math.max(1, Math.min(10, Number(totalQuestions || 10) || 10));
+  const correct = Math.max(0, Math.min(total, Number(correctAnswers || 0) || 0));
+  const score = Number(((correct / total) * 10).toFixed(1));
+  const result = await query(
+    `
+      insert into mini_course_quiz_results (
+        user_id,
+        course_id,
+        best_score,
+        last_score,
+        best_correct_answers,
+        last_correct_answers,
+        total_questions,
+        attempts_count,
+        updated_at
+      )
+      values ($1, $2, $3, $3, $4, $4, $5, 1, now())
+      on conflict (user_id, course_id)
+      do update set
+        best_score = greatest(mini_course_quiz_results.best_score, $3),
+        last_score = $3,
+        best_correct_answers = greatest(mini_course_quiz_results.best_correct_answers, $4),
+        last_correct_answers = $4,
+        total_questions = $5,
+        attempts_count = mini_course_quiz_results.attempts_count + 1,
+        updated_at = now()
+      returning *
+    `,
+    [userId, courseId, score, correct, total]
+  );
+
+  return {
+    score: Number(result.rows[0]?.last_score || score) || score,
+    bestScore: Number(result.rows[0]?.best_score || score) || score,
+    correctAnswers: correct,
+    totalQuestions: total,
+    attemptsCount: Number(result.rows[0]?.attempts_count || 1) || 1,
+    updatedAt: toIso(result.rows[0]?.updated_at)
+  };
 }
 
 export async function startMiniCourse(userId, courseId) {

@@ -866,6 +866,23 @@
       height: 22px;
       fill: currentColor;
     }
+    .course-card-action.is-success {
+      background: rgba(93, 214, 126, .26);
+    }
+    .course-card-action.is-quiz {
+      background: rgba(82, 171, 255, .22);
+    }
+    .course-card-action.is-loading {
+      pointer-events: none;
+    }
+    .course-action-spinner {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.28);
+      border-top-color: #fff;
+      animation: aiSpin .8s linear infinite;
+    }
     .course-card-action.is-danger {
       background: rgba(255, 115, 132, .22);
     }
@@ -957,6 +974,98 @@
     }
     .course-page-audio {
       width: 100%;
+    }
+    .course-quiz-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+      color: #fff;
+    }
+    .course-quiz-progress {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      opacity: .78;
+      font-weight: 800;
+    }
+    .course-quiz-question {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 38px);
+      line-height: 1.18;
+      font-weight: 800;
+    }
+    .course-quiz-options {
+      display: grid;
+      gap: 12px;
+    }
+    .course-quiz-option {
+      border: 0;
+      border-radius: 20px;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      text-align: left;
+      padding: 18px 20px;
+      font-family: "Open Sans", sans-serif;
+      font-size: 18px;
+      line-height: 1.45;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .18s ease, background .18s ease, opacity .18s ease;
+    }
+    .course-quiz-option:disabled {
+      cursor: default;
+    }
+    .course-quiz-option.is-correct {
+      background: rgba(73, 201, 110, .88);
+      color: #fff;
+    }
+    .course-quiz-option.is-wrong {
+      background: rgba(236, 91, 102, .84);
+      color: #fff;
+    }
+    .course-quiz-option.is-muted {
+      opacity: .78;
+    }
+    .course-quiz-explanation {
+      font-size: 16px;
+      line-height: 1.6;
+      font-weight: 700;
+      color: rgba(255,255,255,.92);
+    }
+    .course-quiz-result {
+      min-height: 100%;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 12px;
+      text-align: center;
+      color: #fff;
+      padding: 24px 12px;
+    }
+    .course-quiz-result h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 48px);
+      font-weight: 800;
+      line-height: 1.06;
+    }
+    .course-quiz-result h2 {
+      margin: 0;
+      font-size: clamp(24px, 3.5vw, 34px);
+      font-weight: 800;
+      line-height: 1.12;
+    }
+    .course-quiz-repeat {
+      margin-top: 10px;
+      border: 0;
+      border-radius: 18px;
+      padding: 14px 22px;
+      background: rgba(255,255,255,.16);
+      color: #fff;
+      font-family: "Open Sans", sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
     }
     .courses-footer {
       justify-content: center;
@@ -1982,12 +2091,18 @@
     let miniCourseMobileTouchStartY = 0;
     let miniCourseMobileTouchStartX = 0;
     let miniCourseMobileWheelLocked = false;
+    let miniCourseDownloadStates = {};
+    let currentMiniCourseQuizIndex = -1;
+    let currentMiniCourseQuizAnswers = [];
+    let currentMiniCourseQuizResult = null;
+    let currentMiniCourseQuizSubmitted = false;
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
     const iconBase = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%ADcones/";
     const miniSessionKey = "turma_do_printy_token";
     const miniPlannerDraftKey = "turma_do_printy_mini_planner_draft";
+    const miniCourseDownloadsKey = "turma_do_printy_mini_course_downloads";
 
     function iconUrlById(id) {
       const safe = Math.max(1, Math.min(48, Number(id) || 1));
@@ -2029,6 +2144,37 @@
       miniCourseReadGateKey = "";
       miniCourseReadGateStartedAt = 0;
       miniCourseReadGateRequiredMs = 0;
+    }
+    function resetMiniCourseQuizState() {
+      currentMiniCourseQuizIndex = -1;
+      currentMiniCourseQuizAnswers = [];
+      currentMiniCourseQuizResult = null;
+      currentMiniCourseQuizSubmitted = false;
+    }
+    function getMiniCourseQuizQuestions() {
+      return Array.isArray(currentMiniCourse?.quizQuestions) ? currentMiniCourse.quizQuestions : [];
+    }
+    function getMiniCourseTotalStages() {
+      if (!currentMiniCourse) {
+        return 1;
+      }
+      const basePages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const quizQuestions = getMiniCourseQuizQuestions();
+      return quizQuestions.length ? basePages + quizQuestions.length + 1 : basePages;
+    }
+    function getMiniCourseCurrentStageIndex() {
+      if (!currentMiniCourse) {
+        return 1;
+      }
+      const basePages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const quizQuestions = getMiniCourseQuizQuestions();
+      if (!quizQuestions.length || currentMiniCourseQuizIndex < 0) {
+        return currentMiniCoursePage;
+      }
+      if (currentMiniCourseQuizResult) {
+        return basePages + quizQuestions.length + 1;
+      }
+      return basePages + currentMiniCourseQuizIndex + 1;
     }
     function getMiniCoursePageTimingText(course, page) {
       return [
@@ -2206,6 +2352,18 @@
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5A9.5 9.5 0 1 0 21.5 12 9.51 9.51 0 0 0 12 2.5m0 17A7.5 7.5 0 1 1 19.5 12 7.51 7.51 0 0 1 12 19.5m.75-11.25h-1.5v4.06l3.52 2.1.76-1.25-2.78-1.65z"/></svg>`;
     }
 
+    function getCheckSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.55 18.2-5.3-5.3 1.41-1.4 3.89 3.88 8.79-8.78 1.41 1.41z"/></svg>`;
+    }
+
+    function getQuizSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18h2v2h-2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8m-.13-5h1.5c0-2.25 3.38-2.53 3.38-5.5a4.25 4.25 0 0 0-8.5 0h1.5a2.75 2.75 0 0 1 5.5 0c0 1.84-3.38 2.06-3.38 5.5"/></svg>`;
+    }
+
+    function getSpinnerSvg() {
+      return `<span class="course-action-spinner" aria-hidden="true"></span>`;
+    }
+
     function getListSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>`;
     }
@@ -2216,6 +2374,80 @@
 
     function getMiniChatIconSvg() {
       return `<svg class="create-chat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C7.59 3 4 5.91 4 9.5c0 1.98 1.02 3.74 2.72 4.92L6 18l3.78-1.98c.7.16 1.42.24 2.22.24 4.41 0 8-2.91 8-6.5S16.41 3 12 3zm-3 7h6v1.5H9V10zm0-2.5h10V9H9V7.5zm0 5H16V14H9v-1.5z"/></svg>`;
+    }
+
+    function loadMiniCourseDownloads() {
+      try {
+        const raw = window.localStorage.getItem(miniCourseDownloadsKey);
+        return raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveMiniCourseDownloadsMap(map) {
+      window.localStorage.setItem(miniCourseDownloadsKey, JSON.stringify(map));
+    }
+
+    function isMiniCourseSavedLocally(courseId) {
+      const downloads = loadMiniCourseDownloads();
+      return Boolean(downloads[String(courseId || "").trim()]);
+    }
+
+    function getMiniCourseDownloadButtonMarkup(courseId) {
+      const safeCourseId = String(courseId || "").trim();
+      const state = miniCourseDownloadStates[safeCourseId] || (isMiniCourseSavedLocally(safeCourseId) ? "saved" : "idle");
+      const classNames = ["course-card-action"];
+      let icon = getDownloadSvg();
+      let label = "Salvar curso no app";
+      if (state === "saving") {
+        classNames.push("is-loading");
+        icon = getSpinnerSvg();
+        label = "Salvando curso";
+      } else if (state === "saved") {
+        classNames.push("is-success");
+        icon = getCheckSvg();
+        label = "Curso salvo no app";
+      }
+      return `<button class="${classNames.join(" ")}" type="button" data-download-course-id="${escapeAttr(safeCourseId)}" aria-label="${escapeAttr(label)}">${icon}</button>`;
+    }
+
+    function getMiniCourseQuizAdminButtonMarkup(course) {
+      if (!isMiniCourseAdmin) {
+        return "";
+      }
+      const hasQuiz = Boolean(course?.hasQuiz);
+      const classNames = ["course-card-action", "is-quiz"];
+      if (hasQuiz) {
+        classNames.push("is-success");
+      }
+      return `<button class="${classNames.join(" ")}" type="button" data-generate-quiz-course-id="${escapeAttr(course?.id || "")}" aria-label="${escapeAttr(hasQuiz ? "Quiz gerado" : "Gerar quiz do curso")}">${hasQuiz ? getCheckSvg() : getQuizSvg()}</button>`;
+    }
+
+    function playMiniCourseTone(type = "success") {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        return;
+      }
+      try {
+        const audioContext = new AudioContextClass();
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.type = "sine";
+        oscillator.frequency.value = type === "success" ? 880 : 220;
+        gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.14, audioContext.currentTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + (type === "success" ? 0.22 : 0.3));
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + (type === "success" ? 0.24 : 0.32));
+        oscillator.onended = () => {
+          void audioContext.close().catch(() => {});
+        };
+      } catch (_) {
+        // ignore audio failures
+      }
     }
 
     function formatMiniChatTimestamp(value) {
@@ -3058,7 +3290,8 @@
             <div class="course-card-mobile-hint">Deslize para ver o próximo • toque para iniciar</div>
           </div>
           <div class="mobile-course-actions">
-            <button class="course-card-action" type="button" data-download-course-id="${escapeAttr(course.id)}" aria-label="Baixar curso">${getDownloadSvg()}</button>
+            ${getMiniCourseDownloadButtonMarkup(course.id)}
+            ${getMiniCourseQuizAdminButtonMarkup(course)}
             ${isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course.id)}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""}
           </div>
         </article>
@@ -3079,6 +3312,12 @@
         button.onclick = async (event) => {
           event.stopPropagation();
           await downloadMiniCourse(button.getAttribute("data-download-course-id") || "");
+        };
+      });
+      container.querySelectorAll("[data-generate-quiz-course-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          await generateMiniCourseQuizAdmin(button.getAttribute("data-generate-quiz-course-id") || "");
         };
       });
       container.querySelectorAll("[data-delete-course-id]").forEach((button) => {
@@ -3208,8 +3447,7 @@
       const closeButton = $("closeCourses");
       if (title) {
         if (currentMiniCourse) {
-          const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
-          title.textContent = `${Math.min(currentMiniCoursePage, totalPages)}/${totalPages}`;
+          title.textContent = `${getMiniCourseCurrentStageIndex()}/${getMiniCourseTotalStages()}`;
         } else {
           title.textContent = "Cursos";
         }
@@ -3234,12 +3472,24 @@
       }
 
       const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const quizQuestions = getMiniCourseQuizQuestions();
       prev.hidden = false;
       next.hidden = false;
-      prev.disabled = currentMiniCoursePage <= 1;
+      prev.disabled = currentMiniCoursePage <= 1 && currentMiniCourseQuizIndex < 0;
       next.disabled = false;
-      setCourseFooterStatus(`${currentMiniCourse.title} • ${currentMiniCoursePage}/${totalPages}`);
-      next.setAttribute("aria-label", currentMiniCoursePage >= totalPages ? "Concluir curso" : "Próxima página");
+      if (currentMiniCourseQuizResult) {
+        setCourseFooterStatus(`${currentMiniCourse.title} • Resultado do quiz`);
+        next.hidden = true;
+      } else if (currentMiniCourseQuizIndex >= 0) {
+        setCourseFooterStatus(`${currentMiniCourse.title} • Pergunta ${currentMiniCourseQuizIndex + 1}/${quizQuestions.length}`);
+        next.hidden = true;
+      } else {
+        setCourseFooterStatus(`${currentMiniCourse.title} • ${currentMiniCoursePage}/${totalPages}`);
+        next.hidden = false;
+        next.setAttribute("aria-label", currentMiniCoursePage >= totalPages
+          ? (quizQuestions.length ? "Iniciar quiz" : "Concluir curso")
+          : "Próxima página");
+      }
     }
 
     function renderMiniCoursesList() {
@@ -3296,7 +3546,8 @@
               <div class="course-card-mobile-hint">Toque na capa para iniciar</div>
             </div>
             <div class="course-card-actions">
-              <button class="course-card-action" type="button" data-download-course-id="${escapeAttr(course.id)}" aria-label="Baixar curso">${getDownloadSvg()}</button>
+              ${getMiniCourseDownloadButtonMarkup(course.id)}
+              ${getMiniCourseQuizAdminButtonMarkup(course)}
               ${isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course.id)}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""}
             </div>
           </div>
@@ -3320,6 +3571,12 @@
           await downloadMiniCourse(button.getAttribute("data-download-course-id") || "");
         };
       });
+      listView.querySelectorAll("[data-generate-quiz-course-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          await generateMiniCourseQuizAdmin(button.getAttribute("data-generate-quiz-course-id") || "");
+        };
+      });
       listView.querySelectorAll("[data-delete-course-id]").forEach((button) => {
         button.onclick = async (event) => {
           event.stopPropagation();
@@ -3333,6 +3590,97 @@
 
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
+    }
+
+    function renderMiniCourseQuizResult(readerView) {
+      const result = currentMiniCourseQuizResult || { score: 0 };
+      const canRepeat = Number(result.score || 0) < 10;
+      readerView.innerHTML = `
+        <div class="course-quiz-result">
+          <h1>Curso concluído</h1>
+          <h2>nota: ${escapeText(Number(result.score || 0).toFixed(1))}</h2>
+          ${canRepeat ? `<button id="repeatMiniCourseQuiz" class="course-quiz-repeat" type="button">Repetir Quiz</button>` : ""}
+        </div>
+      `;
+      const repeatButton = $("repeatMiniCourseQuiz");
+      if (repeatButton) {
+        repeatButton.onclick = () => {
+          currentMiniCourseQuizAnswers = [];
+          currentMiniCourseQuizResult = null;
+          currentMiniCourseQuizSubmitted = false;
+          currentMiniCourseQuizIndex = 0;
+          renderMiniCourseReader();
+        };
+      }
+    }
+
+    function renderMiniCourseQuizQuestion(readerView) {
+      const quizQuestions = getMiniCourseQuizQuestions();
+      const question = quizQuestions[currentMiniCourseQuizIndex];
+      if (!question) {
+        currentMiniCourseQuizIndex = -1;
+        renderMiniCourseReader();
+        return;
+      }
+
+      const answerState = currentMiniCourseQuizAnswers[currentMiniCourseQuizIndex] || null;
+      const isAnswered = Boolean(answerState);
+      readerView.innerHTML = `
+        <div class="course-quiz-shell">
+          <div class="course-quiz-progress">Pergunta ${currentMiniCourseQuizIndex + 1} de ${quizQuestions.length}</div>
+          <h2 class="course-quiz-question">${escapeText(question.question)}</h2>
+          <div class="course-quiz-options">
+            ${question.options.map((option, index) => {
+              const classNames = ["course-quiz-option"];
+              if (isAnswered) {
+                if (index === Number(question.correctIndex)) {
+                  classNames.push("is-correct");
+                } else {
+                  classNames.push("is-wrong");
+                }
+              }
+              return `<button class="${classNames.join(" ")}" type="button" data-quiz-option-index="${index}" ${isAnswered ? "disabled" : ""}>${escapeText(option)}</button>`;
+            }).join("")}
+          </div>
+          ${isAnswered && question.explanation ? `<div class="course-quiz-explanation">${escapeText(question.explanation)}</div>` : ""}
+        </div>
+      `;
+
+      readerView.querySelectorAll("[data-quiz-option-index]").forEach((button) => {
+        button.onclick = async () => {
+          const selectedIndex = Number(button.getAttribute("data-quiz-option-index") || -1);
+          const correct = selectedIndex === Number(question.correctIndex);
+          currentMiniCourseQuizAnswers[currentMiniCourseQuizIndex] = { selectedIndex, correct };
+          playMiniCourseTone(correct ? "success" : "error");
+          renderMiniCourseReader();
+          window.setTimeout(async () => {
+            if (currentMiniCourseQuizIndex >= quizQuestions.length - 1) {
+              if (!currentMiniCourseQuizSubmitted) {
+                currentMiniCourseQuizSubmitted = true;
+                try {
+                  currentMiniCourseQuizResult = await submitMiniCourseQuizResult();
+                } catch (error) {
+                  setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao salvar a nota.");
+                  const correctAnswers = quizQuestions.reduce((total, item, answerIndex) => (
+                    Number(currentMiniCourseQuizAnswers[answerIndex]?.selectedIndex) === Number(item.correctIndex) ? total + 1 : total
+                  ), 0);
+                  currentMiniCourseQuizResult = {
+                    score: Number(((correctAnswers / Math.max(1, quizQuestions.length)) * 10).toFixed(1)),
+                    bestScore: Number(((correctAnswers / Math.max(1, quizQuestions.length)) * 10).toFixed(1)),
+                    correctAnswers,
+                    totalQuestions: quizQuestions.length,
+                    attemptsCount: 1
+                  };
+                }
+              }
+              renderMiniCourseReader();
+              return;
+            }
+            currentMiniCourseQuizIndex += 1;
+            renderMiniCourseReader();
+          }, 700);
+        };
+      });
     }
 
     function renderMiniCourseReader() {
@@ -3351,16 +3699,34 @@
 
       const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
       currentMiniCoursePage = Math.max(1, Math.min(totalPages, Number(currentMiniCoursePage || 1) || 1));
+      const quizQuestions = getMiniCourseQuizQuestions();
       const currentPage = currentMiniCourse.pages?.[currentMiniCoursePage - 1] || {};
       const paragraphs = Array.isArray(currentPage.paragraphs) ? currentPage.paragraphs : [];
       const bullets = Array.isArray(currentPage.bullets) ? currentPage.bullets : [];
       const tableRows = Array.isArray(currentPage.tableRows) ? currentPage.tableRows : [];
 
-      syncMiniCourseReadGate(currentPage);
       clearMiniCourseAnimationTimers();
       readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
       listView.hidden = true;
       readerView.hidden = false;
+
+      if (quizQuestions.length && currentMiniCourseQuizResult) {
+        renderMiniCourseQuizResult(readerView);
+        readerView.scrollTop = 0;
+        updateMiniCoursesHeader();
+        updateMiniCoursesFooter();
+        return;
+      }
+
+      if (quizQuestions.length && currentMiniCourseQuizIndex >= 0) {
+        renderMiniCourseQuizQuestion(readerView);
+        readerView.scrollTop = 0;
+        updateMiniCoursesHeader();
+        updateMiniCoursesFooter();
+        return;
+      }
+
+      syncMiniCourseReadGate(currentPage);
       readerView.innerHTML = `
         <div class="course-page-shell">
           <h2 class="course-page-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
@@ -3434,6 +3800,7 @@
       $("coursesModal").classList.add("show");
       $("coursesModal").setAttribute("aria-hidden", "false");
       resetMiniCourseReadGate();
+      resetMiniCourseQuizState();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
       renderMiniCoursesList();
@@ -3448,6 +3815,7 @@
       closeMiniCourseAdminModal();
       closeMiniCourseJobsModal();
       resetMiniCourseReadGate();
+      resetMiniCourseQuizState();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
     }
@@ -3509,9 +3877,11 @@
           title: "Carregando curso",
           pageCount: 1,
           pages: [],
+          quizQuestions: [],
           progress: { currentPage: 1, pagesRead: 1 }
         };
         resetMiniCourseReadGate();
+        resetMiniCourseQuizState();
         currentMiniCoursePage = 1;
         renderMiniCourseReaderLoading();
         const token = getMiniToken();
@@ -3535,9 +3905,11 @@
         updateMiniCoursesUserCard();
         currentMiniCourse = payload.course || null;
         currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || 1) || 1);
+        resetMiniCourseQuizState();
         renderMiniCourseReader();
       } catch (error) {
         resetMiniCourseReadGate();
+        resetMiniCourseQuizState();
         currentMiniCourse = null;
         currentMiniCoursePage = 1;
         setCourseFooterStatus(error instanceof Error ? error.message : "Erro ao abrir o curso.");
@@ -3551,22 +3923,99 @@
         return;
       }
 
-      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}`);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || "Falha ao baixar curso.");
+      miniCourseDownloadStates[safeCourseId] = "saving";
+      renderMiniCoursesList();
+
+      try {
+        const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao salvar curso.");
+        }
+
+        const course = payload?.course || {};
+        const downloads = loadMiniCourseDownloads();
+        downloads[safeCourseId] = {
+          savedAt: new Date().toISOString(),
+          course
+        };
+        saveMiniCourseDownloadsMap(downloads);
+        miniCourseDownloadStates[safeCourseId] = "saved";
+        renderMiniCoursesList();
+        setCourseFooterStatus("Curso salvo no app com sucesso.");
+      } catch (error) {
+        delete miniCourseDownloadStates[safeCourseId];
+        renderMiniCoursesList();
+        throw error;
+      }
+    }
+
+    async function generateMiniCourseQuizAdmin(courseId) {
+      if (!isMiniCourseAdmin) {
+        return;
       }
 
-      const course = payload?.course || {};
-      const blob = new Blob([JSON.stringify(course, null, 2)], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${String(course.title || "curso-mini").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || "curso-mini"}.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      const safeCourseId = String(courseId || "").trim();
+      if (!safeCourseId) {
+        return;
+      }
+
+      setCourseFooterStatus("Gerando quiz do curso...");
+      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}/quiz/generate`, {
+        method: "POST"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao gerar quiz.");
+      }
+
+      const updatedCourse = payload?.course || null;
+      miniCourses = miniCourses.map((course) => course.id === safeCourseId ? {
+        ...course,
+        hasQuiz: Boolean(updatedCourse?.hasQuiz),
+        quizQuestions: []
+      } : course);
+      if (currentMiniCourse?.id === safeCourseId && updatedCourse) {
+        currentMiniCourse = {
+          ...currentMiniCourse,
+          hasQuiz: Boolean(updatedCourse?.hasQuiz),
+          quizQuestions: Array.isArray(updatedCourse?.quizQuestions) ? updatedCourse.quizQuestions : currentMiniCourse.quizQuestions
+        };
+      }
+      renderMiniCoursesList();
+      setCourseFooterStatus(String(payload?.feedback || "Quiz gerado com sucesso."));
+    }
+
+    async function submitMiniCourseQuizResult() {
+      const quizQuestions = getMiniCourseQuizQuestions();
+      const payloadAnswers = quizQuestions.map((question, index) => ({
+        questionId: question.id,
+        selectedIndex: Number(currentMiniCourseQuizAnswers[index]?.selectedIndex)
+      }));
+      const correctAnswers = quizQuestions.reduce((total, question, index) => (
+        Number(currentMiniCourseQuizAnswers[index]?.selectedIndex) === Number(question.correctIndex) ? total + 1 : total
+      ), 0);
+      const fallbackResult = {
+        score: Number(((correctAnswers / Math.max(1, quizQuestions.length)) * 10).toFixed(1)),
+        bestScore: Number(((correctAnswers / Math.max(1, quizQuestions.length)) * 10).toFixed(1)),
+        correctAnswers,
+        totalQuestions: quizQuestions.length,
+        attemptsCount: 1
+      };
+
+      if (!getMiniToken()) {
+        return fallbackResult;
+      }
+
+      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(currentMiniCourse.id)}/quiz/submit`, {
+        method: "POST",
+        body: JSON.stringify({ answers: payloadAnswers })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao salvar a nota do quiz.");
+      }
+      return payload?.result || fallbackResult;
     }
 
     async function deleteMiniCourseAdmin(courseId) {
@@ -3662,6 +4111,29 @@
         return;
       }
 
+      const quizQuestions = getMiniCourseQuizQuestions();
+      if (currentMiniCourseQuizResult) {
+        if (direction < 0 && quizQuestions.length) {
+          currentMiniCourseQuizResult = null;
+          currentMiniCourseQuizIndex = quizQuestions.length - 1;
+          renderMiniCourseReader();
+        }
+        return;
+      }
+
+      if (currentMiniCourseQuizIndex >= 0) {
+        if (direction < 0) {
+          if (currentMiniCourseQuizIndex === 0) {
+            currentMiniCourseQuizIndex = -1;
+            currentMiniCoursePage = Math.max(1, Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1);
+          } else {
+            currentMiniCourseQuizIndex -= 1;
+          }
+          renderMiniCourseReader();
+        }
+        return;
+      }
+
       const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
       const targetPage = Math.max(1, Math.min(totalPages, currentMiniCoursePage + direction));
 
@@ -3680,6 +4152,11 @@
 
       if (direction > 0 && currentMiniCoursePage >= totalPages) {
         await persistMiniCourseProgress(totalPages);
+        if (quizQuestions.length) {
+          currentMiniCourseQuizIndex = 0;
+          renderMiniCourseReader();
+          return;
+        }
         setCourseFooterStatus("Curso concluído.");
         return;
       }

@@ -29,7 +29,9 @@ import {
   listMiniCourseJobs,
   listMiniCourses,
   resetRunningMiniCourseJobs,
+  saveMiniCourseQuizResult,
   startMiniCourse,
+  updateMiniCourseQuiz,
   updateMiniCourseJobProgress,
   updateMiniCourseProgress
 } from "./src/mini-courses.js";
@@ -2660,6 +2662,42 @@ function buildMiniCourseChunks(kinds, chunkSize = 4) {
   return chunks;
 }
 
+function buildMiniCourseQuizSchema(questionCount = 10) {
+  return {
+    name: "mini_course_quiz",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["questions"],
+      properties: {
+        questions: {
+          type: "array",
+          minItems: questionCount,
+          maxItems: questionCount,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "question", "options", "correctIndex", "explanation"],
+            properties: {
+              id: { type: "string" },
+              question: { type: "string" },
+              options: {
+                type: "array",
+                minItems: 4,
+                maxItems: 4,
+                items: { type: "string" }
+              },
+              correctIndex: { type: "integer" },
+              explanation: { type: "string" }
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
 class MiniCourseGenerationError extends Error {
   constructor(message, feedback = "", generatedPageCount = 0) {
     super(message);
@@ -2944,7 +2982,8 @@ async function handleMiniCoursesListRequest(request, response) {
     ]);
     const courseSummaries = courses.map((course) => ({
       ...course,
-      pages: []
+      pages: [],
+      quizQuestions: []
     }));
 
     sendJson(response, 200, {
@@ -3066,6 +3105,161 @@ async function handleMiniCourseDeleteRequest(request, response, courseId) {
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel excluir o curso."
+    });
+  }
+}
+
+function buildMiniCourseQuizSourceText(course) {
+  const pages = Array.isArray(course?.pages) ? course.pages : [];
+  return [
+    `Titulo do curso: ${String(course?.title || "").trim()}`,
+    `Contexto do curso: ${String(course?.context || "").trim()}`,
+    ...pages.flatMap((page, index) => [
+      `Pagina ${index + 1}: ${String(page?.title || "").trim()}`,
+      ...(Array.isArray(page?.paragraphs) ? page.paragraphs : []).map((item) => String(item || "").trim()),
+      ...(Array.isArray(page?.bullets) ? page.bullets : []).map((item) => String(item || "").trim()),
+      ...(Array.isArray(page?.tableRows) ? page.tableRows : []).flatMap((row) => [
+        String(row?.label || "").trim(),
+        String(row?.value || "").trim()
+      ])
+    ])
+  ].filter(Boolean).join("\n");
+}
+
+async function handleMiniCourseQuizGenerateRequest(request, response, courseId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  try {
+    const course = await getMiniCourseById(courseId, adminUser.id);
+    if (!course) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    const quizModel = "gpt-5.1";
+    const requestPayload = {
+      model: quizModel,
+      temperature: 0.35,
+      max_completion_tokens: 2600,
+      response_format: {
+        type: "json_schema",
+        json_schema: buildMiniCourseQuizSchema(10)
+      },
+      messages: [
+        {
+          role: "system",
+          content: buildMiniSystemPrompt({
+            modeKey: "project",
+            sharedContext: await getContextPrompt(),
+            plannerContext: MINI_MINISTRY_CONTEXT,
+            theme: course.title,
+            extraInstructions: [
+              "Crie um quiz de 10 perguntas para professores com base no curso.",
+              "Cada pergunta deve ter exatamente 4 alternativas.",
+              "Apenas 1 alternativa pode estar correta e 3 devem estar erradas, mas plausiveis.",
+              "As perguntas devem se basear no conteudo real do curso.",
+              "Escreva em portugues do Brasil.",
+              "Nao repita perguntas.",
+              "Responda apenas em JSON estruturado."
+            ].join(" ")
+          })
+        },
+        {
+          role: "user",
+          content: [
+            "Crie 10 perguntas de multipla escolha com base no curso abaixo.",
+            buildMiniCourseQuizSourceText(course)
+          ].join("\n\n")
+        }
+      ]
+    };
+    if (supportsReasoningEffortForModel(quizModel)) {
+      requestPayload.reasoning_effort = "none";
+    }
+
+    const completion = await createChatCompletion(apiKey, requestPayload);
+    const raw = extractChatCompletionText(completion);
+    const parsed = parseStructuredJsonText(raw);
+    const updatedCourse = await updateMiniCourseQuiz(courseId, Array.isArray(parsed?.questions) ? parsed.questions : []);
+    if (!updatedCourse || !updatedCourse.hasQuiz) {
+      sendJson(response, 422, { error: "Nao foi possivel montar o quiz do curso." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      course: {
+        ...updatedCourse,
+        pages: []
+      },
+      feedback: "Quiz gerado com 10 perguntas."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel gerar o quiz."
+    });
+  }
+}
+
+async function handleMiniCourseQuizSubmitRequest(request, response, courseId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const course = await getMiniCourseById(courseId, user.id);
+    if (!course) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+    const quizQuestions = Array.isArray(course.quizQuestions) ? course.quizQuestions : [];
+    if (!quizQuestions.length) {
+      sendJson(response, 404, { error: "Este curso ainda nao possui quiz." });
+      return;
+    }
+
+    const answers = Array.isArray(body?.answers) ? body.answers : [];
+    let correctAnswers = 0;
+    quizQuestions.forEach((question, index) => {
+      const selectedIndex = Number(answers[index]?.selectedIndex);
+      if (Number.isInteger(selectedIndex) && selectedIndex === Number(question.correctIndex)) {
+        correctAnswers += 1;
+      }
+    });
+
+    const result = await saveMiniCourseQuizResult(user.id, courseId, {
+      correctAnswers,
+      totalQuestions: quizQuestions.length
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      result
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar a nota do quiz."
     });
   }
 }
@@ -5501,6 +5695,18 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/mini/courses/generate") {
     await handleMiniCourseGenerateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/quiz/generate")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/quiz\/generate$/, ""));
+    await handleMiniCourseQuizGenerateRequest(request, response, courseId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/quiz/submit")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/quiz\/submit$/, ""));
+    await handleMiniCourseQuizSubmitRequest(request, response, courseId);
     return;
   }
 
