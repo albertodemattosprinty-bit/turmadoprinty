@@ -863,12 +863,14 @@
       letter-spacing: .16em;
       opacity: .82;
       font-weight: 800;
+      min-height: 18px;
     }
     .course-page-title {
       margin: 0;
       font-size: clamp(28px, 4vw, 40px);
       line-height: 1.08;
       font-weight: 800;
+      min-height: 44px;
     }
     .course-page-paragraph {
       margin: 0;
@@ -876,6 +878,7 @@
       line-height: 1.75;
       font-weight: 700;
       color: rgba(255,255,255,.96);
+      min-height: 2.2em;
     }
     .course-page-bullets {
       margin: 0;
@@ -889,6 +892,20 @@
     .course-page-table {
       display: grid;
       gap: 10px;
+    }
+    .course-word {
+      opacity: 0;
+      animation: courseWordFade .5s ease forwards;
+      white-space: pre-wrap;
+    }
+    .course-step-item {
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    .course-step-item.is-visible {
+      opacity: 1;
+      transform: translateY(0);
     }
     .course-page-row {
       display: grid;
@@ -991,6 +1008,16 @@
     .course-admin-submit {
       margin-top: 12px;
       width: 100%;
+    }
+    @keyframes courseWordFade {
+      from {
+        opacity: 0;
+        filter: blur(8px);
+      }
+      to {
+        opacity: 1;
+        filter: blur(0);
+      }
     }
     @keyframes aiSpin {
       to { transform: rotate(360deg); }
@@ -1637,6 +1664,8 @@
     let isMiniCourseAdmin = false;
     let miniCoursesLoading = false;
     let miniCoursesError = "";
+    let miniCourseAnimationTimers = [];
+    let miniCourseAnimationRunId = 0;
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
@@ -1664,6 +1693,21 @@
       if (footer) {
         footer.textContent = text || "";
       }
+    }
+    function clearMiniCourseAnimationTimers() {
+      miniCourseAnimationTimers.forEach((timer) => clearTimeout(timer));
+      miniCourseAnimationTimers = [];
+      miniCourseAnimationRunId += 1;
+    }
+    function scheduleMiniCourseAnimation(callback, delay) {
+      const runId = miniCourseAnimationRunId;
+      const timer = window.setTimeout(() => {
+        if (runId !== miniCourseAnimationRunId) {
+          return;
+        }
+        callback();
+      }, Math.max(0, Number(delay || 0) || 0));
+      miniCourseAnimationTimers.push(timer);
     }
     function getDownloadSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5zm7-18v12.17l3.59-3.58L17 12l-5 5-5-5 1.41-1.41L11 14.17V2z"/></svg>`;
@@ -2469,6 +2513,7 @@
         return;
       }
 
+      clearMiniCourseAnimationTimers();
       readerView.hidden = true;
       listView.hidden = false;
 
@@ -2556,15 +2601,16 @@
         closing: "Conclusão"
       };
 
+      clearMiniCourseAnimationTimers();
       listView.hidden = true;
       readerView.hidden = false;
       readerView.innerHTML = `
         <div class="course-page-shell">
-          <div class="course-page-kicker">${escapeText(kindLabels[currentPage.kind] || "Curso")}</div>
-          <h2 class="course-page-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
-          ${paragraphs.map((paragraph) => `<p class="course-page-paragraph">${escapeText(paragraph)}</p>`).join("")}
-          ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li>${escapeText(item)}</li>`).join("")}</ul>` : ""}
-          ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
+          <div class="course-page-kicker" data-animate-text="${escapeAttr(kindLabels[currentPage.kind] || "Curso")}"></div>
+          <h2 class="course-page-title" data-animate-text="${escapeAttr(currentPage.title || currentMiniCourse.title)}"></h2>
+          ${paragraphs.map((paragraph) => `<p class="course-page-paragraph" data-animate-text="${escapeAttr(paragraph)}"></p>`).join("")}
+          ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li class="course-step-item">${escapeText(item)}</li>`).join("")}</ul>` : ""}
+          ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row course-step-item"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
           ${(currentPage.imageUrl || currentPage.audioUrl) ? `
             <div class="course-page-media">
               ${currentPage.imageUrl ? `<img src="${escapeAttr(currentPage.imageUrl)}" alt="${escapeAttr(currentPage.title || currentMiniCourse.title)}">` : ""}
@@ -2574,9 +2620,43 @@
         </div>
       `;
       readerView.scrollTop = 0;
+      playMiniCoursePageAnimation(readerView);
 
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
+    }
+
+    function playMiniCoursePageAnimation(readerView) {
+      const textNodes = Array.from(readerView.querySelectorAll("[data-animate-text]"));
+      const stepNodes = Array.from(readerView.querySelectorAll(".course-step-item"));
+      let textDelay = 0;
+
+      textNodes.forEach((node) => {
+        const fullText = String(node.getAttribute("data-animate-text") || "").trim();
+        const words = fullText ? fullText.split(/\s+/).filter(Boolean) : [];
+        node.textContent = "";
+        if (!words.length) {
+          return;
+        }
+
+        words.forEach((word, index) => {
+          scheduleMiniCourseAnimation(() => {
+            const span = document.createElement("span");
+            span.className = "course-word";
+            span.textContent = `${word}${index < words.length - 1 ? " " : ""}`;
+            node.appendChild(span);
+          }, textDelay + (index * 250));
+        });
+
+        textDelay += (words.length * 250) + 250;
+      });
+
+      stepNodes.forEach((node, index) => {
+        node.classList.remove("is-visible");
+        scheduleMiniCourseAnimation(() => {
+          node.classList.add("is-visible");
+        }, textDelay + (index * 2000));
+      });
     }
 
     function renderMiniCourseReaderLoading() {
@@ -2585,6 +2665,7 @@
       if (!listView || !readerView) {
         return;
       }
+      clearMiniCourseAnimationTimers();
       listView.hidden = true;
       readerView.hidden = false;
       readerView.innerHTML = `<div class="course-reader-loading">Abrindo o conteúdo do curso...</div>`;
@@ -2637,6 +2718,7 @@
     }
 
     function closeMiniCoursesModal() {
+      clearMiniCourseAnimationTimers();
       $("coursesModal").classList.remove("show");
       $("coursesModal").setAttribute("aria-hidden", "true");
       closeMiniCoursesUserModal();
@@ -2864,19 +2946,21 @@
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-          throw new Error(payload.error || "Falha ao gerar curso.");
+          throw new Error(payload.feedback || payload.error || "Falha ao gerar curso.");
         }
 
+        const feedback = String(payload?.feedback || `Curso criado com ${pageCount} páginas.`).trim();
         closeMiniCourseAdminModal();
         await loadMiniCourses();
         if (status) {
-          status.textContent = "";
+          status.textContent = feedback;
         }
-        setCourseFooterStatus("Curso criado com sucesso.");
+        setCourseFooterStatus(feedback);
       } catch (error) {
         if (status) {
           status.textContent = error instanceof Error ? error.message : "Erro ao gerar curso.";
         }
+        setCourseFooterStatus(error instanceof Error ? error.message : "Erro ao gerar curso.");
       } finally {
         if (button) {
           button.disabled = false;
