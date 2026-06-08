@@ -2191,6 +2191,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
     const mainTitle = String(parsed?.mainTitle || `Plano de Aula: ${themePrompt}`).trim();
     const intro = String(parsed?.intro || "").trim();
     const parts = Array.isArray(parsed?.parts) ? parsed.parts : [];
+    const plainOutput = [intro, ...parts.map((item) => String(item?.content || "").trim())].filter(Boolean).join("\n\n").trim();
     const normalizedParts = stageNames.map((name, index) => {
       const source = parts[index] || {};
       return {
@@ -2200,12 +2201,32 @@ async function handleMiniLessonPlanGenerate(request, response) {
       };
     });
 
+    const fallbackChunks = plainOutput
+      ? plainOutput.split(/\n{2,}/).map((chunk) => chunk.trim()).filter(Boolean)
+      : [];
+
+    const balancedParts = normalizedParts.map((part, index) => {
+      const ownContent = String(part.content || "").trim();
+      if (ownContent && ownContent !== `Conteudo para ${part.title}.`) {
+        return part;
+      }
+
+      const fallbackText = fallbackChunks[index] || fallbackChunks[0] || "";
+      return {
+        ...part,
+        content: fallbackText || part.content
+      };
+    });
+
+    const hasAnyRealPartContent = balancedParts.some((part) => String(part.content || "").trim() && !String(part.content || "").startsWith("Conteudo para "));
+    const finalParts = hasAnyRealPartContent ? balancedParts : normalizedParts;
+
     sendJson(response, 200, {
       ok: true,
       model,
       mainTitle,
       intro,
-      parts: normalizedParts
+      parts: finalParts
     });
   } catch (error) {
     sendJson(response, 500, {

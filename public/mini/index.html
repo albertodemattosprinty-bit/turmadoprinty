@@ -333,27 +333,7 @@
       letter-spacing: -0.04em;
     }
     .ai-progress-stages {
-      display: grid;
-      gap: 8px;
-      width: min(100%, 460px);
-      margin-top: 2px;
-    }
-    .ai-progress-stage-item {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: center;
-      font-family: "Open Sans", sans-serif;
-      font-size: 12px;
-      padding: 7px 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.1);
-      color: rgba(255,255,255,.86);
-    }
-    .ai-progress-stage-item.active {
-      background: rgba(255,255,255,.2);
-      color: #fff;
-      box-shadow: 0 10px 22px rgba(0,0,0,.12);
+      display: none;
     }
     .ai-result {
       background: rgba(255,255,255,.14);
@@ -680,13 +660,7 @@
           <div id="aiProgressFill" class="ai-progress-fill"></div>
         </div>
         <div id="aiProgressPercent" class="ai-progress-percent">0%</div>
-        <div class="ai-progress-stages" aria-hidden="true">
-          <div id="aiStageItem0" class="ai-progress-stage-item active"><span>Entendendo ideias</span><span>20%</span></div>
-          <div id="aiStageItem1" class="ai-progress-stage-item"><span>Consultando a bíblia</span><span>40%</span></div>
-          <div id="aiStageItem2" class="ai-progress-stage-item"><span>Criando esboço</span><span>60%</span></div>
-          <div id="aiStageItem3" class="ai-progress-stage-item"><span>Afinando os detalhes</span><span>80%</span></div>
-          <div id="aiStageItem4" class="ai-progress-stage-item"><span>Finalizando</span><span>100%</span></div>
-        </div>
+        <div class="ai-progress-stages" aria-hidden="true"></div>
       </div>
     </div>
 
@@ -736,6 +710,7 @@
     let aiWizardStep = 1;
     let aiProgressTimer = null;
     let aiProgressValue = 0;
+    let aiProgressStartAt = 0;
     let aiIsGenerating = false;
     let aiHasResult = false;
 
@@ -773,15 +748,18 @@
         el.classList.toggle("active", index === getAiStageIndexForProgress(progress));
       });
     }
+    function updateAiProgressStageLabel(progress) {
+      const label = $("aiProgressLabel");
+      if (!label) return;
+      label.textContent = aiWizardStages[getAiStageIndexForProgress(progress)]?.label || aiWizardStages[0].label;
+    }
     function updateAiProgress(progress) {
       aiProgressValue = Math.max(0, Math.min(100, Math.round(progress)));
       const fill = $("aiProgressFill");
       const percent = $("aiProgressPercent");
-      const label = $("aiProgressLabel");
       if (fill) fill.style.width = `${aiProgressValue}%`;
       if (percent) percent.textContent = `${aiProgressValue}%`;
-      const stageIndex = getAiStageIndexForProgress(aiProgressValue);
-      if (label) label.textContent = aiWizardStages[stageIndex]?.label || aiWizardStages[0].label;
+      updateAiProgressStageLabel(aiProgressValue);
       updateAiStageIndicators(aiProgressValue);
     }
     function clearAiProgressTimer() {
@@ -792,17 +770,16 @@
     }
     function startAiProgressLoop() {
       clearAiProgressTimer();
+      aiProgressStartAt = Date.now();
       updateAiProgress(0);
-      const checkpoints = [8, 18, 31, 44, 58, 72, 84, 92];
-      let index = 0;
       aiProgressTimer = setInterval(() => {
-        if (index >= checkpoints.length) {
+        const elapsed = Date.now() - aiProgressStartAt;
+        const progress = Math.min(100, (elapsed / 15000) * 100);
+        updateAiProgress(progress);
+        if (progress >= 100) {
           clearAiProgressTimer();
-          return;
         }
-        updateAiProgress(checkpoints[index]);
-        index += 1;
-      }, 420);
+      }, 120);
     }
     function setAiWizardStep(step, keepResultVisible = false) {
       aiWizardStep = Math.max(1, Math.min(3, Number(step) || 1));
@@ -822,6 +799,9 @@
       if (next) next.textContent = aiWizardStep === 2 ? "Gerar Plano" : "Continuar";
       if (stage3) {
         stage3.hidden = aiWizardStep !== 3;
+      }
+      if (aiWizardStep === 3) {
+        updateAiProgressStageLabel(aiProgressValue);
       }
     }
     function resetAiWizard() {
@@ -1116,17 +1096,23 @@
           const sourceBlocks = state.selected.length ? state.selected : [];
           const rawParts = Array.isArray(payload?.parts) ? payload.parts : [];
           const rawContent = String(payload?.content || "").trim();
-          const parts = rawParts.length ? rawParts : (rawContent ? rawContent.split(/\n{2,}/).map((chunk, index) => ({
-            title: sourceBlocks[index]?.name || `Parte ${index + 1}`,
-            minutes: sourceBlocks[index]?.minutes || 0,
-            content: chunk.trim()
-          })) : []);
+          const fallbackChunks = rawContent ? rawContent.split(/\n{2,}/).map((chunk) => chunk.trim()).filter(Boolean) : [];
+          const parts = sourceBlocks.map((block, index) => {
+            const source = rawParts[index] || {};
+            const ownContent = String(source?.content || "").trim();
+            return {
+              title: String(source?.title || block.name || `Parte ${index + 1}`).trim() || block.name || `Parte ${index + 1}`,
+              minutes: Number(source?.minutes || block.minutes || 0) || Number(block.minutes || 0) || 0,
+              content: ownContent || fallbackChunks[index] || fallbackChunks[0] || `Conteúdo em processamento para ${block.name || `Parte ${index + 1}`}.`
+            };
+          });
           const planHtml = [];
           planHtml.push(`<h1>${escapeText(safeTitle)}</h1>`);
           if (intro) {
             planHtml.push(`<p class="ai-plan-intro">${escapeText(intro)}</p>`);
           }
-          parts.forEach((part, index) => {
+          const renderParts = parts.length ? parts : rawParts;
+          renderParts.forEach((part, index) => {
             const blockName = sourceBlocks[index]?.name || part?.title || "Bloco";
             const icon = iconUrlByName(blockName);
             const title = String(part?.title || blockName).trim() || blockName;
@@ -1145,7 +1131,7 @@
               </div>
             `);
           });
-          if (!parts.length) {
+          if (!renderParts.length) {
             const fallbackText = String(payload?.content || "").trim() || "A IA nao retornou um texto consolidado.";
             planHtml.push(`<p class="ai-plan-intro">${escapeText(fallbackText)}</p>`);
           }
