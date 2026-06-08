@@ -763,25 +763,42 @@
       text-align: left;
       cursor: pointer;
     }
-    .course-cover,
-    .course-cover-fallback {
+    .course-cover-shell {
       width: 132px;
       height: 132px;
       border-radius: 24px;
-      object-fit: cover;
+      position: relative;
+      overflow: hidden;
       box-shadow: 0 16px 28px rgba(0,0,0,.16);
     }
+    .course-cover,
     .course-cover-fallback {
-      display: grid;
-      place-items: center;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .course-cover-fallback {
       background:
         radial-gradient(circle at 25% 20%, rgba(255,239,153,.50), transparent 26%),
         linear-gradient(155deg, rgba(43,119,255,.96), rgba(255,157,193,.85));
-      padding: 16px;
-      font-size: 22px;
-      font-weight: 800;
-      text-align: center;
-      line-height: 1.2;
+    }
+    .course-cover-star {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(180deg, rgba(7, 18, 58, .05), rgba(7, 18, 58, .16));
+    }
+    .course-cover-star.is-complete {
+      color: #ffe165;
+    }
+    .course-cover-star svg {
+      width: 44px;
+      height: 44px;
+      fill: currentColor;
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.20));
     }
     .course-card-body {
       min-width: 0;
@@ -1289,8 +1306,7 @@
       .course-card {
         grid-template-columns: 1fr;
       }
-      .course-cover,
-      .course-cover-fallback {
+      .course-cover-shell {
         width: 100%;
         height: 170px;
       }
@@ -2371,10 +2387,13 @@
     }
 
     function buildMiniCourseCover(course) {
+      const isComplete = Boolean(course?.progress?.completed);
+      const starClass = isComplete ? "course-cover-star is-complete" : "course-cover-star";
+      const starSvg = `<div class="${starClass}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>`;
       if (course?.coverImageUrl) {
-        return `<img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">`;
+        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${starSvg}</div>`;
       }
-      return `<div class="course-cover-fallback">${escapeText(course?.title || "Curso")}</div>`;
+      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${starSvg}</div>`;
     }
 
     function updateMiniCoursesHeader() {
@@ -2516,6 +2535,7 @@
           ` : ""}
         </div>
       `;
+      readerView.scrollTop = 0;
 
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
