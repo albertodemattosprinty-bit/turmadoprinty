@@ -840,6 +840,10 @@
     .course-card-mobile-meta {
       display: none;
     }
+    .mobile-course-carousel,
+    .mobile-course-stage {
+      display: none;
+    }
     .course-card-actions {
       align-self: flex-start;
       display: flex;
@@ -1164,6 +1168,62 @@
       font-weight: 800;
       cursor: pointer;
       font-family: "Open Sans", sans-serif;
+    }
+    .mobile-course-carousel {
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+    .mobile-course-stage {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .mobile-course-slide {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto auto;
+      gap: 12px;
+      padding: 18px 14px 24px;
+      box-sizing: border-box;
+    }
+    .mobile-course-slide.is-animating {
+      transition: transform .5s ease, opacity .5s ease;
+    }
+    .mobile-course-slide.current {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    .mobile-course-slide.before-next {
+      transform: translateX(100%);
+      opacity: .92;
+    }
+    .mobile-course-slide.before-prev {
+      transform: translateX(-100%);
+      opacity: .92;
+    }
+    .mobile-course-slide.leave-next {
+      transform: translateX(-100%);
+      opacity: .82;
+    }
+    .mobile-course-slide.leave-prev {
+      transform: translateX(100%);
+      opacity: .82;
+    }
+    .mobile-course-open {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+    }
+    .mobile-course-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 4px;
     }
     @keyframes courseWordFade {
       from {
@@ -1513,18 +1573,14 @@
         padding: 0;
         gap: 0;
         align-content: stretch;
-        scroll-snap-type: y mandatory;
+        overflow: hidden;
+      }
+      .mobile-course-carousel,
+      .mobile-course-stage {
+        display: block;
       }
       .course-card {
-        grid-template-columns: 1fr;
-        min-height: 100%;
-        padding: 18px 14px 24px;
-        background: transparent;
-        box-shadow: none;
-        align-content: start;
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
-        gap: 12px;
+        display: none;
       }
       .course-cover-shell {
         width: 100%;
@@ -1830,8 +1886,12 @@
       <input id="courseAdminTitleInput" class="course-admin-input" type="text" placeholder="Ex.: Fundamentos do ministério infantil">
       <label class="course-admin-label" for="courseAdminContextInput">Contexto do curso</label>
       <textarea id="courseAdminContextInput" class="course-admin-input course-admin-textarea" placeholder="Descreva o tema, o objetivo e o contexto do curso."></textarea>
+      <label class="course-admin-label" for="courseAdminModelSelect">Modelo do ChatGPT</label>
+      <select id="courseAdminModelSelect" class="course-admin-input">
+        <option value="gpt-5.1">GPT-5.1</option>
+      </select>
       <label class="course-admin-label" for="courseAdminPagesInput">Quantidade de páginas</label>
-      <input id="courseAdminPagesInput" class="course-admin-input" type="number" min="4" max="24" value="8">
+      <input id="courseAdminPagesInput" class="course-admin-input" type="number" min="4" max="300" value="8">
       <button id="generateCourseAdmin" class="ai-primary course-admin-submit" type="button">Gerar curso</button>
       <div id="courseAdminStatus" class="create-status"></div>
     </div>
@@ -1902,11 +1962,18 @@
     let miniCourseJobsPollTimer = null;
     let miniCoursesLoading = false;
     let miniCoursesError = "";
+    let miniCourseGeneratorModels = [];
+    let miniCourseGeneratorDefaultModel = "gpt-5.1";
     let miniCourseAnimationTimers = [];
     let miniCourseAnimationRunId = 0;
     let miniCourseReadGateKey = "";
     let miniCourseReadGateStartedAt = 0;
     let miniCourseReadGateRequiredMs = 0;
+    let miniCourseMobileIndex = 0;
+    let miniCourseMobileAnimating = false;
+    let miniCourseMobileTouchStartY = 0;
+    let miniCourseMobileTouchStartX = 0;
+    let miniCourseMobileWheelLocked = false;
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
@@ -2758,6 +2825,43 @@
       return "Na fila";
     }
 
+    function renderMiniCourseModelOptions() {
+      const select = $("courseAdminModelSelect");
+      if (!select) {
+        return;
+      }
+
+      const models = miniCourseGeneratorModels.length
+        ? miniCourseGeneratorModels
+        : [{ id: miniCourseGeneratorDefaultModel, label: miniCourseGeneratorDefaultModel.toUpperCase() }];
+      const previousValue = String(select.value || miniCourseGeneratorDefaultModel).trim();
+      select.innerHTML = models.map((model) => `
+        <option value="${escapeAttr(model.id)}">${escapeText(model.label || model.id)}</option>
+      `).join("");
+      select.value = models.some((model) => model.id === previousValue)
+        ? previousValue
+        : (miniCourseGeneratorDefaultModel || models[0]?.id || "gpt-5.1");
+    }
+
+    async function loadMiniCourseGeneratorModels() {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+
+      const response = await apiMini("/api/mini/courses/models");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao carregar os modelos.");
+      }
+
+      if (payload?.user) {
+        miniCourseUser = payload.user || miniCourseUser;
+      }
+      miniCourseGeneratorModels = Array.isArray(payload?.models) ? payload.models : [];
+      miniCourseGeneratorDefaultModel = String(payload?.defaultModel || miniCourseGeneratorDefaultModel || "gpt-5.1").trim() || "gpt-5.1";
+      renderMiniCourseModelOptions();
+    }
+
     function stopMiniCourseJobsPolling() {
       if (miniCourseJobsPollTimer) {
         clearInterval(miniCourseJobsPollTimer);
@@ -2794,6 +2898,7 @@
       if (completed) {
         completed.textContent = String(Number(miniCourseSummary?.completedCourses || 0) || 0);
       }
+      renderMiniCourseModelOptions();
     }
 
     function renderMiniCourseJobs() {
@@ -2834,6 +2939,7 @@
               <h4 class="course-job-title">${escapeText(job.title || "Curso MINI")}</h4>
               <div class="course-job-badge ${escapeAttr(safeStatus)}">${escapeText(getMiniCourseJobStatusLabel(safeStatus))}</div>
             </div>
+            <div class="course-job-feedback">Modelo: ${escapeText(job.requestedModel || "gpt-5.1")}</div>
             <div class="course-job-progress">
               <span>${generated}/${requested} páginas</span>
               <span>${percent}%</span>
@@ -2920,6 +3026,175 @@
       return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${titleOverlay}${starSvg}</div>`;
     }
 
+    function isMiniCoursesMobileView() {
+      return window.matchMedia("(max-width: 900px)").matches;
+    }
+
+    function normalizeMiniCourseMobileIndex() {
+      if (!miniCourses.length) {
+        miniCourseMobileIndex = 0;
+        return;
+      }
+      miniCourseMobileIndex = Math.max(0, Math.min(miniCourses.length - 1, Number(miniCourseMobileIndex || 0) || 0));
+    }
+
+    function buildMiniCourseMobileSlide(course) {
+      const totalPages = Math.max(Number(course?.pageCount || 1) || 1, 1);
+      return `
+        <article class="mobile-course-slide-card" data-course-id="${escapeAttr(course.id)}">
+          <button class="mobile-course-open" type="button" data-open-mobile-course="${escapeAttr(course.id)}" aria-label="Abrir curso ${escapeAttr(course.title || "Curso")}">
+            ${buildMiniCourseCover(course)}
+          </button>
+          <div class="course-card-mobile-meta">
+            <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
+            <div class="course-card-mobile-hint">Deslize para ver o próximo • toque para iniciar</div>
+          </div>
+          <div class="mobile-course-actions">
+            <button class="course-card-action" type="button" data-download-course-id="${escapeAttr(course.id)}" aria-label="Baixar curso">${getDownloadSvg()}</button>
+            ${isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course.id)}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""}
+          </div>
+        </article>
+      `;
+    }
+
+    function bindMiniCourseMobileSlideEvents(container) {
+      if (!container) {
+        return;
+      }
+
+      container.querySelectorAll("[data-open-mobile-course]").forEach((button) => {
+        button.onclick = async () => {
+          await openMiniCourseById(button.getAttribute("data-open-mobile-course") || "");
+        };
+      });
+      container.querySelectorAll("[data-download-course-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          await downloadMiniCourse(button.getAttribute("data-download-course-id") || "");
+        };
+      });
+      container.querySelectorAll("[data-delete-course-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          try {
+            await deleteMiniCourseAdmin(button.getAttribute("data-delete-course-id") || "");
+          } catch (error) {
+            setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao excluir curso.");
+          }
+        };
+      });
+    }
+
+    function attachMiniCourseMobileCarouselEvents(stage) {
+      if (!stage) {
+        return;
+      }
+
+      stage.onwheel = (event) => {
+        if (!isMiniCoursesMobileView() || miniCourseMobileAnimating) {
+          return;
+        }
+        if (Math.abs(event.deltaY) < 14) {
+          return;
+        }
+        event.preventDefault();
+        if (miniCourseMobileWheelLocked) {
+          return;
+        }
+        miniCourseMobileWheelLocked = true;
+        const direction = event.deltaY > 0 ? 1 : -1;
+        void animateMiniCourseMobileCarousel(direction);
+        window.setTimeout(() => {
+          miniCourseMobileWheelLocked = false;
+        }, 540);
+      };
+
+      stage.ontouchstart = (event) => {
+        const touch = event.touches?.[0];
+        if (!touch) {
+          return;
+        }
+        miniCourseMobileTouchStartY = touch.clientY;
+        miniCourseMobileTouchStartX = touch.clientX;
+      };
+      stage.ontouchend = (event) => {
+        if (!isMiniCoursesMobileView() || miniCourseMobileAnimating) {
+          return;
+        }
+        const touch = event.changedTouches?.[0];
+        if (!touch) {
+          return;
+        }
+        const deltaY = touch.clientY - miniCourseMobileTouchStartY;
+        const deltaX = touch.clientX - miniCourseMobileTouchStartX;
+        if (Math.abs(deltaY) < 32 || Math.abs(deltaY) < Math.abs(deltaX)) {
+          return;
+        }
+        const direction = deltaY < 0 ? 1 : -1;
+        void animateMiniCourseMobileCarousel(direction);
+      };
+    }
+
+    async function animateMiniCourseMobileCarousel(direction) {
+      if (!isMiniCoursesMobileView() || miniCourseMobileAnimating || !miniCourses.length) {
+        return;
+      }
+
+      normalizeMiniCourseMobileIndex();
+      const targetIndex = miniCourseMobileIndex + direction;
+      if (targetIndex < 0 || targetIndex >= miniCourses.length) {
+        return;
+      }
+
+      const stage = $("mobileCourseStage");
+      if (!stage) {
+        miniCourseMobileIndex = targetIndex;
+        renderMiniCoursesList();
+        return;
+      }
+
+      miniCourseMobileAnimating = true;
+      const currentCourse = miniCourses[miniCourseMobileIndex];
+      const nextCourse = miniCourses[targetIndex];
+      const outgoingClass = direction > 0 ? "leave-next" : "leave-prev";
+      const incomingClass = direction > 0 ? "before-next" : "before-prev";
+
+      stage.innerHTML = `
+        <div class="mobile-course-slide current">${buildMiniCourseMobileSlide(currentCourse)}</div>
+        <div class="mobile-course-slide ${incomingClass}">${buildMiniCourseMobileSlide(nextCourse)}</div>
+      `;
+
+      const slides = stage.querySelectorAll(".mobile-course-slide");
+      slides.forEach((slide) => slide.offsetWidth);
+      bindMiniCourseMobileSlideEvents(stage);
+
+      const [currentSlide, nextSlide] = slides;
+      currentSlide.classList.add("is-animating", outgoingClass);
+      nextSlide.classList.remove(incomingClass);
+      nextSlide.classList.add("is-animating", "current");
+
+      window.setTimeout(() => {
+        miniCourseMobileIndex = targetIndex;
+        miniCourseMobileAnimating = false;
+        renderMiniCoursesList();
+      }, 500);
+    }
+
+    function renderMiniCoursesMobileList(listView) {
+      normalizeMiniCourseMobileIndex();
+      const currentCourse = miniCourses[miniCourseMobileIndex];
+      listView.innerHTML = `
+        <div class="mobile-course-carousel">
+          <div id="mobileCourseStage" class="mobile-course-stage">
+            <div class="mobile-course-slide current">${buildMiniCourseMobileSlide(currentCourse)}</div>
+          </div>
+        </div>
+      `;
+      const stage = $("mobileCourseStage");
+      bindMiniCourseMobileSlideEvents(stage);
+      attachMiniCourseMobileCarouselEvents(stage);
+    }
+
     function updateMiniCoursesHeader() {
       const title = $("coursesHeadTitle");
       const closeButton = $("closeCourses");
@@ -2986,6 +3261,13 @@
 
       if (!miniCourses.length) {
         listView.innerHTML = `<div class="courses-empty">Não há cursos.</div>`;
+        updateMiniCoursesHeader();
+        updateMiniCoursesFooter();
+        return;
+      }
+
+      if (isMiniCoursesMobileView()) {
+        renderMiniCoursesMobileList(listView);
         updateMiniCoursesHeader();
         updateMiniCoursesFooter();
         return;
@@ -3191,8 +3473,12 @@
         return;
       }
       $("courseAdminStatus").textContent = "";
+      renderMiniCourseModelOptions();
       modal.classList.add("show");
       modal.setAttribute("aria-hidden", "false");
+      void loadMiniCourseGeneratorModels().catch((error) => {
+        $("courseAdminStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar os modelos.";
+      });
     }
 
     function closeMiniCourseAdminModal() {
@@ -3404,7 +3690,8 @@
 
       const title = $("courseAdminTitleInput")?.value.trim() || "";
       const context = $("courseAdminContextInput")?.value.trim() || "";
-      const pageCount = Math.max(4, Math.min(24, Number($("courseAdminPagesInput")?.value || 8) || 8));
+      const model = $("courseAdminModelSelect")?.value.trim() || miniCourseGeneratorDefaultModel || "gpt-5.1";
+      const pageCount = Math.max(4, Math.min(300, Number($("courseAdminPagesInput")?.value || 8) || 8));
       const status = $("courseAdminStatus");
       const button = $("generateCourseAdmin");
 
@@ -3425,7 +3712,7 @@
       try {
         const response = await apiMini("/api/mini/courses/generate", {
           method: "POST",
-          body: JSON.stringify({ title, context, pageCount })
+          body: JSON.stringify({ title, context, model, pageCount })
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -3436,6 +3723,7 @@
         $("courseAdminTitleInput").value = "";
         $("courseAdminContextInput").value = "";
         $("courseAdminPagesInput").value = String(pageCount);
+        $("courseAdminModelSelect").value = model;
         closeMiniCourseAdminModal();
         openMiniCourseJobsModal();
         await loadMiniCourseJobs();

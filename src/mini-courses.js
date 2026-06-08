@@ -130,6 +130,7 @@ function normalizeCourseJob(row) {
     id: row.id,
     title: String(row.title || "Curso MINI").trim() || "Curso MINI",
     context: String(row.context || "").trim(),
+    requestedModel: String(row.requested_model || "").trim() || "gpt-5.1",
     requestedPageCount: Math.max(1, Number(row.requested_page_count || 1) || 1),
     generatedPageCount: Math.max(0, Number(row.generated_page_count || 0) || 0),
     status: String(row.status || "queued").trim().toLowerCase() || "queued",
@@ -182,6 +183,7 @@ export async function ensureMiniCoursesSchema() {
       id uuid primary key default gen_random_uuid(),
       title text not null default 'Curso MINI',
       context text not null default '',
+      requested_model text not null default 'gpt-5.1',
       requested_page_count smallint not null default 8,
       generated_page_count smallint not null default 0,
       status text not null default 'queued',
@@ -195,6 +197,7 @@ export async function ensureMiniCoursesSchema() {
       updated_at timestamptz not null default now()
     );
   `);
+  await query("alter table mini_course_jobs add column if not exists requested_model text not null default 'gpt-5.1';");
   await query("create index if not exists idx_mini_course_jobs_creator_updated_at on mini_course_jobs(created_by_user_id, updated_at desc, created_at desc);");
   await query("create index if not exists idx_mini_course_jobs_status_created_at on mini_course_jobs(status, created_at asc);");
 }
@@ -367,16 +370,18 @@ export async function createMiniCourse({ title, context, pages, coverImageUrl = 
   return normalizeCourse(result.rows[0]);
 }
 
-export async function createMiniCourseJob({ title, context, requestedPageCount = 8, createdByUserId } = {}) {
+export async function createMiniCourseJob({ title, context, requestedModel = "gpt-5.1", requestedPageCount = 8, createdByUserId } = {}) {
   await ensureMiniCoursesSchema();
   const safeTitle = String(title || "Curso MINI").trim() || "Curso MINI";
   const safeContext = String(context || "").trim();
-  const pageCount = Math.max(4, Math.min(24, Number(requestedPageCount || 8) || 8));
+  const safeModel = String(requestedModel || "gpt-5.1").trim() || "gpt-5.1";
+  const pageCount = Math.max(4, Math.min(300, Number(requestedPageCount || 8) || 8));
   const result = await query(
     `
       insert into mini_course_jobs (
         title,
         context,
+        requested_model,
         requested_page_count,
         generated_page_count,
         status,
@@ -386,12 +391,13 @@ export async function createMiniCourseJob({ title, context, requestedPageCount =
         created_at,
         updated_at
       )
-      values ($1, $2, $3, 0, 'queued', 'Na fila para gerar o curso.', '', $4, now(), now())
+      values ($1, $2, $3, $4, 0, 'queued', 'Na fila para gerar o curso.', '', $5, now(), now())
       returning *
     `,
     [
       safeTitle.slice(0, 180),
       safeContext.slice(0, 2000),
+      safeModel.slice(0, 120),
       pageCount,
       createdByUserId
     ]

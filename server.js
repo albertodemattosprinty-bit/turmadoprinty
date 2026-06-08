@@ -68,6 +68,7 @@ const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, 
 const ADMIN_USERNAME = "rosemattos";
 const ALBUM_ZIP_FOLDER = "album-zips";
 const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
+const MINI_COURSE_MODEL_CANDIDATES = ["gpt-5.1", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"];
 
 const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
@@ -371,6 +372,32 @@ function normalizeMiniInstantModel(value) {
   }
 
   return requested;
+}
+
+function getMiniCourseGeneratorModels() {
+  const unique = new Set();
+  [
+    "gpt-5.1",
+    OPENAI_MODEL,
+    OPENAI_INSTANT_MODEL,
+    ...MINI_COURSE_MODEL_CANDIDATES
+  ].forEach((value) => {
+    const safe = String(value || "").trim();
+    if (safe) {
+      unique.add(safe);
+    }
+  });
+
+  return Array.from(unique).map((id) => ({
+    id,
+    label: id.toUpperCase().replace(/^GPT-/, "GPT-")
+  }));
+}
+
+function normalizeMiniCourseGeneratorModel(value) {
+  const requested = normalizeMiniInstantModel(value);
+  const available = getMiniCourseGeneratorModels().map((item) => item.id);
+  return available.includes(requested) ? requested : "gpt-5.1";
 }
 
 function getPositiveInteger(value, fallback) {
@@ -2443,7 +2470,7 @@ async function handleMiniLessonPlansListRequest(request, response) {
 }
 
 function buildMiniCoursePageKinds(pageCount) {
-  const total = Math.max(4, Math.min(24, Number(pageCount || 8) || 8));
+  const total = Math.max(4, Math.min(300, Number(pageCount || 8) || 8));
   const textCount = Math.max(1, Math.round(total * 0.5));
   const didacticCount = Math.max(1, Math.round(total * 0.25));
   const closingCount = Math.max(1, total - textCount - didacticCount);
@@ -2641,10 +2668,13 @@ class MiniCourseGenerationError extends Error {
 let miniCourseJobsBootstrapped = false;
 let miniCourseJobsProcessing = false;
 
-async function generateMiniCourseDraft({ apiKey, title, context, pageCount, onProgress } = {}) {
+async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, context, pageCount, onProgress } = {}) {
   const sharedContext = await getContextPrompt();
   const kinds = buildMiniCoursePageKinds(pageCount);
-  const courseChunks = buildMiniCourseChunks(kinds, pageCount >= 16 ? 3 : 4);
+  const courseChunks = buildMiniCourseChunks(
+    kinds,
+    pageCount >= 180 ? 8 : pageCount >= 90 ? 6 : pageCount >= 24 ? 5 : 4
+  );
 
   const system = buildMiniSystemPrompt({
     modeKey: "project",
@@ -2679,7 +2709,7 @@ async function generateMiniCourseDraft({ apiKey, title, context, pageCount, onPr
 
   const createCourseChunkAttempt = async (chunk, extraUserInstruction = "", includeMetadata = false, courseOverview = "") => {
     const completion = await createChatCompletion(apiKey, {
-      model: "gpt-5.1",
+      model,
       reasoning_effort: "none",
       temperature: extraUserInstruction ? 0.3 : 0.45,
       max_completion_tokens: includeMetadata ? 3400 : 2600,
@@ -2837,6 +2867,7 @@ async function processMiniCourseJobsQueue() {
 
         const draft = await generateMiniCourseDraft({
           apiKey,
+          model: normalizeMiniCourseGeneratorModel(job.requestedModel),
           title: job.title,
           context: job.context,
           pageCount: job.requestedPageCount,
@@ -3052,6 +3083,20 @@ async function handleMiniCourseJobsListRequest(request, response) {
   }
 }
 
+async function handleMiniCourseModelsRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  sendJson(response, 200, {
+    ok: true,
+    models: getMiniCourseGeneratorModels(),
+    defaultModel: normalizeMiniCourseGeneratorModel("gpt-5.1"),
+    user: sanitizeUser(adminUser)
+  });
+}
+
 async function handleMiniCourseGenerateRequest(request, response) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -3077,7 +3122,8 @@ async function handleMiniCourseGenerateRequest(request, response) {
 
   const title = String(body?.title || "").trim();
   const context = String(body?.context || "").trim();
-  const pageCount = Math.max(4, Math.min(24, Number(body?.pageCount || 8) || 8));
+  const model = normalizeMiniCourseGeneratorModel(body?.model);
+  const pageCount = Math.max(4, Math.min(300, Number(body?.pageCount || 8) || 8));
 
   if (!title) {
     sendJson(response, 400, { error: "Informe o titulo do curso." });
@@ -3093,6 +3139,7 @@ async function handleMiniCourseGenerateRequest(request, response) {
     const job = await createMiniCourseJob({
       title,
       context,
+      requestedModel: model,
       requestedPageCount: pageCount,
       createdByUserId: adminUser.id
     });
@@ -3101,7 +3148,7 @@ async function handleMiniCourseGenerateRequest(request, response) {
     sendJson(response, 202, {
       ok: true,
       job,
-      feedback: `Curso solicitado com ${pageCount} páginas. Ele entrou na fila de geração.`
+      feedback: `Curso solicitado com ${pageCount} páginas usando ${model}. Ele entrou na fila de geração.`
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -5437,6 +5484,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/mini/courses/jobs") {
     await handleMiniCourseJobsListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/mini/courses/models") {
+    await handleMiniCourseModelsRequest(request, response);
     return;
   }
 
