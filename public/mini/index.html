@@ -846,6 +846,7 @@
     }
     .course-reader-view {
       padding: 28px 24px;
+      position: relative;
     }
     .course-reader-loading {
       min-height: 100%;
@@ -863,6 +864,7 @@
       display: grid;
       gap: 18px;
       color: #fff;
+      transition: filter .5s ease, opacity .5s ease;
     }
     .course-page-kicker {
       font-size: 13px;
@@ -899,20 +901,6 @@
     .course-page-table {
       display: grid;
       gap: 10px;
-    }
-    .course-word {
-      opacity: 0;
-      animation: courseWordFade .33s ease forwards;
-      white-space: pre-wrap;
-    }
-    .course-step-item {
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity .33s ease, transform .33s ease;
-    }
-    .course-step-item.is-visible {
-      opacity: 1;
-      transform: translateY(0);
     }
     .course-page-row {
       display: grid;
@@ -957,8 +945,59 @@
       min-width: 0;
     }
     .courses-nav-btn {
-      min-width: 122px;
-      padding: 0 18px;
+      width: 64px;
+      min-width: 64px;
+      height: 64px;
+      padding: 0;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+    .courses-nav-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+    .courses-nav-btn:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+    .course-reader-view.is-read-lock-blur .course-page-shell {
+      filter: blur(14px);
+      opacity: .24;
+    }
+    .course-read-lock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity .5s ease;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .course-reader-view.is-read-lock-visible .course-read-lock {
+      opacity: 1;
+    }
+    .course-read-lock-box {
+      display: grid;
+      gap: 6px;
+      justify-items: center;
+      color: #fff;
+      text-shadow: 0 10px 22px rgba(0, 0, 0, .28);
+    }
+    .course-read-lock-title {
+      font-size: clamp(24px, 3vw, 34px);
+      font-weight: 800;
+      line-height: 1.05;
+    }
+    .course-read-lock-subtitle {
+      font-size: clamp(18px, 2.4vw, 24px);
+      font-weight: 700;
+      line-height: 1.2;
     }
     .courses-nav-btn[hidden],
     .course-reader-view[hidden],
@@ -1390,12 +1429,19 @@
       .course-page-row span {
         font-size: 21px;
       }
+      .course-read-lock-title {
+        font-size: 32px;
+      }
+      .course-read-lock-subtitle {
+        font-size: 24px;
+      }
       .course-page-row {
         grid-template-columns: 1fr;
       }
       .courses-nav-btn {
-        min-width: 100px;
-        padding: 0 12px;
+        width: 58px;
+        min-width: 58px;
+        height: 58px;
       }
       .courses-footer-status {
         font-size: 13px;
@@ -1587,9 +1633,13 @@
       </div>
 
       <footer class="courses-footer">
-        <button id="coursePrev" class="courses-nav-btn" type="button" hidden>Anterior</button>
+        <button id="coursePrev" class="courses-nav-btn" type="button" hidden aria-label="Página anterior">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </button>
         <div id="courseFooterStatus" class="courses-footer-status">Escolha um curso para começar.</div>
-        <button id="courseNext" class="courses-nav-btn" type="button" hidden>Próxima</button>
+        <button id="courseNext" class="courses-nav-btn" type="button" hidden aria-label="Próxima página">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.59 16.59 1.41 1.41 6-6-6-6-1.41 1.41L13.17 12z"/></svg>
+        </button>
       </footer>
     </div>
   </section>
@@ -1683,6 +1733,9 @@
     let miniCoursesError = "";
     let miniCourseAnimationTimers = [];
     let miniCourseAnimationRunId = 0;
+    let miniCourseReadGateKey = "";
+    let miniCourseReadGateStartedAt = 0;
+    let miniCourseReadGateRequiredMs = 0;
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
@@ -1725,6 +1778,78 @@
         callback();
       }, Math.max(0, Number(delay || 0) || 0));
       miniCourseAnimationTimers.push(timer);
+    }
+    function resetMiniCourseReadGate() {
+      miniCourseReadGateKey = "";
+      miniCourseReadGateStartedAt = 0;
+      miniCourseReadGateRequiredMs = 0;
+    }
+    function getMiniCoursePageTimingText(course, page) {
+      return [
+        String(course?.title || "").trim(),
+        String(page?.title || "").trim(),
+        ...(Array.isArray(page?.paragraphs) ? page.paragraphs : []).map((item) => String(item || "").trim()),
+        ...(Array.isArray(page?.bullets) ? page.bullets : []).map((item) => String(item || "").trim()),
+        ...(Array.isArray(page?.tableRows) ? page.tableRows : []).flatMap((row) => [
+          String(row?.label || "").trim(),
+          String(row?.value || "").trim()
+        ])
+      ].filter(Boolean).join(" ");
+    }
+    function getMiniCoursePageRequiredMs(course, page) {
+      const totalChars = getMiniCoursePageTimingText(course, page).length;
+      const requiredSeconds = Math.max(1, Math.ceil(totalChars / 15));
+      return requiredSeconds * 1000;
+    }
+    function syncMiniCourseReadGate(page) {
+      if (!currentMiniCourse) {
+        resetMiniCourseReadGate();
+        return;
+      }
+      const gateKey = `${String(currentMiniCourse.id || "curso")}::${currentMiniCoursePage}`;
+      if (miniCourseReadGateKey === gateKey) {
+        return;
+      }
+      miniCourseReadGateKey = gateKey;
+      miniCourseReadGateStartedAt = Date.now();
+      miniCourseReadGateRequiredMs = getMiniCoursePageRequiredMs(currentMiniCourse, page);
+    }
+    function getMiniCourseRemainingReadMs() {
+      if (!miniCourseReadGateStartedAt || !miniCourseReadGateRequiredMs) {
+        return 0;
+      }
+      return Math.max(0, miniCourseReadGateRequiredMs - (Date.now() - miniCourseReadGateStartedAt));
+    }
+    function flashMiniCourseReadGate(remainingMs) {
+      const readerView = $("courseReaderView");
+      if (!readerView) {
+        return;
+      }
+
+      clearMiniCourseAnimationTimers();
+      readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
+      readerView.querySelectorAll(".course-read-lock").forEach((node) => node.remove());
+
+      const remainingSeconds = Math.max(1, Math.ceil(Math.max(0, Number(remainingMs || 0) || 0) / 1000));
+      const overlay = document.createElement("div");
+      overlay.className = "course-read-lock";
+      overlay.innerHTML = `
+        <div class="course-read-lock-box">
+          <div class="course-read-lock-title">Tempo mínimo</div>
+          <div class="course-read-lock-subtitle">Aguarde ${remainingSeconds} segundos</div>
+        </div>
+      `;
+      readerView.appendChild(overlay);
+
+      scheduleMiniCourseAnimation(() => {
+        readerView.classList.add("is-read-lock-blur", "is-read-lock-visible");
+      }, 0);
+      scheduleMiniCourseAnimation(() => {
+        readerView.classList.remove("is-read-lock-visible", "is-read-lock-blur");
+      }, 1500);
+      scheduleMiniCourseAnimation(() => {
+        overlay.remove();
+      }, 2000);
     }
     function getDownloadSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5zm7-18v12.17l3.59-3.58L17 12l-5 5-5-5 1.41-1.41L11 14.17V2z"/></svg>`;
@@ -2488,9 +2613,8 @@
       const closeButton = $("closeCourses");
       if (title) {
         if (currentMiniCourse) {
-          const pagesRead = Math.max(Number(currentMiniCourse.progress?.pagesRead || currentMiniCoursePage || 1) || 1, 1);
           const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
-          title.textContent = `${Math.min(pagesRead, totalPages)}/${totalPages}`;
+          title.textContent = `${Math.min(currentMiniCoursePage, totalPages)}/${totalPages}`;
         } else {
           title.textContent = "Cursos";
         }
@@ -2519,8 +2643,8 @@
       next.hidden = false;
       prev.disabled = currentMiniCoursePage <= 1;
       next.disabled = false;
-      next.textContent = currentMiniCoursePage >= totalPages ? "Concluir" : "Próxima";
       setCourseFooterStatus(`${currentMiniCourse.title} • ${currentMiniCoursePage}/${totalPages}`);
+      next.setAttribute("aria-label", currentMiniCoursePage >= totalPages ? "Concluir curso" : "Próxima página");
     }
 
     function renderMiniCoursesList() {
@@ -2625,22 +2749,18 @@
       const paragraphs = Array.isArray(currentPage.paragraphs) ? currentPage.paragraphs : [];
       const bullets = Array.isArray(currentPage.bullets) ? currentPage.bullets : [];
       const tableRows = Array.isArray(currentPage.tableRows) ? currentPage.tableRows : [];
-      const kindLabels = {
-        text: "Conteúdo principal",
-        didactic: "Página didática",
-        closing: "Conclusão"
-      };
 
+      syncMiniCourseReadGate(currentPage);
       clearMiniCourseAnimationTimers();
+      readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
       listView.hidden = true;
       readerView.hidden = false;
       readerView.innerHTML = `
         <div class="course-page-shell">
-          <div class="course-page-kicker" data-animate-text="${escapeAttr(kindLabels[currentPage.kind] || "Curso")}"></div>
-          <h2 class="course-page-title" data-animate-text="${escapeAttr(currentPage.title || currentMiniCourse.title)}"></h2>
-          ${paragraphs.map((paragraph) => `<p class="course-page-paragraph" data-animate-text="${escapeAttr(paragraph)}"></p>`).join("")}
-          ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li class="course-step-item">${escapeText(item)}</li>`).join("")}</ul>` : ""}
-          ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row course-step-item"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
+          <h2 class="course-page-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
+          ${paragraphs.map((paragraph) => `<p class="course-page-paragraph">${escapeText(paragraph)}</p>`).join("")}
+          ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li>${escapeText(item)}</li>`).join("")}</ul>` : ""}
+          ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
           ${(currentPage.imageUrl || currentPage.audioUrl) ? `
             <div class="course-page-media">
               ${currentPage.imageUrl ? `<img src="${escapeAttr(currentPage.imageUrl)}" alt="${escapeAttr(currentPage.title || currentMiniCourse.title)}">` : ""}
@@ -2650,43 +2770,9 @@
         </div>
       `;
       readerView.scrollTop = 0;
-      playMiniCoursePageAnimation(readerView);
 
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
-    }
-
-    function playMiniCoursePageAnimation(readerView) {
-      const textNodes = Array.from(readerView.querySelectorAll("[data-animate-text]"));
-      const stepNodes = Array.from(readerView.querySelectorAll(".course-step-item"));
-      let textDelay = 0;
-
-      textNodes.forEach((node) => {
-        const fullText = String(node.getAttribute("data-animate-text") || "").trim();
-        const words = fullText ? fullText.split(/\s+/).filter(Boolean) : [];
-        node.textContent = "";
-        if (!words.length) {
-          return;
-        }
-
-        words.forEach((word, index) => {
-          scheduleMiniCourseAnimation(() => {
-            const span = document.createElement("span");
-            span.className = "course-word";
-            span.textContent = `${word}${index < words.length - 1 ? " " : ""}`;
-            node.appendChild(span);
-          }, textDelay + (index * 167));
-        });
-
-        textDelay += (words.length * 167) + 167;
-      });
-
-      stepNodes.forEach((node, index) => {
-        node.classList.remove("is-visible");
-        scheduleMiniCourseAnimation(() => {
-          node.classList.add("is-visible");
-        }, textDelay + (index * 1333));
-      });
     }
 
     function renderMiniCourseReaderLoading() {
@@ -2741,6 +2827,7 @@
     function openMiniCoursesModal() {
       $("coursesModal").classList.add("show");
       $("coursesModal").setAttribute("aria-hidden", "false");
+      resetMiniCourseReadGate();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
       renderMiniCoursesList();
@@ -2753,6 +2840,7 @@
       $("coursesModal").setAttribute("aria-hidden", "true");
       closeMiniCoursesUserModal();
       closeMiniCourseAdminModal();
+      resetMiniCourseReadGate();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
     }
@@ -2811,6 +2899,7 @@
           pages: [],
           progress: { currentPage: 1, pagesRead: 1 }
         };
+        resetMiniCourseReadGate();
         currentMiniCoursePage = 1;
         renderMiniCourseReaderLoading();
         const token = getMiniToken();
@@ -2836,6 +2925,7 @@
         currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || 1) || 1);
         renderMiniCourseReader();
       } catch (error) {
+        resetMiniCourseReadGate();
         currentMiniCourse = null;
         currentMiniCoursePage = 1;
         setCourseFooterStatus(error instanceof Error ? error.message : "Erro ao abrir o curso.");
@@ -2895,6 +2985,7 @@
       }
 
       if (currentMiniCourse?.id === safeCourseId) {
+        resetMiniCourseReadGate();
         currentMiniCourse = null;
         currentMiniCoursePage = 1;
       }
@@ -2964,6 +3055,15 @@
 
       if (direction < 0 && targetPage === currentMiniCoursePage) {
         return;
+      }
+
+      if (direction > 0) {
+        const remainingMs = getMiniCourseRemainingReadMs();
+        if (remainingMs > 0) {
+          flashMiniCourseReadGate(remainingMs);
+          setCourseFooterStatus(`Tempo mínimo em andamento • faltam ${Math.max(1, Math.ceil(remainingMs / 1000))} segundos`);
+          return;
+        }
       }
 
       if (direction > 0 && currentMiniCoursePage >= totalPages) {
