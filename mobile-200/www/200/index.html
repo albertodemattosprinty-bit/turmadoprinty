@@ -357,10 +357,10 @@
           </section>
 
           <section class="wizard-step" data-step="2">
-            <span class="step-label step-label-with-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v2h6V2h2v2h3v18H4V4zm11 6H6v12h12zM8 11h3v3H8zm5 0h3v3h-3z" fill="currentColor"/></svg>
-              <span>Data</span>
-            </span>
+            <div class="repeat-type-tabs" id="repeatTypeTabs" role="tablist" aria-label="Tipo de tarefa">
+              <button type="button" data-repeat-open="false">Uma vez</button>
+              <button type="button" data-repeat-open="true">Recorrente</button>
+            </div>
             <div class="date-picker" id="wizardDatePickerWrap">
               <button class="circle-nav" type="button" data-wizard-date="-1" aria-label="Data anterior">
                 <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
@@ -374,6 +374,7 @@
             <div class="repeat-box" id="repeatBox" hidden>
               <div class="repeat-presets" id="repeatModeButtons">
                 <button type="button" data-repeat-mode="daily">Diariamente</button>
+                <button type="button" data-repeat-mode="weekly">Semanalmente</button>
                 <button type="button" data-repeat-mode="periodic">Periodico</button>
                 <button type="button" data-repeat-mode="monthly_custom">Personalizado</button>
               </div>

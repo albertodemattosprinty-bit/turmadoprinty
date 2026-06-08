@@ -103,6 +103,7 @@ const monthlyWeekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quart
 const recurrenceDays = {
   none: [],
   daily: [0, 1, 2, 3, 4, 5, 6],
+  weekly: [],
   weekdays: [1, 2, 3, 4, 5]
 };
 const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
@@ -206,9 +207,9 @@ const actionCategoryModal = document.getElementById("actionCategoryModal");
 const closeActionCategoryModal = document.getElementById("closeActionCategoryModal");
 const actionCategoryGrid = document.getElementById("actionCategoryGrid");
 const confirmActionCategoryModal = document.getElementById("confirmActionCategoryModal");
+const repeatTypeTabs = document.getElementById("repeatTypeTabs");
 const wizardDateLabel = document.getElementById("wizardDateLabel");
 const wizardDatePickerWrap = document.getElementById("wizardDatePickerWrap");
-const repeatToggle = document.getElementById("repeatToggle");
 const repeatBox = document.getElementById("repeatBox");
 const weekdayRow = document.getElementById("weekdayRow");
 const repeatPeriodicBox = document.getElementById("repeatPeriodicBox");
@@ -2558,6 +2559,16 @@ function buildInitialWizardState() {
   };
 }
 
+function normalizeRepeatMode(mode) {
+  if (mode === "custom") {
+    return "weekly";
+  }
+  if (mode === "daily" || mode === "weekly" || mode === "periodic" || mode === "monthly_custom" || mode === "none") {
+    return mode;
+  }
+  return "none";
+}
+
 function buildInitialPlatformWizardState() {
   return {
     step: 1,
@@ -4078,28 +4089,30 @@ function closeProfileLinkOverlay() {
 }
 
 function renderRepeatControls() {
+  const repeatMode = normalizeRepeatMode(state.wizard.repeatMode);
   repeatBox.hidden = !state.wizard.repeatOpen;
-  repeatToggle.classList.toggle("active", state.wizard.repeatOpen);
-  if (repeatToggle) {
-    repeatToggle.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg><span>Personalizar</span>`;
+  if (repeatTypeTabs) {
+    repeatTypeTabs.querySelectorAll("[data-repeat-open]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.repeatOpen === String(state.wizard.repeatOpen));
+    });
   }
 
   document.querySelectorAll("[data-repeat-mode]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.repeatMode === state.wizard.repeatMode);
+    button.classList.toggle("active", normalizeRepeatMode(button.dataset.repeatMode) === repeatMode);
   });
-  const showingDetailMode = state.wizard.repeatMode === "periodic" || state.wizard.repeatMode === "monthly_custom";
+  const showingDetailMode = repeatMode === "weekly" || repeatMode === "periodic" || repeatMode === "monthly_custom";
   if (wizardDatePickerWrap) {
     wizardDatePickerWrap.hidden = Boolean(state.wizard.repeatOpen);
   }
   if (repeatModeButtons) {
-    repeatModeButtons.hidden = showingDetailMode;
+    repeatModeButtons.hidden = !state.wizard.repeatOpen || showingDetailMode;
   }
   if (repeatModeBackButton) {
-    repeatModeBackButton.hidden = !showingDetailMode;
+    repeatModeBackButton.hidden = !state.wizard.repeatOpen || !showingDetailMode;
   }
 
   weekdayRow.innerHTML = "";
-  weekdayRow.hidden = state.wizard.repeatMode !== "custom";
+  weekdayRow.hidden = repeatMode !== "weekly";
   weekdayLabels.forEach((label, index) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -4109,7 +4122,7 @@ function renderRepeatControls() {
     weekdayRow.appendChild(button);
   });
   if (repeatPeriodicBox) {
-    repeatPeriodicBox.hidden = state.wizard.repeatMode !== "periodic";
+    repeatPeriodicBox.hidden = repeatMode !== "periodic";
   }
   if (periodicEveryLabel) {
     periodicEveryLabel.textContent = `${state.wizard.periodicEveryDays} ${state.wizard.periodicEveryDays === 1 ? "dia" : "dias"}`;
@@ -4121,7 +4134,7 @@ function renderRepeatControls() {
     avoidSundayInput.checked = Boolean(state.wizard.avoidSunday);
   }
   if (repeatMonthlyCustomBox) {
-    repeatMonthlyCustomBox.hidden = state.wizard.repeatMode !== "monthly_custom";
+    repeatMonthlyCustomBox.hidden = repeatMode !== "monthly_custom";
   }
   if (monthlyOrdinalLabel) {
     monthlyOrdinalLabel.textContent = monthlyOrdinalLabels[state.wizard.monthlyOrdinalIndex] || monthlyOrdinalLabels[0];
@@ -4167,13 +4180,13 @@ function renderTimePickers() {
 }
 
 function setRepeatMode(mode) {
-  if (state.wizard.repeatMode === mode) {
-    state.wizard.repeatMode = "none";
-    state.wizard.repeatDays = [];
-  } else {
-    state.wizard.repeatMode = mode;
-    state.wizard.repeatDays = recurrenceDays[mode] || [];
+  const normalizedMode = normalizeRepeatMode(mode);
+  const currentMode = normalizeRepeatMode(state.wizard.repeatMode);
+  state.wizard.repeatOpen = true;
+  if (currentMode !== normalizedMode) {
+    state.wizard.repeatDays = [...(recurrenceDays[normalizedMode] || [])];
   }
+  state.wizard.repeatMode = normalizedMode;
 
   renderRepeatControls();
 }
@@ -4188,7 +4201,7 @@ function toggleWeekday(day) {
   }
 
   state.wizard.repeatDays = [...days].sort((a, b) => a - b);
-  state.wizard.repeatMode = state.wizard.repeatDays.length ? "custom" : "none";
+  state.wizard.repeatMode = state.wizard.repeatDays.length ? "weekly" : "none";
   renderRepeatControls();
 }
 
@@ -4219,7 +4232,7 @@ function validateStep() {
     return false;
   }
 
-  if (state.wizard.step === 2 && state.wizard.repeatOpen && state.wizard.repeatMode === "custom" && !state.wizard.repeatDays.length) {
+  if (state.wizard.step === 2 && state.wizard.repeatOpen && normalizeRepeatMode(state.wizard.repeatMode) === "weekly" && !state.wizard.repeatDays.length) {
     wizardMessage.textContent = "Marque pelo menos um dia da semana.";
     return false;
   }
@@ -4278,20 +4291,21 @@ function buildOccurrences() {
   const selectedDate = dateFromOffset(state.wizard.dateOffset);
   const firstStart = buildDateWithTime(selectedDate, state.wizard.startHour, state.wizard.startMinute);
   const firstEnd = buildDateWithTime(selectedDate, state.wizard.endHour, state.wizard.endMinute);
+  const repeatMode = normalizeRepeatMode(state.wizard.repeatMode);
   if (firstEnd <= firstStart) {
     throw new Error("O horario final precisa ser depois do inicial.");
   }
 
-  if (!state.wizard.repeatOpen || state.wizard.repeatMode === "none") {
+  if (!state.wizard.repeatOpen || repeatMode === "none") {
     return [{ startAt: firstStart.toISOString(), endAt: firstEnd.toISOString() }];
   }
 
-  const allowedDays = state.wizard.repeatMode === "custom"
+  const allowedDays = repeatMode === "weekly"
     ? state.wizard.repeatDays
-    : recurrenceDays[state.wizard.repeatMode] || [];
+    : recurrenceDays[repeatMode] || [];
   const occurrences = [];
 
-  if (state.wizard.repeatMode === "periodic") {
+  if (repeatMode === "periodic") {
     for (let index = 0; index < 180; index += Number(state.wizard.periodicEveryDays || 1)) {
       const date = addDays(selectedDate, index);
       if (state.wizard.avoidSaturday && date.getDay() === 6) continue;
@@ -4303,7 +4317,7 @@ function buildOccurrences() {
     return occurrences;
   }
 
-  if (state.wizard.repeatMode === "monthly_custom") {
+  if (repeatMode === "monthly_custom") {
     for (let monthOffset = 0; monthOffset < 12; monthOffset += 1) {
       const base = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + monthOffset, 1);
       const monthDays = [];
@@ -4427,8 +4441,8 @@ function closeOverlapWizardWith(payload) {
 async function saveAction() {
   try {
     wizardMessage.textContent = "Salvando...";
-    const repeatRule = state.wizard.repeatOpen ? state.wizard.repeatMode : "none";
-    const repeatDays = repeatRule === "custom"
+    const repeatRule = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
+    const repeatDays = repeatRule === "weekly"
       ? state.wizard.repeatDays
       : recurrenceDays[repeatRule] || [];
 
@@ -4913,15 +4927,18 @@ function formatRepeatLabel(repeatRule, repeatDays) {
   if (repeatRule === "daily") {
     return "Diariamente";
   }
+  if (repeatRule === "weekly" || repeatRule === "custom") {
+    if (Array.isArray(repeatDays) && repeatDays.length) {
+      const names = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+      return `Semanalmente (${repeatDays.map((day) => names[day] || day).join(", ")})`;
+    }
+    return "Semanalmente";
+  }
   if (repeatRule === "periodic") {
     return `A cada ${state.wizard.periodicEveryDays} dias`;
   }
   if (repeatRule === "monthly_custom") {
     return `Toda ${monthlyOrdinalLabels[state.wizard.monthlyOrdinalIndex]} ${monthlyWeekdayLabels[state.wizard.monthlyWeekdayIndex]}`;
-  }
-  if (repeatRule === "custom" && Array.isArray(repeatDays) && repeatDays.length) {
-    const names = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-    return repeatDays.map((day) => names[day] || day).join(", ");
   }
   return "Data única";
 }
@@ -4960,7 +4977,7 @@ function applyInterpretedAction(entry) {
   state.wizard.endHour = Math.max(0, Math.min(23, Number(entry?.endHour || state.wizard.endHour)));
   state.wizard.endMinute = Math.max(0, Math.min(55, Math.round(Number(entry?.endMinute || state.wizard.endMinute) / 5) * 5));
   state.wizard.repeatOpen = String(entry?.repeatRule || "none") !== "none";
-  state.wizard.repeatMode = String(entry?.repeatRule || "none");
+  state.wizard.repeatMode = normalizeRepeatMode(String(entry?.repeatRule || "none"));
   state.wizard.repeatDays = Array.isArray(entry?.repeatDays) ? entry.repeatDays.map((day) => Number(day)).filter((day) => day >= 0 && day <= 6) : [];
   renderActionCategoryPicker();
   void interpretActionCategoryFromTitle(taskTitle.value);
@@ -6077,9 +6094,20 @@ platformWizardAiCreateButton?.addEventListener("click", () => {
   })();
 });
 
-repeatToggle.addEventListener("click", () => {
-  state.wizard.repeatOpen = !state.wizard.repeatOpen;
-  renderRepeatControls();
+repeatTypeTabs?.querySelectorAll("[data-repeat-open]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const shouldOpen = button.dataset.repeatOpen === "true";
+    state.wizard.repeatOpen = shouldOpen;
+    if (shouldOpen && normalizeRepeatMode(state.wizard.repeatMode) === "none") {
+      state.wizard.repeatMode = "daily";
+      state.wizard.repeatDays = [...recurrenceDays.daily];
+    }
+    if (!shouldOpen) {
+      state.wizard.repeatMode = "none";
+      state.wizard.repeatDays = [];
+    }
+    renderRepeatControls();
+  });
 });
 repeatModeBackButton?.addEventListener("click", () => {
   state.wizard.repeatMode = "none";

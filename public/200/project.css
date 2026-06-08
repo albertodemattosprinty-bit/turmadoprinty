@@ -2285,6 +2285,30 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.repeat-type-tabs {
+  width: min(70vw, 420px);
+  margin: 0 auto 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.repeat-type-tabs button {
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-weight: 800;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.repeat-type-tabs button.active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .repeat-box {
   width: min(460px, 100%);
   margin: 0 auto;
@@ -2302,7 +2326,7 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 #repeatModeButtons {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: min(70vw, 420px);
   margin: 0 auto;
 }
@@ -2382,7 +2406,7 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   background: rgba(255, 255, 255, 0.14);
   font-weight: 800;
   padding: 10px 12px;
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: pointer;
 }
 
