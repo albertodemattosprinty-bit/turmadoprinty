@@ -400,6 +400,10 @@ function normalizeMiniCourseGeneratorModel(value) {
   return available.includes(requested) ? requested : "gpt-5.1";
 }
 
+function supportsReasoningEffortForModel(model) {
+  return /^gpt-5/i.test(String(model || "").trim());
+}
+
 function getPositiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -2708,9 +2712,8 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
   };
 
   const createCourseChunkAttempt = async (chunk, extraUserInstruction = "", includeMetadata = false, courseOverview = "") => {
-    const completion = await createChatCompletion(apiKey, {
+    const requestPayload = {
       model,
-      reasoning_effort: "none",
       temperature: extraUserInstruction ? 0.3 : 0.45,
       max_completion_tokens: includeMetadata ? 3400 : 2600,
       response_format: {
@@ -2736,7 +2739,11 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
           ].filter(Boolean).join("\n")
         }
       ]
-    });
+    };
+    if (supportsReasoningEffortForModel(model)) {
+      requestPayload.reasoning_effort = "none";
+    }
+    const completion = await createChatCompletion(apiKey, requestPayload);
 
     const raw = extractChatCompletionText(completion);
     const parsed = parseStructuredJsonText(raw);
