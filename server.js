@@ -17,6 +17,7 @@ import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
 import { appendMiniChatMessages, createMiniChat, getMiniChatById, listMiniChats } from "./src/mini-chats.js";
+import { createMiniCourse, getMiniCourseById, getMiniCourseUserSummary, listMiniCourses, startMiniCourse, updateMiniCourseProgress } from "./src/mini-courses.js";
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
@@ -2426,6 +2427,325 @@ async function handleMiniLessonPlansListRequest(request, response) {
   }
 }
 
+function buildMiniCoursePageKinds(pageCount) {
+  const total = Math.max(4, Math.min(24, Number(pageCount || 8) || 8));
+  const textCount = Math.max(1, Math.round(total * 0.5));
+  const didacticCount = Math.max(1, Math.round(total * 0.25));
+  const closingCount = Math.max(1, total - textCount - didacticCount);
+  const kinds = [];
+
+  for (let index = 0; index < textCount; index += 1) {
+    kinds.push("text");
+  }
+  for (let index = 0; index < didacticCount; index += 1) {
+    kinds.push("didactic");
+  }
+  while (kinds.length < total - closingCount) {
+    kinds.push("text");
+  }
+  while (kinds.length < total) {
+    kinds.push("closing");
+  }
+
+  return kinds.slice(0, total);
+}
+
+function normalizeMiniCourseGeneratedPage(page, index, expectedKind = "text") {
+  const kind = ["text", "didactic", "closing"].includes(String(page?.kind || "").trim().toLowerCase())
+    ? String(page.kind).trim().toLowerCase()
+    : expectedKind;
+  const paragraphs = Array.isArray(page?.paragraphs)
+    ? page.paragraphs.map((item) => String(item || "").trim()).filter(Boolean).slice(0, kind === "closing" ? 3 : 2)
+    : [];
+  const bullets = Array.isArray(page?.bullets)
+    ? page.bullets.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 6)
+    : [];
+  const tableRows = Array.isArray(page?.tableRows)
+    ? page.tableRows
+      .map((item) => ({
+        label: String(item?.label || "").trim(),
+        value: String(item?.value || "").trim()
+      }))
+      .filter((item) => item.label || item.value)
+      .slice(0, 6)
+    : [];
+
+  return {
+    pageNumber: index + 1,
+    kind,
+    title: String(page?.title || `Pagina ${index + 1}`).trim() || `Pagina ${index + 1}`,
+    paragraphs,
+    bullets,
+    tableRows,
+    imageUrl: String(page?.imageUrl || "").trim(),
+    imagePrompt: String(page?.imagePrompt || "").trim(),
+    audioUrl: String(page?.audioUrl || "").trim(),
+    audioScript: String(page?.audioScript || "").trim()
+  };
+}
+
+async function handleMiniCoursesListRequest(request, response) {
+  const user = await getOptionalAuthUser(request);
+
+  try {
+    const [courses, summary] = await Promise.all([
+      listMiniCourses(user?.id || ""),
+      user ? getMiniCourseUserSummary(user.id) : Promise.resolve({ completedCourses: 0, startedCourses: 0 })
+    ]);
+    const courseSummaries = courses.map((course) => ({
+      ...course,
+      pages: []
+    }));
+
+    sendJson(response, 200, {
+      ok: true,
+      courses: courseSummaries,
+      user: user ? sanitizeUser(user) : null,
+      summary
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os cursos."
+    });
+  }
+}
+
+async function handleMiniCourseDetailRequest(request, response, courseId) {
+  const user = await getOptionalAuthUser(request);
+
+  try {
+    const course = await getMiniCourseById(courseId, user?.id || "");
+    if (!course) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      course,
+      user: user ? sanitizeUser(user) : null
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o curso."
+    });
+  }
+}
+
+async function handleMiniCourseStartRequest(request, response, courseId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const course = await startMiniCourse(user.id, courseId);
+    if (!course) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    const summary = await getMiniCourseUserSummary(user.id);
+    sendJson(response, 200, {
+      ok: true,
+      course,
+      user: sanitizeUser(user),
+      summary
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel iniciar o curso."
+    });
+  }
+}
+
+async function handleMiniCourseProgressRequest(request, response, courseId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const course = await updateMiniCourseProgress(user.id, courseId, Number(body?.currentPage || 1) || 1);
+    if (!course) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    const summary = await getMiniCourseUserSummary(user.id);
+    sendJson(response, 200, {
+      ok: true,
+      course,
+      user: sanitizeUser(user),
+      summary
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar o progresso."
+    });
+  }
+}
+
+async function handleMiniCourseGenerateRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const title = String(body?.title || "").trim();
+  const context = String(body?.context || "").trim();
+  const pageCount = Math.max(4, Math.min(24, Number(body?.pageCount || 8) || 8));
+
+  if (!title) {
+    sendJson(response, 400, { error: "Informe o titulo do curso." });
+    return;
+  }
+
+  if (!context) {
+    sendJson(response, 400, { error: "Informe o contexto do curso." });
+    return;
+  }
+
+  try {
+    const sharedContext = await getContextPrompt();
+    const kinds = buildMiniCoursePageKinds(pageCount);
+    const courseJsonSchema = {
+      name: "mini_course",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["mainTitle", "coverImagePrompt", "pages"],
+        properties: {
+          mainTitle: { type: "string" },
+          coverImagePrompt: { type: "string" },
+          pages: {
+            type: "array",
+            minItems: pageCount,
+            maxItems: pageCount,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["pageNumber", "kind", "title", "paragraphs", "bullets", "tableRows", "imageUrl", "imagePrompt", "audioUrl", "audioScript"],
+              properties: {
+                pageNumber: { type: "integer" },
+                kind: { type: "string" },
+                title: { type: "string" },
+                paragraphs: { type: "array", items: { type: "string" } },
+                bullets: { type: "array", items: { type: "string" } },
+                tableRows: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["label", "value"],
+                    properties: {
+                      label: { type: "string" },
+                      value: { type: "string" }
+                    }
+                  }
+                },
+                imageUrl: { type: "string" },
+                imagePrompt: { type: "string" },
+                audioUrl: { type: "string" },
+                audioScript: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const system = buildMiniSystemPrompt({
+      modeKey: "project",
+      sharedContext,
+      plannerContext: MINI_MINISTRY_CONTEXT,
+      theme: title,
+      extraInstructions: [
+        "Voce esta criando cursos completos e globais para professores do Ministerio Infantil dentro do MINI.",
+        "Use o contexto cristao compartilhado da plataforma e o tom ministerial do MINI.",
+        "O curso deve ser pratico, profundo, amoroso, biblicamente coerente e muito util para professores.",
+        `Crie exatamente ${pageCount} paginas na ordem obrigatoria destes tipos: ${kinds.join(", ")}.`,
+        "Cada pagina equivale a 1 minuto de curso.",
+        "Nas paginas text, escreva 1 ou 2 paragrafos totalizando cerca de 500 a 600 caracteres.",
+        "Nas paginas didactic, entregue conteudo pedagogico e responsivo com bullets ou tableRows claros.",
+        "Nas paginas closing, entregue 3 paragrafos entre 150 e 200 caracteres cada, com conclusao, aplicacao e encorajamento final.",
+        "Preencha imagePrompt e audioScript pensando em futuras geracoes de imagem e mp3, mas deixe imageUrl e audioUrl vazios se ainda nao existir arquivo.",
+        "Responda apenas em JSON estruturado."
+      ].join(" ")
+    });
+
+    const completion = await createChatCompletion(apiKey, {
+      model: "gpt-5.1",
+      reasoning_effort: "none",
+      temperature: 0.45,
+      max_completion_tokens: 6200,
+      response_format: {
+        type: "json_schema",
+        json_schema: courseJsonSchema
+      },
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: [
+            `Titulo do curso: ${title}`,
+            `Contexto do curso: ${context}`,
+            `Quantidade de paginas: ${pageCount}`,
+            "Crie um curso completo para professores, com progressao clara e linguagem brasileira natural."
+          ].join("\n")
+        }
+      ]
+    });
+
+    const raw = extractChatCompletionText(completion);
+    const parsed = parseStructuredJsonText(raw);
+    const pages = Array.isArray(parsed?.pages) ? parsed.pages : [];
+    const normalizedPages = kinds.map((kind, index) => normalizeMiniCourseGeneratedPage(pages[index] || {}, index, kind));
+    const course = await createMiniCourse({
+      title: String(parsed?.mainTitle || title).trim() || title,
+      context,
+      pages: normalizedPages,
+      coverImagePrompt: String(parsed?.coverImagePrompt || `Capa em PNG para o curso ${title}, visual cristao infantil, limpo e acolhedor.`).trim(),
+      createdByUserId: adminUser.id
+    });
+
+    sendJson(response, 201, {
+      ok: true,
+      course
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel gerar o curso."
+    });
+  }
+}
+
 async function handleMiniLessonPlansCreateRequest(request, response) {
   const user = await requireAuth(request, response);
   if (!user) {
@@ -4742,6 +5062,36 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/mini/aulas/gerar") {
     await handleMiniLessonPlanGenerate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/mini/courses") {
+    await handleMiniCoursesListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/mini/courses/generate") {
+    await handleMiniCourseGenerateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/api/mini/courses/")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", ""));
+    if (courseId && !courseId.includes("/")) {
+      await handleMiniCourseDetailRequest(request, response, courseId);
+      return;
+    }
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/start")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/start$/, ""));
+    await handleMiniCourseStartRequest(request, response, courseId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/progress")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/progress$/, ""));
+    await handleMiniCourseProgressRequest(request, response, courseId);
     return;
   }
 

@@ -638,6 +638,320 @@
       border-radius: 16px;
       background: rgba(255,255,255,.08);
     }
+    .courses-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 55;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255, 244, 160, .24), transparent 30%),
+        radial-gradient(circle at 82% 82%, rgba(255, 165, 190, .22), transparent 28%),
+        linear-gradient(160deg, #71b6ff 0%, #6f85ff 34%, #ffb7d5 67%, #ffe790 100%);
+      color: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(.985);
+      transition: opacity .2s ease, transform .2s ease;
+      font-family: "Open Sans", sans-serif;
+    }
+    .courses-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+    .courses-shell {
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: 10dvh minmax(0, 80dvh) 10dvh;
+      padding: 0 16px;
+    }
+    .courses-top,
+    .courses-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .courses-head-title {
+      flex: 1;
+      text-align: center;
+      font-size: clamp(24px, 4vw, 34px);
+      font-weight: 800;
+      letter-spacing: .02em;
+      text-shadow: 0 6px 24px rgba(0,0,0,.16);
+    }
+    .courses-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .courses-head-btn,
+    .courses-nav-btn {
+      border: 0;
+      border-radius: 18px;
+      background: rgba(255,255,255,.18);
+      color: #fff;
+      min-width: 52px;
+      height: 52px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 14px 30px rgba(0,0,0,.12);
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .courses-head-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+    .courses-head-create {
+      width: 52px;
+      font-size: 26px;
+      line-height: 1;
+      background: rgba(32, 92, 255, .44);
+    }
+    .courses-viewport {
+      width: 100%;
+      height: 100%;
+      border-radius: 34px;
+      background: rgba(255,255,255,.16);
+      backdrop-filter: blur(18px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 24px 60px rgba(53, 58, 123, .24);
+      overflow: hidden;
+      position: relative;
+    }
+    .courses-list-view,
+    .course-reader-view {
+      height: 100%;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .courses-list-view::-webkit-scrollbar,
+    .course-reader-view::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    .courses-list-view {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+    .courses-empty {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      font-weight: 800;
+      opacity: .88;
+      text-align: center;
+      padding: 24px;
+    }
+    .course-card {
+      border: 0;
+      width: 100%;
+      padding: 16px;
+      border-radius: 28px;
+      background: linear-gradient(160deg, rgba(255,255,255,.24), rgba(255,255,255,.10));
+      display: grid;
+      grid-template-columns: 132px 1fr auto;
+      gap: 16px;
+      align-items: center;
+      color: #fff;
+      text-align: left;
+      cursor: pointer;
+    }
+    .course-cover,
+    .course-cover-fallback {
+      width: 132px;
+      height: 132px;
+      border-radius: 24px;
+      object-fit: cover;
+      box-shadow: 0 16px 28px rgba(0,0,0,.16);
+    }
+    .course-cover-fallback {
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 25% 20%, rgba(255,239,153,.50), transparent 26%),
+        linear-gradient(155deg, rgba(43,119,255,.96), rgba(255,157,193,.85));
+      padding: 16px;
+      font-size: 22px;
+      font-weight: 800;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .course-card-body {
+      min-width: 0;
+    }
+    .course-card-title {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 30px);
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .course-card-duration {
+      margin-top: 8px;
+      font-size: 15px;
+      opacity: .88;
+      font-weight: 700;
+    }
+    .course-card-progress {
+      align-self: flex-start;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.18);
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .course-reader-view {
+      padding: 28px 24px;
+    }
+    .course-page-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+      color: #fff;
+    }
+    .course-page-kicker {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      opacity: .82;
+      font-weight: 800;
+    }
+    .course-page-title {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.08;
+      font-weight: 800;
+    }
+    .course-page-paragraph {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 22px);
+      line-height: 1.75;
+      font-weight: 700;
+      color: rgba(255,255,255,.96);
+    }
+    .course-page-bullets {
+      margin: 0;
+      padding-left: 22px;
+      display: grid;
+      gap: 12px;
+      font-size: 18px;
+      line-height: 1.65;
+      font-weight: 700;
+    }
+    .course-page-table {
+      display: grid;
+      gap: 10px;
+    }
+    .course-page-row {
+      display: grid;
+      grid-template-columns: minmax(140px, 220px) 1fr;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.14);
+    }
+    .course-page-row strong {
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .course-page-row span {
+      font-size: 16px;
+      line-height: 1.55;
+      font-weight: 700;
+    }
+    .course-page-media {
+      display: grid;
+      gap: 10px;
+    }
+    .course-page-media img {
+      width: 100%;
+      border-radius: 24px;
+      max-height: 280px;
+      object-fit: cover;
+      box-shadow: 0 16px 34px rgba(0,0,0,.18);
+    }
+    .course-page-audio {
+      width: 100%;
+    }
+    .courses-footer {
+      justify-content: center;
+    }
+    .courses-footer-status {
+      flex: 1;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 800;
+      opacity: .92;
+      min-width: 0;
+    }
+    .courses-nav-btn {
+      min-width: 122px;
+      padding: 0 18px;
+    }
+    .courses-nav-btn[hidden],
+    .course-reader-view[hidden],
+    .courses-head-create[hidden] {
+      display: none !important;
+    }
+    .courses-side-panel,
+    .course-admin-panel {
+      background: linear-gradient(180deg, rgba(37, 76, 177, .98), rgba(31, 46, 107, .98));
+    }
+    .courses-user-card {
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.10);
+      display: grid;
+      gap: 6px;
+    }
+    .courses-user-label {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      opacity: .72;
+      font-weight: 700;
+    }
+    .courses-user-value {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+    .course-admin-label {
+      font-size: 14px;
+      font-weight: 800;
+      margin-top: 6px;
+    }
+    .course-admin-input {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      padding: 14px 16px;
+      font-family: "Open Sans", sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      box-sizing: border-box;
+    }
+    .course-admin-input::placeholder {
+      color: rgba(255,255,255,.72);
+    }
+    .course-admin-textarea {
+      min-height: 144px;
+      resize: vertical;
+    }
+    .course-admin-submit {
+      margin-top: 12px;
+      width: 100%;
+    }
     @keyframes aiSpin {
       to { transform: rotate(360deg); }
     }
@@ -966,6 +1280,43 @@
       background: transparent;
     }
     @media (max-width: 900px) {
+      .courses-shell {
+        padding: 0 10px;
+      }
+      .courses-head-title {
+        font-size: 22px;
+      }
+      .course-card {
+        grid-template-columns: 1fr;
+      }
+      .course-cover,
+      .course-cover-fallback {
+        width: 100%;
+        height: 170px;
+      }
+      .course-card-progress {
+        justify-self: flex-start;
+      }
+      .course-reader-view {
+        padding: 18px 16px;
+      }
+      .course-page-title {
+        font-size: 26px;
+      }
+      .course-page-paragraph,
+      .course-page-bullets {
+        font-size: 16px;
+      }
+      .course-page-row {
+        grid-template-columns: 1fr;
+      }
+      .courses-nav-btn {
+        min-width: 100px;
+        padding: 0 12px;
+      }
+      .courses-footer-status {
+        font-size: 13px;
+      }
       .create-modal {
         grid-template-columns: 1fr;
       }
@@ -1018,7 +1369,7 @@
     <img class="mini-logo" src="/mini/mini.png" alt="Mini" />
     <section class="actions-5">
       <button class="icon-chip" type="button"><span class="icon-ball g-red"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg></span><span>Midia</span></button>
-      <button class="icon-chip" type="button"><span class="icon-ball g-blue"><svg viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm0 13L5 12.18v3.27L12 19l7-3.55v-3.27L12 16z"/></svg></span><span>Cursos</span></button>
+      <button id="openCourses" class="icon-chip" type="button"><span class="icon-ball g-blue"><svg viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm0 13L5 12.18v3.27L12 19l7-3.55v-3.27L12 16z"/></svg></span><span>Cursos</span></button>
       <button id="openCreate" class="icon-chip" type="button"><span class="icon-ball g-purple"><svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span><span>Criar</span></button>
       <button id="openAulas" class="icon-chip" type="button"><span class="icon-ball g-gold"><svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg></span><span>Aulas</span></button>
       <button class="icon-chip" type="button"><span class="icon-ball g-navy"><svg viewBox="0 0 24 24"><path d="M4 13h6v7H4zm10-9h6l-1 6h-4v4l-5 3V7z"/></svg></span><span>Liderar</span></button>
@@ -1132,6 +1483,73 @@
     </section>
   </section>
 
+  <section id="coursesModal" class="courses-modal" aria-hidden="true">
+    <div class="courses-shell">
+      <header class="courses-top">
+        <button id="openCoursesUser" class="courses-head-btn" type="button" aria-label="Abrir painel do usuário">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
+        </button>
+        <div id="coursesHeadTitle" class="courses-head-title">Cursos</div>
+        <div class="courses-head-actions">
+          <button id="openCourseAdmin" class="courses-head-btn courses-head-create" type="button" hidden aria-label="Criar curso">C</button>
+          <button id="closeCourses" class="courses-head-btn" type="button" aria-label="Voltar">
+            <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div id="coursesViewport" class="courses-viewport">
+        <div id="coursesListView" class="courses-list-view"></div>
+        <article id="courseReaderView" class="course-reader-view" hidden></article>
+      </div>
+
+      <footer class="courses-footer">
+        <button id="coursePrev" class="courses-nav-btn" type="button" hidden>Anterior</button>
+        <div id="courseFooterStatus" class="courses-footer-status">Escolha um curso para começar.</div>
+        <button id="courseNext" class="courses-nav-btn" type="button" hidden>Próxima</button>
+      </footer>
+    </div>
+  </section>
+
+  <section id="coursesUserModal" class="mini-plans-modal" aria-hidden="true">
+    <div class="mini-plans-panel courses-side-panel" role="dialog" aria-modal="true" aria-labelledby="coursesUserTitle">
+      <div class="mini-plans-head">
+        <h3 id="coursesUserTitle">Seu perfil</h3>
+        <button id="closeCoursesUser" class="round-action close" type="button" aria-label="Fechar painel">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div class="courses-user-card">
+        <div class="courses-user-label">Nome</div>
+        <div id="coursesUserName" class="courses-user-value">Visitante</div>
+      </div>
+      <div class="courses-user-card">
+        <div class="courses-user-label">Cursos concluídos</div>
+        <div id="coursesUserCompleted" class="courses-user-value">0</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="courseAdminModal" class="mini-plans-modal" aria-hidden="true">
+    <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="courseAdminTitle">
+      <div class="mini-plans-head">
+        <h3 id="courseAdminTitle">Criar curso global</h3>
+        <button id="closeCourseAdmin" class="round-action close" type="button" aria-label="Fechar criação">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div class="section-muted">Esse curso será criado com IA e ficará salvo de forma global para todos os usuários.</div>
+      <label class="course-admin-label" for="courseAdminTitleInput">Título do curso</label>
+      <input id="courseAdminTitleInput" class="course-admin-input" type="text" placeholder="Ex.: Fundamentos do ministério infantil">
+      <label class="course-admin-label" for="courseAdminContextInput">Contexto do curso</label>
+      <textarea id="courseAdminContextInput" class="course-admin-input course-admin-textarea" placeholder="Descreva o tema, o objetivo e o contexto do curso."></textarea>
+      <label class="course-admin-label" for="courseAdminPagesInput">Quantidade de páginas</label>
+      <input id="courseAdminPagesInput" class="course-admin-input" type="number" min="4" max="24" value="8">
+      <button id="generateCourseAdmin" class="ai-primary course-admin-submit" type="button">Gerar curso</button>
+      <div id="courseAdminStatus" class="create-status"></div>
+    </div>
+  </section>
+
   <section id="miniPlansModal" class="mini-plans-modal" aria-hidden="true">
     <div class="mini-plans-panel" role="dialog" aria-modal="true" aria-labelledby="miniPlansTitle">
       <div class="mini-plans-head">
@@ -1172,6 +1590,14 @@
     let currentAiPlan = null;
     let currentAiPlanId = "";
     let savedMiniPlans = [];
+    let miniCourses = [];
+    let currentMiniCourse = null;
+    let currentMiniCoursePage = 1;
+    let miniCourseUser = null;
+    let miniCourseSummary = { completedCourses: 0, startedCourses: 0 };
+    let isMiniCourseAdmin = false;
+    let miniCoursesLoading = false;
+    let miniCoursesError = "";
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
@@ -1194,6 +1620,12 @@
     function getMiniToken(){ return window.localStorage.getItem(miniSessionKey) || ""; }
     function setMiniStatus(text){ $("miniChatStatus").textContent = text || ""; }
     function scrollMiniChatToBottom(){ const thread = $("miniChatThread"); if (thread) thread.scrollTop = thread.scrollHeight; }
+    function setCourseFooterStatus(text) {
+      const footer = $("courseFooterStatus");
+      if (footer) {
+        footer.textContent = text || "";
+      }
+    }
     function getAiStageIndexForProgress(progress) {
       if (progress >= 100) return 4;
       if (progress >= 80) return 3;
@@ -1291,6 +1723,9 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+    }
+    function escapeAttr(value) {
+      return escapeText(value).replace(/`/g, "&#96;");
     }
 
     function getClockSvg() {
@@ -1912,6 +2347,421 @@
       closeMiniChatsPanel();
     }
 
+    function getMiniCourseDisplayName() {
+      return String(miniCourseUser?.name || miniCourseUser?.username || "Visitante").trim() || "Visitante";
+    }
+
+    function updateMiniCourseAdminButton() {
+      const button = $("openCourseAdmin");
+      if (!button) {
+        return;
+      }
+      button.hidden = !isMiniCourseAdmin;
+    }
+
+    function updateMiniCoursesUserCard() {
+      const userName = $("coursesUserName");
+      const completed = $("coursesUserCompleted");
+      if (userName) {
+        userName.textContent = getMiniCourseDisplayName();
+      }
+      if (completed) {
+        completed.textContent = String(Number(miniCourseSummary?.completedCourses || 0) || 0);
+      }
+    }
+
+    function buildMiniCourseCover(course) {
+      if (course?.coverImageUrl) {
+        return `<img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">`;
+      }
+      return `<div class="course-cover-fallback">${escapeText(course?.title || "Curso")}</div>`;
+    }
+
+    function updateMiniCoursesHeader() {
+      const title = $("coursesHeadTitle");
+      const closeButton = $("closeCourses");
+      if (title) {
+        if (currentMiniCourse) {
+          const pagesRead = Math.max(Number(currentMiniCourse.progress?.pagesRead || currentMiniCoursePage || 1) || 1, 1);
+          const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+          title.textContent = `${Math.min(pagesRead, totalPages)}/${totalPages}`;
+        } else {
+          title.textContent = "Cursos";
+        }
+      }
+      if (closeButton) {
+        closeButton.setAttribute("aria-label", currentMiniCourse ? "Voltar para lista" : "Voltar ao menu");
+      }
+    }
+
+    function updateMiniCoursesFooter() {
+      const prev = $("coursePrev");
+      const next = $("courseNext");
+      if (!prev || !next) {
+        return;
+      }
+
+      if (!currentMiniCourse) {
+        prev.hidden = true;
+        next.hidden = true;
+        setCourseFooterStatus(miniCoursesLoading ? "Carregando cursos..." : (miniCoursesError || "Escolha um curso para começar."));
+        return;
+      }
+
+      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      prev.hidden = false;
+      next.hidden = false;
+      prev.disabled = currentMiniCoursePage <= 1;
+      next.disabled = false;
+      next.textContent = currentMiniCoursePage >= totalPages ? "Concluir" : "Próxima";
+      setCourseFooterStatus(`${currentMiniCourse.title} • ${currentMiniCoursePage}/${totalPages}`);
+    }
+
+    function renderMiniCoursesList() {
+      const listView = $("coursesListView");
+      const readerView = $("courseReaderView");
+      if (!listView || !readerView) {
+        return;
+      }
+
+      readerView.hidden = true;
+      listView.hidden = false;
+
+      if (miniCoursesLoading) {
+        listView.innerHTML = `<div class="courses-empty">Carregando cursos...</div>`;
+        updateMiniCoursesHeader();
+        updateMiniCoursesFooter();
+        return;
+      }
+
+      if (miniCoursesError) {
+        listView.innerHTML = `<div class="courses-empty">${escapeText(miniCoursesError)}</div>`;
+        updateMiniCoursesHeader();
+        updateMiniCoursesFooter();
+        return;
+      }
+
+      if (!miniCourses.length) {
+        listView.innerHTML = `<div class="courses-empty">Não há cursos.</div>`;
+        updateMiniCoursesHeader();
+        updateMiniCoursesFooter();
+        return;
+      }
+
+      listView.innerHTML = miniCourses.map((course) => {
+        const pagesRead = Number(course?.progress?.pagesRead || 0) || 0;
+        const totalPages = Math.max(Number(course?.pageCount || 1) || 1, 1);
+        return `
+          <button class="course-card" type="button" data-course-id="${escapeAttr(course.id)}">
+            ${buildMiniCourseCover(course)}
+            <div class="course-card-body">
+              <h3 class="course-card-title">${escapeText(course.title)}</h3>
+              <div class="course-card-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
+            </div>
+            <div class="course-card-progress">${pagesRead ? `${pagesRead}/${totalPages}` : `${totalPages} min`}</div>
+          </button>
+        `;
+      }).join("");
+
+      listView.querySelectorAll("[data-course-id]").forEach((button) => {
+        button.onclick = async () => {
+          await openMiniCourseById(button.getAttribute("data-course-id") || "");
+        };
+      });
+
+      updateMiniCoursesHeader();
+      updateMiniCoursesFooter();
+    }
+
+    function renderMiniCourseReader() {
+      const listView = $("coursesListView");
+      const readerView = $("courseReaderView");
+      if (!listView || !readerView) {
+        return;
+      }
+
+      if (!currentMiniCourse) {
+        readerView.hidden = true;
+        listView.hidden = false;
+        renderMiniCoursesList();
+        return;
+      }
+
+      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      currentMiniCoursePage = Math.max(1, Math.min(totalPages, Number(currentMiniCoursePage || 1) || 1));
+      const currentPage = currentMiniCourse.pages?.[currentMiniCoursePage - 1] || {};
+      const paragraphs = Array.isArray(currentPage.paragraphs) ? currentPage.paragraphs : [];
+      const bullets = Array.isArray(currentPage.bullets) ? currentPage.bullets : [];
+      const tableRows = Array.isArray(currentPage.tableRows) ? currentPage.tableRows : [];
+      const kindLabels = {
+        text: "Conteúdo principal",
+        didactic: "Página didática",
+        closing: "Conclusão"
+      };
+
+      listView.hidden = true;
+      readerView.hidden = false;
+      readerView.innerHTML = `
+        <div class="course-page-shell">
+          <div class="course-page-kicker">${escapeText(kindLabels[currentPage.kind] || "Curso")}</div>
+          <h2 class="course-page-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
+          ${paragraphs.map((paragraph) => `<p class="course-page-paragraph">${escapeText(paragraph)}</p>`).join("")}
+          ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li>${escapeText(item)}</li>`).join("")}</ul>` : ""}
+          ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
+          ${(currentPage.imageUrl || currentPage.audioUrl) ? `
+            <div class="course-page-media">
+              ${currentPage.imageUrl ? `<img src="${escapeAttr(currentPage.imageUrl)}" alt="${escapeAttr(currentPage.title || currentMiniCourse.title)}">` : ""}
+              ${currentPage.audioUrl ? `<audio class="course-page-audio" controls src="${escapeAttr(currentPage.audioUrl)}"></audio>` : ""}
+            </div>
+          ` : ""}
+        </div>
+      `;
+
+      updateMiniCoursesHeader();
+      updateMiniCoursesFooter();
+    }
+
+    function applyMiniCoursesPayload(payload) {
+      miniCourses = Array.isArray(payload?.courses) ? payload.courses : miniCourses;
+      miniCourseUser = Object.prototype.hasOwnProperty.call(payload || {}, "user") ? (payload?.user || null) : miniCourseUser;
+      miniCourseSummary = payload?.summary || (miniCourseUser ? miniCourseSummary : { completedCourses: 0, startedCourses: 0 });
+      isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
+      updateMiniCourseAdminButton();
+      updateMiniCoursesUserCard();
+    }
+
+    async function loadMiniCourses() {
+      miniCoursesLoading = true;
+      miniCoursesError = "";
+      renderMiniCoursesList();
+      try {
+        const response = await apiMini("/api/mini/courses");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao carregar cursos.");
+        }
+        applyMiniCoursesPayload(payload || {});
+        miniCourses = Array.isArray(payload?.courses) ? payload.courses : [];
+      } catch (error) {
+        miniCourses = [];
+        miniCoursesError = error instanceof Error ? error.message : "Falha ao carregar cursos.";
+      } finally {
+        miniCoursesLoading = false;
+        renderMiniCoursesList();
+      }
+    }
+
+    function openMiniCoursesModal() {
+      $("coursesModal").classList.add("show");
+      $("coursesModal").setAttribute("aria-hidden", "false");
+      currentMiniCourse = null;
+      currentMiniCoursePage = 1;
+      renderMiniCoursesList();
+      void loadMiniCourses();
+    }
+
+    function closeMiniCoursesModal() {
+      $("coursesModal").classList.remove("show");
+      $("coursesModal").setAttribute("aria-hidden", "true");
+      closeMiniCoursesUserModal();
+      closeMiniCourseAdminModal();
+      currentMiniCourse = null;
+      currentMiniCoursePage = 1;
+    }
+
+    function openMiniCoursesUserModal() {
+      updateMiniCoursesUserCard();
+      const modal = $("coursesUserModal");
+      if (!modal) {
+        return;
+      }
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeMiniCoursesUserModal() {
+      const modal = $("coursesUserModal");
+      if (!modal) {
+        return;
+      }
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    function openMiniCourseAdminModal() {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+      const modal = $("courseAdminModal");
+      if (!modal) {
+        return;
+      }
+      $("courseAdminStatus").textContent = "";
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeMiniCourseAdminModal() {
+      const modal = $("courseAdminModal");
+      if (!modal) {
+        return;
+      }
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    async function openMiniCourseById(courseId) {
+      const safeCourseId = String(courseId || "").trim();
+      if (!safeCourseId) {
+        return;
+      }
+
+      try {
+        const token = getMiniToken();
+        const path = token ? `/api/mini/courses/${encodeURIComponent(safeCourseId)}/start` : `/api/mini/courses/${encodeURIComponent(safeCourseId)}`;
+        const response = await apiMini(path, {
+          method: token ? "POST" : "GET"
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao abrir o curso.");
+        }
+
+        if (Object.prototype.hasOwnProperty.call(payload || {}, "user")) {
+          miniCourseUser = payload.user || null;
+        }
+        if (payload?.summary) {
+          miniCourseSummary = payload.summary;
+        }
+        isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
+        updateMiniCourseAdminButton();
+        updateMiniCoursesUserCard();
+        currentMiniCourse = payload.course || null;
+        currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || 1) || 1);
+        renderMiniCourseReader();
+      } catch (error) {
+        currentMiniCourse = null;
+        currentMiniCoursePage = 1;
+        setCourseFooterStatus(error instanceof Error ? error.message : "Erro ao abrir o curso.");
+        renderMiniCoursesList();
+      }
+    }
+
+    async function persistMiniCourseProgress(nextPage) {
+      if (!currentMiniCourse) {
+        return;
+      }
+
+      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
+
+      if (!getMiniToken()) {
+        currentMiniCoursePage = safePage;
+        currentMiniCourse.progress = {
+          ...(currentMiniCourse.progress || {}),
+          currentPage: safePage,
+          pagesRead: Math.max(Number(currentMiniCourse.progress?.pagesRead || 0) || 0, safePage),
+          totalPages
+        };
+        renderMiniCourseReader();
+        return;
+      }
+
+      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(currentMiniCourse.id)}/progress`, {
+        method: "PUT",
+        body: JSON.stringify({ currentPage: safePage })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao salvar o progresso.");
+      }
+
+      if (payload?.user) {
+        miniCourseUser = payload.user;
+      }
+      if (payload?.summary) {
+        miniCourseSummary = payload.summary;
+      }
+      currentMiniCourse = payload.course || currentMiniCourse;
+      currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || safePage) || safePage);
+      miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? currentMiniCourse : course);
+      updateMiniCoursesUserCard();
+      renderMiniCourseReader();
+    }
+
+    async function goToMiniCoursePage(direction) {
+      if (!currentMiniCourse) {
+        return;
+      }
+
+      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const targetPage = Math.max(1, Math.min(totalPages, currentMiniCoursePage + direction));
+
+      if (direction < 0 && targetPage === currentMiniCoursePage) {
+        return;
+      }
+
+      if (direction > 0 && currentMiniCoursePage >= totalPages) {
+        await persistMiniCourseProgress(totalPages);
+        setCourseFooterStatus("Curso concluído.");
+        return;
+      }
+
+      await persistMiniCourseProgress(targetPage);
+    }
+
+    async function generateMiniCourseAdmin() {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+
+      const title = $("courseAdminTitleInput")?.value.trim() || "";
+      const context = $("courseAdminContextInput")?.value.trim() || "";
+      const pageCount = Math.max(4, Math.min(24, Number($("courseAdminPagesInput")?.value || 8) || 8));
+      const status = $("courseAdminStatus");
+      const button = $("generateCourseAdmin");
+
+      if (!title || !context) {
+        if (status) {
+          status.textContent = "Preencha título e contexto para gerar o curso.";
+        }
+        return;
+      }
+
+      if (button) {
+        button.disabled = true;
+      }
+      if (status) {
+        status.textContent = "Gerando curso global...";
+      }
+
+      try {
+        const response = await apiMini("/api/mini/courses/generate", {
+          method: "POST",
+          body: JSON.stringify({ title, context, pageCount })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao gerar curso.");
+        }
+
+        closeMiniCourseAdminModal();
+        await loadMiniCourses();
+        if (status) {
+          status.textContent = "";
+        }
+        setCourseFooterStatus("Curso criado com sucesso.");
+      } catch (error) {
+        if (status) {
+          status.textContent = error instanceof Error ? error.message : "Erro ao gerar curso.";
+        }
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
+
     function renderPool(){
       const pages=Math.max(1,Math.ceil(baseBlocks.length/pageSize)); state.poolPage=Math.max(0,Math.min(state.poolPage,pages-1));
       $("poolPage").textContent=`${state.poolPage+1} / ${pages}`; $("poolCounter").textContent=String(baseBlocks.length);
@@ -1930,6 +2780,40 @@
 
     function openMinute(block){ state.currentPick=block; state.currentMinutes=5; $("stepName").textContent=block.name; renderMinute(); $("minuteModal").classList.add("show"); }
     function renderMinute(){ $("minuteValue").textContent=String(state.currentMinutes); $("minuteLabel").textContent=toHoursText(state.currentMinutes); }
+
+    $("openCourses").onclick = () => {
+      openMiniCoursesModal();
+    };
+    $("closeCourses").onclick = () => {
+      if (currentMiniCourse) {
+        currentMiniCourse = null;
+        currentMiniCoursePage = 1;
+        renderMiniCoursesList();
+        return;
+      }
+      closeMiniCoursesModal();
+    };
+    $("openCoursesUser").onclick = () => {
+      openMiniCoursesUserModal();
+    };
+    $("closeCoursesUser").onclick = () => {
+      closeMiniCoursesUserModal();
+    };
+    $("openCourseAdmin").onclick = () => {
+      openMiniCourseAdminModal();
+    };
+    $("closeCourseAdmin").onclick = () => {
+      closeMiniCourseAdminModal();
+    };
+    $("generateCourseAdmin").onclick = async () => {
+      await generateMiniCourseAdmin();
+    };
+    $("coursePrev").onclick = async () => {
+      await goToMiniCoursePage(-1);
+    };
+    $("courseNext").onclick = async () => {
+      await goToMiniCoursePage(1);
+    };
 
     $("openAulas").onclick=()=>{ $("aulasModal").classList.add("show"); renderSelected(); };
     $("closeAulas").onclick=()=>$("aulasModal").classList.remove("show");
