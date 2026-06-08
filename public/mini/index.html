@@ -2762,39 +2762,49 @@
 
       const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
       const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
+      const previousPage = currentMiniCoursePage;
+      const previousProgress = { ...(currentMiniCourse.progress || {}) };
+
+      currentMiniCoursePage = safePage;
+      currentMiniCourse.progress = {
+        ...(currentMiniCourse.progress || {}),
+        currentPage: safePage,
+        pagesRead: Math.max(Number(currentMiniCourse.progress?.pagesRead || 0) || 0, safePage),
+        totalPages
+      };
+      renderMiniCourseReader();
 
       if (!getMiniToken()) {
-        currentMiniCoursePage = safePage;
-        currentMiniCourse.progress = {
-          ...(currentMiniCourse.progress || {}),
-          currentPage: safePage,
-          pagesRead: Math.max(Number(currentMiniCourse.progress?.pagesRead || 0) || 0, safePage),
-          totalPages
-        };
-        renderMiniCourseReader();
         return;
       }
 
-      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(currentMiniCourse.id)}/progress`, {
-        method: "PUT",
-        body: JSON.stringify({ currentPage: safePage })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || "Falha ao salvar o progresso.");
-      }
+      try {
+        const response = await apiMini(`/api/mini/courses/${encodeURIComponent(currentMiniCourse.id)}/progress`, {
+          method: "PUT",
+          body: JSON.stringify({ currentPage: safePage })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao salvar o progresso.");
+        }
 
-      if (payload?.user) {
-        miniCourseUser = payload.user;
+        if (payload?.user) {
+          miniCourseUser = payload.user;
+        }
+        if (payload?.summary) {
+          miniCourseSummary = payload.summary;
+        }
+        currentMiniCourse = payload.course || currentMiniCourse;
+        currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || safePage) || safePage);
+        miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? currentMiniCourse : course);
+        updateMiniCoursesUserCard();
+        renderMiniCourseReader();
+      } catch (error) {
+        currentMiniCoursePage = previousPage;
+        currentMiniCourse.progress = previousProgress;
+        renderMiniCourseReader();
+        throw error;
       }
-      if (payload?.summary) {
-        miniCourseSummary = payload.summary;
-      }
-      currentMiniCourse = payload.course || currentMiniCourse;
-      currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || safePage) || safePage);
-      miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? currentMiniCourse : course);
-      updateMiniCoursesUserCard();
-      renderMiniCourseReader();
     }
 
     async function goToMiniCoursePage(direction) {
@@ -2815,7 +2825,11 @@
         return;
       }
 
-      await persistMiniCourseProgress(targetPage);
+      try {
+        await persistMiniCourseProgress(targetPage);
+      } catch (error) {
+        setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao trocar de página.");
+      }
     }
 
     async function generateMiniCourseAdmin() {
