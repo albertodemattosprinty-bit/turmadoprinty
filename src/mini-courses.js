@@ -327,6 +327,19 @@ export async function createMiniCourse({ title, context, pages, coverImageUrl = 
   return normalizeCourse(result.rows[0]);
 }
 
+export async function deleteMiniCourse(courseId) {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      delete from mini_courses
+      where id = $1
+      returning id
+    `,
+    [courseId]
+  );
+  return Boolean(result.rowCount);
+}
+
 export async function startMiniCourse(userId, courseId) {
   await ensureMiniCoursesSchema();
   const course = await getMiniCourseById(courseId, userId);

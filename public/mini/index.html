@@ -819,8 +819,12 @@
       opacity: .88;
       font-weight: 700;
     }
-    .course-card-action {
+    .course-card-actions {
       align-self: flex-start;
+      display: flex;
+      gap: 10px;
+    }
+    .course-card-action {
       width: 52px;
       height: 52px;
       border: 0;
@@ -836,6 +840,9 @@
       width: 22px;
       height: 22px;
       fill: currentColor;
+    }
+    .course-card-action.is-danger {
+      background: rgba(255, 115, 132, .22);
     }
     .course-reader-view {
       padding: 28px 24px;
@@ -1361,6 +1368,9 @@
         height: 170px;
       }
       .course-card-action {
+        justify-self: flex-start;
+      }
+      .course-card-actions {
         justify-self: flex-start;
       }
       .course-reader-view {
@@ -2548,7 +2558,10 @@
               <h3 class="course-card-title">${escapeText(course.title)}</h3>
               <div class="course-card-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
             </div>
-            <button class="course-card-action" type="button" data-download-course-id="${escapeAttr(course.id)}" aria-label="Baixar curso">${getDownloadSvg()}</button>
+            <div class="course-card-actions">
+              <button class="course-card-action" type="button" data-download-course-id="${escapeAttr(course.id)}" aria-label="Baixar curso">${getDownloadSvg()}</button>
+              ${isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course.id)}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""}
+            </div>
           </div>
         `;
       }).join("");
@@ -2568,6 +2581,16 @@
         button.onclick = async (event) => {
           event.stopPropagation();
           await downloadMiniCourse(button.getAttribute("data-download-course-id") || "");
+        };
+      });
+      listView.querySelectorAll("[data-delete-course-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          try {
+            await deleteMiniCourseAdmin(button.getAttribute("data-delete-course-id") || "");
+          } catch (error) {
+            setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao excluir curso.");
+          }
         };
       });
 
@@ -2835,6 +2858,41 @@
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+    }
+
+    async function deleteMiniCourseAdmin(courseId) {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+
+      const safeCourseId = String(courseId || "").trim();
+      if (!safeCourseId) {
+        return;
+      }
+
+      const course = miniCourses.find((item) => item.id === safeCourseId);
+      const courseTitle = String(course?.title || "este curso").trim();
+      const confirmed = window.confirm(`Excluir o curso "${courseTitle}"?`);
+      if (!confirmed) {
+        return;
+      }
+
+      setCourseFooterStatus(`Excluindo ${courseTitle}...`);
+
+      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao excluir curso.");
+      }
+
+      if (currentMiniCourse?.id === safeCourseId) {
+        currentMiniCourse = null;
+        currentMiniCoursePage = 1;
+      }
+      await loadMiniCourses();
+      setCourseFooterStatus(String(payload?.feedback || "Curso excluído com sucesso."));
     }
 
     async function persistMiniCourseProgress(nextPage) {
