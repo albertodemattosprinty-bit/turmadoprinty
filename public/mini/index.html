@@ -344,6 +344,27 @@
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
     }
     .ai-result[hidden] { display: none !important; }
+    .ai-plan-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+    .ai-plan-toolbar-btn {
+      border: 0;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 10px 18px rgba(0,0,0,.12);
+    }
+    .ai-plan-toolbar-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
     .ai-plan {
       color: #fff;
       display: grid;
@@ -426,6 +447,39 @@
       fill: currentColor;
       flex: 0 0 auto;
     }
+    .ai-plan-edit-title,
+    .ai-plan-edit-text,
+    .ai-plan-edit-intro {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      font-family: "Open Sans", sans-serif;
+      outline: none;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+    .ai-plan-edit-title {
+      padding: 10px 12px;
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .ai-plan-edit-intro,
+    .ai-plan-edit-text {
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.55;
+      resize: vertical;
+      min-height: 84px;
+    }
+    .ai-plan-edit-intro::placeholder,
+    .ai-plan-edit-text::placeholder,
+    .ai-plan-edit-title::placeholder {
+      color: rgba(255,255,255,.7);
+    }
+    .ai-plan-edit-text {
+      min-height: 118px;
+    }
     .ai-actions {
       display: flex;
       gap: 8px;
@@ -447,6 +501,98 @@
     .ai-primary:disabled {
       opacity: .55;
       cursor: default;
+    }
+    .mini-plans-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(9, 10, 22, .58);
+      backdrop-filter: blur(8px);
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+    .mini-plans-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .mini-plans-panel {
+      width: min(100%, 640px);
+      max-height: min(82vh, 760px);
+      background: linear-gradient(180deg, rgba(34, 22, 74, .98), rgba(20, 20, 48, .98));
+      color: #fff;
+      border-radius: 24px;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 12px;
+      padding: 16px;
+      box-shadow: 0 28px 70px rgba(0,0,0,.30);
+    }
+    .mini-plans-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .mini-plans-head h3 {
+      margin: 0;
+      font-family: "Open Sans", sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+    }
+    .mini-plans-list {
+      overflow-y: auto;
+      display: grid;
+      gap: 10px;
+      padding-right: 2px;
+    }
+    .mini-plan-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.10);
+      cursor: pointer;
+    }
+    .mini-plan-item strong {
+      display: block;
+      font-family: "Open Sans", sans-serif;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    .mini-plan-item small {
+      display: block;
+      opacity: .78;
+      line-height: 1.35;
+    }
+    .mini-plan-delete {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 10px;
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+    .mini-plan-delete svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    .mini-plan-empty {
+      padding: 18px;
+      text-align: center;
+      opacity: .8;
+      border-radius: 16px;
+      background: rgba(255,255,255,.08);
     }
     @keyframes aiSpin {
       to { transform: rotate(360deg); }
@@ -630,7 +776,7 @@
     <h1>Planejar Aula</h1>
     <div class="hint">Vamos montar sua aula em etapas, com um fluxo suave e guiado.</div>
 
-    <div class="ai-stage-shell">
+    <div id="aiStageShell" class="ai-stage-shell">
       <div id="aiStage1" class="ai-stage">
         <div class="ai-stage-title">Etapa 1</div>
         <div class="ai-field-label">Qual a idade da sua turma?</div>
@@ -671,6 +817,7 @@
       <button id="aiBack" class="ai-secondary" type="button">Voltar</button>
       <button id="generateAi" class="ai-primary" type="button">Continuar</button>
     </div>
+    <div id="aiPlanStatus" class="create-status"></div>
   </section>
 
   <section id="createModal" class="create-modal">
@@ -688,6 +835,19 @@
       <button id="miniChatSend" class="create-send" type="submit" aria-label="Enviar mensagem"><svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.1 2-12.1 2z"/></svg></button>
     </form>
     <div id="miniChatStatus" class="create-status"></div>
+  </section>
+
+  <section id="miniPlansModal" class="mini-plans-modal" aria-hidden="true">
+    <div class="mini-plans-panel" role="dialog" aria-modal="true" aria-labelledby="miniPlansTitle">
+      <div class="mini-plans-head">
+        <h3 id="miniPlansTitle">Aulas salvas</h3>
+        <button id="closePlansModal" class="round-action close" type="button" aria-label="Fechar lista">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div class="section-muted">Toque em uma aula para carregar. Use o lixo à direita para excluir.</div>
+      <div id="miniPlansList" class="mini-plans-list"></div>
+    </div>
   </section>
 
   <script>
@@ -713,11 +873,16 @@
     let aiProgressStartAt = 0;
     let aiIsGenerating = false;
     let aiHasResult = false;
+    let aiEditMode = false;
+    let currentAiPlan = null;
+    let currentAiPlanId = "";
+    let savedMiniPlans = [];
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
     const iconBase = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/%C3%ADcones/";
     const miniSessionKey = "turma_do_printy_token";
+    const miniPlannerDraftKey = "turma_do_printy_mini_planner_draft";
 
     function iconUrlById(id) {
       const safe = Math.max(1, Math.min(48, Number(id) || 1));
@@ -810,6 +975,10 @@
       aiHasResult = false;
       updateAiProgress(0);
       setAiWizardStep(1);
+      const shell = $("aiStageShell");
+      if (shell) {
+        shell.hidden = false;
+      }
       const result = $("aiOutput");
       if (result) {
         result.hidden = true;
@@ -833,6 +1002,196 @@
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5A9.5 9.5 0 1 0 21.5 12 9.51 9.51 0 0 0 12 2.5m0 17A7.5 7.5 0 1 1 19.5 12 7.51 7.51 0 0 1 12 19.5m.75-11.25h-1.5v4.06l3.52 2.1.76-1.25-2.78-1.65z"/></svg>`;
     }
 
+    function getListSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>`;
+    }
+
+    function getTrashSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4zm1 6h2v8h-2zm4 0h2v8h-2zM7 9h2v8H7zm-1 11h12l1-13H5z"/></svg>`;
+    }
+
+    function getMiniPlannerDraft() {
+      try {
+        const raw = window.localStorage.getItem(miniPlannerDraftKey);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function setMiniPlannerDraft(plan) {
+      if (!plan) {
+        window.localStorage.removeItem(miniPlannerDraftKey);
+        return;
+      }
+      window.localStorage.setItem(miniPlannerDraftKey, JSON.stringify(plan));
+    }
+
+    function clearMiniPlannerDraft() {
+      window.localStorage.removeItem(miniPlannerDraftKey);
+    }
+
+    function normalizeMiniPlanPayload(payload, sourceBlocks = []) {
+      const mainTitle = String(payload?.mainTitle || "Plano de Aula").trim() || "Plano de Aula";
+      const intro = String(payload?.intro || "").trim();
+      const rawParts = Array.isArray(payload?.parts) ? payload.parts : [];
+      const rawContent = String(payload?.content || "").trim();
+      const fallbackChunks = rawContent ? rawContent.split(/\n{2,}/).map((chunk) => chunk.trim()).filter(Boolean) : [];
+      const parts = sourceBlocks.map((block, index) => {
+        const source = rawParts[index] || {};
+        const ownContent = String(source?.content || "").trim();
+        return {
+          title: String(source?.title || block?.name || `Parte ${index + 1}`).trim() || block?.name || `Parte ${index + 1}`,
+          minutes: Number(source?.minutes || block?.minutes || 0) || Number(block?.minutes || 0) || 0,
+          content: ownContent || fallbackChunks[index] || fallbackChunks[0] || `Conteúdo em processamento para ${block?.name || `Parte ${index + 1}`}.`
+        };
+      });
+      const content = [intro, ...parts.map((item) => item.content)].filter(Boolean).join("\n\n").trim();
+      return {
+        id: String(payload?.id || "").trim(),
+        mainTitle,
+        intro,
+        parts,
+        content,
+        age: Number(payload?.age || state.age || 6) || 6,
+        theme: String(payload?.theme || $("aiPrompt")?.value || "").trim(),
+        selectedBlocks: sourceBlocks.map((block) => ({ name: block?.name || "", minutes: Number(block?.minutes || 0) || 0 }))
+      };
+    }
+
+    function collectPlanFromUi() {
+      const titleInput = $("aiPlanMainTitle");
+      const introInput = $("aiPlanIntroInput");
+      const partInputs = Array.from(document.querySelectorAll("[data-plan-part-index]"));
+      const title = String(titleInput?.value || currentAiPlan?.mainTitle || "Plano de Aula").trim() || "Plano de Aula";
+      const intro = String(introInput?.value || currentAiPlan?.intro || "").trim();
+      const parts = (currentAiPlan?.parts || []).map((part, index) => {
+        const input = partInputs.find((item) => Number(item.dataset.planPartIndex) === index);
+        return {
+          ...part,
+          content: String(input?.value || part.content || "").trim()
+        };
+      });
+      return {
+        ...(currentAiPlan || {}),
+        mainTitle: title,
+        intro,
+        parts,
+        content: [intro, ...parts.map((item) => item.content)].filter(Boolean).join("\n\n").trim()
+      };
+    }
+
+    function renderMiniPlan(plan, { editable = false } = {}) {
+      const result = $("aiOutput");
+      if (!result || !plan) {
+        return;
+      }
+
+      currentAiPlan = plan;
+      aiEditMode = Boolean(editable);
+
+      const toolbar = `
+        <div class="ai-plan-toolbar">
+          <button id="openPlansList" class="ai-plan-toolbar-btn" type="button" aria-label="Aulas salvas">${getListSvg()}</button>
+        </div>
+      `;
+
+      const introField = aiEditMode
+        ? `<textarea id="aiPlanIntroInput" class="ai-plan-edit-intro" placeholder="Introdução da aula">${escapeText(plan.intro || "")}</textarea>`
+        : (plan.intro ? `<p class="ai-plan-intro">${escapeText(plan.intro)}</p>` : "");
+
+      const partsHtml = (plan.parts || []).map((part, index) => {
+        const blockName = plan.selectedBlocks?.[index]?.name || part.title || `Parte ${index + 1}`;
+        const icon = iconUrlByName(blockName);
+        const title = String(part.title || blockName).trim() || blockName;
+        const time = Number(part.minutes || 0) || 0;
+        const text = String(part.content || "").trim();
+
+        return `
+          <div class="ai-plan-part">
+            <img class="ai-plan-icon" src="${escapeText(icon)}" alt="${escapeText(blockName)}">
+            <div class="ai-plan-body">
+              <div class="ai-plan-line">
+                <p class="ai-plan-title"><strong>${escapeText(title)}</strong></p>
+                <div class="ai-plan-time">${getClockSvg()}<span>${time} min</span></div>
+              </div>
+              ${aiEditMode ? `<textarea class="ai-plan-edit-text" data-plan-part-index="${index}" placeholder="Texto desta parte">${escapeText(text)}</textarea>` : `<p class="ai-plan-text">${escapeText(text)}</p>`}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const titleField = aiEditMode
+        ? `<input id="aiPlanMainTitle" class="ai-plan-edit-title" type="text" value="${escapeText(plan.mainTitle || "Plano de Aula")}">`
+        : `<h1>${escapeText(plan.mainTitle || "Plano de Aula")}</h1>`;
+
+      result.innerHTML = `
+        ${toolbar}
+        <article class="ai-plan">
+          ${titleField}
+          ${introField}
+          ${partsHtml}
+        </article>
+      `;
+
+      const listButton = $("openPlansList");
+      if (listButton) {
+        listButton.onclick = () => openMiniPlansModal();
+      }
+
+      if (aiEditMode) {
+        const syncOnInput = () => {
+          currentAiPlan = collectPlanFromUi();
+          setMiniPlannerDraft(currentAiPlan);
+        };
+        const titleInput = $("aiPlanMainTitle");
+        const introInput = $("aiPlanIntroInput");
+        if (titleInput) titleInput.addEventListener("input", syncOnInput);
+        if (introInput) introInput.addEventListener("input", syncOnInput);
+        result.querySelectorAll("[data-plan-part-index]").forEach((node) => node.addEventListener("input", syncOnInput));
+      }
+    }
+
+    function applyPlanToScreen(plan, { editable = false, keepDraft = true } = {}) {
+      if (!plan) {
+        return;
+      }
+      currentAiPlan = plan;
+      aiHasResult = true;
+      aiEditMode = Boolean(editable);
+      setAiWizardStep(2, true);
+      const shell = $("aiStageShell");
+      if (shell) {
+        shell.hidden = true;
+      }
+      const result = $("aiOutput");
+      if (result) {
+        result.hidden = false;
+      }
+      renderMiniPlan(plan, { editable });
+      updateAiPlanButtons();
+      if (keepDraft) {
+        setMiniPlannerDraft(currentAiPlan);
+      }
+    }
+
+    function updateAiPlanButtons() {
+      const back = $("aiBack");
+      const next = $("generateAi");
+      if (!back || !next) return;
+      if (aiHasResult) {
+        back.hidden = false;
+        back.disabled = false;
+        back.textContent = aiEditMode ? "Visualizar" : "Editar";
+        next.disabled = false;
+        next.textContent = "Salvar aula";
+      } else {
+        back.hidden = aiWizardStep === 1;
+        back.textContent = "Voltar";
+        next.textContent = aiWizardStep === 2 ? "Gerar Plano" : "Continuar";
+      }
+    }
+
     async function apiMini(path, options = {}) {
       const headers = Object.assign({}, options.headers || {});
       const token = getMiniToken();
@@ -844,6 +1203,178 @@
       }
       const response = await fetch(path, { ...options, headers });
       return response;
+    }
+
+    function setAiPlanStatus(text) {
+      const status = $("aiPlanStatus");
+      if (status) {
+        status.textContent = text || "";
+      }
+    }
+
+    function openMiniPlansModal() {
+      const modal = $("miniPlansModal");
+      if (modal) {
+        modal.classList.add("show");
+        modal.setAttribute("aria-hidden", "false");
+      }
+      void loadMiniPlans();
+    }
+
+    function closeMiniPlansModal() {
+      const modal = $("miniPlansModal");
+      if (modal) {
+        modal.classList.remove("show");
+        modal.setAttribute("aria-hidden", "true");
+      }
+    }
+
+    async function loadMiniPlans() {
+      const list = $("miniPlansList");
+      if (!list) {
+        return;
+      }
+
+      try {
+        const response = await apiMini("/api/mini/plans");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao carregar aulas salvas.");
+        }
+        savedMiniPlans = Array.isArray(payload.plans) ? payload.plans : [];
+        if (!savedMiniPlans.length) {
+          list.innerHTML = `<div class="mini-plan-empty">Nenhuma aula salva ainda.</div>`;
+          return;
+        }
+
+        list.innerHTML = "";
+        savedMiniPlans.forEach((plan) => {
+          const item = document.createElement("div");
+          item.className = "mini-plan-item";
+          item.innerHTML = `
+            <div>
+              <strong>${escapeText(plan.title || "Plano de Aula")}</strong>
+              <small>${escapeText(plan.theme || "Sem tema definido")} • ${escapeText(String(plan.age || 6))} anos</small>
+            </div>
+            <button class="mini-plan-delete" type="button" aria-label="Excluir aula">${getTrashSvg()}</button>
+          `;
+          item.onclick = async () => {
+            await loadMiniPlan(plan.id);
+            closeMiniPlansModal();
+          };
+          const deleteButton = item.querySelector(".mini-plan-delete");
+          if (deleteButton) {
+            deleteButton.onclick = async (event) => {
+              event.stopPropagation();
+              await deleteMiniPlan(plan.id);
+            };
+          }
+          list.appendChild(item);
+        });
+      } catch (error) {
+        list.innerHTML = `<div class="mini-plan-empty">${escapeText(error instanceof Error ? error.message : "Erro ao carregar aulas salvas.")}</div>`;
+      }
+    }
+
+    async function loadMiniPlan(planId) {
+      try {
+        const response = await apiMini(`/api/mini/plans/${encodeURIComponent(planId)}`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao carregar a aula.");
+        }
+        const sourceBlocks = Array.isArray(payload.plan?.selectedBlocks) && payload.plan.selectedBlocks.length
+          ? payload.plan.selectedBlocks
+          : (state.selected.length ? state.selected : []);
+        const plan = normalizeMiniPlanPayload({
+          mainTitle: payload.plan?.title || payload.plan?.mainTitle,
+          intro: payload.plan?.intro || "",
+          parts: payload.plan?.parts || [],
+          content: payload.plan?.content || "",
+          age: payload.plan?.age || state.age,
+          theme: payload.plan?.theme || "",
+          id: payload.plan?.id || ""
+        }, sourceBlocks);
+        currentAiPlanId = payload.plan?.id || "";
+        applyPlanToScreen(plan, { editable: false, keepDraft: false });
+        setAiPlanStatus("Aula carregada.");
+      } catch (error) {
+        setAiPlanStatus(error instanceof Error ? error.message : "Falha ao carregar a aula.");
+      }
+    }
+
+    async function deleteMiniPlan(planId) {
+      try {
+        const response = await apiMini(`/api/mini/plans/${encodeURIComponent(planId)}`, {
+          method: "DELETE"
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao excluir a aula.");
+        }
+        savedMiniPlans = savedMiniPlans.filter((item) => item.id !== planId);
+        await loadMiniPlans();
+        setAiPlanStatus("Aula excluída.");
+        if (currentAiPlanId === planId) {
+          currentAiPlanId = "";
+        }
+      } catch (error) {
+        setAiPlanStatus(error instanceof Error ? error.message : "Falha ao excluir a aula.");
+      }
+    }
+
+    async function saveCurrentMiniPlan() {
+      if (!currentAiPlan) {
+        setAiPlanStatus("Gere uma aula antes de salvar.");
+        return;
+      }
+
+      const plan = aiEditMode ? collectPlanFromUi() : currentAiPlan;
+      const sourceBlocks = Array.isArray(plan.selectedBlocks) ? plan.selectedBlocks : (state.selected.length ? state.selected : []);
+      const content = [plan.intro, ...plan.parts.map((item) => item.content)].filter(Boolean).join("\n\n").trim();
+      const payload = {
+        title: plan.mainTitle,
+        theme: plan.theme || $("aiPrompt")?.value || "",
+        age: plan.age || state.age,
+        intro: plan.intro || "",
+        parts: plan.parts || [],
+        selectedBlocks: sourceBlocks,
+        content
+      };
+
+      try {
+        const method = currentAiPlanId ? "PUT" : "POST";
+        const path = currentAiPlanId ? `/api/mini/plans/${encodeURIComponent(currentAiPlanId)}` : "/api/mini/plans";
+        const response = await apiMini(path, {
+          method,
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(body.error || "Falha ao salvar a aula.");
+        }
+        const savedPlan = body.plan || {};
+        currentAiPlanId = savedPlan.id || currentAiPlanId;
+        currentAiPlan = normalizeMiniPlanPayload({
+          ...payload,
+          id: currentAiPlanId,
+          mainTitle: savedPlan.title || payload.title,
+          intro: savedPlan.intro || payload.intro,
+          parts: savedPlan.parts || payload.parts,
+          content: savedPlan.content || payload.content,
+          age: savedPlan.age || payload.age,
+          theme: savedPlan.theme || payload.theme
+        }, payload.selectedBlocks || []);
+        clearMiniPlannerDraft();
+        aiEditMode = false;
+        aiHasResult = true;
+        renderMiniPlan(currentAiPlan, { editable: false });
+        updateAiPlanButtons();
+        setAiPlanStatus("Aula salva com sucesso.");
+        await loadMiniPlans();
+      } catch (error) {
+        setAiPlanStatus(error instanceof Error ? error.message : "Falha ao salvar a aula.");
+      }
     }
 
     function renderMiniChatChip(chat) {
@@ -999,14 +1530,35 @@
     }
     $("closeCreate").onclick=()=>$("createModal").classList.remove("show");
 
-    $("openAi").onclick=()=>{
+    $("openAi").onclick = () => {
       $("aiModal").classList.add("show");
+      const draft = getMiniPlannerDraft();
+      if (draft && (draft.mainTitle || draft.intro || draft.content || (Array.isArray(draft.parts) && draft.parts.length))) {
+        const sourceBlocks = Array.isArray(draft.selectedBlocks) && draft.selectedBlocks.length
+          ? draft.selectedBlocks
+          : (state.selected.length ? state.selected : []);
+        const plan = normalizeMiniPlanPayload(draft, sourceBlocks);
+        currentAiPlanId = String(draft.id || "").trim();
+        applyPlanToScreen(plan, { editable: false, keepDraft: true });
+        setAiPlanStatus("Rascunho carregado. Você pode editar ou salvar a aula.");
+        updateAiPlanButtons();
+        return;
+      }
+
+      currentAiPlan = null;
+      currentAiPlanId = "";
       if (!$("aiPrompt").value) {
         $("aiPrompt").value = examples[0];
       }
       resetAiWizard();
+      const shell = $("aiStageShell");
+      if (shell) {
+        shell.hidden = false;
+      }
+      setAiPlanStatus("");
+      updateAiPlanButtons();
     };
-    $("closeAi").onclick=()=>{
+    $("closeAi").onclick = () => {
       clearAiProgressTimer();
       aiIsGenerating = false;
       $("aiModal").classList.remove("show");
@@ -1040,14 +1592,20 @@
       if (aiIsGenerating) {
         return;
       }
+
       if (aiHasResult) {
-        aiHasResult = false;
-        const result = $("aiOutput");
-        if (result) {
-          result.hidden = true;
+        aiEditMode = !aiEditMode;
+        if (currentAiPlan) {
+          renderMiniPlan(currentAiPlan, { editable: aiEditMode });
+          setMiniPlannerDraft(currentAiPlan);
+          setAiPlanStatus(aiEditMode ? "Editando a aula." : "Visualizando a aula.");
         }
+        updateAiPlanButtons();
+        return;
       }
+
       setAiWizardStep(Math.max(1, aiWizardStep - 1));
+      updateAiPlanButtons();
     };
 
     $("generateAi").onclick = async () => {
@@ -1055,15 +1613,14 @@
         return;
       }
 
+      if (aiHasResult) {
+        await saveCurrentMiniPlan();
+        return;
+      }
+
       if (aiWizardStep === 1) {
-        if (aiHasResult) {
-          aiHasResult = false;
-          const result = $("aiOutput");
-          if (result) {
-            result.hidden = true;
-          }
-        }
         setAiWizardStep(2);
+        updateAiPlanButtons();
         return;
       }
 
@@ -1075,6 +1632,11 @@
         }
 
         aiIsGenerating = true;
+        aiHasResult = false;
+        aiEditMode = false;
+        currentAiPlan = null;
+        currentAiPlanId = "";
+        setAiPlanStatus("Gerando sua aula...");
         setAiWizardStep(3);
         const result = $("aiOutput");
         if (result) {
@@ -1091,77 +1653,40 @@
           const payload = await generateMiniPlan(prompt);
           updateAiProgress(100);
           clearAiProgressTimer();
-          const safeTitle = payload?.mainTitle || "Plano de Aula";
-          const intro = String(payload?.intro || "").trim();
           const sourceBlocks = state.selected.length ? state.selected : [];
-          const rawParts = Array.isArray(payload?.parts) ? payload.parts : [];
-          const rawContent = String(payload?.content || "").trim();
-          const fallbackChunks = rawContent ? rawContent.split(/\n{2,}/).map((chunk) => chunk.trim()).filter(Boolean) : [];
-          const parts = sourceBlocks.map((block, index) => {
-            const source = rawParts[index] || {};
-            const ownContent = String(source?.content || "").trim();
-            return {
-              title: String(source?.title || block.name || `Parte ${index + 1}`).trim() || block.name || `Parte ${index + 1}`,
-              minutes: Number(source?.minutes || block.minutes || 0) || Number(block.minutes || 0) || 0,
-              content: ownContent || fallbackChunks[index] || fallbackChunks[0] || `Conteúdo em processamento para ${block.name || `Parte ${index + 1}`}.`
-            };
-          });
-          const planHtml = [];
-          planHtml.push(`<h1>${escapeText(safeTitle)}</h1>`);
-          if (intro) {
-            planHtml.push(`<p class="ai-plan-intro">${escapeText(intro)}</p>`);
-          }
-          const renderParts = parts.length ? parts : rawParts;
-          renderParts.forEach((part, index) => {
-            const blockName = sourceBlocks[index]?.name || part?.title || "Bloco";
-            const icon = iconUrlByName(blockName);
-            const title = String(part?.title || blockName).trim() || blockName;
-            const text = String(part?.content || "").trim() || rawContent || "Conteúdo em processamento.";
-            const minutes = Number(part?.minutes || sourceBlocks[index]?.minutes || 0) || 0;
-            planHtml.push(`
-              <div class="ai-plan-part">
-                <img class="ai-plan-icon" src="${escapeText(icon)}" alt="${escapeText(blockName)}">
-                <div class="ai-plan-body">
-                  <div class="ai-plan-line">
-                    <p class="ai-plan-title"><strong>${escapeText(title)}</strong></p>
-                    <div class="ai-plan-time">${getClockSvg()}<span>${minutes} min</span></div>
-                  </div>
-                  <p class="ai-plan-text">${escapeText(text)}</p>
-                </div>
-              </div>
-            `);
-          });
-          if (!renderParts.length) {
-            const fallbackText = String(payload?.content || "").trim() || "A IA nao retornou um texto consolidado.";
-            planHtml.push(`<p class="ai-plan-intro">${escapeText(fallbackText)}</p>`);
-          }
-          const card = document.createElement("article");
-          card.className = "ai-plan";
-          card.innerHTML = planHtml.join("");
-          if (result) {
-            result.innerHTML = "";
-            result.appendChild(card);
-            result.hidden = false;
-          }
-          aiIsGenerating = false;
-          aiHasResult = true;
-          if (back) back.disabled = false;
-          if (next) next.disabled = false;
-          next.textContent = "Gerar Plano";
-          setAiWizardStep(2, true);
+          const plan = normalizeMiniPlanPayload({
+            ...payload,
+            theme: prompt,
+            age: state.age
+          }, sourceBlocks);
+          currentAiPlan = plan;
+          applyPlanToScreen(plan, { editable: false, keepDraft: true });
+          setAiPlanStatus("Aula pronta. Você pode editar ou salvar.");
         } catch (error) {
           clearAiProgressTimer();
           aiIsGenerating = false;
           aiHasResult = false;
+          aiEditMode = false;
+          currentAiPlan = null;
           if (back) back.disabled = false;
           if (next) next.disabled = false;
           updateAiProgress(0);
           setAiWizardStep(2);
-          const result = $("aiOutput");
-          if (result) {
-            result.hidden = false;
-            result.innerHTML = `<article class="ai-single"><h1>Falha</h1><p>${escapeText(error instanceof Error ? error.message : "Erro desconhecido.")}</p></article>`;
+          const shell = $("aiStageShell");
+          if (shell) {
+            shell.hidden = false;
           }
+          const resultNode = $("aiOutput");
+          if (resultNode) {
+            resultNode.hidden = true;
+            resultNode.innerHTML = "";
+          }
+          setAiPlanStatus(error instanceof Error ? error.message : "Erro desconhecido.");
+        } finally {
+          aiIsGenerating = false;
+          if (back) back.disabled = false;
+          if (next) next.disabled = false;
+          updateAiPlanButtons();
         }
         return;
       }

@@ -17,6 +17,7 @@ import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
 import { appendMiniChatMessages, createMiniChat, getMiniChatById, listMiniChats } from "./src/mini-chats.js";
+import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -2315,6 +2316,114 @@ async function handleMiniChatsCreateRequest(request, response) {
   }
 }
 
+async function handleMiniLessonPlansListRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const plans = await listMiniLessonPlans(user.id, 30);
+    sendJson(response, 200, { ok: true, plans });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os planos."
+    });
+  }
+}
+
+async function handleMiniLessonPlansCreateRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const plan = await createMiniLessonPlan(user.id, body || {});
+    sendJson(response, 201, { ok: true, plan });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar o plano."
+    });
+  }
+}
+
+async function handleMiniLessonPlanDetailRequest(request, response, planId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const plan = await getMiniLessonPlanById(user.id, planId);
+    if (!plan) {
+      sendJson(response, 404, { error: "Plano nao encontrado." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, plan });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o plano."
+    });
+  }
+}
+
+async function handleMiniLessonPlanUpdateRequest(request, response, planId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const plan = await updateMiniLessonPlan(user.id, planId, body || {});
+    if (!plan) {
+      sendJson(response, 404, { error: "Plano nao encontrado." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, plan });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar o plano."
+    });
+  }
+}
+
+async function handleMiniLessonPlanDeleteRequest(request, response, planId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const deleted = await deleteMiniLessonPlan(user.id, planId);
+    if (!deleted) {
+      sendJson(response, 404, { error: "Plano nao encontrado." });
+      return;
+    }
+    sendJson(response, 200, { ok: true });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir o plano."
+    });
+  }
+}
+
 async function handleMiniChatDetailRequest(request, response, chatId) {
   const user = await requireAuth(request, response);
   if (!user) {
@@ -4539,6 +4648,34 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/mini/aulas/gerar") {
     await handleMiniLessonPlanGenerate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/mini/plans") {
+    await handleMiniLessonPlansListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/mini/plans") {
+    await handleMiniLessonPlansCreateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/api/mini/plans/")) {
+    const planId = decodeURIComponent(pathname.replace("/api/mini/plans/", ""));
+    await handleMiniLessonPlanDetailRequest(request, response, planId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/mini/plans/")) {
+    const planId = decodeURIComponent(pathname.replace("/api/mini/plans/", ""));
+    await handleMiniLessonPlanUpdateRequest(request, response, planId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/plans/")) {
+    const planId = decodeURIComponent(pathname.replace("/api/mini/plans/", ""));
+    await handleMiniLessonPlanDeleteRequest(request, response, planId);
     return;
   }
 
