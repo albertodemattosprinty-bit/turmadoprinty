@@ -125,6 +125,25 @@ function normalizeCourse(row) {
   };
 }
 
+function normalizeCourseJob(row) {
+  return {
+    id: row.id,
+    title: String(row.title || "Curso MINI").trim() || "Curso MINI",
+    context: String(row.context || "").trim(),
+    requestedPageCount: Math.max(1, Number(row.requested_page_count || 1) || 1),
+    generatedPageCount: Math.max(0, Number(row.generated_page_count || 0) || 0),
+    status: String(row.status || "queued").trim().toLowerCase() || "queued",
+    feedback: String(row.feedback || "").trim(),
+    errorMessage: String(row.error_message || "").trim(),
+    courseId: row.course_id || null,
+    createdByUserId: row.created_by_user_id || null,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+    startedAt: toIso(row.started_at),
+    finishedAt: toIso(row.finished_at)
+  };
+}
+
 export async function ensureMiniCoursesSchema() {
   await query(`
     create table if not exists mini_courses (
@@ -157,6 +176,27 @@ export async function ensureMiniCoursesSchema() {
 
   await query("create index if not exists idx_mini_courses_updated_at on mini_courses(updated_at desc, created_at desc);");
   await query("create index if not exists idx_mini_course_progress_user_updated_at on mini_course_progress(user_id, updated_at desc);");
+
+  await query(`
+    create table if not exists mini_course_jobs (
+      id uuid primary key default gen_random_uuid(),
+      title text not null default 'Curso MINI',
+      context text not null default '',
+      requested_page_count smallint not null default 8,
+      generated_page_count smallint not null default 0,
+      status text not null default 'queued',
+      feedback text not null default '',
+      error_message text not null default '',
+      course_id uuid references mini_courses(id) on delete set null,
+      created_by_user_id uuid references users(id) on delete cascade,
+      started_at timestamptz,
+      finished_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  `);
+  await query("create index if not exists idx_mini_course_jobs_creator_updated_at on mini_course_jobs(created_by_user_id, updated_at desc, created_at desc);");
+  await query("create index if not exists idx_mini_course_jobs_status_created_at on mini_course_jobs(status, created_at asc);");
 }
 
 export async function listMiniCourses(userId = "") {
@@ -325,6 +365,179 @@ export async function createMiniCourse({ title, context, pages, coverImageUrl = 
   );
 
   return normalizeCourse(result.rows[0]);
+}
+
+export async function createMiniCourseJob({ title, context, requestedPageCount = 8, createdByUserId } = {}) {
+  await ensureMiniCoursesSchema();
+  const safeTitle = String(title || "Curso MINI").trim() || "Curso MINI";
+  const safeContext = String(context || "").trim();
+  const pageCount = Math.max(4, Math.min(24, Number(requestedPageCount || 8) || 8));
+  const result = await query(
+    `
+      insert into mini_course_jobs (
+        title,
+        context,
+        requested_page_count,
+        generated_page_count,
+        status,
+        feedback,
+        error_message,
+        created_by_user_id,
+        created_at,
+        updated_at
+      )
+      values ($1, $2, $3, 0, 'queued', 'Na fila para gerar o curso.', '', $4, now(), now())
+      returning *
+    `,
+    [
+      safeTitle.slice(0, 180),
+      safeContext.slice(0, 2000),
+      pageCount,
+      createdByUserId
+    ]
+  );
+
+  return normalizeCourseJob(result.rows[0]);
+}
+
+export async function listMiniCourseJobs(createdByUserId) {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      select *
+      from mini_course_jobs
+      where created_by_user_id = $1
+      order by
+        case status
+          when 'running' then 0
+          when 'queued' then 1
+          when 'failed' then 2
+          else 3
+        end,
+        updated_at desc,
+        created_at desc
+    `,
+    [createdByUserId]
+  );
+
+  return result.rows.map((row) => normalizeCourseJob(row));
+}
+
+export async function resetRunningMiniCourseJobs() {
+  await ensureMiniCoursesSchema();
+  await query(
+    `
+      update mini_course_jobs
+      set
+        status = 'queued',
+        feedback = case
+          when feedback = '' then 'Retomando a geracao apos reinicio do servidor.'
+          else feedback
+        end,
+        updated_at = now()
+      where status = 'running'
+    `
+  );
+}
+
+export async function claimNextMiniCourseJob() {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      update mini_course_jobs
+      set
+        status = 'running',
+        started_at = coalesce(started_at, now()),
+        feedback = 'Iniciando geracao do curso...',
+        error_message = '',
+        updated_at = now()
+      where id = (
+        select id
+        from mini_course_jobs
+        where status = 'queued'
+        order by created_at asc
+        limit 1
+      )
+      returning *
+    `
+  );
+
+  return result.rows[0] ? normalizeCourseJob(result.rows[0]) : null;
+}
+
+export async function updateMiniCourseJobProgress(jobId, { generatedPageCount, feedback = "" } = {}) {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      update mini_course_jobs
+      set
+        generated_page_count = greatest(0, $2::smallint),
+        feedback = $3,
+        updated_at = now()
+      where id = $1
+      returning *
+    `,
+    [
+      jobId,
+      Math.max(0, Number(generatedPageCount || 0) || 0),
+      String(feedback || "").trim()
+    ]
+  );
+
+  return result.rows[0] ? normalizeCourseJob(result.rows[0]) : null;
+}
+
+export async function completeMiniCourseJob(jobId, { generatedPageCount, courseId = null, feedback = "" } = {}) {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      update mini_course_jobs
+      set
+        status = 'completed',
+        generated_page_count = greatest(0, $2::smallint),
+        course_id = $3,
+        feedback = $4,
+        error_message = '',
+        finished_at = now(),
+        updated_at = now()
+      where id = $1
+      returning *
+    `,
+    [
+      jobId,
+      Math.max(0, Number(generatedPageCount || 0) || 0),
+      courseId,
+      String(feedback || "").trim()
+    ]
+  );
+
+  return result.rows[0] ? normalizeCourseJob(result.rows[0]) : null;
+}
+
+export async function failMiniCourseJob(jobId, { generatedPageCount = 0, feedback = "", errorMessage = "" } = {}) {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      update mini_course_jobs
+      set
+        status = 'failed',
+        generated_page_count = greatest(0, $2::smallint),
+        feedback = $3,
+        error_message = $4,
+        finished_at = now(),
+        updated_at = now()
+      where id = $1
+      returning *
+    `,
+    [
+      jobId,
+      Math.max(0, Number(generatedPageCount || 0) || 0),
+      String(feedback || "").trim(),
+      String(errorMessage || "").trim()
+    ]
+  );
+
+  return result.rows[0] ? normalizeCourseJob(result.rows[0]) : null;
 }
 
 export async function deleteMiniCourse(courseId) {

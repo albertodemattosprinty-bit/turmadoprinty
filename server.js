@@ -17,7 +17,22 @@ import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
 import { hasDatabase, query } from "./src/db.js";
 import { appendMiniChatMessages, createMiniChat, getMiniChatById, listMiniChats } from "./src/mini-chats.js";
-import { createMiniCourse, deleteMiniCourse, getMiniCourseById, getMiniCourseUserSummary, listMiniCourses, startMiniCourse, updateMiniCourseProgress } from "./src/mini-courses.js";
+import {
+  claimNextMiniCourseJob,
+  completeMiniCourseJob,
+  createMiniCourse,
+  createMiniCourseJob,
+  deleteMiniCourse,
+  failMiniCourseJob,
+  getMiniCourseById,
+  getMiniCourseUserSummary,
+  listMiniCourseJobs,
+  listMiniCourses,
+  resetRunningMiniCourseJobs,
+  startMiniCourse,
+  updateMiniCourseJobProgress,
+  updateMiniCourseProgress
+} from "./src/mini-courses.js";
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
@@ -2614,6 +2629,273 @@ function buildMiniCourseChunks(kinds, chunkSize = 4) {
   return chunks;
 }
 
+class MiniCourseGenerationError extends Error {
+  constructor(message, feedback = "", generatedPageCount = 0) {
+    super(message);
+    this.name = "MiniCourseGenerationError";
+    this.feedback = String(feedback || "").trim();
+    this.generatedPageCount = Math.max(0, Number(generatedPageCount || 0) || 0);
+  }
+}
+
+let miniCourseJobsBootstrapped = false;
+let miniCourseJobsProcessing = false;
+
+async function generateMiniCourseDraft({ apiKey, title, context, pageCount, onProgress } = {}) {
+  const sharedContext = await getContextPrompt();
+  const kinds = buildMiniCoursePageKinds(pageCount);
+  const courseChunks = buildMiniCourseChunks(kinds, pageCount >= 16 ? 3 : 4);
+
+  const system = buildMiniSystemPrompt({
+    modeKey: "project",
+    sharedContext,
+    plannerContext: MINI_MINISTRY_CONTEXT,
+    theme: title,
+    extraInstructions: [
+      "Voce esta criando cursos completos e globais para professores do Ministerio Infantil dentro do MINI.",
+      "Use o contexto cristao compartilhado da plataforma e o tom ministerial do MINI.",
+      "O curso deve ser pratico, profundo, amoroso, biblicamente coerente e muito util para professores.",
+      `Crie exatamente ${pageCount} paginas na ordem obrigatoria destes tipos: ${kinds.join(", ")}.`,
+      "Cada pagina equivale a 1 minuto de curso.",
+      "Nas paginas text, escreva 1 ou 2 paragrafos totalizando cerca de 500 a 600 caracteres, sem deixar paginas vazias.",
+      "Nas paginas didactic, entregue conteudo pedagogico e responsivo com pelo menos 3 bullets ou 2 linhas de tabela, e pode adicionar 1 paragrafo curto se ajudar.",
+      "Nas paginas closing, entregue 3 paragrafos entre 150 e 200 caracteres cada, com conclusao, aplicacao e encorajamento final.",
+      "Preencha imagePrompt e audioScript pensando em futuras geracoes de imagem e mp3, mas deixe imageUrl e audioUrl vazios se ainda nao existir arquivo.",
+      "Nenhuma pagina pode vir vazia, resumida demais ou so com titulo.",
+      "Nunca use placeholders como 'Conteudo para...', 'Subtitulo 2', 'Pagina 1' sem desenvolver o conteudo real.",
+      "Responda apenas em JSON estruturado."
+    ].join(" ")
+  });
+
+  const reportProgress = async (generatedPageCount, feedback) => {
+    if (typeof onProgress === "function") {
+      await onProgress({
+        generatedPageCount,
+        requestedPageCount: pageCount,
+        feedback
+      });
+    }
+  };
+
+  const createCourseChunkAttempt = async (chunk, extraUserInstruction = "", includeMetadata = false, courseOverview = "") => {
+    const completion = await createChatCompletion(apiKey, {
+      model: "gpt-5.1",
+      reasoning_effort: "none",
+      temperature: extraUserInstruction ? 0.3 : 0.45,
+      max_completion_tokens: includeMetadata ? 3400 : 2600,
+      response_format: {
+        type: "json_schema",
+        json_schema: buildMiniCourseChunkSchema(chunk.kinds, chunk.startPageNumber, includeMetadata)
+      },
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: [
+            `Titulo-base do curso: ${title}`,
+            `Contexto do curso: ${context}`,
+            `Quantidade de paginas: ${pageCount}`,
+            `Gere somente as paginas ${chunk.startPageNumber} a ${chunk.endPageNumber}.`,
+            `Tipos obrigatorios neste bloco: ${chunk.kinds.map((kind, index) => `pagina ${chunk.startPageNumber + index} = ${kind}`).join("; ")}.`,
+            courseOverview ? `Visao geral ja definida para manter consistencia: ${courseOverview}` : "",
+            includeMetadata
+              ? "Neste primeiro bloco, junto com as paginas, devolva tambem mainTitle, coverImagePrompt e courseOverview com a identidade completa do curso."
+              : "Nao repita a capa do curso nem mude a direcao do tema. Continue exatamente o mesmo curso com fluidez natural.",
+            "Crie um curso completo para professores, com progressao clara, linguagem brasileira natural e densidade real.",
+            extraUserInstruction
+          ].filter(Boolean).join("\n")
+        }
+      ]
+    });
+
+    const raw = extractChatCompletionText(completion);
+    const parsed = parseStructuredJsonText(raw);
+    const pages = Array.isArray(parsed?.pages) ? parsed.pages : [];
+    const normalizedPages = chunk.kinds.map((kind, index) => normalizeMiniCourseGeneratedPage(
+      pages[index] || {},
+      chunk.startIndex + index,
+      kind
+    ));
+    const evaluation = evaluateMiniCoursePages(normalizedPages, chunk.startPageNumber);
+    return {
+      parsed,
+      normalizedPages,
+      evaluation
+    };
+  };
+
+  const firstChunk = courseChunks[0];
+  let firstAttempt = await createCourseChunkAttempt(firstChunk, "", true);
+  const firstChunkMinimum = firstChunk.kinds.length;
+  if (firstAttempt.evaluation.validCount < firstChunkMinimum) {
+    firstAttempt = await createCourseChunkAttempt(firstChunk, [
+      "A tentativa anterior veio incompleta.",
+      "Regenere este bloco inicial com paginas totalmente preenchidas.",
+      "Nao deixe nenhuma pagina vazia ou com placeholder.",
+      "Entregue conteudo pronto para leitura real por professores."
+    ].join(" "), true);
+  }
+
+  if (firstAttempt.evaluation.validCount < firstChunkMinimum) {
+    throw new MiniCourseGenerationError(
+      "A IA nao devolveu conteudo suficiente para iniciar o curso.",
+      firstAttempt.evaluation.issues.slice(0, 4).join(" ") || "O bloco inicial veio vazio ou insuficiente.",
+      0
+    );
+  }
+
+  const generatedPages = [...firstAttempt.normalizedPages];
+  const courseMainTitle = String(firstAttempt.parsed?.mainTitle || title).trim() || title;
+  const coverImagePrompt = String(
+    firstAttempt.parsed?.coverImagePrompt
+    || `Capa em PNG para o curso ${courseMainTitle}, visual cristao infantil, limpo e acolhedor.`
+  ).trim();
+  const courseOverview = String(firstAttempt.parsed?.courseOverview || "").trim();
+  const chunkFeedback = [];
+
+  await reportProgress(
+    generatedPages.length,
+    `Gerando curso: ${generatedPages.length}/${pageCount} páginas concluídas.`
+  );
+
+  for (let chunkIndex = 1; chunkIndex < courseChunks.length; chunkIndex += 1) {
+    const chunk = courseChunks[chunkIndex];
+    let chunkAttempt = await createCourseChunkAttempt(chunk, "", false, courseOverview);
+    const minimumValidPages = chunk.kinds.length;
+
+    if (chunkAttempt.evaluation.validCount < minimumValidPages) {
+      chunkAttempt = await createCourseChunkAttempt(chunk, [
+        `O bloco das paginas ${chunk.startPageNumber} a ${chunk.endPageNumber} veio incompleto.`,
+        "Regenere somente este bloco com conteudo real e consistente com as paginas anteriores.",
+        "Nao use placeholders.",
+        "Cada pagina precisa sair pronta para leitura dentro do curso."
+      ].join(" "), false, courseOverview);
+    }
+
+    if (chunkAttempt.evaluation.validCount < minimumValidPages) {
+      throw new MiniCourseGenerationError(
+        "A IA nao devolveu conteudo suficiente para concluir o curso.",
+        `Falha no bloco ${chunk.startPageNumber}-${chunk.endPageNumber}. ${chunkAttempt.evaluation.issues.slice(0, 4).join(" ") || "As paginas vieram vazias ou insuficientes."}`,
+        generatedPages.length
+      );
+    }
+
+    generatedPages.push(...chunkAttempt.normalizedPages);
+    if (chunkAttempt.evaluation.issues.length) {
+      chunkFeedback.push(...chunkAttempt.evaluation.issues);
+    }
+    await reportProgress(
+      generatedPages.length,
+      `Gerando curso: ${generatedPages.length}/${pageCount} páginas concluídas.`
+    );
+  }
+
+  const finalEvaluation = evaluateMiniCoursePages(generatedPages, 1);
+  if (finalEvaluation.validCount < kinds.length) {
+    throw new MiniCourseGenerationError(
+      "O curso final ficou incompleto e nao foi salvo.",
+      finalEvaluation.issues.slice(0, 6).join(" ") || "A validacao final detectou paginas vazias.",
+      generatedPages.length
+    );
+  }
+
+  return {
+    title: courseMainTitle,
+    context,
+    pages: generatedPages,
+    coverImagePrompt,
+    feedback: chunkFeedback.length
+      ? `Curso criado com ${generatedPages.length} paginas. Ajustamos pequenos pontos durante a geracao: ${chunkFeedback.slice(0, 2).join(" ")}`
+      : `Curso criado com ${generatedPages.length} paginas e validado em ${courseChunks.length} etapas.`
+  };
+}
+
+async function processMiniCourseJobsQueue() {
+  if (miniCourseJobsProcessing) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return;
+  }
+
+  miniCourseJobsProcessing = true;
+
+  try {
+    while (true) {
+      const job = await claimNextMiniCourseJob();
+      if (!job) {
+        break;
+      }
+
+      try {
+        await updateMiniCourseJobProgress(job.id, {
+          generatedPageCount: 0,
+          feedback: `Preparando ${job.requestedPageCount} páginas para geração...`
+        });
+
+        const draft = await generateMiniCourseDraft({
+          apiKey,
+          title: job.title,
+          context: job.context,
+          pageCount: job.requestedPageCount,
+          onProgress: async ({ generatedPageCount, feedback }) => {
+            await updateMiniCourseJobProgress(job.id, {
+              generatedPageCount,
+              feedback
+            });
+          }
+        });
+
+        const course = await createMiniCourse({
+          title: draft.title,
+          context: draft.context,
+          pages: draft.pages,
+          coverImagePrompt: draft.coverImagePrompt,
+          createdByUserId: job.createdByUserId
+        });
+
+        await completeMiniCourseJob(job.id, {
+          generatedPageCount: draft.pages.length,
+          courseId: course.id,
+          feedback: draft.feedback
+        });
+      } catch (error) {
+        const failure = error instanceof MiniCourseGenerationError
+          ? error
+          : new MiniCourseGenerationError(
+            error instanceof Error ? error.message : "Nao foi possivel gerar o curso.",
+            "A geracao falhou antes de salvar o curso no Postgres.",
+            0
+          );
+
+        await failMiniCourseJob(job.id, {
+          generatedPageCount: failure.generatedPageCount,
+          feedback: failure.feedback || "A IA nao conseguiu concluir a geracao deste curso.",
+          errorMessage: failure.message
+        });
+      }
+    }
+  } finally {
+    miniCourseJobsProcessing = false;
+  }
+}
+
+async function bootstrapMiniCourseJobsQueue() {
+  if (miniCourseJobsBootstrapped) {
+    return;
+  }
+  miniCourseJobsBootstrapped = true;
+
+  try {
+    await resetRunningMiniCourseJobs();
+    await processMiniCourseJobsQueue();
+  } catch (error) {
+    console.error("Falha ao retomar jobs de cursos do MINI:", error);
+  }
+}
+
 async function handleMiniCoursesListRequest(request, response) {
   const user = await getOptionalAuthUser(request);
 
@@ -2750,6 +3032,26 @@ async function handleMiniCourseDeleteRequest(request, response, courseId) {
   }
 }
 
+async function handleMiniCourseJobsListRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  try {
+    const jobs = await listMiniCourseJobs(adminUser.id);
+    sendJson(response, 200, {
+      ok: true,
+      jobs,
+      user: sanitizeUser(adminUser)
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar a fila de cursos."
+    });
+  }
+}
+
 async function handleMiniCourseGenerateRequest(request, response) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -2788,157 +3090,18 @@ async function handleMiniCourseGenerateRequest(request, response) {
   }
 
   try {
-    const sharedContext = await getContextPrompt();
-    const kinds = buildMiniCoursePageKinds(pageCount);
-    const courseChunks = buildMiniCourseChunks(kinds, pageCount >= 16 ? 3 : 4);
-
-    const system = buildMiniSystemPrompt({
-      modeKey: "project",
-      sharedContext,
-      plannerContext: MINI_MINISTRY_CONTEXT,
-      theme: title,
-      extraInstructions: [
-        "Voce esta criando cursos completos e globais para professores do Ministerio Infantil dentro do MINI.",
-        "Use o contexto cristao compartilhado da plataforma e o tom ministerial do MINI.",
-        "O curso deve ser pratico, profundo, amoroso, biblicamente coerente e muito util para professores.",
-        `Crie exatamente ${pageCount} paginas na ordem obrigatoria destes tipos: ${kinds.join(", ")}.`,
-        "Cada pagina equivale a 1 minuto de curso.",
-        "Nas paginas text, escreva 1 ou 2 paragrafos totalizando cerca de 500 a 600 caracteres, sem deixar paginas vazias.",
-        "Nas paginas didactic, entregue conteudo pedagogico e responsivo com pelo menos 3 bullets ou 2 linhas de tabela, e pode adicionar 1 paragrafo curto se ajudar.",
-        "Nas paginas closing, entregue 3 paragrafos entre 150 e 200 caracteres cada, com conclusao, aplicacao e encorajamento final.",
-        "Preencha imagePrompt e audioScript pensando em futuras geracoes de imagem e mp3, mas deixe imageUrl e audioUrl vazios se ainda nao existir arquivo.",
-        "Nenhuma pagina pode vir vazia, resumida demais ou so com titulo.",
-        "Nunca use placeholders como 'Conteudo para...', 'Subtitulo 2', 'Pagina 1' sem desenvolver o conteudo real.",
-        "Responda apenas em JSON estruturado."
-      ].join(" ")
-    });
-    const createCourseChunkAttempt = async (chunk, extraUserInstruction = "", includeMetadata = false, courseOverview = "") => {
-      const completion = await createChatCompletion(apiKey, {
-        model: "gpt-5.1",
-        reasoning_effort: "none",
-        temperature: extraUserInstruction ? 0.3 : 0.45,
-        max_completion_tokens: includeMetadata ? 3400 : 2600,
-        response_format: {
-          type: "json_schema",
-          json_schema: buildMiniCourseChunkSchema(chunk.kinds, chunk.startPageNumber, includeMetadata)
-        },
-        messages: [
-          { role: "system", content: system },
-          {
-            role: "user",
-            content: [
-              `Titulo-base do curso: ${title}`,
-              `Contexto do curso: ${context}`,
-              `Quantidade de paginas: ${pageCount}`,
-              `Gere somente as paginas ${chunk.startPageNumber} a ${chunk.endPageNumber}.`,
-              `Tipos obrigatorios neste bloco: ${chunk.kinds.map((kind, index) => `pagina ${chunk.startPageNumber + index} = ${kind}`).join("; ")}.`,
-              courseOverview ? `Visao geral ja definida para manter consistencia: ${courseOverview}` : "",
-              includeMetadata
-                ? "Neste primeiro bloco, junto com as paginas, devolva tambem mainTitle, coverImagePrompt e courseOverview com a identidade completa do curso."
-                : "Nao repita a capa do curso nem mude a direcao do tema. Continue exatamente o mesmo curso com fluidez natural.",
-              "Crie um curso completo para professores, com progressao clara, linguagem brasileira natural e densidade real.",
-              extraUserInstruction
-            ].filter(Boolean).join("\n")
-          }
-        ]
-      });
-
-      const raw = extractChatCompletionText(completion);
-      const parsed = parseStructuredJsonText(raw);
-      const pages = Array.isArray(parsed?.pages) ? parsed.pages : [];
-      const normalizedPages = chunk.kinds.map((kind, index) => normalizeMiniCourseGeneratedPage(
-        pages[index] || {},
-        chunk.startIndex + index,
-        kind
-      ));
-      const evaluation = evaluateMiniCoursePages(normalizedPages, chunk.startPageNumber);
-      return {
-        parsed,
-        normalizedPages,
-        evaluation
-      };
-    };
-
-    const firstChunk = courseChunks[0];
-    let firstAttempt = await createCourseChunkAttempt(firstChunk, "", true);
-    const firstChunkMinimum = firstChunk.kinds.length;
-    if (firstAttempt.evaluation.validCount < firstChunkMinimum) {
-      firstAttempt = await createCourseChunkAttempt(firstChunk, [
-        "A tentativa anterior veio incompleta.",
-        "Regenere este bloco inicial com paginas totalmente preenchidas.",
-        "Nao deixe nenhuma pagina vazia ou com placeholder.",
-        "Entregue conteudo pronto para leitura real por professores."
-      ].join(" "), true);
-    }
-
-    if (firstAttempt.evaluation.validCount < firstChunkMinimum) {
-      sendJson(response, 422, {
-        error: "A IA nao devolveu conteudo suficiente para iniciar o curso.",
-        feedback: firstAttempt.evaluation.issues.slice(0, 4).join(" ") || "O bloco inicial veio vazio ou insuficiente."
-      });
-      return;
-    }
-
-    const generatedPages = [...firstAttempt.normalizedPages];
-    const courseMainTitle = String(firstAttempt.parsed?.mainTitle || title).trim() || title;
-    const coverImagePrompt = String(
-      firstAttempt.parsed?.coverImagePrompt
-      || `Capa em PNG para o curso ${courseMainTitle}, visual cristao infantil, limpo e acolhedor.`
-    ).trim();
-    const courseOverview = String(firstAttempt.parsed?.courseOverview || "").trim();
-    const chunkFeedback = [];
-
-    for (let chunkIndex = 1; chunkIndex < courseChunks.length; chunkIndex += 1) {
-      const chunk = courseChunks[chunkIndex];
-      let chunkAttempt = await createCourseChunkAttempt(chunk, "", false, courseOverview);
-      const minimumValidPages = chunk.kinds.length;
-
-      if (chunkAttempt.evaluation.validCount < minimumValidPages) {
-        chunkAttempt = await createCourseChunkAttempt(chunk, [
-          `O bloco das paginas ${chunk.startPageNumber} a ${chunk.endPageNumber} veio incompleto.`,
-          "Regenere somente este bloco com conteudo real e consistente com as paginas anteriores.",
-          "Nao use placeholders.",
-          "Cada pagina precisa sair pronta para leitura dentro do curso."
-        ].join(" "), false, courseOverview);
-      }
-
-      if (chunkAttempt.evaluation.validCount < minimumValidPages) {
-        sendJson(response, 422, {
-          error: "A IA nao devolveu conteudo suficiente para concluir o curso.",
-          feedback: `Falha no bloco ${chunk.startPageNumber}-${chunk.endPageNumber}. ${chunkAttempt.evaluation.issues.slice(0, 4).join(" ") || "As paginas vieram vazias ou insuficientes."}`
-        });
-        return;
-      }
-
-      generatedPages.push(...chunkAttempt.normalizedPages);
-      if (chunkAttempt.evaluation.issues.length) {
-        chunkFeedback.push(...chunkAttempt.evaluation.issues);
-      }
-    }
-
-    const finalEvaluation = evaluateMiniCoursePages(generatedPages, 1);
-    if (finalEvaluation.validCount < kinds.length) {
-      sendJson(response, 422, {
-        error: "O curso final ficou incompleto e nao foi salvo.",
-        feedback: finalEvaluation.issues.slice(0, 6).join(" ") || "A validacao final detectou paginas vazias."
-      });
-      return;
-    }
-
-    const course = await createMiniCourse({
-      title: courseMainTitle,
+    const job = await createMiniCourseJob({
+      title,
       context,
-      pages: generatedPages,
-      coverImagePrompt,
+      requestedPageCount: pageCount,
       createdByUserId: adminUser.id
     });
+    void processMiniCourseJobsQueue();
 
-    sendJson(response, 201, {
+    sendJson(response, 202, {
       ok: true,
-      course,
-      feedback: chunkFeedback.length
-        ? `Curso criado com ${generatedPages.length} paginas. Ajustamos pequenos pontos durante a geracao: ${chunkFeedback.slice(0, 2).join(" ")}`
-        : `Curso criado com ${generatedPages.length} paginas e validado em ${courseChunks.length} etapas.`
+      job,
+      feedback: `Curso solicitado com ${pageCount} páginas. Ele entrou na fila de geração.`
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -5272,6 +5435,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/mini/courses/jobs") {
+    await handleMiniCourseJobsListRequest(request, response);
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/mini/courses/generate") {
     await handleMiniCourseGenerateRequest(request, response);
     return;
@@ -6484,6 +6652,8 @@ const server = http.createServer(async (request, response) => {
   response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
   response.end("Pagina nao encontrada.");
 });
+
+void bootstrapMiniCourseJobsQueue();
 
 server.listen(PORT, () => {
   console.log(`Servidor online em http://localhost:${PORT}`);

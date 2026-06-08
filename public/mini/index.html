@@ -804,6 +804,24 @@
       fill: currentColor;
       filter: drop-shadow(0 8px 18px rgba(0,0,0,.20));
     }
+    .course-cover-overlay {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 18px 18px 20px;
+      background: linear-gradient(180deg, rgba(7, 18, 58, 0), rgba(7, 18, 58, .82));
+      display: none;
+      z-index: 2;
+    }
+    .course-cover-overlay-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.12;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 10px 20px rgba(0,0,0,.28);
+    }
     .course-card-body {
       min-width: 0;
     }
@@ -818,6 +836,9 @@
       font-size: 15px;
       opacity: .88;
       font-weight: 700;
+    }
+    .course-card-mobile-meta {
+      display: none;
     }
     .course-card-actions {
       align-self: flex-start;
@@ -1054,6 +1075,95 @@
     .course-admin-submit {
       margin-top: 12px;
       width: 100%;
+    }
+    .course-jobs-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .course-job-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.10);
+      display: grid;
+      gap: 10px;
+    }
+    .course-job-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .course-job-title {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+    .course-job-badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    .course-job-badge.running {
+      background: rgba(71, 183, 255, .24);
+    }
+    .course-job-badge.queued {
+      background: rgba(255, 214, 102, .24);
+    }
+    .course-job-badge.completed {
+      background: rgba(91, 214, 123, .24);
+    }
+    .course-job-badge.failed {
+      background: rgba(255, 120, 141, .24);
+    }
+    .course-job-progress {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      opacity: .92;
+    }
+    .course-job-bar {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.12);
+      overflow: hidden;
+    }
+    .course-job-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(96, 191, 255, .98), rgba(255, 221, 116, .98));
+      transition: width .25s ease;
+    }
+    .course-job-feedback {
+      font-size: 13px;
+      line-height: 1.45;
+      opacity: .9;
+    }
+    .course-job-error {
+      font-size: 13px;
+      line-height: 1.45;
+      color: rgba(255, 227, 232, .96);
+    }
+    .course-job-open {
+      justify-self: flex-start;
+      border: 0;
+      border-radius: 14px;
+      padding: 10px 14px;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: "Open Sans", sans-serif;
     }
     @keyframes courseWordFade {
       from {
@@ -1399,18 +1509,56 @@
       .courses-head-title {
         font-size: 22px;
       }
+      .courses-list-view {
+        padding: 0;
+        gap: 0;
+        align-content: stretch;
+        scroll-snap-type: y mandatory;
+      }
       .course-card {
         grid-template-columns: 1fr;
+        min-height: 100%;
+        padding: 18px 14px 24px;
+        background: transparent;
+        box-shadow: none;
+        align-content: start;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+        gap: 12px;
       }
       .course-cover-shell {
         width: 100%;
-        height: 170px;
+        height: auto;
+        aspect-ratio: 9 / 16;
+        border-radius: 28px;
+      }
+      .course-cover-overlay {
+        display: block;
+      }
+      .course-card-body {
+        display: none;
+      }
+      .course-card-mobile-meta {
+        display: grid;
+        gap: 4px;
+        padding: 0 4px;
+      }
+      .course-card-mobile-duration {
+        font-size: 18px;
+        font-weight: 800;
+        opacity: .94;
+      }
+      .course-card-mobile-hint {
+        font-size: 13px;
+        font-weight: 700;
+        opacity: .72;
       }
       .course-card-action {
         justify-self: flex-start;
       }
       .course-card-actions {
         justify-self: flex-start;
+        padding: 0 4px;
       }
       .course-reader-view {
         padding: 18px 16px;
@@ -1445,6 +1593,9 @@
       }
       .courses-footer-status {
         font-size: 13px;
+      }
+      .course-job-title {
+        font-size: 17px;
       }
       .create-modal {
         grid-template-columns: 1fr;
@@ -1621,6 +1772,9 @@
         <div id="coursesHeadTitle" class="courses-head-title">Cursos</div>
         <div class="courses-head-actions">
           <button id="openCourseAdmin" class="courses-head-btn courses-head-create" type="button" hidden aria-label="Criar curso">C</button>
+          <button id="openCourseJobs" class="courses-head-btn" type="button" hidden aria-label="Abrir fila de cursos">
+            <svg viewBox="0 0 24 24"><path d="M4 5h16v3H4zm0 5h11v3H4zm0 5h16v3H4z"/><circle cx="18" cy="11.5" r="2.2"/></svg>
+          </button>
           <button id="closeCourses" class="courses-head-btn" type="button" aria-label="Voltar">
             <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
           </button>
@@ -1683,6 +1837,20 @@
     </div>
   </section>
 
+  <section id="courseJobsModal" class="mini-plans-modal" aria-hidden="true">
+    <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="courseJobsTitle">
+      <div class="mini-plans-head">
+        <h3 id="courseJobsTitle">Fila de cursos</h3>
+        <button id="closeCourseJobs" class="round-action close" type="button" aria-label="Fechar fila">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div class="section-muted">Acompanhe os cursos pedidos pelo admin, com páginas já criadas e total solicitado.</div>
+      <div id="courseJobsStatus" class="create-status"></div>
+      <div id="courseJobsList" class="course-jobs-list"></div>
+    </div>
+  </section>
+
   <section id="miniPlansModal" class="mini-plans-modal" aria-hidden="true">
     <div class="mini-plans-panel" role="dialog" aria-modal="true" aria-labelledby="miniPlansTitle">
       <div class="mini-plans-head">
@@ -1729,6 +1897,9 @@
     let miniCourseUser = null;
     let miniCourseSummary = { completedCourses: 0, startedCourses: 0 };
     let isMiniCourseAdmin = false;
+    let miniCourseJobs = [];
+    let miniCourseJobsLoading = false;
+    let miniCourseJobsPollTimer = null;
     let miniCoursesLoading = false;
     let miniCoursesError = "";
     let miniCourseAnimationTimers = [];
@@ -2579,12 +2750,39 @@
       return String(miniCourseUser?.name || miniCourseUser?.username || "Visitante").trim() || "Visitante";
     }
 
-    function updateMiniCourseAdminButton() {
-      const button = $("openCourseAdmin");
-      if (!button) {
-        return;
+    function getMiniCourseJobStatusLabel(status) {
+      const safeStatus = String(status || "").trim().toLowerCase();
+      if (safeStatus === "running") return "Gerando";
+      if (safeStatus === "completed") return "Concluído";
+      if (safeStatus === "failed") return "Falhou";
+      return "Na fila";
+    }
+
+    function stopMiniCourseJobsPolling() {
+      if (miniCourseJobsPollTimer) {
+        clearInterval(miniCourseJobsPollTimer);
+        miniCourseJobsPollTimer = null;
       }
-      button.hidden = !isMiniCourseAdmin;
+    }
+
+    function startMiniCourseJobsPolling() {
+      stopMiniCourseJobsPolling();
+      miniCourseJobsPollTimer = window.setInterval(() => {
+        if ($("courseJobsModal")?.getAttribute("aria-hidden") === "false") {
+          void loadMiniCourseJobs(true);
+        }
+      }, 2500);
+    }
+
+    function updateMiniCourseAdminButton() {
+      const createButton = $("openCourseAdmin");
+      const jobsButton = $("openCourseJobs");
+      if (createButton) {
+        createButton.hidden = !isMiniCourseAdmin;
+      }
+      if (jobsButton) {
+        jobsButton.hidden = !isMiniCourseAdmin;
+      }
     }
 
     function updateMiniCoursesUserCard() {
@@ -2598,14 +2796,128 @@
       }
     }
 
+    function renderMiniCourseJobs() {
+      const list = $("courseJobsList");
+      const status = $("courseJobsStatus");
+      if (!list || !status) {
+        return;
+      }
+
+      if (miniCourseJobsLoading && !miniCourseJobs.length) {
+        status.textContent = "Carregando a fila de cursos...";
+        list.innerHTML = "";
+        return;
+      }
+
+      if (!miniCourseJobs.length) {
+        status.textContent = "";
+        list.innerHTML = `<div class="mini-plan-empty">Nenhum curso solicitado ainda.</div>`;
+        return;
+      }
+
+      const runningCount = miniCourseJobs.filter((job) => job.status === "running").length;
+      const queuedCount = miniCourseJobs.filter((job) => job.status === "queued").length;
+      status.textContent = runningCount || queuedCount
+        ? `${runningCount} gerando • ${queuedCount} na fila`
+        : "Histórico de solicitações do admin";
+
+      list.innerHTML = miniCourseJobs.map((job) => {
+        const requested = Math.max(1, Number(job.requestedPageCount || 1) || 1);
+        const generated = Math.max(0, Number(job.generatedPageCount || 0) || 0);
+        const percent = Math.max(0, Math.min(100, Math.round((generated / requested) * 100)));
+        const safeStatus = String(job.status || "queued").trim().toLowerCase();
+        const feedback = String(job.feedback || "").trim();
+        const errorMessage = String(job.errorMessage || "").trim();
+        return `
+          <div class="course-job-card">
+            <div class="course-job-head">
+              <h4 class="course-job-title">${escapeText(job.title || "Curso MINI")}</h4>
+              <div class="course-job-badge ${escapeAttr(safeStatus)}">${escapeText(getMiniCourseJobStatusLabel(safeStatus))}</div>
+            </div>
+            <div class="course-job-progress">
+              <span>${generated}/${requested} páginas</span>
+              <span>${percent}%</span>
+            </div>
+            <div class="course-job-bar"><div class="course-job-fill" style="width:${percent}%"></div></div>
+            ${feedback ? `<div class="course-job-feedback">${escapeText(feedback)}</div>` : ""}
+            ${errorMessage ? `<div class="course-job-error">${escapeText(errorMessage)}</div>` : ""}
+            ${job.courseId ? `<button class="course-job-open" type="button" data-open-generated-course="${escapeAttr(job.courseId)}">Abrir curso</button>` : ""}
+          </div>
+        `;
+      }).join("");
+
+      list.querySelectorAll("[data-open-generated-course]").forEach((button) => {
+        button.onclick = async () => {
+          closeMiniCourseJobsModal();
+          await openMiniCourseById(button.getAttribute("data-open-generated-course") || "");
+        };
+      });
+    }
+
+    async function loadMiniCourseJobs(silent = false) {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+
+      if (!silent) {
+        miniCourseJobsLoading = true;
+        renderMiniCourseJobs();
+      }
+
+      try {
+        const response = await apiMini("/api/mini/courses/jobs");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao carregar a fila de cursos.");
+        }
+        if (Object.prototype.hasOwnProperty.call(payload || {}, "user")) {
+          miniCourseUser = payload.user || miniCourseUser;
+        }
+        miniCourseJobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+      } catch (error) {
+        if (!silent) {
+          $("courseJobsStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar a fila de cursos.";
+        }
+      } finally {
+        miniCourseJobsLoading = false;
+        renderMiniCourseJobs();
+      }
+    }
+
+    function openMiniCourseJobsModal() {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+      const modal = $("courseJobsModal");
+      if (!modal) {
+        return;
+      }
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+      renderMiniCourseJobs();
+      void loadMiniCourseJobs();
+      startMiniCourseJobsPolling();
+    }
+
+    function closeMiniCourseJobsModal() {
+      const modal = $("courseJobsModal");
+      if (!modal) {
+        return;
+      }
+      stopMiniCourseJobsPolling();
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
     function buildMiniCourseCover(course) {
       const isComplete = Boolean(course?.progress?.completed);
       const starClass = isComplete ? "course-cover-star is-complete" : "course-cover-star";
       const starSvg = `<div class="${starClass}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>`;
+      const titleOverlay = `<div class="course-cover-overlay"><h3 class="course-cover-overlay-title">${escapeText(course?.title || "Curso")}</h3></div>`;
       if (course?.coverImageUrl) {
-        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${starSvg}</div>`;
+        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${titleOverlay}${starSvg}</div>`;
       }
-      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${starSvg}</div>`;
+      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${titleOverlay}${starSvg}</div>`;
     }
 
     function updateMiniCoursesHeader() {
@@ -2688,6 +3000,10 @@
             <div class="course-card-body">
               <h3 class="course-card-title">${escapeText(course.title)}</h3>
               <div class="course-card-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
+            </div>
+            <div class="course-card-mobile-meta">
+              <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
+              <div class="course-card-mobile-hint">Toque na capa para iniciar</div>
             </div>
             <div class="course-card-actions">
               <button class="course-card-action" type="button" data-download-course-id="${escapeAttr(course.id)}" aria-label="Baixar curso">${getDownloadSvg()}</button>
@@ -2840,6 +3156,7 @@
       $("coursesModal").setAttribute("aria-hidden", "true");
       closeMiniCoursesUserModal();
       closeMiniCourseAdminModal();
+      closeMiniCourseJobsModal();
       resetMiniCourseReadGate();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
@@ -2868,6 +3185,7 @@
       if (!isMiniCourseAdmin) {
         return;
       }
+      closeMiniCourseJobsModal();
       const modal = $("courseAdminModal");
       if (!modal) {
         return;
@@ -3114,8 +3432,13 @@
           throw new Error(payload.feedback || payload.error || "Falha ao gerar curso.");
         }
 
-        const feedback = String(payload?.feedback || `Curso criado com ${pageCount} páginas.`).trim();
+        const feedback = String(payload?.feedback || `Curso solicitado com ${pageCount} páginas.`).trim();
+        $("courseAdminTitleInput").value = "";
+        $("courseAdminContextInput").value = "";
+        $("courseAdminPagesInput").value = String(pageCount);
         closeMiniCourseAdminModal();
+        openMiniCourseJobsModal();
+        await loadMiniCourseJobs();
         await loadMiniCourses();
         if (status) {
           status.textContent = feedback;
@@ -3169,6 +3492,12 @@
     };
     $("closeCoursesUser").onclick = () => {
       closeMiniCoursesUserModal();
+    };
+    $("openCourseJobs").onclick = () => {
+      openMiniCourseJobsModal();
+    };
+    $("closeCourseJobs").onclick = () => {
+      closeMiniCourseJobsModal();
     };
     $("openCourseAdmin").onclick = () => {
       openMiniCourseAdminModal();
