@@ -470,6 +470,25 @@ export async function updateMiniCourseQuiz(courseId, quizQuestions = []) {
   return result.rows[0] ? normalizeCourse(result.rows[0]) : null;
 }
 
+export async function updateMiniCourseCover(courseId, coverImageUrl = "") {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      update mini_courses
+      set
+        cover_image_url = $2,
+        updated_at = now()
+      where id = $1
+      returning *
+    `,
+    [
+      courseId,
+      String(coverImageUrl || "").trim().slice(0, 2000)
+    ]
+  );
+  return result.rows[0] ? normalizeCourse(result.rows[0]) : null;
+}
+
 export async function createMiniCourseJob({ title, context, requestedModel = "gpt-5.1", requestedPageCount = 8, createdByUserId } = {}) {
   await ensureMiniCoursesSchema();
   const safeTitle = String(title || "Curso MINI").trim() || "Curso MINI";

@@ -114,15 +114,16 @@
     .g-red { background: var(--g-red); } .g-blue { background: var(--g-blue); } .g-purple { background: var(--g-purple); } .g-gold { background: var(--g-gold); } .g-navy { background: var(--g-navy); }
 
     .media-modal {
+      display: flex;
+      flex-direction: column;
       background:
         radial-gradient(circle at 18% 14%, rgba(112, 177, 255, .30), transparent 30%),
         radial-gradient(circle at 84% 18%, rgba(255, 228, 145, .24), transparent 26%),
         radial-gradient(circle at 50% 86%, rgba(255, 172, 222, .22), transparent 32%),
         linear-gradient(180deg, #f8fbff 0%, #fffdf8 55%, #fff5fb 100%);
       color: #233048;
-      grid-template-rows: auto 7dvh minmax(0, 1fr) auto;
       padding: 16px 14px 12px;
-      gap: 10px;
+      gap: 8px;
       overflow: hidden;
     }
     .media-head {
@@ -150,11 +151,16 @@
       font-weight: 700;
       color: rgba(35, 48, 72, .72);
     }
+    .media-head-copy p:empty {
+      display: none;
+    }
     .media-tabs {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
-      height: 7dvh;
+      flex: 0 0 7dvh;
+      min-height: 42px;
+      max-height: 56px;
       align-items: stretch;
     }
     .media-tab {
@@ -176,12 +182,12 @@
       box-shadow: 0 16px 28px rgba(58, 105, 245, .22);
     }
     .media-content {
+      flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
       padding-right: 2px;
-      padding-top: 2px;
       display: grid;
-      gap: 14px;
+      gap: 12px;
       align-content: start;
       scrollbar-width: none;
     }
@@ -448,7 +454,7 @@
     .footer-actions { display: flex; justify-content: center; gap: 8px; align-items: center; }
     .round-action { border: 0; width: 54px; height: 54px; border-radius: 50%; color: #fff; display: grid; place-items: center; box-shadow: 0 10px 20px rgba(0,0,0,.14); cursor: pointer; }
     .round-action svg { width: 26px; height: 26px; fill: #fff; }
-    .plus { background: var(--g-ok); } .close { background: var(--g-danger); } .edit { background: var(--g-edit); } .star { background: var(--g-star); }
+    .plus { background: var(--g-ok); } .close { background: var(--g-danger); } .edit { background: var(--g-edit); } .star { background: var(--g-star); } .home { background: var(--g-blue); }
 
     .step-modal, .ai-modal, .create-modal { position: fixed; inset: 0; z-index: 35; transform: scale(.96); opacity: 0; pointer-events: none; transition: .18s ease; }
     .step-modal.show, .ai-modal.show, .create-modal.show { transform: scale(1); opacity: 1; pointer-events: auto; }
@@ -1070,9 +1076,10 @@
       height: 0;
     }
     .courses-list-view {
-      padding: 18px;
+      padding: 22px;
       display: grid;
-      gap: 14px;
+      gap: 18px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       align-content: start;
     }
     .courses-list-view[hidden],
@@ -1093,20 +1100,21 @@
       border: 0;
       width: 100%;
       padding: 16px;
-      border-radius: 28px;
+      border-radius: 30px;
       background: linear-gradient(160deg, rgba(255,255,255,.24), rgba(255,255,255,.10));
       display: grid;
-      grid-template-columns: 132px 1fr auto;
-      gap: 16px;
-      align-items: center;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+      align-content: start;
       color: #fff;
-      text-align: left;
+      text-align: center;
       cursor: pointer;
     }
     .course-cover-shell {
-      width: 132px;
-      height: 132px;
-      border-radius: 24px;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 9 / 16;
+      border-radius: 26px;
       position: relative;
       overflow: hidden;
       box-shadow: 0 16px 28px rgba(0,0,0,.16);
@@ -1160,15 +1168,17 @@
     }
     .course-card-body {
       min-width: 0;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
     }
     .course-card-title {
       margin: 0;
-      font-size: clamp(22px, 3vw, 30px);
+      font-size: clamp(20px, 2vw, 28px);
       font-weight: 800;
       line-height: 1.1;
     }
     .course-card-duration {
-      margin-top: 8px;
       font-size: 15px;
       opacity: .88;
       font-weight: 700;
@@ -1181,9 +1191,10 @@
       display: none;
     }
     .course-card-actions {
-      align-self: flex-start;
       display: flex;
       gap: 10px;
+      justify-content: center;
+      align-items: center;
     }
     .course-card-action {
       width: 52px;
@@ -1207,6 +1218,9 @@
     }
     .course-card-action.is-quiz {
       background: rgba(82, 171, 255, .22);
+    }
+    .course-card-action.is-cover {
+      background: rgba(82, 171, 255, .26);
     }
     .course-card-action.is-loading {
       pointer-events: none;
@@ -2110,12 +2124,13 @@
         height: 34px;
       }
       .media-modal {
-        grid-template-rows: auto 7dvh minmax(0, 1fr) auto;
         padding: 14px 12px 12px;
         gap: 8px;
       }
       .media-tabs {
-        height: 7dvh;
+        flex-basis: 7dvh;
+        min-height: 38px;
+        max-height: 50px;
       }
       .media-tab {
         font-size: 12px;
@@ -2153,6 +2168,7 @@
         font-size: 22px;
       }
       .courses-list-view {
+        grid-template-columns: 1fr;
         padding: 0;
         gap: 0;
         align-content: stretch;
@@ -2296,12 +2312,12 @@
 
   <section id="mediaModal" class="immersive media-modal" aria-hidden="true">
     <header class="media-head">
-      <button id="closeMidia" class="round-action close" type="button" aria-label="Fechar mídia">
-        <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+      <button id="closeMidia" class="round-action home" type="button" aria-label="Voltar para home">
+        <svg viewBox="0 0 24 24"><path d="M12 3 3 10.2V21h6v-6h6v6h6V10.2z"/></svg>
       </button>
       <div class="media-head-copy">
         <h2 id="mediaTitle">Midia</h2>
-        <p id="mediaSubtitle">Previews curtos de 10 segundos para validar o modelo.</p>
+        <p id="mediaSubtitle"></p>
       </div>
     </header>
     <div class="media-tabs">
@@ -2473,6 +2489,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.59 16.59 1.41 1.41 6-6-6-6-1.41 1.41L13.17 12z"/></svg>
         </button>
       </footer>
+      <input id="courseCoverUploadInput" type="file" accept="image/*" hidden>
     </div>
   </section>
 
@@ -2597,6 +2614,8 @@
     let miniCourseMobileTouchStartX = 0;
     let miniCourseMobileWheelLocked = false;
     let miniCourseDownloadStates = {};
+    let miniCourseCoverUploadStates = {};
+    let miniCourseCoverUploadTargetId = "";
     let currentMiniCourseQuizIndex = -1;
     let currentMiniCourseQuizAnswers = [];
     let currentMiniCourseQuizResult = null;
@@ -2607,12 +2626,14 @@
     let mediaLibraryLoading = false;
     let mediaLibraryLoaded = false;
     let mediaLibraryError = "";
+    const mediaTrackDurations = new Map();
+    const mediaTrackDurationLoads = new Set();
     const mediaPreviewState = {
       key: "",
       song: null,
       startedAt: 0,
       pausedAt: 0,
-      durationMs: 10000,
+      durationMs: 0,
       isPlaying: false,
       rafId: 0,
       mode: "",
@@ -2629,59 +2650,6 @@
     const miniSessionKey = "turma_do_printy_token";
     const miniPlannerDraftKey = "turma_do_printy_mini_planner_draft";
     const miniCourseDownloadsKey = "turma_do_printy_mini_course_downloads";
-    const mediaSongs = [
-      { id: "song-1", title: "Te Louvarei de Manha", subtitle: "Preview simples • 10 segundos", tone: 246, wave: "sine" },
-      { id: "song-2", title: "Graca Que Me Alcancou", subtitle: "Preview simples • 10 segundos", tone: 262, wave: "triangle" },
-      { id: "song-3", title: "Cristo Reina Aqui", subtitle: "Preview simples • 10 segundos", tone: 278, wave: "sine" },
-      { id: "song-4", title: "Casa de Oracao", subtitle: "Preview simples • 10 segundos", tone: 294, wave: "triangle" },
-      { id: "song-5", title: "Cordeiro Vencedor", subtitle: "Preview simples • 10 segundos", tone: 311, wave: "sawtooth" },
-      { id: "song-6", title: "Fonte de Esperanca", subtitle: "Preview simples • 10 segundos", tone: 330, wave: "sine" },
-      { id: "song-7", title: "Santo Para Sempre", subtitle: "Preview simples • 10 segundos", tone: 349, wave: "triangle" },
-      { id: "song-8", title: "Chama do Altar", subtitle: "Preview simples • 10 segundos", tone: 370, wave: "sawtooth" },
-      { id: "song-9", title: "Rei da Minha Vida", subtitle: "Preview simples • 10 segundos", tone: 392, wave: "sine" },
-      { id: "song-10", title: "Brilha Tua Luz", subtitle: "Preview simples • 10 segundos", tone: 415, wave: "triangle" }
-    ];
-    const mediaAlbums = [
-      {
-        id: "album-1",
-        title: "Manha com Jesus",
-        subtitle: "6 musicas • ambiente leve",
-        songs: [
-          { id: "a1-s1", title: "Bom Dia Salvador", subtitle: "Album Manha com Jesus • 10 segundos", tone: 220, wave: "sine" },
-          { id: "a1-s2", title: "Minha Primeira Oracao", subtitle: "Album Manha com Jesus • 10 segundos", tone: 233, wave: "triangle" },
-          { id: "a1-s3", title: "Alegria no Coracao", subtitle: "Album Manha com Jesus • 10 segundos", tone: 247, wave: "sine" },
-          { id: "a1-s4", title: "Pequenos Adoradores", subtitle: "Album Manha com Jesus • 10 segundos", tone: 262, wave: "triangle" },
-          { id: "a1-s5", title: "Paz para Hoje", subtitle: "Album Manha com Jesus • 10 segundos", tone: 277, wave: "sawtooth" },
-          { id: "a1-s6", title: "Seguirei com Fe", subtitle: "Album Manha com Jesus • 10 segundos", tone: 294, wave: "sine" }
-        ]
-      },
-      {
-        id: "album-2",
-        title: "Historias que Cantam",
-        subtitle: "6 musicas • historias biblicas",
-        songs: [
-          { id: "a2-s1", title: "Arca de Esperanca", subtitle: "Album Historias que Cantam • 10 segundos", tone: 247, wave: "triangle" },
-          { id: "a2-s2", title: "Coragem de Davi", subtitle: "Album Historias que Cantam • 10 segundos", tone: 262, wave: "sine" },
-          { id: "a2-s3", title: "Jonas e o Chamado", subtitle: "Album Historias que Cantam • 10 segundos", tone: 278, wave: "sawtooth" },
-          { id: "a2-s4", title: "Jose Sonhou Grande", subtitle: "Album Historias que Cantam • 10 segundos", tone: 294, wave: "triangle" },
-          { id: "a2-s5", title: "Maria Disse Sim", subtitle: "Album Historias que Cantam • 10 segundos", tone: 311, wave: "sine" },
-          { id: "a2-s6", title: "Cristo e a Tempestade", subtitle: "Album Historias que Cantam • 10 segundos", tone: 330, wave: "triangle" }
-        ]
-      },
-      {
-        id: "album-3",
-        title: "Noite de Gratidao",
-        subtitle: "6 musicas • clima calmo",
-        songs: [
-          { id: "a3-s1", title: "Descanso em Ti", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 233, wave: "sine" },
-          { id: "a3-s2", title: "Luz no Meu Quarto", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 247, wave: "triangle" },
-          { id: "a3-s3", title: "Obrigado Meu Deus", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 262, wave: "sine" },
-          { id: "a3-s4", title: "Cantarei em Paz", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 277, wave: "triangle" },
-          { id: "a3-s5", title: "Silencio que Ora", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 294, wave: "sawtooth" },
-          { id: "a3-s6", title: "Fiel Ate o Fim", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 311, wave: "sine" }
-        ]
-      }
-    ];
     const miniCourseReaderThemes = [
       { id: 0, name: "Tema principal" },
       { id: 1, name: "Papel de Aula" },
@@ -2728,31 +2696,72 @@
     function isMiniMediaAdmin() {
       return String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
     }
-    function getDefaultMediaAlbums() {
-      return mediaAlbums.map((album) => ({
-        ...album,
-        coverImageUrl: "",
-        songs: (Array.isArray(album.songs) ? album.songs : []).map((song) => ({
-          ...song,
-          url: "",
-          coverImageUrl: ""
-        }))
-      }));
-    }
     function getMediaAlbumsLibrary() {
-      return mediaLibraryAlbums.length ? mediaLibraryAlbums : getDefaultMediaAlbums();
+      return mediaLibraryAlbums;
     }
     function getMediaSongsLibrary() {
-      if (mediaLibraryAlbums.length) {
-        return mediaLibraryAlbums.flatMap((album) => (Array.isArray(album.songs) ? album.songs : []).map((song) => ({
-          ...song,
-          coverImageUrl: song.coverImageUrl || album.coverImageUrl || ""
-        })));
-      }
-      return mediaSongs.map((song) => ({ ...song, url: "", coverImageUrl: "" }));
+      return mediaLibraryAlbums.flatMap((album) => (Array.isArray(album.songs) ? album.songs : []).map((song) => ({
+        ...song,
+        coverImageUrl: song.coverImageUrl || album.coverImageUrl || ""
+      })));
     }
     function getMediaAlbumById(albumId) {
       return getMediaAlbumsLibrary().find((album) => album.id === albumId) || null;
+    }
+    function getMediaTrackSourceKey(song, scopeId = "songs") {
+      if (song?.url) {
+        return `url::${song.url}`;
+      }
+      return `track::${buildMediaTrackKey(scopeId, song?.id || "track")}`;
+    }
+    function getMediaTrackDurationMs(song, scopeId = "songs") {
+      const value = mediaTrackDurations.get(getMediaTrackSourceKey(song, scopeId));
+      return Number.isFinite(value) && value > 0 ? value : 0;
+    }
+    function getMediaTrackTotalLabel(song, scopeId = "songs") {
+      const durationMs = getMediaTrackDurationMs(song, scopeId);
+      if (durationMs > 0) {
+        return formatMediaSeconds(Math.round(durationMs / 1000));
+      }
+      return song?.url ? "--:--" : "0:00";
+    }
+    function updateMediaTrackDurationUi(song, scopeId = "songs") {
+      const totalLabel = getMediaTrackTotalLabel(song, scopeId);
+      document.querySelectorAll(`[data-media-total-key="${CSS.escape(getMediaTrackSourceKey(song, scopeId))}"]`).forEach((node) => {
+        node.textContent = totalLabel;
+      });
+    }
+    function ensureMediaTrackDuration(song, scopeId = "songs") {
+      if (!song?.url) {
+        return;
+      }
+      const key = getMediaTrackSourceKey(song, scopeId);
+      if (mediaTrackDurations.has(key) || mediaTrackDurationLoads.has(key)) {
+        return;
+      }
+      mediaTrackDurationLoads.add(key);
+      const audio = new Audio();
+      audio.preload = "metadata";
+      audio.src = song.url;
+      audio.addEventListener("loadedmetadata", () => {
+        const durationMs = Math.max(0, Number(audio.duration || 0) || 0) * 1000;
+        if (durationMs > 0) {
+          mediaTrackDurations.set(key, durationMs);
+          if (mediaPreviewState.key === buildMediaTrackKey(scopeId, song.id) && mediaPreviewState.mode === "audio") {
+            mediaPreviewState.durationMs = durationMs;
+          }
+          updateMediaTrackDurationUi(song, scopeId);
+        }
+        mediaTrackDurationLoads.delete(key);
+      }, { once: true });
+      audio.addEventListener("error", () => {
+        mediaTrackDurationLoads.delete(key);
+      }, { once: true });
+      try {
+        audio.load();
+      } catch (_) {
+        mediaTrackDurationLoads.delete(key);
+      }
     }
     function getMediaPreviewElapsedMs() {
       if (!mediaPreviewState.key) {
@@ -2806,6 +2815,7 @@
       mediaPreviewState.song = null;
       mediaPreviewState.startedAt = 0;
       mediaPreviewState.pausedAt = 0;
+      mediaPreviewState.durationMs = 0;
       mediaPreviewState.isPlaying = false;
       syncMediaPreviewUi();
     }
@@ -2814,8 +2824,9 @@
       document.querySelectorAll("[data-media-track-key]").forEach((row) => {
         const key = row.getAttribute("data-media-track-key") || "";
         const isActive = key === mediaPreviewState.key;
-        const elapsed = isActive ? Math.min(mediaPreviewState.durationMs, elapsedMs) : 0;
-        const percent = isActive ? (elapsed / mediaPreviewState.durationMs) * 100 : 0;
+        const hasDuration = isActive && mediaPreviewState.durationMs > 0;
+        const elapsed = isActive ? (hasDuration ? Math.min(mediaPreviewState.durationMs, elapsedMs) : elapsedMs) : 0;
+        const percent = hasDuration ? (elapsed / mediaPreviewState.durationMs) * 100 : 0;
         const button = row.querySelector("[data-media-play]");
         const fill = row.querySelector("[data-media-progress]");
         const current = row.querySelector("[data-media-current]");
@@ -2838,7 +2849,7 @@
         return;
       }
       const elapsed = getMediaPreviewElapsedMs();
-      if (elapsed >= mediaPreviewState.durationMs) {
+      if (mediaPreviewState.durationMs > 0 && elapsed >= mediaPreviewState.durationMs) {
         resetMediaPreviewState();
         setMediaStatus("Preview concluido. Escolha outra faixa para continuar testando.");
         return;
@@ -2846,19 +2857,37 @@
       syncMediaPreviewUi();
       mediaPreviewState.rafId = window.requestAnimationFrame(tickMediaPreview);
     }
-    function startMediaPreview(trackKey, song, offsetMs = 0) {
+    function startMediaPreview(trackKey, song, offsetMs = 0, scopeId = "songs") {
       teardownMediaPreviewAudio();
       mediaPreviewState.key = trackKey;
       mediaPreviewState.song = song;
       mediaPreviewState.startedAt = Date.now() - Math.max(0, Number(offsetMs || 0) || 0);
       mediaPreviewState.pausedAt = Math.max(0, Number(offsetMs || 0) || 0);
+      mediaPreviewState.durationMs = song?.url ? getMediaTrackDurationMs(song, scopeId) : 10000;
       mediaPreviewState.isPlaying = true;
 
       try {
         if (song?.url) {
+          ensureMediaTrackDuration(song, scopeId);
           const audio = new Audio(song.url);
           audio.preload = "auto";
           audio.currentTime = Math.max(0, Number(offsetMs || 0) || 0) / 1000;
+          audio.addEventListener("loadedmetadata", () => {
+            const durationMs = Math.max(0, Number(audio.duration || 0) || 0) * 1000;
+            if (durationMs > 0) {
+              mediaTrackDurations.set(getMediaTrackSourceKey(song, scopeId), durationMs);
+              mediaPreviewState.durationMs = durationMs;
+              updateMediaTrackDurationUi(song, scopeId);
+              syncMediaPreviewUi();
+            }
+          }, { once: true });
+          audio.addEventListener("ended", () => {
+            resetMediaPreviewState();
+            setMediaStatus("Faixa concluida.");
+          }, { once: true });
+          audio.addEventListener("error", () => {
+            setMediaStatus("Nao foi possivel reproduzir esta faixa agora.");
+          }, { once: true });
           mediaPreviewState.audio = audio;
           mediaPreviewState.mode = "audio";
           void audio.play().catch(() => {});
@@ -2899,7 +2928,9 @@
       if (!mediaPreviewState.key || !mediaPreviewState.isPlaying) {
         return;
       }
-      mediaPreviewState.pausedAt = Math.min(mediaPreviewState.durationMs, getMediaPreviewElapsedMs());
+      mediaPreviewState.pausedAt = mediaPreviewState.durationMs > 0
+        ? Math.min(mediaPreviewState.durationMs, getMediaPreviewElapsedMs())
+        : getMediaPreviewElapsedMs();
       mediaPreviewState.isPlaying = false;
       if (mediaPreviewState.audio) {
         try {
@@ -2923,15 +2954,17 @@
           pauseMediaPreview();
           return;
         }
-        if (mediaPreviewState.pausedAt > 0 && mediaPreviewState.pausedAt < mediaPreviewState.durationMs) {
-          startMediaPreview(trackKey, song, mediaPreviewState.pausedAt);
+        if (mediaPreviewState.pausedAt > 0 && (mediaPreviewState.durationMs <= 0 || mediaPreviewState.pausedAt < mediaPreviewState.durationMs)) {
+          startMediaPreview(trackKey, song, mediaPreviewState.pausedAt, scopeId);
           return;
         }
       }
-      startMediaPreview(trackKey, song, 0);
+      startMediaPreview(trackKey, song, 0, scopeId);
     }
     function buildMediaTrackCard(song, scopeId) {
       const trackKey = buildMediaTrackKey(scopeId, song.id);
+      const totalKey = getMediaTrackSourceKey(song, scopeId);
+      const subtitle = String(song?.subtitle || "").trim();
       const cover = song?.coverImageUrl
         ? `<img class="media-track-cover-image" src="${escapeAttr(song.coverImageUrl)}" alt="${escapeAttr(song.title || "Faixa")}">`
         : `<div class="media-track-cover"></div>`;
@@ -2941,11 +2974,11 @@
           <div class="media-track-main">
             <div class="media-track-copy">
               <h3 class="media-track-title">${escapeText(song.title)}</h3>
-              <p class="media-track-meta">${escapeText(song.subtitle || "Preview simples • 10 segundos")}</p>
+              ${subtitle ? `<p class="media-track-meta">${escapeText(subtitle)}</p>` : ""}
             </div>
             <div class="media-progress-shell">
               <div class="media-progress-track"><div class="media-progress-fill" data-media-progress></div></div>
-              <div class="media-progress-meta"><span data-media-current>0:00</span><span>0:10</span></div>
+              <div class="media-progress-meta"><span data-media-current>0:00</span><span data-media-total-key="${escapeAttr(totalKey)}">${escapeText(getMediaTrackTotalLabel(song, scopeId))}</span></div>
             </div>
           </div>
           <button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>
@@ -3138,10 +3171,11 @@
       if (mediaActiveTab === "songs") {
         const songsLibrary = getMediaSongsLibrary();
         title.textContent = "Midia";
-        subtitle.textContent = isMiniMediaAdmin()
-          ? "Músicas globais. Pressione U para enviar um álbum novo."
-          : "Músicas globais com preview de 10 segundos.";
-        content.innerHTML = `<div class="media-track-list">${songsLibrary.map((song) => buildMediaTrackCard(song, "songs")).join("")}</div>`;
+        subtitle.textContent = "";
+        content.innerHTML = songsLibrary.length
+          ? `<div class="media-track-list">${songsLibrary.map((song) => buildMediaTrackCard(song, "songs")).join("")}</div>`
+          : `<div class="courses-empty">Nao ha musicas publicadas ainda.</div>`;
+        songsLibrary.forEach((song) => ensureMediaTrackDuration(song, "songs"));
       } else if (mediaActiveAlbumId) {
         const album = getMediaAlbumById(mediaActiveAlbumId);
         if (!album) {
@@ -3150,7 +3184,7 @@
           return;
         }
         title.textContent = album.title;
-        subtitle.textContent = `${album.songs.length} músicas • preview de 10 segundos`;
+        subtitle.textContent = "";
         content.innerHTML = `
           <div class="media-album-detail-head">
             <button id="backToAlbums" class="media-album-back" type="button" aria-label="Voltar para álbuns">
@@ -3163,22 +3197,26 @@
           </div>
           <div class="media-track-list">${album.songs.map((song) => buildMediaTrackCard(song, album.id)).join("")}</div>
         `;
+        album.songs.forEach((song) => ensureMediaTrackDuration(song, album.id));
       } else {
-        title.textContent = "Álbuns";
-        subtitle.textContent = "3 modelos com capa e 6 músicas cada.";
-        content.innerHTML = `
-          <div class="media-album-grid">
-            ${getMediaAlbumsLibrary().map((album) => `
-              <button class="media-album-card" type="button" data-media-album="${escapeAttr(album.id)}">
-                <div class="media-album-cover">${album.coverImageUrl ? `<img class="media-album-cover-image" src="${escapeAttr(album.coverImageUrl)}" alt="${escapeAttr(album.title)}">` : ""}<span>${escapeText(album.title)}</span></div>
-                <div>
-                  <h3 class="media-album-title">${escapeText(album.title)}</h3>
-                  <p class="media-album-meta">${escapeText(album.subtitle)}</p>
-                </div>
-              </button>
-            `).join("")}
-          </div>
-        `;
+        const albums = getMediaAlbumsLibrary();
+        title.textContent = "Midia";
+        subtitle.textContent = "";
+        content.innerHTML = albums.length
+          ? `
+            <div class="media-album-grid">
+              ${albums.map((album) => `
+                <button class="media-album-card" type="button" data-media-album="${escapeAttr(album.id)}">
+                  <div class="media-album-cover">${album.coverImageUrl ? `<img class="media-album-cover-image" src="${escapeAttr(album.coverImageUrl)}" alt="${escapeAttr(album.title)}">` : ""}<span>${escapeText(album.title)}</span></div>
+                  <div>
+                    <h3 class="media-album-title">${escapeText(album.title)}</h3>
+                    <p class="media-album-meta">${escapeText(album.subtitle)}</p>
+                  </div>
+                </button>
+              `).join("")}
+            </div>
+          `
+          : `<div class="courses-empty">Nao ha albuns publicados ainda.</div>`;
       }
 
       content.querySelectorAll("[data-media-play]").forEach((button) => {
@@ -3214,7 +3252,7 @@
       renderMediaModal();
       await loadMiniMediaLibrary();
       renderMediaModal();
-      setMediaStatus(isMiniMediaAdmin() ? "Escolha uma música ou um álbum. Pressione U para enviar um álbum novo." : "Escolha uma música ou um álbum para navegar.");
+      setMediaStatus(isMiniMediaAdmin() ? "Escolha uma musica ou um album. Pressione U para enviar novo conteudo." : "Escolha uma musica ou um album para navegar.");
     }
     function closeMediaModal() {
       resetMediaPreviewState();
@@ -3376,6 +3414,9 @@
     }
     function getDownloadSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5zm7-18v12.17l3.59-3.58L17 12l-5 5-5-5 1.41-1.41L11 14.17V2z"/></svg>`;
+    }
+    function getImageUploadSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v11.5A1.5 1.5 0 0 1 17.5 20h-13A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4zm10.2 1.8H4.8a.3.3 0 0 0-.3.3v12.4c0 .17.13.3.3.3h12.4c.17 0 .3-.13.3-.3V7.8zM8.2 9.2a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6m8.3 7.1H5.8l2.6-3.2a.9.9 0 0 1 1.39-.03l1.43 1.68 2.06-2.48a.9.9 0 0 1 1.38 0z"/></svg>`;
     }
     function getAiStageIndexForProgress(progress) {
       if (progress >= 100) return 4;
@@ -3541,6 +3582,39 @@
         label = "Curso salvo no app";
       }
       return `<button class="${classNames.join(" ")}" type="button" data-download-course-id="${escapeAttr(safeCourseId)}" aria-label="${escapeAttr(label)}">${icon}</button>`;
+    }
+
+    function getMiniCourseCoverUploadButtonMarkup(courseId) {
+      if (!isMiniCourseAdmin) {
+        return "";
+      }
+      const safeCourseId = String(courseId || "").trim();
+      const state = miniCourseCoverUploadStates[safeCourseId] || "idle";
+      const classNames = ["course-card-action", "is-cover"];
+      let icon = getImageUploadSvg();
+      let label = "Adicionar capa global";
+      if (state === "loading") {
+        classNames.push("is-loading");
+        icon = getSpinnerSvg();
+        label = "Enviando capa";
+      } else if (state === "saved") {
+        classNames.push("is-success");
+        icon = getCheckSvg();
+        label = "Capa atualizada";
+      }
+      return `<button class="${classNames.join(" ")}" type="button" data-upload-course-cover-id="${escapeAttr(safeCourseId)}" aria-label="${escapeAttr(label)}">${icon}</button>`;
+    }
+
+    function getMiniCourseCardActionsMarkup(course) {
+      const actions = [
+        getMiniCourseCoverUploadButtonMarkup(course?.id || ""),
+        getMiniCourseQuizAdminButtonMarkup(course),
+        isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course?.id || "")}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""
+      ].filter(Boolean);
+      if (!actions.length) {
+        return "";
+      }
+      return `<div class="course-card-actions">${actions.join("")}</div>`;
     }
 
     function getMiniCourseQuizAdminButtonMarkup(course) {
@@ -4420,11 +4494,7 @@
             <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
             <div class="course-card-mobile-hint">Deslize para ver o próximo • toque para iniciar</div>
           </div>
-          <div class="mobile-course-actions">
-            ${getMiniCourseDownloadButtonMarkup(course.id)}
-            ${getMiniCourseQuizAdminButtonMarkup(course)}
-            ${isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course.id)}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""}
-          </div>
+          ${getMiniCourseCardActionsMarkup(course)}
         </article>
       `;
     }
@@ -4439,10 +4509,10 @@
           await openMiniCourseById(button.getAttribute("data-open-mobile-course") || "");
         };
       });
-      container.querySelectorAll("[data-download-course-id]").forEach((button) => {
+      container.querySelectorAll("[data-upload-course-cover-id]").forEach((button) => {
         button.onclick = async (event) => {
           event.stopPropagation();
-          await downloadMiniCourse(button.getAttribute("data-download-course-id") || "");
+          openMiniCourseCoverPicker(button.getAttribute("data-upload-course-cover-id") || "");
         };
       });
       container.querySelectorAll("[data-generate-quiz-course-id]").forEach((button) => {
@@ -4677,11 +4747,7 @@
               <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
               <div class="course-card-mobile-hint">Toque na capa para iniciar</div>
             </div>
-            <div class="course-card-actions">
-              ${getMiniCourseDownloadButtonMarkup(course.id)}
-              ${getMiniCourseQuizAdminButtonMarkup(course)}
-              ${isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course.id)}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""}
-            </div>
+            ${getMiniCourseCardActionsMarkup(course)}
           </div>
         `;
       }).join("");
@@ -4697,10 +4763,10 @@
           }
         };
       });
-      listView.querySelectorAll("[data-download-course-id]").forEach((button) => {
+      listView.querySelectorAll("[data-upload-course-cover-id]").forEach((button) => {
         button.onclick = async (event) => {
           event.stopPropagation();
-          await downloadMiniCourse(button.getAttribute("data-download-course-id") || "");
+          openMiniCourseCoverPicker(button.getAttribute("data-upload-course-cover-id") || "");
         };
       });
       listView.querySelectorAll("[data-generate-quiz-course-id]").forEach((button) => {
@@ -5085,6 +5151,142 @@
       }
     }
 
+    function loadMiniCourseCoverImage(file) {
+      return new Promise((resolve, reject) => {
+        const objectUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(image);
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error("Nao foi possivel abrir a imagem escolhida."));
+        };
+        image.src = objectUrl;
+      });
+    }
+
+    async function prepareMiniCourseCoverBlob(file) {
+      const image = await loadMiniCourseCoverImage(file);
+      const width = 400;
+      const height = 600;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Nao foi possivel preparar a capa desta imagem.");
+      }
+
+      const sourceWidth = Math.max(1, Number(image.naturalWidth || image.width || width) || width);
+      const sourceHeight = Math.max(1, Number(image.naturalHeight || image.height || height) || height);
+      const scale = Math.max(width / sourceWidth, height / sourceHeight);
+      const drawWidth = sourceWidth * scale;
+      const drawHeight = sourceHeight * scale;
+      const offsetX = (width - drawWidth) / 2;
+      const offsetY = (height - drawHeight) / 2;
+
+      context.clearRect(0, 0, width, height);
+      context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((result) => {
+          if (result) {
+            resolve(result);
+            return;
+          }
+          reject(new Error("Nao foi possivel converter a capa para WebP."));
+        }, "image/webp", 0.88);
+      });
+
+      return blob;
+    }
+
+    function openMiniCourseCoverPicker(courseId) {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+      const safeCourseId = String(courseId || "").trim();
+      const input = $("courseCoverUploadInput");
+      if (!safeCourseId || !input) {
+        return;
+      }
+      miniCourseCoverUploadTargetId = safeCourseId;
+      input.value = "";
+      input.click();
+    }
+
+    async function uploadMiniCourseCover(courseId, file) {
+      const safeCourseId = String(courseId || "").trim();
+      if (!safeCourseId || !file || !isMiniCourseAdmin) {
+        return;
+      }
+
+      miniCourseCoverUploadStates[safeCourseId] = "loading";
+      renderMiniCoursesList();
+      setCourseFooterStatus("Preparando capa global do curso...");
+
+      try {
+        const webpBlob = await prepareMiniCourseCoverBlob(file);
+        setCourseFooterStatus("Enviando capa global do curso...");
+        const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}/cover`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "image/webp",
+            "X-File-Name": encodeURIComponent("cover.webp")
+          },
+          body: webpBlob
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao salvar a capa global.");
+        }
+
+        const updatedCourse = payload?.course || null;
+        if (updatedCourse?.coverImageUrl) {
+          miniCourses = miniCourses.map((course) => course.id === safeCourseId ? {
+            ...course,
+            coverImageUrl: updatedCourse.coverImageUrl
+          } : course);
+          if (currentMiniCourse?.id === safeCourseId) {
+            currentMiniCourse = {
+              ...currentMiniCourse,
+              coverImageUrl: updatedCourse.coverImageUrl
+            };
+          }
+        }
+
+        miniCourseCoverUploadStates[safeCourseId] = "saved";
+        renderMiniCoursesList();
+        setCourseFooterStatus(String(payload?.feedback || "Capa global atualizada com sucesso."));
+      } catch (error) {
+        delete miniCourseCoverUploadStates[safeCourseId];
+        renderMiniCoursesList();
+        throw error;
+      }
+    }
+
+    async function handleMiniCourseCoverInputChange() {
+      const input = $("courseCoverUploadInput");
+      const safeCourseId = String(miniCourseCoverUploadTargetId || "").trim();
+      const file = input?.files?.[0] || null;
+      miniCourseCoverUploadTargetId = "";
+      if (!safeCourseId || !file) {
+        return;
+      }
+
+      try {
+        await uploadMiniCourseCover(safeCourseId, file);
+      } catch (error) {
+        setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao enviar a capa do curso.");
+      } finally {
+        if (input) {
+          input.value = "";
+        }
+      }
+    }
+
     async function generateMiniCourseQuizAdmin(courseId) {
       if (!isMiniCourseAdmin) {
         return;
@@ -5450,6 +5652,9 @@
     };
     $("closeCourseAdmin").onclick = () => {
       closeMiniCourseAdminModal();
+    };
+    $("courseCoverUploadInput").onchange = async () => {
+      await handleMiniCourseCoverInputChange();
     };
     $("generateCourseAdmin").onclick = async () => {
       await generateMiniCourseAdmin();

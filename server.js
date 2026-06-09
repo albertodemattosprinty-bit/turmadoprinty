@@ -31,6 +31,7 @@ import {
   resetRunningMiniCourseJobs,
   saveMiniCourseQuizResult,
   startMiniCourse,
+  updateMiniCourseCover,
   updateMiniCourseQuiz,
   updateMiniCourseJobProgress,
   updateMiniCourseProgress
@@ -71,8 +72,10 @@ const ADMIN_USERNAME = "rosemattos";
 const ALBUM_ZIP_FOLDER = "album-zips";
 const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
 const MINI_COURSE_MODEL_CANDIDATES = ["gpt-5.1", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"];
+const MINI_COURSE_COVERS_PREFIX = "mini/courses";
 const MINI_MEDIA_LIBRARY_KEY = "mini/media/library.json";
 const MINI_MEDIA_ALBUMS_PREFIX = "mini/media/albums";
+const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 
@@ -312,6 +315,10 @@ function normalizeMiniMediaLibrary(raw) {
 
 function buildMiniMediaAlbumFolder(albumId) {
   return `${MINI_MEDIA_ALBUMS_PREFIX}/${String(albumId || "").trim()}`;
+}
+
+function buildMiniCourseCoverFolder(courseId) {
+  return `${MINI_COURSE_COVERS_PREFIX}/${String(courseId || "").trim()}`;
 }
 
 function buildMiniMediaAlbumPayload(album) {
@@ -3412,6 +3419,63 @@ async function handleMiniCourseDetailRequest(request, response, courseId) {
   }
 }
 
+async function handleMiniCourseCoverUploadRequest(request, response, courseId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const providedFileName = decodeURIComponent(String(request.headers["x-file-name"] || "cover.webp").trim() || "cover.webp");
+  const contentType = String(request.headers["content-type"] || "").trim().toLowerCase();
+
+  if (!isMiniMediaImageUpload(providedFileName, contentType)) {
+    sendJson(response, 400, { error: "Envie uma imagem valida para a capa do curso." });
+    return;
+  }
+
+  try {
+    const existingCourse = await getMiniCourseById(courseId, "");
+    if (!existingCourse) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    const fileBuffer = await readBinaryBody(request, MAX_MINI_COURSE_COVER_BYTES);
+    if (!fileBuffer.length) {
+      sendJson(response, 400, { error: "Imagem de capa vazia." });
+      return;
+    }
+
+    const extension = ".webp";
+    const key = `${buildMiniCourseCoverFolder(courseId)}/cover-${Date.now()}${extension}`;
+    const finalContentType = "image/webp";
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: finalContentType
+    }));
+
+    const coverImageUrl = buildAlbumZipPublicUrlFromKey(key);
+    const updatedCourse = await updateMiniCourseCover(courseId, coverImageUrl);
+    if (!updatedCourse) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      course: updatedCourse,
+      feedback: "Capa global do curso atualizada com sucesso."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar a capa do curso."
+    });
+  }
+}
+
 async function handleMiniCourseStartRequest(request, response, courseId) {
   const user = await requireAuth(request, response);
   if (!user) {
@@ -6212,6 +6276,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/quiz/submit")) {
     const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/quiz\/submit$/, ""));
     await handleMiniCourseQuizSubmitRequest(request, response, courseId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/cover")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/cover$/, ""));
+    await handleMiniCourseCoverUploadRequest(request, response, courseId);
     return;
   }
 
