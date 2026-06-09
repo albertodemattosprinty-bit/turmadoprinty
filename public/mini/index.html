@@ -90,11 +90,278 @@
     }
     .app { position: relative; z-index: 1; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 18px 16px 26px; }
     .mini-logo { width: min(88vw, 460px); max-height: 35vh; object-fit: contain; }
-    .actions-5 { width: min(88vw, 460px); display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-    .icon-chip { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 6px; color: #30333c; font-size: 12px; }
-    .icon-ball { width: 54px; height: 54px; border-radius: 17px; display: grid; place-items: center; box-shadow: 0 10px 18px rgba(0, 0, 0, .12); }
-    .icon-ball svg { width: 28px; height: 28px; fill: #fff; }
+    .actions-5 { width: min(92vw, 520px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+    .icon-chip {
+      border: 0;
+      background: rgba(255,255,255,.18);
+      border-radius: 28px;
+      min-height: 148px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: #30333c;
+      font-size: 16px;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
+      box-shadow: 0 16px 32px rgba(45, 61, 126, .12);
+      backdrop-filter: blur(16px);
+      padding: 18px 16px;
+    }
+    .icon-ball { width: 70px; height: 70px; border-radius: 22px; display: grid; place-items: center; box-shadow: 0 10px 18px rgba(0, 0, 0, .12); }
+    .icon-ball svg { width: 36px; height: 36px; fill: #fff; }
     .g-red { background: var(--g-red); } .g-blue { background: var(--g-blue); } .g-purple { background: var(--g-purple); } .g-gold { background: var(--g-gold); } .g-navy { background: var(--g-navy); }
+
+    .media-modal {
+      background:
+        radial-gradient(circle at 18% 14%, rgba(112, 177, 255, .30), transparent 30%),
+        radial-gradient(circle at 84% 18%, rgba(255, 228, 145, .24), transparent 26%),
+        radial-gradient(circle at 50% 86%, rgba(255, 172, 222, .22), transparent 32%),
+        linear-gradient(180deg, #f8fbff 0%, #fffdf8 55%, #fff5fb 100%);
+      color: #233048;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      padding: 20px 14px 16px;
+      gap: 16px;
+      overflow: hidden;
+    }
+    .media-head {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 14px;
+    }
+    .media-head-copy {
+      min-width: 0;
+    }
+    .media-head-copy h2 {
+      margin: 0;
+      font-size: clamp(28px, 5vw, 36px);
+      line-height: 1.05;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
+      color: #1d4ed8;
+    }
+    .media-head-copy p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      line-height: 1.4;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 700;
+      color: rgba(35, 48, 72, .72);
+    }
+    .media-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .media-tab {
+      border: 0;
+      border-radius: 18px;
+      padding: 15px 16px;
+      background: rgba(255,255,255,.68);
+      color: rgba(37, 48, 68, .70);
+      font-family: "Open Sans", sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgba(29, 78, 216, .08);
+    }
+    .media-tab.is-active {
+      background: linear-gradient(145deg, #6bc6ff, #3a69f5);
+      color: #fff;
+      box-shadow: 0 16px 28px rgba(58, 105, 245, .22);
+    }
+    .media-content {
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 2px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+      scrollbar-width: none;
+    }
+    .media-content::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    .media-track-list {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+    .media-track-card {
+      border-radius: 26px;
+      background: rgba(255,255,255,.70);
+      box-shadow: 0 18px 34px rgba(45, 61, 126, .10);
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      gap: 14px;
+      align-items: center;
+    }
+    .media-track-cover,
+    .media-album-cover {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 25% 22%, rgba(255,239,153,.50), transparent 24%),
+        linear-gradient(155deg, rgba(43,119,255,.95), rgba(255,157,193,.82));
+      box-shadow: 0 14px 26px rgba(43, 119, 255, .20);
+    }
+    .media-track-main {
+      min-width: 0;
+      display: grid;
+      gap: 8px;
+    }
+    .media-track-copy {
+      min-width: 0;
+    }
+    .media-track-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.15;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
+      color: #253044;
+    }
+    .media-track-meta {
+      margin: 4px 0 0;
+      font-size: 13px;
+      line-height: 1.35;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 700;
+      color: rgba(37, 48, 68, .68);
+    }
+    .media-progress-shell {
+      display: grid;
+      gap: 6px;
+    }
+    .media-progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(37, 48, 68, .10);
+      overflow: hidden;
+    }
+    .media-progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(145deg, #6bc6ff, #3a69f5);
+      transition: width .12s linear;
+    }
+    .media-progress-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 700;
+      color: rgba(37, 48, 68, .58);
+    }
+    .media-play-btn,
+    .media-album-back {
+      border: 0;
+      border-radius: 18px;
+      background: rgba(58, 105, 245, .12);
+      color: #1d4ed8;
+      display: inline-grid;
+      place-items: center;
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgba(29, 78, 216, .06);
+    }
+    .media-play-btn {
+      width: 54px;
+      height: 54px;
+      align-self: center;
+    }
+    .media-play-btn.is-playing {
+      background: linear-gradient(145deg, #6bc6ff, #3a69f5);
+      color: #fff;
+      box-shadow: 0 16px 28px rgba(58, 105, 245, .22);
+    }
+    .media-play-btn svg,
+    .media-album-back svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+    .media-album-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .media-album-card {
+      border: 0;
+      border-radius: 28px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 18px 34px rgba(45, 61, 126, .10);
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      text-align: left;
+      cursor: pointer;
+      color: #253044;
+    }
+    .media-album-cover {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1 / 1;
+      border-radius: 24px;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      align-items: end;
+      padding: 16px;
+    }
+    .media-album-cover span {
+      font-family: "Open Sans", sans-serif;
+      font-size: 21px;
+      line-height: 1.08;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 12px 22px rgba(0,0,0,.26);
+    }
+    .media-album-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.15;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 800;
+      color: #253044;
+    }
+    .media-album-meta {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.35;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 700;
+      color: rgba(37, 48, 68, .68);
+    }
+    .media-album-detail-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .media-album-back {
+      width: 46px;
+      height: 46px;
+      flex: 0 0 auto;
+    }
+    .media-status {
+      min-height: 22px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.35;
+      font-family: "Open Sans", sans-serif;
+      font-weight: 700;
+      color: rgba(37, 48, 68, .64);
+      padding: 0 8px;
+    }
 
     .immersive { position: fixed; inset: 0; background: #fff; z-index: 20; transform: translateY(100%); opacity: 0; pointer-events: none; transition: transform .26s ease, opacity .2s ease; display: grid; grid-template-rows: auto 70vh auto 10vh; padding: 8px 12px 8px; }
     .immersive.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
@@ -1777,6 +2044,49 @@
       background: transparent;
     }
     @media (max-width: 900px) {
+      .actions-5 {
+        width: min(92vw, 430px);
+        gap: 14px;
+      }
+      .icon-chip {
+        min-height: 132px;
+        font-size: 15px;
+      }
+      .icon-ball {
+        width: 66px;
+        height: 66px;
+      }
+      .icon-ball svg {
+        width: 34px;
+        height: 34px;
+      }
+      .media-modal {
+        padding: 18px 12px 14px;
+        gap: 14px;
+      }
+      .media-track-card {
+        grid-template-columns: 56px 1fr auto;
+        gap: 12px;
+      }
+      .media-track-cover,
+      .media-album-cover {
+        border-radius: 18px;
+      }
+      .media-track-cover {
+        width: 56px;
+        height: 56px;
+      }
+      .media-track-title,
+      .media-album-title {
+        font-size: 17px;
+      }
+      .media-album-grid {
+        grid-template-columns: 1fr;
+      }
+      .media-play-btn {
+        width: 50px;
+        height: 50px;
+      }
       .courses-shell {
         padding: 0 10px;
       }
@@ -1918,13 +2228,30 @@
   <main class="app">
     <img class="mini-logo" src="/mini/mini.png" alt="Mini" />
     <section class="actions-5">
-      <button class="icon-chip" type="button"><span class="icon-ball g-red"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg></span><span>Midia</span></button>
+      <button id="openMidia" class="icon-chip" type="button"><span class="icon-ball g-red"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg></span><span>Midia</span></button>
       <button id="openCourses" class="icon-chip" type="button"><span class="icon-ball g-blue"><svg viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm0 13L5 12.18v3.27L12 19l7-3.55v-3.27L12 16z"/></svg></span><span>Cursos</span></button>
       <button id="openCreate" class="icon-chip" type="button"><span class="icon-ball g-purple"><svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span><span>Criar</span></button>
       <button id="openAulas" class="icon-chip" type="button"><span class="icon-ball g-gold"><svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg></span><span>Aulas</span></button>
-      <button class="icon-chip" type="button"><span class="icon-ball g-navy"><svg viewBox="0 0 24 24"><path d="M4 13h6v7H4zm10-9h6l-1 6h-4v4l-5 3V7z"/></svg></span><span>Liderar</span></button>
     </section>
   </main>
+
+  <section id="mediaModal" class="immersive media-modal" aria-hidden="true">
+    <header class="media-head">
+      <button id="closeMidia" class="round-action close" type="button" aria-label="Fechar mídia">
+        <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+      </button>
+      <div class="media-head-copy">
+        <h2 id="mediaTitle">Midia</h2>
+        <p id="mediaSubtitle">Previews curtos de 10 segundos para validar o modelo.</p>
+      </div>
+    </header>
+    <div class="media-tabs">
+      <button id="mediaTabSongs" class="media-tab is-active" type="button">Músicas</button>
+      <button id="mediaTabAlbums" class="media-tab" type="button">Álbuns</button>
+    </div>
+    <div id="mediaContent" class="media-content"></div>
+    <div id="mediaStatus" class="media-status">Escolha uma música ou um álbum para navegar.</div>
+  </section>
 
   <section id="aulasModal" class="immersive">
     <header class="modal-head"><h2>Planejar Aula</h2></header>
@@ -2193,6 +2520,20 @@
     let currentMiniCourseQuizAnswers = [];
     let currentMiniCourseQuizResult = null;
     let currentMiniCourseQuizSubmitted = false;
+    let mediaActiveTab = "songs";
+    let mediaActiveAlbumId = "";
+    const mediaPreviewState = {
+      key: "",
+      song: null,
+      startedAt: 0,
+      pausedAt: 0,
+      durationMs: 10000,
+      isPlaying: false,
+      rafId: 0,
+      audioContext: null,
+      oscillator: null,
+      gain: null
+    };
     let miniCourseReaderThemeIndex = 0;
 
     const $ = (id) => document.getElementById(id);
@@ -2201,6 +2542,59 @@
     const miniSessionKey = "turma_do_printy_token";
     const miniPlannerDraftKey = "turma_do_printy_mini_planner_draft";
     const miniCourseDownloadsKey = "turma_do_printy_mini_course_downloads";
+    const mediaSongs = [
+      { id: "song-1", title: "Te Louvarei de Manha", subtitle: "Preview simples • 10 segundos", tone: 246, wave: "sine" },
+      { id: "song-2", title: "Graca Que Me Alcancou", subtitle: "Preview simples • 10 segundos", tone: 262, wave: "triangle" },
+      { id: "song-3", title: "Cristo Reina Aqui", subtitle: "Preview simples • 10 segundos", tone: 278, wave: "sine" },
+      { id: "song-4", title: "Casa de Oracao", subtitle: "Preview simples • 10 segundos", tone: 294, wave: "triangle" },
+      { id: "song-5", title: "Cordeiro Vencedor", subtitle: "Preview simples • 10 segundos", tone: 311, wave: "sawtooth" },
+      { id: "song-6", title: "Fonte de Esperanca", subtitle: "Preview simples • 10 segundos", tone: 330, wave: "sine" },
+      { id: "song-7", title: "Santo Para Sempre", subtitle: "Preview simples • 10 segundos", tone: 349, wave: "triangle" },
+      { id: "song-8", title: "Chama do Altar", subtitle: "Preview simples • 10 segundos", tone: 370, wave: "sawtooth" },
+      { id: "song-9", title: "Rei da Minha Vida", subtitle: "Preview simples • 10 segundos", tone: 392, wave: "sine" },
+      { id: "song-10", title: "Brilha Tua Luz", subtitle: "Preview simples • 10 segundos", tone: 415, wave: "triangle" }
+    ];
+    const mediaAlbums = [
+      {
+        id: "album-1",
+        title: "Manha com Jesus",
+        subtitle: "6 musicas • ambiente leve",
+        songs: [
+          { id: "a1-s1", title: "Bom Dia Salvador", subtitle: "Album Manha com Jesus • 10 segundos", tone: 220, wave: "sine" },
+          { id: "a1-s2", title: "Minha Primeira Oracao", subtitle: "Album Manha com Jesus • 10 segundos", tone: 233, wave: "triangle" },
+          { id: "a1-s3", title: "Alegria no Coracao", subtitle: "Album Manha com Jesus • 10 segundos", tone: 247, wave: "sine" },
+          { id: "a1-s4", title: "Pequenos Adoradores", subtitle: "Album Manha com Jesus • 10 segundos", tone: 262, wave: "triangle" },
+          { id: "a1-s5", title: "Paz para Hoje", subtitle: "Album Manha com Jesus • 10 segundos", tone: 277, wave: "sawtooth" },
+          { id: "a1-s6", title: "Seguirei com Fe", subtitle: "Album Manha com Jesus • 10 segundos", tone: 294, wave: "sine" }
+        ]
+      },
+      {
+        id: "album-2",
+        title: "Historias que Cantam",
+        subtitle: "6 musicas • historias biblicas",
+        songs: [
+          { id: "a2-s1", title: "Arca de Esperanca", subtitle: "Album Historias que Cantam • 10 segundos", tone: 247, wave: "triangle" },
+          { id: "a2-s2", title: "Coragem de Davi", subtitle: "Album Historias que Cantam • 10 segundos", tone: 262, wave: "sine" },
+          { id: "a2-s3", title: "Jonas e o Chamado", subtitle: "Album Historias que Cantam • 10 segundos", tone: 278, wave: "sawtooth" },
+          { id: "a2-s4", title: "Jose Sonhou Grande", subtitle: "Album Historias que Cantam • 10 segundos", tone: 294, wave: "triangle" },
+          { id: "a2-s5", title: "Maria Disse Sim", subtitle: "Album Historias que Cantam • 10 segundos", tone: 311, wave: "sine" },
+          { id: "a2-s6", title: "Cristo e a Tempestade", subtitle: "Album Historias que Cantam • 10 segundos", tone: 330, wave: "triangle" }
+        ]
+      },
+      {
+        id: "album-3",
+        title: "Noite de Gratidao",
+        subtitle: "6 musicas • clima calmo",
+        songs: [
+          { id: "a3-s1", title: "Descanso em Ti", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 233, wave: "sine" },
+          { id: "a3-s2", title: "Luz no Meu Quarto", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 247, wave: "triangle" },
+          { id: "a3-s3", title: "Obrigado Meu Deus", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 262, wave: "sine" },
+          { id: "a3-s4", title: "Cantarei em Paz", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 277, wave: "triangle" },
+          { id: "a3-s5", title: "Silencio que Ora", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 294, wave: "sawtooth" },
+          { id: "a3-s6", title: "Fiel Ate o Fim", subtitle: "Album Noite de Gratidao • 10 segundos", tone: 311, wave: "sine" }
+        ]
+      }
+    ];
     const miniCourseReaderThemes = [
       { id: 0, name: "Tema principal" },
       { id: 1, name: "Papel de Aula" },
@@ -2228,6 +2622,289 @@
       if (footer) {
         footer.textContent = text || "";
       }
+    }
+    function setMediaStatus(text) {
+      const node = $("mediaStatus");
+      if (node) {
+        node.textContent = text || "";
+      }
+    }
+    function getMediaPlaySvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>`;
+    }
+    function getMediaPauseSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>`;
+    }
+    function buildMediaTrackKey(scopeId, songId) {
+      return `${String(scopeId || "songs")}::${String(songId || "track")}`;
+    }
+    function getMediaAlbumById(albumId) {
+      return mediaAlbums.find((album) => album.id === albumId) || null;
+    }
+    function getMediaPreviewElapsedMs() {
+      if (!mediaPreviewState.key) {
+        return 0;
+      }
+      if (mediaPreviewState.isPlaying) {
+        return Math.max(0, Date.now() - mediaPreviewState.startedAt);
+      }
+      return Math.max(0, mediaPreviewState.pausedAt);
+    }
+    function formatMediaSeconds(value) {
+      const safeValue = Math.max(0, Number(value || 0) || 0);
+      const minutes = Math.floor(safeValue / 60);
+      const seconds = safeValue % 60;
+      return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    }
+    function teardownMediaPreviewAudio() {
+      if (mediaPreviewState.rafId) {
+        window.cancelAnimationFrame(mediaPreviewState.rafId);
+        mediaPreviewState.rafId = 0;
+      }
+      if (mediaPreviewState.oscillator) {
+        try {
+          mediaPreviewState.oscillator.stop();
+        } catch (_) {}
+      }
+      if (mediaPreviewState.gain) {
+        try {
+          mediaPreviewState.gain.disconnect();
+        } catch (_) {}
+      }
+      if (mediaPreviewState.audioContext) {
+        void mediaPreviewState.audioContext.close().catch(() => {});
+      }
+      mediaPreviewState.oscillator = null;
+      mediaPreviewState.gain = null;
+      mediaPreviewState.audioContext = null;
+    }
+    function resetMediaPreviewState() {
+      teardownMediaPreviewAudio();
+      mediaPreviewState.key = "";
+      mediaPreviewState.song = null;
+      mediaPreviewState.startedAt = 0;
+      mediaPreviewState.pausedAt = 0;
+      mediaPreviewState.isPlaying = false;
+      syncMediaPreviewUi();
+    }
+    function syncMediaPreviewUi() {
+      const elapsedMs = getMediaPreviewElapsedMs();
+      document.querySelectorAll("[data-media-track-key]").forEach((row) => {
+        const key = row.getAttribute("data-media-track-key") || "";
+        const isActive = key === mediaPreviewState.key;
+        const elapsed = isActive ? Math.min(mediaPreviewState.durationMs, elapsedMs) : 0;
+        const percent = isActive ? (elapsed / mediaPreviewState.durationMs) * 100 : 0;
+        const button = row.querySelector("[data-media-play]");
+        const fill = row.querySelector("[data-media-progress]");
+        const current = row.querySelector("[data-media-current]");
+        if (button) {
+          button.innerHTML = isActive && mediaPreviewState.isPlaying ? getMediaPauseSvg() : getMediaPlaySvg();
+          button.classList.toggle("is-playing", Boolean(isActive && mediaPreviewState.isPlaying));
+          button.setAttribute("aria-label", isActive && mediaPreviewState.isPlaying ? "Pausar preview" : "Tocar preview");
+        }
+        if (fill) {
+          fill.style.width = `${percent}%`;
+        }
+        if (current) {
+          current.textContent = formatMediaSeconds(Math.floor(elapsed / 1000));
+        }
+      });
+    }
+    function tickMediaPreview() {
+      if (!mediaPreviewState.isPlaying) {
+        syncMediaPreviewUi();
+        return;
+      }
+      const elapsed = getMediaPreviewElapsedMs();
+      if (elapsed >= mediaPreviewState.durationMs) {
+        resetMediaPreviewState();
+        setMediaStatus("Preview concluido. Escolha outra faixa para continuar testando.");
+        return;
+      }
+      syncMediaPreviewUi();
+      mediaPreviewState.rafId = window.requestAnimationFrame(tickMediaPreview);
+    }
+    function startMediaPreview(trackKey, song, offsetMs = 0) {
+      teardownMediaPreviewAudio();
+      mediaPreviewState.key = trackKey;
+      mediaPreviewState.song = song;
+      mediaPreviewState.startedAt = Date.now() - Math.max(0, Number(offsetMs || 0) || 0);
+      mediaPreviewState.pausedAt = Math.max(0, Number(offsetMs || 0) || 0);
+      mediaPreviewState.isPlaying = true;
+
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          const audioContext = new AudioContextClass();
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          oscillator.type = String(song?.wave || "sine");
+          oscillator.frequency.setValueAtTime(Number(song?.tone || 262), audioContext.currentTime);
+          oscillator.frequency.linearRampToValueAtTime(Number(song?.tone || 262) * 1.08, audioContext.currentTime + 3.4);
+          oscillator.frequency.linearRampToValueAtTime(Number(song?.tone || 262) * 0.94, audioContext.currentTime + 6.8);
+          oscillator.frequency.linearRampToValueAtTime(Number(song?.tone || 262), audioContext.currentTime + 10);
+          gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.06, audioContext.currentTime + 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.05, audioContext.currentTime + 8.8);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 10);
+          oscillator.connect(gain);
+          gain.connect(audioContext.destination);
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + Math.max(0.15, (mediaPreviewState.durationMs - mediaPreviewState.pausedAt) / 1000));
+          mediaPreviewState.audioContext = audioContext;
+          mediaPreviewState.oscillator = oscillator;
+          mediaPreviewState.gain = gain;
+        }
+      } catch (_) {
+        // ignore preview audio failures and keep visual timer active
+      }
+
+      syncMediaPreviewUi();
+      mediaPreviewState.rafId = window.requestAnimationFrame(tickMediaPreview);
+      setMediaStatus(`Tocando preview: ${song?.title || "Faixa"}`);
+    }
+    function pauseMediaPreview() {
+      if (!mediaPreviewState.key || !mediaPreviewState.isPlaying) {
+        return;
+      }
+      mediaPreviewState.pausedAt = Math.min(mediaPreviewState.durationMs, getMediaPreviewElapsedMs());
+      mediaPreviewState.isPlaying = false;
+      teardownMediaPreviewAudio();
+      syncMediaPreviewUi();
+      setMediaStatus(`Preview pausado em ${formatMediaSeconds(Math.floor(mediaPreviewState.pausedAt / 1000))}.`);
+    }
+    function toggleMediaPreview(scopeId, songId) {
+      const album = scopeId === "songs" ? null : getMediaAlbumById(scopeId);
+      const library = album ? album.songs : mediaSongs;
+      const song = library.find((item) => item.id === songId);
+      if (!song) {
+        return;
+      }
+      const trackKey = buildMediaTrackKey(scopeId, songId);
+      if (mediaPreviewState.key === trackKey) {
+        if (mediaPreviewState.isPlaying) {
+          pauseMediaPreview();
+          return;
+        }
+        if (mediaPreviewState.pausedAt > 0 && mediaPreviewState.pausedAt < mediaPreviewState.durationMs) {
+          startMediaPreview(trackKey, song, mediaPreviewState.pausedAt);
+          return;
+        }
+      }
+      startMediaPreview(trackKey, song, 0);
+    }
+    function buildMediaTrackCard(song, scopeId) {
+      const trackKey = buildMediaTrackKey(scopeId, song.id);
+      return `
+        <article class="media-track-card" data-media-track-key="${escapeAttr(trackKey)}">
+          <div class="media-track-cover"></div>
+          <div class="media-track-main">
+            <div class="media-track-copy">
+              <h3 class="media-track-title">${escapeText(song.title)}</h3>
+              <p class="media-track-meta">${escapeText(song.subtitle || "Preview simples • 10 segundos")}</p>
+            </div>
+            <div class="media-progress-shell">
+              <div class="media-progress-track"><div class="media-progress-fill" data-media-progress></div></div>
+              <div class="media-progress-meta"><span data-media-current>0:00</span><span>0:10</span></div>
+            </div>
+          </div>
+          <button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>
+        </article>
+      `;
+    }
+    function renderMediaModal() {
+      const content = $("mediaContent");
+      const title = $("mediaTitle");
+      const subtitle = $("mediaSubtitle");
+      const songsTab = $("mediaTabSongs");
+      const albumsTab = $("mediaTabAlbums");
+      if (!content || !title || !subtitle || !songsTab || !albumsTab) {
+        return;
+      }
+
+      songsTab.classList.toggle("is-active", mediaActiveTab === "songs");
+      albumsTab.classList.toggle("is-active", mediaActiveTab === "albums");
+
+      if (mediaActiveTab === "songs") {
+        title.textContent = "Midia";
+        subtitle.textContent = "Músicas com preview de 10 segundos e modelo de player.";
+        content.innerHTML = `<div class="media-track-list">${mediaSongs.map((song) => buildMediaTrackCard(song, "songs")).join("")}</div>`;
+      } else if (mediaActiveAlbumId) {
+        const album = getMediaAlbumById(mediaActiveAlbumId);
+        if (!album) {
+          mediaActiveAlbumId = "";
+          renderMediaModal();
+          return;
+        }
+        title.textContent = album.title;
+        subtitle.textContent = `${album.songs.length} músicas • preview de 10 segundos`;
+        content.innerHTML = `
+          <div class="media-album-detail-head">
+            <button id="backToAlbums" class="media-album-back" type="button" aria-label="Voltar para álbuns">
+              <svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+            </button>
+            <div>
+              <h3 class="media-album-title">${escapeText(album.title)}</h3>
+              <p class="media-album-meta">${escapeText(album.subtitle)}</p>
+            </div>
+          </div>
+          <div class="media-track-list">${album.songs.map((song) => buildMediaTrackCard(song, album.id)).join("")}</div>
+        `;
+      } else {
+        title.textContent = "Álbuns";
+        subtitle.textContent = "3 modelos com capa e 6 músicas cada.";
+        content.innerHTML = `
+          <div class="media-album-grid">
+            ${mediaAlbums.map((album) => `
+              <button class="media-album-card" type="button" data-media-album="${escapeAttr(album.id)}">
+                <div class="media-album-cover"><span>${escapeText(album.title)}</span></div>
+                <div>
+                  <h3 class="media-album-title">${escapeText(album.title)}</h3>
+                  <p class="media-album-meta">${escapeText(album.subtitle)}</p>
+                </div>
+              </button>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      content.querySelectorAll("[data-media-play]").forEach((button) => {
+        button.onclick = () => {
+          toggleMediaPreview(button.getAttribute("data-media-scope") || "songs", button.getAttribute("data-media-play") || "");
+        };
+      });
+      const backToAlbums = $("backToAlbums");
+      if (backToAlbums) {
+        backToAlbums.onclick = () => {
+          resetMediaPreviewState();
+          mediaActiveAlbumId = "";
+          renderMediaModal();
+          setMediaStatus("Escolha um album para abrir a lista de musicas.");
+        };
+      }
+      content.querySelectorAll("[data-media-album]").forEach((button) => {
+        button.onclick = () => {
+          resetMediaPreviewState();
+          mediaActiveAlbumId = button.getAttribute("data-media-album") || "";
+          renderMediaModal();
+          setMediaStatus("Album aberto. Escolha uma faixa para ouvir o preview.");
+        };
+      });
+      syncMediaPreviewUi();
+    }
+    function openMediaModal() {
+      mediaActiveTab = "songs";
+      mediaActiveAlbumId = "";
+      resetMediaPreviewState();
+      $("mediaModal").classList.add("show");
+      $("mediaModal").setAttribute("aria-hidden", "false");
+      renderMediaModal();
+      setMediaStatus("Escolha uma música ou um álbum para navegar.");
+    }
+    function closeMediaModal() {
+      resetMediaPreviewState();
+      $("mediaModal").classList.remove("show");
+      $("mediaModal").setAttribute("aria-hidden", "true");
     }
     function clearMiniCourseAnimationTimers() {
       miniCourseAnimationTimers.forEach((timer) => clearTimeout(timer));
@@ -4390,6 +5067,32 @@
     function openMinute(block){ state.currentPick=block; state.currentMinutes=5; $("stepName").textContent=block.name; renderMinute(); $("minuteModal").classList.add("show"); }
     function renderMinute(){ $("minuteValue").textContent=String(state.currentMinutes); $("minuteLabel").textContent=toHoursText(state.currentMinutes); }
 
+    $("openMidia").onclick = () => {
+      openMediaModal();
+    };
+    $("closeMidia").onclick = () => {
+      closeMediaModal();
+    };
+    $("mediaTabSongs").onclick = () => {
+      if (mediaActiveTab === "songs") {
+        return;
+      }
+      mediaActiveTab = "songs";
+      mediaActiveAlbumId = "";
+      resetMediaPreviewState();
+      renderMediaModal();
+      setMediaStatus("Lista de musicas aberta.");
+    };
+    $("mediaTabAlbums").onclick = () => {
+      if (mediaActiveTab === "albums" && !mediaActiveAlbumId) {
+        return;
+      }
+      mediaActiveTab = "albums";
+      mediaActiveAlbumId = "";
+      resetMediaPreviewState();
+      renderMediaModal();
+      setMediaStatus("Escolha um album para abrir suas musicas.");
+    };
     $("openCourses").onclick = () => {
       openMiniCoursesModal();
     };
