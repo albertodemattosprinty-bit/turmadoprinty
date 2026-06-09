@@ -5303,8 +5303,8 @@
 
     async function prepareMiniCourseCoverBlob(file) {
       const image = await loadMiniCourseCoverImage(file);
-      const width = 400;
-      const height = 600;
+      const width = 800;
+      const height = 1200;
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
@@ -5315,13 +5315,15 @@
 
       const sourceWidth = Math.max(1, Number(image.naturalWidth || image.width || width) || width);
       const sourceHeight = Math.max(1, Number(image.naturalHeight || image.height || height) || height);
-      const scale = Math.max(width / sourceWidth, height / sourceHeight);
+      const scale = Math.min(width / sourceWidth, height / sourceHeight);
       const drawWidth = sourceWidth * scale;
       const drawHeight = sourceHeight * scale;
       const offsetX = (width - drawWidth) / 2;
       const offsetY = (height - drawHeight) / 2;
 
       context.clearRect(0, 0, width, height);
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
       context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 
       const blob = await new Promise((resolve, reject) => {
@@ -5331,7 +5333,7 @@
             return;
           }
           reject(new Error("Nao foi possivel converter a capa para WebP."));
-        }, "image/webp", 0.88);
+        }, "image/webp", 0.96);
       });
 
       return blob;
