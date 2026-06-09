@@ -7,7 +7,7 @@ import http from "node:http";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
@@ -75,6 +75,7 @@ const MINI_COURSE_MODEL_CANDIDATES = ["gpt-5.1", "gpt-4.1", "gpt-4.1-mini", "gpt
 const MINI_COURSE_COVERS_PREFIX = "mini/courses";
 const MINI_MEDIA_LIBRARY_KEY = "mini/media/library.json";
 const MINI_MEDIA_ALBUMS_PREFIX = "mini/media/albums";
+const MINI_MEDIA_COVER_SYNC_PREFIX = "Capas/";
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
@@ -313,6 +314,23 @@ function normalizeMiniMediaLibrary(raw) {
   return { albums };
 }
 
+function normalizeMiniMediaAlbumSongsOrder(album) {
+  if (!album || !Array.isArray(album.songs)) {
+    return;
+  }
+  album.songs = album.songs
+    .map((song, index) => normalizeMiniMediaSong({
+      ...song,
+      order: Math.max(0, Number(song?.order ?? index) || index)
+    }, index))
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+    .map((song, index) => ({
+      ...song,
+      order: index
+    }));
+  album.subtitle = `${album.songs.length} musicas`;
+}
+
 function buildMiniMediaAlbumFolder(albumId) {
   return `${MINI_MEDIA_ALBUMS_PREFIX}/${String(albumId || "").trim()}`;
 }
@@ -327,6 +345,7 @@ function buildMiniMediaAlbumPayload(album) {
     id: song.id,
     title: song.title,
     subtitle: song.subtitle,
+    order: Math.max(0, Number(song.order || 0) || 0),
     url: song.key ? buildAlbumZipPublicUrlFromKey(song.key) : "",
     coverImageUrl
   })) : [];
@@ -349,15 +368,15 @@ function buildMiniMediaLibraryPayload(library) {
 
 async function loadMiniMediaLibrary() {
   const rawText = await readR2ObjectText(MINI_MEDIA_LIBRARY_KEY);
-  if (!rawText) {
-    return { albums: [] };
+  let library = { albums: [] };
+  if (rawText) {
+    try {
+      library = normalizeMiniMediaLibrary(JSON.parse(rawText));
+    } catch {
+      library = { albums: [] };
+    }
   }
-
-  try {
-    return normalizeMiniMediaLibrary(JSON.parse(rawText));
-  } catch {
-    return { albums: [] };
-  }
+  return syncMiniMediaLibraryFromCoverFolder(library);
 }
 
 async function saveMiniMediaLibrary(library) {
@@ -369,6 +388,84 @@ async function saveMiniMediaLibrary(library) {
     Body: Buffer.from(JSON.stringify(normalized, null, 2), "utf8"),
     ContentType: "application/json; charset=utf-8"
   }));
+  return normalized;
+}
+
+async function syncMiniMediaLibraryFromCoverFolder(library) {
+  const normalized = normalizeMiniMediaLibrary(library);
+
+  try {
+    const client = getR2Client();
+    const result = await client.send(new ListObjectsV2Command({
+      Bucket: R2_BUCKET_NAME,
+      Prefix: MINI_MEDIA_COVER_SYNC_PREFIX
+    }));
+    const objects = Array.isArray(result?.Contents) ? result.Contents : [];
+    let changed = false;
+
+    for (const item of objects) {
+      const key = String(item?.Key || "").trim();
+      if (!key || key.endsWith("/") || !/\.avif$/i.test(key)) {
+        continue;
+      }
+
+      const fileName = path.posix.basename(key);
+      const rawTitle = fileName.replace(/\.avif$/i, "");
+      let decodedTitle = rawTitle;
+      try {
+        decodedTitle = decodeURIComponent(rawTitle);
+      } catch {
+        decodedTitle = rawTitle;
+      }
+      const title = sanitizeMiniMediaTitle(decodedTitle.replace(/[_-]+/g, " "), "");
+      if (!title) {
+        continue;
+      }
+
+      const existing = normalized.albums.find((album) => (
+        String(album.coverKey || "").trim() === key
+        || String(album.title || "").trim().toLowerCase() === title.toLowerCase()
+      ));
+      const now = new Date().toISOString();
+
+      if (existing) {
+        if (!existing.coverKey) {
+          existing.coverKey = key;
+          existing.coverContentType = "image/avif";
+          existing.updatedAt = now;
+          changed = true;
+        }
+        continue;
+      }
+
+      const baseId = slugifyAlbumName(title) || `album-${Date.now()}`;
+      let albumId = baseId;
+      let suffix = 2;
+      while (normalized.albums.some((album) => album.id === albumId)) {
+        albumId = `${baseId}-${suffix}`;
+        suffix += 1;
+      }
+
+      normalized.albums.push(normalizeMiniMediaAlbum({
+        id: albumId,
+        title,
+        subtitle: "0 musicas",
+        coverKey: key,
+        coverContentType: "image/avif",
+        createdAt: now,
+        updatedAt: now,
+        songs: []
+      }));
+      changed = true;
+    }
+
+    if (changed) {
+      return saveMiniMediaLibrary(normalized);
+    }
+  } catch (_) {
+    // Keep current library if cover sync fails.
+  }
+
   return normalized;
 }
 
@@ -3363,6 +3460,13 @@ async function handleMiniMediaTrackUploadRequest(request, response, albumId, tra
     const titleFromFile = sanitizeMiniMediaTitle(providedFileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "), `Faixa ${trackOrder + 1}`);
     const songTitle = providedTrackTitle || titleFromFile;
     const existingIndex = album.songs.findIndex((song) => song.id === safeTrackId);
+    if (existingIndex < 0) {
+      album.songs.forEach((song) => {
+        if (Number(song.order || 0) >= trackOrder) {
+          song.order = Number(song.order || 0) + 1;
+        }
+      });
+    }
     const nextSong = normalizeMiniMediaSong({
       id: safeTrackId,
       title: songTitle,
@@ -3379,8 +3483,7 @@ async function handleMiniMediaTrackUploadRequest(request, response, albumId, tra
     } else {
       album.songs.push(nextSong);
     }
-    album.songs.sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-    album.subtitle = `${album.songs.length} musicas`;
+    normalizeMiniMediaAlbumSongsOrder(album);
     album.updatedAt = new Date().toISOString();
     const saved = await saveMiniMediaLibrary(library);
     const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
@@ -3393,6 +3496,106 @@ async function handleMiniMediaTrackUploadRequest(request, response, albumId, tra
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel enviar a musica."
+    });
+  }
+}
+
+async function handleMiniMediaTrackUpdateRequest(request, response, albumId, trackId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const title = sanitizeMiniMediaTitle(body?.title, "");
+  if (!title) {
+    sendJson(response, 400, { error: "Informe o nome da faixa." });
+    return;
+  }
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+    const song = album.songs.find((item) => item.id === trackId);
+    if (!song) {
+      sendJson(response, 404, { error: "Faixa nao encontrada." });
+      return;
+    }
+
+    song.title = title;
+    song.updatedAt = new Date().toISOString();
+    album.updatedAt = song.updatedAt;
+    const saved = await saveMiniMediaLibrary(library);
+    const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      album: buildMiniMediaAlbumPayload(savedAlbum),
+      library: buildMiniMediaLibraryPayload(saved)
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a faixa."
+    });
+  }
+}
+
+async function handleMiniMediaTrackDeleteRequest(request, response, albumId, trackId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+    const existingIndex = album.songs.findIndex((item) => item.id === trackId);
+    if (existingIndex < 0) {
+      sendJson(response, 404, { error: "Faixa nao encontrada." });
+      return;
+    }
+
+    const [song] = album.songs.splice(existingIndex, 1);
+    normalizeMiniMediaAlbumSongsOrder(album);
+    album.updatedAt = new Date().toISOString();
+
+    if (song?.key) {
+      try {
+        await getR2Client().send(new DeleteObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: song.key
+        }));
+      } catch (_) {
+        // Ignore bucket delete errors and keep metadata deletion.
+      }
+    }
+
+    const saved = await saveMiniMediaLibrary(library);
+    const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      album: buildMiniMediaAlbumPayload(savedAlbum),
+      library: buildMiniMediaLibraryPayload(saved)
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir a faixa."
     });
   }
 }
@@ -6239,11 +6442,27 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "PATCH" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/")) {
+    const parts = pathname.replace("/api/mini/media/albums/", "").split("/tracks/");
+    const albumId = decodeURIComponent(parts[0] || "");
+    const trackId = decodeURIComponent(parts[1] || "");
+    await handleMiniMediaTrackUpdateRequest(request, response, albumId, trackId);
+    return;
+  }
+
   if (request.method === "PUT" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/")) {
     const parts = pathname.replace("/api/mini/media/albums/", "").split("/tracks/");
     const albumId = decodeURIComponent(parts[0] || "");
     const trackId = decodeURIComponent(parts[1] || "");
     await handleMiniMediaTrackUploadRequest(request, response, albumId, trackId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/")) {
+    const parts = pathname.replace("/api/mini/media/albums/", "").split("/tracks/");
+    const albumId = decodeURIComponent(parts[0] || "");
+    const trackId = decodeURIComponent(parts[1] || "");
+    await handleMiniMediaTrackDeleteRequest(request, response, albumId, trackId);
     return;
   }
 

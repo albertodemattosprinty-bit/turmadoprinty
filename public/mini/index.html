@@ -126,6 +126,12 @@
       gap: 8px;
       overflow: hidden;
     }
+    .media-modal.is-editing {
+      background:
+        radial-gradient(circle at 18% 14%, rgba(206, 212, 222, .38), transparent 30%),
+        radial-gradient(circle at 84% 18%, rgba(238, 241, 246, .30), transparent 26%),
+        linear-gradient(180deg, #f3f5f8 0%, #eef1f5 100%);
+    }
     .media-head {
       display: grid;
       grid-template-columns: auto 1fr;
@@ -259,6 +265,19 @@
       font-weight: 700;
       color: rgba(37, 48, 68, .68);
     }
+    .media-track-title-input {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      background: rgba(255,255,255,.82);
+      color: #253044;
+      padding: 12px 14px;
+      font-family: "Open Sans", sans-serif;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 800;
+      box-shadow: inset 0 0 0 1px rgba(37, 48, 68, .08);
+    }
     .media-progress-shell {
       display: grid;
       gap: 6px;
@@ -303,10 +322,23 @@
       height: 54px;
       align-self: center;
     }
+    .media-track-actions {
+      display: grid;
+      gap: 10px;
+      align-self: center;
+    }
     .media-play-btn.is-playing {
       background: linear-gradient(145deg, #6bc6ff, #3a69f5);
       color: #fff;
       box-shadow: 0 16px 28px rgba(58, 105, 245, .22);
+    }
+    .media-play-btn.is-delete {
+      background: rgba(255, 108, 132, .14);
+      color: #db274f;
+    }
+    .media-play-btn.is-add {
+      background: rgba(73, 201, 110, .14);
+      color: #1f9d4b;
     }
     .media-play-btn svg,
     .media-album-back svg {
@@ -416,6 +448,29 @@
       font-weight: 700;
       opacity: .76;
       margin-top: 4px;
+    }
+    .media-empty-add-shell {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .media-empty-add-btn {
+      width: 88px;
+      height: 88px;
+      border: 0;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #49c96e, #23964a);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      box-shadow: 0 18px 34px rgba(35, 150, 74, .26);
+    }
+    .media-empty-add-btn svg {
+      width: 34px;
+      height: 34px;
+      fill: currentColor;
     }
 
     .immersive { position: fixed; inset: 0; background: #fff; z-index: 20; transform: translateY(100%); opacity: 0; pointer-events: none; transition: transform .26s ease, opacity .2s ease; display: grid; grid-template-rows: auto 70vh auto 10vh; padding: 8px 12px 8px; }
@@ -2388,6 +2443,7 @@
     </div>
     <div id="mediaContent" class="media-content"></div>
     <div id="mediaStatus" class="media-status">Escolha uma música ou um álbum para navegar.</div>
+    <input id="mediaInlineTracksInput" type="file" accept="audio/*" multiple hidden>
   </section>
 
   <section id="mediaUploadModal" class="mini-plans-modal" aria-hidden="true">
@@ -2685,12 +2741,15 @@
     let currentMiniCourseQuizSubmitted = false;
     let mediaActiveTab = "songs";
     let mediaActiveAlbumId = "";
+    let mediaAlbumEditMode = false;
     let mediaLibraryAlbums = [];
     let mediaLibraryLoading = false;
     let mediaLibraryLoaded = false;
     let mediaLibraryError = "";
     const mediaTrackDurations = new Map();
     const mediaTrackDurationLoads = new Set();
+    let mediaPendingInsertAlbumId = "";
+    let mediaPendingInsertOrder = 0;
     const mediaPreviewState = {
       key: "",
       song: null,
@@ -2753,6 +2812,9 @@
     function getMediaPauseSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>`;
     }
+    function getMediaPlusSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/></svg>`;
+    }
     function buildMediaTrackKey(scopeId, songId) {
       return `${String(scopeId || "songs")}::${String(songId || "track")}`;
     }
@@ -2770,6 +2832,12 @@
     }
     function getMediaAlbumById(albumId) {
       return getMediaAlbumsLibrary().find((album) => album.id === albumId) || null;
+    }
+    function applyMediaEditModeUi() {
+      const modal = $("mediaModal");
+      if (modal) {
+        modal.classList.toggle("is-editing", Boolean(mediaAlbumEditMode));
+      }
     }
     function getMediaTrackSourceKey(song, scopeId = "songs") {
       if (song?.url) {
@@ -3024,10 +3092,11 @@
       }
       startMediaPreview(trackKey, song, 0, scopeId);
     }
-    function buildMediaTrackCard(song, scopeId) {
+    function buildMediaTrackCard(song, scopeId, options = {}) {
       const trackKey = buildMediaTrackKey(scopeId, song.id);
       const totalKey = getMediaTrackSourceKey(song, scopeId);
       const subtitle = String(song?.subtitle || "").trim();
+      const editMode = Boolean(options?.editMode);
       const cover = song?.coverImageUrl
         ? `<img class="media-track-cover-image" src="${escapeAttr(song.coverImageUrl)}" alt="${escapeAttr(song.title || "Faixa")}">`
         : `<div class="media-track-cover"></div>`;
@@ -3036,15 +3105,24 @@
           ${cover}
           <div class="media-track-main">
             <div class="media-track-copy">
-              <h3 class="media-track-title">${escapeText(song.title)}</h3>
-              ${subtitle ? `<p class="media-track-meta">${escapeText(subtitle)}</p>` : ""}
+              ${editMode
+                ? `<input class="media-track-title-input" type="text" value="${escapeAttr(song.title)}" data-media-track-title-input="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}">`
+                : `<h3 class="media-track-title">${escapeText(song.title)}</h3>`}
+              ${!editMode && subtitle ? `<p class="media-track-meta">${escapeText(subtitle)}</p>` : ""}
             </div>
-            <div class="media-progress-shell">
-              <div class="media-progress-track"><div class="media-progress-fill" data-media-progress></div></div>
-              <div class="media-progress-meta"><span data-media-current>0:00</span><span data-media-total-key="${escapeAttr(totalKey)}">${escapeText(getMediaTrackTotalLabel(song, scopeId))}</span></div>
-            </div>
+            ${editMode ? "" : `
+              <div class="media-progress-shell">
+                <div class="media-progress-track"><div class="media-progress-fill" data-media-progress></div></div>
+                <div class="media-progress-meta"><span data-media-current>0:00</span><span data-media-total-key="${escapeAttr(totalKey)}">${escapeText(getMediaTrackTotalLabel(song, scopeId))}</span></div>
+              </div>
+            `}
           </div>
-          <button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>
+          ${editMode ? `
+            <div class="media-track-actions">
+              <button class="media-play-btn is-delete" type="button" data-media-delete-track="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Excluir faixa">${getTrashSvg()}</button>
+              <button class="media-play-btn is-add" type="button" data-media-add-track-order="${escapeAttr(String(Number(song?.order || 0) + 1))}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Adicionar faixas abaixo">${getMediaPlusSvg()}</button>
+            </div>
+          ` : `<button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>`}
         </article>
       `;
     }
@@ -3190,6 +3268,108 @@
         if (button) button.disabled = false;
       }
     }
+    function openMediaTrackInsertPicker(albumId, order = 0) {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      const input = $("mediaInlineTracksInput");
+      if (!input) {
+        return;
+      }
+      mediaPendingInsertAlbumId = String(albumId || "").trim();
+      mediaPendingInsertOrder = Math.max(0, Number(order || 0) || 0);
+      input.value = "";
+      input.click();
+    }
+    async function insertMediaTracksAtOrder(albumId, startOrder, files) {
+      const safeAlbumId = String(albumId || "").trim();
+      const trackFiles = Array.from(files || []).filter(Boolean);
+      if (!safeAlbumId || !trackFiles.length) {
+        return;
+      }
+
+      setMediaStatus("Adicionando faixas ao album...");
+      for (let index = 0; index < trackFiles.length; index += 1) {
+        const track = trackFiles[index];
+        const trackTitle = track.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+        const trackId = trackTitle.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || `faixa-${Date.now()}-${index + 1}`;
+        const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(safeAlbumId)}/tracks/${encodeURIComponent(trackId)}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": track.type || "application/octet-stream",
+            "X-File-Name": encodeURIComponent(track.name),
+            "X-Track-Title": encodeURIComponent(trackTitle),
+            "X-Track-Order": String(Math.max(0, Number(startOrder || 0) || 0) + index)
+          },
+          body: track
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || `Nao foi possivel adicionar a faixa ${index + 1}.`);
+        }
+        if (payload?.library?.albums) {
+          mediaLibraryAlbums = payload.library.albums;
+        }
+      }
+      mediaActiveAlbumId = safeAlbumId;
+      renderMediaModal();
+      setMediaStatus("Faixas adicionadas com sucesso.");
+    }
+    async function handleMediaInlineTracksInputChange() {
+      const input = $("mediaInlineTracksInput");
+      const files = Array.from(input?.files || []);
+      const albumId = mediaPendingInsertAlbumId;
+      const order = mediaPendingInsertOrder;
+      mediaPendingInsertAlbumId = "";
+      mediaPendingInsertOrder = 0;
+      if (!albumId || !files.length) {
+        return;
+      }
+      try {
+        await insertMediaTracksAtOrder(albumId, order, files);
+      } catch (error) {
+        setMediaStatus(error instanceof Error ? error.message : "Falha ao adicionar as faixas.");
+      } finally {
+        if (input) {
+          input.value = "";
+        }
+      }
+    }
+    async function renameMediaTrack(albumId, trackId, title) {
+      const safeTitle = String(title || "").trim();
+      if (!safeTitle) {
+        throw new Error("Informe um nome para a faixa.");
+      }
+      const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: safeTitle })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Nao foi possivel atualizar a faixa.");
+      }
+      if (payload?.library?.albums) {
+        mediaLibraryAlbums = payload.library.albums;
+      }
+      mediaActiveAlbumId = String(albumId || "").trim();
+      renderMediaModal();
+      setMediaStatus("Nome da faixa atualizado.");
+    }
+    async function deleteMediaTrack(albumId, trackId) {
+      const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Nao foi possivel excluir a faixa.");
+      }
+      if (payload?.library?.albums) {
+        mediaLibraryAlbums = payload.library.albums;
+      }
+      mediaActiveAlbumId = String(albumId || "").trim();
+      renderMediaModal();
+      setMediaStatus("Faixa excluida com sucesso.");
+    }
     function handleMediaAdminHotkeys(event) {
       if (!isMiniMediaAdmin() || isMiniInteractiveField(event.target)) {
         return;
@@ -3198,11 +3378,20 @@
       if (!modal || !modal.classList.contains("show")) {
         return;
       }
-      if (String(event.key || "").toLowerCase() !== "u") {
+      const key = String(event.key || "").toLowerCase();
+      if (key === "u") {
+        event.preventDefault();
+        openMediaUploadModal();
         return;
       }
-      event.preventDefault();
-      openMediaUploadModal();
+      if (key === "e" && mediaActiveAlbumId) {
+        event.preventDefault();
+        mediaAlbumEditMode = !mediaAlbumEditMode;
+        resetMediaPreviewState();
+        applyMediaEditModeUi();
+        renderMediaModal();
+        setMediaStatus(mediaAlbumEditMode ? "Edicao do album ativada." : "Edicao do album finalizada.");
+      }
     }
     function renderMediaModal() {
       const content = $("mediaContent");
@@ -3213,6 +3402,8 @@
       if (!content || !title || !subtitle || !songsTab || !albumsTab) {
         return;
       }
+
+      applyMediaEditModeUi();
 
       songsTab.classList.toggle("is-active", mediaActiveTab === "songs");
       albumsTab.classList.toggle("is-active", mediaActiveTab === "albums");
@@ -3233,6 +3424,8 @@
 
       if (mediaActiveTab === "songs") {
         const songsLibrary = getMediaSongsLibrary();
+        mediaAlbumEditMode = false;
+        applyMediaEditModeUi();
         title.textContent = "Midia";
         subtitle.textContent = "";
         content.innerHTML = songsLibrary.length
@@ -3247,7 +3440,7 @@
           return;
         }
         title.textContent = album.title;
-        subtitle.textContent = "";
+        subtitle.textContent = mediaAlbumEditMode ? "Modo de edicao ativo. Pressione E para sair." : "";
         content.innerHTML = `
           <div class="media-album-detail-head">
             <button id="backToAlbums" class="media-album-back" type="button" aria-label="Voltar para álbuns">
@@ -3258,11 +3451,17 @@
               <p class="media-album-meta">${escapeText(album.subtitle)}</p>
             </div>
           </div>
-          <div class="media-track-list">${album.songs.map((song) => buildMediaTrackCard(song, album.id)).join("")}</div>
+          ${album.songs.length
+            ? `<div class="media-track-list">${album.songs.map((song) => buildMediaTrackCard(song, album.id, { editMode: mediaAlbumEditMode })).join("")}</div>`
+            : (mediaAlbumEditMode
+              ? `<div class="media-empty-add-shell"><button class="media-empty-add-btn" type="button" data-media-add-track-order="0" data-media-scope="${escapeAttr(album.id)}" aria-label="Adicionar faixas">${getMediaPlusSvg()}</button></div>`
+              : `<div class="courses-empty">Este album ainda nao tem faixas.</div>`)}
         `;
         album.songs.forEach((song) => ensureMediaTrackDuration(song, album.id));
       } else {
         const albums = getMediaAlbumsLibrary();
+        mediaAlbumEditMode = false;
+        applyMediaEditModeUi();
         title.textContent = "Midia";
         subtitle.textContent = "";
         content.innerHTML = albums.length
@@ -3287,10 +3486,58 @@
           toggleMediaPreview(button.getAttribute("data-media-scope") || "songs", button.getAttribute("data-media-play") || "");
         };
       });
+      content.querySelectorAll("[data-media-delete-track]").forEach((button) => {
+        button.onclick = async () => {
+          try {
+            await deleteMediaTrack(button.getAttribute("data-media-scope") || "", button.getAttribute("data-media-delete-track") || "");
+          } catch (error) {
+            setMediaStatus(error instanceof Error ? error.message : "Falha ao excluir a faixa.");
+          }
+        };
+      });
+      content.querySelectorAll("[data-media-add-track-order]").forEach((button) => {
+        button.onclick = () => {
+          openMediaTrackInsertPicker(
+            button.getAttribute("data-media-scope") || "",
+            Number(button.getAttribute("data-media-add-track-order") || 0) || 0
+          );
+        };
+      });
+      content.querySelectorAll("[data-media-track-title-input]").forEach((input) => {
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            input.blur();
+          } else if (event.key === "Escape") {
+            input.value = input.defaultValue || input.value;
+            input.blur();
+          }
+        });
+        input.addEventListener("blur", async () => {
+          const nextValue = String(input.value || "").trim();
+          const originalValue = String(input.defaultValue || "").trim();
+          if (!nextValue || nextValue === originalValue) {
+            input.value = originalValue || nextValue;
+            return;
+          }
+          try {
+            await renameMediaTrack(
+              input.getAttribute("data-media-scope") || "",
+              input.getAttribute("data-media-track-title-input") || "",
+              nextValue
+            );
+          } catch (error) {
+            input.value = originalValue;
+            setMediaStatus(error instanceof Error ? error.message : "Falha ao renomear a faixa.");
+          }
+        });
+      });
       const backToAlbums = $("backToAlbums");
       if (backToAlbums) {
         backToAlbums.onclick = () => {
           resetMediaPreviewState();
+          mediaAlbumEditMode = false;
+          applyMediaEditModeUi();
           mediaActiveAlbumId = "";
           renderMediaModal();
           setMediaStatus("Escolha um album para abrir a lista de musicas.");
@@ -3299,6 +3546,8 @@
       content.querySelectorAll("[data-media-album]").forEach((button) => {
         button.onclick = () => {
           resetMediaPreviewState();
+          mediaAlbumEditMode = false;
+          applyMediaEditModeUi();
           mediaActiveAlbumId = button.getAttribute("data-media-album") || "";
           renderMediaModal();
           setMediaStatus("Album aberto. Escolha uma faixa para ouvir o preview.");
@@ -3309,6 +3558,7 @@
     async function openMediaModal() {
       mediaActiveTab = "songs";
       mediaActiveAlbumId = "";
+      mediaAlbumEditMode = false;
       resetMediaPreviewState();
       $("mediaModal").classList.add("show");
       $("mediaModal").setAttribute("aria-hidden", "false");
@@ -3319,6 +3569,8 @@
     }
     function closeMediaModal() {
       resetMediaPreviewState();
+      mediaAlbumEditMode = false;
+      applyMediaEditModeUi();
       closeMediaUploadModal();
       $("mediaModal").classList.remove("show");
       $("mediaModal").setAttribute("aria-hidden", "true");
@@ -5752,12 +6004,16 @@
     $("mediaUploadTracksInput").onchange = () => {
       renderMediaUploadFilesList();
     };
+    $("mediaInlineTracksInput").onchange = async () => {
+      await handleMediaInlineTracksInputChange();
+    };
     $("mediaTabSongs").onclick = () => {
       if (mediaActiveTab === "songs") {
         return;
       }
       mediaActiveTab = "songs";
       mediaActiveAlbumId = "";
+      mediaAlbumEditMode = false;
       resetMediaPreviewState();
       renderMediaModal();
       setMediaStatus("Lista de musicas aberta.");
@@ -5768,6 +6024,7 @@
       }
       mediaActiveTab = "albums";
       mediaActiveAlbumId = "";
+      mediaAlbumEditMode = false;
       resetMediaPreviewState();
       renderMediaModal();
       setMediaStatus("Escolha um album para abrir suas musicas.");
