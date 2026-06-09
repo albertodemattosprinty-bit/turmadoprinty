@@ -1106,12 +1106,12 @@
     .course-card {
       border: 0;
       width: 100%;
-      padding: 16px;
+      padding: 18px 16px 16px;
       border-radius: 30px;
       background: linear-gradient(160deg, rgba(255,255,255,.24), rgba(255,255,255,.10));
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 14px;
+      gap: 12px;
       align-content: start;
       color: #fff;
       text-align: center;
@@ -1121,17 +1121,22 @@
       width: 100%;
       height: auto;
       aspect-ratio: 9 / 16;
-      border-radius: 26px;
+      border-radius: 0;
       position: relative;
-      overflow: hidden;
-      box-shadow: 0 16px 28px rgba(0,0,0,.16);
+      overflow: visible;
+      transform: perspective(1200px) rotateX(5deg) rotateY(-4deg);
+      transform-style: preserve-3d;
+      filter: drop-shadow(0 20px 30px rgba(0,0,0,.18));
+      transition: transform .22s ease, filter .22s ease;
     }
     .course-cover,
     .course-cover-fallback {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
+      border-radius: 0;
+      background: transparent;
     }
     .course-cover-fallback {
       background:
@@ -1140,55 +1145,61 @@
     }
     .course-cover-star {
       position: absolute;
-      inset: 0;
+      top: 12px;
+      right: 12px;
+      width: 42px;
+      height: 42px;
       display: grid;
       place-items: center;
       color: #fff;
-      background: linear-gradient(180deg, rgba(7, 18, 58, .05), rgba(7, 18, 58, .16));
+      background: rgba(18, 34, 78, .26);
+      border-radius: 50%;
+      backdrop-filter: blur(10px);
     }
     .course-cover-star.is-complete {
       color: #ffe165;
     }
     .course-cover-star svg {
-      width: 44px;
-      height: 44px;
+      width: 22px;
+      height: 22px;
       fill: currentColor;
-      filter: drop-shadow(0 8px 18px rgba(0,0,0,.20));
-    }
-    .course-cover-overlay {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding: 18px 18px 20px;
-      background: linear-gradient(180deg, rgba(7, 18, 58, 0), rgba(7, 18, 58, .82));
-      display: none;
-      z-index: 2;
-    }
-    .course-cover-overlay-title {
-      margin: 0;
-      font-size: 20px;
-      line-height: 1.12;
-      font-weight: 800;
-      color: #fff;
-      text-shadow: 0 10px 20px rgba(0,0,0,.28);
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.24));
     }
     .course-card-body {
       min-width: 0;
       display: grid;
-      gap: 8px;
+      gap: 10px;
       justify-items: center;
-    }
-    .course-card-title {
-      margin: 0;
-      font-size: clamp(20px, 2vw, 28px);
-      font-weight: 800;
-      line-height: 1.1;
     }
     .course-card-duration {
       font-size: 15px;
       opacity: .88;
       font-weight: 700;
+    }
+    .course-progress-shell {
+      width: min(180px, 100%);
+      display: grid;
+      gap: 6px;
+      justify-items: center;
+    }
+    .course-progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.18);
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+    }
+    .course-progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #3ed36a, #7ff3a8);
+    }
+    .course-progress-meta {
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 800;
+      opacity: .84;
     }
     .course-card-mobile-meta {
       display: none;
@@ -1256,6 +1267,50 @@
       font-weight: 800;
       opacity: .88;
       padding: 24px;
+    }
+    .course-intro-shell {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 18px 0;
+    }
+    .course-intro-card {
+      width: min(100%, 460px);
+      display: grid;
+      gap: 22px;
+      justify-items: center;
+    }
+    .course-intro-card .course-cover-shell {
+      width: min(100%, 360px);
+    }
+    .course-intro-actions {
+      width: 100%;
+      display: grid;
+      gap: 12px;
+      justify-items: center;
+    }
+    .course-intro-button {
+      border: 0;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #6bc6ff, #3a69f5);
+      color: #fff;
+      min-width: 220px;
+      min-height: 56px;
+      padding: 0 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: var(--course-ui-font);
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 18px 34px rgba(58, 105, 245, .22);
+    }
+    .course-intro-button svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
     }
     .course-page-shell {
       max-width: 960px;
@@ -2600,6 +2655,7 @@
     let miniCourses = [];
     let currentMiniCourse = null;
     let currentMiniCoursePage = 1;
+    let currentMiniCourseViewMode = "preview";
     let miniCourseUser = null;
     let miniCourseSummary = { completedCourses: 0, startedCourses: 0 };
     let isMiniCourseAdmin = false;
@@ -4467,15 +4523,64 @@
       modal.setAttribute("aria-hidden", "true");
     }
 
+    function getMiniCourseProgressPercent(course) {
+      const totalPages = Math.max(Number(course?.pageCount || course?.pages?.length || 1) || 1, 1);
+      const pagesRead = Math.max(0, Number(course?.progress?.pagesRead || 0) || 0);
+      return Math.max(0, Math.min(100, Math.round((pagesRead / totalPages) * 100)));
+    }
+
+    function getMiniCourseProgressMarkup(course) {
+      const totalPages = Math.max(Number(course?.pageCount || course?.pages?.length || 1) || 1, 1);
+      const pagesRead = Math.max(0, Number(course?.progress?.pagesRead || 0) || 0);
+      if (pagesRead <= 0) {
+        return "";
+      }
+      const percent = getMiniCourseProgressPercent(course);
+      return `
+        <div class="course-progress-shell">
+          <div class="course-progress-track"><div class="course-progress-fill" style="width:${percent}%"></div></div>
+          <div class="course-progress-meta">${pagesRead}/${totalPages}</div>
+        </div>
+      `;
+    }
+
     function buildMiniCourseCover(course) {
       const isComplete = Boolean(course?.progress?.completed);
       const starClass = isComplete ? "course-cover-star is-complete" : "course-cover-star";
       const starSvg = `<div class="${starClass}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>`;
-      const titleOverlay = `<div class="course-cover-overlay"><h3 class="course-cover-overlay-title">${escapeText(course?.title || "Curso")}</h3></div>`;
       if (course?.coverImageUrl) {
-        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${titleOverlay}${starSvg}</div>`;
+        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${starSvg}</div>`;
       }
-      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${titleOverlay}${starSvg}</div>`;
+      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${starSvg}</div>`;
+    }
+
+    function renderMiniCourseIntro(readerView) {
+      const totalPages = Math.max(Number(currentMiniCourse?.pageCount || currentMiniCourse?.pages?.length || 1) || 1, 1);
+      const hasStarted = Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0) > 0;
+      readerView.innerHTML = `
+        <div class="course-intro-shell">
+          <div class="course-intro-card">
+            ${buildMiniCourseCover(currentMiniCourse)}
+            <div class="course-intro-actions">
+              ${getMiniCourseProgressMarkup(currentMiniCourse)}
+              <div class="course-card-duration">${escapeText(String(currentMiniCourse?.durationMinutes || totalPages))} min</div>
+              <button id="startMiniCourseButton" class="course-intro-button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>
+                <span>${hasStarted ? "Continuar" : "Iniciar"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      const startButton = $("startMiniCourseButton");
+      if (startButton) {
+        startButton.onclick = () => {
+          currentMiniCourseViewMode = "reading";
+          currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || 1) || 1);
+          resetMiniCourseReadGate();
+          renderMiniCourseReader();
+        };
+      }
     }
 
     function isMiniCoursesMobileView() {
@@ -4499,7 +4604,8 @@
           </button>
           <div class="course-card-mobile-meta">
             <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
-            <div class="course-card-mobile-hint">Deslize para ver o próximo • toque para iniciar</div>
+            ${getMiniCourseProgressMarkup(course)}
+            <div class="course-card-mobile-hint">Deslize para ver o próximo • toque para abrir</div>
           </div>
           ${getMiniCourseCardActionsMarkup(course)}
         </article>
@@ -4654,7 +4760,7 @@
       const title = $("coursesHeadTitle");
       const closeButton = $("closeCourses");
       if (title) {
-        if (currentMiniCourse) {
+        if (currentMiniCourse && currentMiniCourseViewMode === "reading") {
           title.textContent = `${getMiniCourseCurrentStageIndex()}/${getMiniCourseTotalStages()}`;
         } else {
           title.textContent = "Cursos";
@@ -4676,6 +4782,15 @@
         prev.hidden = true;
         next.hidden = true;
         setCourseFooterStatus(miniCoursesLoading ? "Carregando cursos..." : (miniCoursesError || "Escolha um curso para começar."));
+        return;
+      }
+
+      if (currentMiniCourseViewMode !== "reading") {
+        prev.hidden = true;
+        next.hidden = true;
+        setCourseFooterStatus(Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0) > 0
+          ? "Continue de onde voce parou."
+          : "Pronto para iniciar.");
         return;
       }
 
@@ -4741,18 +4856,18 @@
       }
 
       listView.innerHTML = miniCourses.map((course) => {
-        const pagesRead = Number(course?.progress?.pagesRead || 0) || 0;
         const totalPages = Math.max(Number(course?.pageCount || 1) || 1, 1);
         return `
           <div class="course-card" role="button" tabindex="0" data-course-id="${escapeAttr(course.id)}">
             ${buildMiniCourseCover(course)}
             <div class="course-card-body">
-              <h3 class="course-card-title">${escapeText(course.title)}</h3>
               <div class="course-card-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
+              ${getMiniCourseProgressMarkup(course)}
             </div>
             <div class="course-card-mobile-meta">
               <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
-              <div class="course-card-mobile-hint">Toque na capa para iniciar</div>
+              ${getMiniCourseProgressMarkup(course)}
+              <div class="course-card-mobile-hint">Toque na capa para abrir</div>
             </div>
             ${getMiniCourseCardActionsMarkup(course)}
           </div>
@@ -4898,6 +5013,7 @@
       if (!currentMiniCourse) {
         readerView.hidden = true;
         listView.hidden = false;
+        currentMiniCourseViewMode = "preview";
         renderMiniCoursesList();
         return;
       }
@@ -4915,6 +5031,14 @@
       applyMiniCourseReaderTheme();
       listView.hidden = true;
       readerView.hidden = false;
+
+      if (currentMiniCourseViewMode !== "reading") {
+        renderMiniCourseIntro(readerView);
+        readerView.scrollTop = 0;
+        updateMiniCoursesHeader();
+        updateMiniCoursesFooter();
+        return;
+      }
 
       if (quizQuestions.length && currentMiniCourseQuizResult) {
         renderMiniCourseQuizResult(readerView);
@@ -5009,6 +5133,7 @@
       resetMiniCourseQuizState();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
+      currentMiniCourseViewMode = "preview";
       applyMiniCourseReaderTheme();
       renderMiniCoursesList();
       void loadMiniCourses();
@@ -5025,6 +5150,7 @@
       resetMiniCourseQuizState();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
+      currentMiniCourseViewMode = "preview";
       applyMiniCourseReaderTheme();
     }
 
@@ -5086,16 +5212,15 @@
           pageCount: 1,
           pages: [],
           quizQuestions: [],
-          progress: { currentPage: 1, pagesRead: 1 }
+          progress: { currentPage: 1, pagesRead: 0 }
         };
         resetMiniCourseReadGate();
         resetMiniCourseQuizState();
         currentMiniCoursePage = 1;
+        currentMiniCourseViewMode = "preview";
         renderMiniCourseReaderLoading();
-        const token = getMiniToken();
-        const path = token ? `/api/mini/courses/${encodeURIComponent(safeCourseId)}/start` : `/api/mini/courses/${encodeURIComponent(safeCourseId)}`;
-        const response = await apiMini(path, {
-          method: token ? "POST" : "GET"
+        const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}`, {
+          method: "GET"
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -5113,6 +5238,7 @@
         updateMiniCoursesUserCard();
         currentMiniCourse = payload.course || null;
         currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || 1) || 1);
+        currentMiniCourseViewMode = "preview";
         resetMiniCourseQuizState();
         renderMiniCourseReader();
       } catch (error) {
@@ -5120,6 +5246,7 @@
         resetMiniCourseQuizState();
         currentMiniCourse = null;
         currentMiniCoursePage = 1;
+        currentMiniCourseViewMode = "preview";
         setCourseFooterStatus(error instanceof Error ? error.message : "Erro ao abrir o curso.");
         renderMiniCoursesList();
       }
@@ -5393,6 +5520,7 @@
         resetMiniCourseReadGate();
         currentMiniCourse = null;
         currentMiniCoursePage = 1;
+        currentMiniCourseViewMode = "preview";
       }
       await loadMiniCourses();
       setCourseFooterStatus(String(payload?.feedback || "Curso excluído com sucesso."));
@@ -5403,10 +5531,15 @@
         return;
       }
 
+      if (currentMiniCourseViewMode !== "reading") {
+        return;
+      }
+
       const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
       const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
       const previousPage = currentMiniCoursePage;
       const previousProgress = { ...(currentMiniCourse.progress || {}) };
+      const previousCourses = miniCourses.map((course) => ({ ...course, progress: course?.progress ? { ...course.progress } : course?.progress }));
 
       currentMiniCoursePage = safePage;
       currentMiniCourse.progress = {
@@ -5415,6 +5548,10 @@
         pagesRead: Math.max(Number(currentMiniCourse.progress?.pagesRead || 0) || 0, safePage),
         totalPages
       };
+      miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? {
+        ...course,
+        progress: { ...(currentMiniCourse.progress || {}) }
+      } : course);
       renderMiniCourseReader();
 
       if (!getMiniToken()) {
@@ -5445,6 +5582,7 @@
       } catch (error) {
         currentMiniCoursePage = previousPage;
         currentMiniCourse.progress = previousProgress;
+        miniCourses = previousCourses;
         renderMiniCourseReader();
         throw error;
       }
@@ -5637,6 +5775,7 @@
       if (currentMiniCourse) {
         currentMiniCourse = null;
         currentMiniCoursePage = 1;
+        currentMiniCourseViewMode = "preview";
         renderMiniCoursesList();
         return;
       }

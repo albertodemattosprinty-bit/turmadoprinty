@@ -723,30 +723,7 @@ export async function saveMiniCourseQuizResult(userId, courseId, { correctAnswer
 
 export async function startMiniCourse(userId, courseId) {
   await ensureMiniCoursesSchema();
-  const course = await getMiniCourseById(courseId, userId);
-  if (!course) {
-    return null;
-  }
-
-  const totalPages = Math.max(1, Number(course.pageCount || 1) || 1);
-  const result = await query(
-    `
-      insert into mini_course_progress (user_id, course_id, current_page, pages_read, started_at, updated_at)
-      values ($1, $2, 1, 1, now(), now())
-      on conflict (user_id, course_id)
-      do update set
-        current_page = greatest(mini_course_progress.current_page, 1),
-        pages_read = greatest(mini_course_progress.pages_read, 1),
-        updated_at = now()
-      returning user_id, course_id, current_page, pages_read, started_at, completed_at, updated_at
-    `,
-    [userId, courseId]
-  );
-
-  return {
-    ...course,
-    progress: normalizeProgress(result.rows[0], totalPages)
-  };
+  return getMiniCourseById(courseId, userId);
 }
 
 export async function updateMiniCourseProgress(userId, courseId, nextPage) {
@@ -758,6 +735,21 @@ export async function updateMiniCourseProgress(userId, courseId, nextPage) {
 
   const totalPages = Math.max(1, Number(course.pageCount || 1) || 1);
   const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
+  const hasStoredProgress = Boolean(course.progress?.startedAt) || Math.max(0, Number(course.progress?.pagesRead || 0) || 0) >= 2;
+
+  if (!hasStoredProgress && safePage < 2) {
+    return {
+      ...course,
+      progress: {
+        ...course.progress,
+        currentPage: 1,
+        pagesRead: 0,
+        totalPages,
+        completed: false
+      }
+    };
+  }
+
   const result = await query(
     `
       insert into mini_course_progress (user_id, course_id, current_page, pages_read, started_at, updated_at, completed_at)
