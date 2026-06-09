@@ -419,6 +419,13 @@
     }
 
     .immersive { position: fixed; inset: 0; background: #fff; z-index: 20; transform: translateY(100%); opacity: 0; pointer-events: none; transition: transform .26s ease, opacity .2s ease; display: grid; grid-template-rows: auto 70vh auto 10vh; padding: 8px 12px 8px; }
+    .immersive.media-modal {
+      display: flex;
+      flex-direction: column;
+      grid-template-rows: none;
+      padding: 16px 14px 12px;
+      gap: 8px;
+    }
     .immersive.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
     .modal-head { text-align: center; }
     .modal-head h2 { margin: 0; font-size: 27px; font-family: "Open Sans", sans-serif; font-weight: 800; background: linear-gradient(145deg, #5ba9ff, #2f57d7); -webkit-background-clip: text; background-clip: text; color: transparent; }
