@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mini</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800&family=Lora:wght@700;800&family=Merriweather:wght@700&family=Nunito+Sans:wght@700;800&family=Open+Sans:wght@700;800&family=Source+Serif+4:wght@700;800&display=swap');
     :root {
       color-scheme: only light;
       --text: #1a1a1a;
@@ -639,19 +639,38 @@
       background: rgba(255,255,255,.08);
     }
     .courses-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 55;
-      background:
+      --course-modal-bg:
         radial-gradient(circle at 18% 18%, rgba(255, 244, 160, .24), transparent 30%),
         radial-gradient(circle at 82% 82%, rgba(255, 165, 190, .22), transparent 28%),
         linear-gradient(160deg, #71b6ff 0%, #6f85ff 34%, #ffb7d5 67%, #ffe790 100%);
-      color: #fff;
+      --course-modal-text: #fff;
+      --course-ui-font: "Open Sans", sans-serif;
+      --course-body-font: "Open Sans", sans-serif;
+      --course-reader-card-bg: rgba(255,255,255,.16);
+      --course-reader-card-border: rgba(255,255,255,.18);
+      --course-reader-card-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 24px 60px rgba(53, 58, 123, .24);
+      --course-ui-surface: rgba(255,255,255,.18);
+      --course-ui-text-shadow: 0 6px 24px rgba(0,0,0,.16);
+      --course-reader-text-shadow: none;
+      --course-title-color: #fff;
+      --course-body-color: rgba(255,255,255,.96);
+      --course-muted-color: rgba(255,255,255,.82);
+      --course-row-bg: rgba(255,255,255,.14);
+      --course-row-strong-color: #fff;
+      --course-quiz-option-bg: rgba(255,255,255,.14);
+      --course-quiz-repeat-bg: rgba(255,255,255,.16);
+      --course-quiz-repeat-color: #fff;
+      --course-lock-text-shadow: 0 10px 22px rgba(0, 0, 0, .28);
+      position: fixed;
+      inset: 0;
+      z-index: 55;
+      background: var(--course-modal-bg);
+      color: var(--course-modal-text);
       opacity: 0;
       pointer-events: none;
       transform: scale(.985);
       transition: opacity .2s ease, transform .2s ease;
-      font-family: "Open Sans", sans-serif;
+      font-family: var(--course-ui-font);
     }
     .courses-modal.show {
       opacity: 1;
@@ -677,7 +696,7 @@
       font-size: clamp(24px, 4vw, 34px);
       font-weight: 800;
       letter-spacing: .02em;
-      text-shadow: 0 6px 24px rgba(0,0,0,.16);
+      text-shadow: var(--course-ui-text-shadow);
     }
     .courses-head-actions {
       display: flex;
@@ -688,8 +707,8 @@
     .courses-nav-btn {
       border: 0;
       border-radius: 18px;
-      background: rgba(255,255,255,.18);
-      color: #fff;
+      background: var(--course-ui-surface);
+      color: var(--course-modal-text);
       min-width: 52px;
       height: 52px;
       display: inline-flex;
@@ -697,7 +716,7 @@
       justify-content: center;
       backdrop-filter: blur(10px);
       box-shadow: 0 14px 30px rgba(0,0,0,.12);
-      font-family: "Open Sans", sans-serif;
+      font-family: var(--course-ui-font);
       font-weight: 800;
       cursor: pointer;
     }
@@ -716,9 +735,10 @@
       width: 100%;
       height: 100%;
       border-radius: 34px;
-      background: rgba(255,255,255,.16);
+      background: var(--course-reader-card-bg);
+      border: 1px solid var(--course-reader-card-border);
       backdrop-filter: blur(18px);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 24px 60px rgba(53, 58, 123, .24);
+      box-shadow: var(--course-reader-card-shadow);
       overflow: hidden;
       position: relative;
     }
@@ -905,7 +925,9 @@
       margin: 0 auto;
       display: grid;
       gap: 18px;
-      color: #fff;
+      color: var(--course-body-color);
+      font-family: var(--course-body-font);
+      text-shadow: var(--course-reader-text-shadow);
       transition: filter .5s ease, opacity .5s ease;
     }
     .course-page-kicker {
@@ -922,13 +944,14 @@
       line-height: 1.08;
       font-weight: 800;
       min-height: 44px;
+      color: var(--course-title-color);
     }
     .course-page-paragraph {
       margin: 0;
       font-size: clamp(18px, 2vw, 22px);
       line-height: 1.75;
       font-weight: 700;
-      color: rgba(255,255,255,.96);
+      color: var(--course-body-color);
       min-height: 2.2em;
     }
     .course-page-bullets {
@@ -939,6 +962,7 @@
       font-size: 18px;
       line-height: 1.65;
       font-weight: 700;
+      color: var(--course-body-color);
     }
     .course-page-table {
       display: grid;
@@ -950,16 +974,18 @@
       gap: 12px;
       padding: 16px 18px;
       border-radius: 20px;
-      background: rgba(255,255,255,.14);
+      background: var(--course-row-bg);
     }
     .course-page-row strong {
       font-size: 16px;
       font-weight: 800;
+      color: var(--course-row-strong-color);
     }
     .course-page-row span {
       font-size: 16px;
       line-height: 1.55;
       font-weight: 700;
+      color: var(--course-body-color);
     }
     .course-page-media {
       display: grid;
@@ -980,20 +1006,24 @@
       margin: 0 auto;
       display: grid;
       gap: 18px;
-      color: #fff;
+      color: var(--course-body-color);
+      font-family: var(--course-body-font);
+      text-shadow: var(--course-reader-text-shadow);
     }
     .course-quiz-progress {
       font-size: 13px;
       text-transform: uppercase;
       letter-spacing: .14em;
-      opacity: .78;
+      opacity: .88;
       font-weight: 800;
+      color: var(--course-muted-color);
     }
     .course-quiz-question {
       margin: 0;
       font-size: clamp(26px, 4vw, 38px);
       line-height: 1.18;
       font-weight: 800;
+      color: var(--course-title-color);
     }
     .course-quiz-options {
       display: grid;
@@ -1002,11 +1032,11 @@
     .course-quiz-option {
       border: 0;
       border-radius: 20px;
-      background: rgba(255,255,255,.14);
-      color: #fff;
+      background: var(--course-quiz-option-bg);
+      color: var(--course-body-color);
       text-align: left;
       padding: 18px 20px;
-      font-family: "Open Sans", sans-serif;
+      font-family: var(--course-ui-font);
       font-size: 18px;
       line-height: 1.45;
       font-weight: 800;
@@ -1031,7 +1061,7 @@
       font-size: 16px;
       line-height: 1.6;
       font-weight: 700;
-      color: rgba(255,255,255,.92);
+      color: var(--course-body-color);
     }
     .course-quiz-result {
       min-height: 100%;
@@ -1040,29 +1070,33 @@
       justify-items: center;
       gap: 12px;
       text-align: center;
-      color: #fff;
+      color: var(--course-body-color);
       padding: 24px 12px;
+      font-family: var(--course-body-font);
+      text-shadow: var(--course-reader-text-shadow);
     }
     .course-quiz-result h1 {
       margin: 0;
       font-size: clamp(34px, 5vw, 48px);
       font-weight: 800;
       line-height: 1.06;
+      color: var(--course-title-color);
     }
     .course-quiz-result h2 {
       margin: 0;
       font-size: clamp(24px, 3.5vw, 34px);
       font-weight: 800;
       line-height: 1.12;
+      color: var(--course-title-color);
     }
     .course-quiz-repeat {
       margin-top: 10px;
       border: 0;
       border-radius: 18px;
       padding: 14px 22px;
-      background: rgba(255,255,255,.16);
-      color: #fff;
-      font-family: "Open Sans", sans-serif;
+      background: var(--course-quiz-repeat-bg);
+      color: var(--course-quiz-repeat-color);
+      font-family: var(--course-ui-font);
       font-size: 16px;
       font-weight: 800;
       cursor: pointer;
@@ -1120,8 +1154,8 @@
       display: grid;
       gap: 6px;
       justify-items: center;
-      color: #fff;
-      text-shadow: 0 10px 22px rgba(0, 0, 0, .28);
+      color: var(--course-modal-text);
+      text-shadow: var(--course-lock-text-shadow);
     }
     .course-read-lock-title {
       font-size: clamp(24px, 3vw, 34px);
@@ -1148,6 +1182,69 @@
       background: rgba(255,255,255,.10);
       display: grid;
       gap: 6px;
+    }
+    .courses-modal.is-reading[data-reader-theme="1"] {
+      --course-modal-bg: #F7F8FA;
+      --course-modal-text: #253044;
+      --course-ui-font: "Inter", sans-serif;
+      --course-body-font: "Lora", serif;
+      --course-reader-card-bg: #FFFFFF;
+      --course-reader-card-border: rgba(20, 40, 80, 0.08);
+      --course-reader-card-shadow: 0 24px 60px rgba(20, 40, 80, .08);
+      --course-ui-surface: rgba(29, 78, 216, .08);
+      --course-ui-text-shadow: none;
+      --course-reader-text-shadow: none;
+      --course-title-color: #1D4ED8;
+      --course-body-color: #253044;
+      --course-muted-color: rgba(37, 48, 68, .68);
+      --course-row-bg: rgba(29, 78, 216, .05);
+      --course-row-strong-color: #1D4ED8;
+      --course-quiz-option-bg: rgba(29, 78, 216, .06);
+      --course-quiz-repeat-bg: rgba(29, 78, 216, .10);
+      --course-quiz-repeat-color: #1D4ED8;
+      --course-lock-text-shadow: none;
+    }
+    .courses-modal.is-reading[data-reader-theme="2"] {
+      --course-modal-bg: #FFF4E2;
+      --course-modal-text: #4A3324;
+      --course-ui-font: "Nunito Sans", "Inter", sans-serif;
+      --course-body-font: "Merriweather", serif;
+      --course-reader-card-bg: #FFF9EF;
+      --course-reader-card-border: rgba(138, 79, 29, 0.10);
+      --course-reader-card-shadow: 0 24px 60px rgba(138, 79, 29, .10);
+      --course-ui-surface: rgba(217, 144, 47, .12);
+      --course-ui-text-shadow: none;
+      --course-reader-text-shadow: 0 1px 0 rgba(255,255,255,0.55);
+      --course-title-color: #8A4F1D;
+      --course-body-color: #4A3324;
+      --course-muted-color: rgba(74, 51, 36, .72);
+      --course-row-bg: rgba(217, 144, 47, .08);
+      --course-row-strong-color: #D9902F;
+      --course-quiz-option-bg: rgba(217, 144, 47, .10);
+      --course-quiz-repeat-bg: rgba(217, 144, 47, .14);
+      --course-quiz-repeat-color: #8A4F1D;
+      --course-lock-text-shadow: 0 1px 0 rgba(255,255,255,0.55);
+    }
+    .courses-modal.is-reading[data-reader-theme="3"] {
+      --course-modal-bg: linear-gradient(135deg, #101A33 0%, #1B2450 45%, #322044 100%);
+      --course-modal-text: #F5F7FF;
+      --course-ui-font: "Inter", sans-serif;
+      --course-body-font: "Source Serif 4", serif;
+      --course-reader-card-bg: rgba(255,255,255,.08);
+      --course-reader-card-border: rgba(255,255,255,.08);
+      --course-reader-card-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 24px 60px rgba(0, 0, 0, .26);
+      --course-ui-surface: rgba(255,255,255,.12);
+      --course-ui-text-shadow: 0 6px 24px rgba(0,0,0,.24);
+      --course-reader-text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+      --course-title-color: #F8C84E;
+      --course-body-color: #F5F7FF;
+      --course-muted-color: #C9D3EA;
+      --course-row-bg: rgba(255,255,255,.06);
+      --course-row-strong-color: #F8C84E;
+      --course-quiz-option-bg: rgba(255,255,255,.08);
+      --course-quiz-repeat-bg: rgba(248, 200, 78, .16);
+      --course-quiz-repeat-color: #F8C84E;
+      --course-lock-text-shadow: 0 1px 2px rgba(0,0,0,0.35);
     }
     .courses-user-label {
       font-size: 13px;
@@ -2096,6 +2193,7 @@
     let currentMiniCourseQuizAnswers = [];
     let currentMiniCourseQuizResult = null;
     let currentMiniCourseQuizSubmitted = false;
+    let miniCourseReaderThemeIndex = 0;
 
     const $ = (id) => document.getElementById(id);
     const pageSize = 6;
@@ -2103,6 +2201,12 @@
     const miniSessionKey = "turma_do_printy_token";
     const miniPlannerDraftKey = "turma_do_printy_mini_planner_draft";
     const miniCourseDownloadsKey = "turma_do_printy_mini_course_downloads";
+    const miniCourseReaderThemes = [
+      { id: 0, name: "Tema principal" },
+      { id: 1, name: "Papel de Aula" },
+      { id: 2, name: "Creme Devocional" },
+      { id: 3, name: "Noite MINI" }
+    ];
 
     function iconUrlById(id) {
       const safe = Math.max(1, Math.min(48, Number(id) || 1));
@@ -2150,6 +2254,40 @@
       currentMiniCourseQuizAnswers = [];
       currentMiniCourseQuizResult = null;
       currentMiniCourseQuizSubmitted = false;
+    }
+    function isMiniInteractiveField(target) {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      const tagName = String(target.tagName || "").toUpperCase();
+      return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT" || target.isContentEditable;
+    }
+    function applyMiniCourseReaderTheme() {
+      const modal = $("coursesModal");
+      if (!modal) {
+        return;
+      }
+      const safeThemeIndex = Math.max(0, Math.min(miniCourseReaderThemes.length - 1, Number(miniCourseReaderThemeIndex || 0) || 0));
+      modal.dataset.readerTheme = String(safeThemeIndex);
+      modal.classList.toggle("is-reading", Boolean(currentMiniCourse));
+    }
+    function cycleMiniCourseReaderTheme() {
+      miniCourseReaderThemeIndex = (Number(miniCourseReaderThemeIndex || 0) + 1) % miniCourseReaderThemes.length;
+      applyMiniCourseReaderTheme();
+    }
+    function handleMiniCourseReaderHotkeys(event) {
+      if (!currentMiniCourse || isMiniCoursesMobileView() || isMiniInteractiveField(event.target)) {
+        return;
+      }
+      const coursesModal = $("coursesModal");
+      if (!coursesModal || !coursesModal.classList.contains("show")) {
+        return;
+      }
+      if (event.key !== "3") {
+        return;
+      }
+      event.preventDefault();
+      cycleMiniCourseReaderTheme();
     }
     function getMiniCourseQuizQuestions() {
       return Array.isArray(currentMiniCourse?.quizQuestions) ? currentMiniCourse.quizQuestions : [];
@@ -3500,6 +3638,7 @@
       }
 
       clearMiniCourseAnimationTimers();
+      applyMiniCourseReaderTheme();
       readerView.hidden = true;
       listView.hidden = false;
 
@@ -3707,6 +3846,7 @@
 
       clearMiniCourseAnimationTimers();
       readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
+      applyMiniCourseReaderTheme();
       listView.hidden = true;
       readerView.hidden = false;
 
@@ -3803,6 +3943,7 @@
       resetMiniCourseQuizState();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
+      applyMiniCourseReaderTheme();
       renderMiniCoursesList();
       void loadMiniCourses();
     }
@@ -3818,6 +3959,7 @@
       resetMiniCourseQuizState();
       currentMiniCourse = null;
       currentMiniCoursePage = 1;
+      applyMiniCourseReaderTheme();
     }
 
     function openMiniCoursesUserModal() {
@@ -4287,6 +4429,7 @@
     $("courseNext").onclick = async () => {
       await goToMiniCoursePage(1);
     };
+    document.addEventListener("keydown", handleMiniCourseReaderHotkeys);
 
     $("openAulas").onclick=()=>{ $("aulasModal").classList.add("show"); renderSelected(); };
     $("closeAulas").onclick=()=>$("aulasModal").classList.remove("show");

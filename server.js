@@ -3126,6 +3126,73 @@ function buildMiniCourseQuizSourceText(course) {
   ].filter(Boolean).join("\n");
 }
 
+function normalizeMiniQuizText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isMiniQuizOptionSuspicious(option, averageLength) {
+  const normalized = normalizeMiniQuizText(option);
+  const length = normalized.length;
+  if (!normalized) {
+    return true;
+  }
+  if (
+    normalized.includes("todas as alternativas anteriores") ||
+    normalized.includes("nenhuma das alternativas") ||
+    normalized.includes("apenas a alternativa") ||
+    normalized.includes("somente a alternativa")
+  ) {
+    return true;
+  }
+  if (length > (averageLength * 1.75) && (length - averageLength) > 28) {
+    return true;
+  }
+  return false;
+}
+
+function miniCourseQuizQuestionNeedsRetry(question) {
+  if (!question || !Array.isArray(question.options) || question.options.length !== 4) {
+    return true;
+  }
+
+  const options = question.options
+    .map((option) => String(option || "").trim())
+    .filter(Boolean);
+  if (options.length !== 4) {
+    return true;
+  }
+
+  const normalizedOptions = options.map((option) => normalizeMiniQuizText(option));
+  if (new Set(normalizedOptions).size !== 4) {
+    return true;
+  }
+
+  const averageLength = normalizedOptions.reduce((total, item) => total + item.length, 0) / normalizedOptions.length;
+  if (normalizedOptions.some((option) => isMiniQuizOptionSuspicious(option, averageLength))) {
+    return true;
+  }
+
+  return false;
+}
+
+function miniCourseQuizNeedsRetry(parsed) {
+  const questions = Array.isArray(parsed?.questions) ? parsed.questions : [];
+  if (questions.length !== 10) {
+    return true;
+  }
+  if (questions.some((question) => miniCourseQuizQuestionNeedsRetry(question))) {
+    return true;
+  }
+
+  const correctIndexes = questions.map((question) => Math.max(0, Math.min(3, Number(question?.correctIndex || 0) || 0)));
+  return new Set(correctIndexes).size < 3;
+}
+
 async function handleMiniCourseQuizGenerateRequest(request, response, courseId) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -3149,49 +3216,72 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
     }
 
     const quizModel = "gpt-5.1";
-    const requestPayload = {
-      model: quizModel,
-      temperature: 0.35,
-      max_completion_tokens: 2600,
-      response_format: {
-        type: "json_schema",
-        json_schema: buildMiniCourseQuizSchema(10)
-      },
-      messages: [
-        {
-          role: "system",
-          content: buildMiniSystemPrompt({
-            modeKey: "project",
-            sharedContext: await getContextPrompt(),
-            plannerContext: MINI_MINISTRY_CONTEXT,
-            theme: course.title,
-            extraInstructions: [
-              "Crie um quiz de 10 perguntas para professores com base no curso.",
-              "Cada pergunta deve ter exatamente 4 alternativas.",
-              "Apenas 1 alternativa pode estar correta e 3 devem estar erradas, mas plausiveis.",
-              "As perguntas devem se basear no conteudo real do curso.",
-              "Escreva em portugues do Brasil.",
-              "Nao repita perguntas.",
-              "Responda apenas em JSON estruturado."
-            ].join(" ")
-          })
+    const sharedContext = await getContextPrompt();
+    const quizSourceText = buildMiniCourseQuizSourceText(course);
+    let parsed = null;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const requestPayload = {
+        model: quizModel,
+        temperature: 0.22,
+        max_completion_tokens: 2600,
+        response_format: {
+          type: "json_schema",
+          json_schema: buildMiniCourseQuizSchema(10)
         },
-        {
-          role: "user",
-          content: [
-            "Crie 10 perguntas de multipla escolha com base no curso abaixo.",
-            buildMiniCourseQuizSourceText(course)
-          ].join("\n\n")
-        }
-      ]
-    };
-    if (supportsReasoningEffortForModel(quizModel)) {
-      requestPayload.reasoning_effort = "none";
+        messages: [
+          {
+            role: "system",
+            content: buildMiniSystemPrompt({
+              modeKey: "project",
+              sharedContext,
+              plannerContext: MINI_MINISTRY_CONTEXT,
+              theme: course.title,
+              extraInstructions: [
+                "Crie um quiz de 10 perguntas para professores com base no curso.",
+                "Cada pergunta deve ter exatamente 4 alternativas.",
+                "Apenas 1 alternativa pode estar correta e 3 devem estar erradas, mas plausiveis.",
+                "As perguntas devem se basear no conteudo real do curso.",
+                "As 4 alternativas precisam ser parecidas em tom, tamanho e nivel de detalhe.",
+                "A resposta correta nao pode destoar das outras em comprimento, linguagem, profundidade, espiritualidade ou especificidade.",
+                "As alternativas erradas devem parecer possiveis e errar por nuance, ordem, enfase ou aplicacao, nunca por absurdo.",
+                "Evite opcoes obviamente longas, moralistas, genericas demais ou com cara de resumo final.",
+                "Distribua a resposta correta entre as quatro posicoes ao longo do quiz.",
+                "Escreva em portugues do Brasil.",
+                "Nao repita perguntas.",
+                "Responda apenas em JSON estruturado."
+              ].join(" ")
+            })
+          },
+          {
+            role: "user",
+            content: [
+              "Crie 10 perguntas de multipla escolha com base no curso abaixo.",
+              "Cada pergunta deve exigir atencao real para acertar.",
+              "As 4 alternativas devem ficar equilibradas, sem uma opcao gritar que e a correta.",
+              attempt > 1 ? "Refaca com mais equilibrio entre as alternativas: elas precisam parecer igualmente plausiveis a primeira vista." : "",
+              quizSourceText
+            ].filter(Boolean).join("\n\n")
+          }
+        ]
+      };
+      if (supportsReasoningEffortForModel(quizModel)) {
+        requestPayload.reasoning_effort = "none";
+      }
+
+      const completion = await createChatCompletion(apiKey, requestPayload);
+      const raw = extractChatCompletionText(completion);
+      const candidate = parseStructuredJsonText(raw);
+      if (!miniCourseQuizNeedsRetry(candidate)) {
+        parsed = candidate;
+        break;
+      }
     }
 
-    const completion = await createChatCompletion(apiKey, requestPayload);
-    const raw = extractChatCompletionText(completion);
-    const parsed = parseStructuredJsonText(raw);
+    if (!parsed) {
+      sendJson(response, 422, { error: "Nao foi possivel montar um quiz equilibrado para este curso." });
+      return;
+    }
+
     const updatedCourse = await updateMiniCourseQuiz(courseId, Array.isArray(parsed?.questions) ? parsed.questions : []);
     if (!updatedCourse || !updatedCourse.hasQuiz) {
       sendJson(response, 422, { error: "Nao foi possivel montar o quiz do curso." });
