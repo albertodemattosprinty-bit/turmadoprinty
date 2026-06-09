@@ -3422,7 +3422,7 @@
     }
     function getMiniCoursePageRequiredMs(course, page) {
       const totalChars = getMiniCoursePageTimingText(course, page).length;
-      const requiredSeconds = Math.max(1, Math.ceil(totalChars / 15));
+      const requiredSeconds = Math.max(1, Math.ceil(totalChars / 30));
       return requiredSeconds * 1000;
     }
     function syncMiniCourseReadGate(page) {
@@ -5620,12 +5620,14 @@
 
       const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
       const targetPage = Math.max(1, Math.min(totalPages, currentMiniCoursePage + direction));
+      const pagesRead = Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0);
+      const targetPageAlreadyUnlocked = targetPage <= pagesRead;
 
       if (direction < 0 && targetPage === currentMiniCoursePage) {
         return;
       }
 
-      if (direction > 0) {
+      if (direction > 0 && !targetPageAlreadyUnlocked) {
         const remainingMs = getMiniCourseRemainingReadMs();
         if (remainingMs > 0) {
           flashMiniCourseReadGate(remainingMs);
