@@ -449,6 +449,13 @@
       opacity: .76;
       margin-top: 4px;
     }
+    .media-imagegen-status {
+      min-height: 20px;
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 700;
+      color: rgba(37, 48, 68, .78);
+    }
     .media-empty-add-shell {
       min-height: 100%;
       display: grid;
@@ -2468,6 +2475,25 @@
     </div>
   </section>
 
+  <section id="mediaImageGenModal" class="mini-plans-modal" aria-hidden="true">
+    <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="mediaImageGenTitle">
+      <div class="mini-plans-head">
+        <h3 id="mediaImageGenTitle">Gerar capa com OpenAI</h3>
+        <button id="closeMediaImageGen" class="round-action close" type="button" aria-label="Fechar gerador de capa">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div class="section-muted">Escolha o modelo de imagem da OpenAI e o álbum que servirá de base. A nova capa gerada será salva no R2.</div>
+      <div class="media-admin-hint">Atalho do admin: com o Midia aberto, pressione <strong>X</strong>.</div>
+      <label class="course-admin-label" for="mediaImageModelSelect">Modelo de imagem</label>
+      <select id="mediaImageModelSelect" class="course-admin-input"></select>
+      <label class="course-admin-label" for="mediaImageAlbumSelect">Álbum</label>
+      <select id="mediaImageAlbumSelect" class="course-admin-input"></select>
+      <button id="submitMediaImageGen" class="ai-primary course-admin-submit" type="button">Gerar nova capa</button>
+      <div id="mediaImageGenStatus" class="media-imagegen-status"></div>
+    </div>
+  </section>
+
   <section id="aulasModal" class="immersive">
     <header class="modal-head"><h2>Planejar Aula</h2></header>
     <div class="deck"><div><div id="selectedRows" class="rows"></div><div class="pager"><button id="selPrev" class="pill-btn">&#8249;</button><span id="selPage">1 / 1</span><button id="selNext" class="pill-btn">&#8250;</button></div></div><div id="timeline" class="timeline"></div></div>
@@ -2750,6 +2776,8 @@
     const mediaTrackDurationLoads = new Set();
     let mediaPendingInsertAlbumId = "";
     let mediaPendingInsertOrder = 0;
+    let mediaImageModels = [];
+    let mediaImageDefaultModel = "gpt-image-2";
     const mediaPreviewState = {
       key: "",
       song: null,
@@ -2815,6 +2843,9 @@
     function getMediaPlusSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/></svg>`;
     }
+    function getMediaSparkSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zm7 11 1 2.7L23 18l-3 1.3L19 22l-1.1-2.7L15 18l2.9-1.3zM5 15l.9 2.3L8 18l-2.1.7L5 21l-.9-2.3L2 18l2.1-.7z"/></svg>`;
+    }
     function buildMediaTrackKey(scopeId, songId) {
       return `${String(scopeId || "songs")}::${String(songId || "track")}`;
     }
@@ -2837,6 +2868,29 @@
       const modal = $("mediaModal");
       if (modal) {
         modal.classList.toggle("is-editing", Boolean(mediaAlbumEditMode));
+      }
+    }
+    function renderMediaImageModelOptions() {
+      const select = $("mediaImageModelSelect");
+      if (!select) {
+        return;
+      }
+      const models = mediaImageModels.length ? mediaImageModels : [{ id: mediaImageDefaultModel, label: mediaImageDefaultModel.toUpperCase() }];
+      const previousValue = String(select.value || mediaImageDefaultModel).trim();
+      select.innerHTML = models.map((model) => `<option value="${escapeAttr(model.id)}">${escapeText(model.label || model.id)}</option>`).join("");
+      select.value = models.some((model) => model.id === previousValue) ? previousValue : (mediaImageDefaultModel || models[0]?.id || "gpt-image-2");
+    }
+    function renderMediaImageAlbumOptions() {
+      const select = $("mediaImageAlbumSelect");
+      if (!select) {
+        return;
+      }
+      const albums = getMediaAlbumsLibrary();
+      select.innerHTML = albums.length
+        ? albums.map((album) => `<option value="${escapeAttr(album.id)}">${escapeText(album.title)}</option>`).join("")
+        : `<option value="">Sem albums</option>`;
+      if (mediaActiveAlbumId && albums.some((album) => album.id === mediaActiveAlbumId)) {
+        select.value = mediaActiveAlbumId;
       }
     }
     function getMediaTrackSourceKey(song, scopeId = "songs") {
@@ -3155,6 +3209,7 @@
         }
         mediaLibraryAlbums = Array.isArray(payload?.library?.albums) ? payload.library.albums : [];
         mediaLibraryLoaded = true;
+        renderMediaImageAlbumOptions();
         if (Object.prototype.hasOwnProperty.call(payload || {}, "user")) {
           miniCourseUser = payload.user || null;
           isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
@@ -3268,6 +3323,86 @@
         if (button) button.disabled = false;
       }
     }
+    async function loadMediaImageModels() {
+      const response = await apiMini("/api/mini/media/image-models");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Nao foi possivel carregar os modelos de imagem.");
+      }
+      mediaImageModels = Array.isArray(payload?.models) ? payload.models : [];
+      mediaImageDefaultModel = String(payload?.defaultModel || mediaImageDefaultModel || "gpt-image-2").trim() || "gpt-image-2";
+      renderMediaImageModelOptions();
+      renderMediaImageAlbumOptions();
+    }
+    async function openMediaImageGenModal() {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      $("mediaImageGenStatus").textContent = "";
+      renderMediaImageModelOptions();
+      renderMediaImageAlbumOptions();
+      $("mediaImageGenModal").classList.add("show");
+      $("mediaImageGenModal").setAttribute("aria-hidden", "false");
+      try {
+        await loadMediaImageModels();
+      } catch (error) {
+        $("mediaImageGenStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar os modelos de imagem.";
+      }
+    }
+    function closeMediaImageGenModal() {
+      $("mediaImageGenModal").classList.remove("show");
+      $("mediaImageGenModal").setAttribute("aria-hidden", "true");
+    }
+    async function submitMediaImageGeneration() {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      const model = String($("mediaImageModelSelect")?.value || mediaImageDefaultModel || "gpt-image-2").trim();
+      const albumId = String($("mediaImageAlbumSelect")?.value || "").trim();
+      const status = $("mediaImageGenStatus");
+      const button = $("submitMediaImageGen");
+      if (!albumId) {
+        if (status) {
+          status.textContent = "Escolha um album para gerar a nova capa.";
+        }
+        return;
+      }
+      if (button) {
+        button.disabled = true;
+      }
+      if (status) {
+        status.textContent = "Gerando nova capa com a OpenAI...";
+      }
+      try {
+        const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(albumId)}/cover/generate`, {
+          method: "POST",
+          body: JSON.stringify({ model })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel gerar a capa.");
+        }
+        if (payload?.library?.albums) {
+          mediaLibraryAlbums = payload.library.albums;
+          mediaActiveTab = "albums";
+          mediaActiveAlbumId = albumId;
+          renderMediaImageAlbumOptions();
+          renderMediaModal();
+        }
+        if (status) {
+          status.textContent = String(payload?.feedback || "Nova capa gerada com sucesso.");
+        }
+        setMediaStatus(String(payload?.feedback || "Nova capa gerada com sucesso."));
+      } catch (error) {
+        if (status) {
+          status.textContent = error instanceof Error ? error.message : "Falha ao gerar a capa.";
+        }
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
     function openMediaTrackInsertPicker(albumId, order = 0) {
       if (!isMiniMediaAdmin()) {
         return;
@@ -3378,10 +3513,19 @@
       if (!modal || !modal.classList.contains("show")) {
         return;
       }
+      const imageGenModal = $("mediaImageGenModal");
+      if (imageGenModal?.classList.contains("show")) {
+        return;
+      }
       const key = String(event.key || "").toLowerCase();
       if (key === "u") {
         event.preventDefault();
         openMediaUploadModal();
+        return;
+      }
+      if (key === "x") {
+        event.preventDefault();
+        void openMediaImageGenModal();
         return;
       }
       if (key === "e" && mediaActiveAlbumId) {
@@ -3572,6 +3716,7 @@
       mediaAlbumEditMode = false;
       applyMediaEditModeUi();
       closeMediaUploadModal();
+      closeMediaImageGenModal();
       $("mediaModal").classList.remove("show");
       $("mediaModal").setAttribute("aria-hidden", "true");
     }
@@ -5994,6 +6139,12 @@
     };
     $("closeMediaUpload").onclick = () => {
       closeMediaUploadModal();
+    };
+    $("closeMediaImageGen").onclick = () => {
+      closeMediaImageGenModal();
+    };
+    $("submitMediaImageGen").onclick = async () => {
+      await submitMediaImageGeneration();
     };
     $("submitMediaUpload").onclick = async () => {
       await submitMediaUpload();

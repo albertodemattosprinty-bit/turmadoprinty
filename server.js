@@ -76,6 +76,12 @@ const MINI_COURSE_COVERS_PREFIX = "mini/courses";
 const MINI_MEDIA_LIBRARY_KEY = "mini/media/library.json";
 const MINI_MEDIA_ALBUMS_PREFIX = "mini/media/albums";
 const MINI_MEDIA_COVER_SYNC_PREFIX = "Capas/";
+const MINI_MEDIA_IMAGE_MODELS = [
+  { id: "gpt-image-2", label: "GPT Image 2" },
+  { id: "gpt-image-1.5", label: "GPT Image 1.5" },
+  { id: "gpt-image-1", label: "GPT Image 1" },
+  { id: "gpt-image-1-mini", label: "GPT Image 1 Mini" }
+];
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
@@ -217,6 +223,28 @@ async function readR2ObjectText(key) {
     }
     throw error;
   }
+}
+
+async function readR2ObjectBuffer(key) {
+  const client = getR2Client();
+
+  const result = await client.send(new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key
+  }));
+  const body = result?.Body;
+  if (!body) {
+    return Buffer.alloc(0);
+  }
+  if (typeof body.transformToByteArray === "function") {
+    return Buffer.from(await body.transformToByteArray());
+  }
+
+  const chunks = [];
+  for await (const chunk of body) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
 }
 
 function sanitizeMiniMediaTitle(value, fallback = "Sem titulo") {
@@ -429,7 +457,7 @@ async function syncMiniMediaLibraryFromCoverFolder(library) {
       const now = new Date().toISOString();
 
       if (existing) {
-        if (!existing.coverKey) {
+        if (String(existing.coverKey || "").trim() !== key || String(existing.coverContentType || "").trim() !== "image/avif") {
           existing.coverKey = key;
           existing.coverContentType = "image/avif";
           existing.updatedAt = now;
@@ -3304,6 +3332,17 @@ async function handleMiniMediaLibraryRequest(request, response) {
   }
 }
 
+async function handleMiniMediaImageModelsRequest(request, response) {
+  const user = await getOptionalAuthUser(request);
+  sendJson(response, 200, {
+    ok: true,
+    user: user ? sanitizeUser(user) : null,
+    models: MINI_MEDIA_IMAGE_MODELS,
+    defaultModel: MINI_MEDIA_IMAGE_MODELS[0]?.id || "gpt-image-2",
+    hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY)
+  });
+}
+
 async function handleMiniMediaAlbumCreateRequest(request, response) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -3596,6 +3635,118 @@ async function handleMiniMediaTrackDeleteRequest(request, response, albumId, tra
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel excluir a faixa."
+    });
+  }
+}
+
+async function handleMiniMediaAlbumCoverGenerateRequest(request, response, albumId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const requestedModel = String(body?.model || "").trim();
+  const model = MINI_MEDIA_IMAGE_MODELS.some((item) => item.id === requestedModel)
+    ? requestedModel
+    : (MINI_MEDIA_IMAGE_MODELS[0]?.id || "gpt-image-2");
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+    if (!album.coverKey) {
+      sendJson(response, 400, { error: "Este album ainda nao possui capa base para replicar." });
+      return;
+    }
+
+    const sourceBuffer = await readR2ObjectBuffer(album.coverKey);
+    if (!sourceBuffer.length) {
+      sendJson(response, 400, { error: "Nao foi possivel carregar a capa atual do album." });
+      return;
+    }
+
+    const coverType = String(album.coverContentType || getMiniMediaContentType(album.coverKey, "image/avif")).trim() || "image/avif";
+    const formData = new FormData();
+    formData.append("model", model);
+    formData.append(
+      "prompt",
+      [
+        `Use a imagem enviada como referencia principal do album "${album.title}".`,
+        "Recrie uma nova imagem com fidelidade maxima ao enquadramento, personagens, objetos, cores, luz, fundo, estilo artistico e atmosfera.",
+        "Nao invente elementos novos, nao mude o tema e nao simplifique a composicao.",
+        "Entregue uma nova versao visualmente muito proxima da capa original, mais limpa e nítida."
+      ].join(" ")
+    );
+    formData.append("size", "1024x1536");
+    formData.append("quality", "high");
+    formData.append("image[]", new Blob([sourceBuffer], { type: coverType }), path.posix.basename(album.coverKey) || "cover.png");
+
+    const openAiResponse = await fetch("https://api.openai.com/v1/images/edits", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: formData
+    });
+
+    const payload = await openAiResponse.json().catch(() => ({}));
+    if (!openAiResponse.ok) {
+      sendJson(response, openAiResponse.status || 502, {
+        error: payload?.error?.message || payload?.error || "Nao foi possivel gerar a nova capa com a OpenAI."
+      });
+      return;
+    }
+
+    const b64 = String(payload?.data?.[0]?.b64_json || "").trim();
+    if (!b64) {
+      sendJson(response, 502, { error: "A OpenAI nao devolveu a imagem gerada." });
+      return;
+    }
+
+    const generatedBuffer = Buffer.from(b64, "base64");
+    const key = `${buildMiniMediaAlbumFolder(albumId)}/cover-generated-${Date.now()}.png`;
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: generatedBuffer,
+      ContentType: "image/png"
+    }));
+
+    album.coverKey = key;
+    album.coverContentType = "image/png";
+    album.updatedAt = new Date().toISOString();
+    const saved = await saveMiniMediaLibrary(library);
+    const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      album: buildMiniMediaAlbumPayload(savedAlbum),
+      library: buildMiniMediaLibraryPayload(saved),
+      feedback: `Nova capa gerada com ${model}.`
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel gerar a capa do album."
     });
   }
 }
@@ -6431,8 +6582,19 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/mini/media/image-models") {
+    await handleMiniMediaImageModelsRequest(request, response);
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/mini/media/albums") {
     await handleMiniMediaAlbumCreateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/mini/media/albums/") && pathname.endsWith("/cover/generate")) {
+    const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", "").replace(/\/cover\/generate$/, ""));
+    await handleMiniMediaAlbumCoverGenerateRequest(request, response, albumId);
     return;
   }
 
