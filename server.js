@@ -4357,6 +4357,12 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
                 "Pode criar perguntas sobre ideias centrais, detalhes relevantes, aplicacoes, sequencias, exemplos e enfases presentes no curso.",
                 "Evite inventar fatos que nao aparecem no curso.",
                 "Mantenha 1 alternativa correta por pergunta.",
+                "Evite alternativas obviamente faceis de eliminar pelo tamanho, pela simplicidade ou pelo tom.",
+                "Em cada pergunta, escreva as 4 alternativas com estrutura, extensao e nivel de detalhe parecidos entre si.",
+                "As alternativas erradas devem soar plausiveis e bem escritas, mas se desviar levemente do eixo central por termos, foco, objetivo ou aplicacao.",
+                "Prefira distratores semanticamente proximos da correta, em vez de respostas curtas, caricatas ou fora do assunto.",
+                "Quando a alternativa correta for uma frase longa, faca as incorretas tambem longas e com construcoes parecidas.",
+                "Quando fizer sentido, comece as alternativas com uma mesma estrutura frasal para nao entregar a correta pelo formato.",
                 "Escreva em portugues do Brasil.",
                 "Nao repita perguntas.",
                 "Responda apenas em JSON estruturado."
@@ -4369,6 +4375,9 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
               "Crie 10 perguntas de multipla escolha com base no curso abaixo.",
               "Use somente o curso como fonte.",
               "Extraia perguntas que reflitam o curso como ele foi escrito.",
+              "Torne o quiz mais equilibrado: respostas certas e erradas devem parecer igualmente fortes a primeira vista.",
+              "Nao use uma alternativa correta muito mais longa ou muito mais especifica que as demais.",
+              "Se a correta falar de objetivo, contexto, metodo ou aplicacao, faca as erradas seguirem a mesma forma frasal, mudando sutilmente o foco.",
               attempt > 1 ? "Refaca mantendo fidelidade ao curso e eliminando qualquer pergunta incompleta, repetida ou fora do conteudo." : "",
               quizSourceText
             ].filter(Boolean).join("\n\n")
