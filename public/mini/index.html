@@ -410,8 +410,7 @@
     .media-status {
       display: none;
     }
-    .media-footer,
-    .courses-app-footer {
+    .media-footer {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       align-items: center;
@@ -420,6 +419,17 @@
       padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
       background: linear-gradient(180deg, #4f95ff 0%, #2755df 100%);
       box-shadow: 0 -14px 28px rgba(39, 85, 223, .22);
+    }
+    .courses-app-footer {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      min-height: 0;
+      padding: 0;
+      background: transparent;
+      box-shadow: none;
     }
     .media-footer-item,
     .courses-app-footer-item {
@@ -1188,7 +1198,7 @@
       display: none !important;
     }
     .courses-modal.is-immersive-reading .courses-shell {
-      grid-template-rows: minmax(0, 85dvh) 15dvh;
+      grid-template-rows: minmax(0, 93dvh) 7dvh;
       padding: 0;
     }
     .courses-modal.is-immersive-reading .courses-top {
@@ -1449,17 +1459,17 @@
     }
     .course-page-title {
       margin: 0;
-      font-size: clamp(28px, 4vw, 40px);
+      font-size: clamp(24px, 3.4vw, 34px);
       line-height: 1.08;
-      font-weight: 800;
+      font-weight: 700;
       min-height: 44px;
       color: var(--course-title-color);
     }
     .course-page-paragraph {
       margin: 0;
-      font-size: clamp(18px, 2vw, 22px);
-      line-height: 1.75;
-      font-weight: 700;
+      font-size: clamp(14px, 1.6vw, 18px);
+      line-height: 1.72;
+      font-weight: 400;
       color: var(--course-body-color);
       min-height: 2.2em;
     }
@@ -1468,9 +1478,9 @@
       padding-left: 22px;
       display: grid;
       gap: 12px;
-      font-size: 18px;
-      line-height: 1.65;
-      font-weight: 700;
+      font-size: 15px;
+      line-height: 1.62;
+      font-weight: 400;
       color: var(--course-body-color);
     }
     .course-page-table {
@@ -1486,14 +1496,14 @@
       background: var(--course-row-bg);
     }
     .course-page-row strong {
-      font-size: 16px;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 700;
       color: var(--course-row-strong-color);
     }
     .course-page-row span {
-      font-size: 16px;
-      line-height: 1.55;
-      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.52;
+      font-weight: 400;
       color: var(--course-body-color);
     }
     .course-page-media {
@@ -1529,9 +1539,9 @@
     }
     .course-quiz-question {
       margin: 0;
-      font-size: clamp(26px, 4vw, 38px);
+      font-size: clamp(22px, 3.5vw, 32px);
       line-height: 1.18;
-      font-weight: 800;
+      font-weight: 700;
       color: var(--course-title-color);
     }
     .course-quiz-options {
@@ -1546,9 +1556,9 @@
       text-align: left;
       padding: 18px 20px;
       font-family: var(--course-ui-font);
-      font-size: 18px;
-      line-height: 1.45;
-      font-weight: 800;
+      font-size: 15px;
+      line-height: 1.42;
+      font-weight: 500;
       cursor: pointer;
       transition: transform .18s ease, background .18s ease, opacity .18s ease;
     }
@@ -1567,9 +1577,9 @@
       opacity: .78;
     }
     .course-quiz-explanation {
-      font-size: 16px;
-      line-height: 1.6;
-      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.58;
+      font-weight: 400;
       color: var(--course-body-color);
     }
     .course-quiz-result {
@@ -1613,8 +1623,8 @@
     .courses-footer {
       justify-content: center;
       position: relative;
-      background: transparent;
-      box-shadow: none;
+      background: linear-gradient(180deg, #4f95ff 0%, #2755df 100%);
+      box-shadow: 0 -14px 28px rgba(39, 85, 223, .22);
       border-radius: 0;
       overflow: visible;
     }
@@ -1630,16 +1640,16 @@
       gap: 12px;
       padding: 0 18px calc(8px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
-      background: rgba(236, 239, 244, .96);
-      color: rgba(37, 48, 68, .82);
+      background: rgba(216, 221, 229, .68);
+      color: rgba(255,255,255,.82);
     }
     .course-reader-footer-btn {
-      width: 46px;
-      height: 46px;
+      width: 40px;
+      height: 40px;
       border: 0;
-      border-radius: 14px;
-      background: rgba(37, 48, 68, .08);
-      color: rgba(37, 48, 68, .78);
+      border-radius: 12px;
+      background: rgba(255,255,255,.10);
+      color: rgba(255,255,255,.78);
       display: grid;
       place-items: center;
       cursor: pointer;
@@ -1652,10 +1662,10 @@
     .course-reader-footer-progress {
       text-align: center;
       font-family: var(--course-ui-font);
-      font-size: 15px;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 700;
       letter-spacing: .04em;
-      color: rgba(37, 48, 68, .68);
+      color: rgba(255,255,255,.68);
     }
     .courses-modal.is-immersive-reading .courses-footer {
       background: transparent;
@@ -1754,67 +1764,88 @@
       gap: 6px;
     }
     .courses-modal.is-reading[data-reader-theme="1"] {
-      --course-modal-bg: #F7F8FA;
-      --course-modal-text: #253044;
-      --course-ui-font: "Inter", sans-serif;
-      --course-body-font: "Lora", serif;
-      --course-reader-card-bg: #FFFFFF;
-      --course-reader-card-border: rgba(20, 40, 80, 0.08);
-      --course-reader-card-shadow: 0 24px 60px rgba(20, 40, 80, .08);
-      --course-ui-surface: rgba(29, 78, 216, .08);
+      --course-modal-bg: linear-gradient(180deg, #f7f7f9 0%, #e8ebf0 46%, #cfd5de 100%);
+      --course-modal-text: rgba(255, 255, 255, 0.96);
+      --course-ui-font: "SF Pro Display", "Inter", sans-serif;
+      --course-body-font: "SF Pro Text", "Inter", sans-serif;
+      --course-reader-card-bg: rgba(255,255,255,.08);
+      --course-reader-card-border: rgba(255,255,255,.10);
+      --course-reader-card-shadow: 0 18px 44px rgba(90, 98, 110, .10);
+      --course-ui-surface: rgba(255,255,255,.14);
       --course-ui-text-shadow: none;
       --course-reader-text-shadow: none;
-      --course-title-color: #1D4ED8;
-      --course-body-color: #253044;
-      --course-muted-color: rgba(37, 48, 68, .68);
-      --course-row-bg: rgba(29, 78, 216, .05);
-      --course-row-strong-color: #1D4ED8;
-      --course-quiz-option-bg: rgba(29, 78, 216, .06);
-      --course-quiz-repeat-bg: rgba(29, 78, 216, .10);
-      --course-quiz-repeat-color: #1D4ED8;
+      --course-title-color: rgba(255,255,255,.98);
+      --course-body-color: rgba(255,255,255,.82);
+      --course-muted-color: rgba(255,255,255,.54);
+      --course-row-bg: rgba(255,255,255,.08);
+      --course-row-strong-color: rgba(255,255,255,.92);
+      --course-quiz-option-bg: rgba(255,255,255,.10);
+      --course-quiz-repeat-bg: rgba(255,255,255,.12);
+      --course-quiz-repeat-color: rgba(255,255,255,.92);
       --course-lock-text-shadow: none;
     }
     .courses-modal.is-reading[data-reader-theme="2"] {
-      --course-modal-bg: #FFF4E2;
-      --course-modal-text: #4A3324;
-      --course-ui-font: "Nunito Sans", "Inter", sans-serif;
-      --course-body-font: "Merriweather", serif;
-      --course-reader-card-bg: #FFF9EF;
-      --course-reader-card-border: rgba(138, 79, 29, 0.10);
-      --course-reader-card-shadow: 0 24px 60px rgba(138, 79, 29, .10);
-      --course-ui-surface: rgba(217, 144, 47, .12);
+      --course-modal-bg: linear-gradient(180deg, #191c22 0%, #242932 54%, #313845 100%);
+      --course-modal-text: rgba(255,255,255,.94);
+      --course-ui-font: "Inter", sans-serif;
+      --course-body-font: "Inter", sans-serif;
+      --course-reader-card-bg: rgba(255,255,255,.06);
+      --course-reader-card-border: rgba(255,255,255,.08);
+      --course-reader-card-shadow: 0 24px 56px rgba(0, 0, 0, .22);
+      --course-ui-surface: rgba(255,255,255,.10);
       --course-ui-text-shadow: none;
-      --course-reader-text-shadow: 0 1px 0 rgba(255,255,255,0.55);
-      --course-title-color: #8A4F1D;
-      --course-body-color: #4A3324;
-      --course-muted-color: rgba(74, 51, 36, .72);
-      --course-row-bg: rgba(217, 144, 47, .08);
-      --course-row-strong-color: #D9902F;
-      --course-quiz-option-bg: rgba(217, 144, 47, .10);
-      --course-quiz-repeat-bg: rgba(217, 144, 47, .14);
-      --course-quiz-repeat-color: #8A4F1D;
-      --course-lock-text-shadow: 0 1px 0 rgba(255,255,255,0.55);
+      --course-reader-text-shadow: none;
+      --course-title-color: rgba(255,255,255,.98);
+      --course-body-color: rgba(255,255,255,.78);
+      --course-muted-color: rgba(255,255,255,.48);
+      --course-row-bg: rgba(255,255,255,.07);
+      --course-row-strong-color: rgba(255,255,255,.92);
+      --course-quiz-option-bg: rgba(255,255,255,.08);
+      --course-quiz-repeat-bg: rgba(255,255,255,.12);
+      --course-quiz-repeat-color: rgba(255,255,255,.94);
+      --course-lock-text-shadow: none;
     }
     .courses-modal.is-reading[data-reader-theme="3"] {
-      --course-modal-bg: linear-gradient(135deg, #101A33 0%, #1B2450 45%, #322044 100%);
-      --course-modal-text: #F5F7FF;
+      --course-modal-bg: linear-gradient(180deg, #262b31 0%, #3a4047 52%, #555d66 100%);
+      --course-modal-text: rgba(255,255,255,.94);
       --course-ui-font: "Inter", sans-serif;
-      --course-body-font: "Source Serif 4", serif;
-      --course-reader-card-bg: rgba(255,255,255,.08);
+      --course-body-font: "Inter", sans-serif;
+      --course-reader-card-bg: rgba(255,255,255,.06);
       --course-reader-card-border: rgba(255,255,255,.08);
-      --course-reader-card-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 24px 60px rgba(0, 0, 0, .26);
+      --course-reader-card-shadow: 0 24px 60px rgba(0, 0, 0, .18);
       --course-ui-surface: rgba(255,255,255,.12);
-      --course-ui-text-shadow: 0 6px 24px rgba(0,0,0,.24);
-      --course-reader-text-shadow: 0 1px 2px rgba(0,0,0,0.35);
-      --course-title-color: #F8C84E;
-      --course-body-color: #F5F7FF;
-      --course-muted-color: #C9D3EA;
+      --course-ui-text-shadow: none;
+      --course-reader-text-shadow: none;
+      --course-title-color: rgba(255,255,255,.98);
+      --course-body-color: rgba(255,255,255,.76);
+      --course-muted-color: rgba(255,255,255,.46);
       --course-row-bg: rgba(255,255,255,.06);
-      --course-row-strong-color: #F8C84E;
+      --course-row-strong-color: rgba(255,255,255,.90);
       --course-quiz-option-bg: rgba(255,255,255,.08);
-      --course-quiz-repeat-bg: rgba(248, 200, 78, .16);
-      --course-quiz-repeat-color: #F8C84E;
-      --course-lock-text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+      --course-quiz-repeat-bg: rgba(255,255,255,.12);
+      --course-quiz-repeat-color: rgba(255,255,255,.94);
+      --course-lock-text-shadow: none;
+    }
+    .courses-modal.is-reading[data-reader-theme="0"] {
+      --course-modal-bg: linear-gradient(180deg, #f4f5f7 0%, #dde1e7 48%, #c8ced7 100%);
+      --course-modal-text: rgba(255,255,255,.94);
+      --course-ui-font: "SF Pro Display", "Inter", sans-serif;
+      --course-body-font: "SF Pro Text", "Inter", sans-serif;
+      --course-reader-card-bg: rgba(255,255,255,.08);
+      --course-reader-card-border: rgba(255,255,255,.10);
+      --course-reader-card-shadow: 0 16px 40px rgba(120, 128, 139, .10);
+      --course-ui-surface: rgba(255,255,255,.16);
+      --course-ui-text-shadow: none;
+      --course-reader-text-shadow: none;
+      --course-title-color: rgba(255,255,255,.98);
+      --course-body-color: rgba(255,255,255,.84);
+      --course-muted-color: rgba(255,255,255,.54);
+      --course-row-bg: rgba(255,255,255,.09);
+      --course-row-strong-color: rgba(255,255,255,.94);
+      --course-quiz-option-bg: rgba(255,255,255,.10);
+      --course-quiz-repeat-bg: rgba(255,255,255,.14);
+      --course-quiz-repeat-color: rgba(255,255,255,.96);
+      --course-lock-text-shadow: none;
     }
     .courses-user-label {
       font-size: 13px;
@@ -2514,24 +2545,24 @@
         padding: 18px 16px;
       }
       .course-page-kicker {
-        font-size: 17px;
+        font-size: 14px;
       }
       .course-page-title {
-        font-size: 34px;
+        font-size: 28px;
       }
       .course-page-paragraph,
       .course-page-bullets {
-        font-size: 21px;
+        font-size: 15px;
       }
       .course-page-row strong,
       .course-page-row span {
-        font-size: 21px;
+        font-size: 15px;
       }
       .course-read-lock-title {
-        font-size: 32px;
+        font-size: 26px;
       }
       .course-read-lock-subtitle {
-        font-size: 24px;
+        font-size: 18px;
       }
       .course-page-row {
         grid-template-columns: 1fr;
