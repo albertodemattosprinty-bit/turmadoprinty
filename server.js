@@ -457,7 +457,20 @@ async function syncMiniMediaLibraryFromCoverFolder(library) {
       const now = new Date().toISOString();
 
       if (existing) {
-        if (String(existing.coverKey || "").trim() !== key || String(existing.coverContentType || "").trim() !== "image/avif") {
+        const currentCoverKey = String(existing.coverKey || "").trim();
+        const currentCoverType = String(existing.coverContentType || "").trim().toLowerCase();
+        const shouldKeepCustomCover = Boolean(
+          currentCoverKey
+          && currentCoverKey !== key
+          && currentCoverType
+          && currentCoverType !== "image/avif"
+        );
+
+        if (shouldKeepCustomCover) {
+          continue;
+        }
+
+        if (currentCoverKey !== key || currentCoverType !== "image/avif") {
           existing.coverKey = key;
           existing.coverContentType = "image/avif";
           existing.updatedAt = now;
