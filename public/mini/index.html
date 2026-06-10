@@ -1183,6 +1183,8 @@
     .course-reader-view {
       height: 100%;
       overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
     }
     .courses-list-view::-webkit-scrollbar,
@@ -1236,7 +1238,7 @@
       height: 100%;
       padding: 26px 22px 18px;
       box-sizing: border-box;
-      touch-action: pan-x;
+      touch-action: pan-y;
     }
     .courses-modal.is-immersive-reading .courses-list-view {
       display: none !important;
@@ -1502,7 +1504,7 @@
     }
     .course-page-title {
       margin: 0;
-      font-size: clamp(calc(24px * var(--course-reader-font-scale)), calc(3.4vw * var(--course-reader-font-scale)), calc(34px * var(--course-reader-font-scale)));
+      font-size: clamp(calc(19px * var(--course-reader-font-scale)), calc(2.8vw * var(--course-reader-font-scale)), calc(27px * var(--course-reader-font-scale)));
       line-height: 1.08;
       font-weight: 700;
       min-height: 44px;
@@ -1700,12 +1702,7 @@
       box-shadow: none;
     }
     .course-reader-footer-size {
-      width: auto;
-      min-width: 96px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 8px;
+      width: 32px;
     }
     .course-reader-footer-btn svg {
       width: 20px;
@@ -1723,16 +1720,6 @@
       font-weight: 600;
       letter-spacing: .04em;
       color: var(--course-footer-muted-color);
-    }
-    .course-reader-footer-font {
-      min-width: 0;
-      text-align: left;
-      font-family: var(--course-footer-font);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .03em;
-      color: var(--course-footer-muted-color);
-      white-space: nowrap;
     }
     .courses-modal.is-immersive-reading .courses-footer {
       background: transparent;
@@ -2569,11 +2556,7 @@
         border-radius: 12px;
       }
       .course-reader-footer-size {
-        min-width: 104px;
-        gap: 6px;
-      }
-      .course-reader-footer-font {
-        font-size: 10px;
+        width: 42px;
       }
       .course-reader-footer-progress {
         font-size: 14px;
@@ -2647,7 +2630,7 @@
         font-size: 14px;
       }
       .course-page-title {
-        font-size: calc(28px * var(--course-reader-font-scale));
+        font-size: calc(22px * var(--course-reader-font-scale));
       }
       .course-page-paragraph,
       .course-page-bullets {
