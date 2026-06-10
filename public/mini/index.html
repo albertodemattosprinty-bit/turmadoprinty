@@ -114,16 +114,16 @@
     .g-red { background: var(--g-red); } .g-blue { background: var(--g-blue); } .g-purple { background: var(--g-purple); } .g-gold { background: var(--g-gold); } .g-navy { background: var(--g-navy); }
 
     .media-modal {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) 10dvh;
       background:
         radial-gradient(circle at 18% 14%, rgba(112, 177, 255, .30), transparent 30%),
         radial-gradient(circle at 84% 18%, rgba(255, 228, 145, .24), transparent 26%),
         radial-gradient(circle at 50% 86%, rgba(255, 172, 222, .22), transparent 32%),
         linear-gradient(180deg, #f8fbff 0%, #fffdf8 55%, #fff5fb 100%);
       color: #233048;
-      padding: 16px 14px 12px;
-      gap: 8px;
+      padding: 10px 0 0;
+      gap: 10px;
       overflow: hidden;
     }
     .media-modal.is-editing {
@@ -133,10 +133,7 @@
         linear-gradient(180deg, #f3f5f8 0%, #eef1f5 100%);
     }
     .media-head {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      align-items: center;
-      gap: 14px;
+      display: none;
     }
     .media-head-copy {
       min-width: 0;
@@ -164,10 +161,10 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
-      flex: 0 0 7dvh;
       min-height: 42px;
       max-height: 56px;
       align-items: stretch;
+      padding: 0 14px;
     }
     .media-tab {
       border: 0;
@@ -188,10 +185,9 @@
       box-shadow: 0 16px 28px rgba(58, 105, 245, .22);
     }
     .media-content {
-      flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
-      padding-right: 2px;
+      padding: 0 14px;
       display: grid;
       gap: 12px;
       align-content: start;
@@ -348,7 +344,7 @@
     }
     .media-album-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 16px;
     }
     .media-album-card {
@@ -412,14 +408,49 @@
       flex: 0 0 auto;
     }
     .media-status {
-      min-height: 22px;
-      text-align: center;
-      font-size: 13px;
-      line-height: 1.35;
+      display: none;
+    }
+    .media-footer {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      align-items: center;
+      gap: 6px;
+      min-height: 0;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+      background: linear-gradient(180deg, #4f95ff 0%, #2755df 100%);
+      box-shadow: 0 -14px 28px rgba(39, 85, 223, .22);
+    }
+    .media-footer-item {
+      border: 0;
+      border-radius: 18px;
+      min-width: 0;
+      height: 100%;
+      background: transparent;
+      color: rgba(255,255,255,.88);
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 4px;
       font-family: "Open Sans", sans-serif;
-      font-weight: 700;
-      color: rgba(37, 48, 68, .64);
-      padding: 0 8px 2px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background .18s ease, color .18s ease, transform .18s ease;
+    }
+    .media-footer-item svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+    .media-footer-item.is-active {
+      background: rgba(255,255,255,.18);
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
+    }
+    .media-footer-item:not(.is-active):hover {
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      transform: translateY(-1px);
     }
     .media-upload-list {
       margin-top: 10px;
@@ -482,11 +513,10 @@
 
     .immersive { position: fixed; inset: 0; background: #fff; z-index: 20; transform: translateY(100%); opacity: 0; pointer-events: none; transition: transform .26s ease, opacity .2s ease; display: grid; grid-template-rows: auto 70vh auto 10vh; padding: 8px 12px 8px; }
     .immersive.media-modal {
-      display: flex;
-      flex-direction: column;
-      grid-template-rows: none;
-      padding: 16px 14px 12px;
-      gap: 8px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) 10dvh;
+      padding: 10px 0 0;
+      gap: 10px;
     }
     .immersive.show { transform: translateY(0); opacity: 1; pointer-events: auto; }
     .modal-head { text-align: center; }
@@ -2248,13 +2278,13 @@
         height: 34px;
       }
       .media-modal {
-        padding: 14px 12px 12px;
-        gap: 8px;
+        padding-top: 10px;
+        gap: 10px;
       }
       .media-tabs {
-        flex-basis: 7dvh;
         min-height: 38px;
         max-height: 50px;
+        padding: 0 12px;
       }
       .media-tab {
         font-size: 12px;
@@ -2280,6 +2310,21 @@
       }
       .media-album-grid {
         grid-template-columns: 1fr;
+      }
+      .media-content {
+        padding: 0 12px;
+      }
+      .media-footer {
+        padding-inline: 10px;
+        gap: 4px;
+      }
+      .media-footer-item {
+        border-radius: 14px;
+        font-size: 10px;
+      }
+      .media-footer-item svg {
+        width: 20px;
+        height: 20px;
       }
       .media-play-btn {
         width: 50px;
@@ -2450,6 +2495,28 @@
     </div>
     <div id="mediaContent" class="media-content"></div>
     <div id="mediaStatus" class="media-status">Escolha uma música ou um álbum para navegar.</div>
+    <footer class="media-footer">
+      <button id="mediaFooterHome" class="media-footer-item" type="button" aria-label="Ir para a home do mini">
+        <svg viewBox="0 0 24 24"><path d="M12 3 3 10.2V21h6v-6h6v6h6V10.2z"/></svg>
+        <span>Home</span>
+      </button>
+      <button id="mediaFooterMidia" class="media-footer-item is-active" type="button" aria-current="page" aria-label="Seção atual: Midia">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>
+        <span>Midia</span>
+      </button>
+      <button id="mediaFooterCursos" class="media-footer-item" type="button" aria-label="Ir para Cursos">
+        <svg viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm0 13L5 12.18v3.27L12 19l7-3.55v-3.27L12 16z"/></svg>
+        <span>Cursos</span>
+      </button>
+      <button id="mediaFooterCriar" class="media-footer-item" type="button" aria-label="Ir para Criar">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+        <span>Criar</span>
+      </button>
+      <button id="mediaFooterAulas" class="media-footer-item" type="button" aria-label="Ir para Aulas">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg>
+        <span>Aulas</span>
+      </button>
+    </footer>
     <input id="mediaInlineTracksInput" type="file" accept="audio/*" multiple hidden>
   </section>
 
@@ -3989,6 +4056,24 @@
       await loadMiniMediaLibrary();
       renderMediaModal();
       setMediaStatus(isMiniMediaAdmin() ? "Escolha uma musica ou um album. Pressione U para enviar novo conteudo." : "Escolha uma musica ou um album para navegar.");
+    }
+    function navigateFromMedia(target) {
+      if (target === "midia") {
+        return;
+      }
+      closeMediaModal();
+      if (target === "home") {
+        return;
+      }
+      const map = {
+        cursos: "openCourses",
+        criar: "openCreate",
+        aulas: "openAulas"
+      };
+      const button = $(map[target] || "");
+      if (button) {
+        button.click();
+      }
     }
     function closeMediaModal() {
       resetMediaPreviewState();
@@ -6525,6 +6610,21 @@
       resetMediaPreviewState();
       renderMediaModal();
       setMediaStatus("Escolha um album para abrir suas musicas.");
+    };
+    $("mediaFooterHome").onclick = () => {
+      navigateFromMedia("home");
+    };
+    $("mediaFooterMidia").onclick = () => {
+      navigateFromMedia("midia");
+    };
+    $("mediaFooterCursos").onclick = () => {
+      navigateFromMedia("cursos");
+    };
+    $("mediaFooterCriar").onclick = () => {
+      navigateFromMedia("criar");
+    };
+    $("mediaFooterAulas").onclick = () => {
+      navigateFromMedia("aulas");
     };
     $("openCourses").onclick = () => {
       openMiniCoursesModal();
