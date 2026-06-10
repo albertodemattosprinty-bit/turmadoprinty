@@ -6156,9 +6156,11 @@
         return;
       }
 
+      let finalStatusMessage = "";
       miniCourseQuizGenerationStates[safeCourseId] = true;
       renderMiniCoursesList();
-      setCourseFooterStatus("Gerando quiz do curso com gpt-5.1...");
+      finalStatusMessage = "Gerando quiz do curso com gpt-5.1...";
+      setCourseFooterStatus(finalStatusMessage);
       try {
         const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}/quiz/generate`, {
           method: "POST",
@@ -6183,12 +6185,17 @@
             quizQuestions: Array.isArray(updatedCourse?.quizQuestions) ? updatedCourse.quizQuestions : currentMiniCourse.quizQuestions
           };
         }
-        setCourseFooterStatus(String(payload?.feedback || "Quiz gerado com sucesso."));
+        finalStatusMessage = String(payload?.feedback || "Quiz gerado com sucesso.");
+        setCourseFooterStatus(finalStatusMessage);
       } catch (error) {
-        setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao gerar quiz.");
+        finalStatusMessage = error instanceof Error ? error.message : "Falha ao gerar quiz.";
+        setCourseFooterStatus(finalStatusMessage);
       } finally {
         delete miniCourseQuizGenerationStates[safeCourseId];
         renderMiniCoursesList();
+        if (finalStatusMessage) {
+          setCourseFooterStatus(finalStatusMessage);
+        }
       }
     }
 
