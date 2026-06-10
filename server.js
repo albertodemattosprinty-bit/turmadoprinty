@@ -826,27 +826,47 @@ async function saveBannerAsset(dataUrl, bannerKey) {
   return `/${relativeDir.replaceAll("\\", "/")}/${fileName}`;
 }
 
-async function createChatCompletion(apiKey, payload) {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify(payload)
-  });
+async function createChatCompletion(apiKey, payload, options = {}) {
+  const timeoutMs = Math.max(0, Number(options?.timeoutMs || 0) || 0);
+  const timeoutMessage = String(options?.timeoutMessage || "").trim()
+    || "A chamada para a OpenAI demorou demais e foi interrompida.";
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
 
-  const { data, text } = await readApiResponse(response);
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: controller?.signal
+    });
 
-  if (!response.ok) {
-    throw new Error(data?.error?.message || text || "Falha ao chamar a API da OpenAI.");
+    const { data, text } = await readApiResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data?.error?.message || text || "Falha ao chamar a API da OpenAI.");
+    }
+
+    if (!data) {
+      throw new Error("A OpenAI devolveu uma resposta vazia ou invalida.");
+    }
+
+    return data;
+  } catch (error) {
+    if (controller?.signal?.aborted || error?.name === "AbortError") {
+      throw new Error(timeoutMessage);
+    }
+    throw error;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
-
-  if (!data) {
-    throw new Error("A OpenAI devolveu uma resposta vazia ou invalida.");
-  }
-
-  return data;
 }
 
 async function getContextPrompt() {
@@ -3026,6 +3046,10 @@ class MiniCourseGenerationError extends Error {
 let miniCourseJobsBootstrapped = false;
 let miniCourseJobsProcessing = false;
 
+function buildMiniCourseChunkLabel(chunk, chunkIndex, totalChunks) {
+  return `Bloco ${chunkIndex + 1}/${totalChunks} • páginas ${chunk.startPageNumber}-${chunk.endPageNumber}`;
+}
+
 async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, context, pageCount, onProgress } = {}) {
   const sharedContext = await getContextPrompt();
   const kinds = buildMiniCoursePageKinds(pageCount);
@@ -3033,6 +3057,14 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     kinds,
     pageCount >= 180 ? 8 : pageCount >= 90 ? 6 : pageCount >= 24 ? 5 : 4
   );
+  const maxChunkAttempts = 3;
+  const chunkTimeoutMs = pageCount >= 180
+    ? 300000
+    : pageCount >= 90
+      ? 240000
+      : pageCount >= 24
+        ? 180000
+        : 120000;
 
   const system = buildMiniSystemPrompt({
     modeKey: "project",
@@ -3065,7 +3097,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     }
   };
 
-  const createCourseChunkAttempt = async (chunk, extraUserInstruction = "", includeMetadata = false, courseOverview = "") => {
+  const createCourseChunkAttempt = async (chunk, extraUserInstruction = "", includeMetadata = false, courseOverview = "", requestOptions = {}) => {
     const requestPayload = {
       model,
       temperature: extraUserInstruction ? 0.3 : 0.45,
@@ -3097,7 +3129,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     if (supportsReasoningEffortForModel(model)) {
       requestPayload.reasoning_effort = "none";
     }
-    const completion = await createChatCompletion(apiKey, requestPayload);
+    const completion = await createChatCompletion(apiKey, requestPayload, requestOptions);
 
     const raw = extractChatCompletionText(completion);
     const parsed = parseStructuredJsonText(raw);
@@ -3115,25 +3147,82 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     };
   };
 
-  const firstChunk = courseChunks[0];
-  let firstAttempt = await createCourseChunkAttempt(firstChunk, "", true);
-  const firstChunkMinimum = firstChunk.kinds.length;
-  if (firstAttempt.evaluation.validCount < firstChunkMinimum) {
-    firstAttempt = await createCourseChunkAttempt(firstChunk, [
-      "A tentativa anterior veio incompleta.",
-      "Regenere este bloco inicial com paginas totalmente preenchidas.",
-      "Nao deixe nenhuma pagina vazia ou com placeholder.",
-      "Entregue conteudo pronto para leitura real por professores."
-    ].join(" "), true);
-  }
+  const runCourseChunkWithRetries = async ({ chunk, chunkIndex, generatedPageCountBefore, includeMetadata = false, courseOverview = "", emptyFailureMessage = "" }) => {
+    let lastAttempt = null;
+    let lastError = null;
+    const minimumValidPages = chunk.kinds.length;
+    const chunkLabel = buildMiniCourseChunkLabel(chunk, chunkIndex, courseChunks.length);
 
-  if (firstAttempt.evaluation.validCount < firstChunkMinimum) {
+    for (let attemptIndex = 0; attemptIndex < maxChunkAttempts; attemptIndex += 1) {
+      const attemptLabel = `${chunkLabel} • tentativa ${attemptIndex + 1}/${maxChunkAttempts}`;
+      const retryInstruction = attemptIndex === 0
+        ? ""
+        : [
+          `A tentativa anterior do ${chunkLabel.toLowerCase()} veio incompleta ou inconsistente.`,
+          "Regenere somente este bloco.",
+          "Nao use placeholders.",
+          "Entregue conteudo real, com densidade e coerencia com o tema do curso.",
+          "Se alguma pagina for didatica, prefira bullets claros ou tabela objetiva.",
+          "Se alguma pagina for final, entregue exatamente 3 paragrafos completos."
+        ].join(" ");
+
+      await reportProgress(generatedPageCountBefore, `${attemptLabel}: solicitando conteúdo para a IA...`);
+
+      try {
+        const attempt = await createCourseChunkAttempt(
+          chunk,
+          retryInstruction,
+          includeMetadata,
+          courseOverview,
+          {
+            timeoutMs: chunkTimeoutMs,
+            timeoutMessage: `${attemptLabel}: a OpenAI demorou demais para responder.`
+          }
+        );
+        lastAttempt = attempt;
+
+        if (attempt.evaluation.validCount >= minimumValidPages) {
+          return attempt;
+        }
+
+        const issuesText = attempt.evaluation.issues.slice(0, 3).join(" ");
+        await reportProgress(
+          generatedPageCountBefore,
+          `${attemptLabel}: a IA devolveu ${attempt.evaluation.validCount}/${minimumValidPages} páginas válidas.${issuesText ? ` ${issuesText}` : ""}${attemptIndex < maxChunkAttempts - 1 ? " Vamos tentar novamente." : ""}`
+        );
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : "Erro desconhecido ao chamar a OpenAI.";
+        await reportProgress(
+          generatedPageCountBefore,
+          `${attemptLabel}: ${message}${attemptIndex < maxChunkAttempts - 1 ? " Vamos tentar novamente." : ""}`
+        );
+      }
+    }
+
+    if (lastAttempt) {
+      throw new MiniCourseGenerationError(
+        emptyFailureMessage,
+        `${chunkLabel}. ${lastAttempt.evaluation.issues.slice(0, 4).join(" ") || "A IA continuou devolvendo páginas vazias ou fracas após as tentativas."}`,
+        generatedPageCountBefore
+      );
+    }
+
     throw new MiniCourseGenerationError(
-      "A IA nao devolveu conteudo suficiente para iniciar o curso.",
-      firstAttempt.evaluation.issues.slice(0, 4).join(" ") || "O bloco inicial veio vazio ou insuficiente.",
-      0
+      emptyFailureMessage,
+      `${chunkLabel}. ${lastError instanceof Error ? lastError.message : "A IA falhou repetidamente sem retornar conteúdo utilizável."}`,
+      generatedPageCountBefore
     );
-  }
+  };
+
+  const firstChunk = courseChunks[0];
+  const firstAttempt = await runCourseChunkWithRetries({
+    chunk: firstChunk,
+    chunkIndex: 0,
+    generatedPageCountBefore: 0,
+    includeMetadata: true,
+    emptyFailureMessage: "A IA nao devolveu conteudo suficiente para iniciar o curso."
+  });
 
   const generatedPages = [...firstAttempt.normalizedPages];
   const courseMainTitle = String(firstAttempt.parsed?.mainTitle || title).trim() || title;
@@ -3146,30 +3235,19 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
 
   await reportProgress(
     generatedPages.length,
-    `Gerando curso: ${generatedPages.length}/${pageCount} páginas concluídas.`
+    `Bloco 1/${courseChunks.length} concluído. Gerando curso: ${generatedPages.length}/${pageCount} páginas prontas.`
   );
 
   for (let chunkIndex = 1; chunkIndex < courseChunks.length; chunkIndex += 1) {
     const chunk = courseChunks[chunkIndex];
-    let chunkAttempt = await createCourseChunkAttempt(chunk, "", false, courseOverview);
-    const minimumValidPages = chunk.kinds.length;
-
-    if (chunkAttempt.evaluation.validCount < minimumValidPages) {
-      chunkAttempt = await createCourseChunkAttempt(chunk, [
-        `O bloco das paginas ${chunk.startPageNumber} a ${chunk.endPageNumber} veio incompleto.`,
-        "Regenere somente este bloco com conteudo real e consistente com as paginas anteriores.",
-        "Nao use placeholders.",
-        "Cada pagina precisa sair pronta para leitura dentro do curso."
-      ].join(" "), false, courseOverview);
-    }
-
-    if (chunkAttempt.evaluation.validCount < minimumValidPages) {
-      throw new MiniCourseGenerationError(
-        "A IA nao devolveu conteudo suficiente para concluir o curso.",
-        `Falha no bloco ${chunk.startPageNumber}-${chunk.endPageNumber}. ${chunkAttempt.evaluation.issues.slice(0, 4).join(" ") || "As paginas vieram vazias ou insuficientes."}`,
-        generatedPages.length
-      );
-    }
+    const chunkAttempt = await runCourseChunkWithRetries({
+      chunk,
+      chunkIndex,
+      generatedPageCountBefore: generatedPages.length,
+      includeMetadata: false,
+      courseOverview,
+      emptyFailureMessage: "A IA nao devolveu conteudo suficiente para concluir o curso."
+    });
 
     generatedPages.push(...chunkAttempt.normalizedPages);
     if (chunkAttempt.evaluation.issues.length) {
@@ -3177,7 +3255,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     }
     await reportProgress(
       generatedPages.length,
-      `Gerando curso: ${generatedPages.length}/${pageCount} páginas concluídas.`
+      `${buildMiniCourseChunkLabel(chunk, chunkIndex, courseChunks.length)} concluído. Gerando curso: ${generatedPages.length}/${pageCount} páginas prontas.`
     );
   }
 
@@ -3223,7 +3301,7 @@ async function processMiniCourseJobsQueue() {
       try {
         await updateMiniCourseJobProgress(job.id, {
           generatedPageCount: 0,
-          feedback: `Preparando ${job.requestedPageCount} páginas para geração...`
+          feedback: `Preparando ${job.requestedPageCount} páginas para geração com ${normalizeMiniCourseGeneratorModel(job.requestedModel)}...`
         });
 
         const draft = await generateMiniCourseDraft({
@@ -3258,7 +3336,7 @@ async function processMiniCourseJobsQueue() {
           ? error
           : new MiniCourseGenerationError(
             error instanceof Error ? error.message : "Nao foi possivel gerar o curso.",
-            "A geracao falhou antes de salvar o curso no Postgres.",
+            "A geração falhou antes de salvar o curso. Verifique o bloco informado e a mensagem técnica abaixo.",
             0
           );
 

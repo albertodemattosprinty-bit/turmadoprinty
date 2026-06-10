@@ -5013,6 +5013,30 @@
       return "Na fila";
     }
 
+    function formatMiniCourseJobUpdatedAt(value) {
+      const time = Date.parse(String(value || ""));
+      if (!Number.isFinite(time)) {
+        return "";
+      }
+      const diffMs = Date.now() - time;
+      if (!Number.isFinite(diffMs) || diffMs < 0) {
+        return "agora";
+      }
+      const diffMinutes = Math.floor(diffMs / 60000);
+      if (diffMinutes <= 0) {
+        return "agora";
+      }
+      if (diffMinutes < 60) {
+        return `há ${diffMinutes} min`;
+      }
+      const diffHours = Math.floor(diffMinutes / 60);
+      if (diffHours < 24) {
+        return `há ${diffHours} h`;
+      }
+      const diffDays = Math.floor(diffHours / 24);
+      return `há ${diffDays} d`;
+    }
+
     function renderMiniCourseModelOptions() {
       const select = $("courseAdminModelSelect");
       if (!select) {
@@ -5121,6 +5145,10 @@
         const safeStatus = String(job.status || "queued").trim().toLowerCase();
         const feedback = String(job.feedback || "").trim();
         const errorMessage = String(job.errorMessage || "").trim();
+        const updatedAtLabel = formatMiniCourseJobUpdatedAt(job.updatedAt);
+        const staleWarning = safeStatus === "running" && updatedAtLabel && ((Date.now() - Date.parse(String(job.updatedAt || ""))) >= 180000)
+          ? `Sem atualização ${updatedAtLabel}. Se continuar assim, esse bloco provavelmente travou.`
+          : "";
         return `
           <div class="course-job-card">
             <div class="course-job-head">
@@ -5128,12 +5156,14 @@
               <div class="course-job-badge ${escapeAttr(safeStatus)}">${escapeText(getMiniCourseJobStatusLabel(safeStatus))}</div>
             </div>
             <div class="course-job-feedback">Modelo: ${escapeText(job.requestedModel || "gpt-5.1")}</div>
+            ${updatedAtLabel ? `<div class="course-job-feedback">Última atualização: ${escapeText(updatedAtLabel)}</div>` : ""}
             <div class="course-job-progress">
               <span>${generated}/${requested} páginas</span>
               <span>${percent}%</span>
             </div>
             <div class="course-job-bar"><div class="course-job-fill" style="width:${percent}%"></div></div>
             ${feedback ? `<div class="course-job-feedback">${escapeText(feedback)}</div>` : ""}
+            ${staleWarning ? `<div class="course-job-error">${escapeText(staleWarning)}</div>` : ""}
             ${errorMessage ? `<div class="course-job-error">${escapeText(errorMessage)}</div>` : ""}
             ${job.courseId ? `<button class="course-job-open" type="button" data-open-generated-course="${escapeAttr(job.courseId)}">Abrir curso</button>` : ""}
           </div>
@@ -6346,7 +6376,7 @@
         button.disabled = true;
       }
       if (status) {
-        status.textContent = "Gerando curso global...";
+        status.textContent = "Criando o job do curso e enviando para a fila...";
       }
 
       try {
