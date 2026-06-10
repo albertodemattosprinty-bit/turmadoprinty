@@ -1885,6 +1885,7 @@
       height: 100%;
       position: relative;
       overflow: hidden;
+      touch-action: pan-x;
     }
     .mobile-course-slide {
       position: absolute;
@@ -2351,10 +2352,13 @@
       }
       .courses-shell {
         grid-template-rows: 9dvh minmax(0, 84dvh) 7dvh;
-        padding: 0 10px;
+        padding: 0;
       }
       .courses-head-title {
         font-size: 22px;
+      }
+      .courses-top {
+        padding: 0 10px;
       }
       .courses-list-view {
         grid-template-columns: 1fr;
@@ -2385,7 +2389,8 @@
         display: none;
       }
       .course-cover-shell {
-        width: 100%;
+        width: 85%;
+        margin: 0 auto;
         height: auto;
         aspect-ratio: 9 / 16;
         border-radius: 28px;
@@ -2398,25 +2403,28 @@
       }
       .course-card-mobile-meta {
         display: grid;
-        gap: 4px;
-        padding: 0 4px;
+        gap: 8px;
+        padding: 0 12px;
+        justify-items: start;
       }
       .course-card-mobile-duration {
         font-size: 18px;
         font-weight: 800;
         opacity: .94;
       }
-      .course-card-mobile-hint {
-        font-size: 13px;
-        font-weight: 700;
-        opacity: .72;
+      .course-card-mobile-meta .course-progress-shell {
+        width: min(210px, 100%);
+        justify-items: start;
+      }
+      .course-card-mobile-meta .course-progress-meta {
+        display: none;
       }
       .course-card-action {
         justify-self: flex-start;
       }
       .course-card-actions {
         justify-self: flex-start;
-        padding: 0 4px;
+        padding: 0 12px;
       }
       .course-reader-view {
         padding: 18px 16px;
@@ -5498,7 +5506,6 @@
           <div class="course-card-mobile-meta">
             <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
             ${getMiniCourseProgressMarkup(course)}
-            <div class="course-card-mobile-hint">Deslize para ver o próximo • toque para abrir</div>
           </div>
           ${getMiniCourseCardActionsMarkup(course)}
         </article>
@@ -5548,7 +5555,8 @@
         if (!isMiniCoursesMobileView() || miniCourseMobileAnimating) {
           return;
         }
-        if (Math.abs(event.deltaY) < 14) {
+        const dominantDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+        if (Math.abs(dominantDelta) < 14) {
           return;
         }
         event.preventDefault();
@@ -5556,7 +5564,7 @@
           return;
         }
         miniCourseMobileWheelLocked = true;
-        const direction = event.deltaY > 0 ? 1 : -1;
+        const direction = dominantDelta > 0 ? 1 : -1;
         void animateMiniCourseMobileCarousel(direction);
         window.setTimeout(() => {
           miniCourseMobileWheelLocked = false;
@@ -5579,12 +5587,12 @@
         if (!touch) {
           return;
         }
-        const deltaY = touch.clientY - miniCourseMobileTouchStartY;
         const deltaX = touch.clientX - miniCourseMobileTouchStartX;
-        if (Math.abs(deltaY) < 32 || Math.abs(deltaY) < Math.abs(deltaX)) {
+        const deltaY = touch.clientY - miniCourseMobileTouchStartY;
+        if (Math.abs(deltaX) < 32 || Math.abs(deltaX) < Math.abs(deltaY)) {
           return;
         }
-        const direction = deltaY < 0 ? 1 : -1;
+        const direction = deltaX < 0 ? 1 : -1;
         void animateMiniCourseMobileCarousel(direction);
       };
     }
