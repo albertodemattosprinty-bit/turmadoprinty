@@ -3654,15 +3654,38 @@ async function handleMiniMediaAlbumCoverGenerateRequest(request, response, album
     return;
   }
 
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, { error: error.message });
-    return;
+  const requestContentType = String(request.headers["content-type"] || "").trim().toLowerCase();
+  const isUploadReference = requestContentType.startsWith("image/");
+  let body = null;
+  let uploadedReferenceBuffer = null;
+  let uploadedReferenceType = requestContentType || "image/png";
+  let uploadedReferenceName = decodeURIComponent(String(request.headers["x-file-name"] || "reference.png").trim() || "reference.png");
+
+  if (isUploadReference) {
+    if (!isMiniMediaImageUpload(uploadedReferenceName, uploadedReferenceType)) {
+      sendJson(response, 400, { error: "Envie uma imagem valida como referencia." });
+      return;
+    }
+    try {
+      uploadedReferenceBuffer = await readBinaryBody(request, MAX_MINI_MEDIA_COVER_BYTES);
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Falha ao ler a imagem enviada." });
+      return;
+    }
+    if (!uploadedReferenceBuffer?.length) {
+      sendJson(response, 400, { error: "Imagem de referencia vazia." });
+      return;
+    }
+  } else {
+    try {
+      body = await readJsonBody(request);
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+      return;
+    }
   }
 
-  const requestedModel = String(body?.model || "").trim();
+  const requestedModel = String(isUploadReference ? request.headers["x-model"] || "" : body?.model || "").trim();
   const model = MINI_MEDIA_IMAGE_MODELS.some((item) => item.id === requestedModel)
     ? requestedModel
     : (MINI_MEDIA_IMAGE_MODELS[0]?.id || "gpt-image-2");
@@ -3674,18 +3697,24 @@ async function handleMiniMediaAlbumCoverGenerateRequest(request, response, album
       sendJson(response, 404, { error: "Album nao encontrado." });
       return;
     }
-    if (!album.coverKey) {
+    if (!album.coverKey && !uploadedReferenceBuffer?.length) {
       sendJson(response, 400, { error: "Este album ainda nao possui capa base para replicar." });
       return;
     }
 
-    const sourceBuffer = await readR2ObjectBuffer(album.coverKey);
+    const sourceBuffer = uploadedReferenceBuffer?.length
+      ? uploadedReferenceBuffer
+      : await readR2ObjectBuffer(album.coverKey);
     if (!sourceBuffer.length) {
-      sendJson(response, 400, { error: "Nao foi possivel carregar a capa atual do album." });
+      sendJson(response, 400, { error: uploadedReferenceBuffer?.length ? "Nao foi possivel ler a imagem enviada." : "Nao foi possivel carregar a capa atual do album." });
       return;
     }
 
-    const coverType = String(album.coverContentType || getMiniMediaContentType(album.coverKey, "image/avif")).trim() || "image/avif";
+    const coverType = String(
+      uploadedReferenceBuffer?.length
+        ? uploadedReferenceType
+        : (album.coverContentType || getMiniMediaContentType(album.coverKey, "image/avif"))
+    ).trim() || "image/avif";
     const formData = new FormData();
     formData.append("model", model);
     formData.append(
@@ -3699,7 +3728,13 @@ async function handleMiniMediaAlbumCoverGenerateRequest(request, response, album
     );
     formData.append("size", "1024x1536");
     formData.append("quality", "high");
-    formData.append("image[]", new Blob([sourceBuffer], { type: coverType }), path.posix.basename(album.coverKey) || "cover.png");
+    formData.append(
+      "image[]",
+      new Blob([sourceBuffer], { type: coverType }),
+      uploadedReferenceBuffer?.length
+        ? (path.posix.basename(uploadedReferenceName) || "reference.png")
+        : (path.posix.basename(album.coverKey) || "cover.png")
+    );
 
     const openAiResponse = await fetch("https://api.openai.com/v1/images/edits", {
       method: "POST",

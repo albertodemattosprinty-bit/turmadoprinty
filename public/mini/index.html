@@ -2489,6 +2489,8 @@
       <select id="mediaImageModelSelect" class="course-admin-input"></select>
       <label class="course-admin-label" for="mediaImageAlbumSelect">Álbum</label>
       <select id="mediaImageAlbumSelect" class="course-admin-input"></select>
+      <label class="course-admin-label" for="mediaImageReferenceInput">Upload opcional de referência</label>
+      <input id="mediaImageReferenceInput" class="course-admin-input" type="file" accept="image/*">
       <button id="submitMediaImageGen" class="ai-primary course-admin-submit" type="button">Gerar nova capa</button>
       <div id="mediaImageGenStatus" class="media-imagegen-status"></div>
     </div>
@@ -3339,6 +3341,7 @@
         return;
       }
       $("mediaImageGenStatus").textContent = "";
+      $("mediaImageReferenceInput").value = "";
       renderMediaImageModelOptions();
       renderMediaImageAlbumOptions();
       $("mediaImageGenModal").classList.add("show");
@@ -3359,6 +3362,7 @@
       }
       const model = String($("mediaImageModelSelect")?.value || mediaImageDefaultModel || "gpt-image-2").trim();
       const albumId = String($("mediaImageAlbumSelect")?.value || "").trim();
+      const referenceFile = $("mediaImageReferenceInput")?.files?.[0] || null;
       const status = $("mediaImageGenStatus");
       const button = $("submitMediaImageGen");
       if (!albumId) {
@@ -3371,13 +3375,26 @@
         button.disabled = true;
       }
       if (status) {
-        status.textContent = "Gerando nova capa com a OpenAI...";
+        status.textContent = referenceFile
+          ? "Gerando nova capa com a referencia enviada..."
+          : "Gerando nova capa com a OpenAI...";
       }
       try {
-        const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(albumId)}/cover/generate`, {
-          method: "POST",
-          body: JSON.stringify({ model })
-        });
+        const response = referenceFile
+          ? await fetch(`/api/mini/media/albums/${encodeURIComponent(albumId)}/cover/generate`, {
+            method: "POST",
+            headers: {
+              "Authorization": getMiniToken() ? `Bearer ${getMiniToken()}` : "",
+              "Content-Type": referenceFile.type || "application/octet-stream",
+              "X-File-Name": encodeURIComponent(referenceFile.name),
+              "X-Model": model
+            },
+            body: referenceFile
+          })
+          : await apiMini(`/api/mini/media/albums/${encodeURIComponent(albumId)}/cover/generate`, {
+            method: "POST",
+            body: JSON.stringify({ model })
+          });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(payload.error || "Nao foi possivel gerar a capa.");
