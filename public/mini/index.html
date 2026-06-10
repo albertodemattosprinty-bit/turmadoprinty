@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mini</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800&family=Lora:wght@700;800&family=Merriweather:wght@700&family=Nunito+Sans:wght@700;800&family=Open+Sans:wght@700;800&family=Source+Serif+4:wght@700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Lora:wght@700;800&family=Manrope:wght@400;500;700;800&family=Merriweather:wght@700&family=Nunito+Sans:wght@400;500;700;800&family=Open+Sans:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Source+Serif+4:wght@700;800&display=swap');
     :root {
       color-scheme: only light;
       --text: #1a1a1a;
@@ -1094,6 +1094,10 @@
       --course-quiz-repeat-bg: rgba(29, 78, 216, .10);
       --course-quiz-repeat-color: #1d4ed8;
       --course-lock-text-shadow: none;
+      --course-footer-bg: rgba(79, 149, 255, .98);
+      --course-footer-text-color: rgba(255,255,255,.92);
+      --course-footer-muted-color: rgba(255,255,255,.74);
+      --course-footer-font: var(--course-ui-font);
       position: fixed;
       inset: 0;
       z-index: 55;
@@ -1640,32 +1644,34 @@
       gap: 12px;
       padding: 0 18px calc(8px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
-      background: rgba(216, 221, 229, .68);
-      color: rgba(255,255,255,.82);
+      background: var(--course-footer-bg);
+      color: var(--course-footer-text-color);
     }
     .course-reader-footer-btn {
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       border: 0;
-      border-radius: 12px;
-      background: rgba(255,255,255,.10);
-      color: rgba(255,255,255,.78);
+      border-radius: 0;
+      background: transparent;
+      color: inherit;
       display: grid;
       place-items: center;
       cursor: pointer;
+      padding: 0;
+      box-shadow: none;
     }
     .course-reader-footer-btn svg {
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       fill: currentColor;
     }
     .course-reader-footer-progress {
       text-align: center;
-      font-family: var(--course-ui-font);
+      font-family: var(--course-footer-font);
       font-size: 14px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: .04em;
-      color: rgba(255,255,255,.68);
+      color: var(--course-footer-muted-color);
     }
     .courses-modal.is-immersive-reading .courses-footer {
       background: transparent;
@@ -1766,8 +1772,8 @@
     .courses-modal.is-reading[data-reader-theme="1"] {
       --course-modal-bg: linear-gradient(180deg, #f7f7f9 0%, #e8ebf0 46%, #cfd5de 100%);
       --course-modal-text: rgba(255, 255, 255, 0.96);
-      --course-ui-font: "SF Pro Display", "Inter", sans-serif;
-      --course-body-font: "SF Pro Text", "Inter", sans-serif;
+      --course-ui-font: "Plus Jakarta Sans", "Inter", sans-serif;
+      --course-body-font: "Plus Jakarta Sans", "Inter", sans-serif;
       --course-reader-card-bg: rgba(255,255,255,.08);
       --course-reader-card-border: rgba(255,255,255,.10);
       --course-reader-card-shadow: 0 18px 44px rgba(90, 98, 110, .10);
@@ -1783,12 +1789,16 @@
       --course-quiz-repeat-bg: rgba(255,255,255,.12);
       --course-quiz-repeat-color: rgba(255,255,255,.92);
       --course-lock-text-shadow: none;
+      --course-footer-bg: rgba(194, 170, 154, .84);
+      --course-footer-text-color: rgba(83, 66, 56, .92);
+      --course-footer-muted-color: rgba(107, 84, 72, .78);
+      --course-footer-font: "Plus Jakarta Sans", "Inter", sans-serif;
     }
     .courses-modal.is-reading[data-reader-theme="2"] {
       --course-modal-bg: linear-gradient(180deg, #191c22 0%, #242932 54%, #313845 100%);
       --course-modal-text: rgba(255,255,255,.94);
-      --course-ui-font: "Inter", sans-serif;
-      --course-body-font: "Inter", sans-serif;
+      --course-ui-font: "Manrope", "Inter", sans-serif;
+      --course-body-font: "Manrope", "Inter", sans-serif;
       --course-reader-card-bg: rgba(255,255,255,.06);
       --course-reader-card-border: rgba(255,255,255,.08);
       --course-reader-card-shadow: 0 24px 56px rgba(0, 0, 0, .22);
@@ -1804,12 +1814,16 @@
       --course-quiz-repeat-bg: rgba(255,255,255,.12);
       --course-quiz-repeat-color: rgba(255,255,255,.94);
       --course-lock-text-shadow: none;
+      --course-footer-bg: linear-gradient(180deg, #29a8ff 0%, #006bff 100%);
+      --course-footer-text-color: rgba(255,255,255,.96);
+      --course-footer-muted-color: rgba(255,255,255,.78);
+      --course-footer-font: "Manrope", "Inter", sans-serif;
     }
     .courses-modal.is-reading[data-reader-theme="3"] {
       --course-modal-bg: linear-gradient(180deg, #262b31 0%, #3a4047 52%, #555d66 100%);
       --course-modal-text: rgba(255,255,255,.94);
-      --course-ui-font: "Inter", sans-serif;
-      --course-body-font: "Inter", sans-serif;
+      --course-ui-font: "Nunito Sans", "Inter", sans-serif;
+      --course-body-font: "Nunito Sans", "Inter", sans-serif;
       --course-reader-card-bg: rgba(255,255,255,.06);
       --course-reader-card-border: rgba(255,255,255,.08);
       --course-reader-card-shadow: 0 24px 60px rgba(0, 0, 0, .18);
@@ -1825,12 +1839,16 @@
       --course-quiz-repeat-bg: rgba(255,255,255,.12);
       --course-quiz-repeat-color: rgba(255,255,255,.94);
       --course-lock-text-shadow: none;
+      --course-footer-bg: rgba(71, 79, 90, .86);
+      --course-footer-text-color: rgba(242, 244, 247, .92);
+      --course-footer-muted-color: rgba(221, 226, 233, .72);
+      --course-footer-font: "Nunito Sans", "Inter", sans-serif;
     }
     .courses-modal.is-reading[data-reader-theme="0"] {
       --course-modal-bg: linear-gradient(180deg, #f4f5f7 0%, #dde1e7 48%, #c8ced7 100%);
       --course-modal-text: rgba(255,255,255,.94);
-      --course-ui-font: "SF Pro Display", "Inter", sans-serif;
-      --course-body-font: "SF Pro Text", "Inter", sans-serif;
+      --course-ui-font: "Manrope", "Inter", sans-serif;
+      --course-body-font: "Manrope", "Inter", sans-serif;
       --course-reader-card-bg: rgba(255,255,255,.08);
       --course-reader-card-border: rgba(255,255,255,.10);
       --course-reader-card-shadow: 0 16px 40px rgba(120, 128, 139, .10);
@@ -1846,6 +1864,10 @@
       --course-quiz-repeat-bg: rgba(255,255,255,.14);
       --course-quiz-repeat-color: rgba(255,255,255,.96);
       --course-lock-text-shadow: none;
+      --course-footer-bg: rgba(84, 89, 97, .90);
+      --course-footer-text-color: rgba(232, 235, 239, .96);
+      --course-footer-muted-color: rgba(201, 206, 213, .82);
+      --course-footer-font: "Manrope", "Inter", sans-serif;
     }
     .courses-user-label {
       font-size: 13px;
