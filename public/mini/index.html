@@ -1187,6 +1187,28 @@
     .course-reader-view[hidden] {
       display: none !important;
     }
+    .courses-modal.is-immersive-reading .courses-shell {
+      grid-template-rows: minmax(0, 85dvh) 15dvh;
+      padding: 0;
+    }
+    .courses-modal.is-immersive-reading .courses-top {
+      display: none;
+    }
+    .courses-modal.is-immersive-reading .courses-viewport {
+      border-radius: 0;
+      border: 0;
+      box-shadow: none;
+      background: transparent;
+    }
+    .courses-modal.is-immersive-reading .course-reader-view {
+      height: 100%;
+      padding: 26px 22px 18px;
+      box-sizing: border-box;
+      touch-action: pan-x;
+    }
+    .courses-modal.is-immersive-reading .courses-list-view {
+      display: none !important;
+    }
     .courses-empty {
       min-height: 100%;
       display: grid;
@@ -1598,6 +1620,54 @@
     }
     .courses-footer-status {
       display: none;
+    }
+    .course-reader-footer {
+      display: none;
+      width: 100%;
+      height: 100%;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 0 18px calc(8px + env(safe-area-inset-bottom, 0px));
+      box-sizing: border-box;
+      background: rgba(236, 239, 244, .96);
+      color: rgba(37, 48, 68, .82);
+    }
+    .course-reader-footer-btn {
+      width: 46px;
+      height: 46px;
+      border: 0;
+      border-radius: 14px;
+      background: rgba(37, 48, 68, .08);
+      color: rgba(37, 48, 68, .78);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .course-reader-footer-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+    .course-reader-footer-progress {
+      text-align: center;
+      font-family: var(--course-ui-font);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      color: rgba(37, 48, 68, .68);
+    }
+    .courses-modal.is-immersive-reading .courses-footer {
+      background: transparent;
+      min-height: 0;
+    }
+    .courses-modal.is-immersive-reading .courses-app-footer,
+    .courses-modal.is-immersive-reading .courses-footer-status,
+    .courses-modal.is-immersive-reading .courses-nav-btn {
+      display: none !important;
+    }
+    .courses-modal.is-immersive-reading .course-reader-footer {
+      display: grid;
     }
     .courses-nav-btn {
       width: 64px;
@@ -2370,6 +2440,20 @@
       .courses-footer {
         border-radius: 0;
       }
+      .courses-modal.is-immersive-reading .course-reader-view {
+        padding: 20px 18px 14px;
+      }
+      .course-reader-footer {
+        padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px));
+      }
+      .course-reader-footer-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+      }
+      .course-reader-footer-progress {
+        font-size: 14px;
+      }
       .courses-nav-btn {
         width: 48px;
         min-width: 48px;
@@ -2745,6 +2829,15 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
         </button>
         <div id="courseFooterStatus" class="courses-footer-status"></div>
+        <div id="courseReaderFooter" class="course-reader-footer">
+          <button id="courseReaderBack" class="course-reader-footer-btn" type="button" aria-label="Voltar para a lista de cursos">
+            <svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+          </button>
+          <div id="courseReaderFooterProgress" class="course-reader-footer-progress">0%</div>
+          <button id="courseReaderTheme" class="course-reader-footer-btn" type="button" aria-label="Mudar tema de leitura">
+            <svg viewBox="0 0 24 24"><path d="m7 16 9.6-9.6a2.2 2.2 0 0 1 3.11 0l.89.89a2.2 2.2 0 0 1 0 3.11L11 20H7zm1.8 2H12l6.1-6.1-3.1-3.1L8.9 14.9zM4 20h16v2H4z"/></svg>
+          </button>
+        </div>
         <div class="courses-app-footer">
           <button id="coursesFooterHome" class="courses-app-footer-item" type="button" aria-label="Ir para a home do mini">
             <svg viewBox="0 0 24 24"><path d="M12 3 3 10.2V21h6v-6h6v6h6V10.2z"/></svg>
@@ -2921,6 +3014,8 @@
     let miniCourseMobileAnimating = false;
     let miniCourseMobileTouchStartY = 0;
     let miniCourseMobileTouchStartX = 0;
+    let miniCourseReaderTouchStartX = 0;
+    let miniCourseReaderTouchStartY = 0;
     let miniCourseMobileWheelLocked = false;
     let miniCourseDownloadStates = {};
     let miniCourseCoverUploadStates = {};
@@ -4207,10 +4302,71 @@
       const safeThemeIndex = Math.max(0, Math.min(miniCourseReaderThemes.length - 1, Number(miniCourseReaderThemeIndex || 0) || 0));
       modal.dataset.readerTheme = String(safeThemeIndex);
       modal.classList.toggle("is-reading", Boolean(currentMiniCourse));
+      modal.classList.toggle("is-immersive-reading", Boolean(currentMiniCourse && currentMiniCourseViewMode === "reading"));
+    }
+    function getMiniCourseCompletionPercent() {
+      if (!currentMiniCourse) {
+        return 0;
+      }
+      const totalStages = Math.max(1, Number(getMiniCourseTotalStages() || 1) || 1);
+      const currentStage = Math.max(1, Number(getMiniCourseCurrentStageIndex() || 1) || 1);
+      return Math.max(0, Math.min(100, Math.round((currentStage / totalStages) * 100)));
+    }
+    function updateMiniCourseReaderFooter() {
+      const progressNode = $("courseReaderFooterProgress");
+      const themeButton = $("courseReaderTheme");
+      if (progressNode) {
+        progressNode.textContent = `${getMiniCourseCompletionPercent()}%`;
+      }
+      if (themeButton) {
+        const nextTheme = miniCourseReaderThemes[(Number(miniCourseReaderThemeIndex || 0) + 1) % miniCourseReaderThemes.length];
+        themeButton.setAttribute("aria-label", `Mudar tema de leitura. Próximo: ${nextTheme?.name || "Tema"}`);
+      }
+    }
+    function attachMiniCourseReaderSwipe(readerView) {
+      if (!readerView) {
+        return;
+      }
+      readerView.ontouchstart = (event) => {
+        const touch = event.touches?.[0];
+        if (!touch || currentMiniCourseViewMode !== "reading") {
+          return;
+        }
+        miniCourseReaderTouchStartX = touch.clientX;
+        miniCourseReaderTouchStartY = touch.clientY;
+      };
+      readerView.ontouchend = (event) => {
+        if (currentMiniCourseViewMode !== "reading") {
+          return;
+        }
+        const touch = event.changedTouches?.[0];
+        if (!touch) {
+          return;
+        }
+        const deltaX = touch.clientX - miniCourseReaderTouchStartX;
+        const deltaY = touch.clientY - miniCourseReaderTouchStartY;
+        if (Math.abs(deltaX) < 38 || Math.abs(deltaX) < Math.abs(deltaY)) {
+          return;
+        }
+        const direction = deltaX < 0 ? 1 : -1;
+        void goToMiniCoursePage(direction);
+      };
+    }
+    function returnToMiniCoursesList() {
+      if (!currentMiniCourse) {
+        closeMiniCoursesModal();
+        return;
+      }
+      resetMiniCourseReadGate();
+      resetMiniCourseQuizState();
+      currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || 1) || 1);
+      currentMiniCourseViewMode = "preview";
+      renderMiniCourseReader();
     }
     function cycleMiniCourseReaderTheme() {
       miniCourseReaderThemeIndex = (Number(miniCourseReaderThemeIndex || 0) + 1) % miniCourseReaderThemes.length;
       applyMiniCourseReaderTheme();
+      updateMiniCourseReaderFooter();
     }
     function handleMiniCourseReaderHotkeys(event) {
       if (isMiniInteractiveField(event.target)) {
@@ -5660,6 +5816,9 @@
     function updateMiniCoursesHeader() {
       const title = $("coursesHeadTitle");
       const closeButton = $("closeCourses");
+      if (currentMiniCourse && currentMiniCourseViewMode === "reading") {
+        return;
+      }
       if (title) {
         if (currentMiniCourse && currentMiniCourseViewMode === "reading") {
           title.textContent = `${getMiniCourseCurrentStageIndex()}/${getMiniCourseTotalStages()}`;
@@ -5678,6 +5837,7 @@
       if (!prev || !next) {
         return;
       }
+      updateMiniCourseReaderFooter();
 
       if (!currentMiniCourse) {
         prev.hidden = true;
@@ -5930,6 +6090,7 @@
       clearMiniCourseAnimationTimers();
       readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
       applyMiniCourseReaderTheme();
+      attachMiniCourseReaderSwipe(readerView);
       listView.hidden = true;
       readerView.hidden = false;
 
@@ -5988,6 +6149,7 @@
       listView.hidden = true;
       readerView.hidden = false;
       readerView.innerHTML = `<div class="course-reader-loading">Abrindo o conteúdo do curso...</div>`;
+      attachMiniCourseReaderSwipe(readerView);
       readerView.scrollTop = 0;
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
@@ -6725,6 +6887,12 @@
     };
     $("coursesFooterAulas").onclick = () => {
       navigateFromCourses("aulas");
+    };
+    $("courseReaderBack").onclick = () => {
+      returnToMiniCoursesList();
+    };
+    $("courseReaderTheme").onclick = () => {
+      cycleMiniCourseReaderTheme();
     };
     $("closeCourses").onclick = () => {
       if (currentMiniCourse) {
