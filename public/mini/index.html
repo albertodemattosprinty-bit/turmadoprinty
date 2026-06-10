@@ -2793,6 +2793,7 @@
     let miniCourseMobileWheelLocked = false;
     let miniCourseDownloadStates = {};
     let miniCourseCoverUploadStates = {};
+    let miniCourseQuizGenerationStates = {};
     let miniCourseCoverUploadTargetId = "";
     let currentMiniCourseQuizIndex = -1;
     let currentMiniCourseQuizAnswers = [];
@@ -4365,11 +4366,19 @@
         return "";
       }
       const hasQuiz = Boolean(course?.hasQuiz);
+      const safeCourseId = String(course?.id || "").trim();
+      const isGenerating = Boolean(miniCourseQuizGenerationStates[safeCourseId]);
       const classNames = ["course-card-action", "is-quiz"];
-      if (hasQuiz) {
+      let icon = hasQuiz ? getCheckSvg() : getQuizSvg();
+      let label = hasQuiz ? "Quiz gerado" : "Gerar quiz do curso";
+      if (isGenerating) {
+        classNames.push("is-loading");
+        icon = getSpinnerSvg();
+        label = "Gerando quiz do curso";
+      } else if (hasQuiz) {
         classNames.push("is-success");
       }
-      return `<button class="${classNames.join(" ")}" type="button" data-generate-quiz-course-id="${escapeAttr(course?.id || "")}" aria-label="${escapeAttr(hasQuiz ? "Quiz gerado" : "Gerar quiz do curso")}">${hasQuiz ? getCheckSvg() : getQuizSvg()}</button>`;
+      return `<button class="${classNames.join(" ")}" type="button" data-generate-quiz-course-id="${escapeAttr(safeCourseId)}" aria-label="${escapeAttr(label)}" ${isGenerating ? "disabled" : ""}>${icon}</button>`;
     }
 
     function playMiniCourseTone(type = "success") {
@@ -4714,8 +4723,23 @@
       if (options.body && !headers["Content-Type"]) {
         headers["Content-Type"] = "application/json";
       }
-      const response = await fetch(path, { ...options, headers });
-      return response;
+      const timeoutMs = Math.max(0, Number(options.timeoutMs || 0) || 0);
+      const timeoutMessage = String(options.timeoutMessage || "").trim() || "A requisição demorou demais e foi interrompida.";
+      const controller = timeoutMs ? new AbortController() : null;
+      const timeoutId = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : 0;
+      try {
+        const response = await fetch(path, { ...options, headers, signal: controller?.signal });
+        return response;
+      } catch (error) {
+        if (controller?.signal?.aborted || error?.name === "AbortError") {
+          throw new Error(timeoutMessage);
+        }
+        throw error;
+      } finally {
+        if (timeoutId) {
+          window.clearTimeout(timeoutId);
+        }
+      }
     }
 
     function setAiPlanStatus(text) {
@@ -6128,34 +6152,44 @@
       }
 
       const safeCourseId = String(courseId || "").trim();
-      if (!safeCourseId) {
+      if (!safeCourseId || miniCourseQuizGenerationStates[safeCourseId]) {
         return;
       }
 
-      setCourseFooterStatus("Gerando quiz do curso...");
-      const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}/quiz/generate`, {
-        method: "POST"
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || "Falha ao gerar quiz.");
-      }
-
-      const updatedCourse = payload?.course || null;
-      miniCourses = miniCourses.map((course) => course.id === safeCourseId ? {
-        ...course,
-        hasQuiz: Boolean(updatedCourse?.hasQuiz),
-        quizQuestions: []
-      } : course);
-      if (currentMiniCourse?.id === safeCourseId && updatedCourse) {
-        currentMiniCourse = {
-          ...currentMiniCourse,
-          hasQuiz: Boolean(updatedCourse?.hasQuiz),
-          quizQuestions: Array.isArray(updatedCourse?.quizQuestions) ? updatedCourse.quizQuestions : currentMiniCourse.quizQuestions
-        };
-      }
+      miniCourseQuizGenerationStates[safeCourseId] = true;
       renderMiniCoursesList();
-      setCourseFooterStatus(String(payload?.feedback || "Quiz gerado com sucesso."));
+      setCourseFooterStatus("Gerando quiz do curso com gpt-5.1...");
+      try {
+        const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}/quiz/generate`, {
+          method: "POST",
+          timeoutMs: 150000,
+          timeoutMessage: "O quiz demorou demais para responder. Provavelmente esse curso ficou pesado demais ou a OpenAI travou nesta tentativa."
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao gerar quiz.");
+        }
+
+        const updatedCourse = payload?.course || null;
+        miniCourses = miniCourses.map((course) => course.id === safeCourseId ? {
+          ...course,
+          hasQuiz: Boolean(updatedCourse?.hasQuiz),
+          quizQuestions: []
+        } : course);
+        if (currentMiniCourse?.id === safeCourseId && updatedCourse) {
+          currentMiniCourse = {
+            ...currentMiniCourse,
+            hasQuiz: Boolean(updatedCourse?.hasQuiz),
+            quizQuestions: Array.isArray(updatedCourse?.quizQuestions) ? updatedCourse.quizQuestions : currentMiniCourse.quizQuestions
+          };
+        }
+        setCourseFooterStatus(String(payload?.feedback || "Quiz gerado com sucesso."));
+      } catch (error) {
+        setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao gerar quiz.");
+      } finally {
+        delete miniCourseQuizGenerationStates[safeCourseId];
+        renderMiniCoursesList();
+      }
     }
 
     async function submitMiniCourseQuizResult() {

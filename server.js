@@ -4181,19 +4181,71 @@ async function handleMiniCourseDeleteRequest(request, response, courseId) {
 
 function buildMiniCourseQuizSourceText(course) {
   const pages = Array.isArray(course?.pages) ? course.pages : [];
-  return [
-    `Titulo do curso: ${String(course?.title || "").trim()}`,
-    `Contexto do curso: ${String(course?.context || "").trim()}`,
-    ...pages.flatMap((page, index) => [
-      `Pagina ${index + 1}: ${String(page?.title || "").trim()}`,
-      ...(Array.isArray(page?.paragraphs) ? page.paragraphs : []).map((item) => String(item || "").trim()),
-      ...(Array.isArray(page?.bullets) ? page.bullets : []).map((item) => String(item || "").trim()),
-      ...(Array.isArray(page?.tableRows) ? page.tableRows : []).flatMap((row) => [
-        String(row?.label || "").trim(),
-        String(row?.value || "").trim()
-      ])
-    ])
-  ].filter(Boolean).join("\n");
+  const maxPages = 18;
+  const maxChars = 16000;
+  const compactText = (value, limit = 320) => String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
+  const selectedIndexes = (() => {
+    if (pages.length <= maxPages) {
+      return pages.map((_, index) => index);
+    }
+    const indexes = new Set([0, pages.length - 1]);
+    for (let pickIndex = 1; pickIndex < maxPages - 1; pickIndex += 1) {
+      const ratio = pickIndex / (maxPages - 1);
+      indexes.add(Math.min(pages.length - 1, Math.round(ratio * (pages.length - 1))));
+    }
+    return [...indexes].sort((left, right) => left - right).slice(0, maxPages);
+  })();
+
+  const lines = [
+    `Titulo do curso: ${compactText(course?.title || "", 180)}`,
+    `Contexto do curso: ${compactText(course?.context || "", 600)}`
+  ];
+
+  if (pages.length > selectedIndexes.length) {
+    lines.push(`Resumo parcial para quiz: usando ${selectedIndexes.length} de ${pages.length} páginas distribuídas pelo curso para manter a geração estável.`);
+  }
+
+  selectedIndexes.forEach((pageIndex) => {
+    const page = pages[pageIndex] || {};
+    lines.push(`Pagina ${pageIndex + 1}: ${compactText(page?.title || "", 140)}`);
+    (Array.isArray(page?.paragraphs) ? page.paragraphs : [])
+      .map((item) => compactText(item, 280))
+      .filter(Boolean)
+      .slice(0, 2)
+      .forEach((item) => lines.push(item));
+    (Array.isArray(page?.bullets) ? page.bullets : [])
+      .map((item) => compactText(item, 180))
+      .filter(Boolean)
+      .slice(0, 4)
+      .forEach((item) => lines.push(`- ${item}`));
+    (Array.isArray(page?.tableRows) ? page.tableRows : [])
+      .slice(0, 4)
+      .forEach((row) => {
+        const label = compactText(row?.label || "", 120);
+        const value = compactText(row?.value || "", 160);
+        if (label || value) {
+          lines.push(`${label}${label && value ? ": " : ""}${value}`);
+        }
+      });
+  });
+
+  const output = [];
+  let currentLength = 0;
+  for (const line of lines) {
+    const safeLine = String(line || "").trim();
+    if (!safeLine) {
+      continue;
+    }
+    const nextLength = currentLength + safeLine.length + 1;
+    if (nextLength > maxChars) {
+      output.push("Resumo cortado para evitar travamento do quiz em cursos muito longos.");
+      break;
+    }
+    output.push(safeLine);
+    currentLength = nextLength;
+  }
+
+  return output.join("\n");
 }
 
 function normalizeMiniQuizText(value) {
@@ -4286,9 +4338,11 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
     }
 
     const quizModel = "gpt-5.1";
+    const quizTimeoutMs = 120000;
     const sharedContext = await getContextPrompt();
     const quizSourceText = buildMiniCourseQuizSourceText(course);
     let parsed = null;
+    let lastFailureMessage = "";
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const requestPayload = {
         model: quizModel,
@@ -4338,17 +4392,27 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
         requestPayload.reasoning_effort = "none";
       }
 
-      const completion = await createChatCompletion(apiKey, requestPayload);
-      const raw = extractChatCompletionText(completion);
-      const candidate = parseStructuredJsonText(raw);
-      if (!miniCourseQuizNeedsRetry(candidate)) {
-        parsed = candidate;
-        break;
+      try {
+        const completion = await createChatCompletion(apiKey, requestPayload, {
+          timeoutMs: quizTimeoutMs,
+          timeoutMessage: `A OpenAI demorou demais para responder ao quiz na tentativa ${attempt}/3.`
+        });
+        const raw = extractChatCompletionText(completion);
+        const candidate = parseStructuredJsonText(raw);
+        if (!miniCourseQuizNeedsRetry(candidate)) {
+          parsed = candidate;
+          break;
+        }
+        lastFailureMessage = `Tentativa ${attempt}/3: a IA devolveu perguntas desequilibradas ou incompletas para este curso.`;
+      } catch (error) {
+        lastFailureMessage = error instanceof Error ? error.message : "Nao foi possivel gerar o quiz.";
       }
     }
 
     if (!parsed) {
-      sendJson(response, 422, { error: "Nao foi possivel montar um quiz equilibrado para este curso." });
+      sendJson(response, 422, {
+        error: lastFailureMessage || "Nao foi possivel montar um quiz equilibrado para este curso."
+      });
       return;
     }
 
