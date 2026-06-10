@@ -4248,37 +4248,13 @@ function buildMiniCourseQuizSourceText(course) {
   return output.join("\n");
 }
 
-function normalizeMiniQuizText(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isMiniQuizOptionSuspicious(option, averageLength) {
-  const normalized = normalizeMiniQuizText(option);
-  const length = normalized.length;
-  if (!normalized) {
-    return true;
-  }
-  if (
-    normalized.includes("todas as alternativas anteriores") ||
-    normalized.includes("nenhuma das alternativas") ||
-    normalized.includes("apenas a alternativa") ||
-    normalized.includes("somente a alternativa")
-  ) {
-    return true;
-  }
-  if (length > (averageLength * 1.75) && (length - averageLength) > 28) {
-    return true;
-  }
-  return false;
-}
-
 function miniCourseQuizQuestionNeedsRetry(question) {
   if (!question || !Array.isArray(question.options) || question.options.length !== 4) {
+    return true;
+  }
+
+  const promptText = String(question?.question || "").trim();
+  if (!promptText) {
     return true;
   }
 
@@ -4289,13 +4265,18 @@ function miniCourseQuizQuestionNeedsRetry(question) {
     return true;
   }
 
-  const normalizedOptions = options.map((option) => normalizeMiniQuizText(option));
+  const normalizedOptions = options.map((option) => option.toLowerCase());
   if (new Set(normalizedOptions).size !== 4) {
     return true;
   }
 
-  const averageLength = normalizedOptions.reduce((total, item) => total + item.length, 0) / normalizedOptions.length;
-  if (normalizedOptions.some((option) => isMiniQuizOptionSuspicious(option, averageLength))) {
+  const correctIndex = Number(question?.correctIndex);
+  if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+    return true;
+  }
+
+  const explanation = String(question?.explanation || "").trim();
+  if (!explanation) {
     return true;
   }
 
@@ -4307,12 +4288,7 @@ function miniCourseQuizNeedsRetry(parsed) {
   if (questions.length !== 10) {
     return true;
   }
-  if (questions.some((question) => miniCourseQuizQuestionNeedsRetry(question))) {
-    return true;
-  }
-
-  const correctIndexes = questions.map((question) => Math.max(0, Math.min(3, Number(question?.correctIndex || 0) || 0)));
-  return new Set(correctIndexes).size < 3;
+  return questions.some((question) => miniCourseQuizQuestionNeedsRetry(question));
 }
 
 async function handleMiniCourseQuizGenerateRequest(request, response, courseId) {
@@ -4363,13 +4339,11 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
               extraInstructions: [
                 "Crie um quiz de 10 perguntas para professores com base no curso.",
                 "Cada pergunta deve ter exatamente 4 alternativas.",
-                "Apenas 1 alternativa pode estar correta e 3 devem estar erradas, mas plausiveis.",
                 "As perguntas devem se basear no conteudo real do curso.",
-                "As 4 alternativas precisam ser parecidas em tom, tamanho e nivel de detalhe.",
-                "A resposta correta nao pode destoar das outras em comprimento, linguagem, profundidade, espiritualidade ou especificidade.",
-                "As alternativas erradas devem parecer possiveis e errar por nuance, ordem, enfase ou aplicacao, nunca por absurdo.",
-                "Evite opcoes obviamente longas, moralistas, genericas demais ou com cara de resumo final.",
-                "Distribua a resposta correta entre as quatro posicoes ao longo do quiz.",
+                "Formule perguntas que reflitam com fidelidade o conteudo, a progressao e a linguagem do curso.",
+                "Pode criar perguntas sobre ideias centrais, detalhes relevantes, aplicacoes, sequencias, exemplos e enfases presentes no curso.",
+                "Evite inventar fatos que nao aparecem no curso.",
+                "Mantenha 1 alternativa correta por pergunta.",
                 "Escreva em portugues do Brasil.",
                 "Nao repita perguntas.",
                 "Responda apenas em JSON estruturado."
@@ -4380,9 +4354,9 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
             role: "user",
             content: [
               "Crie 10 perguntas de multipla escolha com base no curso abaixo.",
-              "Cada pergunta deve exigir atencao real para acertar.",
-              "As 4 alternativas devem ficar equilibradas, sem uma opcao gritar que e a correta.",
-              attempt > 1 ? "Refaca com mais equilibrio entre as alternativas: elas precisam parecer igualmente plausiveis a primeira vista." : "",
+              "Use somente o curso como fonte.",
+              "Extraia perguntas que reflitam o curso como ele foi escrito.",
+              attempt > 1 ? "Refaca mantendo fidelidade ao curso e eliminando qualquer pergunta incompleta, repetida ou fora do conteudo." : "",
               quizSourceText
             ].filter(Boolean).join("\n\n")
           }
@@ -4403,7 +4377,7 @@ async function handleMiniCourseQuizGenerateRequest(request, response, courseId) 
           parsed = candidate;
           break;
         }
-        lastFailureMessage = `Tentativa ${attempt}/3: a IA devolveu perguntas desequilibradas ou incompletas para este curso.`;
+        lastFailureMessage = `Tentativa ${attempt}/3: a IA devolveu perguntas incompletas, repetidas ou fora do formato esperado para este curso.`;
       } catch (error) {
         lastFailureMessage = error instanceof Error ? error.message : "Nao foi possivel gerar o quiz.";
       }
