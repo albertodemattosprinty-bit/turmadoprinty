@@ -3927,6 +3927,154 @@ async function handleMiniCourseProgressRequest(request, response, courseId) {
   }
 }
 
+async function handleMiniCourseCoverGenerateRequest(request, response, courseId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  const requestContentType = String(request.headers["content-type"] || "").trim().toLowerCase();
+  const isUploadReference = requestContentType.startsWith("image/");
+  let body = null;
+  let uploadedReferenceBuffer = null;
+  let uploadedReferenceType = requestContentType || "image/png";
+  let uploadedReferenceName = decodeURIComponent(String(request.headers["x-file-name"] || "reference.png").trim() || "reference.png");
+
+  if (isUploadReference) {
+    if (!isMiniMediaImageUpload(uploadedReferenceName, uploadedReferenceType)) {
+      sendJson(response, 400, { error: "Envie uma imagem valida como referencia da capa." });
+      return;
+    }
+    try {
+      uploadedReferenceBuffer = await readBinaryBody(request, MAX_MINI_COURSE_COVER_BYTES);
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Falha ao ler a imagem enviada." });
+      return;
+    }
+    if (!uploadedReferenceBuffer?.length) {
+      sendJson(response, 400, { error: "Imagem de referencia vazia." });
+      return;
+    }
+  } else {
+    try {
+      body = await readJsonBody(request);
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+      return;
+    }
+  }
+
+  const requestedModel = String(isUploadReference ? request.headers["x-model"] || "" : body?.model || "").trim();
+  const model = MINI_MEDIA_IMAGE_MODELS.some((item) => item.id === requestedModel)
+    ? requestedModel
+    : (MINI_MEDIA_IMAGE_MODELS[0]?.id || "gpt-image-2");
+
+  try {
+    const existingCourse = await getMiniCourseById(courseId, "");
+    if (!existingCourse) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    const prompt = [
+      `Crie uma capa vertical original em proporcao 2:3 para o curso "${String(existingCourse.title || "Curso").trim()}".`,
+      existingCourse.context ? `Contexto do curso: ${String(existingCourse.context).trim()}.` : "",
+      existingCourse.coverImagePrompt ? `Direcao visual sugerida: ${String(existingCourse.coverImagePrompt).trim()}.` : "",
+      "A arte deve parecer premium, acolhedora, nítida e apropriada para um curso cristao infantil ou de formacao de professores.",
+      "Nao escreva titulo, letras, tipografia, selo ou texto na imagem.",
+      uploadedReferenceBuffer?.length ? "Use a imagem enviada apenas como referencia de estilo, paleta, clima, composicao e nivel de detalhe." : "",
+      uploadedReferenceBuffer?.length ? "Nao replique exatamente a imagem enviada e nao copie personagens, poses, enquadramento ou elementos de forma identica." : "",
+      "Crie uma capa nova e original, mantendo personalidade propria mesmo quando houver referencia.",
+      "A imagem precisa funcionar bem como capa do curso em tela mobile e desktop."
+    ].filter(Boolean).join(" ");
+
+    let openAiResponse = null;
+    if (uploadedReferenceBuffer?.length) {
+      const formData = new FormData();
+      formData.append("model", model);
+      formData.append("prompt", prompt);
+      formData.append("size", "1024x1536");
+      formData.append("quality", "high");
+      formData.append(
+        "image[]",
+        new Blob([uploadedReferenceBuffer], { type: uploadedReferenceType }),
+        path.posix.basename(uploadedReferenceName) || "reference.png"
+      );
+      openAiResponse = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: formData
+      });
+    } else {
+      openAiResponse = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          prompt,
+          size: "1024x1536",
+          quality: "high"
+        })
+      });
+    }
+
+    const payload = await openAiResponse.json().catch(() => ({}));
+    if (!openAiResponse.ok) {
+      sendJson(response, openAiResponse.status || 502, {
+        error: payload?.error?.message || payload?.error || "Nao foi possivel gerar a capa do curso com a OpenAI."
+      });
+      return;
+    }
+
+    const b64 = String(payload?.data?.[0]?.b64_json || "").trim();
+    if (!b64) {
+      sendJson(response, 502, { error: "A OpenAI nao devolveu a imagem gerada." });
+      return;
+    }
+
+    const generatedBuffer = Buffer.from(b64, "base64");
+    const key = `${buildMiniCourseCoverFolder(courseId)}/cover-generated-${Date.now()}.png`;
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: generatedBuffer,
+      ContentType: "image/png"
+    }));
+
+    const coverImageUrl = buildAlbumZipPublicUrlFromKey(key);
+    const updatedCourse = await updateMiniCourseCover(courseId, coverImageUrl);
+    if (!updatedCourse) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      course: updatedCourse,
+      feedback: `Nova capa do curso gerada com ${model}.`
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel gerar a capa do curso."
+    });
+  }
+}
+
 async function handleMiniCourseDeleteRequest(request, response, courseId) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -6692,6 +6840,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/quiz/submit")) {
     const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/quiz\/submit$/, ""));
     await handleMiniCourseQuizSubmitRequest(request, response, courseId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/cover/generate")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/cover\/generate$/, ""));
+    await handleMiniCourseCoverGenerateRequest(request, response, courseId);
     return;
   }
 

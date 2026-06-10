@@ -2485,6 +2485,11 @@
       </div>
       <div class="section-muted">Escolha o modelo de imagem da OpenAI e o álbum que servirá de base. A nova capa gerada será salva no R2.</div>
       <div class="media-admin-hint">Atalho do admin: com o Midia aberto, pressione <strong>X</strong>.</div>
+      <label class="course-admin-label" for="mediaImageActionSelect">Acao do upload</label>
+      <select id="mediaImageActionSelect" class="course-admin-input">
+        <option value="generate">Usar upload como referencia</option>
+        <option value="cover">Definir upload como capa do album</option>
+      </select>
       <label class="course-admin-label" for="mediaImageModelSelect">Modelo de imagem</label>
       <select id="mediaImageModelSelect" class="course-admin-input"></select>
       <label class="course-admin-label" for="mediaImageAlbumSelect">Álbum</label>
@@ -2679,6 +2684,32 @@
       <input id="courseAdminPagesInput" class="course-admin-input" type="number" min="4" max="300" value="8">
       <button id="generateCourseAdmin" class="ai-primary course-admin-submit" type="button">Gerar curso</button>
       <div id="courseAdminStatus" class="create-status"></div>
+    </div>
+  </section>
+
+  <section id="courseImageGenModal" class="mini-plans-modal" aria-hidden="true">
+    <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="courseImageGenTitle">
+      <div class="mini-plans-head">
+        <h3 id="courseImageGenTitle">Criar capa do curso</h3>
+        <button id="closeCourseImageGen" class="round-action close" type="button" aria-label="Fechar gerador de capa do curso">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div class="section-muted">Escolha o curso, o modelo da OpenAI e uma imagem opcional de base. Aqui a IA usa a referência como direção visual, sem replicar exatamente.</div>
+      <div class="media-admin-hint">Atalho do admin: com os Cursos abertos, pressione <strong>X</strong>.</div>
+      <label class="course-admin-label" for="courseImageActionSelect">Acao do upload</label>
+      <select id="courseImageActionSelect" class="course-admin-input">
+        <option value="generate">Usar upload como referencia</option>
+        <option value="cover">Definir upload como capa do curso</option>
+      </select>
+      <label class="course-admin-label" for="courseImageModelSelect">Modelo de imagem</label>
+      <select id="courseImageModelSelect" class="course-admin-input"></select>
+      <label class="course-admin-label" for="courseImageCourseSelect">Curso</label>
+      <select id="courseImageCourseSelect" class="course-admin-input"></select>
+      <label class="course-admin-label" for="courseImageReferenceInput">Upload opcional de referencia</label>
+      <input id="courseImageReferenceInput" class="course-admin-input" type="file" accept="image/*">
+      <button id="submitCourseImageGen" class="ai-primary course-admin-submit" type="button">Gerar nova capa</button>
+      <div id="courseImageGenStatus" class="media-imagegen-status"></div>
     </div>
   </section>
 
@@ -2894,6 +2925,103 @@
       if (mediaActiveAlbumId && albums.some((album) => album.id === mediaActiveAlbumId)) {
         select.value = mediaActiveAlbumId;
       }
+    }
+    function syncMediaImageGenActionUi() {
+      const action = String($("mediaImageActionSelect")?.value || "generate").trim();
+      const modelLabel = $("mediaImageModelSelect")?.previousElementSibling;
+      const modelSelect = $("mediaImageModelSelect");
+      const referenceLabel = $("mediaImageReferenceInput")?.previousElementSibling;
+      const referenceInput = $("mediaImageReferenceInput");
+      const submitButton = $("submitMediaImageGen");
+      if (modelLabel) {
+        modelLabel.textContent = "Modelo de imagem";
+      }
+      if (modelSelect) {
+        modelSelect.disabled = action === "cover";
+        modelSelect.style.opacity = action === "cover" ? ".55" : "1";
+      }
+      if (referenceLabel) {
+        referenceLabel.textContent = action === "cover"
+          ? "Upload da capa"
+          : "Upload opcional de referencia";
+      }
+      if (referenceInput) {
+        referenceInput.required = action === "cover";
+      }
+      if (submitButton) {
+        submitButton.textContent = action === "cover" ? "Salvar upload como capa" : "Gerar nova capa";
+      }
+    }
+    function renderMiniCourseImageModelOptions() {
+      const select = $("courseImageModelSelect");
+      if (!select) {
+        return;
+      }
+      const models = mediaImageModels.length ? mediaImageModels : [{ id: mediaImageDefaultModel, label: mediaImageDefaultModel.toUpperCase() }];
+      const previousValue = String(select.value || mediaImageDefaultModel).trim();
+      select.innerHTML = models.map((model) => `<option value="${escapeAttr(model.id)}">${escapeText(model.label || model.id)}</option>`).join("");
+      select.value = models.some((model) => model.id === previousValue) ? previousValue : (mediaImageDefaultModel || models[0]?.id || "gpt-image-2");
+    }
+    function renderMiniCourseImageCourseOptions() {
+      const select = $("courseImageCourseSelect");
+      if (!select) {
+        return;
+      }
+      select.innerHTML = miniCourses.length
+        ? miniCourses.map((course) => `<option value="${escapeAttr(course.id)}">${escapeText(course.title || "Curso sem titulo")}</option>`).join("")
+        : `<option value="">Sem cursos</option>`;
+      const preferredCourseId = String(currentMiniCourse?.id || "").trim();
+      if (preferredCourseId && miniCourses.some((course) => course.id === preferredCourseId)) {
+        select.value = preferredCourseId;
+      }
+    }
+    function syncMiniCourseImageGenActionUi() {
+      const action = String($("courseImageActionSelect")?.value || "generate").trim();
+      const modelLabel = $("courseImageModelSelect")?.previousElementSibling;
+      const modelSelect = $("courseImageModelSelect");
+      const referenceLabel = $("courseImageReferenceInput")?.previousElementSibling;
+      const referenceInput = $("courseImageReferenceInput");
+      const submitButton = $("submitCourseImageGen");
+      if (modelLabel) {
+        modelLabel.textContent = "Modelo de imagem";
+      }
+      if (modelSelect) {
+        modelSelect.disabled = action === "cover";
+        modelSelect.style.opacity = action === "cover" ? ".55" : "1";
+      }
+      if (referenceLabel) {
+        referenceLabel.textContent = action === "cover"
+          ? "Upload da capa"
+          : "Upload opcional de referencia";
+      }
+      if (referenceInput) {
+        referenceInput.required = action === "cover";
+      }
+      if (submitButton) {
+        submitButton.textContent = action === "cover" ? "Salvar upload como capa" : "Gerar nova capa";
+      }
+    }
+    function applyMiniCourseCoverUpdateLocally(courseId, updatedCourse) {
+      const safeCourseId = String(courseId || updatedCourse?.id || "").trim();
+      if (!safeCourseId || !updatedCourse?.coverImageUrl) {
+        return;
+      }
+      miniCourses = miniCourses.map((course) => course.id === safeCourseId ? {
+        ...course,
+        coverImageUrl: updatedCourse.coverImageUrl
+      } : course);
+      if (currentMiniCourse?.id === safeCourseId) {
+        currentMiniCourse = {
+          ...currentMiniCourse,
+          coverImageUrl: updatedCourse.coverImageUrl
+        };
+      }
+      if (currentMiniCourse?.id === safeCourseId) {
+        renderMiniCourseReader();
+      } else {
+        renderMiniCoursesList();
+      }
+      renderMiniCourseImageCourseOptions();
     }
     function getMediaTrackSourceKey(song, scopeId = "songs") {
       if (song?.url) {
@@ -3341,9 +3469,11 @@
         return;
       }
       $("mediaImageGenStatus").textContent = "";
+      $("mediaImageActionSelect").value = "generate";
       $("mediaImageReferenceInput").value = "";
       renderMediaImageModelOptions();
       renderMediaImageAlbumOptions();
+      syncMediaImageGenActionUi();
       $("mediaImageGenModal").classList.add("show");
       $("mediaImageGenModal").setAttribute("aria-hidden", "false");
       try {
@@ -3356,10 +3486,36 @@
       $("mediaImageGenModal").classList.remove("show");
       $("mediaImageGenModal").setAttribute("aria-hidden", "true");
     }
+    async function openMiniCourseImageGenModal() {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+      closeMiniCourseAdminModal();
+      closeMiniCourseJobsModal();
+      $("courseImageGenStatus").textContent = "";
+      $("courseImageActionSelect").value = "generate";
+      $("courseImageReferenceInput").value = "";
+      renderMiniCourseImageModelOptions();
+      renderMiniCourseImageCourseOptions();
+      syncMiniCourseImageGenActionUi();
+      $("courseImageGenModal").classList.add("show");
+      $("courseImageGenModal").setAttribute("aria-hidden", "false");
+      try {
+        await loadMediaImageModels();
+        renderMiniCourseImageModelOptions();
+      } catch (error) {
+        $("courseImageGenStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar os modelos de imagem.";
+      }
+    }
+    function closeMiniCourseImageGenModal() {
+      $("courseImageGenModal").classList.remove("show");
+      $("courseImageGenModal").setAttribute("aria-hidden", "true");
+    }
     async function submitMediaImageGeneration() {
       if (!isMiniMediaAdmin()) {
         return;
       }
+      const action = String($("mediaImageActionSelect")?.value || "generate").trim();
       const model = String($("mediaImageModelSelect")?.value || mediaImageDefaultModel || "gpt-image-2").trim();
       const albumId = String($("mediaImageAlbumSelect")?.value || "").trim();
       const referenceFile = $("mediaImageReferenceInput")?.files?.[0] || null;
@@ -3371,16 +3527,34 @@
         }
         return;
       }
+      if (action === "cover" && !referenceFile) {
+        if (status) {
+          status.textContent = "Envie uma imagem para definir como capa do album.";
+        }
+        return;
+      }
       if (button) {
         button.disabled = true;
       }
       if (status) {
-        status.textContent = referenceFile
+        status.textContent = action === "cover"
+          ? "Salvando upload como capa do album..."
+          : (referenceFile
           ? "Gerando nova capa com a referencia enviada..."
-          : "Gerando nova capa com a OpenAI...";
+          : "Gerando nova capa com a OpenAI...");
       }
       try {
-        const response = referenceFile
+        const response = action === "cover"
+          ? await fetch(`/api/mini/media/albums/${encodeURIComponent(albumId)}/cover`, {
+            method: "PUT",
+            headers: {
+              "Authorization": getMiniToken() ? `Bearer ${getMiniToken()}` : "",
+              "Content-Type": referenceFile?.type || "application/octet-stream",
+              "X-File-Name": encodeURIComponent(referenceFile?.name || "cover.png")
+            },
+            body: referenceFile
+          })
+          : referenceFile
           ? await fetch(`/api/mini/media/albums/${encodeURIComponent(albumId)}/cover/generate`, {
             method: "POST",
             headers: {
@@ -3407,13 +3581,100 @@
           renderMediaModal();
         }
         if (status) {
-          status.textContent = String(payload?.feedback || "Nova capa gerada com sucesso.");
+          status.textContent = String(payload?.feedback || (action === "cover" ? "Capa atualizada com sucesso." : "Nova capa gerada com sucesso."));
         }
-        setMediaStatus(String(payload?.feedback || "Nova capa gerada com sucesso."));
+        setMediaStatus(String(payload?.feedback || (action === "cover" ? "Capa atualizada com sucesso." : "Nova capa gerada com sucesso.")));
       } catch (error) {
         if (status) {
-          status.textContent = error instanceof Error ? error.message : "Falha ao gerar a capa.";
+          status.textContent = error instanceof Error ? error.message : (action === "cover" ? "Falha ao salvar a capa." : "Falha ao gerar a capa.");
         }
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
+    async function submitMiniCourseImageGeneration() {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+      const action = String($("courseImageActionSelect")?.value || "generate").trim();
+      const model = String($("courseImageModelSelect")?.value || mediaImageDefaultModel || "gpt-image-2").trim();
+      const courseId = String($("courseImageCourseSelect")?.value || "").trim();
+      const referenceFile = $("courseImageReferenceInput")?.files?.[0] || null;
+      const status = $("courseImageGenStatus");
+      const button = $("submitCourseImageGen");
+      if (!courseId) {
+        if (status) {
+          status.textContent = "Escolha um curso para criar a capa.";
+        }
+        return;
+      }
+      if (action === "cover" && !referenceFile) {
+        if (status) {
+          status.textContent = "Envie uma imagem para definir como capa do curso.";
+        }
+        return;
+      }
+      if (button) {
+        button.disabled = true;
+      }
+      if (status) {
+        status.textContent = action === "cover"
+          ? "Preparando upload da capa do curso..."
+          : (referenceFile
+          ? "Gerando nova capa a partir da referencia enviada..."
+          : "Gerando nova capa com a OpenAI...");
+      }
+      try {
+        if (action === "cover") {
+          await uploadMiniCourseCover(courseId, referenceFile);
+          if (status) {
+            status.textContent = "Capa do curso salva com sucesso.";
+          }
+          return;
+        }
+
+        miniCourseCoverUploadStates[courseId] = "loading";
+        renderMiniCoursesList();
+        setCourseFooterStatus(referenceFile
+          ? "Gerando capa original do curso com a referencia enviada..."
+          : "Gerando capa original do curso...");
+
+        const response = referenceFile
+          ? await fetch(`/api/mini/courses/${encodeURIComponent(courseId)}/cover/generate`, {
+            method: "POST",
+            headers: {
+              "Authorization": getMiniToken() ? `Bearer ${getMiniToken()}` : "",
+              "Content-Type": referenceFile.type || "application/octet-stream",
+              "X-File-Name": encodeURIComponent(referenceFile.name),
+              "X-Model": model
+            },
+            body: referenceFile
+          })
+          : await apiMini(`/api/mini/courses/${encodeURIComponent(courseId)}/cover/generate`, {
+            method: "POST",
+            body: JSON.stringify({ model })
+          });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel gerar a capa do curso.");
+        }
+
+        miniCourseCoverUploadStates[courseId] = "saved";
+        applyMiniCourseCoverUpdateLocally(courseId, payload?.course || null);
+        if (status) {
+          status.textContent = String(payload?.feedback || "Nova capa criada com sucesso.");
+        }
+        setCourseFooterStatus(String(payload?.feedback || "Nova capa criada com sucesso."));
+      } catch (error) {
+        delete miniCourseCoverUploadStates[courseId];
+        renderMiniCoursesList();
+        const message = error instanceof Error ? error.message : "Falha ao criar a capa do curso.";
+        if (status) {
+          status.textContent = message;
+        }
+        setCourseFooterStatus(message);
       } finally {
         if (button) {
           button.disabled = false;
@@ -3784,14 +4045,19 @@
       applyMiniCourseReaderTheme();
     }
     function handleMiniCourseReaderHotkeys(event) {
-      if (!currentMiniCourse || isMiniCoursesMobileView() || isMiniInteractiveField(event.target)) {
+      if (isMiniInteractiveField(event.target)) {
         return;
       }
       const coursesModal = $("coursesModal");
       if (!coursesModal || !coursesModal.classList.contains("show")) {
         return;
       }
-      if (event.key !== "3") {
+      if (String(event.key || "").toLowerCase() === "x" && isMiniCourseAdmin) {
+        event.preventDefault();
+        void openMiniCourseImageGenModal();
+        return;
+      }
+      if (!currentMiniCourse || isMiniCoursesMobileView() || event.key !== "3") {
         return;
       }
       event.preventDefault();
@@ -5513,6 +5779,7 @@
       isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
       updateMiniCourseAdminButton();
       updateMiniCoursesUserCard();
+      renderMiniCourseImageCourseOptions();
     }
 
     async function loadMiniCourses() {
@@ -5559,6 +5826,7 @@
       $("coursesModal").setAttribute("aria-hidden", "true");
       closeMiniCoursesUserModal();
       closeMiniCourseAdminModal();
+      closeMiniCourseImageGenModal();
       closeMiniCourseJobsModal();
       resetMiniCourseReadGate();
       resetMiniCourseQuizState();
@@ -5794,21 +6062,8 @@
         }
 
         const updatedCourse = payload?.course || null;
-        if (updatedCourse?.coverImageUrl) {
-          miniCourses = miniCourses.map((course) => course.id === safeCourseId ? {
-            ...course,
-            coverImageUrl: updatedCourse.coverImageUrl
-          } : course);
-          if (currentMiniCourse?.id === safeCourseId) {
-            currentMiniCourse = {
-              ...currentMiniCourse,
-              coverImageUrl: updatedCourse.coverImageUrl
-            };
-          }
-        }
-
         miniCourseCoverUploadStates[safeCourseId] = "saved";
-        renderMiniCoursesList();
+        applyMiniCourseCoverUpdateLocally(safeCourseId, updatedCourse);
         setCourseFooterStatus(String(payload?.feedback || "Capa global atualizada com sucesso."));
       } catch (error) {
         delete miniCourseCoverUploadStates[safeCourseId];
@@ -6160,6 +6415,9 @@
     $("closeMediaImageGen").onclick = () => {
       closeMediaImageGenModal();
     };
+    $("mediaImageActionSelect").onchange = () => {
+      syncMediaImageGenActionUi();
+    };
     $("submitMediaImageGen").onclick = async () => {
       await submitMediaImageGeneration();
     };
@@ -6227,6 +6485,15 @@
     };
     $("closeCourseAdmin").onclick = () => {
       closeMiniCourseAdminModal();
+    };
+    $("closeCourseImageGen").onclick = () => {
+      closeMiniCourseImageGenModal();
+    };
+    $("courseImageActionSelect").onchange = () => {
+      syncMiniCourseImageGenActionUi();
+    };
+    $("submitCourseImageGen").onclick = async () => {
+      await submitMiniCourseImageGeneration();
     };
     $("courseCoverUploadInput").onchange = async () => {
       await handleMiniCourseCoverInputChange();
