@@ -2824,6 +2824,24 @@
     </div>
   </section>
 
+  <section id="mediaLyricsModal" class="mini-plans-modal" aria-hidden="true">
+    <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="mediaLyricsTitle">
+      <div class="mini-plans-head">
+        <h3 id="mediaLyricsTitle">Letra da música</h3>
+        <button id="closeMediaLyrics" class="round-action close" type="button" aria-label="Fechar letra da música">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div class="section-muted">Cole ou edite a letra desta música. Ela será salva em um JSON próprio vinculado à faixa.</div>
+      <label class="course-admin-label" for="mediaLyricsTrackTitle">Música</label>
+      <input id="mediaLyricsTrackTitle" class="course-admin-input" type="text" readonly>
+      <label class="course-admin-label" for="mediaLyricsTextarea">Letra</label>
+      <textarea id="mediaLyricsTextarea" class="course-admin-input course-admin-textarea" placeholder="Cole a letra completa aqui."></textarea>
+      <button id="submitMediaLyrics" class="ai-primary course-admin-submit" type="button">Salvar letra</button>
+      <div id="mediaLyricsStatus" class="create-status"></div>
+    </div>
+  </section>
+
   <section id="aulasModal" class="immersive">
     <header class="modal-head"><h2>Planejar Aula</h2></header>
     <div class="deck"><div><div id="selectedRows" class="rows"></div><div class="pager"><button id="selPrev" class="pill-btn">&#8249;</button><span id="selPage">1 / 1</span><button id="selNext" class="pill-btn">&#8250;</button></div></div><div id="timeline" class="timeline"></div></div>
@@ -3173,6 +3191,8 @@
     const mediaTrackDurationLoads = new Set();
     let mediaPendingInsertAlbumId = "";
     let mediaPendingInsertOrder = 0;
+    let mediaLyricsAlbumId = "";
+    let mediaLyricsTrackId = "";
     let mediaImageModels = [];
     let mediaImageDefaultModel = "gpt-image-2";
     const mediaPreviewState = {
@@ -3676,7 +3696,7 @@
           ${editMode ? `
             <div class="media-track-actions">
               <button class="media-play-btn is-delete" type="button" data-media-delete-track="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Excluir faixa">${getTrashSvg()}</button>
-              <button class="media-play-btn is-add" type="button" data-media-add-track-order="${escapeAttr(String(Number(song?.order || 0) + 1))}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Adicionar faixas abaixo">${getMediaPlusSvg()}</button>
+              <button class="media-play-btn is-add" type="button" data-media-edit-lyrics="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" data-media-track-title="${escapeAttr(song.title || "Faixa")}" aria-label="Adicionar letra da música">${getMediaPlusSvg()}</button>
             </div>
           ` : `<button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>`}
         </article>
@@ -4180,6 +4200,80 @@
       renderMediaModal();
       setMediaStatus(String(payload?.feedback || "Album excluido com sucesso."));
     }
+    function closeMediaLyricsModal() {
+      mediaLyricsAlbumId = "";
+      mediaLyricsTrackId = "";
+      $("mediaLyricsModal").classList.remove("show");
+      $("mediaLyricsModal").setAttribute("aria-hidden", "true");
+      $("mediaLyricsTrackTitle").value = "";
+      $("mediaLyricsTextarea").value = "";
+      $("mediaLyricsStatus").textContent = "";
+    }
+    async function openMediaLyricsModal(albumId, trackId, trackTitle = "") {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      mediaLyricsAlbumId = String(albumId || "").trim();
+      mediaLyricsTrackId = String(trackId || "").trim();
+      $("mediaLyricsTrackTitle").value = String(trackTitle || "Faixa").trim() || "Faixa";
+      $("mediaLyricsTextarea").value = "";
+      $("mediaLyricsStatus").textContent = "Carregando letra atual...";
+      $("mediaLyricsModal").classList.add("show");
+      $("mediaLyricsModal").setAttribute("aria-hidden", "false");
+
+      try {
+        const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/lyrics`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel carregar a letra.");
+        }
+        $("mediaLyricsTextarea").value = String(payload?.lyrics || "");
+        $("mediaLyricsStatus").textContent = payload?.updatedAt
+          ? "Letra carregada. Você pode editar e salvar."
+          : "Ainda nao existe letra salva para esta música.";
+      } catch (error) {
+        $("mediaLyricsStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar a letra.";
+      }
+    }
+    async function submitMediaLyrics() {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      const albumId = String(mediaLyricsAlbumId || "").trim();
+      const trackId = String(mediaLyricsTrackId || "").trim();
+      const textarea = $("mediaLyricsTextarea");
+      const status = $("mediaLyricsStatus");
+      const button = $("submitMediaLyrics");
+      if (!albumId || !trackId || !textarea || !status) {
+        return;
+      }
+      if (button) {
+        button.disabled = true;
+      }
+      status.textContent = "Salvando letra da música...";
+      try {
+        const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics`, {
+          method: "PATCH",
+          body: JSON.stringify({ lyrics: textarea.value || "" })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel salvar a letra.");
+        }
+        if (payload?.library?.albums) {
+          mediaLibraryAlbums = payload.library.albums;
+        }
+        renderMediaModal();
+        status.textContent = String(payload?.feedback || "Letra salva com sucesso.");
+        setMediaStatus(String(payload?.feedback || "Letra salva com sucesso."));
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : "Falha ao salvar a letra.";
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
     function handleMediaAdminHotkeys(event) {
       if (!isMiniMediaAdmin() || isMiniInteractiveField(event.target)) {
         return;
@@ -4335,6 +4429,15 @@
           );
         };
       });
+      content.querySelectorAll("[data-media-edit-lyrics]").forEach((button) => {
+        button.onclick = async () => {
+          await openMediaLyricsModal(
+            button.getAttribute("data-media-scope") || "",
+            button.getAttribute("data-media-edit-lyrics") || "",
+            button.getAttribute("data-media-track-title") || "Faixa"
+          );
+        };
+      });
       content.querySelectorAll("[data-media-track-title-input]").forEach((input) => {
         input.addEventListener("keydown", (event) => {
           if (event.key === "Enter") {
@@ -4441,6 +4544,7 @@
       applyMediaEditModeUi();
       closeMediaUploadModal();
       closeMediaImageGenModal();
+      closeMediaLyricsModal();
       $("mediaModal").classList.remove("show");
       $("mediaModal").setAttribute("aria-hidden", "true");
     }
@@ -7049,11 +7153,17 @@
     $("closeMediaImageGen").onclick = () => {
       closeMediaImageGenModal();
     };
+    $("closeMediaLyrics").onclick = () => {
+      closeMediaLyricsModal();
+    };
     $("mediaImageActionSelect").onchange = () => {
       syncMediaImageGenActionUi();
     };
     $("submitMediaImageGen").onclick = async () => {
       await submitMediaImageGeneration();
+    };
+    $("submitMediaLyrics").onclick = async () => {
+      await submitMediaLyrics();
     };
     $("submitMediaUpload").onclick = async () => {
       await submitMediaUpload();

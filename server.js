@@ -314,6 +314,8 @@ function normalizeMiniMediaSong(raw, index = 0) {
     title: safeTitle,
     subtitle: sanitizeMiniMediaTitle(raw?.subtitle || "Faixa do album", "Faixa do album"),
     key: String(raw?.key || "").trim(),
+    lyricsKey: String(raw?.lyricsKey || "").trim(),
+    lyricsUpdatedAt: raw?.lyricsUpdatedAt || null,
     contentType: String(raw?.contentType || "").trim(),
     order: Math.max(0, Number(raw?.order || index) || index),
     createdAt: raw?.createdAt || null,
@@ -363,6 +365,10 @@ function buildMiniMediaAlbumFolder(albumId) {
   return `${MINI_MEDIA_ALBUMS_PREFIX}/${String(albumId || "").trim()}`;
 }
 
+function buildMiniMediaTrackLyricsKey(albumId, trackId) {
+  return `${buildMiniMediaAlbumFolder(albumId)}/lyrics/${String(trackId || "").trim()}.json`;
+}
+
 function buildMiniCourseCoverFolder(courseId) {
   return `${MINI_COURSE_COVERS_PREFIX}/${String(courseId || "").trim()}`;
 }
@@ -375,7 +381,9 @@ function buildMiniMediaAlbumPayload(album) {
     subtitle: song.subtitle,
     order: Math.max(0, Number(song.order || 0) || 0),
     url: song.key ? buildAlbumZipPublicUrlFromKey(song.key) : "",
-    coverImageUrl
+    coverImageUrl,
+    hasLyrics: Boolean(song.lyricsKey),
+    lyricsUpdatedAt: song.lyricsUpdatedAt || null
   })) : [];
 
   return {
@@ -417,6 +425,40 @@ async function saveMiniMediaLibrary(library) {
     ContentType: "application/json; charset=utf-8"
   }));
   return normalized;
+}
+
+async function loadMiniMediaTrackLyrics(key) {
+  const rawText = await readR2ObjectText(key);
+  if (!rawText) {
+    return { lyrics: "", updatedAt: null };
+  }
+  try {
+    const parsed = JSON.parse(rawText);
+    return {
+      lyrics: String(parsed?.lyrics || "").trim(),
+      updatedAt: parsed?.updatedAt || null
+    };
+  } catch {
+    return {
+      lyrics: String(rawText || "").trim(),
+      updatedAt: null
+    };
+  }
+}
+
+async function saveMiniMediaTrackLyrics(key, lyrics, updatedBy = "") {
+  const payload = {
+    lyrics: String(lyrics || "").trim(),
+    updatedAt: new Date().toISOString(),
+    updatedBy: String(updatedBy || "").trim() || null
+  };
+  await getR2Client().send(new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    Body: Buffer.from(JSON.stringify(payload, null, 2), "utf8"),
+    ContentType: "application/json; charset=utf-8"
+  }));
+  return payload;
 }
 
 async function syncMiniMediaLibraryFromCoverFolder(library) {
@@ -3602,6 +3644,8 @@ async function handleMiniMediaTrackUploadRequest(request, response, albumId, tra
       title: songTitle,
       subtitle: `${album.title} • faixa ${trackOrder + 1}`,
       key,
+      lyricsKey: existingIndex >= 0 ? album.songs[existingIndex].lyricsKey : "",
+      lyricsUpdatedAt: existingIndex >= 0 ? album.songs[existingIndex].lyricsUpdatedAt : null,
       contentType: finalContentType,
       order: trackOrder,
       createdAt: existingIndex >= 0 ? album.songs[existingIndex].createdAt : new Date().toISOString(),
@@ -3681,6 +3725,133 @@ async function handleMiniMediaTrackUpdateRequest(request, response, albumId, tra
   }
 }
 
+async function handleMiniMediaTrackLyricsRequest(request, response, albumId, trackId) {
+  const user = await getOptionalAuthUser(request);
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+    const song = album.songs.find((item) => item.id === trackId);
+    if (!song) {
+      sendJson(response, 404, { error: "Faixa nao encontrada." });
+      return;
+    }
+
+    const lyricsData = song.lyricsKey
+      ? await loadMiniMediaTrackLyrics(song.lyricsKey)
+      : { lyrics: "", updatedAt: null };
+
+    sendJson(response, 200, {
+      ok: true,
+      user: user ? sanitizeUser(user) : null,
+      albumId,
+      trackId,
+      song: {
+        id: song.id,
+        title: song.title
+      },
+      lyrics: lyricsData.lyrics,
+      hasLyrics: Boolean(song.lyricsKey && lyricsData.lyrics),
+      updatedAt: song.lyricsUpdatedAt || lyricsData.updatedAt || null
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar a letra."
+    });
+  }
+}
+
+async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumId, trackId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const lyrics = String(body?.lyrics || "").replace(/\r\n/g, "\n").trim();
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+    const song = album.songs.find((item) => item.id === trackId);
+    if (!song) {
+      sendJson(response, 404, { error: "Faixa nao encontrada." });
+      return;
+    }
+
+    if (!lyrics) {
+      const existingLyricsKey = String(song.lyricsKey || "").trim();
+      if (existingLyricsKey) {
+        try {
+          await getR2Client().send(new DeleteObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: existingLyricsKey
+          }));
+        } catch (_) {
+          // Ignore bucket delete errors and keep metadata update.
+        }
+      }
+      song.lyricsKey = "";
+      song.lyricsUpdatedAt = null;
+      song.updatedAt = new Date().toISOString();
+      album.updatedAt = song.updatedAt;
+      const saved = await saveMiniMediaLibrary(library);
+      const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+      sendJson(response, 200, {
+        ok: true,
+        user: sanitizeUser(adminUser),
+        album: buildMiniMediaAlbumPayload(savedAlbum),
+        library: buildMiniMediaLibraryPayload(saved),
+        trackId,
+        lyrics: "",
+        hasLyrics: false,
+        updatedAt: null,
+        feedback: "Letra removida com sucesso."
+      });
+      return;
+    }
+
+    const lyricsKey = String(song.lyricsKey || "").trim() || buildMiniMediaTrackLyricsKey(albumId, trackId);
+    const savedLyrics = await saveMiniMediaTrackLyrics(lyricsKey, lyrics, adminUser.username || adminUser.name || "");
+    song.lyricsKey = lyricsKey;
+    song.lyricsUpdatedAt = savedLyrics.updatedAt;
+    song.updatedAt = savedLyrics.updatedAt;
+    album.updatedAt = savedLyrics.updatedAt;
+    const saved = await saveMiniMediaLibrary(library);
+    const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      album: buildMiniMediaAlbumPayload(savedAlbum),
+      library: buildMiniMediaLibraryPayload(saved),
+      trackId,
+      lyrics: savedLyrics.lyrics,
+      hasLyrics: true,
+      updatedAt: savedLyrics.updatedAt,
+      feedback: "Letra salva com sucesso."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar a letra."
+    });
+  }
+}
+
 async function handleMiniMediaTrackDeleteRequest(request, response, albumId, trackId) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -3709,6 +3880,16 @@ async function handleMiniMediaTrackDeleteRequest(request, response, albumId, tra
         await getR2Client().send(new DeleteObjectCommand({
           Bucket: R2_BUCKET_NAME,
           Key: song.key
+        }));
+      } catch (_) {
+        // Ignore bucket delete errors and keep metadata deletion.
+      }
+    }
+    if (song?.lyricsKey) {
+      try {
+        await getR2Client().send(new DeleteObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: song.lyricsKey
         }));
       } catch (_) {
         // Ignore bucket delete errors and keep metadata deletion.
@@ -3747,7 +3928,10 @@ async function handleMiniMediaAlbumDeleteRequest(request, response, albumId) {
     const [album] = library.albums.splice(existingIndex, 1);
     const keysToDelete = [
       String(album?.coverKey || "").trim(),
-      ...((Array.isArray(album?.songs) ? album.songs : []).map((song) => String(song?.key || "").trim()))
+      ...((Array.isArray(album?.songs) ? album.songs : []).flatMap((song) => [
+        String(song?.key || "").trim(),
+        String(song?.lyricsKey || "").trim()
+      ]))
     ].filter(Boolean);
 
     for (const key of keysToDelete) {
@@ -6975,6 +7159,22 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PUT" && pathname.startsWith("/api/mini/media/albums/") && pathname.endsWith("/cover")) {
     const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", "").replace(/\/cover$/, ""));
     await handleMiniMediaAlbumCoverUploadRequest(request, response, albumId);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/") && pathname.endsWith("/lyrics")) {
+    const parts = pathname.replace("/api/mini/media/albums/", "").replace(/\/lyrics$/, "").split("/tracks/");
+    const albumId = decodeURIComponent(parts[0] || "");
+    const trackId = decodeURIComponent(parts[1] || "");
+    await handleMiniMediaTrackLyricsRequest(request, response, albumId, trackId);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/") && pathname.endsWith("/lyrics")) {
+    const parts = pathname.replace("/api/mini/media/albums/", "").replace(/\/lyrics$/, "").split("/tracks/");
+    const albumId = decodeURIComponent(parts[0] || "");
+    const trackId = decodeURIComponent(parts[1] || "");
+    await handleMiniMediaTrackLyricsUpdateRequest(request, response, albumId, trackId);
     return;
   }
 
