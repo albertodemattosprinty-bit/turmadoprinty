@@ -3730,6 +3730,53 @@ async function handleMiniMediaTrackDeleteRequest(request, response, albumId, tra
   }
 }
 
+async function handleMiniMediaAlbumDeleteRequest(request, response, albumId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const existingIndex = library.albums.findIndex((item) => item.id === albumId);
+    if (existingIndex < 0) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+
+    const [album] = library.albums.splice(existingIndex, 1);
+    const keysToDelete = [
+      String(album?.coverKey || "").trim(),
+      ...((Array.isArray(album?.songs) ? album.songs : []).map((song) => String(song?.key || "").trim()))
+    ].filter(Boolean);
+
+    for (const key of keysToDelete) {
+      try {
+        await getR2Client().send(new DeleteObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: key
+        }));
+      } catch (_) {
+        // Ignore bucket delete errors and keep metadata deletion.
+      }
+    }
+
+    const saved = await saveMiniMediaLibrary(library);
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      deleted: true,
+      albumId,
+      library: buildMiniMediaLibraryPayload(saved),
+      feedback: "Album excluido com sucesso."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir o album."
+    });
+  }
+}
+
 async function handleMiniMediaAlbumCoverGenerateRequest(request, response, albumId) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -6910,6 +6957,12 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/mini/media/albums") {
     await handleMiniMediaAlbumCreateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && !pathname.includes("/tracks/") && !pathname.endsWith("/cover") && !pathname.endsWith("/cover/generate")) {
+    const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", ""));
+    await handleMiniMediaAlbumDeleteRequest(request, response, albumId);
     return;
   }
 

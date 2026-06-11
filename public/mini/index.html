@@ -359,6 +359,16 @@
       cursor: pointer;
       color: #253044;
     }
+    .media-album-card-shell {
+      position: relative;
+    }
+    .media-album-card-shell .media-play-btn.is-delete {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 2;
+      box-shadow: 0 10px 20px rgba(181, 24, 24, .18);
+    }
     .media-album-cover {
       width: 100%;
       height: auto;
@@ -401,6 +411,11 @@
       align-items: center;
       gap: 12px;
       margin-bottom: 2px;
+    }
+    .media-album-detail-head-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
     }
     .media-album-back {
       width: 46px;
@@ -4138,6 +4153,31 @@
       renderMediaModal();
       setMediaStatus("Faixa excluida com sucesso.");
     }
+    async function deleteMediaAlbum(albumId) {
+      const safeAlbumId = String(albumId || "").trim();
+      const album = getMediaAlbumById(safeAlbumId);
+      const albumTitle = String(album?.title || "este album").trim();
+      const confirmed = window.confirm(`Excluir o album "${albumTitle}"?`);
+      if (!confirmed) {
+        return;
+      }
+      const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(safeAlbumId)}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Nao foi possivel excluir o album.");
+      }
+      if (payload?.library?.albums) {
+        mediaLibraryAlbums = payload.library.albums;
+      }
+      if (mediaActiveAlbumId === safeAlbumId) {
+        mediaActiveAlbumId = "";
+      }
+      mediaActiveTab = "albums";
+      renderMediaModal();
+      setMediaStatus(String(payload?.feedback || "Album excluido com sucesso."));
+    }
     function handleMediaAdminHotkeys(event) {
       if (!isMiniMediaAdmin() || isMiniInteractiveField(event.target)) {
         return;
@@ -4227,6 +4267,7 @@
               <h3 class="media-album-title">${escapeText(album.title)}</h3>
               <p class="media-album-meta">${escapeText(album.subtitle)}</p>
             </div>
+            ${mediaAlbumEditMode ? `<div class="media-album-detail-head-actions"><button class="media-play-btn is-delete" type="button" data-media-delete-album="${escapeAttr(album.id)}" aria-label="Excluir album">${getTrashSvg()}</button></div>` : ""}
           </div>
           ${album.songs.length
             ? `<div class="media-track-list">${album.songs.map((song) => buildMediaTrackCard(song, album.id, { editMode: mediaAlbumEditMode })).join("")}</div>`
@@ -4245,13 +4286,15 @@
           ? `
             <div class="media-album-grid">
               ${albums.map((album) => `
-                <button class="media-album-card" type="button" data-media-album="${escapeAttr(album.id)}">
-                  <div class="media-album-cover">${album.coverImageUrl ? `<img class="media-album-cover-image" src="${escapeAttr(album.coverImageUrl)}" alt="${escapeAttr(album.title)}">` : ""}<span>${escapeText(album.title)}</span></div>
-                  <div>
-                    <h3 class="media-album-title">${escapeText(album.title)}</h3>
-                    <p class="media-album-meta">${escapeText(album.subtitle)}</p>
-                  </div>
-                </button>
+                <div class="media-album-card-shell">
+                  <button class="media-album-card" type="button" data-media-album="${escapeAttr(album.id)}">
+                    <div class="media-album-cover">${album.coverImageUrl ? `<img class="media-album-cover-image" src="${escapeAttr(album.coverImageUrl)}" alt="${escapeAttr(album.title)}">` : ""}<span>${escapeText(album.title)}</span></div>
+                    <div>
+                      <h3 class="media-album-title">${escapeText(album.title)}</h3>
+                      <p class="media-album-meta">${escapeText(album.subtitle)}</p>
+                    </div>
+                  </button>
+                </div>
               `).join("")}
             </div>
           `
@@ -4269,6 +4312,16 @@
             await deleteMediaTrack(button.getAttribute("data-media-scope") || "", button.getAttribute("data-media-delete-track") || "");
           } catch (error) {
             setMediaStatus(error instanceof Error ? error.message : "Falha ao excluir a faixa.");
+          }
+        };
+      });
+      content.querySelectorAll("[data-media-delete-album]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          try {
+            await deleteMediaAlbum(button.getAttribute("data-media-delete-album") || "");
+          } catch (error) {
+            setMediaStatus(error instanceof Error ? error.message : "Falha ao excluir o album.");
           }
         };
       });
