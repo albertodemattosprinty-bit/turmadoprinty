@@ -1672,6 +1672,75 @@
     .course-page-audio {
       width: 100%;
     }
+    .course-map-shell,
+    .course-chapter-open-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+      color: var(--course-body-color);
+      font-family: var(--course-body-font);
+      text-shadow: var(--course-reader-text-shadow);
+    }
+    .course-map-shell {
+      padding: 8px 0 32px;
+    }
+    .course-map-title,
+    .course-chapter-open-title {
+      margin: 0;
+      font-size: clamp(calc(22px * var(--course-reader-font-scale)), calc(3vw * var(--course-reader-font-scale)), calc(34px * var(--course-reader-font-scale)));
+      line-height: 1.04;
+      color: var(--course-title-color);
+      font-weight: 800;
+    }
+    .course-map-subtitle,
+    .course-chapter-open-subtitle {
+      margin: 0;
+      font-size: calc(15px * var(--course-reader-font-scale));
+      line-height: 1.6;
+      opacity: .82;
+    }
+    .course-map-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .course-map-row {
+      display: grid;
+      grid-template-columns: minmax(110px, 170px) 1fr;
+      gap: 14px;
+      padding: 16px 18px;
+      border-radius: 22px;
+      background: var(--course-row-bg);
+      align-items: start;
+    }
+    .course-map-row strong {
+      font-size: calc(13px * var(--course-reader-font-scale));
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--course-row-strong-color);
+    }
+    .course-map-row span {
+      font-size: calc(15px * var(--course-reader-font-scale));
+      line-height: 1.6;
+    }
+    .course-chapter-open-shell {
+      min-height: 58vh;
+      align-content: center;
+      padding: 10vh 0 8vh;
+    }
+    .course-chapter-open-kicker {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .18em;
+      opacity: .8;
+      font-weight: 800;
+    }
+    .course-chapter-open-logline {
+      margin: 0;
+      font-size: clamp(calc(16px * var(--course-reader-font-scale)), calc(1.9vw * var(--course-reader-font-scale)), calc(22px * var(--course-reader-font-scale)));
+      line-height: 1.72;
+      max-width: 42ch;
+    }
     .course-quiz-shell {
       max-width: 960px;
       margin: 0 auto;
@@ -3170,6 +3239,13 @@
       </select>
       <label class="course-admin-label" for="courseAdminPagesInput">Quantidade de páginas</label>
       <input id="courseAdminPagesInput" class="course-admin-input" type="number" min="4" max="300" value="8">
+      <label class="course-admin-label" for="courseAdminChaptersInput">Quantidade de capítulos</label>
+      <input id="courseAdminChaptersInput" class="course-admin-input" type="number" min="1" max="300" value="1">
+      <label class="course-admin-label" for="courseAdminStyleSelect">Dinâmica do livro</label>
+      <select id="courseAdminStyleSelect" class="course-admin-input">
+        <option value="course">Estilo Curso (50-25-25)</option>
+        <option value="story">Estilo história (50-0-50)</option>
+      </select>
       <button id="generateCourseAdmin" class="ai-primary course-admin-submit" type="button">Gerar curso</button>
       <div id="courseAdminStatus" class="create-status"></div>
     </div>
@@ -5072,6 +5148,10 @@
       return basePages + currentMiniCourseQuizIndex + 1;
     }
     function getMiniCoursePageTimingText(course, page) {
+      const kind = String(page?.kind || "").trim().toLowerCase();
+      if (kind === "course-map" || kind === "chapter_open") {
+        return "";
+      }
       return [
         String(course?.title || "").trim(),
         String(page?.title || "").trim(),
@@ -5084,6 +5164,10 @@
       ].filter(Boolean).join(" ");
     }
     function getMiniCoursePageRequiredMs(course, page) {
+      const kind = String(page?.kind || "").trim().toLowerCase();
+      if (kind === "course-map" || kind === "chapter_open") {
+        return 0;
+      }
       const totalChars = getMiniCoursePageTimingText(course, page).length;
       const requiredSeconds = Math.max(1, Math.ceil(totalChars / 30));
       return requiredSeconds * 1000;
@@ -6162,6 +6246,7 @@
               <div class="course-job-badge ${escapeAttr(safeStatus)}">${escapeText(getMiniCourseJobStatusLabel(safeStatus))}</div>
             </div>
             <div class="course-job-feedback">Modelo: ${escapeText(job.requestedModel || "gpt-5.1")}</div>
+            <div class="course-job-feedback">${escapeText(String(job.requestedPageCount || 0))} páginas de conteúdo • ${escapeText(String(job.requestedChapterCount || 1))} capítulos • ${escapeText(job.requestedCourseStyle === "story" ? "Estilo história" : "Estilo Curso")}</div>
             ${updatedAtLabel ? `<div class="course-job-feedback">Última atualização: ${escapeText(updatedAtLabel)}</div>` : ""}
             <div class="course-job-progress">
               <span>${generated}/${requested} páginas</span>
@@ -6748,6 +6833,7 @@
       currentMiniCoursePage = Math.max(1, Math.min(totalPages, Number(currentMiniCoursePage || 1) || 1));
       const quizQuestions = getMiniCourseQuizQuestions();
       const currentPage = currentMiniCourse.pages?.[currentMiniCoursePage - 1] || {};
+      const currentPageKind = String(currentPage.kind || "").trim().toLowerCase();
       const paragraphs = Array.isArray(currentPage.paragraphs) ? currentPage.paragraphs : [];
       const bullets = Array.isArray(currentPage.bullets) ? currentPage.bullets : [];
       const tableRows = Array.isArray(currentPage.tableRows) ? currentPage.tableRows : [];
@@ -6784,20 +6870,36 @@
       }
 
       syncMiniCourseReadGate(currentPage);
-      readerView.innerHTML = `
-        <div class="course-page-shell">
-          <h2 class="course-page-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
-          ${paragraphs.map((paragraph) => `<p class="course-page-paragraph">${escapeText(paragraph)}</p>`).join("")}
-          ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li>${escapeText(item)}</li>`).join("")}</ul>` : ""}
-          ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
-          ${(currentPage.imageUrl || currentPage.audioUrl) ? `
-            <div class="course-page-media">
-              ${currentPage.imageUrl ? `<img src="${escapeAttr(currentPage.imageUrl)}" alt="${escapeAttr(currentPage.title || currentMiniCourse.title)}">` : ""}
-              ${currentPage.audioUrl ? `<audio class="course-page-audio" controls src="${escapeAttr(currentPage.audioUrl)}"></audio>` : ""}
+      if (currentPageKind === "course-map") {
+        readerView.innerHTML = `
+          <div class="course-map-shell">
+            <h2 class="course-map-title">${escapeText(currentPage.title || "Mapa do curso")}</h2>
+            ${currentPage.subtitle ? `<p class="course-map-subtitle">${escapeText(currentPage.subtitle)}</p>` : ""}
+            ${currentPage.logline ? `<p class="course-page-paragraph">${escapeText(currentPage.logline)}</p>` : ""}
+            <div class="course-map-grid">
+              ${tableRows.map((row) => `<div class="course-map-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}
             </div>
-          ` : ""}
-        </div>
-      `;
+          </div>
+        `;
+      } else if (currentPageKind === "chapter_open") {
+        readerView.innerHTML = `
+          <div class="course-chapter-open-shell">
+            <div class="course-chapter-open-kicker">Capítulo ${escapeText(String(currentPage.chapterNumber || currentMiniCoursePage))}</div>
+            <h2 class="course-chapter-open-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
+            ${currentPage.subtitle ? `<p class="course-chapter-open-subtitle">${escapeText(currentPage.subtitle)}</p>` : ""}
+            <p class="course-chapter-open-logline">${escapeText(currentPage.logline || "")}</p>
+          </div>
+        `;
+      } else {
+        readerView.innerHTML = `
+          <div class="course-page-shell">
+            <h2 class="course-page-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
+            ${paragraphs.map((paragraph) => `<p class="course-page-paragraph">${escapeText(paragraph)}</p>`).join("")}
+            ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li>${escapeText(item)}</li>`).join("")}</ul>` : ""}
+            ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
+          </div>
+        `;
+      }
       readerView.scrollTop = 0;
 
       updateMiniCoursesHeader();
@@ -7397,6 +7499,8 @@
       const context = $("courseAdminContextInput")?.value.trim() || "";
       const model = $("courseAdminModelSelect")?.value.trim() || miniCourseGeneratorDefaultModel || "gpt-5.1";
       const pageCount = Math.max(4, Math.min(300, Number($("courseAdminPagesInput")?.value || 8) || 8));
+      const chapterCount = Math.max(1, Math.min(pageCount, Number($("courseAdminChaptersInput")?.value || 1) || 1));
+      const courseStyle = String($("courseAdminStyleSelect")?.value || "course").trim() || "course";
       const status = $("courseAdminStatus");
       const button = $("generateCourseAdmin");
 
@@ -7417,7 +7521,7 @@
       try {
         const response = await apiMini("/api/mini/courses/generate", {
           method: "POST",
-          body: JSON.stringify({ title, context, model, pageCount })
+          body: JSON.stringify({ title, context, model, pageCount, chapterCount, courseStyle })
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -7428,6 +7532,8 @@
         $("courseAdminTitleInput").value = "";
         $("courseAdminContextInput").value = "";
         $("courseAdminPagesInput").value = String(pageCount);
+        $("courseAdminChaptersInput").value = String(chapterCount);
+        $("courseAdminStyleSelect").value = courseStyle;
         $("courseAdminModelSelect").value = model;
         closeMiniCourseAdminModal();
         openMiniCourseJobsModal();

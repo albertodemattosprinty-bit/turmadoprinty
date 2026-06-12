@@ -3005,31 +3005,79 @@ async function handleMiniLessonPlansListRequest(request, response) {
   }
 }
 
-function buildMiniCoursePageKinds(pageCount) {
-  const total = Math.max(4, Math.min(300, Number(pageCount || 8) || 8));
-  const textCount = Math.max(1, Math.round(total * 0.5));
-  const didacticCount = Math.max(1, Math.round(total * 0.25));
-  const closingCount = Math.max(1, total - textCount - didacticCount);
+function normalizeMiniCourseStyle(value) {
+  return String(value || "").trim().toLowerCase() === "story" ? "story" : "course";
+}
+
+function buildMiniCourseStyleLabel(style) {
+  return normalizeMiniCourseStyle(style) === "story" ? "Estilo historia" : "Estilo curso";
+}
+
+function distributeMiniCourseKindCounts(total, ratioEntries) {
+  const safeTotal = Math.max(1, Number(total || 1) || 1);
+  const draft = ratioEntries.map(([kind, ratio]) => ({
+    kind,
+    count: Math.floor(safeTotal * ratio),
+    remainder: (safeTotal * ratio) - Math.floor(safeTotal * ratio)
+  }));
+  let assigned = draft.reduce((sum, entry) => sum + entry.count, 0);
+  while (assigned < safeTotal) {
+    draft
+      .slice()
+      .sort((a, b) => b.remainder - a.remainder)
+      .some((entry) => {
+        entry.count += 1;
+        assigned += 1;
+        return true;
+      });
+  }
+  return draft;
+}
+
+function buildMiniCourseChapterContentKinds(pageCount, style = "course") {
+  const safeStyle = normalizeMiniCourseStyle(style);
+  const ratios = safeStyle === "story"
+    ? [["text", 0.5], ["closing", 0.5]]
+    : [["text", 0.5], ["didactic", 0.25], ["closing", 0.25]];
+  const counts = distributeMiniCourseKindCounts(pageCount, ratios);
   const kinds = [];
-
-  for (let index = 0; index < textCount; index += 1) {
+  for (const entry of counts) {
+    for (let index = 0; index < entry.count; index += 1) {
+      kinds.push(entry.kind);
+    }
+  }
+  while (kinds.length < pageCount) {
     kinds.push("text");
   }
-  for (let index = 0; index < didacticCount; index += 1) {
-    kinds.push("didactic");
-  }
-  while (kinds.length < total - closingCount) {
-    kinds.push("text");
-  }
-  while (kinds.length < total) {
-    kinds.push("closing");
-  }
+  return kinds.slice(0, pageCount);
+}
 
-  return kinds.slice(0, total);
+function distributeMiniCoursePagesAcrossChapters(totalPages, chapterCount) {
+  const safeTotal = Math.max(4, Math.min(300, Number(totalPages || 8) || 8));
+  const safeChapters = Math.max(1, Math.min(safeTotal, Number(chapterCount || 1) || 1));
+  const base = Math.floor(safeTotal / safeChapters);
+  const remainder = safeTotal % safeChapters;
+  return Array.from({ length: safeChapters }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+function buildMiniCourseChapterBlueprints(pageCount, chapterCount, style) {
+  const contentPages = distributeMiniCoursePagesAcrossChapters(pageCount, chapterCount);
+  return contentPages.map((contentPageCount, index) => ({
+    chapterNumber: index + 1,
+    contentPageCount,
+    contentKinds: buildMiniCourseChapterContentKinds(contentPageCount, style)
+  }));
+}
+
+function renumberMiniCoursePages(pages = []) {
+  return (Array.isArray(pages) ? pages : []).map((page, index) => ({
+    ...page,
+    pageNumber: index + 1
+  }));
 }
 
 function normalizeMiniCourseGeneratedPage(page, index, expectedKind = "text") {
-  const kind = ["text", "didactic", "closing"].includes(String(page?.kind || "").trim().toLowerCase())
+  const kind = ["text", "didactic", "closing", "course-map", "chapter_open"].includes(String(page?.kind || "").trim().toLowerCase())
     ? String(page.kind).trim().toLowerCase()
     : expectedKind;
   const paragraphs = Array.isArray(page?.paragraphs)
@@ -3052,13 +3100,16 @@ function normalizeMiniCourseGeneratedPage(page, index, expectedKind = "text") {
     pageNumber: index + 1,
     kind,
     title: String(page?.title || `Pagina ${index + 1}`).trim() || `Pagina ${index + 1}`,
+    subtitle: String(page?.subtitle || "").trim(),
+    logline: String(page?.logline || "").trim(),
+    chapterNumber: Math.max(0, Number(page?.chapterNumber || 0) || 0),
     paragraphs,
     bullets,
     tableRows,
-    imageUrl: String(page?.imageUrl || "").trim(),
-    imagePrompt: String(page?.imagePrompt || "").trim(),
-    audioUrl: String(page?.audioUrl || "").trim(),
-    audioScript: String(page?.audioScript || "").trim()
+    imageUrl: "",
+    imagePrompt: "",
+    audioUrl: "",
+    audioScript: ""
   };
 }
 
@@ -3079,6 +3130,22 @@ function evaluateMiniCoursePages(pages = [], startPageNumber = 1) {
     const bullets = Array.isArray(page?.bullets) ? page.bullets.filter(Boolean) : [];
     const tableRows = Array.isArray(page?.tableRows) ? page.tableRows.filter((item) => item?.label || item?.value) : [];
     const textLength = getMiniCoursePageTextLength(page);
+
+    if (kind === "course-map") {
+      const ok = Boolean(String(page?.title || "").trim()) && tableRows.length >= 1;
+      if (!ok) {
+        issues.push(`Pagina ${displayPageNumber} de mapa do curso veio vazia ou sem capitulos.`);
+      }
+      return ok;
+    }
+
+    if (kind === "chapter_open") {
+      const ok = Boolean(String(page?.title || "").trim()) && Boolean(String(page?.logline || "").trim());
+      if (!ok) {
+        issues.push(`Pagina ${displayPageNumber} de abertura de capitulo veio incompleta.`);
+      }
+      return ok;
+    }
 
     if (kind === "text") {
       const ok = paragraphs.length >= 1 && textLength >= 360;
@@ -3117,10 +3184,7 @@ function evaluateMiniCoursePages(pages = [], startPageNumber = 1) {
   };
 }
 
-function buildMiniCourseChunkSchema(chunkKinds, startPageNumber, includeMetadata = false) {
-  const required = includeMetadata
-    ? ["mainTitle", "coverImagePrompt", "courseOverview", "pages"]
-    : ["pages"];
+function buildMiniCourseChunkSchema(chunkKinds) {
   const properties = {
     pages: {
       type: "array",
@@ -3129,11 +3193,14 @@ function buildMiniCourseChunkSchema(chunkKinds, startPageNumber, includeMetadata
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["pageNumber", "kind", "title", "paragraphs", "bullets", "tableRows", "imageUrl", "imagePrompt", "audioUrl", "audioScript"],
+        required: ["pageNumber", "kind", "title", "subtitle", "logline", "chapterNumber", "paragraphs", "bullets", "tableRows"],
         properties: {
           pageNumber: { type: "integer" },
           kind: { type: "string" },
           title: { type: "string" },
+          subtitle: { type: "string" },
+          logline: { type: "string" },
+          chapterNumber: { type: "integer" },
           paragraphs: { type: "array", items: { type: "string" } },
           bullets: { type: "array", items: { type: "string" } },
           tableRows: {
@@ -3147,49 +3214,77 @@ function buildMiniCourseChunkSchema(chunkKinds, startPageNumber, includeMetadata
                 value: { type: "string" }
               }
             }
-          },
-          imageUrl: { type: "string" },
-          imagePrompt: { type: "string" },
-          audioUrl: { type: "string" },
-          audioScript: { type: "string" }
+          }
         }
       }
     }
   };
 
-  if (includeMetadata) {
-    properties.mainTitle = { type: "string" };
-    properties.coverImagePrompt = { type: "string" };
-    properties.courseOverview = { type: "string" };
-  }
-
   return {
-    name: includeMetadata ? "mini_course_chunk_with_meta" : "mini_course_chunk",
+    name: "mini_course_chapter_chunk",
     strict: true,
     schema: {
       type: "object",
       additionalProperties: false,
-      required,
+      required: ["pages"],
       properties
     }
   };
 }
 
-function buildMiniCourseChunks(kinds, chunkSize = 4) {
-  const safeChunkSize = Math.max(1, Number(chunkSize || 4) || 4);
-  const chunks = [];
+function buildMiniCourseChapterPlanSchema(chapterCount = 1) {
+  return {
+    name: "mini_course_chapter_plan",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mainTitle", "courseOverview", "chapters"],
+      properties: {
+        mainTitle: { type: "string" },
+        courseOverview: { type: "string" },
+        chapters: {
+          type: "array",
+          minItems: chapterCount,
+          maxItems: chapterCount,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["chapterNumber", "title", "subtitle", "logline"],
+            properties: {
+              chapterNumber: { type: "integer" },
+              title: { type: "string" },
+              subtitle: { type: "string" },
+              logline: { type: "string" }
+            }
+          }
+        }
+      }
+    }
+  };
+}
 
-  for (let startIndex = 0; startIndex < kinds.length; startIndex += safeChunkSize) {
-    const chunkKinds = kinds.slice(startIndex, startIndex + safeChunkSize);
-    chunks.push({
-      startIndex,
-      startPageNumber: startIndex + 1,
-      endPageNumber: startIndex + chunkKinds.length,
-      kinds: chunkKinds
-    });
-  }
+function buildMiniCourseMapPage({ courseTitle, courseOverview, chapters }) {
+  return normalizeMiniCourseGeneratedPage({
+    kind: "course-map",
+    title: "Mapa do curso",
+    subtitle: courseTitle,
+    logline: courseOverview,
+    tableRows: (Array.isArray(chapters) ? chapters : []).map((chapter) => ({
+      label: `Capitulo ${chapter.chapterNumber}`,
+      value: `${chapter.title}${chapter.subtitle ? ` • ${chapter.subtitle}` : ""}`
+    }))
+  }, 0, "course-map");
+}
 
-  return chunks;
+function buildMiniCourseChapterOpenPage(chapter) {
+  return normalizeMiniCourseGeneratedPage({
+    kind: "chapter_open",
+    chapterNumber: chapter.chapterNumber,
+    title: chapter.title,
+    subtitle: chapter.subtitle,
+    logline: chapter.logline
+  }, 0, "chapter_open");
 }
 
 function buildMiniCourseQuizSchema(questionCount = 10) {
@@ -3244,15 +3339,13 @@ function buildMiniCourseChunkLabel(chunk, chunkIndex, totalChunks) {
   return `Bloco ${chunkIndex + 1}/${totalChunks} • páginas ${chunk.startPageNumber}-${chunk.endPageNumber}`;
 }
 
-async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, context, pageCount, onProgress } = {}) {
+async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, context, pageCount, chapterCount = 1, courseStyle = "course", onProgress } = {}) {
   const sharedContext = await getContextPrompt();
-  const kinds = buildMiniCoursePageKinds(pageCount);
-  const courseChunks = buildMiniCourseChunks(
-    kinds,
-    pageCount >= 180 ? 8 : pageCount >= 90 ? 6 : pageCount >= 24 ? 5 : 4
-  );
-  const maxChunkAttempts = 3;
-  const chunkTimeoutMs = pageCount >= 180
+  const safeChapterCount = Math.max(1, Math.min(pageCount, Number(chapterCount || 1) || 1));
+  const safeCourseStyle = normalizeMiniCourseStyle(courseStyle);
+  const chapterBlueprints = buildMiniCourseChapterBlueprints(pageCount, safeChapterCount, safeCourseStyle);
+  const maxChapterAttempts = 3;
+  const chapterTimeoutMs = pageCount >= 180
     ? 300000
     : pageCount >= 90
       ? 240000
@@ -3269,12 +3362,12 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
       "Voce esta criando cursos completos e globais para professores do Ministerio Infantil dentro do MINI.",
       "Use o contexto cristao compartilhado da plataforma e o tom ministerial do MINI.",
       "O curso deve ser pratico, profundo, amoroso, biblicamente coerente e muito util para professores.",
-      `Crie exatamente ${pageCount} paginas na ordem obrigatoria destes tipos: ${kinds.join(", ")}.`,
-      "Cada pagina equivale a 1 minuto de curso.",
-      "Nas paginas text, escreva 1 ou 2 paragrafos totalizando cerca de 500 a 600 caracteres, sem deixar paginas vazias.",
-      "Nas paginas didactic, entregue conteudo pedagogico e responsivo com pelo menos 3 bullets ou 2 linhas de tabela, e pode adicionar 1 paragrafo curto se ajudar.",
-      "Nas paginas closing, entregue 3 paragrafos entre 150 e 200 caracteres cada, com conclusao, aplicacao e encorajamento final.",
-      "Preencha imagePrompt e audioScript pensando em futuras geracoes de imagem e mp3, mas deixe imageUrl e audioUrl vazios se ainda nao existir arquivo.",
+      `O curso tera ${pageCount} paginas de conteudo distribuidas em ${safeChapterCount} capitulos.`,
+      `Use o ${buildMiniCourseStyleLabel(safeCourseStyle)} na distribuicao interna de cada capitulo.`,
+      "Nas paginas text, escreva 1 ou 2 paragrafos densos, claros e sem repeticao mecanica.",
+      "Nas paginas didactic, entregue conteudo pedagogico com bullets claros ou tabela objetiva.",
+      "Nas paginas closing, escreva 3 paragrafos completos de fechamento, aplicacao e encorajamento.",
+      "Crie somente o texto visivel. Nao crie prompts de imagem, prompts de audio ou direcoes de capa.",
       "Nenhuma pagina pode vir vazia, resumida demais ou so com titulo.",
       "Nunca use placeholders como 'Conteudo para...', 'Subtitulo 2', 'Pagina 1' sem desenvolver o conteudo real.",
       "Responda apenas em JSON estruturado."
@@ -3291,14 +3384,14 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     }
   };
 
-  const createCourseChunkAttempt = async (chunk, extraUserInstruction = "", includeMetadata = false, courseOverview = "", requestOptions = {}) => {
+  const createCoursePlanAttempt = async () => {
     const requestPayload = {
       model,
-      temperature: extraUserInstruction ? 0.3 : 0.45,
-      max_completion_tokens: includeMetadata ? 3400 : 2600,
+      temperature: 0.35,
+      max_completion_tokens: 2200,
       response_format: {
         type: "json_schema",
-        json_schema: buildMiniCourseChunkSchema(chunk.kinds, chunk.startPageNumber, includeMetadata)
+        json_schema: buildMiniCourseChapterPlanSchema(safeChapterCount)
       },
       messages: [
         { role: "system", content: system },
@@ -3307,14 +3400,57 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
           content: [
             `Titulo-base do curso: ${title}`,
             `Contexto do curso: ${context}`,
-            `Quantidade de paginas: ${pageCount}`,
-            `Gere somente as paginas ${chunk.startPageNumber} a ${chunk.endPageNumber}.`,
-            `Tipos obrigatorios neste bloco: ${chunk.kinds.map((kind, index) => `pagina ${chunk.startPageNumber + index} = ${kind}`).join("; ")}.`,
-            courseOverview ? `Visao geral ja definida para manter consistencia: ${courseOverview}` : "",
-            includeMetadata
-              ? "Neste primeiro bloco, junto com as paginas, devolva tambem mainTitle, coverImagePrompt e courseOverview com a identidade completa do curso."
-              : "Nao repita a capa do curso nem mude a direcao do tema. Continue exatamente o mesmo curso com fluidez natural.",
-            "Crie um curso completo para professores, com progressao clara, linguagem brasileira natural e densidade real.",
+            `Paginas de conteudo: ${pageCount}.`,
+            `Capitulos: ${safeChapterCount}.`,
+            `Estilo escolhido: ${buildMiniCourseStyleLabel(safeCourseStyle)}.`,
+            `Distribuicao de paginas por capitulo: ${chapterBlueprints.map((item) => `capitulo ${item.chapterNumber} = ${item.contentPageCount} paginas`).join("; ")}.`,
+            "Crie a estrutura geral do curso e devolva um titulo principal, uma visao geral curta e todos os capitulos.",
+            "Cada capitulo precisa ter titulo, subtitulo e logline proprios, sem repeticao entre si.",
+            "Os capitulos devem avançar com progressao natural e coerente."
+          ].filter(Boolean).join("\n")
+        }
+      ]
+    };
+    if (supportsReasoningEffortForModel(model)) {
+      requestPayload.reasoning_effort = "none";
+    }
+    const completion = await createChatCompletion(apiKey, requestPayload, {
+      timeoutMs: 120000,
+      timeoutMessage: "Planejamento do curso demorou demais para responder."
+    });
+    const raw = extractChatCompletionText(completion);
+    return {
+      parsed: parseStructuredJsonText(raw)
+    };
+  };
+
+  const createCourseChapterAttempt = async ({ blueprint, chapterMeta, courseMainTitle, courseOverview, extraUserInstruction = "" }) => {
+    const requestPayload = {
+      model,
+      temperature: extraUserInstruction ? 0.28 : 0.4,
+      max_completion_tokens: 2600,
+      response_format: {
+        type: "json_schema",
+        json_schema: buildMiniCourseChunkSchema(blueprint.contentKinds)
+      },
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: [
+            `Titulo final do curso: ${courseMainTitle}`,
+            `Contexto do curso: ${context}`,
+            `Visao geral do curso: ${courseOverview}`,
+            `Capitulo ${chapterMeta.chapterNumber}: ${chapterMeta.title}`,
+            `Subtitulo do capitulo: ${chapterMeta.subtitle}`,
+            `Logline do capitulo: ${chapterMeta.logline}`,
+            `Este capitulo tem ${blueprint.contentPageCount} paginas de conteudo.`,
+            `Tipos obrigatorios neste capitulo: ${blueprint.contentKinds.map((kind, index) => `pagina ${index + 1} = ${kind}`).join("; ")}.`,
+            normalizeMiniCourseStyle(safeCourseStyle) === "story"
+              ? "Este e um curso no Estilo historia: nao use pagina didatica neste capitulo."
+              : "Este e um curso no Estilo curso: use paginas didaticas quando elas estiverem previstas.",
+            "Escreva somente o conteudo visivel dessas paginas de conteudo.",
+            "Mantenha fluidez interna dentro do capitulo e evite repetir a mesma ideia com palavras parecidas.",
             extraUserInstruction
           ].filter(Boolean).join("\n")
         }
@@ -3323,37 +3459,34 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     if (supportsReasoningEffortForModel(model)) {
       requestPayload.reasoning_effort = "none";
     }
-    const completion = await createChatCompletion(apiKey, requestPayload, requestOptions);
-
+    const completion = await createChatCompletion(apiKey, requestPayload, {
+      timeoutMs: chapterTimeoutMs,
+      timeoutMessage: `Capitulo ${chapterMeta.chapterNumber}: a OpenAI demorou demais para responder.`
+    });
     const raw = extractChatCompletionText(completion);
     const parsed = parseStructuredJsonText(raw);
     const pages = Array.isArray(parsed?.pages) ? parsed.pages : [];
-    const normalizedPages = chunk.kinds.map((kind, index) => normalizeMiniCourseGeneratedPage(
-      pages[index] || {},
-      chunk.startIndex + index,
-      kind
-    ));
-    const evaluation = evaluateMiniCoursePages(normalizedPages, chunk.startPageNumber);
-    return {
-      parsed,
-      normalizedPages,
-      evaluation
-    };
+    const normalizedPages = blueprint.contentKinds.map((kind, index) => normalizeMiniCourseGeneratedPage({
+      ...(pages[index] || {}),
+      chapterNumber: chapterMeta.chapterNumber
+    }, index, kind));
+    const evaluation = evaluateMiniCoursePages(normalizedPages, 1);
+    return { parsed, normalizedPages, evaluation };
   };
 
-  const runCourseChunkWithRetries = async ({ chunk, chunkIndex, generatedPageCountBefore, includeMetadata = false, courseOverview = "", emptyFailureMessage = "" }) => {
+  const runCourseChapterWithRetries = async ({ blueprint, chapterMeta, courseMainTitle, courseOverview, generatedPageCountBefore }) => {
     let lastAttempt = null;
     let lastError = null;
-    const minimumValidPages = chunk.kinds.length;
-    const chunkLabel = buildMiniCourseChunkLabel(chunk, chunkIndex, courseChunks.length);
+    const minimumValidPages = blueprint.contentKinds.length;
+    const chapterLabel = `Capitulo ${chapterMeta.chapterNumber}/${safeChapterCount}`;
 
-    for (let attemptIndex = 0; attemptIndex < maxChunkAttempts; attemptIndex += 1) {
-      const attemptLabel = `${chunkLabel} • tentativa ${attemptIndex + 1}/${maxChunkAttempts}`;
+    for (let attemptIndex = 0; attemptIndex < maxChapterAttempts; attemptIndex += 1) {
+      const attemptLabel = `${chapterLabel} • tentativa ${attemptIndex + 1}/${maxChapterAttempts}`;
       const retryInstruction = attemptIndex === 0
         ? ""
         : [
-          `A tentativa anterior do ${chunkLabel.toLowerCase()} veio incompleta ou inconsistente.`,
-          "Regenere somente este bloco.",
+          `A tentativa anterior do ${chapterLabel.toLowerCase()} veio incompleta ou inconsistente.`,
+          "Regenere somente este capitulo.",
           "Nao use placeholders.",
           "Entregue conteudo real, com densidade e coerencia com o tema do curso.",
           "Se alguma pagina for didatica, prefira bullets claros ou tabela objetiva.",
@@ -3363,16 +3496,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
       await reportProgress(generatedPageCountBefore, `${attemptLabel}: solicitando conteúdo para a IA...`);
 
       try {
-        const attempt = await createCourseChunkAttempt(
-          chunk,
-          retryInstruction,
-          includeMetadata,
-          courseOverview,
-          {
-            timeoutMs: chunkTimeoutMs,
-            timeoutMessage: `${attemptLabel}: a OpenAI demorou demais para responder.`
-          }
-        );
+        const attempt = await createCourseChapterAttempt({ blueprint, chapterMeta, courseMainTitle, courseOverview, extraUserInstruction: retryInstruction });
         lastAttempt = attempt;
 
         if (attempt.evaluation.validCount >= minimumValidPages) {
@@ -3382,94 +3506,94 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
         const issuesText = attempt.evaluation.issues.slice(0, 3).join(" ");
         await reportProgress(
           generatedPageCountBefore,
-          `${attemptLabel}: a IA devolveu ${attempt.evaluation.validCount}/${minimumValidPages} páginas válidas.${issuesText ? ` ${issuesText}` : ""}${attemptIndex < maxChunkAttempts - 1 ? " Vamos tentar novamente." : ""}`
+          `${attemptLabel}: a IA devolveu ${attempt.evaluation.validCount}/${minimumValidPages} páginas válidas.${issuesText ? ` ${issuesText}` : ""}${attemptIndex < maxChapterAttempts - 1 ? " Vamos tentar novamente." : ""}`
         );
       } catch (error) {
         lastError = error;
         const message = error instanceof Error ? error.message : "Erro desconhecido ao chamar a OpenAI.";
         await reportProgress(
           generatedPageCountBefore,
-          `${attemptLabel}: ${message}${attemptIndex < maxChunkAttempts - 1 ? " Vamos tentar novamente." : ""}`
+          `${attemptLabel}: ${message}${attemptIndex < maxChapterAttempts - 1 ? " Vamos tentar novamente." : ""}`
         );
       }
     }
 
     if (lastAttempt) {
       throw new MiniCourseGenerationError(
-        emptyFailureMessage,
-        `${chunkLabel}. ${lastAttempt.evaluation.issues.slice(0, 4).join(" ") || "A IA continuou devolvendo páginas vazias ou fracas após as tentativas."}`,
+        "A IA nao devolveu conteudo suficiente para concluir o curso.",
+        `${chapterLabel}. ${lastAttempt.evaluation.issues.slice(0, 4).join(" ") || "A IA continuou devolvendo páginas vazias ou fracas após as tentativas."}`,
         generatedPageCountBefore
       );
     }
 
     throw new MiniCourseGenerationError(
-      emptyFailureMessage,
-      `${chunkLabel}. ${lastError instanceof Error ? lastError.message : "A IA falhou repetidamente sem retornar conteúdo utilizável."}`,
+      "A IA nao devolveu conteudo suficiente para concluir o curso.",
+      `${chapterLabel}. ${lastError instanceof Error ? lastError.message : "A IA falhou repetidamente sem retornar conteúdo utilizável."}`,
       generatedPageCountBefore
     );
   };
 
-  const firstChunk = courseChunks[0];
-  const firstAttempt = await runCourseChunkWithRetries({
-    chunk: firstChunk,
-    chunkIndex: 0,
-    generatedPageCountBefore: 0,
-    includeMetadata: true,
-    emptyFailureMessage: "A IA nao devolveu conteudo suficiente para iniciar o curso."
+  await reportProgress(0, `Planejando ${safeChapterCount} capitulos com ${pageCount} paginas de conteudo...`);
+  const planAttempt = await createCoursePlanAttempt();
+  const courseMainTitle = String(planAttempt.parsed?.mainTitle || title).trim() || title;
+  const courseOverview = String(planAttempt.parsed?.courseOverview || "").trim();
+  const chapters = chapterBlueprints.map((blueprint, index) => {
+    const source = Array.isArray(planAttempt.parsed?.chapters) ? planAttempt.parsed.chapters[index] : null;
+    return {
+      chapterNumber: blueprint.chapterNumber,
+      title: String(source?.title || `Capitulo ${blueprint.chapterNumber}`).trim() || `Capitulo ${blueprint.chapterNumber}`,
+      subtitle: String(source?.subtitle || "").trim(),
+      logline: String(source?.logline || "").trim() || `Avanco do capitulo ${blueprint.chapterNumber}.`
+    };
   });
 
-  const generatedPages = [...firstAttempt.normalizedPages];
-  const courseMainTitle = String(firstAttempt.parsed?.mainTitle || title).trim() || title;
-  const coverImagePrompt = String(
-    firstAttempt.parsed?.coverImagePrompt
-    || `Capa em PNG para o curso ${courseMainTitle}, visual cristao infantil, limpo e acolhedor.`
-  ).trim();
-  const courseOverview = String(firstAttempt.parsed?.courseOverview || "").trim();
-  const chunkFeedback = [];
+  const generatedPages = [buildMiniCourseMapPage({ courseTitle: courseMainTitle, courseOverview, chapters })];
+  const chapterFeedback = [];
+  let generatedContentPages = 0;
 
-  await reportProgress(
-    generatedPages.length,
-    `Bloco 1/${courseChunks.length} concluído. Gerando curso: ${generatedPages.length}/${pageCount} páginas prontas.`
-  );
-
-  for (let chunkIndex = 1; chunkIndex < courseChunks.length; chunkIndex += 1) {
-    const chunk = courseChunks[chunkIndex];
-    const chunkAttempt = await runCourseChunkWithRetries({
-      chunk,
-      chunkIndex,
-      generatedPageCountBefore: generatedPages.length,
-      includeMetadata: false,
+  for (let chapterIndex = 0; chapterIndex < chapterBlueprints.length; chapterIndex += 1) {
+    const blueprint = chapterBlueprints[chapterIndex];
+    const chapterMeta = chapters[chapterIndex];
+    generatedPages.push(buildMiniCourseChapterOpenPage(chapterMeta));
+    const chapterAttempt = await runCourseChapterWithRetries({
+      blueprint,
+      chapterMeta,
+      courseMainTitle,
       courseOverview,
-      emptyFailureMessage: "A IA nao devolveu conteudo suficiente para concluir o curso."
+      generatedPageCountBefore: generatedContentPages
     });
-
-    generatedPages.push(...chunkAttempt.normalizedPages);
-    if (chunkAttempt.evaluation.issues.length) {
-      chunkFeedback.push(...chunkAttempt.evaluation.issues);
+    generatedPages.push(...chapterAttempt.normalizedPages);
+    generatedContentPages += blueprint.contentPageCount;
+    if (chapterAttempt.evaluation.issues.length) {
+      chapterFeedback.push(...chapterAttempt.evaluation.issues);
     }
     await reportProgress(
-      generatedPages.length,
-      `${buildMiniCourseChunkLabel(chunk, chunkIndex, courseChunks.length)} concluído. Gerando curso: ${generatedPages.length}/${pageCount} páginas prontas.`
+      generatedContentPages,
+      `Capitulo ${chapterMeta.chapterNumber}/${safeChapterCount} concluido. Gerando curso: ${generatedContentPages}/${pageCount} paginas de conteudo prontas.`
     );
   }
 
-  const finalEvaluation = evaluateMiniCoursePages(generatedPages, 1);
-  if (finalEvaluation.validCount < kinds.length) {
+  const finalPages = renumberMiniCoursePages(generatedPages);
+  const finalEvaluation = evaluateMiniCoursePages(finalPages, 1);
+  if (finalEvaluation.validCount < finalPages.length) {
     throw new MiniCourseGenerationError(
       "O curso final ficou incompleto e nao foi salvo.",
       finalEvaluation.issues.slice(0, 6).join(" ") || "A validacao final detectou paginas vazias.",
-      generatedPages.length
+      generatedContentPages
     );
   }
 
   return {
     title: courseMainTitle,
     context,
-    pages: generatedPages,
-    coverImagePrompt,
-    feedback: chunkFeedback.length
-      ? `Curso criado com ${generatedPages.length} paginas. Ajustamos pequenos pontos durante a geracao: ${chunkFeedback.slice(0, 2).join(" ")}`
-      : `Curso criado com ${generatedPages.length} paginas e validado em ${courseChunks.length} etapas.`
+    pages: finalPages,
+    chapterCount: safeChapterCount,
+    courseStyle: safeCourseStyle,
+    contentPageCount: pageCount,
+    coverImagePrompt: "",
+    feedback: chapterFeedback.length
+      ? `Curso criado com ${pageCount} paginas de conteudo em ${safeChapterCount} capitulos. Ajustamos pequenos pontos durante a geracao: ${chapterFeedback.slice(0, 2).join(" ")}`
+      : `Curso criado com ${pageCount} paginas de conteudo em ${safeChapterCount} capitulos e validado por capitulo.`
   };
 }
 
@@ -3495,7 +3619,7 @@ async function processMiniCourseJobsQueue() {
       try {
         await updateMiniCourseJobProgress(job.id, {
           generatedPageCount: 0,
-          feedback: `Preparando ${job.requestedPageCount} páginas para geração com ${normalizeMiniCourseGeneratorModel(job.requestedModel)}...`
+          feedback: `Preparando ${job.requestedPageCount} páginas em ${job.requestedChapterCount} capítulos no ${buildMiniCourseStyleLabel(job.requestedCourseStyle)} com ${normalizeMiniCourseGeneratorModel(job.requestedModel)}...`
         });
 
         const draft = await generateMiniCourseDraft({
@@ -3504,6 +3628,8 @@ async function processMiniCourseJobsQueue() {
           title: job.title,
           context: job.context,
           pageCount: job.requestedPageCount,
+          chapterCount: job.requestedChapterCount,
+          courseStyle: job.requestedCourseStyle,
           onProgress: async ({ generatedPageCount, feedback }) => {
             await updateMiniCourseJobProgress(job.id, {
               generatedPageCount,
@@ -3516,12 +3642,15 @@ async function processMiniCourseJobsQueue() {
           title: draft.title,
           context: draft.context,
           pages: draft.pages,
+          chapterCount: draft.chapterCount,
+          courseStyle: draft.courseStyle,
+          contentPageCount: draft.contentPageCount,
           coverImagePrompt: draft.coverImagePrompt,
           createdByUserId: job.createdByUserId
         });
 
         await completeMiniCourseJob(job.id, {
-          generatedPageCount: draft.pages.length,
+          generatedPageCount: draft.contentPageCount,
           courseId: course.id,
           feedback: draft.feedback
         });
@@ -4806,7 +4935,7 @@ async function handleMiniCourseDeleteRequest(request, response, courseId) {
 }
 
 function buildMiniCourseQuizSourceText(course) {
-  const pages = Array.isArray(course?.pages) ? course.pages : [];
+  const pages = (Array.isArray(course?.pages) ? course.pages : []).filter((page) => !["course-map", "chapter_open"].includes(String(page?.kind || "").trim().toLowerCase()));
   const maxPages = 18;
   const maxChars = 16000;
   const compactText = (value, limit = 320) => String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
@@ -5158,6 +5287,8 @@ async function handleMiniCourseGenerateRequest(request, response) {
   const context = String(body?.context || "").trim();
   const model = normalizeMiniCourseGeneratorModel(body?.model);
   const pageCount = Math.max(4, Math.min(300, Number(body?.pageCount || 8) || 8));
+  const chapterCount = Math.max(1, Math.min(pageCount, Number(body?.chapterCount || 1) || 1));
+  const courseStyle = normalizeMiniCourseStyle(body?.courseStyle || "course");
 
   if (!title) {
     sendJson(response, 400, { error: "Informe o titulo do curso." });
@@ -5175,6 +5306,8 @@ async function handleMiniCourseGenerateRequest(request, response) {
       context,
       requestedModel: model,
       requestedPageCount: pageCount,
+      requestedChapterCount: chapterCount,
+      requestedCourseStyle: courseStyle,
       createdByUserId: adminUser.id
     });
     void processMiniCourseJobsQueue();
@@ -5182,7 +5315,7 @@ async function handleMiniCourseGenerateRequest(request, response) {
     sendJson(response, 202, {
       ok: true,
       job,
-      feedback: `Curso solicitado com ${pageCount} páginas usando ${model}. Ele entrou na fila de geração.`
+      feedback: `Curso solicitado com ${pageCount} páginas de conteúdo, ${chapterCount} capítulos e ${buildMiniCourseStyleLabel(courseStyle)} usando ${model}. Ele entrou na fila de geração.`
     });
   } catch (error) {
     sendJson(response, 400, {

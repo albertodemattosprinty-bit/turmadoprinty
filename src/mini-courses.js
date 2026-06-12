@@ -47,6 +47,12 @@ function normalizeTableRows(raw) {
 
 function normalizePageKind(value) {
   const kind = String(value || "").trim().toLowerCase();
+  if (kind === "course-map") {
+    return "course-map";
+  }
+  if (kind === "chapter_open") {
+    return "chapter_open";
+  }
   if (kind === "didactic") {
     return "didactic";
   }
@@ -54,6 +60,14 @@ function normalizePageKind(value) {
     return "closing";
   }
   return "text";
+}
+
+function normalizeCourseStyle(value) {
+  return String(value || "").trim().toLowerCase() === "story" ? "story" : "course";
+}
+
+function countCourseContentPages(pages = []) {
+  return (Array.isArray(pages) ? pages : []).filter((page) => !["course-map", "chapter_open"].includes(String(page?.kind || "").trim().toLowerCase())).length;
 }
 
 function normalizeQuizQuestions(raw) {
@@ -94,6 +108,9 @@ function normalizeCoursePages(raw) {
       pageNumber: Math.max(1, Number(item?.pageNumber || index + 1) || index + 1),
       kind: normalizePageKind(item?.kind),
       title: String(item?.title || `Pagina ${index + 1}`).trim() || `Pagina ${index + 1}`,
+      subtitle: String(item?.subtitle || "").trim(),
+      logline: String(item?.logline || "").trim(),
+      chapterNumber: Math.max(0, Number(item?.chapterNumber || 0) || 0),
       paragraphs: normalizeParagraphs(item?.paragraphs),
       bullets: normalizeBullets(item?.bullets),
       tableRows: normalizeTableRows(item?.tableRows),
@@ -102,7 +119,7 @@ function normalizeCoursePages(raw) {
       audioUrl: String(item?.audioUrl || "").trim(),
       audioScript: String(item?.audioScript || "").trim()
     }))
-    .filter((item) => item.title || item.paragraphs.length || item.bullets.length || item.tableRows.length);
+    .filter((item) => item.title || item.subtitle || item.logline || item.paragraphs.length || item.bullets.length || item.tableRows.length);
 }
 
 function normalizeProgress(row, pageCount = 0) {
@@ -137,13 +154,18 @@ function normalizeCourse(row) {
   const pages = normalizeCoursePages(row.pages || []);
   const quizQuestions = normalizeQuizQuestions(row.quiz_questions || []);
   const pageCount = Math.max(1, Number(row.page_count || pages.length || 1) || pages.length || 1);
+  const contentPageCount = Math.max(1, Number(row.content_page_count || countCourseContentPages(pages) || 1) || countCourseContentPages(pages) || 1);
+  const chapterCount = Math.max(1, Number(row.chapter_count || 1) || 1);
 
   return {
     id: row.id,
     title: row.title || "Curso MINI",
     context: row.context || "",
     pageCount,
-    durationMinutes: Math.max(1, Number(row.duration_minutes || pageCount) || pageCount),
+    contentPageCount,
+    chapterCount,
+    courseStyle: normalizeCourseStyle(row.course_style || "course"),
+    durationMinutes: Math.max(1, Number(row.duration_minutes || contentPageCount) || contentPageCount),
     coverImageUrl: row.cover_image_url || "",
     coverImagePrompt: row.cover_image_prompt || "",
     pages,
@@ -169,6 +191,8 @@ function normalizeCourseJob(row) {
     context: String(row.context || "").trim(),
     requestedModel: String(row.requested_model || "").trim() || "gpt-5.1",
     requestedPageCount: Math.max(1, Number(row.requested_page_count || 1) || 1),
+    requestedChapterCount: Math.max(1, Number(row.requested_chapter_count || 1) || 1),
+    requestedCourseStyle: normalizeCourseStyle(row.requested_course_style || "course"),
     generatedPageCount: Math.max(0, Number(row.generated_page_count || 0) || 0),
     status: String(row.status || "queued").trim().toLowerCase() || "queued",
     feedback: String(row.feedback || "").trim(),
@@ -189,6 +213,9 @@ export async function ensureMiniCoursesSchema() {
       title text not null default 'Curso MINI',
       context text not null default '',
       page_count smallint not null default 1,
+      content_page_count smallint not null default 1,
+      chapter_count smallint not null default 1,
+      course_style text not null default 'course',
       duration_minutes smallint not null default 1,
       pages jsonb not null default '[]'::jsonb,
       quiz_questions jsonb not null default '[]'::jsonb,
@@ -200,6 +227,9 @@ export async function ensureMiniCoursesSchema() {
     );
   `);
   await query("alter table mini_courses add column if not exists quiz_questions jsonb not null default '[]'::jsonb;");
+  await query("alter table mini_courses add column if not exists content_page_count smallint not null default 1;");
+  await query("alter table mini_courses add column if not exists chapter_count smallint not null default 1;");
+  await query("alter table mini_courses add column if not exists course_style text not null default 'course';");
 
   await query(`
     create table if not exists mini_course_progress (
@@ -239,6 +269,8 @@ export async function ensureMiniCoursesSchema() {
       context text not null default '',
       requested_model text not null default 'gpt-5.1',
       requested_page_count smallint not null default 8,
+      requested_chapter_count smallint not null default 1,
+      requested_course_style text not null default 'course',
       generated_page_count smallint not null default 0,
       status text not null default 'queued',
       feedback text not null default '',
@@ -252,6 +284,8 @@ export async function ensureMiniCoursesSchema() {
     );
   `);
   await query("alter table mini_course_jobs add column if not exists requested_model text not null default 'gpt-5.1';");
+  await query("alter table mini_course_jobs add column if not exists requested_chapter_count smallint not null default 1;");
+  await query("alter table mini_course_jobs add column if not exists requested_course_style text not null default 'course';");
   await query("create index if not exists idx_mini_course_jobs_creator_updated_at on mini_course_jobs(created_by_user_id, updated_at desc, created_at desc);");
   await query("create index if not exists idx_mini_course_jobs_status_created_at on mini_course_jobs(status, created_at asc);");
 }
@@ -267,6 +301,9 @@ export async function listMiniCourses(userId = "") {
           c.title,
           c.context,
           c.page_count,
+          c.content_page_count,
+          c.chapter_count,
+          c.course_style,
           c.duration_minutes,
           c.pages,
           c.quiz_questions,
@@ -302,6 +339,9 @@ export async function listMiniCourses(userId = "") {
           c.title,
           c.context,
           c.page_count,
+          c.content_page_count,
+          c.chapter_count,
+          c.course_style,
           c.duration_minutes,
           c.pages,
           c.quiz_questions,
@@ -341,6 +381,9 @@ export async function getMiniCourseById(courseId, userId = "") {
           c.title,
           c.context,
           c.page_count,
+          c.content_page_count,
+          c.chapter_count,
+          c.course_style,
           c.duration_minutes,
           c.pages,
           c.quiz_questions,
@@ -377,6 +420,9 @@ export async function getMiniCourseById(courseId, userId = "") {
           c.title,
           c.context,
           c.page_count,
+          c.content_page_count,
+          c.chapter_count,
+          c.course_style,
           c.duration_minutes,
           c.pages,
           c.quiz_questions,
@@ -411,20 +457,26 @@ export async function getMiniCourseById(courseId, userId = "") {
   });
 }
 
-export async function createMiniCourse({ title, context, pages, quizQuestions = [], coverImageUrl = "", coverImagePrompt = "", createdByUserId = null } = {}) {
+export async function createMiniCourse({ title, context, pages, quizQuestions = [], coverImageUrl = "", coverImagePrompt = "", createdByUserId = null, chapterCount = 1, courseStyle = "course", contentPageCount = null } = {}) {
   await ensureMiniCoursesSchema();
   const safeTitle = String(title || "Curso MINI").trim() || "Curso MINI";
   const safeContext = String(context || "").trim();
   const normalizedPages = normalizeCoursePages(pages || []);
   const normalizedQuizQuestions = normalizeQuizQuestions(quizQuestions || []);
   const pageCount = Math.max(1, normalizedPages.length || 1);
-  const durationMinutes = pageCount;
+  const safeContentPageCount = Math.max(1, Number(contentPageCount || countCourseContentPages(normalizedPages) || 1) || countCourseContentPages(normalizedPages) || 1);
+  const safeChapterCount = Math.max(1, Number(chapterCount || 1) || 1);
+  const safeCourseStyle = normalizeCourseStyle(courseStyle);
+  const durationMinutes = safeContentPageCount;
   const result = await query(
     `
       insert into mini_courses (
         title,
         context,
         page_count,
+        content_page_count,
+        chapter_count,
+        course_style,
         duration_minutes,
         pages,
         quiz_questions,
@@ -434,13 +486,16 @@ export async function createMiniCourse({ title, context, pages, quizQuestions = 
         created_at,
         updated_at
       )
-      values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, now(), now())
+      values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, now(), now())
       returning *
     `,
     [
       safeTitle.slice(0, 180),
       safeContext.slice(0, 2000),
       pageCount,
+      safeContentPageCount,
+      safeChapterCount,
+      safeCourseStyle,
       durationMinutes,
       JSON.stringify(normalizedPages),
       JSON.stringify(normalizedQuizQuestions),
@@ -489,12 +544,14 @@ export async function updateMiniCourseCover(courseId, coverImageUrl = "") {
   return result.rows[0] ? normalizeCourse(result.rows[0]) : null;
 }
 
-export async function createMiniCourseJob({ title, context, requestedModel = "gpt-5.1", requestedPageCount = 8, createdByUserId } = {}) {
+export async function createMiniCourseJob({ title, context, requestedModel = "gpt-5.1", requestedPageCount = 8, requestedChapterCount = 1, requestedCourseStyle = "course", createdByUserId } = {}) {
   await ensureMiniCoursesSchema();
   const safeTitle = String(title || "Curso MINI").trim() || "Curso MINI";
   const safeContext = String(context || "").trim();
   const safeModel = String(requestedModel || "gpt-5.1").trim() || "gpt-5.1";
   const pageCount = Math.max(4, Math.min(300, Number(requestedPageCount || 8) || 8));
+  const chapterCount = Math.max(1, Math.min(pageCount, Number(requestedChapterCount || 1) || 1));
+  const courseStyle = normalizeCourseStyle(requestedCourseStyle);
   const result = await query(
     `
       insert into mini_course_jobs (
@@ -502,6 +559,8 @@ export async function createMiniCourseJob({ title, context, requestedModel = "gp
         context,
         requested_model,
         requested_page_count,
+        requested_chapter_count,
+        requested_course_style,
         generated_page_count,
         status,
         feedback,
@@ -510,7 +569,7 @@ export async function createMiniCourseJob({ title, context, requestedModel = "gp
         created_at,
         updated_at
       )
-      values ($1, $2, $3, $4, 0, 'queued', 'Na fila para gerar o curso.', '', $5, now(), now())
+      values ($1, $2, $3, $4, $5, $6, 0, 'queued', 'Na fila para gerar o curso.', '', $7, now(), now())
       returning *
     `,
     [
@@ -518,6 +577,8 @@ export async function createMiniCourseJob({ title, context, requestedModel = "gp
       safeContext.slice(0, 2000),
       safeModel.slice(0, 120),
       pageCount,
+      chapterCount,
+      courseStyle,
       createdByUserId
     ]
   );
