@@ -3148,7 +3148,7 @@ function evaluateMiniCoursePages(pages = [], startPageNumber = 1) {
     }
 
     if (kind === "text") {
-      const ok = paragraphs.length >= 1 && textLength >= 360;
+      const ok = paragraphs.length >= 1 && textLength >= 320;
       if (!ok) {
         issues.push(`Pagina ${displayPageNumber} de texto veio fraca ou vazia.`);
       }
@@ -3275,6 +3275,16 @@ function buildMiniCourseMapPage({ courseTitle, courseOverview, chapters }) {
       value: `${chapter.title}${chapter.subtitle ? ` • ${chapter.subtitle}` : ""}`
     }))
   }, 0, "course-map");
+}
+
+function buildMiniCourseMapPromptText({ courseTitle, courseOverview, chapters }) {
+  return [
+    `Mapa do curso: ${courseTitle}`,
+    courseOverview ? `Visao geral: ${courseOverview}` : "",
+    ...(Array.isArray(chapters) ? chapters : []).map((chapter) => (
+      `Capitulo ${chapter.chapterNumber}: ${chapter.title}${chapter.subtitle ? ` | ${chapter.subtitle}` : ""}${chapter.logline ? ` | ${chapter.logline}` : ""}`
+    ))
+  ].filter(Boolean).join("\n");
 }
 
 function buildMiniCourseChapterOpenPage(chapter) {
@@ -3424,11 +3434,11 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     };
   };
 
-  const createCourseChapterAttempt = async ({ blueprint, chapterMeta, courseMainTitle, courseOverview, extraUserInstruction = "" }) => {
+  const createCourseChapterAttempt = async ({ blueprint, chapterMeta, courseMainTitle, courseOverview, courseMapText, extraUserInstruction = "" }) => {
     const requestPayload = {
       model,
-      temperature: extraUserInstruction ? 0.28 : 0.4,
-      max_completion_tokens: 2600,
+      temperature: extraUserInstruction ? 0.22 : 0.32,
+      max_completion_tokens: Math.max(2600, 900 + (blueprint.contentPageCount * 420)),
       response_format: {
         type: "json_schema",
         json_schema: buildMiniCourseChunkSchema(blueprint.contentKinds)
@@ -3441,6 +3451,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
             `Titulo final do curso: ${courseMainTitle}`,
             `Contexto do curso: ${context}`,
             `Visao geral do curso: ${courseOverview}`,
+            `Course-map oficial do curso:\n${courseMapText}`,
             `Capitulo ${chapterMeta.chapterNumber}: ${chapterMeta.title}`,
             `Subtitulo do capitulo: ${chapterMeta.subtitle}`,
             `Logline do capitulo: ${chapterMeta.logline}`,
@@ -3450,6 +3461,9 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
               ? "Este e um curso no Estilo historia: nao use pagina didatica neste capitulo."
               : "Este e um curso no Estilo curso: use paginas didaticas quando elas estiverem previstas.",
             "Escreva somente o conteudo visivel dessas paginas de conteudo.",
+            "Para cada pagina text, entregue preferencialmente 2 paragrafos completos e densos, somando pelo menos 420 caracteres reais.",
+            "Para cada pagina didactic, entregue estrutura suficiente para ensino: pelo menos 4 bullets fortes ou 2 linhas de tabela bem preenchidas.",
+            "Para cada pagina closing, entregue exatamente 3 paragrafos completos, sem frases telegráficas.",
             "Mantenha fluidez interna dentro do capitulo e evite repetir a mesma ideia com palavras parecidas.",
             extraUserInstruction
           ].filter(Boolean).join("\n")
@@ -3474,7 +3488,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     return { parsed, normalizedPages, evaluation };
   };
 
-  const runCourseChapterWithRetries = async ({ blueprint, chapterMeta, courseMainTitle, courseOverview, generatedPageCountBefore }) => {
+  const runCourseChapterWithRetries = async ({ blueprint, chapterMeta, courseMainTitle, courseOverview, courseMapText, generatedPageCountBefore }) => {
     let lastAttempt = null;
     let lastError = null;
     const minimumValidPages = blueprint.contentKinds.length;
@@ -3489,6 +3503,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
           "Regenere somente este capitulo.",
           "Nao use placeholders.",
           "Entregue conteudo real, com densidade e coerencia com o tema do curso.",
+          "As paginas text precisam ficar mais desenvolvidas e substanciais.",
           "Se alguma pagina for didatica, prefira bullets claros ou tabela objetiva.",
           "Se alguma pagina for final, entregue exatamente 3 paragrafos completos."
         ].join(" ");
@@ -3496,7 +3511,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
       await reportProgress(generatedPageCountBefore, `${attemptLabel}: solicitando conteúdo para a IA...`);
 
       try {
-        const attempt = await createCourseChapterAttempt({ blueprint, chapterMeta, courseMainTitle, courseOverview, extraUserInstruction: retryInstruction });
+        const attempt = await createCourseChapterAttempt({ blueprint, chapterMeta, courseMainTitle, courseOverview, courseMapText, extraUserInstruction: retryInstruction });
         lastAttempt = attempt;
 
         if (attempt.evaluation.validCount >= minimumValidPages) {
@@ -3548,6 +3563,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
   });
 
   const generatedPages = [buildMiniCourseMapPage({ courseTitle: courseMainTitle, courseOverview, chapters })];
+  const courseMapText = buildMiniCourseMapPromptText({ courseTitle: courseMainTitle, courseOverview, chapters });
   const chapterFeedback = [];
   let generatedContentPages = 0;
 
@@ -3560,6 +3576,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
       chapterMeta,
       courseMainTitle,
       courseOverview,
+      courseMapText,
       generatedPageCountBefore: generatedContentPages
     });
     generatedPages.push(...chapterAttempt.normalizedPages);
