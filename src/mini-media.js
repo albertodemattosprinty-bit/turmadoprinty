@@ -1,5 +1,7 @@
 import { query } from "./db.js";
 
+let miniMediaSchemaPromise = null;
+
 function toIso(value) {
   if (!value) {
     return null;
@@ -26,7 +28,11 @@ function normalizeAsset(row) {
 }
 
 export async function ensureMiniMediaSchema() {
-  await query(`
+  if (miniMediaSchemaPromise) {
+    return miniMediaSchemaPromise;
+  }
+  miniMediaSchemaPromise = (async () => {
+    await query(`
     create table if not exists mini_media_albums (
       id uuid primary key default gen_random_uuid(),
       legacy_id text not null unique,
@@ -38,7 +44,7 @@ export async function ensureMiniMediaSchema() {
       updated_at timestamptz not null default now()
     );
   `);
-  await query(`
+    await query(`
     create table if not exists mini_media_songs (
       id uuid primary key default gen_random_uuid(),
       album_id uuid not null references mini_media_albums(id) on delete cascade,
@@ -48,6 +54,9 @@ export async function ensureMiniMediaSchema() {
       audio_key text not null default '',
       playback_key text not null default '',
       lyrics_key text not null default '',
+      lyrics_text text not null default '',
+      lyrics_updated_at timestamptz,
+      playback_song_id uuid references mini_media_songs(id) on delete set null,
       track_order integer not null default 0,
       metadata jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
@@ -55,7 +64,10 @@ export async function ensureMiniMediaSchema() {
       unique (album_id, legacy_id)
     );
   `);
-  await query(`
+    await query("alter table mini_media_songs add column if not exists lyrics_text text not null default '';");
+    await query("alter table mini_media_songs add column if not exists lyrics_updated_at timestamptz;");
+    await query("alter table mini_media_songs add column if not exists playback_song_id uuid references mini_media_songs(id) on delete set null;");
+    await query(`
     create table if not exists mini_media_song_assets (
       id uuid primary key default gen_random_uuid(),
       song_id uuid not null references mini_media_songs(id) on delete cascade,
@@ -71,8 +83,13 @@ export async function ensureMiniMediaSchema() {
       updated_at timestamptz not null default now()
     );
   `);
-  await query("create index if not exists idx_mini_media_songs_album_order on mini_media_songs(album_id, track_order, created_at);");
-  await query("create index if not exists idx_mini_media_song_assets_song_type_order on mini_media_song_assets(song_id, asset_type, page_order, created_at);");
+    await query("create index if not exists idx_mini_media_songs_album_order on mini_media_songs(album_id, track_order, created_at);");
+    await query("create index if not exists idx_mini_media_song_assets_song_type_order on mini_media_song_assets(song_id, asset_type, page_order, created_at);");
+  })().catch((error) => {
+    miniMediaSchemaPromise = null;
+    throw error;
+  });
+  return miniMediaSchemaPromise;
 }
 
 export async function syncMiniMediaLibraryToDatabase(library = { albums: [] }) {
@@ -119,7 +136,7 @@ export async function syncMiniMediaLibraryToDatabase(library = { albums: [] }) {
             lyrics_key = case when excluded.lyrics_key <> '' then excluded.lyrics_key else mini_media_songs.lyrics_key end,
             track_order = excluded.track_order,
             updated_at = now()
-          returning id, playback_key, lyrics_key
+          returning id, playback_key, lyrics_key, lyrics_text, lyrics_updated_at, playback_song_id
         `,
         [
           albumGlobalId,
@@ -135,6 +152,9 @@ export async function syncMiniMediaLibraryToDatabase(library = { albums: [] }) {
       song.globalId = songResult.rows[0]?.id || null;
       song.playbackKey = String(songResult.rows[0]?.playback_key || song?.playbackKey || "").trim();
       song.lyricsKey = String(songResult.rows[0]?.lyrics_key || song?.lyricsKey || "").trim();
+      song.lyricsText = String(songResult.rows[0]?.lyrics_text || "").trim();
+      song.lyricsUpdatedAt = toIso(songResult.rows[0]?.lyrics_updated_at);
+      song.playbackSongId = songResult.rows[0]?.playback_song_id || null;
       const assetCountResult = await query(
         `
           select count(*)::integer as score_count
@@ -147,6 +167,44 @@ export async function syncMiniMediaLibraryToDatabase(library = { albums: [] }) {
     }
   }
 
+  return library;
+}
+
+export async function hydrateMiniMediaLibraryFromDatabase(library = { albums: [] }) {
+  await ensureMiniMediaSchema();
+  const result = await query(`
+    select
+      a.id as album_global_id,
+      a.legacy_id as album_legacy_id,
+      s.id as song_global_id,
+      s.legacy_id as song_legacy_id,
+      s.playback_song_id,
+      s.lyrics_text,
+      s.lyrics_updated_at,
+      count(asset.id) filter (where asset.asset_type = 'score')::integer as score_count
+    from mini_media_albums a
+    left join mini_media_songs s on s.album_id = a.id
+    left join mini_media_song_assets asset on asset.song_id = s.id
+    group by a.id, a.legacy_id, s.id, s.legacy_id, s.playback_song_id, s.lyrics_text, s.lyrics_updated_at
+  `);
+  const albums = new Map((Array.isArray(library?.albums) ? library.albums : []).map((album) => [String(album.id), album]));
+  for (const row of result.rows) {
+    const album = albums.get(String(row.album_legacy_id));
+    if (!album) {
+      continue;
+    }
+    album.globalId = row.album_global_id;
+    const song = album.songs?.find((item) => String(item.id) === String(row.song_legacy_id));
+    if (!song) {
+      continue;
+    }
+    song.globalId = row.song_global_id;
+    song.playbackSongId = row.playback_song_id || null;
+    song.lyricsText = String(row.lyrics_text || "").trim();
+    song.lyricsKey = "";
+    song.lyricsUpdatedAt = toIso(row.lyrics_updated_at);
+    song.scoreCount = Math.max(0, Number(row.score_count || 0) || 0);
+  }
   return library;
 }
 
@@ -168,30 +226,52 @@ export async function getMiniMediaSongByLegacyIds(albumLegacyId, songLegacyId) {
   return result.rows[0] || null;
 }
 
-export async function updateMiniMediaSongLyrics(songId, lyricsKey = "") {
+export async function updateMiniMediaSongLyrics(songId, lyrics = "") {
   await ensureMiniMediaSchema();
   const result = await query(
     `
       update mini_media_songs
-      set lyrics_key = $2, updated_at = now()
+      set
+        lyrics_text = $2,
+        lyrics_key = '',
+        lyrics_updated_at = case when $2 = '' then null else now() end,
+        updated_at = now()
       where id = $1
       returning *
     `,
-    [songId, String(lyricsKey || "").trim()]
+    [songId, String(lyrics || "").replace(/\r\n/g, "\n").trim()]
   );
   return result.rows[0] || null;
 }
 
-export async function updateMiniMediaSongPlayback(songId, playbackKey = "") {
+export async function updateMiniMediaSongPlayback(songId, playbackSongId = null) {
+  await ensureMiniMediaSchema();
+  const result = await query(
+    `
+      update mini_media_songs target
+      set playback_song_id = source.id, playback_key = '', updated_at = now()
+      from mini_media_songs source
+      where target.id = $1
+        and source.id = $2
+        and source.album_id = target.album_id
+        and source.id <> target.id
+      returning target.*
+    `,
+    [songId, playbackSongId]
+  );
+  return result.rows[0] || null;
+}
+
+export async function clearMiniMediaSongPlayback(songId) {
   await ensureMiniMediaSchema();
   const result = await query(
     `
       update mini_media_songs
-      set playback_key = $2, updated_at = now()
+      set playback_song_id = null, playback_key = '', updated_at = now()
       where id = $1
       returning *
     `,
-    [songId, String(playbackKey || "").trim()]
+    [songId]
   );
   return result.rows[0] || null;
 }

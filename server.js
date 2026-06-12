@@ -41,7 +41,7 @@ import {
   updateMiniCourseProgress
 } from "./src/mini-courses.js";
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
-import { createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
+import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, hydrateMiniMediaLibraryFromDatabase, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -100,7 +100,7 @@ const contentDir = path.join(__dirname, "ConteÃºdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
-let miniMediaPersistenceBootstrapped = false;
+let miniMediaDatabaseBootstrapped = false;
 
 const eduDownloadFiles = {
   "abandona-no-lixao": {
@@ -331,7 +331,9 @@ function normalizeMiniMediaSong(raw, index = 0) {
     subtitle: sanitizeMiniMediaTitle(raw?.subtitle || "Faixa do album", "Faixa do album"),
     key: String(raw?.key || "").trim(),
     playbackKey: String(raw?.playbackKey || "").trim(),
+    playbackSongId: String(raw?.playbackSongId || "").trim(),
     lyricsKey: String(raw?.lyricsKey || "").trim(),
+    lyricsText: String(raw?.lyricsText || "").trim(),
     lyricsUpdatedAt: raw?.lyricsUpdatedAt || null,
     scoreCount: Math.max(0, Number(raw?.scoreCount || 0) || 0),
     contentType: String(raw?.contentType || "").trim(),
@@ -401,9 +403,12 @@ function buildMiniMediaAlbumPayload(album) {
     subtitle: song.subtitle,
     order: Math.max(0, Number(song.order || 0) || 0),
     url: song.key ? buildAlbumZipPublicUrlFromKey(song.key) : "",
-    playbackUrl: song.playbackKey ? buildAlbumZipPublicUrlFromKey(song.playbackKey) : "",
+    playbackSongId: song.playbackSongId || "",
+    playbackUrl: song.playbackSongId
+      ? buildAlbumZipPublicUrlFromKey(album.songs.find((candidate) => candidate.globalId === song.playbackSongId)?.key || "")
+      : (song.playbackKey ? buildAlbumZipPublicUrlFromKey(song.playbackKey) : ""),
     coverImageUrl,
-    hasLyrics: Boolean(song.lyricsKey),
+    hasLyrics: Boolean(song.lyricsText || song.lyricsKey),
     lyricsUpdatedAt: song.lyricsUpdatedAt || null,
     hasScores: Math.max(0, Number(song.scoreCount || 0) || 0) > 0,
     scoreCount: Math.max(0, Number(song.scoreCount || 0) || 0)
@@ -439,10 +444,11 @@ async function loadMiniMediaLibrary() {
   let normalized = await syncMiniMediaLibraryFromCoverFolder(library);
   if (hasDatabase()) {
     try {
-      normalized = normalizeMiniMediaLibrary(await syncMiniMediaLibraryToDatabase(normalized));
-      if (!miniMediaPersistenceBootstrapped) {
-        miniMediaPersistenceBootstrapped = true;
-        await persistMiniMediaLibraryDocuments(normalized);
+      if (!miniMediaDatabaseBootstrapped) {
+        normalized = normalizeMiniMediaLibrary(await syncMiniMediaLibraryToDatabase(normalized));
+        miniMediaDatabaseBootstrapped = true;
+      } else {
+        normalized = normalizeMiniMediaLibrary(await hydrateMiniMediaLibraryFromDatabase(normalized));
       }
     } catch (error) {
       console.error("Falha ao carregar a camada Postgres da biblioteca MINI:", error);
@@ -3875,9 +3881,8 @@ async function handleMiniMediaTrackLyricsRequest(request, response, albumId, tra
       return;
     }
 
-    const lyricsData = song.lyricsKey
-      ? await loadMiniMediaTrackLyrics(song.lyricsKey)
-      : { lyrics: "", updatedAt: null };
+    const databaseSong = await getSyncedMiniMediaSong(library, albumId, trackId);
+    const lyrics = String(databaseSong.lyrics_text || "").trim();
 
     sendJson(response, 200, {
       ok: true,
@@ -3888,9 +3893,9 @@ async function handleMiniMediaTrackLyricsRequest(request, response, albumId, tra
         id: song.id,
         title: song.title
       },
-      lyrics: lyricsData.lyrics,
-      hasLyrics: Boolean(song.lyricsKey && lyricsData.lyrics),
-      updatedAt: song.lyricsUpdatedAt || lyricsData.updatedAt || null
+      lyrics,
+      hasLyrics: Boolean(lyrics),
+      updatedAt: databaseSong.lyrics_updated_at || null
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -3928,68 +3933,21 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
       return;
     }
 
-    if (!lyrics) {
-      const existingLyricsKey = String(song.lyricsKey || "").trim();
-      if (existingLyricsKey) {
-        try {
-          await getR2Client().send(new DeleteObjectCommand({
-            Bucket: R2_BUCKET_NAME,
-            Key: existingLyricsKey
-          }));
-        } catch (_) {
-          // Ignore bucket delete errors and keep metadata update.
-        }
-      }
-      song.lyricsKey = "";
-      song.lyricsUpdatedAt = null;
-      song.updatedAt = new Date().toISOString();
-      album.updatedAt = song.updatedAt;
-      const saved = await saveMiniMediaLibrary(library);
-      if (hasDatabase()) {
-        const databaseSong = await getMiniMediaSongByLegacyIds(albumId, trackId);
-        if (databaseSong) {
-          await updateMiniMediaSongLyrics(databaseSong.id, "");
-        }
-      }
-      const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
-      sendJson(response, 200, {
-        ok: true,
-        user: sanitizeUser(adminUser),
-        album: buildMiniMediaAlbumPayload(savedAlbum),
-        library: buildMiniMediaLibraryPayload(saved),
-        trackId,
-        lyrics: "",
-        hasLyrics: false,
-        updatedAt: null,
-        feedback: "Letra removida com sucesso."
-      });
-      return;
-    }
-
-    const lyricsKey = String(song.lyricsKey || "").trim() || buildMiniMediaTrackLyricsKey(albumId, trackId);
-    const savedLyrics = await saveMiniMediaTrackLyrics(lyricsKey, lyrics, adminUser.username || adminUser.name || "");
-    song.lyricsKey = lyricsKey;
-    song.lyricsUpdatedAt = savedLyrics.updatedAt;
-    song.updatedAt = savedLyrics.updatedAt;
-    album.updatedAt = savedLyrics.updatedAt;
-    const saved = await saveMiniMediaLibrary(library);
-    if (hasDatabase()) {
-      const databaseSong = await getMiniMediaSongByLegacyIds(albumId, trackId);
-      if (databaseSong) {
-        await updateMiniMediaSongLyrics(databaseSong.id, lyricsKey);
-      }
-    }
-    const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+    const databaseSong = await getSyncedMiniMediaSong(library, albumId, trackId);
+    const updatedSong = await updateMiniMediaSongLyrics(databaseSong.id, lyrics);
+    song.lyricsText = lyrics;
+    song.lyricsKey = "";
+    song.lyricsUpdatedAt = updatedSong?.lyrics_updated_at || null;
     sendJson(response, 200, {
       ok: true,
       user: sanitizeUser(adminUser),
-      album: buildMiniMediaAlbumPayload(savedAlbum),
-      library: buildMiniMediaLibraryPayload(saved),
+      album: buildMiniMediaAlbumPayload(album),
+      library: buildMiniMediaLibraryPayload(library),
       trackId,
-      lyrics: savedLyrics.lyrics,
-      hasLyrics: true,
-      updatedAt: savedLyrics.updatedAt,
-      feedback: "Letra salva com sucesso."
+      lyrics,
+      hasLyrics: Boolean(lyrics),
+      updatedAt: updatedSong?.lyrics_updated_at || null,
+      feedback: lyrics ? "Letra salva no Postgres com sucesso." : "Letra removida com sucesso."
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -4002,8 +3960,11 @@ async function getSyncedMiniMediaSong(library, albumId, trackId) {
   if (!hasDatabase()) {
     throw new Error("DATABASE_URL nao configurada para os recursos globais da musica.");
   }
-  await syncMiniMediaLibraryToDatabase(library);
-  const song = await getMiniMediaSongByLegacyIds(albumId, trackId);
+  let song = await getMiniMediaSongByLegacyIds(albumId, trackId);
+  if (!song) {
+    await syncMiniMediaLibraryToDatabase(library);
+    song = await getMiniMediaSongByLegacyIds(albumId, trackId);
+  }
   if (!song) {
     throw new Error("Faixa nao encontrada no Postgres.");
   }
@@ -4040,14 +4001,14 @@ async function handleMiniMediaPlaybackUploadRequest(request, response, albumId, 
   if (!adminUser) {
     return;
   }
-  const providedFileName = decodeURIComponent(String(request.headers["x-file-name"] || "playback.mp3").trim() || "playback.mp3");
-  const contentType = String(request.headers["content-type"] || "").trim().toLowerCase();
-  if (!isMiniMediaAudioUpload(providedFileName, contentType)) {
-    sendJson(response, 400, { error: "Envie um arquivo de audio valido para o playback." });
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
     return;
   }
   try {
-    const fileBuffer = await readBinaryBody(request, MAX_MINI_MEDIA_TRACK_BYTES);
     const library = await loadMiniMediaLibrary();
     const album = library.albums.find((item) => item.id === albumId);
     const librarySong = album?.songs?.find((item) => item.id === trackId);
@@ -4056,24 +4017,31 @@ async function handleMiniMediaPlaybackUploadRequest(request, response, albumId, 
       return;
     }
     const song = await getSyncedMiniMediaSong(library, albumId, trackId);
-    const extension = getMiniMediaFileExtension(providedFileName, ".mp3") || ".mp3";
-    const playbackKey = `${buildMiniMediaAlbumFolder(albumId)}/songs/${song.id}/playback/playback${extension}`;
-    await getR2Client().send(new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: playbackKey,
-      Body: fileBuffer,
-      ContentType: getMiniMediaContentType(providedFileName, contentType || "audio/mpeg")
-    }));
-    await updateMiniMediaSongPlayback(song.id, playbackKey);
+    const playbackTrackId = String(body?.playbackTrackId || "").trim();
+    let playbackSong = null;
+    if (playbackTrackId) {
+      playbackSong = await getMiniMediaSongByLegacyIds(albumId, playbackTrackId);
+      if (!playbackSong || playbackSong.id === song.id) {
+        sendJson(response, 400, { error: "Escolha outra musica deste album como playback." });
+        return;
+      }
+      const updated = await updateMiniMediaSongPlayback(song.id, playbackSong.id);
+      if (!updated) {
+        sendJson(response, 400, { error: "O playback precisa ser uma musica do mesmo album." });
+        return;
+      }
+    } else {
+      await clearMiniMediaSongPlayback(song.id);
+    }
     librarySong.globalId = song.id;
-    librarySong.playbackKey = playbackKey;
-    const saved = await saveMiniMediaLibrary(library);
+    librarySong.playbackKey = "";
+    librarySong.playbackSongId = playbackSong?.id || "";
     sendJson(response, 200, {
       ok: true,
       user: sanitizeUser(adminUser),
-      library: buildMiniMediaLibraryPayload(saved),
-      playbackUrl: buildAlbumZipPublicUrlFromKey(playbackKey),
-      feedback: "Playback vinculado com sucesso."
+      library: buildMiniMediaLibraryPayload(library),
+      playbackSongId: playbackSong?.id || "",
+      feedback: playbackSong ? "Playback vinculado com sucesso." : "Playback removido com sucesso."
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -4121,27 +4089,31 @@ async function handleMiniMediaScoreUploadRequest(request, response, albumId, tra
     const downloadKey = `${assetFolder}/${safeBase}-${slugifyAlbumName(title) || "partitura"}.pdf`;
     const converted = await buildMiniMediaScoreFiles(fileBuffer, providedFileName, contentType);
 
-    await getR2Client().send(new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: sourceKey,
-      Body: fileBuffer,
-      ContentType: getMiniMediaContentType(providedFileName, contentType || "application/octet-stream")
-    }));
+    const r2Client = getR2Client();
+    const scoreUploads = [
+      r2Client.send(new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: sourceKey,
+        Body: fileBuffer,
+        ContentType: getMiniMediaContentType(providedFileName, contentType || "application/octet-stream")
+      })),
+      r2Client.send(new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: downloadKey,
+        Body: converted.downloadPdfBuffer,
+        ContentType: "application/pdf",
+        ContentDisposition: buildContentDisposition(`${title}.pdf`)
+      }))
+    ];
     if (converted.previewBuffer?.length) {
-      await getR2Client().send(new PutObjectCommand({
+      scoreUploads.push(r2Client.send(new PutObjectCommand({
         Bucket: R2_BUCKET_NAME,
         Key: previewKey,
         Body: converted.previewBuffer,
         ContentType: "image/webp"
-      }));
+      })));
     }
-    await getR2Client().send(new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
-      Key: downloadKey,
-      Body: converted.downloadPdfBuffer,
-      ContentType: "application/pdf",
-      ContentDisposition: buildContentDisposition(`${title}.pdf`)
-    }));
+    await Promise.all(scoreUploads);
 
     const asset = await createMiniMediaSongAsset(song.id, {
       type: "score",
@@ -4160,12 +4132,11 @@ async function handleMiniMediaScoreUploadRequest(request, response, albumId, tra
 
     librarySong.globalId = song.id;
     librarySong.scoreCount = existingAssets.filter((item) => item.type === "score").length + 1;
-    const saved = await saveMiniMediaLibrary(library);
     sendJson(response, 201, {
       ok: true,
       user: sanitizeUser(adminUser),
       asset: buildMiniMediaAssetPayload(asset),
-      library: buildMiniMediaLibraryPayload(saved),
+      library: buildMiniMediaLibraryPayload(library),
       feedback: `${title} salva com sucesso.`
     });
   } catch (error) {
@@ -4201,13 +4172,12 @@ async function handleMiniMediaSongAssetDeleteRequest(request, response, albumId,
     if (librarySong) {
       librarySong.scoreCount = remainingAssets.filter((item) => item.type === "score").length;
     }
-    const saved = await saveMiniMediaLibrary(library);
     sendJson(response, 200, {
       ok: true,
       user: sanitizeUser(adminUser),
       deleted: true,
       assetId,
-      library: buildMiniMediaLibraryPayload(saved),
+      library: buildMiniMediaLibraryPayload(library),
       feedback: "Partitura excluida com sucesso."
     });
   } catch (error) {

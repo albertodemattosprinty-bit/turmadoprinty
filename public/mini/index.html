@@ -2907,8 +2907,8 @@
         <textarea id="mediaLyricsTextarea" class="course-admin-input course-admin-textarea media-lyrics-textarea" placeholder="A letra ou texto desta música aparecerá aqui."></textarea>
         <button id="submitMediaLyrics" class="ai-primary course-admin-submit" type="button">Salvar texto</button>
         <div id="mediaPlaybackAdminFields">
-          <label class="course-admin-label" for="mediaPlaybackFileInput">Playback opcional</label>
-          <input id="mediaPlaybackFileInput" class="course-admin-input" type="file" accept="audio/*">
+          <label class="course-admin-label" for="mediaPlaybackTrackSelect">Playback opcional</label>
+          <select id="mediaPlaybackTrackSelect" class="course-admin-input"></select>
           <button id="submitMediaPlayback" class="ai-primary course-admin-submit" type="button">Vincular playback</button>
         </div>
       </div>
@@ -4327,6 +4327,18 @@
       if (playbackAdminFields) {
         playbackAdminFields.hidden = !isAdmin;
       }
+      const playbackSelect = $("mediaPlaybackTrackSelect");
+      if (playbackSelect && isAdmin) {
+        const album = mediaLibraryAlbums.find((item) => String(item.id) === String(mediaLyricsAlbumId));
+        const currentSong = album?.songs?.find((item) => String(item.id) === String(mediaLyricsTrackId));
+        const candidates = (album?.songs || []).filter((item) => String(item.id) !== String(mediaLyricsTrackId));
+        playbackSelect.innerHTML = [
+          `<option value="">Sem playback vinculado</option>`,
+          ...candidates.map((item) => `<option value="${escapeAttr(item.id)}">${escapeText(item.title || "Faixa")}</option>`)
+        ].join("");
+        const selected = candidates.find((item) => String(item.globalId) === String(currentSong?.playbackSongId || ""));
+        playbackSelect.value = selected?.id || "";
+      }
       if (scoreAdminFields) {
         scoreAdminFields.hidden = !isAdmin;
       }
@@ -4372,7 +4384,10 @@
       });
     }
     async function loadMediaResourceAssets() {
-      const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets`);
+      const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets`, {
+        timeoutMs: 20000,
+        timeoutMessage: "As partituras demoraram demais para carregar. Tente novamente."
+      });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(payload.error || "Nao foi possivel carregar as partituras.");
@@ -4394,8 +4409,14 @@
 
       try {
         const [lyricsResponse, assetsResponse] = await Promise.all([
-          apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/lyrics`),
-          apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets`)
+          apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/lyrics`, {
+            timeoutMs: 20000,
+            timeoutMessage: "A letra demorou demais para carregar. Tente abrir novamente."
+          }),
+          apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets`, {
+            timeoutMs: 20000,
+            timeoutMessage: "As partituras demoraram demais para carregar. Tente abrir novamente."
+          })
         ]);
         const lyricsPayload = await lyricsResponse.json().catch(() => ({}));
         const assetsPayload = await assetsResponse.json().catch(() => ({}));
@@ -4434,7 +4455,9 @@
       try {
         const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics`, {
           method: "PATCH",
-          body: JSON.stringify({ lyrics: textarea.value || "" })
+          body: JSON.stringify({ lyrics: textarea.value || "" }),
+          timeoutMs: 20000,
+          timeoutMessage: "O Postgres demorou demais para salvar a letra. Tente novamente."
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -4480,7 +4503,9 @@
               "X-File-Name": encodeURIComponent(file.name),
               "X-Page-Order": String(currentScoreCount + index + 1)
             },
-            body: file
+            body: file,
+            timeoutMs: 120000,
+            timeoutMessage: `O envio da partitura ${index + 1} demorou demais. Verifique o tamanho do arquivo e tente novamente.`
           });
           const payload = await response.json().catch(() => ({}));
           if (!response.ok) {
@@ -4506,26 +4531,20 @@
       if (!isMiniMediaAdmin()) {
         return;
       }
-      const input = $("mediaPlaybackFileInput");
-      const file = input?.files?.[0] || null;
+      const select = $("mediaPlaybackTrackSelect");
+      const playbackTrackId = String(select?.value || "").trim();
       const status = $("mediaLyricsStatus");
       const button = $("submitMediaPlayback");
-      if (!file) {
-        status.textContent = "Escolha o arquivo de playback.";
-        return;
-      }
       if (button) {
         button.disabled = true;
       }
-      status.textContent = "Enviando playback...";
+      status.textContent = playbackTrackId ? "Vinculando playback..." : "Removendo playback...";
       try {
         const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/playback`, {
           method: "PUT",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-            "X-File-Name": encodeURIComponent(file.name)
-          },
-          body: file
+          body: JSON.stringify({ playbackTrackId }),
+          timeoutMs: 20000,
+          timeoutMessage: "O Postgres demorou demais para vincular o playback. Tente novamente."
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -4534,7 +4553,6 @@
         if (payload?.library?.albums) {
           mediaLibraryAlbums = payload.library.albums;
         }
-        input.value = "";
         renderMediaModal();
         status.textContent = String(payload?.feedback || "Playback vinculado com sucesso.");
       } catch (error) {
