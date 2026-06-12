@@ -8,6 +8,10 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { createCanvas } from "@napi-rs/canvas";
+import { PDFDocument } from "pdf-lib";
+import { getDocument as getPdfDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import sharp from "sharp";
 import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
@@ -37,6 +41,7 @@ import {
   updateMiniCourseProgress
 } from "./src/mini-courses.js";
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
+import { createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -85,6 +90,7 @@ const MINI_MEDIA_IMAGE_MODELS = [
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
+const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
 
 const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
@@ -94,6 +100,7 @@ const contentDir = path.join(__dirname, "ConteÃºdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
+let miniMediaPersistenceBootstrapped = false;
 
 const eduDownloadFiles = {
   "abandona-no-lixao": {
@@ -162,7 +169,7 @@ function applyCorsHeaders(request, response) {
   response.setHeader("Access-Control-Allow-Origin", origin);
   response.setHeader("Vary", "Origin");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-File-Name, X-Track-Title, X-Track-Order, X-Page-Order, X-Model");
   response.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Type, Content-Disposition");
 }
 
@@ -307,15 +314,26 @@ function isMiniMediaAudioUpload(fileName, contentType) {
     || safeContentType.startsWith("audio/");
 }
 
+function isMiniMediaScoreUpload(fileName, contentType) {
+  const extension = getMiniMediaFileExtension(fileName);
+  const safeContentType = String(contentType || "").trim().toLowerCase();
+  return [".pdf", ".png", ".jpg", ".jpeg", ".webp"].includes(extension)
+    || safeContentType === "application/pdf"
+    || safeContentType.startsWith("image/");
+}
+
 function normalizeMiniMediaSong(raw, index = 0) {
   const safeTitle = sanitizeMiniMediaTitle(raw?.title, `Faixa ${index + 1}`);
   return {
     id: String(raw?.id || `track-${index + 1}`).trim() || `track-${index + 1}`,
+    globalId: String(raw?.globalId || "").trim(),
     title: safeTitle,
     subtitle: sanitizeMiniMediaTitle(raw?.subtitle || "Faixa do album", "Faixa do album"),
     key: String(raw?.key || "").trim(),
+    playbackKey: String(raw?.playbackKey || "").trim(),
     lyricsKey: String(raw?.lyricsKey || "").trim(),
     lyricsUpdatedAt: raw?.lyricsUpdatedAt || null,
+    scoreCount: Math.max(0, Number(raw?.scoreCount || 0) || 0),
     contentType: String(raw?.contentType || "").trim(),
     order: Math.max(0, Number(raw?.order || index) || index),
     createdAt: raw?.createdAt || null,
@@ -329,6 +347,7 @@ function normalizeMiniMediaAlbum(raw, index = 0) {
 
   return {
     id: String(raw?.id || `album-${index + 1}`).trim() || `album-${index + 1}`,
+    globalId: String(raw?.globalId || "").trim(),
     title: sanitizeMiniMediaTitle(raw?.title, `Album ${index + 1}`),
     subtitle: sanitizeMiniMediaTitle(raw?.subtitle || `${songs.length} musicas`, `${songs.length} musicas`),
     coverKey: String(raw?.coverKey || "").trim(),
@@ -377,17 +396,22 @@ function buildMiniMediaAlbumPayload(album) {
   const coverImageUrl = album?.coverKey ? buildAlbumZipPublicUrlFromKey(album.coverKey) : "";
   const songs = Array.isArray(album?.songs) ? album.songs.map((song) => ({
     id: song.id,
+    globalId: song.globalId || "",
     title: song.title,
     subtitle: song.subtitle,
     order: Math.max(0, Number(song.order || 0) || 0),
     url: song.key ? buildAlbumZipPublicUrlFromKey(song.key) : "",
+    playbackUrl: song.playbackKey ? buildAlbumZipPublicUrlFromKey(song.playbackKey) : "",
     coverImageUrl,
     hasLyrics: Boolean(song.lyricsKey),
-    lyricsUpdatedAt: song.lyricsUpdatedAt || null
+    lyricsUpdatedAt: song.lyricsUpdatedAt || null,
+    hasScores: Math.max(0, Number(song.scoreCount || 0) || 0) > 0,
+    scoreCount: Math.max(0, Number(song.scoreCount || 0) || 0)
   })) : [];
 
   return {
     id: album.id,
+    globalId: album.globalId || "",
     title: album.title,
     subtitle: album.subtitle || `${songs.length} musicas`,
     coverImageUrl,
@@ -412,11 +436,22 @@ async function loadMiniMediaLibrary() {
       library = { albums: [] };
     }
   }
-  return syncMiniMediaLibraryFromCoverFolder(library);
+  let normalized = await syncMiniMediaLibraryFromCoverFolder(library);
+  if (hasDatabase()) {
+    try {
+      normalized = normalizeMiniMediaLibrary(await syncMiniMediaLibraryToDatabase(normalized));
+      if (!miniMediaPersistenceBootstrapped) {
+        miniMediaPersistenceBootstrapped = true;
+        await persistMiniMediaLibraryDocuments(normalized);
+      }
+    } catch (error) {
+      console.error("Falha ao carregar a camada Postgres da biblioteca MINI:", error);
+    }
+  }
+  return normalized;
 }
 
-async function saveMiniMediaLibrary(library) {
-  const normalized = normalizeMiniMediaLibrary(library);
+async function persistMiniMediaLibraryDocuments(normalized) {
   const r2Client = getR2Client();
   await r2Client.send(new PutObjectCommand({
     Bucket: R2_BUCKET_NAME,
@@ -424,6 +459,49 @@ async function saveMiniMediaLibrary(library) {
     Body: Buffer.from(JSON.stringify(normalized, null, 2), "utf8"),
     ContentType: "application/json; charset=utf-8"
   }));
+  for (const album of normalized.albums) {
+    const albumJsonKey = `${buildMiniMediaAlbumFolder(album.id)}/album.json`;
+    await r2Client.send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: albumJsonKey,
+      Body: Buffer.from(JSON.stringify(album, null, 2), "utf8"),
+      ContentType: "application/json; charset=utf-8"
+    }));
+    for (const song of album.songs) {
+      let assets = [];
+      if (hasDatabase() && song.globalId) {
+        try {
+          assets = await listMiniMediaSongAssets(song.globalId);
+        } catch {
+          assets = [];
+        }
+      }
+      const songJsonKey = `${buildMiniMediaAlbumFolder(album.id)}/songs/${song.globalId || song.id}/song.json`;
+      await r2Client.send(new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: songJsonKey,
+        Body: Buffer.from(JSON.stringify({
+          ...song,
+          albumId: album.globalId || album.id,
+          albumLegacyId: album.id,
+          assets
+        }, null, 2), "utf8"),
+        ContentType: "application/json; charset=utf-8"
+      }));
+    }
+  }
+}
+
+async function saveMiniMediaLibrary(library) {
+  let normalized = normalizeMiniMediaLibrary(library);
+  if (hasDatabase()) {
+    try {
+      normalized = normalizeMiniMediaLibrary(await syncMiniMediaLibraryToDatabase(normalized));
+    } catch (error) {
+      console.error("Falha ao sincronizar a biblioteca MINI com o Postgres:", error);
+    }
+  }
+  await persistMiniMediaLibraryDocuments(normalized);
   return normalized;
 }
 
@@ -459,6 +537,61 @@ async function saveMiniMediaTrackLyrics(key, lyrics, updatedBy = "") {
     ContentType: "application/json; charset=utf-8"
   }));
   return payload;
+}
+
+async function buildMiniMediaScoreFiles(fileBuffer, fileName, contentType) {
+  const extension = getMiniMediaFileExtension(fileName).toLowerCase();
+  const isPdf = extension === ".pdf" || String(contentType || "").toLowerCase() === "application/pdf";
+  let previewBuffer = null;
+  let downloadPdfBuffer = null;
+
+  if (isPdf) {
+    downloadPdfBuffer = fileBuffer;
+    try {
+      const loadingTask = getPdfDocument({ data: new Uint8Array(fileBuffer) });
+      const pdfDocument = await loadingTask.promise;
+      const firstPage = await pdfDocument.getPage(1);
+      const viewport = firstPage.getViewport({ scale: 1.6 });
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+      const canvasContext = canvas.getContext("2d");
+      await firstPage.render({ canvasContext, viewport }).promise;
+      previewBuffer = await sharp(canvas.toBuffer("image/png")).webp({ quality: 86 }).toBuffer();
+      if (typeof loadingTask.destroy === "function") {
+        await loadingTask.destroy();
+      }
+    } catch {
+      previewBuffer = null;
+    }
+  } else {
+    previewBuffer = await sharp(fileBuffer).webp({ quality: 86 }).toBuffer();
+    const pdfImageBuffer = await sharp(fileBuffer).png().toBuffer();
+    const pdf = await PDFDocument.create();
+    const image = await pdf.embedPng(pdfImageBuffer);
+    const page = pdf.addPage([image.width, image.height]);
+    page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+    downloadPdfBuffer = Buffer.from(await pdf.save());
+  }
+
+  return {
+    previewBuffer,
+    downloadPdfBuffer
+  };
+}
+
+function buildMiniMediaAssetPayload(asset) {
+  return {
+    id: asset.id,
+    type: asset.type,
+    title: asset.title,
+    pageOrder: asset.pageOrder,
+    sourceUrl: asset.sourceKey ? buildAlbumZipPublicUrlFromKey(asset.sourceKey) : "",
+    previewUrl: asset.previewKey ? buildAlbumZipPublicUrlFromKey(asset.previewKey) : "",
+    downloadUrl: asset.downloadKey ? buildAlbumZipPublicUrlFromKey(asset.downloadKey) : "",
+    sourceContentType: asset.sourceContentType,
+    metadata: asset.metadata || {},
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt
+  };
 }
 
 async function syncMiniMediaLibraryFromCoverFolder(library) {
@@ -3641,6 +3774,7 @@ async function handleMiniMediaTrackUploadRequest(request, response, albumId, tra
     }
     const nextSong = normalizeMiniMediaSong({
       id: safeTrackId,
+      globalId: existingIndex >= 0 ? album.songs[existingIndex].globalId : "",
       title: songTitle,
       subtitle: `${album.title} • faixa ${trackOrder + 1}`,
       key,
@@ -3811,6 +3945,12 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
       song.updatedAt = new Date().toISOString();
       album.updatedAt = song.updatedAt;
       const saved = await saveMiniMediaLibrary(library);
+      if (hasDatabase()) {
+        const databaseSong = await getMiniMediaSongByLegacyIds(albumId, trackId);
+        if (databaseSong) {
+          await updateMiniMediaSongLyrics(databaseSong.id, "");
+        }
+      }
       const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
       sendJson(response, 200, {
         ok: true,
@@ -3833,6 +3973,12 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
     song.updatedAt = savedLyrics.updatedAt;
     album.updatedAt = savedLyrics.updatedAt;
     const saved = await saveMiniMediaLibrary(library);
+    if (hasDatabase()) {
+      const databaseSong = await getMiniMediaSongByLegacyIds(albumId, trackId);
+      if (databaseSong) {
+        await updateMiniMediaSongLyrics(databaseSong.id, lyricsKey);
+      }
+    }
     const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
     sendJson(response, 200, {
       ok: true,
@@ -3848,6 +3994,225 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel salvar a letra."
+    });
+  }
+}
+
+async function getSyncedMiniMediaSong(library, albumId, trackId) {
+  if (!hasDatabase()) {
+    throw new Error("DATABASE_URL nao configurada para os recursos globais da musica.");
+  }
+  await syncMiniMediaLibraryToDatabase(library);
+  const song = await getMiniMediaSongByLegacyIds(albumId, trackId);
+  if (!song) {
+    throw new Error("Faixa nao encontrada no Postgres.");
+  }
+  return song;
+}
+
+async function handleMiniMediaSongAssetsRequest(request, response, albumId, trackId) {
+  const user = await getOptionalAuthUser(request);
+  try {
+    const library = await loadMiniMediaLibrary();
+    const song = await getSyncedMiniMediaSong(library, albumId, trackId);
+    const assets = await listMiniMediaSongAssets(song.id);
+    sendJson(response, 200, {
+      ok: true,
+      user: user ? sanitizeUser(user) : null,
+      albumId,
+      trackId,
+      song: {
+        id: song.id,
+        title: song.title,
+        playbackUrl: song.playback_key ? buildAlbumZipPublicUrlFromKey(song.playback_key) : ""
+      },
+      assets: assets.map((asset) => buildMiniMediaAssetPayload(asset))
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os recursos da musica."
+    });
+  }
+}
+
+async function handleMiniMediaPlaybackUploadRequest(request, response, albumId, trackId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+  const providedFileName = decodeURIComponent(String(request.headers["x-file-name"] || "playback.mp3").trim() || "playback.mp3");
+  const contentType = String(request.headers["content-type"] || "").trim().toLowerCase();
+  if (!isMiniMediaAudioUpload(providedFileName, contentType)) {
+    sendJson(response, 400, { error: "Envie um arquivo de audio valido para o playback." });
+    return;
+  }
+  try {
+    const fileBuffer = await readBinaryBody(request, MAX_MINI_MEDIA_TRACK_BYTES);
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    const librarySong = album?.songs?.find((item) => item.id === trackId);
+    if (!album || !librarySong) {
+      sendJson(response, 404, { error: "Album ou faixa nao encontrado." });
+      return;
+    }
+    const song = await getSyncedMiniMediaSong(library, albumId, trackId);
+    const extension = getMiniMediaFileExtension(providedFileName, ".mp3") || ".mp3";
+    const playbackKey = `${buildMiniMediaAlbumFolder(albumId)}/songs/${song.id}/playback/playback${extension}`;
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: playbackKey,
+      Body: fileBuffer,
+      ContentType: getMiniMediaContentType(providedFileName, contentType || "audio/mpeg")
+    }));
+    await updateMiniMediaSongPlayback(song.id, playbackKey);
+    librarySong.globalId = song.id;
+    librarySong.playbackKey = playbackKey;
+    const saved = await saveMiniMediaLibrary(library);
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      library: buildMiniMediaLibraryPayload(saved),
+      playbackUrl: buildAlbumZipPublicUrlFromKey(playbackKey),
+      feedback: "Playback vinculado com sucesso."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar o playback."
+    });
+  }
+}
+
+async function handleMiniMediaScoreUploadRequest(request, response, albumId, trackId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const providedFileName = decodeURIComponent(String(request.headers["x-file-name"] || "partitura").trim() || "partitura");
+  const contentType = String(request.headers["content-type"] || "").trim().toLowerCase();
+  const requestedPageOrder = Math.max(0, Number(request.headers["x-page-order"] || 0) || 0);
+  if (!isMiniMediaScoreUpload(providedFileName, contentType)) {
+    sendJson(response, 400, { error: "Envie uma partitura em PDF, JPG, PNG ou WebP." });
+    return;
+  }
+
+  try {
+    const fileBuffer = await readBinaryBody(request, MAX_MINI_MEDIA_SCORE_BYTES);
+    if (!fileBuffer.length) {
+      sendJson(response, 400, { error: "Arquivo de partitura vazio." });
+      return;
+    }
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    const librarySong = album?.songs?.find((item) => item.id === trackId);
+    if (!album || !librarySong) {
+      sendJson(response, 404, { error: "Album ou faixa nao encontrado." });
+      return;
+    }
+    const song = await getSyncedMiniMediaSong(library, albumId, trackId);
+    const existingAssets = await listMiniMediaSongAssets(song.id);
+    const pageOrder = requestedPageOrder || existingAssets.filter((asset) => asset.type === "score").length + 1;
+    const title = `Partitura ${album.title} Pagina ${pageOrder}`;
+    const safeBase = `pagina-${String(pageOrder).padStart(3, "0")}`;
+    const sourceExtension = getMiniMediaFileExtension(providedFileName, contentType === "application/pdf" ? ".pdf" : ".png") || ".png";
+    const assetFolder = `${buildMiniMediaAlbumFolder(albumId)}/songs/${song.id}/scores`;
+    const sourceKey = `${assetFolder}/${safeBase}-original${sourceExtension}`;
+    const previewKey = `${assetFolder}/${safeBase}-preview.webp`;
+    const downloadKey = `${assetFolder}/${safeBase}-${slugifyAlbumName(title) || "partitura"}.pdf`;
+    const converted = await buildMiniMediaScoreFiles(fileBuffer, providedFileName, contentType);
+
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: sourceKey,
+      Body: fileBuffer,
+      ContentType: getMiniMediaContentType(providedFileName, contentType || "application/octet-stream")
+    }));
+    if (converted.previewBuffer?.length) {
+      await getR2Client().send(new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: previewKey,
+        Body: converted.previewBuffer,
+        ContentType: "image/webp"
+      }));
+    }
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: downloadKey,
+      Body: converted.downloadPdfBuffer,
+      ContentType: "application/pdf",
+      ContentDisposition: buildContentDisposition(`${title}.pdf`)
+    }));
+
+    const asset = await createMiniMediaSongAsset(song.id, {
+      type: "score",
+      title,
+      pageOrder,
+      sourceKey,
+      previewKey: converted.previewBuffer?.length ? previewKey : "",
+      downloadKey,
+      sourceContentType: getMiniMediaContentType(providedFileName, contentType || "application/octet-stream"),
+      metadata: {
+        albumId,
+        trackId,
+        originalFileName: providedFileName
+      }
+    });
+
+    librarySong.globalId = song.id;
+    librarySong.scoreCount = existingAssets.filter((item) => item.type === "score").length + 1;
+    const saved = await saveMiniMediaLibrary(library);
+    sendJson(response, 201, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      asset: buildMiniMediaAssetPayload(asset),
+      library: buildMiniMediaLibraryPayload(saved),
+      feedback: `${title} salva com sucesso.`
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar a partitura."
+    });
+  }
+}
+
+async function handleMiniMediaSongAssetDeleteRequest(request, response, albumId, trackId, assetId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    const librarySong = album?.songs?.find((item) => item.id === trackId);
+    const song = await getSyncedMiniMediaSong(library, albumId, trackId);
+    const asset = await deleteMiniMediaSongAsset(assetId, song.id);
+    if (!asset) {
+      sendJson(response, 404, { error: "Recurso nao encontrado." });
+      return;
+    }
+    for (const key of [asset.sourceKey, asset.previewKey, asset.downloadKey].filter(Boolean)) {
+      try {
+        await getR2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
+      } catch (_) {
+        // Keep database deletion even when an old R2 object is already absent.
+      }
+    }
+    const remainingAssets = await listMiniMediaSongAssets(song.id);
+    if (librarySong) {
+      librarySong.scoreCount = remainingAssets.filter((item) => item.type === "score").length;
+    }
+    const saved = await saveMiniMediaLibrary(library);
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      deleted: true,
+      assetId,
+      library: buildMiniMediaLibraryPayload(saved),
+      feedback: "Partitura excluida com sucesso."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir a partitura."
     });
   }
 }
@@ -3871,6 +4236,8 @@ async function handleMiniMediaTrackDeleteRequest(request, response, albumId, tra
       return;
     }
 
+    const databaseSong = hasDatabase() ? await getMiniMediaSongByLegacyIds(albumId, trackId) : null;
+    const databaseAssets = databaseSong ? await listMiniMediaSongAssets(databaseSong.id) : [];
     const [song] = album.songs.splice(existingIndex, 1);
     normalizeMiniMediaAlbumSongsOrder(album);
     album.updatedAt = new Date().toISOString();
@@ -3894,6 +4261,32 @@ async function handleMiniMediaTrackDeleteRequest(request, response, albumId, tra
       } catch (_) {
         // Ignore bucket delete errors and keep metadata deletion.
       }
+    }
+    if (song?.playbackKey) {
+      try {
+        await getR2Client().send(new DeleteObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: song.playbackKey
+        }));
+      } catch (_) {
+        // Ignore bucket delete errors and keep metadata deletion.
+      }
+    }
+    for (const key of databaseAssets.flatMap((asset) => [asset.sourceKey, asset.previewKey, asset.downloadKey]).filter(Boolean)) {
+      try {
+        await getR2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
+      } catch (_) {
+        // Ignore old object cleanup failures.
+      }
+    }
+    const songJsonKey = `${buildMiniMediaAlbumFolder(albumId)}/songs/${song?.globalId || databaseSong?.id || song?.id}/song.json`;
+    try {
+      await getR2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: songJsonKey }));
+    } catch (_) {
+      // Ignore old object cleanup failures.
+    }
+    if (hasDatabase()) {
+      await deleteMiniMediaSongByLegacyIds(albumId, trackId);
     }
 
     const saved = await saveMiniMediaLibrary(library);
@@ -3926,12 +4319,28 @@ async function handleMiniMediaAlbumDeleteRequest(request, response, albumId) {
     }
 
     const [album] = library.albums.splice(existingIndex, 1);
+    const databaseSongs = [];
+    if (hasDatabase()) {
+      for (const song of album.songs) {
+        const databaseSong = await getMiniMediaSongByLegacyIds(albumId, song.id);
+        if (databaseSong) {
+          databaseSongs.push({
+            song: databaseSong,
+            assets: await listMiniMediaSongAssets(databaseSong.id)
+          });
+        }
+      }
+    }
     const keysToDelete = [
       String(album?.coverKey || "").trim(),
+      `${buildMiniMediaAlbumFolder(albumId)}/album.json`,
       ...((Array.isArray(album?.songs) ? album.songs : []).flatMap((song) => [
         String(song?.key || "").trim(),
-        String(song?.lyricsKey || "").trim()
-      ]))
+        String(song?.playbackKey || "").trim(),
+        String(song?.lyricsKey || "").trim(),
+        `${buildMiniMediaAlbumFolder(albumId)}/songs/${song?.globalId || song?.id}/song.json`
+      ])),
+      ...databaseSongs.flatMap((entry) => entry.assets.flatMap((asset) => [asset.sourceKey, asset.previewKey, asset.downloadKey]))
     ].filter(Boolean);
 
     for (const key of keysToDelete) {
@@ -3945,6 +4354,9 @@ async function handleMiniMediaAlbumDeleteRequest(request, response, albumId) {
       }
     }
 
+    if (hasDatabase()) {
+      await deleteMiniMediaAlbumByLegacyId(albumId);
+    }
     const saved = await saveMiniMediaLibrary(library);
     sendJson(response, 200, {
       ok: true,
@@ -7175,6 +7587,44 @@ const server = http.createServer(async (request, response) => {
     const albumId = decodeURIComponent(parts[0] || "");
     const trackId = decodeURIComponent(parts[1] || "");
     await handleMiniMediaTrackLyricsUpdateRequest(request, response, albumId, trackId);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/") && pathname.endsWith("/assets")) {
+    const parts = pathname.replace("/api/mini/media/albums/", "").replace(/\/assets$/, "").split("/tracks/");
+    const albumId = decodeURIComponent(parts[0] || "");
+    const trackId = decodeURIComponent(parts[1] || "");
+    await handleMiniMediaSongAssetsRequest(request, response, albumId, trackId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/") && pathname.endsWith("/assets/scores")) {
+    const parts = pathname.replace("/api/mini/media/albums/", "").replace(/\/assets\/scores$/, "").split("/tracks/");
+    const albumId = decodeURIComponent(parts[0] || "");
+    const trackId = decodeURIComponent(parts[1] || "");
+    await handleMiniMediaScoreUploadRequest(request, response, albumId, trackId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/") && pathname.endsWith("/playback")) {
+    const parts = pathname.replace("/api/mini/media/albums/", "").replace(/\/playback$/, "").split("/tracks/");
+    const albumId = decodeURIComponent(parts[0] || "");
+    const trackId = decodeURIComponent(parts[1] || "");
+    await handleMiniMediaPlaybackUploadRequest(request, response, albumId, trackId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/") && pathname.includes("/assets/")) {
+    const withoutPrefix = pathname.replace("/api/mini/media/albums/", "");
+    const [albumPart, trackAndAssetPart] = withoutPrefix.split("/tracks/");
+    const [trackPart, assetPart] = String(trackAndAssetPart || "").split("/assets/");
+    await handleMiniMediaSongAssetDeleteRequest(
+      request,
+      response,
+      decodeURIComponent(albumPart || ""),
+      decodeURIComponent(trackPart || ""),
+      decodeURIComponent(assetPart || "")
+    );
     return;
   }
 

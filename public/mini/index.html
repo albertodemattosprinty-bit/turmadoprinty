@@ -419,6 +419,71 @@
       display: flex;
       align-items: center;
     }
+    .media-resource-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .media-resource-tab {
+      border: 0;
+      border-radius: 16px;
+      padding: 12px;
+      background: #edf3ff;
+      color: #3157b7;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .media-resource-tab.is-active {
+      background: #315fe6;
+      color: #fff;
+    }
+    .media-resource-panel {
+      display: grid;
+      gap: 12px;
+      min-height: 0;
+    }
+    .media-lyrics-textarea {
+      min-height: 42vh;
+      max-height: 58vh;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.65;
+    }
+    .media-scores-list {
+      display: grid;
+      gap: 14px;
+      max-height: 55vh;
+      overflow-y: auto;
+    }
+    .media-score-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 18px;
+      background: #f4f7ff;
+    }
+    .media-score-preview {
+      width: 100%;
+      max-height: 58vh;
+      object-fit: contain;
+      border-radius: 12px;
+      background: #fff;
+    }
+    .media-score-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .media-score-download {
+      flex: 1;
+      text-align: center;
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 10px;
+      background: #315fe6;
+      color: #fff;
+      font-weight: 800;
+    }
     .media-album-back {
       width: 46px;
       height: 46px;
@@ -2827,17 +2892,34 @@
   <section id="mediaLyricsModal" class="mini-plans-modal" aria-hidden="true">
     <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="mediaLyricsTitle">
       <div class="mini-plans-head">
-        <h3 id="mediaLyricsTitle">Letra da música</h3>
+        <h3 id="mediaLyricsTitle">Recursos da música</h3>
         <button id="closeMediaLyrics" class="round-action close" type="button" aria-label="Fechar letra da música">
           <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
         </button>
       </div>
-      <div class="section-muted">Cole ou edite a letra desta música. Ela será salva em um JSON próprio vinculado à faixa.</div>
       <label class="course-admin-label" for="mediaLyricsTrackTitle">Música</label>
       <input id="mediaLyricsTrackTitle" class="course-admin-input" type="text" readonly>
-      <label class="course-admin-label" for="mediaLyricsTextarea">Letra</label>
-      <textarea id="mediaLyricsTextarea" class="course-admin-input course-admin-textarea" placeholder="Cole a letra completa aqui."></textarea>
-      <button id="submitMediaLyrics" class="ai-primary course-admin-submit" type="button">Salvar letra</button>
+      <div class="media-resource-tabs">
+        <button id="mediaResourceTabText" class="media-resource-tab is-active" type="button">Textos</button>
+        <button id="mediaResourceTabScores" class="media-resource-tab" type="button">Partituras</button>
+      </div>
+      <div id="mediaResourceTextPanel" class="media-resource-panel">
+        <textarea id="mediaLyricsTextarea" class="course-admin-input course-admin-textarea media-lyrics-textarea" placeholder="A letra ou texto desta música aparecerá aqui."></textarea>
+        <button id="submitMediaLyrics" class="ai-primary course-admin-submit" type="button">Salvar texto</button>
+        <div id="mediaPlaybackAdminFields">
+          <label class="course-admin-label" for="mediaPlaybackFileInput">Playback opcional</label>
+          <input id="mediaPlaybackFileInput" class="course-admin-input" type="file" accept="audio/*">
+          <button id="submitMediaPlayback" class="ai-primary course-admin-submit" type="button">Vincular playback</button>
+        </div>
+      </div>
+      <div id="mediaResourceScoresPanel" class="media-resource-panel" hidden>
+        <div id="mediaScoreAdminFields">
+          <label class="course-admin-label" for="mediaScoreFilesInput">Adicionar partituras</label>
+          <input id="mediaScoreFilesInput" class="course-admin-input" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" multiple>
+          <button id="submitMediaScores" class="ai-primary course-admin-submit" type="button">Enviar partituras</button>
+        </div>
+        <div id="mediaScoresList" class="media-scores-list"></div>
+      </div>
       <div id="mediaLyricsStatus" class="create-status"></div>
     </div>
   </section>
@@ -3193,6 +3275,8 @@
     let mediaPendingInsertOrder = 0;
     let mediaLyricsAlbumId = "";
     let mediaLyricsTrackId = "";
+    let mediaResourceActiveTab = "text";
+    let mediaResourceAssets = [];
     let mediaImageModels = [];
     let mediaImageDefaultModel = "gpt-image-2";
     const mediaPreviewState = {
@@ -3283,6 +3367,7 @@
     function getMediaSongsLibrary() {
       return mediaLibraryAlbums.flatMap((album) => (Array.isArray(album.songs) ? album.songs : []).map((song) => ({
         ...song,
+        albumId: album.id,
         coverImageUrl: song.coverImageUrl || album.coverImageUrl || ""
       })));
     }
@@ -3673,6 +3758,8 @@
       const totalKey = getMediaTrackSourceKey(song, scopeId);
       const subtitle = String(song?.subtitle || "").trim();
       const editMode = Boolean(options?.editMode);
+      const resourceAlbumId = scopeId === "songs" ? String(song?.albumId || "").trim() : String(scopeId || "").trim();
+      const hasResources = Boolean(song?.hasLyrics || song?.hasScores);
       const cover = song?.coverImageUrl
         ? `<img class="media-track-cover-image" src="${escapeAttr(song.coverImageUrl)}" alt="${escapeAttr(song.title || "Faixa")}">`
         : `<div class="media-track-cover"></div>`;
@@ -3698,7 +3785,12 @@
               <button class="media-play-btn is-delete" type="button" data-media-delete-track="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Excluir faixa">${getTrashSvg()}</button>
               <button class="media-play-btn is-add" type="button" data-media-edit-lyrics="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" data-media-track-title="${escapeAttr(song.title || "Faixa")}" aria-label="Adicionar letra da música">${getMediaPlusSvg()}</button>
             </div>
-          ` : `<button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>`}
+          ` : `
+            <div class="media-track-actions">
+              <button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>
+              ${hasResources ? `<button class="media-play-btn is-add" type="button" data-media-open-resources="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(resourceAlbumId)}" data-media-track-title="${escapeAttr(song.title || "Faixa")}" aria-label="Abrir textos e partituras">${getMediaPlusSvg()}</button>` : ""}
+            </div>
+          `}
         </article>
       `;
     }
@@ -4203,36 +4295,124 @@
     function closeMediaLyricsModal() {
       mediaLyricsAlbumId = "";
       mediaLyricsTrackId = "";
+      mediaResourceAssets = [];
       $("mediaLyricsModal").classList.remove("show");
       $("mediaLyricsModal").setAttribute("aria-hidden", "true");
       $("mediaLyricsTrackTitle").value = "";
       $("mediaLyricsTextarea").value = "";
       $("mediaLyricsStatus").textContent = "";
     }
-    async function openMediaLyricsModal(albumId, trackId, trackTitle = "") {
-      if (!isMiniMediaAdmin()) {
+    function renderMediaResourceModal() {
+      const isAdmin = isMiniMediaAdmin();
+      const textPanel = $("mediaResourceTextPanel");
+      const scoresPanel = $("mediaResourceScoresPanel");
+      const textTab = $("mediaResourceTabText");
+      const scoresTab = $("mediaResourceTabScores");
+      const textarea = $("mediaLyricsTextarea");
+      const submitLyrics = $("submitMediaLyrics");
+      const playbackAdminFields = $("mediaPlaybackAdminFields");
+      const scoreAdminFields = $("mediaScoreAdminFields");
+      const scoresList = $("mediaScoresList");
+      if (!textPanel || !scoresPanel || !textTab || !scoresTab || !textarea || !scoresList) {
         return;
       }
+      textTab.classList.toggle("is-active", mediaResourceActiveTab === "text");
+      scoresTab.classList.toggle("is-active", mediaResourceActiveTab === "scores");
+      textPanel.hidden = mediaResourceActiveTab !== "text";
+      scoresPanel.hidden = mediaResourceActiveTab !== "scores";
+      textarea.readOnly = !isAdmin;
+      if (submitLyrics) {
+        submitLyrics.hidden = !isAdmin;
+      }
+      if (playbackAdminFields) {
+        playbackAdminFields.hidden = !isAdmin;
+      }
+      if (scoreAdminFields) {
+        scoreAdminFields.hidden = !isAdmin;
+      }
+      const scores = mediaResourceAssets.filter((asset) => asset.type === "score");
+      scoresList.innerHTML = scores.length
+        ? scores.map((asset) => `
+          <article class="media-score-card">
+            <strong>${escapeText(asset.title || "Partitura")}</strong>
+            ${asset.previewUrl
+              ? `<img class="media-score-preview" src="${escapeAttr(asset.previewUrl)}" alt="${escapeAttr(asset.title || "Partitura")}">`
+              : `<div class="section-muted">Preview indisponível. Use o PDF para visualizar.</div>`}
+            <div class="media-score-actions">
+              ${asset.downloadUrl ? `<a class="media-score-download" href="${escapeAttr(asset.downloadUrl)}" target="_blank" rel="noopener">Baixar PDF</a>` : ""}
+              ${isAdmin ? `<button class="media-play-btn is-delete" type="button" data-media-delete-score="${escapeAttr(asset.id)}" aria-label="Excluir partitura">${getTrashSvg()}</button>` : ""}
+            </div>
+          </article>
+        `).join("")
+        : `<div class="section-muted">Ainda não há partituras vinculadas a esta música.</div>`;
+      scoresList.querySelectorAll("[data-media-delete-score]").forEach((button) => {
+        button.onclick = async () => {
+          const confirmed = window.confirm("Excluir esta página de partitura?");
+          if (!confirmed) {
+            return;
+          }
+          try {
+            const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets/${encodeURIComponent(button.getAttribute("data-media-delete-score") || "")}`, {
+              method: "DELETE"
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(payload.error || "Nao foi possivel excluir a partitura.");
+            }
+            if (payload?.library?.albums) {
+              mediaLibraryAlbums = payload.library.albums;
+            }
+            await loadMediaResourceAssets();
+            renderMediaModal();
+            $("mediaLyricsStatus").textContent = String(payload?.feedback || "Partitura excluida.");
+          } catch (error) {
+            $("mediaLyricsStatus").textContent = error instanceof Error ? error.message : "Falha ao excluir a partitura.";
+          }
+        };
+      });
+    }
+    async function loadMediaResourceAssets() {
+      const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Nao foi possivel carregar as partituras.");
+      }
+      mediaResourceAssets = Array.isArray(payload?.assets) ? payload.assets : [];
+      renderMediaResourceModal();
+    }
+    async function openMediaLyricsModal(albumId, trackId, trackTitle = "") {
       mediaLyricsAlbumId = String(albumId || "").trim();
       mediaLyricsTrackId = String(trackId || "").trim();
+      mediaResourceActiveTab = "text";
+      mediaResourceAssets = [];
       $("mediaLyricsTrackTitle").value = String(trackTitle || "Faixa").trim() || "Faixa";
       $("mediaLyricsTextarea").value = "";
-      $("mediaLyricsStatus").textContent = "Carregando letra atual...";
+      $("mediaLyricsStatus").textContent = "Carregando recursos da música...";
       $("mediaLyricsModal").classList.add("show");
       $("mediaLyricsModal").setAttribute("aria-hidden", "false");
+      renderMediaResourceModal();
 
       try {
-        const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/lyrics`);
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(payload.error || "Nao foi possivel carregar a letra.");
+        const [lyricsResponse, assetsResponse] = await Promise.all([
+          apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/lyrics`),
+          apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets`)
+        ]);
+        const lyricsPayload = await lyricsResponse.json().catch(() => ({}));
+        const assetsPayload = await assetsResponse.json().catch(() => ({}));
+        if (!lyricsResponse.ok) {
+          throw new Error(lyricsPayload.error || "Nao foi possivel carregar o texto.");
         }
-        $("mediaLyricsTextarea").value = String(payload?.lyrics || "");
-        $("mediaLyricsStatus").textContent = payload?.updatedAt
-          ? "Letra carregada. Você pode editar e salvar."
-          : "Ainda nao existe letra salva para esta música.";
+        if (!assetsResponse.ok) {
+          throw new Error(assetsPayload.error || "Nao foi possivel carregar as partituras.");
+        }
+        $("mediaLyricsTextarea").value = String(lyricsPayload?.lyrics || "");
+        mediaResourceAssets = Array.isArray(assetsPayload?.assets) ? assetsPayload.assets : [];
+        renderMediaResourceModal();
+        $("mediaLyricsStatus").textContent = isMiniMediaAdmin()
+          ? "Recursos carregados. Você pode editar e adicionar arquivos."
+          : "";
       } catch (error) {
-        $("mediaLyricsStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar a letra.";
+        $("mediaLyricsStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar os recursos.";
       }
     }
     async function submitMediaLyrics() {
@@ -4268,6 +4448,97 @@
         setMediaStatus(String(payload?.feedback || "Letra salva com sucesso."));
       } catch (error) {
         status.textContent = error instanceof Error ? error.message : "Falha ao salvar a letra.";
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
+    async function submitMediaScores() {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      const files = Array.from($("mediaScoreFilesInput")?.files || []);
+      const status = $("mediaLyricsStatus");
+      const button = $("submitMediaScores");
+      if (!files.length) {
+        status.textContent = "Escolha uma ou mais páginas de partitura.";
+        return;
+      }
+      if (button) {
+        button.disabled = true;
+      }
+      try {
+        const currentScoreCount = mediaResourceAssets.filter((asset) => asset.type === "score").length;
+        for (let index = 0; index < files.length; index += 1) {
+          const file = files[index];
+          status.textContent = `Enviando partitura ${index + 1}/${files.length}...`;
+          const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/assets/scores`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": file.type || "application/octet-stream",
+              "X-File-Name": encodeURIComponent(file.name),
+              "X-Page-Order": String(currentScoreCount + index + 1)
+            },
+            body: file
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload.error || `Nao foi possivel enviar a partitura ${index + 1}.`);
+          }
+          if (payload?.library?.albums) {
+            mediaLibraryAlbums = payload.library.albums;
+          }
+        }
+        $("mediaScoreFilesInput").value = "";
+        await loadMediaResourceAssets();
+        renderMediaModal();
+        status.textContent = "Partituras salvas com sucesso.";
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : "Falha ao enviar as partituras.";
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
+    async function submitMediaPlayback() {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      const input = $("mediaPlaybackFileInput");
+      const file = input?.files?.[0] || null;
+      const status = $("mediaLyricsStatus");
+      const button = $("submitMediaPlayback");
+      if (!file) {
+        status.textContent = "Escolha o arquivo de playback.";
+        return;
+      }
+      if (button) {
+        button.disabled = true;
+      }
+      status.textContent = "Enviando playback...";
+      try {
+        const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(mediaLyricsAlbumId)}/tracks/${encodeURIComponent(mediaLyricsTrackId)}/playback`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+            "X-File-Name": encodeURIComponent(file.name)
+          },
+          body: file
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel salvar o playback.");
+        }
+        if (payload?.library?.albums) {
+          mediaLibraryAlbums = payload.library.albums;
+        }
+        input.value = "";
+        renderMediaModal();
+        status.textContent = String(payload?.feedback || "Playback vinculado com sucesso.");
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : "Falha ao salvar o playback.";
       } finally {
         if (button) {
           button.disabled = false;
@@ -4434,6 +4705,15 @@
           await openMediaLyricsModal(
             button.getAttribute("data-media-scope") || "",
             button.getAttribute("data-media-edit-lyrics") || "",
+            button.getAttribute("data-media-track-title") || "Faixa"
+          );
+        };
+      });
+      content.querySelectorAll("[data-media-open-resources]").forEach((button) => {
+        button.onclick = async () => {
+          await openMediaLyricsModal(
+            button.getAttribute("data-media-scope") || "",
+            button.getAttribute("data-media-open-resources") || "",
             button.getAttribute("data-media-track-title") || "Faixa"
           );
         };
@@ -7164,6 +7444,20 @@
     };
     $("submitMediaLyrics").onclick = async () => {
       await submitMediaLyrics();
+    };
+    $("submitMediaScores").onclick = async () => {
+      await submitMediaScores();
+    };
+    $("submitMediaPlayback").onclick = async () => {
+      await submitMediaPlayback();
+    };
+    $("mediaResourceTabText").onclick = () => {
+      mediaResourceActiveTab = "text";
+      renderMediaResourceModal();
+    };
+    $("mediaResourceTabScores").onclick = () => {
+      mediaResourceActiveTab = "scores";
+      renderMediaResourceModal();
     };
     $("submitMediaUpload").onclick = async () => {
       await submitMediaUpload();

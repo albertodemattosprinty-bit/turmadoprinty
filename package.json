@@ -16,7 +16,11 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
+    "@napi-rs/canvas": "^1.0.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.0.227",
     "pg": "^8.16.3",
+    "sharp": "^0.35.1",
     "stripe": "^20.4.1"
   },
   "engines": {
