@@ -2080,7 +2080,7 @@
     }
     .course-advance-fab {
       position: absolute;
-      right: 18px;
+      right: calc(7dvh + 18px + env(safe-area-inset-bottom, 0px));
       bottom: calc(7dvh + 18px + env(safe-area-inset-bottom, 0px));
       width: 58px;
       height: 58px;
@@ -2094,13 +2094,13 @@
       box-shadow: 0 14px 28px rgba(0,0,0,.18);
       opacity: .2;
       transform: scale(.96);
-      transition: opacity .35s ease, transform .35s ease, background .25s ease, color .25s ease;
+      transition: opacity .18s linear, transform .35s ease, background .25s ease, color .25s ease;
       pointer-events: none;
       z-index: 7;
     }
     .course-advance-fab svg {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       fill: currentColor;
       margin-left: 2px;
     }
@@ -3731,6 +3731,7 @@
     let miniCourseReadGateStartedAt = 0;
     let miniCourseReadGateRequiredMs = 0;
     let miniCourseReadLockRaf = 0;
+    let miniCourseAdvanceFabRaf = 0;
     let miniCourseProgressSaving = false;
     let currentMiniCourseBlockIndex = 0;
     let currentMiniCourseRenderedBlocks = [];
@@ -5369,6 +5370,25 @@
       overlay.innerHTML = "";
       updateMiniCourseAdvanceFab();
     }
+    function stopMiniCourseAdvanceFabLoop() {
+      if (miniCourseAdvanceFabRaf) {
+        window.cancelAnimationFrame(miniCourseAdvanceFabRaf);
+        miniCourseAdvanceFabRaf = 0;
+      }
+    }
+    function startMiniCourseAdvanceFabLoop() {
+      stopMiniCourseAdvanceFabLoop();
+      const tick = () => {
+        updateMiniCourseAdvanceFab();
+        const isReading = Boolean(currentMiniCourse) && currentMiniCourseViewMode === "reading" && currentMiniCourseQuizIndex < 0 && !currentMiniCourseQuizResult;
+        if (!isReading) {
+          miniCourseAdvanceFabRaf = 0;
+          return;
+        }
+        miniCourseAdvanceFabRaf = window.requestAnimationFrame(tick);
+      };
+      miniCourseAdvanceFabRaf = window.requestAnimationFrame(tick);
+    }
     function clearMiniCoursePointsOverlay() {
       if (miniCoursePointsOverlayTimer) {
         window.clearTimeout(miniCoursePointsOverlayTimer);
@@ -5704,6 +5724,7 @@
       const currentKind = String(currentPage?.kind || "").trim().toLowerCase();
       const isReading = Boolean(currentMiniCourse) && currentMiniCourseViewMode === "reading" && currentMiniCourseQuizIndex < 0 && !currentMiniCourseQuizResult;
       if (!isReading) {
+        stopMiniCourseAdvanceFabLoop();
         fab.hidden = true;
         fab.classList.remove("is-ready", "is-chapter-open-page");
         fab.style.opacity = "0.2";
@@ -7622,6 +7643,7 @@
         readerView.classList.remove("is-course-intro");
         readerView.classList.remove("is-chapter-open-page");
         $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
+        stopMiniCourseAdvanceFabLoop();
         clearMiniCourseOverlay();
         currentMiniCourseViewMode = "preview";
         updateMiniCourseAdvanceFab();
@@ -7653,6 +7675,7 @@
         clearMiniCourseOverlay();
         readerView.classList.remove("is-chapter-open-page");
         $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
+        stopMiniCourseAdvanceFabLoop();
         renderMiniCourseIntro(readerView);
         readerView.scrollTop = 0;
         updateMiniCourseAdvanceFab();
@@ -7664,6 +7687,7 @@
       if (quizQuestions.length && currentMiniCourseQuizResult) {
         readerView.classList.remove("is-chapter-open-page");
         $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
+        stopMiniCourseAdvanceFabLoop();
         renderMiniCourseQuizResult(readerView);
         readerView.scrollTop = 0;
         updateMiniCourseAdvanceFab();
@@ -7675,6 +7699,7 @@
       if (quizQuestions.length && currentMiniCourseQuizIndex >= 0) {
         readerView.classList.remove("is-chapter-open-page");
         $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
+        stopMiniCourseAdvanceFabLoop();
         renderMiniCourseQuizQuestion(readerView);
         readerView.scrollTop = 0;
         updateMiniCourseAdvanceFab();
@@ -7733,6 +7758,7 @@
       if (footer) {
         footer.classList.toggle("is-chapter-open-page", currentPageKind === "chapter_open");
       }
+      startMiniCourseAdvanceFabLoop();
       updateMiniCourseAdvanceFab();
 
       updateMiniCoursesHeader();
@@ -7751,6 +7777,7 @@
       readerView.classList.remove("is-course-intro");
       readerView.classList.remove("is-chapter-open-page");
       $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
+      stopMiniCourseAdvanceFabLoop();
       clearMiniCourseOverlay();
       readerView.innerHTML = `<div class="course-reader-loading">Abrindo o conteúdo do curso...</div>`;
       attachMiniCourseReaderSwipe(readerView);
