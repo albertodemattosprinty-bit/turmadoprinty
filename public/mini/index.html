@@ -3106,6 +3106,10 @@
       .courses-modal.is-immersive-reading .course-reader-view {
         padding: 20px 18px 14px;
       }
+      .course-advance-fab {
+        right: 25px;
+        bottom: calc(7dvh + 25px + env(safe-area-inset-bottom, 0px));
+      }
       .course-reader-footer {
         padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px));
       }
@@ -5964,8 +5968,11 @@
         readerView.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-      const extraAnchorOffset = readerView.clientHeight * 0.1;
-      const targetTop = Math.max(0, activeNode.offsetTop - ((readerView.clientHeight - activeNode.offsetHeight) / 2) - 90 - extraAnchorOffset);
+      const mobileAnchorTop = 100;
+      const desktopExtraAnchorOffset = readerView.clientHeight * 0.1;
+      const targetTop = isMiniCoursesMobileView()
+        ? Math.max(0, activeNode.offsetTop - mobileAnchorTop)
+        : Math.max(0, activeNode.offsetTop - ((readerView.clientHeight - activeNode.offsetHeight) / 2) - 90 - desktopExtraAnchorOffset);
       const maxScroll = Math.max(0, readerView.scrollHeight - readerView.clientHeight);
       readerView.scrollTo({ top: Math.min(maxScroll, targetTop), behavior: "smooth" });
     }
