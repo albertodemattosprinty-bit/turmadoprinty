@@ -5287,6 +5287,10 @@
         if (currentMiniCourseViewMode !== "reading" || currentMiniCourseQuizIndex >= 0 || currentMiniCourseQuizResult) {
           return;
         }
+        const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
+        if (String(currentPage?.kind || "").trim().toLowerCase() === "course-map") {
+          return;
+        }
         if (!currentMiniCourseRenderedBlocks.length) {
           return;
         }
@@ -5306,7 +5310,14 @@
         miniCourseReaderTouchStartY = touch.clientY;
       };
       readerView.ontouchmove = (event) => {
-        if (currentMiniCourseViewMode === "reading" && currentMiniCourseRenderedBlocks.length && currentMiniCourseQuizIndex < 0 && !currentMiniCourseQuizResult) {
+        const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
+        if (
+          currentMiniCourseViewMode === "reading"
+          && String(currentPage?.kind || "").trim().toLowerCase() !== "course-map"
+          && currentMiniCourseRenderedBlocks.length
+          && currentMiniCourseQuizIndex < 0
+          && !currentMiniCourseQuizResult
+        ) {
           event.preventDefault();
         }
       };
@@ -5315,6 +5326,10 @@
           return;
         }
         if (isMiniInteractiveField(event.target)) {
+          return;
+        }
+        const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
+        if (String(currentPage?.kind || "").trim().toLowerCase() === "course-map") {
           return;
         }
         const touch = event.changedTouches?.[0];
@@ -5440,12 +5455,7 @@
     function buildMiniCourseReaderBlocks(page) {
       const kind = String(page?.kind || "").trim().toLowerCase();
       if (kind === "course-map") {
-        return [
-          ...splitMiniCourseTextBlocks(page?.title || ""),
-          ...splitMiniCourseTextBlocks(page?.subtitle || ""),
-          ...splitMiniCourseTextBlocks(page?.logline || ""),
-          ...(Array.isArray(page?.tableRows) ? page.tableRows : []).flatMap((row) => splitMiniCourseTextBlocks(`${String(row?.label || "").trim()}: ${String(row?.value || "").trim()}`))
-        ].filter(Boolean);
+        return [];
       }
       if (kind === "chapter_open") {
         return [
@@ -5475,6 +5485,11 @@
       return String(currentMiniCourseRenderedBlocks[clampMiniCourseBlockIndex(currentMiniCourseBlockIndex)] || "").trim();
     }
     function getMiniCourseBlockRequiredMs() {
+      const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
+      const currentKind = String(currentPage?.kind || "").trim().toLowerCase();
+      if (currentKind === "course-map") {
+        return 0;
+      }
       const totalChars = getMiniCourseActiveBlockText().length;
       if (totalChars <= 0) {
         return 0;
@@ -7370,9 +7385,7 @@
             <h2 class="course-map-title">${escapeText(currentPage.title || "Mapa do curso")}</h2>
             ${currentPage.subtitle ? `<p class="course-map-subtitle">${escapeText(currentPage.subtitle)}</p>` : ""}
             <div class="course-page-divider" aria-hidden="true"></div>
-            <div class="course-blocks-shell">
-              ${computedBlocks.map((block, index) => `<p class="course-page-paragraph course-text-block${index === currentMiniCourseBlockIndex ? " is-active" : ""}" data-course-block-index="${index}">${escapeText(block)}</p>`).join("")}
-            </div>
+            ${currentPage.logline ? `<p class="course-page-paragraph">${escapeText(currentPage.logline)}</p>` : ""}
             <div class="course-map-grid">
               ${tableRows.map((row) => `<div class="course-map-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}
             </div>
@@ -7405,7 +7418,11 @@
           </div>
         `;
       }
-      updateMiniCourseActiveBlockUi({ anchor: true });
+      if (currentPageKind === "course-map") {
+        readerView.scrollTop = 0;
+      } else {
+        updateMiniCourseActiveBlockUi({ anchor: true });
+      }
 
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
@@ -8054,7 +8071,9 @@
         return;
       }
 
-      if (currentMiniCourseRenderedBlocks.length) {
+      const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
+      const currentPageKind = String(currentPage?.kind || "").trim().toLowerCase();
+      if (currentPageKind !== "course-map" && currentMiniCourseRenderedBlocks.length) {
         const lastBlockIndex = Math.max(0, currentMiniCourseRenderedBlocks.length - 1);
         if (direction > 0 && currentMiniCourseBlockIndex < lastBlockIndex) {
           await moveMiniCourseBlock(1);

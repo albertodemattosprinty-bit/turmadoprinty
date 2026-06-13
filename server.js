@@ -3277,7 +3277,11 @@ function buildMiniCourseMapPage({ courseTitle, courseOverview, chapters, style =
     logline: courseOverview,
     tableRows: (Array.isArray(chapters) ? chapters : []).map((chapter) => ({
       label: `Capitulo ${chapter.chapterNumber}`,
-      value: `${chapter.title}${chapter.subtitle ? ` • ${chapter.subtitle}` : ""}`
+      value: [
+        String(chapter.title || "").trim(),
+        chapter.subtitle ? String(chapter.subtitle).trim() : "",
+        chapter.logline ? String(chapter.logline).trim() : ""
+      ].filter(Boolean).join(" • ")
     }))
   }, 0, "course-map");
 }
@@ -3342,6 +3346,7 @@ async function planMiniCourseStructure({ apiKey, model = "gpt-5.1", title, conte
           safeCourseStyle === "story"
             ? "Crie a estrutura geral dessa historia, com titulo principal, visao geral e capitulos narrativos que convidem para leitura casual."
             : "Crie a estrutura geral do curso e devolva um titulo principal, uma visao geral curta e todos os capitulos.",
+          `Voce deve devolver exatamente ${safeChapterCount} capitulos no array chapters, sem omitir, juntar, resumir ou cortar nenhum capitulo.`,
           "Cada capitulo precisa ter titulo, subtitulo e logline proprios, sem repeticao entre si.",
           safeCourseStyle === "story"
             ? "Os capitulos devem soar como etapas de uma narrativa viva, envolvente e natural."
