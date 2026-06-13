@@ -1235,6 +1235,8 @@
       --course-footer-text-color: rgba(255,255,255,.92);
       --course-footer-muted-color: rgba(255,255,255,.74);
       --course-footer-font: var(--course-ui-font);
+      --course-chapter-page-text: rgba(240, 247, 255, .96);
+      --course-chapter-page-muted: rgba(224, 238, 255, .82);
       position: fixed;
       inset: 0;
       z-index: 55;
@@ -1829,6 +1831,28 @@
       align-content: center;
       padding: 10vh 0 8vh;
     }
+    .course-reader-view.is-chapter-open-page {
+      background: var(--course-footer-bg);
+      color: var(--course-chapter-page-text);
+    }
+    .course-reader-view.is-chapter-open-page .course-chapter-open-shell {
+      color: var(--course-chapter-page-text);
+      text-shadow: none;
+    }
+    .course-reader-view.is-chapter-open-page .course-chapter-open-kicker,
+    .course-reader-view.is-chapter-open-page .course-chapter-open-title,
+    .course-reader-view.is-chapter-open-page .course-chapter-open-subtitle,
+    .course-reader-view.is-chapter-open-page .course-chapter-open-logline {
+      color: var(--course-chapter-page-text);
+    }
+    .course-reader-view.is-chapter-open-page .course-chapter-open-subtitle,
+    .course-reader-view.is-chapter-open-page .course-chapter-open-logline,
+    .course-reader-view.is-chapter-open-page .course-chapter-open-kicker {
+      opacity: .92;
+    }
+    .course-reader-view.is-chapter-open-page .course-page-divider {
+      background: linear-gradient(90deg, transparent 0%, var(--course-chapter-page-muted) 50%, transparent 100%);
+    }
     .course-chapter-open-kicker {
       font-size: 13px;
       text-transform: uppercase;
@@ -1982,6 +2006,13 @@
       background: var(--course-footer-bg);
       color: var(--course-footer-text-color);
     }
+    .course-reader-footer.is-chapter-open-page {
+      background: var(--course-modal-bg);
+      color: var(--course-footer-bg);
+    }
+    .course-reader-footer.is-chapter-open-page .course-reader-footer-progress {
+      color: color-mix(in srgb, var(--course-footer-bg) 82%, transparent);
+    }
     .course-reader-footer-btn {
       width: 32px;
       height: 32px;
@@ -2046,6 +2077,43 @@
       background: rgba(255,255,255,.18);
       color: #fff;
       box-shadow: 0 12px 24px rgba(0,0,0,.16);
+    }
+    .course-advance-fab {
+      position: absolute;
+      right: 18px;
+      bottom: calc(7dvh + 18px + env(safe-area-inset-bottom, 0px));
+      width: 58px;
+      height: 58px;
+      border: 0;
+      border-radius: 50%;
+      background: var(--course-footer-bg);
+      color: var(--course-footer-text-color);
+      display: grid;
+      place-items: center;
+      padding: 0;
+      box-shadow: 0 14px 28px rgba(0,0,0,.18);
+      opacity: .2;
+      transform: scale(.96);
+      transition: opacity .35s ease, transform .35s ease, background .25s ease, color .25s ease;
+      pointer-events: none;
+      z-index: 7;
+    }
+    .course-advance-fab svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+      margin-left: 2px;
+    }
+    .course-advance-fab.is-ready {
+      pointer-events: auto;
+      transform: scale(1);
+    }
+    .course-advance-fab[hidden] {
+      display: none !important;
+    }
+    .course-advance-fab.is-chapter-open-page {
+      background: var(--course-modal-bg);
+      color: var(--course-footer-bg);
     }
     #coursePrev {
       left: 10px;
@@ -2242,6 +2310,8 @@
       --course-footer-text-color: rgba(255,248,239,.96);
       --course-footer-muted-color: rgba(255,236,218,.78);
       --course-footer-font: "Merriweather", "Literata", serif;
+      --course-chapter-page-text: rgba(255, 246, 234, .96);
+      --course-chapter-page-muted: rgba(255, 233, 212, .82);
       --course-title-weight: 900;
       --course-body-weight: 700;
       --course-strong-weight: 900;
@@ -2270,6 +2340,8 @@
       --course-footer-text-color: rgba(255,255,255,.98);
       --course-footer-muted-color: rgba(226, 240, 255, .88);
       --course-footer-font: "Nunito Sans", "Inter", sans-serif;
+      --course-chapter-page-text: rgba(227, 242, 255, .98);
+      --course-chapter-page-muted: rgba(205, 230, 255, .84);
       --course-title-weight: 900;
       --course-body-weight: 800;
       --course-strong-weight: 900;
@@ -2298,6 +2370,8 @@
       --course-footer-text-color: rgba(255,255,255,.98);
       --course-footer-muted-color: rgba(222, 239, 255, .84);
       --course-footer-font: "Manrope", "Inter", sans-serif;
+      --course-chapter-page-text: rgba(123, 203, 255, .98);
+      --course-chapter-page-muted: rgba(186, 228, 255, .84);
       --course-title-weight: 800;
       --course-body-weight: 500;
       --course-strong-weight: 700;
@@ -2326,6 +2400,8 @@
       --course-footer-text-color: rgba(83, 61, 43, .94);
       --course-footer-muted-color: rgba(107, 84, 72, .78);
       --course-footer-font: "Literata", "Source Serif 4", serif;
+      --course-chapter-page-text: rgba(255, 247, 238, .96);
+      --course-chapter-page-muted: rgba(244, 230, 214, .82);
       --course-title-weight: 800;
       --course-body-weight: 500;
       --course-strong-weight: 700;
@@ -3443,6 +3519,9 @@
         <div id="coursesListView" class="courses-list-view"></div>
         <article id="courseReaderView" class="course-reader-view" hidden></article>
         <div id="courseReaderOverlay" class="course-reader-overlay" hidden></div>
+        <button id="courseAdvanceFab" class="course-advance-fab" type="button" hidden aria-label="Avançar leitura">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
       </div>
 
       <footer class="courses-footer">
@@ -5288,6 +5367,7 @@
       overlay.classList.remove("is-read-lock-visible");
       overlay.hidden = true;
       overlay.innerHTML = "";
+      updateMiniCourseAdvanceFab();
     }
     function clearMiniCoursePointsOverlay() {
       if (miniCoursePointsOverlayTimer) {
@@ -5471,6 +5551,9 @@
       miniCourseReaderFontSizeIndex = (Number(miniCourseReaderFontSizeIndex || 0) + 1) % miniCourseReaderFontSizes.length;
       applyMiniCourseReaderTheme();
       updateMiniCourseReaderFooter();
+      if (currentMiniCourse && currentMiniCourseViewMode === "reading") {
+        updateMiniCourseActiveBlockUi({ anchor: true });
+      }
     }
     function jumpToMiniCourseUnlockedLimit() {
       if (!currentMiniCourse || currentMiniCourseViewMode !== "reading") {
@@ -5612,6 +5695,34 @@
       }
       return Math.max(0, miniCourseReadGateRequiredMs - (Date.now() - miniCourseReadGateStartedAt));
     }
+    function updateMiniCourseAdvanceFab() {
+      const fab = $("courseAdvanceFab");
+      if (!fab) {
+        return;
+      }
+      const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
+      const currentKind = String(currentPage?.kind || "").trim().toLowerCase();
+      const isReading = Boolean(currentMiniCourse) && currentMiniCourseViewMode === "reading" && currentMiniCourseQuizIndex < 0 && !currentMiniCourseQuizResult;
+      if (!isReading) {
+        fab.hidden = true;
+        fab.classList.remove("is-ready", "is-chapter-open-page");
+        fab.style.opacity = "0.2";
+        return;
+      }
+      const remainingMs = getMiniCourseRemainingReadMs();
+      const enabled = !miniCourseProgressSaving && remainingMs <= 0;
+      let opacity = 0.2;
+      if (enabled) {
+        opacity = 1;
+      } else if (remainingMs > 0 && remainingMs <= 2000) {
+        opacity = 0.2 + (0.8 * (1 - (remainingMs / 2000)));
+      }
+      fab.hidden = false;
+      fab.classList.toggle("is-ready", enabled);
+      fab.classList.toggle("is-chapter-open-page", currentKind === "chapter_open");
+      fab.style.opacity = String(Math.max(0.2, Math.min(1, opacity)));
+      fab.setAttribute("aria-disabled", enabled ? "false" : "true");
+    }
     function playMiniCourseUiSound(kind, { waitForTimeMs = 0 } = {}) {
       const src = miniCourseUiSoundUrls[kind];
       if (!src) {
@@ -5720,6 +5831,7 @@
             ? `Aguarde ${Math.max(1, liveRemainingSeconds)} segundos`
             : "Trecho liberado";
         }
+        updateMiniCourseAdvanceFab();
         if (liveRemainingMs <= 0) {
           overlayRoot.classList.remove("is-read-lock-visible");
           scheduleMiniCourseAnimation(() => {
@@ -5757,7 +5869,8 @@
         readerView.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-      const targetTop = Math.max(0, activeNode.offsetTop - ((readerView.clientHeight - activeNode.offsetHeight) / 2) - 90);
+      const extraAnchorOffset = readerView.clientHeight * 0.1;
+      const targetTop = Math.max(0, activeNode.offsetTop - ((readerView.clientHeight - activeNode.offsetHeight) / 2) - 90 - extraAnchorOffset);
       const maxScroll = Math.max(0, readerView.scrollHeight - readerView.clientHeight);
       readerView.scrollTo({ top: Math.min(maxScroll, targetTop), behavior: "smooth" });
     }
@@ -5784,6 +5897,7 @@
         await playMiniCourseUiSound("page", { waitForTimeMs: 2 });
       }
       updateMiniCourseActiveBlockUi({ anchor: true });
+      updateMiniCourseAdvanceFab();
       return true;
     }
     function showMiniCoursePointsAward(pointsAwarded, totalPoints) {
@@ -7506,8 +7620,11 @@
         readerView.hidden = true;
         listView.hidden = false;
         readerView.classList.remove("is-course-intro");
+        readerView.classList.remove("is-chapter-open-page");
+        $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
         clearMiniCourseOverlay();
         currentMiniCourseViewMode = "preview";
+        updateMiniCourseAdvanceFab();
         renderMiniCoursesList();
         return;
       }
@@ -7526,6 +7643,7 @@
       clearMiniCourseAnimationTimers();
       readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
       $("courseReaderOverlay")?.classList.remove("is-read-lock-visible");
+      readerView.classList.toggle("is-chapter-open-page", currentPageKind === "chapter_open");
       applyMiniCourseReaderTheme();
       attachMiniCourseReaderSwipe(readerView);
       listView.hidden = true;
@@ -7533,24 +7651,33 @@
 
       if (currentMiniCourseViewMode !== "reading") {
         clearMiniCourseOverlay();
+        readerView.classList.remove("is-chapter-open-page");
+        $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
         renderMiniCourseIntro(readerView);
         readerView.scrollTop = 0;
+        updateMiniCourseAdvanceFab();
         updateMiniCoursesHeader();
         updateMiniCoursesFooter();
         return;
       }
 
       if (quizQuestions.length && currentMiniCourseQuizResult) {
+        readerView.classList.remove("is-chapter-open-page");
+        $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
         renderMiniCourseQuizResult(readerView);
         readerView.scrollTop = 0;
+        updateMiniCourseAdvanceFab();
         updateMiniCoursesHeader();
         updateMiniCoursesFooter();
         return;
       }
 
       if (quizQuestions.length && currentMiniCourseQuizIndex >= 0) {
+        readerView.classList.remove("is-chapter-open-page");
+        $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
         renderMiniCourseQuizQuestion(readerView);
         readerView.scrollTop = 0;
+        updateMiniCourseAdvanceFab();
         updateMiniCoursesHeader();
         updateMiniCoursesFooter();
         return;
@@ -7602,6 +7729,11 @@
       } else {
         updateMiniCourseActiveBlockUi({ anchor: true });
       }
+      const footer = $("courseReaderFooter");
+      if (footer) {
+        footer.classList.toggle("is-chapter-open-page", currentPageKind === "chapter_open");
+      }
+      updateMiniCourseAdvanceFab();
 
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
@@ -7617,10 +7749,13 @@
       listView.hidden = true;
       readerView.hidden = false;
       readerView.classList.remove("is-course-intro");
+      readerView.classList.remove("is-chapter-open-page");
+      $("courseReaderFooter")?.classList.remove("is-chapter-open-page");
       clearMiniCourseOverlay();
       readerView.innerHTML = `<div class="course-reader-loading">Abrindo o conteúdo do curso...</div>`;
       attachMiniCourseReaderSwipe(readerView);
       readerView.scrollTop = 0;
+      updateMiniCourseAdvanceFab();
       updateMiniCoursesHeader();
       updateMiniCoursesFooter();
     }
@@ -8559,6 +8694,13 @@
       await goToMiniCoursePage(-1);
     };
     $("courseNext").onclick = async () => {
+      await goToMiniCoursePage(1);
+    };
+    $("courseAdvanceFab").onclick = async () => {
+      const fab = $("courseAdvanceFab");
+      if (!fab || fab.hidden || !fab.classList.contains("is-ready")) {
+        return;
+      }
       await goToMiniCoursePage(1);
     };
     document.addEventListener("keydown", handleMiniCourseReaderHotkeys);
