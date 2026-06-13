@@ -2049,7 +2049,7 @@
       transition: opacity .5s ease;
       pointer-events: none;
       z-index: 4;
-      background: var(--course-reader-bg, #ffffff);
+      background: var(--course-modal-bg, var(--course-reader-bg, #ffffff));
     }
     .course-reader-overlay.is-read-lock-visible .course-read-lock {
       opacity: 1;
@@ -2087,7 +2087,7 @@
       transition: stroke-dashoffset .2s linear;
     }
     .course-read-lock-clock-face {
-      fill: color-mix(in srgb, var(--course-reader-bg, rgba(15, 23, 42, .7)) 82%, transparent);
+      fill: color-mix(in srgb, var(--course-modal-bg, var(--course-reader-bg, rgba(15, 23, 42, .7))) 72%, transparent);
       stroke: color-mix(in srgb, currentColor 18%, transparent);
       stroke-width: 1.5;
     }
@@ -2235,28 +2235,28 @@
       --course-strong-weight: 900;
     }
     .courses-modal.is-reading[data-reader-theme="3"] {
-      --course-modal-bg: linear-gradient(180deg, #1b2028 0%, #2c3440 54%, #434d5c 100%);
+      --course-modal-bg: linear-gradient(180deg, #081a2b 0%, #0e3a66 46%, #1177bb 100%);
       --course-modal-text: rgba(255,255,255,.94);
       --course-ui-font: "Manrope", "Inter", sans-serif;
       --course-body-font: "Manrope", "Inter", sans-serif;
-      --course-reader-card-bg: rgba(255,255,255,.06);
-      --course-reader-card-border: rgba(255,255,255,.08);
-      --course-reader-card-shadow: 0 24px 56px rgba(0, 0, 0, .26);
-      --course-ui-surface: rgba(255,255,255,.10);
+      --course-reader-card-bg: rgba(8, 26, 43, .18);
+      --course-reader-card-border: rgba(255,255,255,.10);
+      --course-reader-card-shadow: 0 24px 56px rgba(5, 20, 34, .28);
+      --course-ui-surface: rgba(255,255,255,.12);
       --course-ui-text-shadow: none;
       --course-reader-text-shadow: none;
       --course-title-color: rgba(255,255,255,.98);
-      --course-body-color: rgba(236,241,247,.90);
-      --course-muted-color: rgba(199, 209, 222, .68);
-      --course-row-bg: rgba(255,255,255,.08);
+      --course-body-color: rgba(238, 246, 255, .92);
+      --course-muted-color: rgba(197, 224, 255, .76);
+      --course-row-bg: rgba(255,255,255,.10);
       --course-row-strong-color: rgba(255,255,255,.96);
-      --course-quiz-option-bg: rgba(255,255,255,.08);
-      --course-quiz-repeat-bg: rgba(255,255,255,.16);
+      --course-quiz-option-bg: rgba(255,255,255,.10);
+      --course-quiz-repeat-bg: rgba(255,255,255,.18);
       --course-quiz-repeat-color: rgba(255,255,255,.96);
       --course-lock-text-shadow: none;
-      --course-footer-bg: rgba(0, 0, 0, .96);
+      --course-footer-bg: rgba(6, 30, 54, .96);
       --course-footer-text-color: rgba(255,255,255,.98);
-      --course-footer-muted-color: rgba(255,255,255,.82);
+      --course-footer-muted-color: rgba(222, 239, 255, .84);
       --course-footer-font: "Manrope", "Inter", sans-serif;
       --course-title-weight: 800;
       --course-body-weight: 500;
@@ -5531,18 +5531,38 @@
       }
       return Math.max(0, miniCourseReadGateRequiredMs - (Date.now() - miniCourseReadGateStartedAt));
     }
-    function playMiniCourseUiSound(kind) {
+    function playMiniCourseUiSound(kind, { waitForTimeMs = 0 } = {}) {
       const src = miniCourseUiSoundUrls[kind];
       if (!src) {
-        return;
+        return Promise.resolve();
       }
       try {
         const audio = new Audio(src);
         audio.preload = "auto";
         audio.volume = kind === "point" ? 0.9 : 0.72;
-        void audio.play().catch(() => {});
+        const playback = audio.play().catch(() => {});
+        if (waitForTimeMs <= 0) {
+          return Promise.resolve(playback).then(() => undefined);
+        }
+        return Promise.resolve(playback).then(() => new Promise((resolve) => {
+          const targetSeconds = Math.max(0, Number(waitForTimeMs || 0) || 0) / 1000;
+          const startedAt = performance.now();
+          const checkStarted = () => {
+            if (audio.currentTime >= targetSeconds) {
+              resolve();
+              return;
+            }
+            if ((performance.now() - startedAt) >= 320) {
+              resolve();
+              return;
+            }
+            window.requestAnimationFrame(checkStarted);
+          };
+          window.requestAnimationFrame(checkStarted);
+        }));
       } catch (_error) {
         // ignore UI audio playback failures
+        return Promise.resolve();
       }
     }
     function flashMiniCourseReadGate(remainingMs) {
@@ -5578,8 +5598,8 @@
             <path class="course-read-lock-clock-icon" d="M60 41a4 4 0 0 1 4 4v13.4l8.7 5.2a4 4 0 1 1-4.1 6.9l-10.6-6.3A4 4 0 0 1 56 61V45a4 4 0 0 1 4-4zm0-17c19.9 0 36 16.1 36 36S79.9 96 60 96 24 79.9 24 60s16.1-36 36-36zm0 8c-15.5 0-28 12.5-28 28s12.5 28 28 28 28-12.5 28-28-12.5-28-28-28z"></path>
           </svg>
           <div class="course-read-lock-title">Tempo mínimo</div>
-          <div id="courseReadLockTimer" class="course-read-lock-timer">${remainingSeconds.toFixed(1)}s</div>
-          <div id="courseReadLockSubtitle" class="course-read-lock-subtitle">Aguarde ${remainingSeconds} segundos para liberar este trecho</div>
+          <div id="courseReadLockTimer" class="course-read-lock-timer">${remainingSeconds}s</div>
+          <div id="courseReadLockSubtitle" class="course-read-lock-subtitle">Aguarde ${remainingSeconds} segundos</div>
         </div>
       `;
       overlayRoot.appendChild(overlay);
@@ -5592,7 +5612,7 @@
       }, 0);
       const updateLockUi = () => {
         const liveRemainingMs = getMiniCourseRemainingReadMs();
-        const liveRemainingSeconds = Math.max(0, liveRemainingMs / 1000);
+        const liveRemainingSeconds = Math.max(0, Math.ceil(liveRemainingMs / 1000));
         const livePercent = miniCourseReadGateRequiredMs > 0
           ? Math.max(0, Math.min(100, (liveRemainingMs / miniCourseReadGateRequiredMs) * 100))
           : 0;
@@ -5600,11 +5620,11 @@
           progressCircle.style.strokeDashoffset = String(clockCircumference * (livePercent / 100));
         }
         if (timerNode) {
-          timerNode.textContent = `${liveRemainingSeconds.toFixed(1)}s`;
+          timerNode.textContent = `${liveRemainingSeconds}s`;
         }
         if (subtitleNode) {
           subtitleNode.textContent = liveRemainingMs > 0
-            ? `Aguarde ${Math.max(0.1, liveRemainingSeconds).toFixed(1)} segundos para liberar este trecho`
+            ? `Aguarde ${Math.max(1, liveRemainingSeconds)} segundos`
             : "Trecho liberado";
         }
         if (liveRemainingMs <= 0) {
@@ -5667,10 +5687,10 @@
       }
       currentMiniCourseBlockIndex = nextIndex;
       syncMiniCourseReadGate();
-      updateMiniCourseActiveBlockUi({ anchor: true });
       if (direction > 0) {
-        playMiniCourseUiSound("page");
+        await playMiniCourseUiSound("page", { waitForTimeMs: 2 });
       }
+      updateMiniCourseActiveBlockUi({ anchor: true });
       return true;
     }
     function showMiniCoursePointsAward(pointsAwarded, totalPoints) {
