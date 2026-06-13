@@ -1517,6 +1517,8 @@
       --course-reader-font-scale: 1;
       padding: 28px 24px;
       position: relative;
+      -webkit-user-select: none;
+      user-select: none;
     }
     .course-reader-view.is-course-intro {
       overflow: hidden;
@@ -2015,7 +2017,11 @@
       opacity: .45;
       cursor: default;
     }
-    .course-reader-view.is-read-lock-blur .course-page-shell {
+    .course-reader-view.is-read-lock-blur .course-page-shell,
+    .course-reader-view.is-read-lock-blur .course-map-shell,
+    .course-reader-view.is-read-lock-blur .course-chapter-open-shell,
+    .course-reader-view.is-read-lock-blur .course-quiz-shell,
+    .course-reader-view.is-read-lock-blur .course-quiz-result {
       filter: blur(14px);
       opacity: .24;
     }
@@ -2042,18 +2048,52 @@
       transition: opacity .5s ease;
       pointer-events: none;
       z-index: 4;
+      background: color-mix(in srgb, var(--course-reader-bg, rgba(15, 23, 42, .56)) 58%, transparent);
+      backdrop-filter: blur(16px);
     }
     .course-reader-view.is-read-lock-visible .course-read-lock {
       opacity: 1;
     }
     .course-read-lock-box {
       display: grid;
-      gap: 6px;
+      gap: 10px;
       justify-items: center;
       color: var(--course-body-color);
       text-shadow: var(--course-lock-text-shadow);
       min-height: 100%;
       align-content: center;
+      position: relative;
+      z-index: 5;
+    }
+    .course-read-lock-clock {
+      width: min(168px, 42vw);
+      height: auto;
+      display: block;
+      overflow: visible;
+      filter: drop-shadow(0 14px 34px color-mix(in srgb, currentColor 24%, transparent));
+    }
+    .course-read-lock-clock-track {
+      fill: none;
+      stroke: color-mix(in srgb, currentColor 20%, transparent);
+      stroke-width: 8;
+    }
+    .course-read-lock-clock-progress {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 8;
+      stroke-linecap: round;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+      transition: stroke-dashoffset .2s linear;
+    }
+    .course-read-lock-clock-face {
+      fill: color-mix(in srgb, var(--course-reader-bg, rgba(15, 23, 42, .7)) 82%, transparent);
+      stroke: color-mix(in srgb, currentColor 18%, transparent);
+      stroke-width: 1.5;
+    }
+    .course-read-lock-clock-icon {
+      fill: currentColor;
+      opacity: .96;
     }
     .course-read-lock-title {
       font-size: clamp(24px, 3vw, 34px);
@@ -5271,6 +5311,9 @@
         if (currentMiniCourseViewMode !== "reading") {
           return;
         }
+        if (isMiniInteractiveField(event.target)) {
+          return;
+        }
         const touch = event.changedTouches?.[0];
         if (!touch) {
           return;
@@ -5280,6 +5323,11 @@
         if (Math.abs(deltaY) >= 34 && Math.abs(deltaY) > Math.abs(deltaX) && currentMiniCourseRenderedBlocks.length && currentMiniCourseQuizIndex < 0 && !currentMiniCourseQuizResult) {
           event.preventDefault();
           void moveMiniCourseBlock(deltaY < 0 ? 1 : -1);
+          return;
+        }
+        if (Math.abs(deltaX) < 18 && Math.abs(deltaY) < 18 && currentMiniCourseRenderedBlocks.length && currentMiniCourseQuizIndex < 0 && !currentMiniCourseQuizResult) {
+          event.preventDefault();
+          void goToMiniCoursePage(1);
           return;
         }
         if (Math.abs(deltaX) < 38 || Math.abs(deltaX) < Math.abs(deltaY)) {
@@ -5463,29 +5511,39 @@
       overlayRoot.hidden = false;
       overlayRoot.innerHTML = "";
 
-      const remainingSeconds = Math.max(1, Math.ceil(Math.max(0, Number(remainingMs || 0) || 0) / 1000));
+      const safeRemainingMs = Math.max(0, Number(remainingMs || 0) || 0);
+      const remainingSeconds = Math.max(1, Math.ceil(safeRemainingMs / 1000));
       const remainingPercent = miniCourseReadGateRequiredMs > 0
-        ? Math.max(0, Math.min(100, Math.round((remainingMs / miniCourseReadGateRequiredMs) * 100)))
+        ? Math.max(0, Math.min(100, Math.round((safeRemainingMs / miniCourseReadGateRequiredMs) * 100)))
         : 0;
       const displayDuration = Math.max(700, Math.min(2000, Math.round(Math.max(remainingMs, 0))));
       const nextRemainingPercent = miniCourseReadGateRequiredMs > 0
-        ? Math.max(0, Math.min(100, ((Math.max(remainingMs, 0) - displayDuration) / miniCourseReadGateRequiredMs) * 100))
+        ? Math.max(0, Math.min(100, ((safeRemainingMs - displayDuration) / miniCourseReadGateRequiredMs) * 100))
         : 0;
+      const clockRadius = 46;
+      const clockCircumference = 2 * Math.PI * clockRadius;
+      const clockOffset = clockCircumference * (remainingPercent / 100);
+      const nextClockOffset = clockCircumference * (nextRemainingPercent / 100);
       const overlay = document.createElement("div");
       overlay.className = "course-read-lock";
       overlay.innerHTML = `
         <div class="course-read-lock-box">
+          <svg class="course-read-lock-clock" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="course-read-lock-clock-track" cx="60" cy="60" r="${clockRadius}"></circle>
+            <circle id="courseReadLockClockProgress" class="course-read-lock-clock-progress" cx="60" cy="60" r="${clockRadius}" stroke-dasharray="${clockCircumference}" stroke-dashoffset="${clockOffset}"></circle>
+            <circle class="course-read-lock-clock-face" cx="60" cy="60" r="33"></circle>
+            <path class="course-read-lock-clock-icon" d="M60 41a4 4 0 0 1 4 4v13.4l8.7 5.2a4 4 0 1 1-4.1 6.9l-10.6-6.3A4 4 0 0 1 56 61V45a4 4 0 0 1 4-4zm0-17c19.9 0 36 16.1 36 36S79.9 96 60 96 24 79.9 24 60s16.1-36 36-36zm0 8c-15.5 0-28 12.5-28 28s12.5 28 28 28 28-12.5 28-28-12.5-28-28-28z"></path>
+          </svg>
           <div class="course-read-lock-title">Tempo mínimo</div>
           <div class="course-read-lock-subtitle">Aguarde ${remainingSeconds} segundos para liberar este trecho</div>
-          <div class="course-read-lock-progress" aria-hidden="true"><div id="courseReadLockProgressFill" class="course-read-lock-progress-fill" style="width:${remainingPercent}%"></div></div>
         </div>
       `;
       overlayRoot.appendChild(overlay);
-      const progressFill = $("courseReadLockProgressFill");
-      if (progressFill) {
-        progressFill.style.transitionDuration = `${displayDuration}ms`;
+      const progressCircle = $("courseReadLockClockProgress");
+      if (progressCircle) {
+        progressCircle.style.transitionDuration = `${displayDuration}ms`;
         window.requestAnimationFrame(() => {
-          progressFill.style.width = `${nextRemainingPercent}%`;
+          progressCircle.style.strokeDashoffset = String(nextClockOffset);
         });
       }
 
@@ -5521,7 +5579,7 @@
         readerView.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-      const targetTop = Math.max(0, activeNode.offsetTop - ((readerView.clientHeight - activeNode.offsetHeight) / 2) - 50);
+      const targetTop = Math.max(0, activeNode.offsetTop - ((readerView.clientHeight - activeNode.offsetHeight) / 2) - 90);
       const maxScroll = Math.max(0, readerView.scrollHeight - readerView.clientHeight);
       readerView.scrollTo({ top: Math.min(maxScroll, targetTop), behavior: "smooth" });
     }
