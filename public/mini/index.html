@@ -1918,7 +1918,7 @@
       justify-content: center;
       position: relative;
       background: linear-gradient(180deg, #4f95ff 0%, #2755df 100%);
-      box-shadow: 0 -14px 28px rgba(39, 85, 223, .22);
+      box-shadow: none;
       border-radius: 0;
       overflow: visible;
     }
@@ -2049,8 +2049,7 @@
       transition: opacity .5s ease;
       pointer-events: none;
       z-index: 4;
-      background: color-mix(in srgb, var(--course-reader-bg, rgba(15, 23, 42, .56)) 58%, transparent);
-      backdrop-filter: blur(16px);
+      background: var(--course-reader-bg, #ffffff);
     }
     .course-reader-overlay.is-read-lock-visible .course-read-lock {
       opacity: 1;
@@ -2105,6 +2104,13 @@
       font-size: clamp(18px, 2.4vw, 24px);
       font-weight: 700;
       line-height: 1.2;
+    }
+    .course-read-lock-timer {
+      font-size: clamp(28px, 5vw, 44px);
+      line-height: 1;
+      font-weight: 800;
+      color: var(--course-title-color);
+      letter-spacing: -.04em;
     }
     .course-points-modal {
       position: absolute;
@@ -3564,6 +3570,7 @@
     let miniCourseReadGateKey = "";
     let miniCourseReadGateStartedAt = 0;
     let miniCourseReadGateRequiredMs = 0;
+    let miniCourseReadLockRaf = 0;
     let miniCourseProgressSaving = false;
     let currentMiniCourseBlockIndex = 0;
     let currentMiniCourseRenderedBlocks = [];
@@ -3615,6 +3622,10 @@
       audio: null,
       oscillator: null,
       gain: null
+    };
+    const miniCourseUiSoundUrls = {
+      point: "/mini/sounds/point.mp3",
+      page: "/mini/sounds/page.mp3"
     };
     let miniCourseReaderThemeIndex = 0;
     let miniCourseReaderFontSizeIndex = 0;
@@ -5186,6 +5197,10 @@
     }
     function clearMiniCourseOverlay() {
       const overlay = $("courseReaderOverlay");
+      if (miniCourseReadLockRaf) {
+        window.cancelAnimationFrame(miniCourseReadLockRaf);
+        miniCourseReadLockRaf = 0;
+      }
       if (!overlay) {
         return;
       }
@@ -5491,7 +5506,7 @@
         return 0;
       }
       const totalChars = getMiniCourseActiveBlockText().length;
-      if (totalChars <= 0) {
+      if (totalChars <= 0 || totalChars < 70) {
         return 0;
       }
       const requiredSeconds = Math.max(1, Math.ceil(totalChars / 30));
@@ -5516,6 +5531,20 @@
       }
       return Math.max(0, miniCourseReadGateRequiredMs - (Date.now() - miniCourseReadGateStartedAt));
     }
+    function playMiniCourseUiSound(kind) {
+      const src = miniCourseUiSoundUrls[kind];
+      if (!src) {
+        return;
+      }
+      try {
+        const audio = new Audio(src);
+        audio.preload = "auto";
+        audio.volume = kind === "point" ? 0.9 : 0.72;
+        void audio.play().catch(() => {});
+      } catch (_error) {
+        // ignore UI audio playback failures
+      }
+    }
     function flashMiniCourseReadGate(remainingMs) {
       const readerView = $("courseReaderView");
       const overlayRoot = $("courseReaderOverlay");
@@ -5535,14 +5564,9 @@
       const remainingPercent = miniCourseReadGateRequiredMs > 0
         ? Math.max(0, Math.min(100, Math.round((safeRemainingMs / miniCourseReadGateRequiredMs) * 100)))
         : 0;
-      const displayDuration = Math.max(700, Math.min(2000, Math.round(Math.max(remainingMs, 0))));
-      const nextRemainingPercent = miniCourseReadGateRequiredMs > 0
-        ? Math.max(0, Math.min(100, ((safeRemainingMs - displayDuration) / miniCourseReadGateRequiredMs) * 100))
-        : 0;
       const clockRadius = 46;
       const clockCircumference = 2 * Math.PI * clockRadius;
       const clockOffset = clockCircumference * (remainingPercent / 100);
-      const nextClockOffset = clockCircumference * (nextRemainingPercent / 100);
       const overlay = document.createElement("div");
       overlay.className = "course-read-lock";
       overlay.innerHTML = `
@@ -5554,29 +5578,49 @@
             <path class="course-read-lock-clock-icon" d="M60 41a4 4 0 0 1 4 4v13.4l8.7 5.2a4 4 0 1 1-4.1 6.9l-10.6-6.3A4 4 0 0 1 56 61V45a4 4 0 0 1 4-4zm0-17c19.9 0 36 16.1 36 36S79.9 96 60 96 24 79.9 24 60s16.1-36 36-36zm0 8c-15.5 0-28 12.5-28 28s12.5 28 28 28 28-12.5 28-28-12.5-28-28-28z"></path>
           </svg>
           <div class="course-read-lock-title">Tempo mínimo</div>
-          <div class="course-read-lock-subtitle">Aguarde ${remainingSeconds} segundos para liberar este trecho</div>
+          <div id="courseReadLockTimer" class="course-read-lock-timer">${remainingSeconds.toFixed(1)}s</div>
+          <div id="courseReadLockSubtitle" class="course-read-lock-subtitle">Aguarde ${remainingSeconds} segundos para liberar este trecho</div>
         </div>
       `;
       overlayRoot.appendChild(overlay);
       const progressCircle = $("courseReadLockClockProgress");
-      if (progressCircle) {
-        progressCircle.style.transitionDuration = `${displayDuration}ms`;
-        window.requestAnimationFrame(() => {
-          progressCircle.style.strokeDashoffset = String(nextClockOffset);
-        });
-      }
+      const timerNode = $("courseReadLockTimer");
+      const subtitleNode = $("courseReadLockSubtitle");
 
       scheduleMiniCourseAnimation(() => {
-        readerView.classList.add("is-read-lock-blur");
         overlayRoot.classList.add("is-read-lock-visible");
       }, 0);
-      scheduleMiniCourseAnimation(() => {
-        readerView.classList.remove("is-read-lock-blur");
-        overlayRoot.classList.remove("is-read-lock-visible");
-      }, Math.max(400, displayDuration - 200));
-      scheduleMiniCourseAnimation(() => {
-        clearMiniCourseOverlay();
-      }, displayDuration);
+      const updateLockUi = () => {
+        const liveRemainingMs = getMiniCourseRemainingReadMs();
+        const liveRemainingSeconds = Math.max(0, liveRemainingMs / 1000);
+        const livePercent = miniCourseReadGateRequiredMs > 0
+          ? Math.max(0, Math.min(100, (liveRemainingMs / miniCourseReadGateRequiredMs) * 100))
+          : 0;
+        if (progressCircle) {
+          progressCircle.style.strokeDashoffset = String(clockCircumference * (livePercent / 100));
+        }
+        if (timerNode) {
+          timerNode.textContent = `${liveRemainingSeconds.toFixed(1)}s`;
+        }
+        if (subtitleNode) {
+          subtitleNode.textContent = liveRemainingMs > 0
+            ? `Aguarde ${Math.max(0.1, liveRemainingSeconds).toFixed(1)} segundos para liberar este trecho`
+            : "Trecho liberado";
+        }
+        if (liveRemainingMs <= 0) {
+          overlayRoot.classList.remove("is-read-lock-visible");
+          scheduleMiniCourseAnimation(() => {
+            clearMiniCourseOverlay();
+          }, 180);
+          miniCourseReadLockRaf = 0;
+          return;
+        }
+        miniCourseReadLockRaf = window.requestAnimationFrame(updateLockUi);
+      };
+      if (miniCourseReadLockRaf) {
+        window.cancelAnimationFrame(miniCourseReadLockRaf);
+      }
+      miniCourseReadLockRaf = window.requestAnimationFrame(updateLockUi);
     }
     function updateMiniCourseActiveBlockUi({ anchor = true } = {}) {
       const readerView = $("courseReaderView");
@@ -5624,6 +5668,9 @@
       currentMiniCourseBlockIndex = nextIndex;
       syncMiniCourseReadGate();
       updateMiniCourseActiveBlockUi({ anchor: true });
+      if (direction > 0) {
+        playMiniCourseUiSound("page");
+      }
       return true;
     }
     function showMiniCoursePointsAward(pointsAwarded, totalPoints) {
@@ -5638,6 +5685,7 @@
 
       clearMiniCoursePointsOverlay();
       overlayRoot.hidden = false;
+      playMiniCourseUiSound("point");
       overlayRoot.innerHTML = `
         <div class="course-points-modal">
           <div class="course-points-box">
