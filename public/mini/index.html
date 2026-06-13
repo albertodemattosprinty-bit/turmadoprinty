@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mini</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Lora:wght@700;800&family=Manrope:wght@400;500;700;800&family=Merriweather:wght@700&family=Nunito+Sans:wght@400;500;700;800&family=Open+Sans:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Source+Serif+4:wght@700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Literata:wght@400;500;700;800&family=Lora:wght@700;800&family=Manrope:wght@400;500;700;800&family=Merriweather:wght@400;700;900&family=Nunito+Sans:wght@400;500;700;800&family=Open+Sans:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Source+Serif+4:wght@700;800&display=swap');
     :root {
       color-scheme: only light;
       --text: #1a1a1a;
@@ -1517,6 +1517,10 @@
       padding: 28px 24px;
       position: relative;
     }
+    .course-reader-view.is-course-intro {
+      overflow: hidden;
+      padding: 16px 20px 10px;
+    }
     .course-reader-loading {
       min-height: 100%;
       display: grid;
@@ -1529,19 +1533,27 @@
     }
     .course-intro-shell {
       min-height: 100%;
+      height: 100%;
       display: grid;
-      place-items: center;
-      padding: 18px 0;
+      justify-items: center;
+      align-items: stretch;
+      padding: 0;
       position: relative;
     }
     .course-intro-card {
-      width: min(100%, 460px);
+      width: min(100%, 500px);
+      min-height: 100%;
       display: grid;
-      gap: 26px;
+      grid-template-rows: minmax(0, 4fr) minmax(0, 1fr);
+      gap: 0;
       justify-items: center;
+      align-items: stretch;
     }
     .course-intro-card .course-cover-shell {
-      width: min(100%, 360px);
+      width: min(100%, 420px);
+      height: auto;
+      max-height: 100%;
+      align-self: end;
     }
     .course-intro-back {
       position: absolute;
@@ -1565,8 +1577,9 @@
     .course-intro-actions {
       width: 100%;
       display: grid;
-      gap: 14px;
       justify-items: center;
+      align-content: center;
+      padding: 8px 0 0;
     }
     .course-intro-button {
       border: 0;
@@ -1585,6 +1598,7 @@
       font-weight: 800;
       cursor: pointer;
       box-shadow: 0 18px 34px rgba(58, 105, 245, .22);
+      width: min(100%, 320px);
     }
     .course-intro-button svg {
       width: 20px;
@@ -1600,6 +1614,8 @@
       font-family: var(--course-body-font);
       text-shadow: var(--course-reader-text-shadow);
       transition: filter .5s ease, opacity .5s ease;
+      --course-reader-body-size: clamp(calc(18px * var(--course-reader-font-scale)), calc(1.9vw * var(--course-reader-font-scale)), calc(21px * var(--course-reader-font-scale)));
+      --course-reader-title-size: calc(var(--course-reader-body-size) * 1.2);
     }
     .course-page-kicker {
       font-size: 13px;
@@ -1611,17 +1627,26 @@
     }
     .course-page-title {
       margin: 0;
-      font-size: clamp(calc(19px * var(--course-reader-font-scale)), calc(2.8vw * var(--course-reader-font-scale)), calc(27px * var(--course-reader-font-scale)));
+      font-size: var(--course-reader-title-size);
       line-height: 1.08;
-      font-weight: 700;
+      font-weight: var(--course-title-weight, 800);
       min-height: 44px;
       color: var(--course-title-color);
     }
+    .course-page-divider {
+      width: min(100%, 420px);
+      height: 1px;
+      border: 0;
+      margin: -4px 0 2px;
+      background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, currentColor 18%, transparent) 18%, currentColor 50%, color-mix(in srgb, currentColor 18%, transparent) 82%, transparent 100%);
+      color: var(--course-title-color);
+      opacity: .72;
+    }
     .course-page-paragraph {
       margin: 0;
-      font-size: clamp(calc(14px * var(--course-reader-font-scale)), calc(1.6vw * var(--course-reader-font-scale)), calc(18px * var(--course-reader-font-scale)));
+      font-size: var(--course-reader-body-size);
       line-height: 1.72;
-      font-weight: 400;
+      font-weight: var(--course-body-weight, 400);
       color: var(--course-body-color);
       min-height: 2.2em;
     }
@@ -1630,9 +1655,9 @@
       padding-left: 22px;
       display: grid;
       gap: 12px;
-      font-size: calc(15px * var(--course-reader-font-scale));
+      font-size: var(--course-reader-body-size);
       line-height: 1.62;
-      font-weight: 400;
+      font-weight: var(--course-body-weight, 400);
       color: var(--course-body-color);
     }
     .course-page-table {
@@ -1648,14 +1673,14 @@
       background: var(--course-row-bg);
     }
     .course-page-row strong {
-      font-size: calc(14px * var(--course-reader-font-scale));
-      font-weight: 700;
+      font-size: calc(var(--course-reader-body-size) * .92);
+      font-weight: var(--course-strong-weight, 700);
       color: var(--course-row-strong-color);
     }
     .course-page-row span {
-      font-size: calc(14px * var(--course-reader-font-scale));
+      font-size: calc(var(--course-reader-body-size) * .92);
       line-height: 1.52;
-      font-weight: 400;
+      font-weight: var(--course-body-weight, 400);
       color: var(--course-body-color);
     }
     .course-page-media {
@@ -1681,6 +1706,8 @@
       color: var(--course-body-color);
       font-family: var(--course-body-font);
       text-shadow: var(--course-reader-text-shadow);
+      --course-reader-body-size: clamp(calc(18px * var(--course-reader-font-scale)), calc(1.9vw * var(--course-reader-font-scale)), calc(21px * var(--course-reader-font-scale)));
+      --course-reader-title-size: calc(var(--course-reader-body-size) * 1.2);
     }
     .course-map-shell {
       padding: 8px 0 32px;
@@ -1688,17 +1715,18 @@
     .course-map-title,
     .course-chapter-open-title {
       margin: 0;
-      font-size: clamp(calc(22px * var(--course-reader-font-scale)), calc(3vw * var(--course-reader-font-scale)), calc(34px * var(--course-reader-font-scale)));
+      font-size: var(--course-reader-title-size);
       line-height: 1.04;
       color: var(--course-title-color);
-      font-weight: 800;
+      font-weight: var(--course-title-weight, 800);
     }
     .course-map-subtitle,
     .course-chapter-open-subtitle {
       margin: 0;
-      font-size: calc(15px * var(--course-reader-font-scale));
+      font-size: calc(var(--course-reader-body-size) * .96);
       line-height: 1.6;
       opacity: .82;
+      font-weight: var(--course-body-weight, 400);
     }
     .course-map-grid {
       display: grid;
@@ -1714,14 +1742,15 @@
       align-items: start;
     }
     .course-map-row strong {
-      font-size: calc(13px * var(--course-reader-font-scale));
+      font-size: calc(var(--course-reader-body-size) * .84);
       text-transform: uppercase;
       letter-spacing: .12em;
       color: var(--course-row-strong-color);
     }
     .course-map-row span {
-      font-size: calc(15px * var(--course-reader-font-scale));
+      font-size: calc(var(--course-reader-body-size) * .96);
       line-height: 1.6;
+      font-weight: var(--course-body-weight, 400);
     }
     .course-chapter-open-shell {
       min-height: 58vh;
@@ -1737,9 +1766,10 @@
     }
     .course-chapter-open-logline {
       margin: 0;
-      font-size: clamp(calc(16px * var(--course-reader-font-scale)), calc(1.9vw * var(--course-reader-font-scale)), calc(22px * var(--course-reader-font-scale)));
+      font-size: var(--course-reader-body-size);
       line-height: 1.72;
       max-width: 42ch;
+      font-weight: var(--course-body-weight, 400);
     }
     .course-quiz-shell {
       max-width: 960px;
@@ -1880,6 +1910,9 @@
     .course-reader-footer-size {
       width: 32px;
     }
+    .course-reader-footer-font {
+      display: none;
+    }
     .course-reader-footer-btn svg {
       width: 20px;
       height: 20px;
@@ -1964,8 +1997,10 @@
       display: grid;
       gap: 6px;
       justify-items: center;
-      color: var(--course-modal-text);
+      color: var(--course-body-color);
       text-shadow: var(--course-lock-text-shadow);
+      min-height: 100%;
+      align-content: center;
     }
     .course-read-lock-title {
       font-size: clamp(24px, 3vw, 34px);
@@ -1994,104 +2029,116 @@
       gap: 6px;
     }
     .courses-modal.is-reading[data-reader-theme="1"] {
-      --course-modal-bg: linear-gradient(180deg, #f7f7f9 0%, #e8ebf0 46%, #cfd5de 100%);
-      --course-modal-text: rgba(255, 255, 255, 0.96);
-      --course-ui-font: "Plus Jakarta Sans", "Inter", sans-serif;
-      --course-body-font: "Plus Jakarta Sans", "Inter", sans-serif;
-      --course-reader-card-bg: rgba(255,255,255,.08);
-      --course-reader-card-border: rgba(255,255,255,.10);
-      --course-reader-card-shadow: 0 18px 44px rgba(90, 98, 110, .10);
-      --course-ui-surface: rgba(255,255,255,.14);
-      --course-ui-text-shadow: none;
-      --course-reader-text-shadow: none;
-      --course-title-color: rgba(255,255,255,.98);
-      --course-body-color: rgba(255,255,255,.82);
-      --course-muted-color: rgba(255,255,255,.54);
-      --course-row-bg: rgba(255,255,255,.08);
-      --course-row-strong-color: rgba(255,255,255,.92);
-      --course-quiz-option-bg: rgba(255,255,255,.10);
-      --course-quiz-repeat-bg: rgba(255,255,255,.12);
-      --course-quiz-repeat-color: rgba(255,255,255,.92);
-      --course-lock-text-shadow: none;
-      --course-footer-bg: rgba(194, 170, 154, .84);
-      --course-footer-text-color: rgba(83, 66, 56, .92);
-      --course-footer-muted-color: rgba(107, 84, 72, .78);
-      --course-footer-font: "Plus Jakarta Sans", "Inter", sans-serif;
+      --course-modal-bg: linear-gradient(180deg, #fbf3ea 0%, #f2e5d8 52%, #e8d5c2 100%);
+      --course-modal-text: rgba(70, 45, 29, .96);
+      --course-ui-font: "Merriweather", "Literata", serif;
+      --course-body-font: "Merriweather", "Literata", serif;
+      --course-reader-card-bg: rgba(255,255,255,.22);
+      --course-reader-card-border: rgba(100, 67, 44, .12);
+      --course-reader-card-shadow: 0 24px 56px rgba(93, 63, 40, .12);
+      --course-ui-surface: rgba(255,255,255,.24);
+      --course-ui-text-shadow: 0 1px 2px rgba(255,255,255,.22);
+      --course-reader-text-shadow: 0 1px 2px rgba(255,255,255,.22);
+      --course-title-color: rgba(78, 48, 29, .98);
+      --course-body-color: rgba(78, 48, 29, .92);
+      --course-muted-color: rgba(115, 82, 58, .62);
+      --course-row-bg: rgba(255,255,255,.26);
+      --course-row-strong-color: rgba(78, 48, 29, .96);
+      --course-quiz-option-bg: rgba(255,255,255,.20);
+      --course-quiz-repeat-bg: rgba(255,255,255,.28);
+      --course-quiz-repeat-color: rgba(78, 48, 29, .96);
+      --course-lock-text-shadow: 0 1px 2px rgba(255,255,255,.22);
+      --course-footer-bg: rgba(92, 61, 39, .92);
+      --course-footer-text-color: rgba(255,248,239,.96);
+      --course-footer-muted-color: rgba(255,236,218,.78);
+      --course-footer-font: "Merriweather", "Literata", serif;
+      --course-title-weight: 900;
+      --course-body-weight: 700;
+      --course-strong-weight: 900;
     }
     .courses-modal.is-reading[data-reader-theme="2"] {
-      --course-modal-bg: linear-gradient(180deg, #191c22 0%, #242932 54%, #313845 100%);
+      --course-modal-bg: linear-gradient(180deg, #b9d8ff 0%, #9cc5ff 54%, #7db0ff 100%);
+      --course-modal-text: rgba(255,255,255,.96);
+      --course-ui-font: "Nunito Sans", "Inter", sans-serif;
+      --course-body-font: "Nunito Sans", "Inter", sans-serif;
+      --course-reader-card-bg: rgba(88, 150, 255, .20);
+      --course-reader-card-border: rgba(255,255,255,.18);
+      --course-reader-card-shadow: 0 24px 60px rgba(17, 68, 149, .18);
+      --course-ui-surface: rgba(9, 66, 154, .18);
+      --course-ui-text-shadow: none;
+      --course-reader-text-shadow: 0 1px 2px rgba(17, 68, 149, .30);
+      --course-title-color: rgba(15, 63, 138, .98);
+      --course-body-color: rgba(255,255,255,.98);
+      --course-muted-color: rgba(233, 244, 255, .82);
+      --course-row-bg: rgba(255,255,255,.12);
+      --course-row-strong-color: rgba(15, 63, 138, .96);
+      --course-quiz-option-bg: rgba(255,255,255,.14);
+      --course-quiz-repeat-bg: rgba(10, 67, 157, .86);
+      --course-quiz-repeat-color: rgba(255,255,255,.96);
+      --course-lock-text-shadow: none;
+      --course-footer-bg: rgba(11, 48, 112, .96);
+      --course-footer-text-color: rgba(255,255,255,.98);
+      --course-footer-muted-color: rgba(226, 240, 255, .88);
+      --course-footer-font: "Nunito Sans", "Inter", sans-serif;
+      --course-title-weight: 900;
+      --course-body-weight: 800;
+      --course-strong-weight: 900;
+    }
+    .courses-modal.is-reading[data-reader-theme="3"] {
+      --course-modal-bg: linear-gradient(180deg, #1b2028 0%, #2c3440 54%, #434d5c 100%);
       --course-modal-text: rgba(255,255,255,.94);
       --course-ui-font: "Manrope", "Inter", sans-serif;
       --course-body-font: "Manrope", "Inter", sans-serif;
       --course-reader-card-bg: rgba(255,255,255,.06);
       --course-reader-card-border: rgba(255,255,255,.08);
-      --course-reader-card-shadow: 0 24px 56px rgba(0, 0, 0, .22);
+      --course-reader-card-shadow: 0 24px 56px rgba(0, 0, 0, .26);
       --course-ui-surface: rgba(255,255,255,.10);
       --course-ui-text-shadow: none;
       --course-reader-text-shadow: none;
       --course-title-color: rgba(255,255,255,.98);
-      --course-body-color: rgba(255,255,255,.78);
-      --course-muted-color: rgba(255,255,255,.48);
-      --course-row-bg: rgba(255,255,255,.07);
-      --course-row-strong-color: rgba(255,255,255,.92);
+      --course-body-color: rgba(236,241,247,.90);
+      --course-muted-color: rgba(199, 209, 222, .68);
+      --course-row-bg: rgba(255,255,255,.08);
+      --course-row-strong-color: rgba(255,255,255,.96);
       --course-quiz-option-bg: rgba(255,255,255,.08);
-      --course-quiz-repeat-bg: rgba(255,255,255,.12);
-      --course-quiz-repeat-color: rgba(255,255,255,.94);
+      --course-quiz-repeat-bg: rgba(255,255,255,.16);
+      --course-quiz-repeat-color: rgba(255,255,255,.96);
       --course-lock-text-shadow: none;
-      --course-footer-bg: linear-gradient(180deg, #29a8ff 0%, #006bff 100%);
-      --course-footer-text-color: rgba(255,255,255,.96);
-      --course-footer-muted-color: rgba(255,255,255,.78);
+      --course-footer-bg: rgba(0, 0, 0, .96);
+      --course-footer-text-color: rgba(255,255,255,.98);
+      --course-footer-muted-color: rgba(255,255,255,.82);
       --course-footer-font: "Manrope", "Inter", sans-serif;
-    }
-    .courses-modal.is-reading[data-reader-theme="3"] {
-      --course-modal-bg: linear-gradient(180deg, #262b31 0%, #3a4047 52%, #555d66 100%);
-      --course-modal-text: rgba(255,255,255,.94);
-      --course-ui-font: "Nunito Sans", "Inter", sans-serif;
-      --course-body-font: "Nunito Sans", "Inter", sans-serif;
-      --course-reader-card-bg: rgba(255,255,255,.06);
-      --course-reader-card-border: rgba(255,255,255,.08);
-      --course-reader-card-shadow: 0 24px 60px rgba(0, 0, 0, .18);
-      --course-ui-surface: rgba(255,255,255,.12);
-      --course-ui-text-shadow: none;
-      --course-reader-text-shadow: none;
-      --course-title-color: rgba(255,255,255,.98);
-      --course-body-color: rgba(255,255,255,.76);
-      --course-muted-color: rgba(255,255,255,.46);
-      --course-row-bg: rgba(255,255,255,.06);
-      --course-row-strong-color: rgba(255,255,255,.90);
-      --course-quiz-option-bg: rgba(255,255,255,.08);
-      --course-quiz-repeat-bg: rgba(255,255,255,.12);
-      --course-quiz-repeat-color: rgba(255,255,255,.94);
-      --course-lock-text-shadow: none;
-      --course-footer-bg: rgba(71, 79, 90, .86);
-      --course-footer-text-color: rgba(242, 244, 247, .92);
-      --course-footer-muted-color: rgba(221, 226, 233, .72);
-      --course-footer-font: "Nunito Sans", "Inter", sans-serif;
+      --course-title-weight: 800;
+      --course-body-weight: 500;
+      --course-strong-weight: 700;
     }
     .courses-modal.is-reading[data-reader-theme="0"] {
-      --course-modal-bg: linear-gradient(180deg, #f4f5f7 0%, #dde1e7 48%, #c8ced7 100%);
-      --course-modal-text: rgba(255,255,255,.94);
-      --course-ui-font: "Manrope", "Inter", sans-serif;
-      --course-body-font: "Manrope", "Inter", sans-serif;
-      --course-reader-card-bg: rgba(255,255,255,.08);
-      --course-reader-card-border: rgba(255,255,255,.10);
-      --course-reader-card-shadow: 0 16px 40px rgba(120, 128, 139, .10);
-      --course-ui-surface: rgba(255,255,255,.16);
+      --course-modal-bg: linear-gradient(180deg, #f8f4ec 0%, #efe2d2 48%, #ddc7af 100%);
+      --course-modal-text: rgba(83, 61, 43, 0.96);
+      --course-ui-font: "Literata", "Source Serif 4", serif;
+      --course-body-font: "Literata", "Source Serif 4", serif;
+      --course-reader-card-bg: rgba(255,255,255,.18);
+      --course-reader-card-border: rgba(129, 99, 76, .14);
+      --course-reader-card-shadow: 0 18px 44px rgba(111, 86, 63, .12);
+      --course-ui-surface: rgba(255,255,255,.26);
       --course-ui-text-shadow: none;
       --course-reader-text-shadow: none;
-      --course-title-color: rgba(64, 71, 80, .96);
-      --course-body-color: rgba(76, 84, 94, .88);
-      --course-muted-color: rgba(97, 106, 118, .64);
-      --course-row-bg: rgba(255,255,255,.09);
-      --course-row-strong-color: rgba(64, 71, 80, .94);
-      --course-quiz-option-bg: rgba(255,255,255,.10);
-      --course-quiz-repeat-bg: rgba(255,255,255,.14);
-      --course-quiz-repeat-color: rgba(64, 71, 80, .96);
+      --course-title-color: rgba(91, 63, 41, .98);
+      --course-body-color: rgba(103, 79, 58, .92);
+      --course-muted-color: rgba(128, 104, 83, .64);
+      --course-row-bg: rgba(255,255,255,.28);
+      --course-row-strong-color: rgba(91, 63, 41, .96);
+      --course-quiz-option-bg: rgba(255,255,255,.24);
+      --course-quiz-repeat-bg: rgba(255,255,255,.26);
+      --course-quiz-repeat-color: rgba(91, 63, 41, .96);
       --course-lock-text-shadow: none;
-      --course-footer-bg: rgba(84, 89, 97, .90);
-      --course-footer-text-color: rgba(255, 255, 255, .96);
-      --course-footer-muted-color: rgba(255, 255, 255, .88);
-      --course-footer-font: "Manrope", "Inter", sans-serif;
+      --course-footer-bg: rgba(190, 162, 134, .92);
+      --course-footer-text-color: rgba(83, 61, 43, .94);
+      --course-footer-muted-color: rgba(107, 84, 72, .78);
+      --course-footer-font: "Literata", "Source Serif 4", serif;
+      --course-title-weight: 800;
+      --course-body-weight: 500;
+      --course-strong-weight: 700;
     }
     .courses-user-label {
       font-size: 13px;
@@ -2826,15 +2873,15 @@
         font-size: 14px;
       }
       .course-page-title {
-        font-size: calc(22px * var(--course-reader-font-scale));
+        font-size: var(--course-reader-title-size);
       }
       .course-page-paragraph,
       .course-page-bullets {
-        font-size: calc(15px * var(--course-reader-font-scale));
+        font-size: var(--course-reader-body-size);
       }
       .course-page-row strong,
       .course-page-row span {
-        font-size: calc(15px * var(--course-reader-font-scale));
+        font-size: calc(var(--course-reader-body-size) * .92);
       }
       .course-read-lock-title {
         font-size: 26px;
@@ -3181,7 +3228,6 @@
           </button>
           <button id="courseReaderFontSize" class="course-reader-footer-btn course-reader-footer-size" type="button" aria-label="Mudar tamanho da fonte">
             <svg viewBox="0 0 24 24"><path d="M4 20h2.8l1.45-4h5.53l1.42 4H18L12.7 5h-3.34zm4.98-6 1.98-5.6L12.94 14zM19 6v2h-2v1h2v2h1V9h2V8h-2V6z"/></svg>
-            <span id="courseReaderFontSizeLabel" class="course-reader-footer-font">Tamanho atual</span>
           </button>
           <div id="courseReaderFooterProgress" class="course-reader-footer-progress">0%</div>
           <button id="courseReaderTheme" class="course-reader-footer-btn" type="button" aria-label="Mudar tema de leitura">
@@ -3435,11 +3481,9 @@
       { id: 3, name: "Noite MINI" }
     ];
     const miniCourseReaderFontSizes = [
-      { scale: 1, label: "Tamanho atual" },
       { scale: 1.25, label: "+25%" },
       { scale: 1.5, label: "+50%" },
-      { scale: 0.75, label: "-25%" },
-      { scale: 0.5, label: "-50%" }
+      { scale: 1, label: "Padrão" }
     ];
 
     function iconUrlById(id) {
@@ -5021,6 +5065,7 @@
       modal.classList.toggle("is-immersive-reading", Boolean(currentMiniCourse && currentMiniCourseViewMode === "reading"));
       if (readerView) {
         readerView.style.setProperty("--course-reader-font-scale", String(miniCourseReaderFontSizes[safeFontSizeIndex]?.scale || 1));
+        readerView.classList.toggle("is-course-intro", Boolean(currentMiniCourse && currentMiniCourseViewMode !== "reading"));
       }
     }
     function getMiniCourseCompletionPercent() {
@@ -5034,18 +5079,13 @@
     function updateMiniCourseReaderFooter() {
       const progressNode = $("courseReaderFooterProgress");
       const fontSizeButton = $("courseReaderFontSize");
-      const fontSizeLabel = $("courseReaderFontSizeLabel");
       const forwardButton = $("courseReaderForward");
       const themeButton = $("courseReaderTheme");
       if (progressNode) {
         progressNode.textContent = `${getMiniCourseCompletionPercent()}%`;
       }
       const safeFontSizeIndex = Math.max(0, Math.min(miniCourseReaderFontSizes.length - 1, Number(miniCourseReaderFontSizeIndex || 0) || 0));
-      const currentFontSize = miniCourseReaderFontSizes[safeFontSizeIndex] || miniCourseReaderFontSizes[0];
       const nextFontSize = miniCourseReaderFontSizes[(safeFontSizeIndex + 1) % miniCourseReaderFontSizes.length] || miniCourseReaderFontSizes[0];
-      if (fontSizeLabel) {
-        fontSizeLabel.textContent = currentFontSize.label;
-      }
       if (fontSizeButton) {
         fontSizeButton.setAttribute("aria-label", `Mudar tamanho da fonte. Próximo: ${nextFontSize.label}`);
       }
@@ -6884,6 +6924,7 @@
       if (!currentMiniCourse) {
         readerView.hidden = true;
         listView.hidden = false;
+        readerView.classList.remove("is-course-intro");
         currentMiniCourseViewMode = "preview";
         renderMiniCoursesList();
         return;
@@ -6935,6 +6976,7 @@
           <div class="course-map-shell">
             <h2 class="course-map-title">${escapeText(currentPage.title || "Mapa do curso")}</h2>
             ${currentPage.subtitle ? `<p class="course-map-subtitle">${escapeText(currentPage.subtitle)}</p>` : ""}
+            <div class="course-page-divider" aria-hidden="true"></div>
             ${currentPage.logline ? `<p class="course-page-paragraph">${escapeText(currentPage.logline)}</p>` : ""}
             <div class="course-map-grid">
               ${tableRows.map((row) => `<div class="course-map-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}
@@ -6947,6 +6989,7 @@
             <div class="course-chapter-open-kicker">Capítulo ${escapeText(String(currentPage.chapterNumber || currentMiniCoursePage))}</div>
             <h2 class="course-chapter-open-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
             ${currentPage.subtitle ? `<p class="course-chapter-open-subtitle">${escapeText(currentPage.subtitle)}</p>` : ""}
+            <div class="course-page-divider" aria-hidden="true"></div>
             <p class="course-chapter-open-logline">${escapeText(currentPage.logline || "")}</p>
           </div>
         `;
@@ -6954,6 +6997,7 @@
         readerView.innerHTML = `
           <div class="course-page-shell">
             <h2 class="course-page-title">${escapeText(currentPage.title || currentMiniCourse.title)}</h2>
+            <div class="course-page-divider" aria-hidden="true"></div>
             ${paragraphs.map((paragraph) => `<p class="course-page-paragraph">${escapeText(paragraph)}</p>`).join("")}
             ${bullets.length ? `<ul class="course-page-bullets">${bullets.map((item) => `<li>${escapeText(item)}</li>`).join("")}</ul>` : ""}
             ${tableRows.length ? `<div class="course-page-table">${tableRows.map((row) => `<div class="course-page-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}</div>` : ""}
@@ -6975,6 +7019,7 @@
       clearMiniCourseAnimationTimers();
       listView.hidden = true;
       readerView.hidden = false;
+      readerView.classList.remove("is-course-intro");
       readerView.innerHTML = `<div class="course-reader-loading">Abrindo o conteúdo do curso...</div>`;
       attachMiniCourseReaderSwipe(readerView);
       readerView.scrollTop = 0;
