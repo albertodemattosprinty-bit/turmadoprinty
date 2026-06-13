@@ -96,18 +96,21 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
-      color: #30333c;
+      gap: 14px;
+      color: #163b7a;
       font-family: "Open Sans", sans-serif;
-      font-size: 15px;
+      font-size: 22px;
       line-height: 1.2;
+      text-align: center;
     }
     .mini-home-summary-name {
       font-weight: 800;
+      color: #163b7a;
     }
     .mini-home-summary-points {
-      opacity: .8;
+      opacity: .92;
       font-weight: 700;
+      color: #163b7a;
     }
     .icon-chip {
       border: 0;
@@ -1261,8 +1264,8 @@
     .courses-shell {
       height: 100dvh;
       display: grid;
-      grid-template-rows: 10dvh minmax(0, 83dvh) 7dvh;
-      padding: 0 16px;
+      grid-template-rows: 72px minmax(0, 1fr);
+      padding: 0;
     }
     .courses-top,
     .courses-footer {
@@ -1271,18 +1274,30 @@
       justify-content: space-between;
       gap: 12px;
     }
+    .courses-top {
+      padding: 12px 16px 0;
+    }
     .courses-head-title {
-      flex: 1;
-      text-align: center;
-      font-size: clamp(24px, 4vw, 34px);
-      font-weight: 800;
-      letter-spacing: .02em;
-      text-shadow: var(--course-ui-text-shadow);
+      display: none;
     }
     .courses-head-actions {
       display: flex;
       align-items: center;
       gap: 10px;
+      margin-left: auto;
+    }
+    #openCoursesUser,
+    #openCourseAdmin,
+    #openCourseJobs {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .24s ease;
+    }
+    .courses-modal.is-admin-panel-visible #openCoursesUser,
+    .courses-modal.is-admin-panel-visible #openCourseAdmin,
+    .courses-modal.is-admin-panel-visible #openCourseJobs {
+      opacity: 1;
+      pointer-events: auto;
     }
     .courses-head-btn,
     .courses-nav-btn {
@@ -1312,14 +1327,19 @@
       line-height: 1;
       background: rgba(32, 92, 255, .44);
     }
+    .courses-head-home {
+      margin-left: auto;
+      background: color-mix(in srgb, var(--course-body-color) 12%, transparent);
+      color: var(--course-body-color);
+    }
     .courses-viewport {
       width: 100%;
       height: 100%;
-      border-radius: 34px;
+      border-radius: 0;
       background: var(--course-reader-card-bg);
-      border: 1px solid var(--course-reader-card-border);
+      border: 0;
       backdrop-filter: none;
-      box-shadow: var(--course-reader-card-shadow);
+      box-shadow: none;
       overflow: hidden;
       position: relative;
     }
@@ -1337,7 +1357,7 @@
       height: 0;
     }
     .courses-list-view {
-      padding: 22px;
+      padding: 18px 20px 28px;
       display: grid;
       gap: 18px;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1402,12 +1422,12 @@
       border: 0;
       width: 100%;
       padding: 18px 16px 16px;
-      border-radius: 30px;
-      background: linear-gradient(160deg, rgba(245, 249, 255, .98), rgba(233, 241, 255, .92));
-      box-shadow: 0 18px 34px rgba(35, 58, 125, .08);
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 12px;
+      gap: 16px;
       align-content: start;
       color: #253044;
       text-align: center;
@@ -1425,6 +1445,12 @@
       filter: drop-shadow(0 20px 30px rgba(0,0,0,.18));
       transition: transform .22s ease, filter .22s ease;
     }
+    .course-cover-read-layer {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      overflow: hidden;
+    }
     .course-cover-progress-mask {
       position: absolute;
       inset: 0;
@@ -1434,14 +1460,17 @@
         linear-gradient(
           to top,
           rgba(255,255,255,0) 0%,
-          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) - 8%),
-          rgba(232, 240, 255, .18) calc(var(--course-cover-read, 0%) + 4%),
-          rgba(232, 240, 255, .68) 100%
+          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) - 5%),
+          rgba(255,255,255,.24) calc(var(--course-cover-read, 0%) + 2%),
+          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) + 10%),
+          rgba(255,255,255,0) 100%
         );
       mix-blend-mode: screen;
     }
     .course-cover,
-    .course-cover-fallback {
+    .course-cover-fallback,
+    .course-cover-base,
+    .course-cover-color {
       width: 100%;
       height: 100%;
       object-fit: contain;
@@ -1449,41 +1478,35 @@
       border-radius: 0;
       background: transparent;
     }
+    .course-cover-base {
+      filter: grayscale(1);
+      opacity: .7;
+    }
+    .course-cover-color {
+      clip-path: inset(calc(100% - var(--course-cover-read, 0%)) 0 0 0);
+    }
     .course-cover-fallback {
       background: transparent;
-    }
-    .course-cover-star {
-      position: absolute;
-      bottom: 12px;
-      right: 12px;
-      width: 42px;
-      height: 42px;
-      display: grid;
-      place-items: center;
-      color: #fff;
-      background: rgba(18, 34, 78, .26);
-      border-radius: 50%;
-      backdrop-filter: blur(10px);
-    }
-    .course-cover-star.is-complete {
-      color: #ffe165;
-    }
-    .course-cover-star svg {
-      width: 22px;
-      height: 22px;
-      fill: currentColor;
-      filter: drop-shadow(0 8px 18px rgba(0,0,0,.24));
     }
     .course-card-body {
       min-width: 0;
       display: grid;
-      gap: 10px;
+      gap: 12px;
       justify-items: center;
     }
     .course-card-duration {
-      font-size: 15px;
-      opacity: .78;
-      font-weight: 700;
+      font-size: 22px;
+      opacity: .92;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #1f3c72;
+    }
+    .course-card-duration svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
     }
     .course-progress-shell {
       width: min(180px, 100%);
@@ -2006,6 +2029,7 @@
       cursor: pointer;
     }
     .courses-footer {
+      display: none;
       justify-content: center;
       position: relative;
       background: linear-gradient(180deg, #4f95ff 0%, #2755df 100%);
@@ -2089,6 +2113,7 @@
       color: var(--course-footer-muted-color);
     }
     .courses-modal.is-immersive-reading .courses-footer {
+      display: flex;
       background: transparent;
       min-height: 0;
     }
@@ -2662,8 +2687,9 @@
       min-height: 100%;
       display: grid;
       grid-template-rows: minmax(0, 1fr) auto;
-      gap: 18px;
+      gap: 22px;
       align-items: end;
+      padding: 8px 0 0;
     }
     .mobile-course-open {
       width: 100%;
@@ -3056,7 +3082,7 @@
       }
       .mini-home-summary {
         width: min(92vw, 430px);
-        font-size: 14px;
+        font-size: 18px;
       }
       .icon-ball {
         width: 66px;
@@ -3123,7 +3149,7 @@
         height: 50px;
       }
       .courses-shell {
-        grid-template-rows: 9dvh minmax(0, 84dvh) 7dvh;
+        grid-template-rows: 72px minmax(0, 1fr);
         padding: 0;
       }
       .courses-modal.is-course-focus:not(.is-immersive-reading) .course-reader-view {
@@ -3133,11 +3159,11 @@
         font-size: 22px;
       }
       .courses-top {
-        padding: 0 10px;
+        padding: 12px 16px 0;
       }
       .courses-list-view {
         grid-template-columns: 1fr;
-        padding: 0;
+        padding: 8px 18px 26px;
         gap: 0;
         align-content: stretch;
         overflow: hidden;
@@ -3572,8 +3598,8 @@
           <button id="openCourseJobs" class="courses-head-btn" type="button" hidden aria-label="Abrir fila de cursos">
             <svg viewBox="0 0 24 24"><path d="M4 5h16v3H4zm0 5h11v3H4zm0 5h16v3H4z"/><circle cx="18" cy="11.5" r="2.2"/></svg>
           </button>
-          <button id="closeCourses" class="courses-head-btn" type="button" aria-label="Voltar">
-            <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+          <button id="closeCourses" class="courses-head-btn courses-head-home" type="button" aria-label="Voltar para a home do mini">
+            <svg viewBox="0 0 24 24"><path d="M12 3 3 10.2V21h6v-6h6v6h6V10.2z"/></svg>
           </button>
         </div>
       </header>
@@ -3782,6 +3808,8 @@
     let miniCourseUser = null;
     let miniCourseSummary = { completedCourses: 0, startedCourses: 0, totalPoints: 0 };
     let isMiniCourseAdmin = false;
+    let miniCourseAdminPanelVisible = false;
+    let miniCourseAdminRevealTimer = 0;
     let miniCourseJobs = [];
     let miniCourseJobsLoading = false;
     let miniCourseJobsPollTimer = null;
@@ -3886,7 +3914,19 @@
       return iconUrlById((idx >= 0 ? idx + 1 : 1));
     }
 
-    function toHoursText(m){ if(m<60)return m+" minutos"; const h=Math.floor(m/60),r=m%60; return r?`${h} horas e ${r} minutos`:`${h} horas`; }
+    function toHoursText(m){
+      const totalMinutes = Math.max(0, Number(m || 0) || 0);
+      if (totalMinutes < 60) {
+        return `${totalMinutes} ${totalMinutes === 1 ? "minuto" : "minutos"}`;
+      }
+      const hours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      const hourLabel = hours === 1 ? "hora" : "horas";
+      if (!remainingMinutes) {
+        return `${hours} ${hourLabel}`;
+      }
+      return `${hours} ${hourLabel} e ${remainingMinutes} ${remainingMinutes === 1 ? "minuto" : "minutos"}`;
+    }
     function page(list, idx){ return list.slice(idx*pageSize, idx*pageSize+pageSize); }
     function getMiniToken(){ return window.localStorage.getItem(miniSessionKey) || ""; }
     function setMiniStatus(text){ $("miniChatStatus").textContent = text || ""; }
@@ -7051,14 +7091,41 @@
       }, 2500);
     }
 
+    function setMiniCourseAdminPanelVisible(visible) {
+      miniCourseAdminPanelVisible = Boolean(visible && isMiniCourseAdmin);
+      $("coursesModal")?.classList.toggle("is-admin-panel-visible", miniCourseAdminPanelVisible);
+      updateMiniCourseAdminButton();
+    }
+
+    function clearMiniCourseAdminRevealTimer() {
+      if (miniCourseAdminRevealTimer) {
+        window.clearTimeout(miniCourseAdminRevealTimer);
+        miniCourseAdminRevealTimer = 0;
+      }
+    }
+
+    function beginMiniCourseAdminReveal() {
+      if (!isMiniCourseAdmin || currentMiniCourseViewMode === "reading" || currentMiniCourse) {
+        return;
+      }
+      clearMiniCourseAdminRevealTimer();
+      miniCourseAdminRevealTimer = window.setTimeout(() => {
+        setMiniCourseAdminPanelVisible(true);
+      }, 5000);
+    }
+
     function updateMiniCourseAdminButton() {
+      const userButton = $("openCoursesUser");
       const createButton = $("openCourseAdmin");
       const jobsButton = $("openCourseJobs");
+      if (userButton) {
+        userButton.hidden = !miniCourseAdminPanelVisible;
+      }
       if (createButton) {
-        createButton.hidden = !isMiniCourseAdmin;
+        createButton.hidden = !miniCourseAdminPanelVisible;
       }
       if (jobsButton) {
-        jobsButton.hidden = !isMiniCourseAdmin;
+        jobsButton.hidden = !miniCourseAdminPanelVisible;
       }
     }
 
@@ -7267,14 +7334,30 @@
       `;
     }
 
+    function getMiniCourseReadingTimeMarkup(course) {
+      const totalPages = Math.max(Number(course?.pageCount || 1) || 1, 1);
+      const durationMinutes = Math.max(1, Number(course?.durationMinutes || totalPages) || totalPages);
+      return `
+        <div class="course-card-duration">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.75A10.25 10.25 0 1 0 22.25 12 10.26 10.26 0 0 0 12 1.75Zm0 18.5A8.25 8.25 0 1 1 20.25 12 8.26 8.26 0 0 1 12 20.25Zm.75-13.5h-1.5v5.54l4.46 2.68.78-1.28-3.74-2.24Z"/></svg>
+          <span>${escapeText(toHoursText(durationMinutes))}</span>
+        </div>
+      `;
+    }
+
     function buildMiniCourseCover(course) {
-      const isComplete = Boolean(course?.progress?.completed);
       const progressPercent = getMiniCourseProgressPercent(course);
       const coverUrl = String(course?.coverImageUrl || miniCourseDefaultCoverUrl).trim();
-      const starClass = isComplete ? "course-cover-star is-complete" : "course-cover-star";
-      const starSvg = `<div class="${starClass}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>`;
       const progressMask = `<div class="course-cover-progress-mask" style="--course-cover-read:${progressPercent}%"></div>`;
-      return `<div class="course-cover-shell"><img class="${course?.coverImageUrl ? "course-cover" : "course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="${escapeAttr(course.title || "Curso")}">${progressMask}${starSvg}</div>`;
+      return `
+        <div class="course-cover-shell">
+          <img class="${course?.coverImageUrl ? "course-cover-base" : "course-cover-base course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="${escapeAttr(course.title || "Curso")}">
+          <div class="course-cover-read-layer" style="--course-cover-read:${progressPercent}%">
+            <img class="${course?.coverImageUrl ? "course-cover-color" : "course-cover-color course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="">
+          </div>
+          ${progressMask}
+        </div>
+      `;
     }
 
     function renderMiniCourseIntro(readerView) {
@@ -7284,8 +7367,8 @@
       currentMiniCourseBlockIndex = 0;
       readerView.innerHTML = `
         <div class="course-intro-shell">
-          <button id="courseIntroBack" class="course-intro-back" type="button" aria-label="Voltar para a lista de cursos">
-            <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+          <button id="courseIntroBack" class="course-intro-back" type="button" aria-label="Voltar para a home do mini">
+            <svg viewBox="0 0 24 24"><path d="M12 3 3 10.2V21h6v-6h6v6h6V10.2z"/></svg>
           </button>
           <div class="course-intro-card">
             ${buildMiniCourseCover(currentMiniCourse)}
@@ -7621,16 +7704,15 @@
       }
 
       listView.innerHTML = miniCourses.map((course) => {
-        const totalPages = Math.max(Number(course?.pageCount || 1) || 1, 1);
         return `
           <div class="course-card" role="button" tabindex="0" data-course-id="${escapeAttr(course.id)}">
             ${buildMiniCourseCover(course)}
             <div class="course-card-body">
-              <div class="course-card-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
+              ${getMiniCourseReadingTimeMarkup(course)}
               ${getMiniCourseProgressMarkup(course)}
             </div>
             <div class="course-card-mobile-meta">
-              <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
+              ${getMiniCourseReadingTimeMarkup(course)}
               ${getMiniCourseProgressMarkup(course)}
               <div class="course-card-mobile-hint">Toque na capa para abrir</div>
             </div>
@@ -7936,9 +8018,28 @@
       miniCourseUser = Object.prototype.hasOwnProperty.call(payload || {}, "user") ? (payload?.user || null) : miniCourseUser;
       miniCourseSummary = payload?.summary || (miniCourseUser ? miniCourseSummary : { completedCourses: 0, startedCourses: 0, totalPoints: 0 });
       isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
+      if (!isMiniCourseAdmin) {
+        setMiniCourseAdminPanelVisible(false);
+      }
       updateMiniCourseAdminButton();
       updateMiniCoursesUserCard();
       renderMiniCourseImageCourseOptions();
+    }
+
+    async function loadMiniCourseHomeSummary() {
+      try {
+        const response = await apiMini("/api/mini/courses/summary");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao carregar os pontos.");
+        }
+        applyMiniCoursesPayload(payload || {});
+      } catch (error) {
+        if (!miniCourseUser) {
+          miniCourseSummary = { completedCourses: 0, startedCourses: 0, totalPoints: 0 };
+          updateMiniCoursesUserCard();
+        }
+      }
     }
 
     async function loadMiniCourses() {
@@ -7967,6 +8068,8 @@
     }
 
     function openMiniCoursesModal() {
+      setMiniCourseAdminPanelVisible(false);
+      clearMiniCourseAdminRevealTimer();
       $("coursesModal").classList.add("show");
       $("coursesModal").setAttribute("aria-hidden", "false");
       resetMiniCourseReadGate();
@@ -7981,6 +8084,8 @@
 
     function closeMiniCoursesModal() {
       clearMiniCourseAnimationTimers();
+      clearMiniCourseAdminRevealTimer();
+      setMiniCourseAdminPanelVisible(false);
       $("coursesModal").classList.remove("show");
       $("coursesModal").setAttribute("aria-hidden", "true");
       closeMiniCoursesUserModal();
@@ -8772,6 +8877,17 @@
     $("openCourses").onclick = () => {
       openMiniCoursesModal();
     };
+    $("coursesViewport")?.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "touch") {
+        return;
+      }
+      beginMiniCourseAdminReveal();
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+      $("coursesViewport")?.addEventListener(eventName, () => {
+        clearMiniCourseAdminRevealTimer();
+      });
+    });
     $("coursesFooterHome").onclick = () => {
       navigateFromCourses("home");
     };
@@ -8800,13 +8916,6 @@
       jumpToMiniCourseUnlockedLimit();
     };
     $("closeCourses").onclick = () => {
-      if (currentMiniCourse) {
-        currentMiniCourse = null;
-        currentMiniCoursePage = 1;
-        currentMiniCourseViewMode = "preview";
-        renderMiniCoursesList();
-        return;
-      }
       closeMiniCoursesModal();
     };
     $("openCoursesUser").onclick = () => {
@@ -9152,6 +9261,13 @@
       const input = $("miniChatInput");
       input.style.height = "auto";
       input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+    });
+
+    void loadMiniCourseHomeSummary();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        void loadMiniCourseHomeSummary();
+      }
     });
   </script>
 </body>

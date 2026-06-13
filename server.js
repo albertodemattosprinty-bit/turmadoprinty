@@ -3871,6 +3871,26 @@ async function handleMiniCoursesListRequest(request, response) {
   }
 }
 
+async function handleMiniCoursesSummaryRequest(request, response) {
+  const user = await getOptionalAuthUser(request);
+
+  try {
+    const summary = user
+      ? await getMiniCourseUserSummary(user.id)
+      : { completedCourses: 0, startedCourses: 0, totalPoints: 0 };
+
+    sendJson(response, 200, {
+      ok: true,
+      user: user ? sanitizeUser(user) : null,
+      summary
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o resumo dos cursos."
+    });
+  }
+}
+
 async function handleMiniMediaLibraryRequest(request, response) {
   const user = await getOptionalAuthUser(request);
 
@@ -8044,6 +8064,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/mini/courses") {
     await handleMiniCoursesListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/mini/courses/summary") {
+    await handleMiniCoursesSummaryRequest(request, response);
     return;
   }
 
