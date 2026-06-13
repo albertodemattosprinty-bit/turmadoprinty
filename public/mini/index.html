@@ -1237,6 +1237,11 @@
       --course-footer-font: var(--course-ui-font);
       --course-chapter-page-text: rgba(240, 247, 255, .96);
       --course-chapter-page-muted: rgba(224, 238, 255, .82);
+      --course-chapter-page-bg: var(--course-footer-bg);
+      --course-chapter-footer-bg: var(--course-modal-bg);
+      --course-chapter-footer-text: var(--course-footer-bg);
+      --course-chapter-progress-color: var(--course-footer-text-color);
+      --course-chapter-progress-track: color-mix(in srgb, var(--course-footer-text-color) 12%, transparent);
       position: fixed;
       inset: 0;
       z-index: 55;
@@ -1445,9 +1450,7 @@
       background: transparent;
     }
     .course-cover-fallback {
-      background:
-        radial-gradient(circle at 25% 20%, rgba(255,239,153,.50), transparent 26%),
-        linear-gradient(155deg, rgba(43,119,255,.96), rgba(255,157,193,.85));
+      background: transparent;
     }
     .course-cover-star {
       position: absolute;
@@ -1629,6 +1632,7 @@
       display: grid;
       justify-items: center;
       align-content: center;
+      gap: 12px;
       padding: 8px 0 0;
     }
     .course-intro-button {
@@ -1654,6 +1658,24 @@
       width: 20px;
       height: 20px;
       fill: currentColor;
+    }
+    .course-intro-secondary {
+      border: 0;
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--course-body-color) 10%, transparent);
+      color: var(--course-body-color);
+      min-width: 220px;
+      min-height: 52px;
+      padding: 0 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: var(--course-ui-font);
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      width: min(100%, 320px);
     }
     .course-page-shell {
       max-width: 960px;
@@ -1832,7 +1854,7 @@
       padding: 10vh 0 8vh;
     }
     .course-reader-view.is-chapter-open-page {
-      background: var(--course-footer-bg);
+      background: var(--course-chapter-page-bg, var(--course-footer-bg));
       color: var(--course-chapter-page-text);
     }
     .course-reader-view.is-chapter-open-page .course-chapter-open-shell {
@@ -2013,19 +2035,19 @@
       right: 0;
       top: -6px;
       height: 6px;
-      background: color-mix(in srgb, var(--course-footer-text-color) 12%, transparent);
+      background: var(--course-chapter-progress-track, color-mix(in srgb, var(--course-footer-text-color) 12%, transparent));
       overflow: hidden;
       pointer-events: none;
     }
     .course-reader-chapter-progress-fill {
       width: 0%;
       height: 100%;
-      background: var(--course-footer-text-color);
+      background: var(--course-chapter-progress-color, var(--course-footer-text-color));
       transition: width .28s ease;
     }
     .course-reader-footer.is-chapter-open-page {
-      background: var(--course-modal-bg);
-      color: var(--course-footer-bg);
+      background: var(--course-chapter-footer-bg, var(--course-modal-bg));
+      color: var(--course-chapter-footer-text, var(--course-footer-bg));
     }
     .course-reader-footer.is-chapter-open-page .course-reader-footer-progress {
       color: color-mix(in srgb, var(--course-footer-bg) 82%, transparent);
@@ -2329,6 +2351,11 @@
       --course-footer-font: "Merriweather", "Literata", serif;
       --course-chapter-page-text: rgba(255, 246, 234, .96);
       --course-chapter-page-muted: rgba(255, 233, 212, .82);
+      --course-chapter-page-bg: var(--course-footer-bg);
+      --course-chapter-footer-bg: var(--course-modal-bg);
+      --course-chapter-footer-text: var(--course-footer-bg);
+      --course-chapter-progress-color: #c6a280;
+      --course-chapter-progress-track: rgba(198, 162, 128, .22);
       --course-title-weight: 900;
       --course-body-weight: 700;
       --course-strong-weight: 900;
@@ -2353,12 +2380,17 @@
       --course-quiz-repeat-bg: rgba(10, 67, 157, .86);
       --course-quiz-repeat-color: rgba(255,255,255,.96);
       --course-lock-text-shadow: none;
-      --course-footer-bg: rgba(11, 48, 112, .96);
-      --course-footer-text-color: rgba(255,255,255,.98);
-      --course-footer-muted-color: rgba(226, 240, 255, .88);
+      --course-footer-bg: rgba(231, 234, 239, .98);
+      --course-footer-text-color: rgba(17, 24, 39, .96);
+      --course-footer-muted-color: rgba(55, 65, 81, .76);
       --course-footer-font: "Nunito Sans", "Inter", sans-serif;
-      --course-chapter-page-text: rgba(227, 242, 255, .98);
-      --course-chapter-page-muted: rgba(205, 230, 255, .84);
+      --course-chapter-page-text: rgba(255, 255, 255, .98);
+      --course-chapter-page-muted: rgba(226, 232, 240, .84);
+      --course-chapter-page-bg: #000000;
+      --course-chapter-footer-bg: rgba(231, 234, 239, .98);
+      --course-chapter-footer-text: rgba(17, 24, 39, .96);
+      --course-chapter-progress-color: rgba(255,255,255,.98);
+      --course-chapter-progress-track: rgba(255,255,255,.20);
       --course-title-weight: 900;
       --course-body-weight: 800;
       --course-strong-weight: 900;
@@ -2389,6 +2421,11 @@
       --course-footer-font: "Manrope", "Inter", sans-serif;
       --course-chapter-page-text: rgba(123, 203, 255, .98);
       --course-chapter-page-muted: rgba(186, 228, 255, .84);
+      --course-chapter-page-bg: var(--course-footer-bg);
+      --course-chapter-footer-bg: var(--course-modal-bg);
+      --course-chapter-footer-text: var(--course-footer-bg);
+      --course-chapter-progress-color: var(--course-footer-text-color);
+      --course-chapter-progress-track: rgba(255,255,255,.18);
       --course-title-weight: 800;
       --course-body-weight: 500;
       --course-strong-weight: 700;
@@ -2419,6 +2456,11 @@
       --course-footer-font: "Literata", "Source Serif 4", serif;
       --course-chapter-page-text: rgba(255, 247, 238, .96);
       --course-chapter-page-muted: rgba(244, 230, 214, .82);
+      --course-chapter-page-bg: var(--course-footer-bg);
+      --course-chapter-footer-bg: var(--course-modal-bg);
+      --course-chapter-footer-text: var(--course-footer-bg);
+      --course-chapter-progress-color: var(--course-footer-text-color);
+      --course-chapter-progress-track: rgba(83, 61, 43, .16);
       --course-title-weight: 800;
       --course-body-weight: 500;
       --course-strong-weight: 700;
@@ -3108,7 +3150,7 @@
       }
       .course-advance-fab {
         right: 25px;
-        bottom: calc(7dvh + 25px + env(safe-area-inset-bottom, 0px));
+        bottom: calc(7dvh + 31px + env(safe-area-inset-bottom, 0px));
       }
       .course-reader-footer {
         padding: 0 14px calc(8px + env(safe-area-inset-bottom, 0px));
@@ -3812,7 +3854,7 @@
       point: "/mini/sounds/point.mp3",
       page: "/mini/sounds/page.mp3"
     };
-    let miniCourseReaderThemeIndex = 0;
+    let miniCourseReaderThemeIndex = 1;
     let miniCourseReaderFontSizeIndex = 0;
 
     const $ = (id) => document.getElementById(id);
@@ -3821,6 +3863,7 @@
     const miniSessionKey = "turma_do_printy_token";
     const miniPlannerDraftKey = "turma_do_printy_mini_planner_draft";
     const miniCourseDownloadsKey = "turma_do_printy_mini_course_downloads";
+    const miniCourseDefaultCoverUrl = "/mini/images/default-course-cover.jpg";
     const miniCourseReaderThemes = [
       { id: 0, name: "Tema principal" },
       { id: 1, name: "Papel de Aula" },
@@ -7227,13 +7270,11 @@
     function buildMiniCourseCover(course) {
       const isComplete = Boolean(course?.progress?.completed);
       const progressPercent = getMiniCourseProgressPercent(course);
+      const coverUrl = String(course?.coverImageUrl || miniCourseDefaultCoverUrl).trim();
       const starClass = isComplete ? "course-cover-star is-complete" : "course-cover-star";
       const starSvg = `<div class="${starClass}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>`;
       const progressMask = `<div class="course-cover-progress-mask" style="--course-cover-read:${progressPercent}%"></div>`;
-      if (course?.coverImageUrl) {
-        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${progressMask}${starSvg}</div>`;
-      }
-      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${progressMask}${starSvg}</div>`;
+      return `<div class="course-cover-shell"><img class="${course?.coverImageUrl ? "course-cover" : "course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="${escapeAttr(course.title || "Curso")}">${progressMask}${starSvg}</div>`;
     }
 
     function renderMiniCourseIntro(readerView) {
@@ -7253,6 +7294,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>
                 <span>${hasStarted ? `Continuar leitura | ${progressPercent}%` : "Iniciar leitura"}</span>
               </button>
+              <button id="backMiniCourseButton" class="course-intro-secondary" type="button">Voltar</button>
             </div>
           </div>
         </div>
@@ -7264,6 +7306,7 @@
         };
       }
       const startButton = $("startMiniCourseButton");
+      const backActionButton = $("backMiniCourseButton");
       if (startButton) {
         startButton.onclick = () => {
           currentMiniCourseViewMode = "reading";
@@ -7272,6 +7315,11 @@
           currentMiniCourseRenderedBlocks = [];
           resetMiniCourseReadGate();
           renderMiniCourseReader();
+        };
+      }
+      if (backActionButton) {
+        backActionButton.onclick = () => {
+          closeMiniCoursesModal();
         };
       }
     }
