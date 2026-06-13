@@ -3850,7 +3850,7 @@ async function handleMiniCoursesListRequest(request, response) {
   try {
     const [courses, summary] = await Promise.all([
       listMiniCourses(user?.id || ""),
-      user ? getMiniCourseUserSummary(user.id) : Promise.resolve({ completedCourses: 0, startedCourses: 0 })
+      user ? getMiniCourseUserSummary(user.id) : Promise.resolve({ completedCourses: 0, startedCourses: 0, totalPoints: 0 })
     ]);
     const courseSummaries = courses.map((course) => ({
       ...course,

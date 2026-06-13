@@ -91,6 +91,24 @@
     .app { position: relative; z-index: 1; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 18px 16px 26px; }
     .mini-logo { width: min(88vw, 460px); max-height: 35vh; object-fit: contain; }
     .actions-5 { width: min(92vw, 520px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+    .mini-home-summary {
+      width: min(92vw, 520px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #30333c;
+      font-family: "Open Sans", sans-serif;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+    .mini-home-summary-name {
+      font-weight: 800;
+    }
+    .mini-home-summary-points {
+      opacity: .8;
+      font-weight: 700;
+    }
     .icon-chip {
       border: 0;
       background: rgba(255,255,255,.18);
@@ -108,6 +126,18 @@
       box-shadow: 0 16px 32px rgba(45, 61, 126, .12);
       backdrop-filter: blur(16px);
       padding: 18px 16px;
+    }
+    .icon-chip.is-home-courses {
+      min-height: 110px;
+      display: inline-flex;
+      flex-direction: row;
+      justify-content: center;
+      gap: 16px;
+      border-radius: 999px;
+      padding: 18px 28px;
+    }
+    .icon-chip.is-home-hidden {
+      display: none !important;
     }
     .icon-ball { width: 70px; height: 70px; border-radius: 22px; display: grid; place-items: center; box-shadow: 0 10px 18px rgba(0, 0, 0, .12); }
     .icon-ball svg { width: 36px; height: 36px; fill: #fff; }
@@ -1388,6 +1418,21 @@
       filter: drop-shadow(0 20px 30px rgba(0,0,0,.18));
       transition: transform .22s ease, filter .22s ease;
     }
+    .course-cover-progress-mask {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background:
+        linear-gradient(
+          to top,
+          rgba(255,255,255,0) 0%,
+          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) - 8%),
+          rgba(232, 240, 255, .18) calc(var(--course-cover-read, 0%) + 4%),
+          rgba(232, 240, 255, .68) 100%
+        );
+      mix-blend-mode: screen;
+    }
     .course-cover,
     .course-cover-fallback {
       width: 100%;
@@ -2087,13 +2132,8 @@
       transition: stroke-dashoffset .2s linear;
     }
     .course-read-lock-clock-face {
-      fill: color-mix(in srgb, var(--course-modal-bg, var(--course-reader-bg, rgba(15, 23, 42, .7))) 72%, transparent);
-      stroke: color-mix(in srgb, currentColor 18%, transparent);
-      stroke-width: 1.5;
-    }
-    .course-read-lock-clock-icon {
       fill: currentColor;
-      opacity: .96;
+      stroke: none;
     }
     .course-read-lock-title {
       font-size: clamp(24px, 3vw, 34px);
@@ -2486,8 +2526,9 @@
     .mobile-course-slide-card {
       min-height: 100%;
       display: grid;
-      grid-template-rows: minmax(0, 1fr) auto auto;
-      gap: 12px;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
     }
     .mobile-course-open {
       width: 100%;
@@ -2496,7 +2537,30 @@
       padding: 0;
       background: transparent;
       cursor: pointer;
-      text-align: left;
+      text-align: center;
+    }
+    .mobile-course-read-button {
+      width: 100%;
+      min-height: 58px;
+      border: 0;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #2f7df6, #2459e0);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: "Open Sans", sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      box-shadow: 0 16px 30px rgba(36, 89, 224, .24);
+      cursor: pointer;
+      padding: 14px 18px;
+    }
+    .mobile-course-read-button svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
     }
     .mobile-course-actions {
       display: flex;
@@ -2844,11 +2908,20 @@
     @media (max-width: 900px) {
       .actions-5 {
         width: min(92vw, 430px);
+        grid-template-columns: 1fr;
         gap: 14px;
       }
       .icon-chip {
         min-height: 132px;
         font-size: 15px;
+      }
+      .icon-chip.is-home-courses {
+        min-height: 98px;
+        padding: 16px 22px;
+      }
+      .mini-home-summary {
+        width: min(92vw, 430px);
+        font-size: 14px;
       }
       .icon-ball {
         width: 66px;
@@ -3104,10 +3177,14 @@
   <main class="app">
     <img class="mini-logo" src="/mini/mini.png" alt="Mini" />
     <section class="actions-5">
-      <button id="openMidia" class="icon-chip" type="button"><span class="icon-ball g-red"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg></span><span>Midia</span></button>
-      <button id="openCourses" class="icon-chip" type="button"><span class="icon-ball g-blue"><svg viewBox="0 0 24 24"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm0 13L5 12.18v3.27L12 19l7-3.55v-3.27L12 16z"/></svg></span><span>Cursos</span></button>
-      <button id="openCreate" class="icon-chip" type="button"><span class="icon-ball g-purple"><svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span><span>Criar</span></button>
-      <button id="openAulas" class="icon-chip" type="button"><span class="icon-ball g-gold"><svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg></span><span>Aulas</span></button>
+      <button id="openMidia" class="icon-chip is-home-hidden" type="button"><span class="icon-ball g-red"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg></span><span>Midia</span></button>
+      <button id="openCourses" class="icon-chip is-home-courses" type="button"><span class="icon-ball g-blue"><svg viewBox="0 0 24 24"><path d="M6 4.75A2.75 2.75 0 0 1 8.75 2h9.5A2.75 2.75 0 0 1 21 4.75v13.5A1.75 1.75 0 0 1 19.25 20H9a3 3 0 0 0-3 3V4.75Zm2.75-1.25A1.25 1.25 0 0 0 7.5 4.75V19.2A4.47 4.47 0 0 1 9 18.95h10.25a.25.25 0 0 0 .25-.25V4.75A1.25 1.25 0 0 0 18.25 3.5Zm1.75 3h6.5v1.5h-6.5Zm0 3.5h6.5v1.5h-6.5Zm0 3.5h4.5V15h-4.5Z"/></svg></span><span>Iniciar leituras</span></button>
+      <button id="openCreate" class="icon-chip is-home-hidden" type="button"><span class="icon-ball g-purple"><svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span><span>Criar</span></button>
+      <button id="openAulas" class="icon-chip is-home-hidden" type="button"><span class="icon-ball g-gold"><svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg></span><span>Aulas</span></button>
+    </section>
+    <section class="mini-home-summary" aria-label="Resumo do usuário">
+      <div id="miniHomeUserName" class="mini-home-summary-name">Visitante</div>
+      <div id="miniHomeUserPoints" class="mini-home-summary-points">0 pontos</div>
     </section>
   </main>
 
@@ -3434,6 +3511,10 @@
         <div class="courses-user-label">Cursos concluídos</div>
         <div id="coursesUserCompleted" class="courses-user-value">0</div>
       </div>
+      <div class="courses-user-card">
+        <div class="courses-user-label">Pontos</div>
+        <div id="coursesUserPoints" class="courses-user-value">0</div>
+      </div>
     </div>
   </section>
 
@@ -3554,7 +3635,7 @@
     let currentMiniCoursePage = 1;
     let currentMiniCourseViewMode = "preview";
     let miniCourseUser = null;
-    let miniCourseSummary = { completedCourses: 0, startedCourses: 0 };
+    let miniCourseSummary = { completedCourses: 0, startedCourses: 0, totalPoints: 0 };
     let isMiniCourseAdmin = false;
     let miniCourseJobs = [];
     let miniCourseJobsLoading = false;
@@ -5594,8 +5675,9 @@
           <svg class="course-read-lock-clock" viewBox="0 0 120 120" aria-hidden="true">
             <circle class="course-read-lock-clock-track" cx="60" cy="60" r="${clockRadius}"></circle>
             <circle id="courseReadLockClockProgress" class="course-read-lock-clock-progress" cx="60" cy="60" r="${clockRadius}" stroke-dasharray="${clockCircumference}" stroke-dashoffset="${clockOffset}"></circle>
-            <circle class="course-read-lock-clock-face" cx="60" cy="60" r="33"></circle>
-            <path class="course-read-lock-clock-icon" d="M60 41a4 4 0 0 1 4 4v13.4l8.7 5.2a4 4 0 1 1-4.1 6.9l-10.6-6.3A4 4 0 0 1 56 61V45a4 4 0 0 1 4-4zm0-17c19.9 0 36 16.1 36 36S79.9 96 60 96 24 79.9 24 60s16.1-36 36-36zm0 8c-15.5 0-28 12.5-28 28s12.5 28 28 28 28-12.5 28-28-12.5-28-28-28z"></path>
+            <line id="courseReadLockMinuteHand" x1="60" y1="60" x2="60" y2="36" stroke="currentColor" stroke-width="4" stroke-linecap="round"></line>
+            <line id="courseReadLockSecondHand" x1="60" y1="60" x2="60" y2="26" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line>
+            <circle class="course-read-lock-clock-face" cx="60" cy="60" r="4.5"></circle>
           </svg>
           <div class="course-read-lock-title">Tempo mínimo</div>
           <div id="courseReadLockTimer" class="course-read-lock-timer">${remainingSeconds}s</div>
@@ -5604,6 +5686,8 @@
       `;
       overlayRoot.appendChild(overlay);
       const progressCircle = $("courseReadLockClockProgress");
+      const minuteHand = $("courseReadLockMinuteHand");
+      const secondHand = $("courseReadLockSecondHand");
       const timerNode = $("courseReadLockTimer");
       const subtitleNode = $("courseReadLockSubtitle");
 
@@ -5618,6 +5702,15 @@
           : 0;
         if (progressCircle) {
           progressCircle.style.strokeDashoffset = String(clockCircumference * (livePercent / 100));
+        }
+        const elapsedRatio = miniCourseReadGateRequiredMs > 0
+          ? Math.max(0, Math.min(1, 1 - (liveRemainingMs / miniCourseReadGateRequiredMs)))
+          : 1;
+        if (minuteHand) {
+          minuteHand.setAttribute("transform", `rotate(${(elapsedRatio * 360) % 360} 60 60)`);
+        }
+        if (secondHand) {
+          secondHand.setAttribute("transform", `rotate(${(elapsedRatio * 2160) % 360} 60 60)`);
         }
         if (timerNode) {
           timerNode.textContent = `${liveRemainingSeconds}s`;
@@ -6713,11 +6806,25 @@
     function updateMiniCoursesUserCard() {
       const userName = $("coursesUserName");
       const completed = $("coursesUserCompleted");
+      const points = $("coursesUserPoints");
+      const homeUserName = $("miniHomeUserName");
+      const homeUserPoints = $("miniHomeUserPoints");
+      const safeName = getMiniCourseDisplayName();
+      const safePoints = Math.max(0, Number(miniCourseSummary?.totalPoints || 0) || 0);
       if (userName) {
-        userName.textContent = getMiniCourseDisplayName();
+        userName.textContent = safeName;
       }
       if (completed) {
         completed.textContent = String(Number(miniCourseSummary?.completedCourses || 0) || 0);
+      }
+      if (points) {
+        points.textContent = String(safePoints);
+      }
+      if (homeUserName) {
+        homeUserName.textContent = safeName;
+      }
+      if (homeUserPoints) {
+        homeUserPoints.textContent = `${safePoints} pontos`;
       }
       renderMiniCourseModelOptions();
     }
@@ -6903,16 +7010,19 @@
 
     function buildMiniCourseCover(course) {
       const isComplete = Boolean(course?.progress?.completed);
+      const progressPercent = getMiniCourseProgressPercent(course);
       const starClass = isComplete ? "course-cover-star is-complete" : "course-cover-star";
       const starSvg = `<div class="${starClass}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg></div>`;
+      const progressMask = `<div class="course-cover-progress-mask" style="--course-cover-read:${progressPercent}%"></div>`;
       if (course?.coverImageUrl) {
-        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${starSvg}</div>`;
+        return `<div class="course-cover-shell"><img class="course-cover" src="${escapeAttr(course.coverImageUrl)}" alt="${escapeAttr(course.title || "Curso")}">${progressMask}${starSvg}</div>`;
       }
-      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${starSvg}</div>`;
+      return `<div class="course-cover-shell"><div class="course-cover-fallback"></div>${progressMask}${starSvg}</div>`;
     }
 
     function renderMiniCourseIntro(readerView) {
       const hasStarted = Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0) > 0;
+      const progressPercent = getMiniCourseProgressPercent(currentMiniCourse);
       currentMiniCourseRenderedBlocks = [];
       currentMiniCourseBlockIndex = 0;
       readerView.innerHTML = `
@@ -6925,7 +7035,7 @@
             <div class="course-intro-actions">
               <button id="startMiniCourseButton" class="course-intro-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>
-                <span>${hasStarted ? "Continuar" : "Iniciar"}</span>
+                <span>${hasStarted ? `Continuar leitura | ${progressPercent}%` : "Iniciar leitura"}</span>
               </button>
             </div>
           </div>
@@ -6963,17 +7073,18 @@
     }
 
     function buildMiniCourseMobileSlide(course) {
-      const totalPages = Math.max(Number(course?.pageCount || 1) || 1, 1);
+      const progressPercent = getMiniCourseProgressPercent(course);
+      const hasStarted = Math.max(0, Number(course?.progress?.pagesRead || 0) || 0) > 0;
+      const buttonLabel = hasStarted ? `Continuar leitura | ${progressPercent}%` : "Iniciar leitura";
       return `
         <article class="mobile-course-slide-card" data-course-id="${escapeAttr(course.id)}">
           <button class="mobile-course-open" type="button" data-open-mobile-course="${escapeAttr(course.id)}" aria-label="Abrir curso ${escapeAttr(course.title || "Curso")}">
             ${buildMiniCourseCover(course)}
           </button>
-          <div class="course-card-mobile-meta">
-            <div class="course-card-mobile-duration">${escapeText(String(course.durationMinutes || totalPages))} min</div>
-            ${getMiniCourseProgressMarkup(course)}
-          </div>
-          ${getMiniCourseCardActionsMarkup(course)}
+          <button class="mobile-course-read-button" type="button" data-open-mobile-course="${escapeAttr(course.id)}" aria-label="${escapeAttr(buttonLabel)}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.75A2.75 2.75 0 0 1 8.75 2h9.5A2.75 2.75 0 0 1 21 4.75v13.5A1.75 1.75 0 0 1 19.25 20H9a3 3 0 0 0-3 3V4.75Zm2.75-1.25A1.25 1.25 0 0 0 7.5 4.75V19.2A4.47 4.47 0 0 1 9 18.95h10.25a.25.25 0 0 0 .25-.25V4.75A1.25 1.25 0 0 0 18.25 3.5Zm1.75 3h6.5v1.5h-6.5Zm0 3.5h6.5v1.5h-6.5Zm0 3.5h4.5V15h-4.5Z"/></svg>
+            <span>${escapeText(buttonLabel)}</span>
+          </button>
         </article>
       `;
     }
@@ -7517,7 +7628,7 @@
     function applyMiniCoursesPayload(payload) {
       miniCourses = Array.isArray(payload?.courses) ? payload.courses : miniCourses;
       miniCourseUser = Object.prototype.hasOwnProperty.call(payload || {}, "user") ? (payload?.user || null) : miniCourseUser;
-      miniCourseSummary = payload?.summary || (miniCourseUser ? miniCourseSummary : { completedCourses: 0, startedCourses: 0 });
+      miniCourseSummary = payload?.summary || (miniCourseUser ? miniCourseSummary : { completedCourses: 0, startedCourses: 0, totalPoints: 0 });
       isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
       updateMiniCourseAdminButton();
       updateMiniCoursesUserCard();

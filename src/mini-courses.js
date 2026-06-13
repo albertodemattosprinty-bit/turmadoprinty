@@ -982,19 +982,23 @@ export async function updateMiniCourseProgress(userId, courseId, nextPage) {
 
 export async function getMiniCourseUserSummary(userId) {
   await ensureMiniCoursesSchema();
-  const result = await query(
-    `
-      select
-        count(*) filter (where completed_at is not null)::int as completed_courses,
-        count(*)::int as started_courses
-      from mini_course_progress
-      where user_id = $1
-    `,
-    [userId]
-  );
+  const [progressResult, points] = await Promise.all([
+    query(
+      `
+        select
+          count(*) filter (where completed_at is not null)::int as completed_courses,
+          count(*)::int as started_courses
+        from mini_course_progress
+        where user_id = $1
+      `,
+      [userId]
+    ),
+    getMiniCourseUserPoints(userId)
+  ]);
 
   return {
-    completedCourses: Number(result.rows[0]?.completed_courses || 0) || 0,
-    startedCourses: Number(result.rows[0]?.started_courses || 0) || 0
+    completedCourses: Number(progressResult.rows[0]?.completed_courses || 0) || 0,
+    startedCourses: Number(progressResult.rows[0]?.started_courses || 0) || 0,
+    totalPoints: Math.max(0, Number(points?.totalPoints || 0) || 0)
   };
 }
