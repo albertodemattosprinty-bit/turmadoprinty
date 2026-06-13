@@ -2028,11 +2028,12 @@
     .course-reader-overlay {
       position: absolute;
       inset: 0;
-      z-index: 6;
+      z-index: 12;
       display: grid;
       place-items: center;
       pointer-events: none;
       overflow: hidden;
+      isolation: isolate;
     }
     .course-reader-overlay[hidden] {
       display: none !important;
@@ -2051,7 +2052,7 @@
       background: color-mix(in srgb, var(--course-reader-bg, rgba(15, 23, 42, .56)) 58%, transparent);
       backdrop-filter: blur(16px);
     }
-    .course-reader-view.is-read-lock-visible .course-read-lock {
+    .course-reader-overlay.is-read-lock-visible .course-read-lock {
       opacity: 1;
     }
     .course-read-lock-box {
@@ -3563,6 +3564,7 @@
     let miniCourseReadGateKey = "";
     let miniCourseReadGateStartedAt = 0;
     let miniCourseReadGateRequiredMs = 0;
+    let miniCourseProgressSaving = false;
     let currentMiniCourseBlockIndex = 0;
     let currentMiniCourseRenderedBlocks = [];
     let miniCoursePointsOverlayTimer = 0;
@@ -5187,6 +5189,7 @@
       if (!overlay) {
         return;
       }
+      overlay.classList.remove("is-read-lock-visible");
       overlay.hidden = true;
       overlay.innerHTML = "";
     }
@@ -5508,6 +5511,7 @@
       clearMiniCourseAnimationTimers();
       clearMiniCoursePointsOverlay();
       readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
+      overlayRoot.classList.remove("is-read-lock-visible");
       overlayRoot.hidden = false;
       overlayRoot.innerHTML = "";
 
@@ -5548,10 +5552,12 @@
       }
 
       scheduleMiniCourseAnimation(() => {
-        readerView.classList.add("is-read-lock-blur", "is-read-lock-visible");
+        readerView.classList.add("is-read-lock-blur");
+        overlayRoot.classList.add("is-read-lock-visible");
       }, 0);
       scheduleMiniCourseAnimation(() => {
-        readerView.classList.remove("is-read-lock-visible", "is-read-lock-blur");
+        readerView.classList.remove("is-read-lock-blur");
+        overlayRoot.classList.remove("is-read-lock-visible");
       }, Math.max(400, displayDuration - 200));
       scheduleMiniCourseAnimation(() => {
         clearMiniCourseOverlay();
@@ -7325,6 +7331,7 @@
 
       clearMiniCourseAnimationTimers();
       readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
+      $("courseReaderOverlay")?.classList.remove("is-read-lock-visible");
       applyMiniCourseReaderTheme();
       attachMiniCourseReaderSwipe(readerView);
       listView.hidden = true;
@@ -7956,33 +7963,34 @@
       if (currentMiniCourseViewMode !== "reading") {
         return;
       }
-
-      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
-      const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
-      const previousPage = currentMiniCoursePage;
-      const previousProgress = { ...(currentMiniCourse.progress || {}) };
-      const previousCourses = miniCourses.map((course) => ({ ...course, progress: course?.progress ? { ...course.progress } : course?.progress }));
-
-      currentMiniCoursePage = safePage;
-      currentMiniCourseBlockIndex = 0;
-      currentMiniCourseRenderedBlocks = [];
-      currentMiniCourse.progress = {
-        ...(currentMiniCourse.progress || {}),
-        currentPage: safePage,
-        pagesRead: Math.max(Number(currentMiniCourse.progress?.pagesRead || 0) || 0, safePage),
-        totalPages
-      };
-      miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? {
-        ...course,
-        progress: { ...(currentMiniCourse.progress || {}) }
-      } : course);
-      renderMiniCourseReader();
-
-      if (!getMiniToken()) {
+      if (miniCourseProgressSaving) {
         return;
       }
 
+      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
+      miniCourseProgressSaving = true;
+      setCourseFooterStatus("Salvando progresso...");
+
       try {
+        if (!getMiniToken()) {
+          currentMiniCoursePage = safePage;
+          currentMiniCourseBlockIndex = 0;
+          currentMiniCourseRenderedBlocks = [];
+          currentMiniCourse.progress = {
+            ...(currentMiniCourse.progress || {}),
+            currentPage: safePage,
+            pagesRead: Math.max(Number(currentMiniCourse.progress?.pagesRead || 0) || 0, safePage),
+            totalPages
+          };
+          miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? {
+            ...course,
+            progress: { ...(currentMiniCourse.progress || {}) }
+          } : course);
+          renderMiniCourseReader();
+          return;
+        }
+
         const response = await apiMini(`/api/mini/courses/${encodeURIComponent(currentMiniCourse.id)}/progress`, {
           method: "PUT",
           body: JSON.stringify({ currentPage: safePage })
@@ -7998,27 +8006,28 @@
         if (payload?.summary) {
           miniCourseSummary = payload.summary;
         }
+        if (Math.max(0, Number(payload?.course?.pointsAwarded || 0) || 0) > 0) {
+          await showMiniCoursePointsAward(payload.course.pointsAwarded, payload.course.totalPoints);
+        }
         currentMiniCourse = payload.course || currentMiniCourse;
         currentMiniCoursePage = Math.max(1, Number(currentMiniCourse?.progress?.currentPage || safePage) || safePage);
         currentMiniCourseBlockIndex = 0;
         currentMiniCourseRenderedBlocks = [];
         miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? currentMiniCourse : course);
         updateMiniCoursesUserCard();
-        if (Math.max(0, Number(payload?.course?.pointsAwarded || 0) || 0) > 0) {
-          await showMiniCoursePointsAward(payload.course.pointsAwarded, payload.course.totalPoints);
-        }
         renderMiniCourseReader();
       } catch (error) {
-        currentMiniCoursePage = previousPage;
-        currentMiniCourse.progress = previousProgress;
-        miniCourses = previousCourses;
-        renderMiniCourseReader();
         throw error;
+      } finally {
+        miniCourseProgressSaving = false;
       }
     }
 
     async function goToMiniCoursePage(direction) {
       if (!currentMiniCourse) {
+        return;
+      }
+      if (miniCourseProgressSaving) {
         return;
       }
 
