@@ -1460,9 +1460,11 @@
         linear-gradient(
           to top,
           rgba(255,255,255,0) 0%,
-          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) - 5%),
-          rgba(255,255,255,.24) calc(var(--course-cover-read, 0%) + 2%),
-          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) + 10%),
+          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) - 10%),
+          rgba(255,255,255,.10) calc(var(--course-cover-read, 0%) - 3%),
+          rgba(255,255,255,.26) calc(var(--course-cover-read, 0%) + 2%),
+          rgba(255,255,255,.08) calc(var(--course-cover-read, 0%) + 8%),
+          rgba(255,255,255,0) calc(var(--course-cover-read, 0%) + 16%),
           rgba(255,255,255,0) 100%
         );
       mix-blend-mode: screen;
@@ -7345,9 +7347,16 @@
       `;
     }
 
-    function buildMiniCourseCover(course) {
+    function buildMiniCourseCover(course, { progressPreview = false } = {}) {
       const progressPercent = getMiniCourseProgressPercent(course);
       const coverUrl = String(course?.coverImageUrl || miniCourseDefaultCoverUrl).trim();
+      if (!progressPreview) {
+        return `
+          <div class="course-cover-shell">
+            <img class="${course?.coverImageUrl ? "course-cover" : "course-cover course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="${escapeAttr(course.title || "Curso")}">
+          </div>
+        `;
+      }
       const progressMask = `<div class="course-cover-progress-mask" style="--course-cover-read:${progressPercent}%"></div>`;
       return `
         <div class="course-cover-shell">
@@ -7371,7 +7380,7 @@
             <svg viewBox="0 0 24 24"><path d="M12 3 3 10.2V21h6v-6h6v6h6V10.2z"/></svg>
           </button>
           <div class="course-intro-card">
-            ${buildMiniCourseCover(currentMiniCourse)}
+            ${buildMiniCourseCover(currentMiniCourse, { progressPreview: true })}
             <div class="course-intro-actions">
               <button id="startMiniCourseButton" class="course-intro-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>
