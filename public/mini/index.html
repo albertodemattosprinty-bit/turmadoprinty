@@ -1998,6 +1998,7 @@
       display: none;
       width: 100%;
       height: 100%;
+      position: relative;
       grid-template-columns: auto auto 1fr auto auto;
       align-items: center;
       gap: 12px;
@@ -2005,6 +2006,22 @@
       box-sizing: border-box;
       background: var(--course-footer-bg);
       color: var(--course-footer-text-color);
+    }
+    .course-reader-chapter-progress {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -6px;
+      height: 6px;
+      background: color-mix(in srgb, var(--course-footer-text-color) 12%, transparent);
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .course-reader-chapter-progress-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--course-footer-text-color);
+      transition: width .28s ease;
     }
     .course-reader-footer.is-chapter-open-page {
       background: var(--course-modal-bg);
@@ -3530,6 +3547,9 @@
         </button>
         <div id="courseFooterStatus" class="courses-footer-status"></div>
         <div id="courseReaderFooter" class="course-reader-footer">
+          <div id="courseReaderChapterProgress" class="course-reader-chapter-progress" hidden aria-hidden="true">
+            <div id="courseReaderChapterProgressFill" class="course-reader-chapter-progress-fill"></div>
+          </div>
           <button id="courseReaderBack" class="course-reader-footer-btn" type="button" aria-label="Voltar para a lista de cursos">
             <svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
           </button>
@@ -5541,7 +5561,13 @@
         }
         if (Math.abs(deltaX) < 18 && Math.abs(deltaY) < 18 && currentMiniCourseRenderedBlocks.length && currentMiniCourseQuizIndex < 0 && !currentMiniCourseQuizResult) {
           event.preventDefault();
-          void goToMiniCoursePage(1);
+          const readerRect = readerView.getBoundingClientRect();
+          const activeNode = readerView.querySelector(`[data-course-block-index="${clampMiniCourseBlockIndex(currentMiniCourseBlockIndex)}"]`);
+          const activeRect = activeNode?.getBoundingClientRect?.();
+          const touchIsAboveActive = activeRect
+            ? touch.clientY < activeRect.top
+            : touch.clientY < (readerRect.top + (readerRect.height / 2));
+          void goToMiniCoursePage(touchIsAboveActive ? -1 : 1);
           return;
         }
         if (Math.abs(deltaX) < 38 || Math.abs(deltaX) < Math.abs(deltaY)) {
@@ -5651,14 +5677,14 @@
       const matches = compact.match(/[^.!?]+[.!?]+|[^.!?]+$/g);
       return (Array.isArray(matches) ? matches : [compact]).map((item) => String(item || "").trim()).filter(Boolean);
     }
-    function buildMiniCourseReaderBlocks(page) {
+    function buildMiniCourseReaderBlocksForPage(page, pageNumber = currentMiniCoursePage) {
       const kind = String(page?.kind || "").trim().toLowerCase();
       if (kind === "course-map") {
         return [];
       }
       if (kind === "chapter_open") {
         return [
-          ...splitMiniCourseTextBlocks(`Capitulo ${String(page?.chapterNumber || currentMiniCoursePage || 1)}`),
+          ...splitMiniCourseTextBlocks(`Capitulo ${String(page?.chapterNumber || pageNumber || 1)}`),
           ...splitMiniCourseTextBlocks(page?.title || ""),
           ...splitMiniCourseTextBlocks(page?.subtitle || ""),
           ...splitMiniCourseTextBlocks(page?.logline || "")
@@ -5672,6 +5698,54 @@
         ...(Array.isArray(page?.bullets) ? page.bullets : []).flatMap((item) => splitMiniCourseTextBlocks(item)),
         ...(Array.isArray(page?.tableRows) ? page.tableRows : []).flatMap((row) => splitMiniCourseTextBlocks(`${String(row?.label || "").trim()}: ${String(row?.value || "").trim()}`))
       ].filter(Boolean);
+    }
+    function buildMiniCourseReaderBlocks(page) {
+      return buildMiniCourseReaderBlocksForPage(page, currentMiniCoursePage);
+    }
+    function getMiniCourseChapterProgress() {
+      if (!currentMiniCourse || currentMiniCourseViewMode !== "reading" || currentMiniCourseQuizIndex >= 0 || currentMiniCourseQuizResult) {
+        return { percent: 0, totalCharacters: 0, readCharacters: 0, active: false };
+      }
+      const pages = Array.isArray(currentMiniCourse.pages) ? currentMiniCourse.pages : [];
+      const currentIndex = Math.max(0, Math.min(pages.length - 1, Number(currentMiniCoursePage || 1) - 1));
+      const currentKind = String(pages[currentIndex]?.kind || "").trim().toLowerCase();
+      if (!pages.length || currentKind === "course-map") {
+        return { percent: 0, totalCharacters: 0, readCharacters: 0, active: false };
+      }
+      let chapterStart = currentIndex;
+      while (chapterStart > 0 && String(pages[chapterStart]?.kind || "").trim().toLowerCase() !== "chapter_open") {
+        chapterStart -= 1;
+      }
+      if (String(pages[chapterStart]?.kind || "").trim().toLowerCase() !== "chapter_open") {
+        chapterStart = 0;
+      }
+      let chapterEnd = pages.length - 1;
+      for (let index = chapterStart + 1; index < pages.length; index += 1) {
+        if (String(pages[index]?.kind || "").trim().toLowerCase() === "chapter_open") {
+          chapterEnd = index - 1;
+          break;
+        }
+      }
+      let totalCharacters = 0;
+      let readCharacters = 0;
+      for (let index = chapterStart; index <= chapterEnd; index += 1) {
+        const blocks = buildMiniCourseReaderBlocksForPage(pages[index], index + 1);
+        const blockChars = blocks.map((block) => String(block || "").trim().length).filter((value) => value > 0);
+        const pageChars = blockChars.reduce((sum, value) => sum + value, 0);
+        totalCharacters += pageChars;
+        if (index < currentIndex) {
+          readCharacters += pageChars;
+          continue;
+        }
+        if (index === currentIndex) {
+          const safeBlockIndex = currentMiniCourseRenderedBlocks.length ? clampMiniCourseBlockIndex(currentMiniCourseBlockIndex) : -1;
+          readCharacters += blockChars.slice(0, safeBlockIndex + 1).reduce((sum, value) => sum + value, 0);
+        }
+      }
+      const percent = totalCharacters > 0
+        ? Math.max(0, Math.min(100, Math.round((readCharacters / totalCharacters) * 100)))
+        : 0;
+      return { percent, totalCharacters, readCharacters, active: totalCharacters > 0 };
     }
     function clampMiniCourseBlockIndex(index) {
       const totalBlocks = Math.max(1, currentMiniCourseRenderedBlocks.length || 1);
@@ -7390,6 +7464,8 @@
     function updateMiniCoursesFooter() {
       const prev = $("coursePrev");
       const next = $("courseNext");
+      const chapterProgress = $("courseReaderChapterProgress");
+      const chapterProgressFill = $("courseReaderChapterProgressFill");
       if (!prev || !next) {
         return;
       }
@@ -7398,6 +7474,9 @@
       if (!currentMiniCourse) {
         prev.hidden = true;
         next.hidden = true;
+        if (chapterProgress) {
+          chapterProgress.hidden = true;
+        }
         setCourseFooterStatus(miniCoursesLoading ? "Carregando cursos..." : (miniCoursesError || ""));
         return;
       }
@@ -7405,6 +7484,9 @@
       if (currentMiniCourseViewMode !== "reading") {
         prev.hidden = true;
         next.hidden = true;
+        if (chapterProgress) {
+          chapterProgress.hidden = true;
+        }
         setCourseFooterStatus(Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0) > 0
           ? "Continue de onde voce parou."
           : "Pronto para iniciar.");
@@ -7415,8 +7497,15 @@
       const quizQuestions = getMiniCourseQuizQuestions();
       const totalBlocks = Math.max(0, currentMiniCourseRenderedBlocks.length || 0);
       const currentBlock = totalBlocks ? clampMiniCourseBlockIndex(currentMiniCourseBlockIndex) + 1 : 0;
+      const chapterProgressState = getMiniCourseChapterProgress();
       prev.hidden = false;
       next.hidden = false;
+      if (chapterProgress) {
+        chapterProgress.hidden = !chapterProgressState.active;
+      }
+      if (chapterProgressFill) {
+        chapterProgressFill.style.width = `${chapterProgressState.percent}%`;
+      }
       prev.disabled = currentMiniCoursePage <= 1 && currentMiniCourseQuizIndex < 0 && currentBlock <= 1;
       next.disabled = false;
       if (currentMiniCourseQuizResult) {
