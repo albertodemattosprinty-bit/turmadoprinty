@@ -185,6 +185,9 @@ function normalizeCourse(row) {
 }
 
 function normalizeCourseJob(row) {
+  const debugPayload = row?.debug_payload && typeof row.debug_payload === "object" && !Array.isArray(row.debug_payload)
+    ? row.debug_payload
+    : {};
   return {
     id: row.id,
     title: String(row.title || "Curso MINI").trim() || "Curso MINI",
@@ -197,6 +200,7 @@ function normalizeCourseJob(row) {
     status: String(row.status || "queued").trim().toLowerCase() || "queued",
     feedback: String(row.feedback || "").trim(),
     errorMessage: String(row.error_message || "").trim(),
+    hasDebugPayload: Object.keys(debugPayload).length > 0,
     courseId: row.course_id || null,
     createdByUserId: row.created_by_user_id || null,
     createdAt: toIso(row.created_at),
@@ -275,6 +279,7 @@ export async function ensureMiniCoursesSchema() {
       status text not null default 'queued',
       feedback text not null default '',
       error_message text not null default '',
+      debug_payload jsonb not null default '{}'::jsonb,
       course_id uuid references mini_courses(id) on delete set null,
       created_by_user_id uuid references users(id) on delete cascade,
       started_at timestamptz,
@@ -286,6 +291,7 @@ export async function ensureMiniCoursesSchema() {
   await query("alter table mini_course_jobs add column if not exists requested_model text not null default 'gpt-5.1';");
   await query("alter table mini_course_jobs add column if not exists requested_chapter_count smallint not null default 1;");
   await query("alter table mini_course_jobs add column if not exists requested_course_style text not null default 'course';");
+  await query("alter table mini_course_jobs add column if not exists debug_payload jsonb not null default '{}'::jsonb;");
   await query("create index if not exists idx_mini_course_jobs_creator_updated_at on mini_course_jobs(created_by_user_id, updated_at desc, created_at desc);");
   await query("create index if not exists idx_mini_course_jobs_status_created_at on mini_course_jobs(status, created_at asc);");
 }
@@ -609,6 +615,33 @@ export async function listMiniCourseJobs(createdByUserId) {
   return result.rows.map((row) => normalizeCourseJob(row));
 }
 
+export async function getMiniCourseJobDebug(createdByUserId, jobId) {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      select *
+      from mini_course_jobs
+      where created_by_user_id = $1
+        and id = $2
+      limit 1
+    `,
+    [createdByUserId, jobId]
+  );
+
+  if (!result.rows[0]) {
+    return null;
+  }
+
+  const row = result.rows[0];
+  const normalizedJob = normalizeCourseJob(row);
+  return {
+    ...normalizedJob,
+    debugPayload: row?.debug_payload && typeof row.debug_payload === "object" && !Array.isArray(row.debug_payload)
+      ? row.debug_payload
+      : {}
+  };
+}
+
 export async function resetRunningMiniCourseJobs() {
   await ensureMiniCoursesSchema();
   await query(
@@ -636,6 +669,7 @@ export async function claimNextMiniCourseJob() {
         started_at = coalesce(started_at, now()),
         feedback = 'Iniciando geracao do curso...',
         error_message = '',
+        debug_payload = '{}'::jsonb,
         updated_at = now()
       where id = (
         select id
@@ -684,6 +718,7 @@ export async function completeMiniCourseJob(jobId, { generatedPageCount, courseI
         course_id = $3,
         feedback = $4,
         error_message = '',
+        debug_payload = '{}'::jsonb,
         finished_at = now(),
         updated_at = now()
       where id = $1
@@ -700,7 +735,7 @@ export async function completeMiniCourseJob(jobId, { generatedPageCount, courseI
   return result.rows[0] ? normalizeCourseJob(result.rows[0]) : null;
 }
 
-export async function failMiniCourseJob(jobId, { generatedPageCount = 0, feedback = "", errorMessage = "" } = {}) {
+export async function failMiniCourseJob(jobId, { generatedPageCount = 0, feedback = "", errorMessage = "", debugPayload = null } = {}) {
   await ensureMiniCoursesSchema();
   const result = await query(
     `
@@ -710,6 +745,7 @@ export async function failMiniCourseJob(jobId, { generatedPageCount = 0, feedbac
         generated_page_count = greatest(0, $2::smallint),
         feedback = $3,
         error_message = $4,
+        debug_payload = $5::jsonb,
         finished_at = now(),
         updated_at = now()
       where id = $1
@@ -719,7 +755,8 @@ export async function failMiniCourseJob(jobId, { generatedPageCount = 0, feedbac
       jobId,
       Math.max(0, Number(generatedPageCount || 0) || 0),
       String(feedback || "").trim(),
-      String(errorMessage || "").trim()
+      String(errorMessage || "").trim(),
+      JSON.stringify(debugPayload && typeof debugPayload === "object" && !Array.isArray(debugPayload) ? debugPayload : {})
     ]
   );
 

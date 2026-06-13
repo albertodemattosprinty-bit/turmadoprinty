@@ -2222,6 +2222,26 @@
       cursor: pointer;
       font-family: "Open Sans", sans-serif;
     }
+    .course-job-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .course-job-download {
+      background: rgba(71, 183, 255, .18);
+    }
+    .course-admin-plan {
+      width: 100%;
+      margin-top: 10px;
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #7a3cff, #a855f7);
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: "Open Sans", sans-serif;
+    }
     .mobile-course-carousel {
       height: 100%;
       overflow: hidden;
@@ -3246,6 +3266,7 @@
         <option value="course">Estilo Curso (50-25-25)</option>
         <option value="story">Estilo história (50-0-50)</option>
       </select>
+      <button id="planCourseAdmin" class="course-admin-plan" type="button">Planejar com IA</button>
       <button id="generateCourseAdmin" class="ai-primary course-admin-submit" type="button">Gerar curso</button>
       <div id="courseAdminStatus" class="create-status"></div>
     </div>
@@ -3345,6 +3366,8 @@
     let miniCoursesError = "";
     let miniCourseGeneratorModels = [];
     let miniCourseGeneratorDefaultModel = "gpt-5.1";
+    let miniCoursePlanSourceContext = "";
+    let miniCoursePlanPreviewActive = false;
     let miniCourseAnimationTimers = [];
     let miniCourseAnimationRunId = 0;
     let miniCourseReadGateKey = "";
@@ -6235,10 +6258,15 @@
         const safeStatus = String(job.status || "queued").trim().toLowerCase();
         const feedback = String(job.feedback || "").trim();
         const errorMessage = String(job.errorMessage || "").trim();
+        const hasDebugPayload = Boolean(job.hasDebugPayload);
         const updatedAtLabel = formatMiniCourseJobUpdatedAt(job.updatedAt);
         const staleWarning = safeStatus === "running" && updatedAtLabel && ((Date.now() - Date.parse(String(job.updatedAt || ""))) >= 180000)
           ? `Sem atualização ${updatedAtLabel}. Se continuar assim, esse bloco provavelmente travou.`
           : "";
+        const actions = [
+          job.courseId ? `<button class="course-job-open" type="button" data-open-generated-course="${escapeAttr(job.courseId)}">Abrir curso</button>` : "",
+          safeStatus === "failed" && hasDebugPayload ? `<button class="course-job-open course-job-download" type="button" data-download-course-job-debug="${escapeAttr(job.id)}">Baixar falha (.json)</button>` : ""
+        ].filter(Boolean).join("");
         return `
           <div class="course-job-card">
             <div class="course-job-head">
@@ -6256,7 +6284,7 @@
             ${feedback ? `<div class="course-job-feedback">${escapeText(feedback)}</div>` : ""}
             ${staleWarning ? `<div class="course-job-error">${escapeText(staleWarning)}</div>` : ""}
             ${errorMessage ? `<div class="course-job-error">${escapeText(errorMessage)}</div>` : ""}
-            ${job.courseId ? `<button class="course-job-open" type="button" data-open-generated-course="${escapeAttr(job.courseId)}">Abrir curso</button>` : ""}
+            ${actions ? `<div class="course-job-actions">${actions}</div>` : ""}
           </div>
         `;
       }).join("");
@@ -6265,6 +6293,38 @@
         button.onclick = async () => {
           closeMiniCourseJobsModal();
           await openMiniCourseById(button.getAttribute("data-open-generated-course") || "");
+        };
+      });
+      list.querySelectorAll("[data-download-course-job-debug]").forEach((button) => {
+        button.onclick = async () => {
+          const jobId = String(button.getAttribute("data-download-course-job-debug") || "").trim();
+          if (!jobId) {
+            return;
+          }
+          const previousText = button.textContent;
+          button.disabled = true;
+          button.textContent = "Baixando JSON...";
+          try {
+            const response = await apiMini(`/api/mini/courses/jobs/${encodeURIComponent(jobId)}/debug`);
+            if (!response.ok) {
+              const payload = await response.json().catch(() => ({}));
+              throw new Error(payload.error || "Nao foi possivel baixar o JSON da falha.");
+            }
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `mini-course-job-${jobId}-failed.json`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            alert(error instanceof Error ? error.message : "Nao foi possivel baixar o JSON da falha.");
+          } finally {
+            button.disabled = false;
+            button.textContent = previousText;
+          }
         };
       });
     }
@@ -7015,6 +7075,7 @@
         return;
       }
       $("courseAdminStatus").textContent = "";
+      resetMiniCoursePlanPreview();
       renderMiniCourseModelOptions();
       modal.classList.add("show");
       modal.setAttribute("aria-hidden", "false");
@@ -7028,8 +7089,91 @@
       if (!modal) {
         return;
       }
+      resetMiniCoursePlanPreview();
       modal.classList.remove("show");
       modal.setAttribute("aria-hidden", "true");
+    }
+
+    function resetMiniCoursePlanPreview() {
+      const textarea = $("courseAdminContextInput");
+      if (!textarea) {
+        miniCoursePlanSourceContext = "";
+        miniCoursePlanPreviewActive = false;
+        return;
+      }
+      if (miniCoursePlanPreviewActive) {
+        textarea.value = miniCoursePlanSourceContext;
+      }
+      textarea.dataset.previewText = "";
+      miniCoursePlanPreviewActive = false;
+    }
+
+    function getMiniCourseAdminSourceContext() {
+      const textarea = $("courseAdminContextInput");
+      if (!textarea) {
+        return "";
+      }
+      return miniCoursePlanPreviewActive
+        ? String(miniCoursePlanSourceContext || "").trim()
+        : String(textarea.value || "").trim();
+    }
+
+    async function planMiniCourseAdmin() {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+
+      const title = $("courseAdminTitleInput")?.value.trim() || "";
+      const context = getMiniCourseAdminSourceContext();
+      const model = $("courseAdminModelSelect")?.value.trim() || miniCourseGeneratorDefaultModel || "gpt-5.1";
+      const pageCount = Math.max(4, Math.min(300, Number($("courseAdminPagesInput")?.value || 8) || 8));
+      const chapterCount = Math.max(1, Math.min(pageCount, Number($("courseAdminChaptersInput")?.value || 1) || 1));
+      const courseStyle = String($("courseAdminStyleSelect")?.value || "course").trim() || "course";
+      const status = $("courseAdminStatus");
+      const button = $("planCourseAdmin");
+      const textarea = $("courseAdminContextInput");
+
+      if (!title || !context) {
+        if (status) {
+          status.textContent = "Preencha título e contexto para planejar com a IA.";
+        }
+        return;
+      }
+
+      if (button) {
+        button.disabled = true;
+      }
+      if (status) {
+        status.textContent = "Planejando a estrutura dos capítulos com a IA...";
+      }
+
+      try {
+        const response = await apiMini("/api/mini/courses/plan", {
+          method: "POST",
+          body: JSON.stringify({ title, context, model, pageCount, chapterCount, courseStyle })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao planejar o curso com IA.");
+        }
+        miniCoursePlanSourceContext = context;
+        miniCoursePlanPreviewActive = true;
+        if (textarea) {
+          textarea.value = String(payload?.previewText || "").trim();
+          textarea.dataset.previewText = textarea.value;
+        }
+        if (status) {
+          status.textContent = String(payload?.feedback || "Planejamento pronto.").trim();
+        }
+      } catch (error) {
+        if (status) {
+          status.textContent = error instanceof Error ? error.message : "Erro ao planejar curso com IA.";
+        }
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
     }
 
     async function openMiniCourseById(courseId) {
@@ -7496,7 +7640,7 @@
       }
 
       const title = $("courseAdminTitleInput")?.value.trim() || "";
-      const context = $("courseAdminContextInput")?.value.trim() || "";
+      const context = getMiniCourseAdminSourceContext();
       const model = $("courseAdminModelSelect")?.value.trim() || miniCourseGeneratorDefaultModel || "gpt-5.1";
       const pageCount = Math.max(4, Math.min(300, Number($("courseAdminPagesInput")?.value || 8) || 8));
       const chapterCount = Math.max(1, Math.min(pageCount, Number($("courseAdminChaptersInput")?.value || 1) || 1));
@@ -7530,6 +7674,7 @@
 
         const feedback = String(payload?.feedback || `Curso solicitado com ${pageCount} páginas.`).trim();
         $("courseAdminTitleInput").value = "";
+        resetMiniCoursePlanPreview();
         $("courseAdminContextInput").value = "";
         $("courseAdminPagesInput").value = String(pageCount);
         $("courseAdminChaptersInput").value = String(chapterCount);
@@ -7734,6 +7879,25 @@
     $("generateCourseAdmin").onclick = async () => {
       await generateMiniCourseAdmin();
     };
+    $("planCourseAdmin").onclick = async () => {
+      await planMiniCourseAdmin();
+    };
+    ["courseAdminTitleInput", "courseAdminPagesInput", "courseAdminChaptersInput", "courseAdminStyleSelect", "courseAdminModelSelect"].forEach((id) => {
+      const element = $(id);
+      if (element) {
+        element.addEventListener("input", () => {
+          resetMiniCoursePlanPreview();
+        });
+        element.addEventListener("change", () => {
+          resetMiniCoursePlanPreview();
+        });
+      }
+    });
+    $("courseAdminContextInput")?.addEventListener("input", () => {
+      if (miniCoursePlanPreviewActive) {
+        miniCoursePlanPreviewActive = false;
+      }
+    });
     $("coursePrev").onclick = async () => {
       await goToMiniCoursePage(-1);
     };

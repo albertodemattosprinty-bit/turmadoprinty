@@ -29,6 +29,7 @@ import {
   deleteMiniCourse,
   failMiniCourseJob,
   getMiniCourseById,
+  getMiniCourseJobDebug,
   getMiniCourseUserSummary,
   listMiniCourseJobs,
   listMiniCourses,
@@ -3013,6 +3014,10 @@ function buildMiniCourseStyleLabel(style) {
   return normalizeMiniCourseStyle(style) === "story" ? "Estilo historia" : "Estilo curso";
 }
 
+function buildMiniCourseMapTitle(style) {
+  return normalizeMiniCourseStyle(style) === "story" ? "Mapa da historia" : "Mapa do curso";
+}
+
 function distributeMiniCourseKindCounts(total, ratioEntries) {
   const safeTotal = Math.max(1, Number(total || 1) || 1);
   const draft = ratioEntries.map(([kind, ratio]) => ({
@@ -3264,10 +3269,10 @@ function buildMiniCourseChapterPlanSchema(chapterCount = 1) {
   };
 }
 
-function buildMiniCourseMapPage({ courseTitle, courseOverview, chapters }) {
+function buildMiniCourseMapPage({ courseTitle, courseOverview, chapters, style = "course" }) {
   return normalizeMiniCourseGeneratedPage({
     kind: "course-map",
-    title: "Mapa do curso",
+    title: buildMiniCourseMapTitle(style),
     subtitle: courseTitle,
     logline: courseOverview,
     tableRows: (Array.isArray(chapters) ? chapters : []).map((chapter) => ({
@@ -3277,14 +3282,110 @@ function buildMiniCourseMapPage({ courseTitle, courseOverview, chapters }) {
   }, 0, "course-map");
 }
 
-function buildMiniCourseMapPromptText({ courseTitle, courseOverview, chapters }) {
+function buildMiniCourseMapPromptText({ courseTitle, courseOverview, chapters, style = "course" }) {
   return [
-    `Mapa do curso: ${courseTitle}`,
+    `${buildMiniCourseMapTitle(style)}: ${courseTitle}`,
     courseOverview ? `Visao geral: ${courseOverview}` : "",
     ...(Array.isArray(chapters) ? chapters : []).map((chapter) => (
       `Capitulo ${chapter.chapterNumber}: ${chapter.title}${chapter.subtitle ? ` | ${chapter.subtitle}` : ""}${chapter.logline ? ` | ${chapter.logline}` : ""}`
     ))
   ].filter(Boolean).join("\n");
+}
+
+async function planMiniCourseStructure({ apiKey, model = "gpt-5.1", title, context, pageCount, chapterCount = 1, courseStyle = "course" } = {}) {
+  const sharedContext = await getContextPrompt();
+  const safePageCount = Math.max(4, Math.min(300, Number(pageCount || 8) || 8));
+  const safeChapterCount = Math.max(1, Math.min(safePageCount, Number(chapterCount || 1) || 1));
+  const safeCourseStyle = normalizeMiniCourseStyle(courseStyle);
+  const chapterBlueprints = buildMiniCourseChapterBlueprints(safePageCount, safeChapterCount, safeCourseStyle);
+  const system = buildMiniSystemPrompt({
+    modeKey: "project",
+    sharedContext,
+    plannerContext: MINI_MINISTRY_CONTEXT,
+    theme: title,
+    extraInstructions: [
+      safeCourseStyle === "story"
+        ? "Voce esta criando uma historia narrativa de leitura casual para o MINI, com fluidez, emocao, progressao natural e linguagem acolhedora."
+        : "Voce esta criando cursos completos e globais para professores do Ministerio Infantil dentro do MINI.",
+      "Use o contexto cristao compartilhado da plataforma e o tom ministerial do MINI.",
+      safeCourseStyle === "story"
+        ? "Nao trate a resposta como apostila, aula, roteiro didatico ou treinamento formal."
+        : "O curso deve ser pratico, profundo, amoroso, biblicamente coerente e muito util para professores.",
+      `O projeto tera ${safePageCount} paginas de conteudo distribuidas em ${safeChapterCount} capitulos.`,
+      `Use o ${buildMiniCourseStyleLabel(safeCourseStyle)} na distribuicao interna de cada capitulo.`,
+      safeCourseStyle === "story"
+        ? "Cada capitulo deve soar como parte de uma leitura casual, com progressao narrativa clara."
+        : "Cada capitulo deve conduzir o aprendizado com progressao natural e coerente.",
+      "Responda apenas em JSON estruturado."
+    ].join(" ")
+  });
+
+  const requestPayload = {
+    model,
+    temperature: 0.35,
+    max_completion_tokens: 2200,
+    response_format: {
+      type: "json_schema",
+      json_schema: buildMiniCourseChapterPlanSchema(safeChapterCount)
+    },
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: [
+          `Titulo-base do projeto: ${title}`,
+          `Contexto principal: ${context}`,
+          `Paginas de conteudo: ${safePageCount}.`,
+          `Capitulos: ${safeChapterCount}.`,
+          `Estilo escolhido: ${buildMiniCourseStyleLabel(safeCourseStyle)}.`,
+          `Distribuicao de paginas por capitulo: ${chapterBlueprints.map((item) => `capitulo ${item.chapterNumber} = ${item.contentPageCount} paginas`).join("; ")}.`,
+          safeCourseStyle === "story"
+            ? "Crie a estrutura geral dessa historia, com titulo principal, visao geral e capitulos narrativos que convidem para leitura casual."
+            : "Crie a estrutura geral do curso e devolva um titulo principal, uma visao geral curta e todos os capitulos.",
+          "Cada capitulo precisa ter titulo, subtitulo e logline proprios, sem repeticao entre si.",
+          safeCourseStyle === "story"
+            ? "Os capitulos devem soar como etapas de uma narrativa viva, envolvente e natural."
+            : "Os capitulos devem avancar com progressao natural e coerente."
+        ].filter(Boolean).join("\n")
+      }
+    ]
+  };
+  if (supportsReasoningEffortForModel(model)) {
+    requestPayload.reasoning_effort = "none";
+  }
+
+  const completion = await createChatCompletion(apiKey, requestPayload, {
+    timeoutMs: 120000,
+    timeoutMessage: "Planejamento do curso demorou demais para responder."
+  });
+  const raw = extractChatCompletionText(completion);
+  const parsed = parseStructuredJsonText(raw);
+  const courseMainTitle = String(parsed?.mainTitle || title).trim() || title;
+  const courseOverview = String(parsed?.courseOverview || "").trim();
+  const chapters = chapterBlueprints.map((blueprint, index) => {
+    const source = Array.isArray(parsed?.chapters) ? parsed.chapters[index] : null;
+    return {
+      chapterNumber: blueprint.chapterNumber,
+      title: String(source?.title || `Capitulo ${blueprint.chapterNumber}`).trim() || `Capitulo ${blueprint.chapterNumber}`,
+      subtitle: String(source?.subtitle || "").trim(),
+      logline: String(source?.logline || "").trim() || `Avanco do capitulo ${blueprint.chapterNumber}.`,
+      contentPageCount: blueprint.contentPageCount,
+      contentKinds: blueprint.contentKinds
+    };
+  });
+
+  return {
+    title: courseMainTitle,
+    courseOverview,
+    chapters,
+    courseStyle: safeCourseStyle,
+    courseMapText: buildMiniCourseMapPromptText({
+      courseTitle: courseMainTitle,
+      courseOverview,
+      chapters,
+      style: safeCourseStyle
+    })
+  };
 }
 
 function buildMiniCourseChapterOpenPage(chapter) {
@@ -3334,23 +3435,59 @@ function buildMiniCourseQuizSchema(questionCount = 10) {
 }
 
 class MiniCourseGenerationError extends Error {
-  constructor(message, feedback = "", generatedPageCount = 0) {
+  constructor(message, feedback = "", generatedPageCount = 0, debugPayload = null) {
     super(message);
     this.name = "MiniCourseGenerationError";
     this.feedback = String(feedback || "").trim();
     this.generatedPageCount = Math.max(0, Number(generatedPageCount || 0) || 0);
+    this.debugPayload = debugPayload && typeof debugPayload === "object" && !Array.isArray(debugPayload)
+      ? debugPayload
+      : null;
   }
 }
 
 let miniCourseJobsBootstrapped = false;
 let miniCourseJobsProcessing = false;
 
+function buildMiniCourseFailureDebugPayload({ job, failure }) {
+  const safeFailure = failure instanceof MiniCourseGenerationError
+    ? failure
+    : new MiniCourseGenerationError(
+      failure instanceof Error ? failure.message : "Falha desconhecida na geracao do curso.",
+      "",
+      0
+    );
+  const jobSnapshot = job && typeof job === "object"
+    ? {
+      id: job.id || null,
+      title: job.title || "Curso MINI",
+      context: job.context || "",
+      requestedModel: job.requestedModel || "gpt-5.1",
+      requestedPageCount: Math.max(1, Number(job.requestedPageCount || 1) || 1),
+      requestedChapterCount: Math.max(1, Number(job.requestedChapterCount || 1) || 1),
+      requestedCourseStyle: normalizeMiniCourseStyle(job.requestedCourseStyle || "course"),
+      status: job.status || "failed"
+    }
+    : null;
+  return {
+    exportedAt: new Date().toISOString(),
+    job: jobSnapshot,
+    failure: {
+      message: safeFailure.message,
+      feedback: safeFailure.feedback || "",
+      generatedPageCount: safeFailure.generatedPageCount,
+      debug: safeFailure.debugPayload && typeof safeFailure.debugPayload === "object" && !Array.isArray(safeFailure.debugPayload)
+        ? safeFailure.debugPayload
+        : null
+    }
+  };
+}
+
 function buildMiniCourseChunkLabel(chunk, chunkIndex, totalChunks) {
   return `Bloco ${chunkIndex + 1}/${totalChunks} • páginas ${chunk.startPageNumber}-${chunk.endPageNumber}`;
 }
 
 async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, context, pageCount, chapterCount = 1, courseStyle = "course", onProgress } = {}) {
-  const sharedContext = await getContextPrompt();
   const safeChapterCount = Math.max(1, Math.min(pageCount, Number(chapterCount || 1) || 1));
   const safeCourseStyle = normalizeMiniCourseStyle(courseStyle);
   const chapterBlueprints = buildMiniCourseChapterBlueprints(pageCount, safeChapterCount, safeCourseStyle);
@@ -3362,6 +3499,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
       : pageCount >= 24
         ? 180000
         : 120000;
+  const sharedContext = await getContextPrompt();
 
   const system = buildMiniSystemPrompt({
     modeKey: "project",
@@ -3369,14 +3507,22 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     plannerContext: MINI_MINISTRY_CONTEXT,
     theme: title,
     extraInstructions: [
-      "Voce esta criando cursos completos e globais para professores do Ministerio Infantil dentro do MINI.",
+      safeCourseStyle === "story"
+        ? "Voce esta criando uma historia narrativa de leitura casual para o MINI, com fluidez, emocao, progressao natural e linguagem acolhedora."
+        : "Voce esta criando cursos completos e globais para professores do Ministerio Infantil dentro do MINI.",
       "Use o contexto cristao compartilhado da plataforma e o tom ministerial do MINI.",
-      "O curso deve ser pratico, profundo, amoroso, biblicamente coerente e muito util para professores.",
+      safeCourseStyle === "story"
+        ? "Nao trate a resposta como apostila, aula, roteiro didatico ou treinamento formal."
+        : "O curso deve ser pratico, profundo, amoroso, biblicamente coerente e muito util para professores.",
       `O curso tera ${pageCount} paginas de conteudo distribuidas em ${safeChapterCount} capitulos.`,
       `Use o ${buildMiniCourseStyleLabel(safeCourseStyle)} na distribuicao interna de cada capitulo.`,
       "Nas paginas text, escreva 1 ou 2 paragrafos densos, claros e sem repeticao mecanica.",
-      "Nas paginas didactic, entregue conteudo pedagogico com bullets claros ou tabela objetiva.",
-      "Nas paginas closing, escreva 3 paragrafos completos de fechamento, aplicacao e encorajamento.",
+      safeCourseStyle === "story"
+        ? "Nas paginas closing, escreva 3 paragrafos completos que encerrem, aprofundem e mantenham o tom narrativo da leitura."
+        : "Nas paginas didactic, entregue conteudo pedagogico com bullets claros ou tabela objetiva.",
+      safeCourseStyle === "story"
+        ? "Mantenha o ritmo como leitura casual, evitando explicar como professor para professor."
+        : "Nas paginas closing, escreva 3 paragrafos completos de fechamento, aplicacao e encorajamento.",
       "Crie somente o texto visivel. Nao crie prompts de imagem, prompts de audio ou direcoes de capa.",
       "Nenhuma pagina pode vir vazia, resumida demais ou so com titulo.",
       "Nunca use placeholders como 'Conteudo para...', 'Subtitulo 2', 'Pagina 1' sem desenvolver o conteudo real.",
@@ -3392,46 +3538,6 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
         feedback
       });
     }
-  };
-
-  const createCoursePlanAttempt = async () => {
-    const requestPayload = {
-      model,
-      temperature: 0.35,
-      max_completion_tokens: 2200,
-      response_format: {
-        type: "json_schema",
-        json_schema: buildMiniCourseChapterPlanSchema(safeChapterCount)
-      },
-      messages: [
-        { role: "system", content: system },
-        {
-          role: "user",
-          content: [
-            `Titulo-base do curso: ${title}`,
-            `Contexto do curso: ${context}`,
-            `Paginas de conteudo: ${pageCount}.`,
-            `Capitulos: ${safeChapterCount}.`,
-            `Estilo escolhido: ${buildMiniCourseStyleLabel(safeCourseStyle)}.`,
-            `Distribuicao de paginas por capitulo: ${chapterBlueprints.map((item) => `capitulo ${item.chapterNumber} = ${item.contentPageCount} paginas`).join("; ")}.`,
-            "Crie a estrutura geral do curso e devolva um titulo principal, uma visao geral curta e todos os capitulos.",
-            "Cada capitulo precisa ter titulo, subtitulo e logline proprios, sem repeticao entre si.",
-            "Os capitulos devem avançar com progressao natural e coerente."
-          ].filter(Boolean).join("\n")
-        }
-      ]
-    };
-    if (supportsReasoningEffortForModel(model)) {
-      requestPayload.reasoning_effort = "none";
-    }
-    const completion = await createChatCompletion(apiKey, requestPayload, {
-      timeoutMs: 120000,
-      timeoutMessage: "Planejamento do curso demorou demais para responder."
-    });
-    const raw = extractChatCompletionText(completion);
-    return {
-      parsed: parseStructuredJsonText(raw)
-    };
   };
 
   const createCourseChapterAttempt = async ({ blueprint, chapterMeta, courseMainTitle, courseOverview, courseMapText, extraUserInstruction = "" }) => {
@@ -3458,12 +3564,14 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
             `Este capitulo tem ${blueprint.contentPageCount} paginas de conteudo.`,
             `Tipos obrigatorios neste capitulo: ${blueprint.contentKinds.map((kind, index) => `pagina ${index + 1} = ${kind}`).join("; ")}.`,
             normalizeMiniCourseStyle(safeCourseStyle) === "story"
-              ? "Este e um curso no Estilo historia: nao use pagina didatica neste capitulo."
+              ? "Esta e uma historia narrativa em Estilo historia: nao use pagina didatica e mantenha a leitura casual, viva e natural."
               : "Este e um curso no Estilo curso: use paginas didaticas quando elas estiverem previstas.",
             "Escreva somente o conteudo visivel dessas paginas de conteudo.",
             "Para cada pagina text, entregue preferencialmente 2 paragrafos completos e densos, somando pelo menos 420 caracteres reais.",
             "Para cada pagina didactic, entregue estrutura suficiente para ensino: pelo menos 4 bullets fortes ou 2 linhas de tabela bem preenchidas.",
-            "Para cada pagina closing, entregue exatamente 3 paragrafos completos, sem frases telegráficas.",
+            normalizeMiniCourseStyle(safeCourseStyle) === "story"
+              ? "Para cada pagina closing, entregue exatamente 3 paragrafos completos, mantendo o fechamento narrativo e sem frases telegraficas."
+              : "Para cada pagina closing, entregue exatamente 3 paragrafos completos, sem frases telegraficas.",
             "Mantenha fluidez interna dentro do capitulo e evite repetir a mesma ideia com palavras parecidas.",
             extraUserInstruction
           ].filter(Boolean).join("\n")
@@ -3537,33 +3645,48 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
       throw new MiniCourseGenerationError(
         "A IA nao devolveu conteudo suficiente para concluir o curso.",
         `${chapterLabel}. ${lastAttempt.evaluation.issues.slice(0, 4).join(" ") || "A IA continuou devolvendo páginas vazias ou fracas após as tentativas."}`,
-        generatedPageCountBefore
+        generatedPageCountBefore,
+        {
+          stage: "chapter_validation",
+          chapterLabel,
+          chapterMeta,
+          blueprint,
+          generatedPageCountBefore,
+          attemptEvaluation: lastAttempt.evaluation,
+          parsedChapter: lastAttempt.parsed,
+          normalizedPages: lastAttempt.normalizedPages
+        }
       );
     }
 
     throw new MiniCourseGenerationError(
       "A IA nao devolveu conteudo suficiente para concluir o curso.",
       `${chapterLabel}. ${lastError instanceof Error ? lastError.message : "A IA falhou repetidamente sem retornar conteúdo utilizável."}`,
-      generatedPageCountBefore
+      generatedPageCountBefore,
+      {
+        stage: "chapter_request",
+        chapterLabel,
+        chapterMeta,
+        blueprint,
+        generatedPageCountBefore,
+        lastErrorMessage: lastError instanceof Error ? lastError.message : "Falha desconhecida ao solicitar o capitulo."
+      }
     );
   };
 
   await reportProgress(0, `Planejando ${safeChapterCount} capitulos com ${pageCount} paginas de conteudo...`);
-  const planAttempt = await createCoursePlanAttempt();
-  const courseMainTitle = String(planAttempt.parsed?.mainTitle || title).trim() || title;
-  const courseOverview = String(planAttempt.parsed?.courseOverview || "").trim();
-  const chapters = chapterBlueprints.map((blueprint, index) => {
-    const source = Array.isArray(planAttempt.parsed?.chapters) ? planAttempt.parsed.chapters[index] : null;
-    return {
-      chapterNumber: blueprint.chapterNumber,
-      title: String(source?.title || `Capitulo ${blueprint.chapterNumber}`).trim() || `Capitulo ${blueprint.chapterNumber}`,
-      subtitle: String(source?.subtitle || "").trim(),
-      logline: String(source?.logline || "").trim() || `Avanco do capitulo ${blueprint.chapterNumber}.`
-    };
-  });
+  const plan = await planMiniCourseStructure({ apiKey, model, title, context, pageCount, chapterCount: safeChapterCount, courseStyle: safeCourseStyle });
+  const courseMainTitle = plan.title;
+  const courseOverview = plan.courseOverview;
+  const chapters = chapterBlueprints.map((blueprint, index) => ({
+    chapterNumber: blueprint.chapterNumber,
+    title: String(plan.chapters[index]?.title || `Capitulo ${blueprint.chapterNumber}`).trim() || `Capitulo ${blueprint.chapterNumber}`,
+    subtitle: String(plan.chapters[index]?.subtitle || "").trim(),
+    logline: String(plan.chapters[index]?.logline || "").trim() || `Avanco do capitulo ${blueprint.chapterNumber}.`
+  }));
 
-  const generatedPages = [buildMiniCourseMapPage({ courseTitle: courseMainTitle, courseOverview, chapters })];
-  const courseMapText = buildMiniCourseMapPromptText({ courseTitle: courseMainTitle, courseOverview, chapters });
+  const generatedPages = [buildMiniCourseMapPage({ courseTitle: courseMainTitle, courseOverview, chapters, style: safeCourseStyle })];
+  const courseMapText = plan.courseMapText || buildMiniCourseMapPromptText({ courseTitle: courseMainTitle, courseOverview, chapters, style: safeCourseStyle });
   const chapterFeedback = [];
   let generatedContentPages = 0;
 
@@ -3596,7 +3719,16 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     throw new MiniCourseGenerationError(
       "O curso final ficou incompleto e nao foi salvo.",
       finalEvaluation.issues.slice(0, 6).join(" ") || "A validacao final detectou paginas vazias.",
-      generatedContentPages
+      generatedContentPages,
+      {
+        stage: "final_validation",
+        generatedContentPages,
+        courseMainTitle,
+        courseOverview,
+        chapters,
+        finalEvaluation,
+        finalPages
+      }
     );
   }
 
@@ -3683,7 +3815,8 @@ async function processMiniCourseJobsQueue() {
         await failMiniCourseJob(job.id, {
           generatedPageCount: failure.generatedPageCount,
           feedback: failure.feedback || "A IA nao conseguiu concluir a geracao deste curso.",
-          errorMessage: failure.message
+          errorMessage: failure.message,
+          debugPayload: buildMiniCourseFailureDebugPayload({ job, failure })
         });
       }
     }
@@ -5263,6 +5396,58 @@ async function handleMiniCourseJobsListRequest(request, response) {
   }
 }
 
+async function handleMiniCourseJobDebugDownloadRequest(request, response, jobId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  try {
+    const job = await getMiniCourseJobDebug(adminUser.id, jobId);
+    if (!job) {
+      sendJson(response, 404, { error: "Job de curso nao encontrado." });
+      return;
+    }
+    if (!job.hasDebugPayload || !job.debugPayload || !Object.keys(job.debugPayload).length) {
+      sendJson(response, 404, { error: "Este job ainda nao possui JSON de falha para download." });
+      return;
+    }
+
+    const fileName = `mini-course-job-${job.id}-failed.json`;
+    const payload = {
+      downloadedAt: new Date().toISOString(),
+      job: {
+        id: job.id,
+        title: job.title,
+        context: job.context,
+        requestedModel: job.requestedModel,
+        requestedPageCount: job.requestedPageCount,
+        requestedChapterCount: job.requestedChapterCount,
+        requestedCourseStyle: job.requestedCourseStyle,
+        generatedPageCount: job.generatedPageCount,
+        status: job.status,
+        feedback: job.feedback,
+        errorMessage: job.errorMessage,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt
+      },
+      debug: job.debugPayload
+    };
+
+    response.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Disposition": buildContentDisposition(fileName)
+    });
+    response.end(JSON.stringify(payload, null, 2));
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel baixar o JSON de falha."
+    });
+  }
+}
+
 async function handleMiniCourseModelsRequest(request, response) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -5275,6 +5460,86 @@ async function handleMiniCourseModelsRequest(request, response) {
     defaultModel: normalizeMiniCourseGeneratorModel("gpt-5.1"),
     user: sanitizeUser(adminUser)
   });
+}
+
+async function handleMiniCoursePlanPreviewRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const title = String(body?.title || "").trim();
+  const context = String(body?.context || "").trim();
+  const model = normalizeMiniCourseGeneratorModel(body?.model);
+  const pageCount = Math.max(4, Math.min(300, Number(body?.pageCount || 8) || 8));
+  const chapterCount = Math.max(1, Math.min(pageCount, Number(body?.chapterCount || 1) || 1));
+  const courseStyle = normalizeMiniCourseStyle(body?.courseStyle || "course");
+
+  if (!title) {
+    sendJson(response, 400, { error: "Informe o titulo do curso." });
+    return;
+  }
+
+  if (!context) {
+    sendJson(response, 400, { error: "Informe o contexto do curso." });
+    return;
+  }
+
+  try {
+    const plan = await planMiniCourseStructure({
+      apiKey,
+      model,
+      title,
+      context,
+      pageCount,
+      chapterCount,
+      courseStyle
+    });
+    const previewText = [
+      `${buildMiniCourseMapTitle(courseStyle)} planejado pela IA`,
+      `Titulo final: ${plan.title}`,
+      plan.courseOverview ? `Visao geral: ${plan.courseOverview}` : "",
+      "",
+      ...plan.chapters.map((chapter) => (
+        `Capitulo ${chapter.chapterNumber} (${chapter.contentPageCount} paginas)\nTitulo: ${chapter.title}\nSubtitulo: ${chapter.subtitle || "-"}\nLogline: ${chapter.logline}\nPaginas previstas: ${chapter.contentKinds.join(", ")}`
+      ))
+    ].filter(Boolean).join("\n");
+
+    sendJson(response, 200, {
+      ok: true,
+      plan: {
+        title: plan.title,
+        courseOverview: plan.courseOverview,
+        chapters: plan.chapters,
+        courseMapText: plan.courseMapText,
+        courseStyle: plan.courseStyle
+      },
+      previewText,
+      feedback: normalizeMiniCourseStyle(courseStyle) === "story"
+        ? "Planejamento narrativo pronto. O campo central agora mostra o mapa da historia antes da geracao."
+        : "Planejamento do curso pronto. O campo central agora mostra o mapa de capitulos antes da geracao."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel planejar o curso com IA."
+    });
+  }
 }
 
 async function handleMiniCourseGenerateRequest(request, response) {
@@ -7782,8 +8047,19 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname.startsWith("/api/mini/courses/jobs/") && pathname.endsWith("/debug")) {
+    const jobId = decodeURIComponent(pathname.replace("/api/mini/courses/jobs/", "").replace(/\/debug$/, ""));
+    await handleMiniCourseJobDebugDownloadRequest(request, response, jobId);
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/mini/courses/models") {
     await handleMiniCourseModelsRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/mini/courses/plan") {
+    await handleMiniCoursePlanPreviewRequest(request, response);
     return;
   }
 
