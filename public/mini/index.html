@@ -1978,6 +1978,18 @@
       filter: blur(14px);
       opacity: .24;
     }
+    .course-reader-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .course-reader-overlay[hidden] {
+      display: none !important;
+    }
     .course-read-lock {
       position: absolute;
       inset: 0;
@@ -2011,6 +2023,56 @@
       font-size: clamp(18px, 2.4vw, 24px);
       font-weight: 700;
       line-height: 1.2;
+    }
+    .course-points-modal {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: var(--course-modal-bg);
+      color: var(--course-body-color);
+      font-family: var(--course-body-font);
+      text-shadow: var(--course-reader-text-shadow);
+      opacity: 0;
+      animation: coursePointsFade 1500ms ease forwards;
+    }
+    .course-points-box {
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+      text-align: center;
+      padding: 24px;
+    }
+    .course-points-value {
+      font-size: clamp(42px, 11vw, 88px);
+      line-height: 1;
+      font-weight: var(--course-title-weight, 800);
+      color: var(--course-title-color);
+      letter-spacing: -.04em;
+    }
+    .course-points-delta {
+      font-size: clamp(18px, 3vw, 24px);
+      line-height: 1.1;
+      font-weight: var(--course-body-weight, 700);
+      opacity: .86;
+    }
+    @keyframes coursePointsFade {
+      0% {
+        opacity: 0;
+        transform: scale(.985);
+      }
+      14% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      72% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(1.02);
+      }
     }
     .courses-nav-btn[hidden],
     .course-reader-view[hidden],
@@ -3215,6 +3277,7 @@
       <div id="coursesViewport" class="courses-viewport">
         <div id="coursesListView" class="courses-list-view"></div>
         <article id="courseReaderView" class="course-reader-view" hidden></article>
+        <div id="courseReaderOverlay" class="course-reader-overlay" hidden></div>
       </div>
 
       <footer class="courses-footer">
@@ -3419,6 +3482,8 @@
     let miniCourseReadGateKey = "";
     let miniCourseReadGateStartedAt = 0;
     let miniCourseReadGateRequiredMs = 0;
+    let miniCoursePointsOverlayTimer = 0;
+    let miniCoursePointsOverlayRaf = 0;
     let miniCourseMobileIndex = 0;
     let miniCourseMobileAnimating = false;
     let miniCourseMobileTouchStartY = 0;
@@ -5033,10 +5098,30 @@
       }, Math.max(0, Number(delay || 0) || 0));
       miniCourseAnimationTimers.push(timer);
     }
+    function clearMiniCourseOverlay() {
+      const overlay = $("courseReaderOverlay");
+      if (!overlay) {
+        return;
+      }
+      overlay.hidden = true;
+      overlay.innerHTML = "";
+    }
+    function clearMiniCoursePointsOverlay() {
+      if (miniCoursePointsOverlayTimer) {
+        window.clearTimeout(miniCoursePointsOverlayTimer);
+        miniCoursePointsOverlayTimer = 0;
+      }
+      if (miniCoursePointsOverlayRaf) {
+        window.cancelAnimationFrame(miniCoursePointsOverlayRaf);
+        miniCoursePointsOverlayRaf = 0;
+      }
+    }
     function resetMiniCourseReadGate() {
       miniCourseReadGateKey = "";
       miniCourseReadGateStartedAt = 0;
       miniCourseReadGateRequiredMs = 0;
+      clearMiniCoursePointsOverlay();
+      clearMiniCourseOverlay();
     }
     function resetMiniCourseQuizState() {
       currentMiniCourseQuizIndex = -1;
@@ -5256,13 +5341,16 @@
     }
     function flashMiniCourseReadGate(remainingMs) {
       const readerView = $("courseReaderView");
-      if (!readerView) {
+      const overlayRoot = $("courseReaderOverlay");
+      if (!readerView || !overlayRoot) {
         return;
       }
 
       clearMiniCourseAnimationTimers();
+      clearMiniCoursePointsOverlay();
       readerView.classList.remove("is-read-lock-blur", "is-read-lock-visible");
-      readerView.querySelectorAll(".course-read-lock").forEach((node) => node.remove());
+      overlayRoot.hidden = false;
+      overlayRoot.innerHTML = "";
 
       const remainingSeconds = Math.max(1, Math.ceil(Math.max(0, Number(remainingMs || 0) || 0) / 1000));
       const overlay = document.createElement("div");
@@ -5273,7 +5361,7 @@
           <div class="course-read-lock-subtitle">Aguarde ${remainingSeconds} segundos</div>
         </div>
       `;
-      readerView.appendChild(overlay);
+      overlayRoot.appendChild(overlay);
 
       scheduleMiniCourseAnimation(() => {
         readerView.classList.add("is-read-lock-blur", "is-read-lock-visible");
@@ -5282,8 +5370,52 @@
         readerView.classList.remove("is-read-lock-visible", "is-read-lock-blur");
       }, 1500);
       scheduleMiniCourseAnimation(() => {
-        overlay.remove();
+        clearMiniCourseOverlay();
       }, 2000);
+    }
+    function showMiniCoursePointsAward(pointsAwarded, totalPoints) {
+      const overlayRoot = $("courseReaderOverlay");
+      if (!overlayRoot || !currentMiniCourse || currentMiniCourseViewMode !== "reading") {
+        return;
+      }
+      const safeAward = Math.max(0, Number(pointsAwarded || 0) || 0);
+      if (safeAward <= 0) {
+        return;
+      }
+
+      clearMiniCoursePointsOverlay();
+      overlayRoot.hidden = false;
+      overlayRoot.innerHTML = `
+        <div class="course-points-modal">
+          <div class="course-points-box">
+            <div id="coursePointsValue" class="course-points-value">0</div>
+            <div class="course-points-delta">+ ${safeAward} pontos</div>
+          </div>
+        </div>
+      `;
+
+      const valueNode = $("coursePointsValue");
+      const endValue = Math.max(0, Number(totalPoints || safeAward) || safeAward);
+      const startValue = Math.max(0, endValue - safeAward);
+      const animationDuration = 500;
+      const startedAt = performance.now();
+      const tick = (now) => {
+        const progress = Math.max(0, Math.min(1, (now - startedAt) / animationDuration));
+        const nextValue = Math.round(startValue + ((endValue - startValue) * progress));
+        if (valueNode) {
+          valueNode.textContent = String(nextValue);
+        }
+        if (progress < 1) {
+          miniCoursePointsOverlayRaf = window.requestAnimationFrame(tick);
+          return;
+        }
+        miniCoursePointsOverlayRaf = 0;
+      };
+      miniCoursePointsOverlayRaf = window.requestAnimationFrame(tick);
+      miniCoursePointsOverlayTimer = window.setTimeout(() => {
+        clearMiniCoursePointsOverlay();
+        clearMiniCourseOverlay();
+      }, 1500);
     }
     function getDownloadSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5zm7-18v12.17l3.59-3.58L17 12l-5 5-5-5 1.41-1.41L11 14.17V2z"/></svg>`;
@@ -6925,6 +7057,7 @@
         readerView.hidden = true;
         listView.hidden = false;
         readerView.classList.remove("is-course-intro");
+        clearMiniCourseOverlay();
         currentMiniCourseViewMode = "preview";
         renderMiniCoursesList();
         return;
@@ -6947,6 +7080,7 @@
       readerView.hidden = false;
 
       if (currentMiniCourseViewMode !== "reading") {
+        clearMiniCourseOverlay();
         renderMiniCourseIntro(readerView);
         readerView.scrollTop = 0;
         updateMiniCoursesHeader();
@@ -7020,6 +7154,7 @@
       listView.hidden = true;
       readerView.hidden = false;
       readerView.classList.remove("is-course-intro");
+      clearMiniCourseOverlay();
       readerView.innerHTML = `<div class="course-reader-loading">Abrindo o conteúdo do curso...</div>`;
       attachMiniCourseReaderSwipe(readerView);
       readerView.scrollTop = 0;
@@ -7606,6 +7741,9 @@
         miniCourses = miniCourses.map((course) => course.id === currentMiniCourse.id ? currentMiniCourse : course);
         updateMiniCoursesUserCard();
         renderMiniCourseReader();
+        if (Math.max(0, Number(payload?.course?.pointsAwarded || 0) || 0) > 0) {
+          showMiniCoursePointsAward(payload.course.pointsAwarded, payload.course.totalPoints);
+        }
       } catch (error) {
         currentMiniCoursePage = previousPage;
         currentMiniCourse.progress = previousProgress;

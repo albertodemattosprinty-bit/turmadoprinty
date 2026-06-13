@@ -66,6 +66,24 @@ function normalizeCourseStyle(value) {
   return String(value || "").trim().toLowerCase() === "story" ? "story" : "course";
 }
 
+function getMiniCoursePageReadableText(page) {
+  return [
+    String(page?.title || "").trim(),
+    String(page?.subtitle || "").trim(),
+    String(page?.logline || "").trim(),
+    ...(Array.isArray(page?.paragraphs) ? page.paragraphs : []).map((item) => String(item || "").trim()),
+    ...(Array.isArray(page?.bullets) ? page.bullets : []).map((item) => String(item || "").trim()),
+    ...(Array.isArray(page?.tableRows) ? page.tableRows : []).flatMap((row) => [
+      String(row?.label || "").trim(),
+      String(row?.value || "").trim()
+    ])
+  ].filter(Boolean).join(" ").trim();
+}
+
+function getMiniCoursePageReadableCharacters(page) {
+  return getMiniCoursePageReadableText(page).length;
+}
+
 function countCourseContentPages(pages = []) {
   return (Array.isArray(pages) ? pages : []).filter((page) => !["course-map", "chapter_open"].includes(String(page?.kind || "").trim().toLowerCase())).length;
 }
@@ -250,6 +268,17 @@ export async function ensureMiniCoursesSchema() {
 
   await query("create index if not exists idx_mini_courses_updated_at on mini_courses(updated_at desc, created_at desc);");
   await query("create index if not exists idx_mini_course_progress_user_updated_at on mini_course_progress(user_id, updated_at desc);");
+  await query(`
+    create table if not exists pontos (
+      user_id uuid primary key references users(id) on delete cascade,
+      total_points integer not null default 0,
+      total_characters integer not null default 0,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  `);
+  await query("alter table pontos add column if not exists total_points integer not null default 0;");
+  await query("alter table pontos add column if not exists total_characters integer not null default 0;");
   await query(`
     create table if not exists mini_course_quiz_results (
       user_id uuid not null references users(id) on delete cascade,
@@ -824,6 +853,24 @@ export async function startMiniCourse(userId, courseId) {
   return getMiniCourseById(courseId, userId);
 }
 
+async function getMiniCourseUserPoints(userId) {
+  const result = await query(
+    `
+      select total_points, total_characters, updated_at
+      from pontos
+      where user_id = $1
+      limit 1
+    `,
+    [userId]
+  );
+
+  return {
+    totalPoints: Math.max(0, Number(result.rows[0]?.total_points || 0) || 0),
+    totalCharacters: Math.max(0, Number(result.rows[0]?.total_characters || 0) || 0),
+    updatedAt: toIso(result.rows[0]?.updated_at)
+  };
+}
+
 export async function updateMiniCourseProgress(userId, courseId, nextPage) {
   await ensureMiniCoursesSchema();
   const course = await getMiniCourseById(courseId, userId);
@@ -834,8 +881,15 @@ export async function updateMiniCourseProgress(userId, courseId, nextPage) {
   const totalPages = Math.max(1, Number(course.pageCount || 1) || 1);
   const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
   const hasStoredProgress = Boolean(course.progress?.startedAt) || Math.max(0, Number(course.progress?.pagesRead || 0) || 0) >= 2;
+  const previousCurrentPage = Math.max(1, Math.min(totalPages, Number(course.progress?.currentPage || 1) || 1));
+  const awardedPages = safePage > previousCurrentPage
+    ? (Array.isArray(course.pages) ? course.pages : []).slice(previousCurrentPage - 1, safePage - 1)
+    : [];
+  const awardedCharacters = awardedPages.reduce((sum, page) => sum + getMiniCoursePageReadableCharacters(page), 0);
+  const awardedPoints = Math.max(0, Math.floor(awardedCharacters / 100));
 
   if (!hasStoredProgress && safePage < 2) {
+    const points = await getMiniCourseUserPoints(userId);
     return {
       ...course,
       progress: {
@@ -844,31 +898,66 @@ export async function updateMiniCourseProgress(userId, courseId, nextPage) {
         pagesRead: 0,
         totalPages,
         completed: false
-      }
+      },
+      pointsAwarded: 0,
+      awardedCharacters: 0,
+      totalPoints: points.totalPoints,
+      totalCharacters: points.totalCharacters,
+      pointsUpdatedAt: points.updatedAt
     };
   }
 
   const result = await query(
     `
-      insert into mini_course_progress (user_id, course_id, current_page, pages_read, started_at, updated_at, completed_at)
-      values ($1, $2, $3::smallint, $3::smallint, now(), now(), case when $3::smallint >= $4::smallint then now() else null end)
-      on conflict (user_id, course_id)
-      do update set
-        current_page = $3::smallint,
-        pages_read = greatest(mini_course_progress.pages_read, $3::smallint),
-        completed_at = case
-          when greatest(mini_course_progress.pages_read, $3::smallint) >= $4::smallint then coalesce(mini_course_progress.completed_at, now())
-          else mini_course_progress.completed_at
-        end,
-        updated_at = now()
-      returning user_id, course_id, current_page, pages_read, started_at, completed_at, updated_at
+      with progress_upsert as (
+        insert into mini_course_progress (user_id, course_id, current_page, pages_read, started_at, updated_at, completed_at)
+        values ($1, $2, $3::smallint, $3::smallint, now(), now(), case when $3::smallint >= $4::smallint then now() else null end)
+        on conflict (user_id, course_id)
+        do update set
+          current_page = $3::smallint,
+          pages_read = greatest(mini_course_progress.pages_read, $3::smallint),
+          completed_at = case
+            when greatest(mini_course_progress.pages_read, $3::smallint) >= $4::smallint then coalesce(mini_course_progress.completed_at, now())
+            else mini_course_progress.completed_at
+          end,
+          updated_at = now()
+        returning user_id, course_id, current_page, pages_read, started_at, completed_at, updated_at
+      ),
+      points_upsert as (
+        insert into pontos (user_id, total_points, total_characters, created_at, updated_at)
+        values ($1, $5::integer, $6::integer, now(), now())
+        on conflict (user_id)
+        do update set
+          total_points = pontos.total_points + $5::integer,
+          total_characters = pontos.total_characters + $6::integer,
+          updated_at = now()
+        returning total_points, total_characters, updated_at
+      )
+      select
+        progress_upsert.user_id,
+        progress_upsert.course_id,
+        progress_upsert.current_page,
+        progress_upsert.pages_read,
+        progress_upsert.started_at,
+        progress_upsert.completed_at,
+        progress_upsert.updated_at,
+        points_upsert.total_points as player_total_points,
+        points_upsert.total_characters as player_total_characters,
+        points_upsert.updated_at as player_points_updated_at
+      from progress_upsert
+      cross join points_upsert
     `,
-    [userId, courseId, safePage, totalPages]
+    [userId, courseId, safePage, totalPages, awardedPoints, awardedCharacters]
   );
 
   return {
     ...course,
-    progress: normalizeProgress(result.rows[0], totalPages)
+    progress: normalizeProgress(result.rows[0], totalPages),
+    pointsAwarded: awardedPoints,
+    awardedCharacters,
+    totalPoints: Math.max(0, Number(result.rows[0]?.player_total_points || 0) || 0),
+    totalCharacters: Math.max(0, Number(result.rows[0]?.player_total_characters || 0) || 0),
+    pointsUpdatedAt: toIso(result.rows[0]?.player_points_updated_at)
   };
 }
 
