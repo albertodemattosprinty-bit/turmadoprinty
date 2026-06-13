@@ -66,6 +66,24 @@ function normalizeCourseStyle(value) {
   return String(value || "").trim().toLowerCase() === "story" ? "story" : "course";
 }
 
+function splitTextBlocks(rawText = "") {
+  const compact = String(rawText || "").replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return [];
+  }
+
+  const sentenceMatches = compact.match(/[^.!?]+[.!?]+|[^.!?]+$/g);
+  return (Array.isArray(sentenceMatches) ? sentenceMatches : [compact])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
+function normalizeTextBlocksFromParagraphs(paragraphs = []) {
+  return (Array.isArray(paragraphs) ? paragraphs : [])
+    .flatMap((paragraph) => splitTextBlocks(paragraph))
+    .slice(0, 18);
+}
+
 function getMiniCoursePageReadableText(page) {
   return [
     String(page?.title || "").trim(),
@@ -130,6 +148,7 @@ function normalizeCoursePages(raw) {
       logline: String(item?.logline || "").trim(),
       chapterNumber: Math.max(0, Number(item?.chapterNumber || 0) || 0),
       paragraphs: normalizeParagraphs(item?.paragraphs),
+      textBlocks: normalizeTextBlocksFromParagraphs(item?.paragraphs),
       bullets: normalizeBullets(item?.bullets),
       tableRows: normalizeTableRows(item?.tableRows),
       imageUrl: String(item?.imageUrl || "").trim(),
