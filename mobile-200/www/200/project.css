@@ -1019,7 +1019,7 @@ body.running-music-standalone #actionsModal .actions-list {
   justify-content: center;
   gap: 10px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #2f7dff, #1847c7);
+  background: #123c8f;
   color: #fff;
 }
 
@@ -1030,13 +1030,25 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .running-music-list-head {
+  position: relative;
   display: grid;
-  grid-template-columns: 46px 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  min-height: 46px;
+}
+
+.running-music-list-station-head {
+  width: min(100%, 360px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
   align-items: center;
   gap: 12px;
 }
 
-.running-music-list-back {
+.running-music-list-close {
+  position: absolute;
+  right: 0;
+  top: 0;
   width: 46px;
   height: 46px;
   border-radius: 50%;
@@ -1049,7 +1061,7 @@ body.running-music-standalone #actionsModal .actions-list {
   flex: 0 0 auto;
 }
 
-.running-music-list-back svg {
+.running-music-list-close svg {
   width: 22px;
   height: 22px;
 }
@@ -1359,7 +1371,7 @@ body.running-music-standalone #actionsModal .actions-list {
 .start-decision-task-meta {
   margin: 0;
   width: min(100%, 760px);
-  font-size: clamp(1rem, 2.4vw, 1.28rem);
+  font-size: clamp(1.2rem, 2.9vw, 1.54rem);
   line-height: 1.12;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
@@ -1455,14 +1467,14 @@ body.running-music-standalone #actionsModal .actions-list {
 
 .start-decision-actions {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   width: min(60vw, 520px);
   margin: 0 auto;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 54px;
+  align-items: end;
 }
 
 .start-decision-actions > button {
-  width: 100%;
   min-height: 54px;
 }
 
@@ -1496,6 +1508,25 @@ body.running-music-standalone #actionsModal .actions-list {
 .decision-btn-postpone { background: #f97316; }
 .decision-btn-remove { background: #dc2626; }
 .decision-btn-giveup { background: linear-gradient(160deg, #737373, #171717); }
+.decision-btn-start {
+  grid-column: 1;
+  margin-bottom: 6px;
+}
+
+.decision-btn-remove {
+  grid-column: 2;
+  width: 54px;
+  min-width: 54px;
+  min-height: 54px;
+  padding: 0;
+  border-radius: 999px;
+  justify-self: end;
+  align-self: start;
+}
+
+.decision-btn-remove span {
+  display: none;
+}
 .start-conflict-content {
   width: min(520px, 92vw);
   gap: 14px;

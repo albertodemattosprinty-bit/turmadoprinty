@@ -2405,7 +2405,9 @@ async function saveRunningTaskDefault(mode = "track") {
     state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
     renderRunningMusicPlayer();
     renderRunningMusicList();
+    closeRunningMusicListModal();
     closeModal("runningMusicDefaultModal");
+    closeModal("runningMusicDefaultChoiceModal");
     showFloatingNotice(safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão.");
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
@@ -3754,7 +3756,6 @@ function buildPendingStartActionButtons(targetAction) {
   void targetAction;
   return [
     { label: "Iniciar", value: "start", primary: true },
-    { label: "Adiar", value: "postpone" },
     { label: "Excluir", value: "remove" }
   ];
 }
