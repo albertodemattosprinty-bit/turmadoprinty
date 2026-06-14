@@ -326,6 +326,8 @@ const runningPlayerNext = document.getElementById("runningPlayerNext");
 const runningMiniPlayer = document.getElementById("runningMiniPlayer");
 const runningMusicListModal = document.getElementById("runningMusicListModal");
 const runningMusicListBack = document.getElementById("runningMusicListBack");
+const runningMusicListStationPrev = document.getElementById("runningMusicListStationPrev");
+const runningMusicListStationNext = document.getElementById("runningMusicListStationNext");
 const runningMusicListStation = document.getElementById("runningMusicListStation");
 const runningMusicListTrack = document.getElementById("runningMusicListTrack");
 const runningMusicListItems = document.getElementById("runningMusicListItems");
@@ -347,11 +349,18 @@ const dayDoneDelay = document.getElementById("dayDoneDelay");
 const startDecisionModal = document.getElementById("startDecisionModal");
 const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
 const startDecisionTaskTitle = document.getElementById("startDecisionTaskTitle");
+const startDecisionTitleButton = document.getElementById("startDecisionTitleButton");
 const startDecisionStartAt = document.getElementById("startDecisionStartAt");
 const startDecisionEndAt = document.getElementById("startDecisionEndAt");
 const startDecisionRepeatLabel = document.getElementById("startDecisionRepeatLabel");
 const startDecisionMusicLabel = document.getElementById("startDecisionMusicLabel");
 const startDecisionActions = document.getElementById("startDecisionActions");
+const startConflictModal = document.getElementById("startConflictModal");
+const startConflictCurrentTitle = document.getElementById("startConflictCurrentTitle");
+const startConflictNextTitle = document.getElementById("startConflictNextTitle");
+const startConflictFinalizeButton = document.getElementById("startConflictFinalizeButton");
+const startConflictAbortButton = document.getElementById("startConflictAbortButton");
+const startConflictBackButton = document.getElementById("startConflictBackButton");
 const postponeTaskModal = document.getElementById("postponeTaskModal");
 const closePostponeTaskModal = document.getElementById("closePostponeTaskModal");
 const postponeTaskTitle = document.getElementById("postponeTaskTitle");
@@ -593,6 +602,13 @@ const state = {
   },
   runningConfirm: {
     action: null
+  },
+  startConflict: {
+    currentActionId: "",
+    nextActionId: ""
+  },
+  startDecisionContext: {
+    actionId: ""
   },
   runtimeState: null,
   runningCenterMode: "auto",
@@ -1284,8 +1300,14 @@ async function playRunningEndBellCue(actionId) {
   }
   state.runningEndBell.actionId = actionId;
   state.runningEndBell.played = true;
-  const nextVolume = Math.min(1, Math.max(0.15, Number(runningAudio?.volume || 1) * 1.5));
+  const baseRunningVolume = Math.max(0.2, Number(runningAudio?.volume || 1) || 1);
+  const nextVolume = Math.min(1, Math.max(0.2, baseRunningVolume * 1.8));
   try {
+    if (runningAudio && !runningAudio.paused) {
+      await fadeAudioVolume(runningAudio, 0, 2000);
+      runningAudio.pause();
+      runningAudio.currentTime = 0;
+    }
     for (let index = 0; index < 3; index += 1) {
       runningEndBellAudio.pause();
       runningEndBellAudio.currentTime = 0;
@@ -2034,12 +2056,13 @@ function renderRunningMusicList() {
     const isCurrent = Boolean(track && String(track.url || "").trim() === String(item.url || "").trim());
     const isFavorite = isRunningTrackFavorite(item);
     const isHidden = isRunningTrackHidden(item);
+    const isLooping = Boolean(isCurrent && state.runningPlayer.repeatEnabled);
     const isDefault = Boolean(
       (defaultTrackUrl && String(item.url || "").trim() === defaultTrackUrl)
       || (defaultStationName && String(station?.name || "").trim() === defaultStationName)
     );
     return `
-      <div class="running-music-track-row${isCurrent ? " is-current" : ""}${isFavorite ? " is-favorite" : ""}${isDefault ? " is-default" : ""}${isHidden ? " is-hidden-track" : ""}" role="button" tabindex="0" data-track-url="${escapeHtml(String(item.url || ""))}" data-track-name="${escapeHtml(String(item.name || ""))}" data-track-station="${escapeHtml(String(station?.name || ""))}">
+      <div class="running-music-track-row${isCurrent ? " is-current" : ""}${isFavorite ? " is-favorite" : ""}${isDefault ? " is-default" : ""}${isLooping ? " is-looping" : ""}${isHidden ? " is-hidden-track" : ""}" role="button" tabindex="0" data-track-url="${escapeHtml(String(item.url || ""))}" data-track-name="${escapeHtml(String(item.name || ""))}" data-track-station="${escapeHtml(String(station?.name || ""))}">
         <span class="running-music-track-waveform" aria-hidden="true">
           <span></span><span></span><span></span><span></span><span></span>
         </span>
@@ -2051,8 +2074,10 @@ function renderRunningMusicList() {
           <button class="running-music-track-hide" type="button" data-hide-track="${escapeHtml(String(item.url || ""))}" aria-label="${isHidden ? "Mostrar música" : "Ocultar música"}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20 20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </button>
+          <button class="running-music-track-loop" type="button" data-loop-track="${escapeHtml(String(item.url || ""))}" aria-label="${isLooping ? "Desativar repetição" : "Repetir música"}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17H7l2.6 2.6L8.2 21 3 15.8 8.2 10.6l1.4 1.4L7 14h10a3 3 0 0 0 0-6h-1V6h1a5 5 0 0 1 0 10ZM7 7h10l-2.6-2.6L15.8 3 21 8.2 15.8 13.4l-1.4-1.4L17 10H7a3 3 0 0 0 0 6h1v2H7a5 5 0 0 1 0-10Z" fill="currentColor"/></svg>
+          </button>
           <svg class="running-music-track-heart" viewBox="0 0 24 24"><path d="M12 21.35 10.55 20C5.4 15.4 2 12.4 2 8.5A5.5 5.5 0 0 1 7.5 3C9.24 3 10.92 3.81 12 5.08 13.08 3.81 14.76 3 16.5 3A5.5 5.5 0 0 1 22 8.5c0 3.9-3.4 6.9-8.55 11.5z"/></svg>
-          <svg class="running-music-track-default" viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
         </span>
       </div>
     `;
@@ -2067,6 +2092,15 @@ function renderRunningMusicList() {
         return;
       }
       await toggleRunningTrackHidden(trackUrl);
+    });
+    button.querySelector(".running-music-track-loop")?.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const trackUrl = String(event.currentTarget?.getAttribute("data-loop-track") || "").trim();
+      if (!trackUrl) {
+        return;
+      }
+      await toggleRunningTrackLoop(trackUrl);
     });
     button.addEventListener("click", async () => {
       const trackUrl = String(button.dataset.trackUrl || "").trim();
@@ -2188,6 +2222,23 @@ async function toggleRunningTrackHidden(trackUrl) {
   } else {
     primeRunningTrackBuffer();
   }
+}
+
+async function toggleRunningTrackLoop(trackUrl = "") {
+  const safeTrackUrl = String(trackUrl || "").trim();
+  if (!safeTrackUrl) {
+    return;
+  }
+  const currentTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
+  if (currentTrackUrl !== safeTrackUrl) {
+    state.runningPlayer.playOrderUrls = buildRunningPlayOrder(getCurrentRunningStation());
+    state.runningPlayer.playOrderIndex = Math.max(0, state.runningPlayer.playOrderUrls.findIndex((url) => url === safeTrackUrl));
+    await playRunningTrack(safeTrackUrl);
+  }
+  state.runningPlayer.repeatEnabled = !(state.runningPlayer.repeatEnabled && String(getCurrentRunningTrack()?.url || "").trim() === safeTrackUrl);
+  ensureRunningAudioLoopState();
+  renderRunningMusicPlayer();
+  renderRunningMusicList();
 }
 
 function openRunningMusicDefaultModal() {
@@ -2551,6 +2602,8 @@ function buildInitialWizardState() {
 
   return {
     step: 1,
+    inlineEditStep: 0,
+    returnToStartDecision: false,
     dateOffset: 0,
     repeatOpen: false,
     repeatMode: "none",
@@ -3291,15 +3344,7 @@ async function toggleActionStatus(actionId, options = {}) {
 
   const currentStatus = normalizeActionStatus(targetAction.status);
   if (currentStatus === actionStatuses.pending && !options.skipDecision) {
-    const rootChoice = await openStartDecisionModal(
-      targetAction,
-      getEarliestPendingAction() || targetAction,
-      [
-        { label: "Iniciar", value: "start", primary: true },
-        { label: "Adiar", value: "postpone" },
-        { label: "Excluir", value: "remove" }
-      ]
-    );
+    const rootChoice = await openStartDecisionModal(targetAction, null, buildPendingStartActionButtons(targetAction));
     if (!rootChoice || rootChoice === "cancel") {
       return;
     }
@@ -3312,51 +3357,22 @@ async function toggleActionStatus(actionId, options = {}) {
       await loadActions();
       return;
     }
-
-    const referenceAction = getEarliestPendingAction();
-    const referenceMs = referenceAction ? new Date(referenceAction.startAt).getTime() : Date.now();
-    const targetStartMs = new Date(targetAction.startAt).getTime();
-    const targetEndMs = new Date(targetAction.endAt).getTime();
-    if (referenceAction && referenceAction.id !== targetAction.id && Number.isFinite(targetStartMs) && Number.isFinite(referenceMs) && targetStartMs > referenceMs) {
-      const currentEntry = getCurrentTimelineEntry(referenceMs, targetAction.id) || referenceAction;
-      if (currentEntry) {
-        const buttons = [];
-        const durationMs = Math.max(60 * 1000, targetEndMs - targetStartMs);
-        buttons.push({ label: `Iniciar "${formatActionTitleForDisplay(targetAction.title)}"`, value: "start_chosen", primary: true });
-        buttons.push({ label: `Substituir por "${currentEntry.kind === "free" ? "Tempo livre" : currentEntry.kind === "sleep" ? "Descanso" : formatActionTitleForDisplay(currentEntry.title || "Tarefa esperada")}"`, value: "swap" });
-        buttons.push({ label: `Cumprir "${currentEntry.kind === "free" ? "Tempo livre" : currentEntry.kind === "sleep" ? "Descanso" : formatActionTitleForDisplay(currentEntry.title || "Tarefa esperada")}"`, value: "do_current" });
-        buttons.push({ label: "", value: "cancel" });
-        const decision = await openStartDecisionModal(targetAction, currentEntry, buttons);
-        if (!decision || decision === "cancel") {
-          return;
-        }
-        if (decision === "start_chosen") {
-          return await toggleActionStatus(targetAction.id, { skipDecision: true });
-        }
-        if (decision === "do_current" && currentEntry?.id) {
-          if (currentEntry.kind !== "action") {
-            return;
-          }
-          await toggleActionStatus(currentEntry.id, { skipDecision: true });
-          return;
-        }
-        if (decision === "swap" && currentEntry?.id && currentEntry.kind === "action") {
-          const swapStart = targetAction.startAt;
-          const swapEnd = targetAction.endAt;
-          await patchActionTime(targetAction, currentEntry.startAt, currentEntry.endAt);
-          await patchActionTime(currentEntry, swapStart, swapEnd);
-          await loadActions();
-          return;
-        }
-        if (decision === "swap" && (currentEntry.kind === "free" || currentEntry.kind === "sleep")) {
-          const baseStart = new Date(referenceMs);
-          const startAt = baseStart.toISOString();
-          const endAt = new Date(baseStart.getTime() + durationMs).toISOString();
-          await patchActionTime(targetAction, startAt, endAt);
-          await loadActions();
-          return;
-        }
+  }
+  if (currentStatus === actionStatuses.pending && !options.ignoreRunningConflict) {
+    const runningAction = getRunningActionExcept(targetAction.id);
+    if (runningAction) {
+      const conflictChoice = await openStartConflictModalForActions(runningAction, targetAction);
+      if (conflictChoice === "finalize_and_start") {
+        await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
+        await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
+      } else if (conflictChoice === "abort_and_start") {
+        await restoreActionToPending(runningAction.id);
+        delete state.runningLocalStarts[String(runningAction.id || "")];
+        await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
+      } else {
+        reopenStartDecisionForAction(targetAction.id);
       }
+      return;
     }
   }
   if (currentStatus === actionStatuses.inProgress && !options.skipEndConfirm) {
@@ -3402,7 +3418,7 @@ function moveActiveDate(amount) {
   void loadActions();
 }
 
-function openWizard(action = null) {
+function openWizard(action = null, options = {}) {
   state.wizard = buildInitialWizardState();
   if (action) {
     const startAt = new Date(action.startAt);
@@ -3422,12 +3438,17 @@ function openWizard(action = null) {
   } else {
     taskTitle.value = "";
   }
+  state.wizard.step = Math.max(1, Math.min(4, Number(options.step || state.wizard.step || 1)));
+  state.wizard.inlineEditStep = Number(options.inlineEditStep || 0) || 0;
+  state.wizard.returnToStartDecision = Boolean(options.returnToStartDecision);
   wizardMessage.textContent = "";
   hideActionAiConfirmation();
   actionWizard.classList.add("active");
   actionWizard.setAttribute("aria-hidden", "false");
   renderWizard();
-  setTimeout(() => taskTitle.focus(), 60);
+  if (state.wizard.step === 1) {
+    setTimeout(() => taskTitle.focus(), 60);
+  }
 }
 
 function closeWizard() {
@@ -3546,7 +3567,9 @@ function renderWizard() {
   if (wizardBackButton) {
     wizardBackButton.style.visibility = step === 1 ? "hidden" : "visible";
   }
-  wizardNextButton.textContent = step === 4 ? "Salvar" : "Continuar";
+  wizardNextButton.textContent = state.wizard.inlineEditStep
+    ? "Atualizar"
+    : step === 4 ? "Salvar" : "Continuar";
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
   renderActionCategoryPicker();
   renderRepeatControls();
@@ -3668,23 +3691,91 @@ function closeStartDecisionModalWith(value) {
   if (resolver) resolver(value);
 }
 
+function closeStartConflictModal(value = "cancel") {
+  if (startConflictModal) {
+    startConflictModal.classList.remove("active");
+    startConflictModal.setAttribute("aria-hidden", "true");
+  }
+  const resolver = state.startConflict.resolve;
+  state.startConflict.resolve = null;
+  if (resolver) {
+    resolver(value);
+  }
+}
+
+function formatActionMusicInlineLabel(action) {
+  const label = formatActionMusicDecisionLabel(action);
+  return label.replace(/^Música padrão da atividade:\s*/i, "").trim() || "Definir música";
+}
+
+function buildPendingStartActionButtons(targetAction) {
+  void targetAction;
+  return [
+    { label: "Iniciar", value: "start", primary: true },
+    { label: "Adiar", value: "postpone" },
+    { label: "Excluir", value: "remove" }
+  ];
+}
+
+function findActionById(actionId) {
+  return state.actions.find((item) => String(item?.id || "") === String(actionId || "")) || null;
+}
+
+function getRunningActionExcept(actionId) {
+  return getVisibleActions().find((item) =>
+    normalizeActionStatus(item?.status) === actionStatuses.inProgress
+    && String(item?.id || "") !== String(actionId || "")
+  ) || null;
+}
+
+function reopenStartDecisionForAction(actionId) {
+  const action = findActionById(actionId);
+  if (!action) {
+    return;
+  }
+  void openStartDecisionModal(action, null, buildPendingStartActionButtons(action));
+}
+
+function openStartConflictModalForActions(currentAction, nextAction) {
+  if (!startConflictModal) {
+    return Promise.resolve("cancel");
+  }
+  state.startConflict.currentActionId = String(currentAction?.id || "");
+  state.startConflict.nextActionId = String(nextAction?.id || "");
+  if (startConflictCurrentTitle) {
+    startConflictCurrentTitle.textContent = formatActionTitleForDisplay(currentAction?.title || "Tarefa");
+  }
+  if (startConflictNextTitle) {
+    startConflictNextTitle.textContent = `Iniciar ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
+  }
+  startConflictModal.classList.add("active");
+  startConflictModal.setAttribute("aria-hidden", "false");
+  return new Promise((resolve) => {
+    state.startConflict.resolve = resolve;
+  });
+}
+
 function openStartDecisionModal(targetAction, currentEntry, buttons) {
   return new Promise((resolve) => {
     startDecisionResolver = resolve;
+    state.startDecisionContext.actionId = String(targetAction?.id || "");
     if (startDecisionTaskTitle) {
       startDecisionTaskTitle.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
     }
+    if (startDecisionTitleButton) {
+      startDecisionTitleButton.innerHTML = `<span class="start-decision-task-title-btn-copy">${escapeHtml(formatActionTitleForDisplay(targetAction?.title || "Tarefa"))}</span>`;
+    }
     if (startDecisionStartAt) {
-      startDecisionStartAt.textContent = `Horário de início: ${formatTime(targetAction?.startAt || 0)}`;
+      startDecisionStartAt.innerHTML = `${startDecisionStartAt.querySelector("svg")?.outerHTML || ""}<span>${escapeHtml(formatTime(targetAction?.startAt || 0))}</span>`;
     }
     if (startDecisionEndAt) {
-      startDecisionEndAt.textContent = `Horário final: ${formatTime(targetAction?.endAt || 0)}`;
+      startDecisionEndAt.innerHTML = `${startDecisionEndAt.querySelector("svg")?.outerHTML || ""}<span>${escapeHtml(formatTime(targetAction?.endAt || 0))}</span>`;
     }
     if (startDecisionRepeatLabel) {
-      startDecisionRepeatLabel.textContent = `Natureza da recorrência: ${formatRepeatLabel(String(targetAction?.repeatRule || "none"), Array.isArray(targetAction?.repeatDays) ? targetAction.repeatDays : [])}`;
+      startDecisionRepeatLabel.innerHTML = `${startDecisionRepeatLabel.querySelector("svg")?.outerHTML || ""}<span>${escapeHtml(formatRepeatLabel(String(targetAction?.repeatRule || "none"), Array.isArray(targetAction?.repeatDays) ? targetAction.repeatDays : []))}</span>`;
     }
     if (startDecisionMusicLabel) {
-      startDecisionMusicLabel.textContent = formatActionMusicDecisionLabel(targetAction);
+      startDecisionMusicLabel.innerHTML = `${startDecisionMusicLabel.querySelector("svg")?.outerHTML || ""}<span>${escapeHtml(formatActionMusicInlineLabel(targetAction))}</span>`;
     }
     if (startDecisionActions) {
       startDecisionActions.innerHTML = "";
@@ -3716,6 +3807,12 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
         btn.addEventListener("click", () => closeStartDecisionModalWith(item.value));
         startDecisionActions.appendChild(btn);
       });
+      const backButton = document.createElement("button");
+      backButton.type = "button";
+      backButton.className = "decision-btn decision-btn-back";
+      backButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 6-6 1.4 1.4L9.8 11H18v2H9.8l3.6 3.6L12 18z"/></svg><span>Voltar</span>';
+      backButton.addEventListener("click", () => closeStartDecisionModalWith("cancel"));
+      startDecisionActions.appendChild(backButton);
     }
     startDecisionModal?.classList.add("active");
     startDecisionModal?.setAttribute("aria-hidden", "false");
@@ -4471,6 +4568,9 @@ function closeOverlapWizardWith(payload) {
 async function saveAction() {
   try {
     wizardMessage.textContent = "Salvando...";
+    const reopenStartDecisionActionId = state.wizard.returnToStartDecision
+      ? String(state.wizard.editingActionId || "")
+      : "";
     const repeatRule = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
     const repeatDays = repeatRule === "weekly"
       ? state.wizard.repeatDays
@@ -4532,6 +4632,9 @@ async function saveAction() {
     state.activeOffset = state.wizard.dateOffset;
     closeWizard();
     await loadActions();
+    if (reopenStartDecisionActionId) {
+      reopenStartDecisionForAction(reopenStartDecisionActionId);
+    }
   } catch (error) {
     wizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar.";
   }
@@ -6066,6 +6169,15 @@ platformNameMicButton?.addEventListener("click", () => {
 });
 
 function stepWizardBack() {
+  if (state.wizard.inlineEditStep) {
+    const actionId = String(state.wizard.editingActionId || "");
+    const shouldReturn = Boolean(state.wizard.returnToStartDecision);
+    closeWizard();
+    if (shouldReturn && actionId) {
+      reopenStartDecisionForAction(actionId);
+    }
+    return;
+  }
   state.wizard.step = Math.max(1, state.wizard.step - 1);
   renderWizard();
 }
@@ -6075,6 +6187,11 @@ wizardBackButton?.addEventListener("click", stepWizardBack);
 
 wizardNextButton.addEventListener("click", () => {
   if (!validateStep()) {
+    return;
+  }
+
+  if (state.wizard.inlineEditStep) {
+    void saveAction();
     return;
   }
 
@@ -6726,16 +6843,31 @@ runningTaskRestoreButton?.addEventListener("click", () => {
 
 runningTaskListButton?.addEventListener("click", () => {
   closeRunningTaskModalWithFade();
+  window.setTimeout(() => openModal("actionsModal"), 500);
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
-runningPlayerList?.addEventListener("click", openRunningMusicListModal);
+runningPlayerList?.addEventListener("click", () => {
+  state.startDecisionContext.actionId = "";
+  openRunningMusicListModal();
+});
 runningPlayerPrev?.addEventListener("click", () => {
   void moveRunningTrack(-1);
 });
 runningPlayerNext?.addEventListener("click", () => {
   void moveRunningTrack(1);
 });
-runningMusicListBack?.addEventListener("click", closeRunningMusicListModal);
+runningMusicListBack?.addEventListener("click", () => {
+  closeRunningMusicListModal();
+  if (state.startDecisionContext.actionId && !runningTaskModalElement?.classList.contains("active")) {
+    reopenStartDecisionForAction(state.startDecisionContext.actionId);
+  }
+});
+runningMusicListStationPrev?.addEventListener("click", () => {
+  void moveRunningStation(-1);
+});
+runningMusicListStationNext?.addEventListener("click", () => {
+  void moveRunningStation(1);
+});
 runningPlayerRepeat?.addEventListener("click", toggleRunningPlayPause);
 runningPlayerFavorite?.addEventListener("click", () => {
   void toggleRunningTrackFavorite();
@@ -6757,6 +6889,50 @@ runningMusicDefaultRedefineButton?.addEventListener("click", openRunningMusicDef
 runningMusicDefaultExecuteButton?.addEventListener("click", () => {
   void executeRunningTaskDefaultPreference();
 });
+startDecisionTitleButton?.addEventListener("click", () => {
+  const action = findActionById(state.startDecisionContext.actionId);
+  if (!action) {
+    return;
+  }
+  closeStartDecisionModalWith("cancel");
+  openWizard(action, { step: 1, inlineEditStep: 1, returnToStartDecision: true });
+});
+startDecisionStartAt?.addEventListener("click", () => {
+  const action = findActionById(state.startDecisionContext.actionId);
+  if (!action) {
+    return;
+  }
+  closeStartDecisionModalWith("cancel");
+  openWizard(action, { step: 3, inlineEditStep: 3, returnToStartDecision: true });
+});
+startDecisionEndAt?.addEventListener("click", () => {
+  const action = findActionById(state.startDecisionContext.actionId);
+  if (!action) {
+    return;
+  }
+  closeStartDecisionModalWith("cancel");
+  openWizard(action, { step: 4, inlineEditStep: 4, returnToStartDecision: true });
+});
+startDecisionRepeatLabel?.addEventListener("click", () => {
+  const action = findActionById(state.startDecisionContext.actionId);
+  if (!action) {
+    return;
+  }
+  closeStartDecisionModalWith("cancel");
+  openWizard(action, { step: 2, inlineEditStep: 2, returnToStartDecision: true });
+});
+startDecisionMusicLabel?.addEventListener("click", () => {
+  const action = findActionById(state.startDecisionContext.actionId);
+  if (!action) {
+    return;
+  }
+  state.runningPlayer.currentTaskTitle = String(action.title || "").trim();
+  closeStartDecisionModalWith("cancel");
+  openRunningMusicListModal();
+});
+startConflictFinalizeButton?.addEventListener("click", () => closeStartConflictModal("finalize_and_start"));
+startConflictAbortButton?.addEventListener("click", () => closeStartConflictModal("abort_and_start"));
+startConflictBackButton?.addEventListener("click", () => closeStartConflictModal("cancel"));
 runningConfirmPrimaryButton?.addEventListener("click", () => {
   const action = state.runningConfirm.action;
   const callback = action;

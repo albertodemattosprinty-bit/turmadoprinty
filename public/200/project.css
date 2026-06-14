@@ -994,7 +994,7 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 .running-music-list-head {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  grid-template-columns: 46px 34px minmax(0, 1fr) 34px;
   align-items: center;
   gap: 12px;
 }
@@ -1015,6 +1015,22 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 .running-music-list-back svg {
   width: 22px;
   height: 22px;
+}
+
+.running-music-list-station-nav {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.84);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.running-music-list-station-nav svg {
+  width: 16px;
+  height: 16px;
 }
 
 .running-music-list-title-wrap {
@@ -1083,8 +1099,8 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   color: #ff6a8a;
 }
 
-.running-music-track-row.is-default .running-music-track-default {
-  color: #ffe26a;
+.running-music-track-row.is-looping .running-music-track-loop {
+  color: #9ad4ff;
 }
 
 .running-music-track-waveform {
@@ -1151,6 +1167,18 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   height: 16px;
 }
 
+.running-music-track-loop {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  cursor: pointer;
+}
+
 .running-music-track-hide {
   border: 0;
   background: transparent;
@@ -1174,10 +1202,6 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 .running-music-track-actions .running-music-track-heart {
   color: #ff6a8a;
-}
-
-.running-music-track-actions .running-music-track-default {
-  color: #ffe26a;
 }
 
 #runningTaskModal.workspace-modal {
@@ -1283,6 +1307,19 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   text-wrap: balance;
 }
 
+.start-decision-task-title-btn {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.start-decision-task-title-btn-copy {
+  display: inline-block;
+}
+
 .start-decision-task-meta {
   margin: 0;
   width: min(100%, 760px);
@@ -1290,6 +1327,22 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   line-height: 1.12;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.start-decision-meta-btn {
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.start-decision-meta-btn svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
 }
 
 .start-decision-middle {
@@ -1404,11 +1457,48 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 .decision-btn-remove { background: #dc2626; }
 .decision-btn-giveup { background: linear-gradient(160deg, #737373, #171717); }
 .decision-btn-back {
-  width: 56px;
-  min-height: 56px;
-  border-radius: 999px;
-  justify-self: center;
+  width: 100%;
+  min-height: 54px;
+  border-radius: 16px;
+  justify-self: stretch;
   background: rgba(220, 38, 38, 0.95);
+}
+
+.start-conflict-content {
+  width: min(520px, 92vw);
+  gap: 14px;
+}
+
+.start-conflict-current {
+  font-size: clamp(1.8rem, 6vw, 2.8rem);
+  font-weight: 900;
+  color: #fff;
+  text-align: center;
+}
+
+.start-conflict-current-status {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.74);
+  text-align: center;
+}
+
+.start-conflict-next {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+}
+
+.start-conflict-actions {
+  width: min(100%, 320px);
+  display: grid;
+  gap: 10px;
+}
+
+.start-conflict-actions .primary-btn,
+.start-conflict-actions .ghost-btn {
+  width: 100%;
+  min-height: 52px;
 }
 
 .task-row.task-free-expired {
