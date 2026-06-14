@@ -5711,6 +5711,12 @@
       if (!coursesModal || !coursesModal.classList.contains("show")) {
         return;
       }
+      if (String(event.key || "") === "5") {
+        if (revealMiniCourseAdminPanelFromKeyboard()) {
+          event.preventDefault();
+        }
+        return;
+      }
       if (String(event.key || "").toLowerCase() === "x" && isMiniCourseAdmin) {
         event.preventDefault();
         void openMiniCourseImageGenModal();
@@ -7114,6 +7120,19 @@
       miniCourseAdminRevealTimer = window.setTimeout(() => {
         setMiniCourseAdminPanelVisible(true);
       }, 5000);
+    }
+
+    function revealMiniCourseAdminPanelFromKeyboard() {
+      const coursesModal = $("coursesModal");
+      if (!isMiniCourseAdmin || !coursesModal || coursesModal.getAttribute("aria-hidden") !== "false") {
+        return false;
+      }
+      if (currentMiniCourseViewMode === "reading" || currentMiniCourse) {
+        return false;
+      }
+      clearMiniCourseAdminRevealTimer();
+      setMiniCourseAdminPanelVisible(true);
+      return true;
     }
 
     function updateMiniCourseAdminButton() {
