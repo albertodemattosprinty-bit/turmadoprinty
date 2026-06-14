@@ -842,7 +842,7 @@ function getRunningActionProgressState(action) {
   if (!Number.isFinite(startedAtMs)) {
     return { percent: 0, remainingMinutes: durationMinutes };
   }
-  const elapsedMinutes = Math.max(0, (Date.now() - startedAtMs) / (60 * 1000));
+  const elapsedMinutes = Math.max(0, (getServerNowMs() - startedAtMs) / (60 * 1000));
   const totalBudget = durationMinutes + Math.max(0, Number(runningCarryOverMinutes || 0));
   const remainingBudget = Math.max(0, Math.ceil(totalBudget - elapsedMinutes));
   const percent = totalBudget > 0 ? Math.max(0, Math.min(100, Math.round((elapsedMinutes / totalBudget) * 100))) : 0;
@@ -2536,11 +2536,12 @@ function startHomeDateTimeTicker() {
 function startRunningTaskTicker() {
   renderHomeRunningTask();
   if (runningTaskTicker) {
-    window.clearInterval(runningTaskTicker);
+    window.clearTimeout(runningTaskTicker);
   }
-  runningTaskTicker = window.setInterval(() => {
+  runningTaskTicker = window.setTimeout(function tickRunningTask() {
     renderHomeRunningTask();
-  }, 1000);
+    runningTaskTicker = window.setTimeout(tickRunningTask, 250);
+  }, 250);
 }
 
 function formatMoney(cents) {
@@ -3189,7 +3190,7 @@ function renderActions() {
     }
     if (action.kind === "free") {
       const duration = getActionDurationMinutes(action);
-      const ended = Date.now() >= new Date(action.endAt).getTime();
+      const ended = getServerNowMs() >= new Date(action.endAt).getTime();
       const row = document.createElement("article");
       row.className = `task-row task-free-slot${ended ? " task-free-expired" : ""}`;
       row.dataset.freeSlot = "1";
@@ -3272,7 +3273,7 @@ function getPendingDelayMinutes(action) {
   if (!Number.isFinite(startAt)) {
     return 0;
   }
-  const delta = Date.now() - startAt;
+  const delta = getServerNowMs() - startAt;
   return delta > 0 ? Math.floor(delta / (60 * 1000)) : 0;
 }
 
@@ -3451,7 +3452,7 @@ async function toggleActionStatus(actionId, options = {}) {
     const nextStatus = normalizeActionStatus(updated?.status);
     if (currentStatus === actionStatuses.pending && nextStatus === actionStatuses.inProgress) {
       resetRunningCompletionState();
-      state.runningLocalStarts[String(targetId)] = Date.now();
+      state.runningLocalStarts[String(targetId)] = getServerNowMs();
       openModal("runningTaskModal");
       closeActionsModalWithFade();
     }
@@ -6851,7 +6852,7 @@ async function performRunningFinalize(runningAction) {
   const beforeSummary = getCompletionSummaryForSelectedProfile();
   const duration = getActionDurationMinutes(runningAction);
   const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
-  const elapsed = Number.isFinite(startedAtMs) ? Math.max(0, (Date.now() - startedAtMs) / (60 * 1000)) : duration;
+  const elapsed = Number.isFinite(startedAtMs) ? Math.max(0, (getServerNowMs() - startedAtMs) / (60 * 1000)) : duration;
   const bonusBefore = Math.max(0, Number(runningCarryOverMinutes || 0));
   const remainingAfterBonus = Math.max(0, elapsed - bonusBefore);
   const savedMinutes = Math.max(0, Math.floor(duration - remainingAfterBonus));
@@ -7391,6 +7392,20 @@ document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
 
 handleSwipe(historyDateLabel, moveHistoryDate);
 handleSwipe(historyTimelineList, moveHistoryDate);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    startRunningTaskTicker();
+  }
+});
+window.addEventListener("focus", () => {
+  startRunningTaskTicker();
+});
+window.addEventListener("pageshow", () => {
+  startRunningTaskTicker();
+});
+document.addEventListener("resume", () => {
+  startRunningTaskTicker();
+});
 startHomeDateTimeTicker();
 startRunningTaskTicker();
 void loadRunningMusicStations();
