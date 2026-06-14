@@ -25,6 +25,7 @@ body {
   min-height: 100%;
   margin: 0;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -33,6 +34,7 @@ body {
   background: #030712;
   overflow: hidden;
   position: relative;
+  touch-action: pan-y;
 }
 
 .app-background-video {
@@ -967,6 +969,23 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   transform: scale(0.985);
 }
 
+body.running-music-list-open #actionsModal .actions-app,
+body.running-music-list-open #actionsModal .actions-side-actions,
+body.running-music-list-open #actionsModal .actions-progress,
+body.running-music-list-open #actionsModal .action-wizard,
+body.running-music-list-open #actionsModal .auth-alert,
+body.running-music-list-open #actionsModal .actions-head,
+body.running-music-list-open #actionsModal .actions-list,
+body.running-music-list-open #startDecisionModal .start-decision-content,
+body.running-music-standalone #actionsModal .actions-app,
+body.running-music-standalone #actionsModal .actions-side-actions,
+body.running-music-standalone #actionsModal .actions-progress,
+body.running-music-standalone #actionsModal .actions-head,
+body.running-music-standalone #actionsModal .actions-list {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .running-music-list-modal {
   display: none;
   background: rgba(3, 6, 18, 0.98);
@@ -1308,11 +1327,22 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 .start-decision-top {
   display: grid;
+  grid-template-rows: 10fr 20fr;
+  justify-items: center;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.start-decision-top-spacer {
+  width: 100%;
+}
+
+.start-decision-title-wrap {
+  width: 100%;
+  display: grid;
   align-content: center;
   justify-items: center;
-  gap: 10px;
-  text-align: center;
-  padding: 12px 24px;
+  padding-bottom: 6px;
 }
 
 .start-decision-task-title {
@@ -1355,11 +1385,14 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   display: grid;
   align-content: center;
   justify-items: center;
+  gap: 10px;
   padding: 8px 24px;
 }
 
 .start-decision-bottom {
-  display: block;
+  display: grid;
+  align-content: center;
+  justify-items: center;
 }
 
 #startDecisionModal {
@@ -1430,6 +1463,7 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 .start-decision-actions > button {
   width: 100%;
+  min-height: 54px;
 }
 
 #startDecisionCurrent {
@@ -1774,7 +1808,7 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 .task-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: 52px minmax(0, 1fr) max-content;
   align-items: center;
   gap: 12px;
   padding: 14px 10px 14px 12px;
@@ -1867,12 +1901,23 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   transform: translateY(-1px);
 }
 
+.task-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0;
+  background: transparent;
+}
+
 .task-row:hover {
   transform: translateY(-11px);
 }
 
 .task-row.task-in-progress {
-  background: linear-gradient(90deg, rgba(23, 74, 171, 0.94) 0%, rgba(23, 74, 171, 0.94) 50%, rgba(23, 74, 171, 0.00) 100%);
+  background: linear-gradient(90deg, rgba(33, 191, 115, 0.92) 0%, rgba(33, 191, 115, 0.92) 42%, rgba(28, 103, 215, 0.94) 58%, rgba(28, 103, 215, 0) 100%);
+  background-size: 180% 100%;
+  animation: runningTaskGradientDrift 6s ease-in-out infinite;
 }
 
 .task-row.task-completed {
@@ -1909,12 +1954,12 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 }
 
 .task-row.task-free-slot {
-  background: linear-gradient(90deg, rgba(36, 97, 206, 0.96) 0%, rgba(36, 97, 206, 0.96) 50%, rgba(36, 97, 206, 0.00) 100%);
+  background: rgba(255, 255, 255, 0.02);
 }
 .task-row.task-free-slot .task-title,
 .task-row.task-free-slot .task-assignee,
 .task-row.task-free-slot .task-time {
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .task-row.task-pending-clean {
@@ -1943,7 +1988,7 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 }
 
 .task-time {
-  grid-column: 2;
+  grid-column: 3;
   text-align: right;
   justify-self: end;
   margin-right: 10px;
@@ -1982,11 +2027,12 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 }
 
 .task-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
   font-weight: 700;
   font-size: 1.2rem;
+  line-height: 1.1;
 }
 
 .task-meta {
@@ -2014,6 +2060,12 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 @keyframes taskClockSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes runningTaskGradientDrift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .delete-task {
@@ -2903,9 +2955,14 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   }
 
   .task-row {
-    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-columns: 40px minmax(0, 1fr) max-content;
     gap: 10px;
     padding: 14px 12px;
+  }
+
+  .task-avatar {
+    width: 40px;
+    height: 40px;
   }
 
   .task-main {

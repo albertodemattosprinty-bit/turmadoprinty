@@ -258,7 +258,12 @@
     <button class="modal-close" type="button" id="closeStartDecisionModal" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
     <div class="finance-content running-task-content start-decision-content">
       <div class="start-decision-top">
-        <h1 class="start-decision-task-title" id="startDecisionTaskTitle">Tarefa X</h1>
+        <div class="start-decision-top-spacer" aria-hidden="true"></div>
+        <div class="start-decision-title-wrap">
+          <h1 class="start-decision-task-title" id="startDecisionTaskTitle">Tarefa X</h1>
+        </div>
+      </div>
+      <div class="start-decision-middle">
         <button class="start-decision-task-meta start-decision-meta-btn" type="button" id="startDecisionStartAt">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg>
           <span>00:00</span>
@@ -276,10 +281,9 @@
           <span>Definir música</span>
         </button>
       </div>
-      <div class="start-decision-middle">
+      <div class="start-decision-bottom">
         <div class="start-decision-actions" id="startDecisionActions"></div>
       </div>
-      <div class="start-decision-bottom" aria-hidden="true"></div>
     </div>
   </section>
   <section class="workspace-modal simple-modal" id="startConflictModal" aria-hidden="true" aria-label="Conflito de tarefa em andamento">

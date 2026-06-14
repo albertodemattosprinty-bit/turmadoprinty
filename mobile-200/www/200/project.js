@@ -610,6 +610,10 @@ const state = {
   startDecisionContext: {
     actionId: ""
   },
+  uiAnchors: {
+    actionsCurrentCentered: false,
+    runningMusicCentered: false
+  },
   runtimeState: null,
   runningCenterMode: "auto",
   runningLocalStarts: {}
@@ -1465,6 +1469,23 @@ function anchorToLastCompletedAction() {
   row.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+function anchorToCurrentActionOnce() {
+  if (state.uiAnchors.actionsCurrentCentered || !actionsList) {
+    return;
+  }
+  const runningAction = getRunningActionForSelectedProfile();
+  const targetId = String(runningAction?.id || pendingActionsAnchorId || "").trim();
+  if (!targetId) {
+    return;
+  }
+  const row = actionsList.querySelector(`[data-action-id="${targetId}"]`);
+  if (!row) {
+    return;
+  }
+  state.uiAnchors.actionsCurrentCentered = true;
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function renderHomeRunningTask() {
   if (state.runningCompletion.active) {
     if (openRunningTaskModalButton) {
@@ -2140,13 +2161,21 @@ function renderRunningMusicList() {
     });
   });
 
-  const currentRow = runningMusicListItems.querySelector(".running-music-track-row.is-current");
-  currentRow?.scrollIntoView({ block: "center", behavior: "smooth" });
+  if (!state.uiAnchors.runningMusicCentered) {
+    const currentRow = runningMusicListItems.querySelector(".running-music-track-row.is-current");
+    if (currentRow) {
+      state.uiAnchors.runningMusicCentered = true;
+      currentRow.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }
 }
 
 function openRunningMusicListModal() {
   if (!runningMusicListModal) {
     return;
+  }
+  if (!runningTaskModalElement?.classList.contains("active")) {
+    document.body.classList.add("running-music-standalone");
   }
   renderRunningMusicList();
   runningMusicListModal.classList.add("active");
@@ -2162,6 +2191,7 @@ function closeRunningMusicListModal() {
   runningMusicListModal.classList.remove("active");
   runningMusicListModal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("running-music-list-open");
+  document.body.classList.remove("running-music-standalone");
   updateRunningPlayerOverlayState();
 }
 
@@ -2766,11 +2796,12 @@ function openModal(id) {
   document.body.classList.add("modal-open");
 
   if (id === "actionsModal") {
+    const runningAction = getRunningActionForSelectedProfile();
     const latestDone = getLatestCompletedActionForSelectedProfile();
-    pendingActionsAnchorId = latestDone?.id || "";
+    pendingActionsAnchorId = runningAction?.id || latestDone?.id || "";
     void loadActions();
     window.setTimeout(() => {
-      anchorToLastCompletedAction();
+      anchorToCurrentActionOnce();
     }, 1000);
     if (actionsDelayTicker) {
       window.clearInterval(actionsDelayTicker);
@@ -3127,11 +3158,13 @@ function renderActions() {
 
   timelineEntries.forEach((action) => {
     const slotOwner = state.selectedProfile;
+    const slotAvatar = getActionAvatarPath(slotOwner);
     if (action.kind === "sleep") {
       const row = document.createElement("article");
       row.className = "task-row task-sleep-slot";
       row.dataset.sleepSlot = "1";
       row.innerHTML = `
+        <img class="task-avatar" src="${slotAvatar}" alt="Descanso" loading="lazy" />
         <div class="task-main">
           <div class="task-title">Descanso</div>
           <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
@@ -3150,6 +3183,7 @@ function renderActions() {
       row.dataset.startIso = action.startAt;
       row.dataset.endIso = action.endAt;
       row.innerHTML = `
+        <img class="task-avatar" src="${slotAvatar}" alt="Tempo livre" loading="lazy" />
         <div class="task-main">
           <div class="task-title">Tempo livre</div>
           <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(duration)}</div>
@@ -3160,6 +3194,8 @@ function renderActions() {
       return;
     }
     const status = normalizeActionStatus(action.status);
+    const assignee = normalizeAssigneeName(action.assignee);
+    const avatarPath = getActionAvatarPath(assignee);
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
@@ -3177,6 +3213,7 @@ function renderActions() {
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.innerHTML = `
+      <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
         <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
         <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
@@ -6092,6 +6129,17 @@ function handleSwipe(element, callback) {
 document.querySelectorAll("[data-open-modal]").forEach((button) => {
   button.addEventListener("click", () => openModal(button.dataset.openModal));
 });
+
+if (window.history && typeof window.history.pushState === "function") {
+  try {
+    window.history.pushState({ project200Guard: true }, "", window.location.href);
+    window.addEventListener("popstate", () => {
+      try {
+        window.history.pushState({ project200Guard: true }, "", window.location.href);
+      } catch {}
+    });
+  } catch {}
+}
 
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", () => closeModal(button.closest(".workspace-modal")));
