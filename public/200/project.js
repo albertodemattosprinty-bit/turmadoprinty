@@ -331,6 +331,7 @@ const runningMusicListStationNext = document.getElementById("runningMusicListSta
 const runningMusicListStation = document.getElementById("runningMusicListStation");
 const runningMusicListTrack = document.getElementById("runningMusicListTrack");
 const runningMusicListItems = document.getElementById("runningMusicListItems");
+const runningMusicListDefaultButton = document.getElementById("runningMusicListDefaultButton");
 const runningMusicDefaultModal = document.getElementById("runningMusicDefaultModal");
 const runningMusicDefaultStationButton = document.getElementById("runningMusicDefaultStationButton");
 const runningMusicDefaultTrackButton = document.getElementById("runningMusicDefaultTrackButton");
@@ -349,7 +350,6 @@ const dayDoneDelay = document.getElementById("dayDoneDelay");
 const startDecisionModal = document.getElementById("startDecisionModal");
 const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
 const startDecisionTaskTitle = document.getElementById("startDecisionTaskTitle");
-const startDecisionTitleButton = document.getElementById("startDecisionTitleButton");
 const startDecisionStartAt = document.getElementById("startDecisionStartAt");
 const startDecisionEndAt = document.getElementById("startDecisionEndAt");
 const startDecisionRepeatLabel = document.getElementById("startDecisionRepeatLabel");
@@ -815,10 +815,19 @@ function getRunningActionProgressState(action) {
   if (!durationMinutes) {
     return { percent: 0, remainingMinutes: 0 };
   }
+  const runtimeActionId = String(state.runtimeState?.actionId || "").trim();
+  const runtimeStartedAtMs = runtimeActionId === String(action?.id || "").trim()
+    ? new Date(state.runtimeState?.startedAt || "").getTime()
+    : 0;
+  const persistedStartedAtMs = new Date(action?.startedAt || "").getTime();
   const localStartedAtMs = Number(state.runningLocalStarts?.[String(action?.id || "")] || 0);
-  const startedAtMs = Number.isFinite(localStartedAtMs) && localStartedAtMs > 0
-    ? localStartedAtMs
-    : new Date(action?.startedAt || action?.startAt).getTime();
+  const startedAtMs = Number.isFinite(runtimeStartedAtMs) && runtimeStartedAtMs > 0
+    ? runtimeStartedAtMs
+    : Number.isFinite(persistedStartedAtMs) && persistedStartedAtMs > 0
+      ? persistedStartedAtMs
+      : Number.isFinite(localStartedAtMs) && localStartedAtMs > 0
+        ? localStartedAtMs
+        : new Date(action?.startAt).getTime();
   if (!Number.isFinite(startedAtMs)) {
     return { percent: 0, remainingMinutes: durationMinutes };
   }
@@ -3118,16 +3127,14 @@ function renderActions() {
 
   timelineEntries.forEach((action) => {
     const slotOwner = state.selectedProfile;
-    const slotAvatar = getActionAvatarPath(slotOwner);
     if (action.kind === "sleep") {
       const row = document.createElement("article");
       row.className = "task-row task-sleep-slot";
       row.dataset.sleepSlot = "1";
       row.innerHTML = `
-        <img class="task-avatar" src="${slotAvatar}" alt="Descanso" loading="lazy" />
         <div class="task-main">
           <div class="task-title">Descanso</div>
-          <div class="task-assignee">${escapeHtml(String(slotOwner))}</div>
+          <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
         </div>
         <div class="task-time">${formatHourChip(action.startAt)}</div>
       `;
@@ -3143,10 +3150,9 @@ function renderActions() {
       row.dataset.startIso = action.startAt;
       row.dataset.endIso = action.endAt;
       row.innerHTML = `
-        <img class="task-avatar" src="${slotAvatar}" alt="Tempo livre" loading="lazy" />
         <div class="task-main">
           <div class="task-title">Tempo livre</div>
-          <div class="task-assignee">${escapeHtml(String(slotOwner))}</div>
+          <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(duration)}</div>
         </div>
         <div class="task-time">${formatHourChip(action.startAt)}</div>
       `;
@@ -3154,9 +3160,6 @@ function renderActions() {
       return;
     }
     const status = normalizeActionStatus(action.status);
-    const assignee = normalizeAssigneeName(action.assignee);
-    const categoryIconPath = getTaskCategoryIconPath(action.categoryId);
-    const avatarPath = categoryIconPath || getActionAvatarPath(assignee);
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
@@ -3174,10 +3177,9 @@ function renderActions() {
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.innerHTML = `
-      ${buildTaskAvatarMarkup(avatarPath, categoryIconPath ? `Categoria ${getTaskCategoryName(action.categoryId)}` : `Avatar de ${assignee}`, { categoryIcon: Boolean(categoryIconPath) })}
       <div class="task-main">
         <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
-        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
+        <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
       </div>
       <div class="task-time">${formatHourChip(action.startAt)}</div>
     `;
@@ -3316,6 +3318,9 @@ async function loadActions() {
       const runtimeStartedAt = new Date(state.runtimeState?.startedAt || "").getTime();
       if (runtimeActionId && Number.isFinite(runtimeStartedAt) && runtimeStartedAt > 0) {
         state.runningLocalStarts[runtimeActionId] = runtimeStartedAt;
+        state.actions = state.actions.map((action) => String(action?.id || "") === runtimeActionId
+          ? { ...action, startedAt: state.runtimeState?.startedAt || action.startedAt }
+          : action);
       }
     } catch {
       state.runtimeState = null;
@@ -3762,9 +3767,6 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     if (startDecisionTaskTitle) {
       startDecisionTaskTitle.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
     }
-    if (startDecisionTitleButton) {
-      startDecisionTitleButton.innerHTML = `<span class="start-decision-task-title-btn-copy">${escapeHtml(formatActionTitleForDisplay(targetAction?.title || "Tarefa"))}</span>`;
-    }
     if (startDecisionStartAt) {
       startDecisionStartAt.innerHTML = `${startDecisionStartAt.querySelector("svg")?.outerHTML || ""}<span>${escapeHtml(formatTime(targetAction?.startAt || 0))}</span>`;
     }
@@ -3780,6 +3782,9 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     if (startDecisionActions) {
       startDecisionActions.innerHTML = "";
       buttons.forEach((item) => {
+        if (item.value === "cancel") {
+          return;
+        }
         const btn = document.createElement("button");
         btn.type = "button";
         const icons = {
@@ -3807,12 +3812,6 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
         btn.addEventListener("click", () => closeStartDecisionModalWith(item.value));
         startDecisionActions.appendChild(btn);
       });
-      const backButton = document.createElement("button");
-      backButton.type = "button";
-      backButton.className = "decision-btn decision-btn-back";
-      backButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 6-6 1.4 1.4L9.8 11H18v2H9.8l3.6 3.6L12 18z"/></svg><span>Voltar</span>';
-      backButton.addEventListener("click", () => closeStartDecisionModalWith("cancel"));
-      startDecisionActions.appendChild(backButton);
     }
     startDecisionModal?.classList.add("active");
     startDecisionModal?.setAttribute("aria-hidden", "false");
@@ -6889,7 +6888,14 @@ runningMusicDefaultRedefineButton?.addEventListener("click", openRunningMusicDef
 runningMusicDefaultExecuteButton?.addEventListener("click", () => {
   void executeRunningTaskDefaultPreference();
 });
-startDecisionTitleButton?.addEventListener("click", () => {
+runningMusicListDefaultButton?.addEventListener("click", () => {
+  if (getRunningDefaultPreferenceForCurrentTask()) {
+    openRunningMusicDefaultChoiceModal();
+    return;
+  }
+  openRunningMusicDefaultModal();
+});
+startDecisionTaskTitle?.addEventListener("click", () => {
   const action = findActionById(state.startDecisionContext.actionId);
   if (!action) {
     return;

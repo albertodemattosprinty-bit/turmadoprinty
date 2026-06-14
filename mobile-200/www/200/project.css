@@ -956,21 +956,21 @@ body.start-decision-open .home-running-btn {
 }
 
 body.running-music-list-open #runningTaskModal .running-task-content {
-  filter: blur(22px) saturate(0.72);
-  opacity: 0.2;
+  filter: none;
+  opacity: 0;
   transform: scale(0.985);
 }
 
 body.running-player-overlay-open #runningTaskModal .running-task-content {
-  filter: blur(22px) saturate(0.72);
-  opacity: 0.2;
+  filter: none;
+  opacity: 0;
   transform: scale(0.985);
 }
 
 .running-music-list-modal {
   display: none;
-  background: rgba(3, 6, 18, 0.82);
-  backdrop-filter: blur(18px);
+  background: rgba(3, 6, 18, 0.98);
+  backdrop-filter: none;
   z-index: 170;
   padding: 20px;
 }
@@ -988,8 +988,13 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
   padding: 18px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
+}
+
+.running-music-list-default-btn {
+  width: min(100%, 320px);
+  justify-self: center;
 }
 
 .running-music-list-head {
@@ -1300,24 +1305,12 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 .start-decision-task-title {
   margin: 0;
   width: min(100%, 760px);
-  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-size: clamp(1.5rem, 3.8vw, 2.4rem);
   line-height: 1.02;
   font-weight: 900;
   color: #fff;
   text-wrap: balance;
-}
-
-.start-decision-task-title-btn {
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 0.98rem;
-  font-weight: 700;
   cursor: pointer;
-}
-
-.start-decision-task-title-btn-copy {
-  display: inline-block;
 }
 
 .start-decision-task-meta {
@@ -1456,14 +1449,6 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 .decision-btn-postpone { background: #f97316; }
 .decision-btn-remove { background: #dc2626; }
 .decision-btn-giveup { background: linear-gradient(160deg, #737373, #171717); }
-.decision-btn-back {
-  width: 100%;
-  min-height: 54px;
-  border-radius: 16px;
-  justify-self: stretch;
-  background: rgba(220, 38, 38, 0.95);
-}
-
 .start-conflict-content {
   width: min(520px, 92vw);
   gap: 14px;
@@ -1776,10 +1761,10 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 
 .task-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 8px;
-  padding: 12px 8px 12px 12px;
+  gap: 12px;
+  padding: 14px 10px 14px 12px;
   border: 0;
   border-radius: 8px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.00) 100%);
@@ -1869,29 +1854,6 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   transform: translateY(-1px);
 }
 
-.task-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 0;
-  background: transparent;
-}
-
-.task-avatar.task-avatar-category {
-  display: inline-block;
-  object-fit: unset;
-  background-color: #fff;
-  -webkit-mask-image: var(--task-avatar-icon);
-  mask-image: var(--task-avatar-icon);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: 64% 64%;
-  mask-size: 64% 64%;
-}
-
 .task-row:hover {
   transform: translateY(-11px);
 }
@@ -1968,7 +1930,7 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 }
 
 .task-time {
-  grid-column: 3;
+  grid-column: 2;
   text-align: right;
   justify-self: end;
   margin-right: 10px;
@@ -1988,17 +1950,22 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   background-repeat: no-repeat;
   background-size: contain;
   opacity: 0.74;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M12 1a1 1 0 0 0-1 1v10.2l-4.1 2.9a1 1 0 1 0 1.2 1.6l4.4-3.1a1 1 0 0 0 .4-.8V2a1 1 0 0 0-1-1Z'/%3E%3Cpath d='M19.5 4.5a1 1 0 0 0-1.4 0L12 10.6V12l7.5-7.5a1 1 0 0 0 0-1.4Z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8' fill='none' stroke='white' stroke-width='1.8'/%3E%3Cpath d='M12 12V7.3' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M12 12l3.2 2' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .task-time.is-fading {
   opacity: 0.18;
+}
+
+.task-row.task-in-progress .task-time::before {
+  animation: taskClockSpin 6s linear infinite;
+  transform-origin: center;
 }
 
 .task-main {
   min-width: 0;
   display: grid;
   gap: 4px;
-  padding-left: 15px;
+  padding-left: 0;
 }
 
 .task-title {
@@ -2006,12 +1973,34 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 700;
+  font-size: 1.2rem;
 }
 
 .task-meta {
   color: rgba(255, 255, 255, 0.86);
   font-weight: 600;
   font-size: 0.83rem;
+}
+
+.task-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-duration-clock {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.78;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8' fill='none' stroke='white' stroke-width='1.8'/%3E%3Cpath d='M12 12V7.3' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M12 12l3.2 2' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+@keyframes taskClockSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .delete-task {
