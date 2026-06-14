@@ -995,6 +995,19 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
 .running-music-list-default-btn {
   width: min(100%, 320px);
   justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2f7dff, #1847c7);
+  color: #fff;
+}
+
+.running-music-list-default-btn svg {
+  width: 18px;
+  height: 18px;
+  color: #ffe26a;
 }
 
 .running-music-list-head {
@@ -2890,8 +2903,35 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   }
 
   .task-row {
-    grid-template-columns: 44px minmax(0, 1fr) max-content;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 10px;
+    padding: 14px 12px;
+  }
+
+  .task-main {
+    min-width: 0;
     gap: 6px;
+  }
+
+  .task-title {
+    font-size: 1.14rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.12;
+  }
+
+  .task-assignee.task-duration {
+    font-size: 0.98rem;
+    white-space: nowrap;
+  }
+
+  .task-time {
+    margin-right: 0;
+    font-size: 1rem;
+    align-self: start;
+    padding-top: 2px;
+    white-space: nowrap;
   }
 
   .actions-app {

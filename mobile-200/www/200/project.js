@@ -6889,11 +6889,7 @@ runningMusicDefaultExecuteButton?.addEventListener("click", () => {
   void executeRunningTaskDefaultPreference();
 });
 runningMusicListDefaultButton?.addEventListener("click", () => {
-  if (getRunningDefaultPreferenceForCurrentTask()) {
-    openRunningMusicDefaultChoiceModal();
-    return;
-  }
-  openRunningMusicDefaultModal();
+  void saveRunningTaskDefault("track");
 });
 startDecisionTaskTitle?.addEventListener("click", () => {
   const action = findActionById(state.startDecisionContext.actionId);
