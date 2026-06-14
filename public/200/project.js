@@ -196,6 +196,7 @@ const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
 const actionForm = document.getElementById("actionForm");
 const wizardStepLabel = document.getElementById("wizardStepLabel");
+const wizardHeaderBackButton = document.getElementById("wizardHeaderBack");
 const wizardBackButton = document.getElementById("wizardBack");
 const wizardNextButton = document.getElementById("wizardNext");
 const wizardMessage = document.getElementById("wizardMessage");
@@ -345,9 +346,11 @@ const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
 const startDecisionModal = document.getElementById("startDecisionModal");
 const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
-const startDecisionTarget = document.getElementById("startDecisionTarget");
-const startDecisionContextLabel = document.getElementById("startDecisionContextLabel");
-const startDecisionCurrent = document.getElementById("startDecisionCurrent");
+const startDecisionTaskTitle = document.getElementById("startDecisionTaskTitle");
+const startDecisionStartAt = document.getElementById("startDecisionStartAt");
+const startDecisionEndAt = document.getElementById("startDecisionEndAt");
+const startDecisionRepeatLabel = document.getElementById("startDecisionRepeatLabel");
+const startDecisionMusicLabel = document.getElementById("startDecisionMusicLabel");
 const startDecisionActions = document.getElementById("startDecisionActions");
 const postponeTaskModal = document.getElementById("postponeTaskModal");
 const closePostponeTaskModal = document.getElementById("closePostponeTaskModal");
@@ -1535,7 +1538,6 @@ function renderHomeRunningTask() {
   if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = false;
-  if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = false;
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
   }
@@ -2485,6 +2487,15 @@ function getTaskCategoryIconPath(categoryId) {
   return `/200/category-icons/${normalized}.svg`;
 }
 
+function buildTaskAvatarMarkup(src, alt, options = {}) {
+  const safeSrc = String(src || "").trim();
+  const safeAlt = escapeHtml(alt || "");
+  if (options.categoryIcon && safeSrc) {
+    return `<span class="task-avatar task-avatar-category" style="--task-avatar-icon:url('${escapeHtml(safeSrc)}')" role="img" aria-label="${safeAlt}"></span>`;
+  }
+  return `<img class="task-avatar" src="${safeSrc}" alt="${safeAlt}" loading="lazy" />`;
+}
+
 function getTaskCategoryName(categoryId) {
   const normalized = String(categoryId || "").trim().toLowerCase();
   return taskCategoryMap.get(normalized)?.name || "";
@@ -3101,16 +3112,16 @@ function renderActions() {
     const row = document.createElement("article");
     const cleanPendingClass = (status === actionStatuses.pending && delayMinutes <= 0) ? " task-pending-clean" : "";
     row.className = `task-row${stateClass}${gaveUpClass}${getDelayClassByMinutes(delayMinutes)}${cleanPendingClass}`;
-    if (delayMinutes > 0 && delayMinutes <= 5) {
-      row.style.setProperty("--delay-progress", String(Math.max(0, Math.min(1, delayMinutes / 5))));
+    if (delayMinutes > 0 && delayMinutes <= 15) {
+      row.style.setProperty("--delay-soft-rgb", getDelaySoftRgbByMinutes(delayMinutes));
     } else {
-      row.style.removeProperty("--delay-progress");
+      row.style.removeProperty("--delay-soft-rgb");
     }
     row.dataset.actionId = action.id;
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     row.innerHTML = `
-      <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(categoryIconPath ? `Categoria ${getTaskCategoryName(action.categoryId)}` : `Avatar de ${assignee}`)}" loading="lazy" />
+      ${buildTaskAvatarMarkup(avatarPath, categoryIconPath ? `Categoria ${getTaskCategoryName(action.categoryId)}` : `Avatar de ${assignee}`, { categoryIcon: Boolean(categoryIconPath) })}
       <div class="task-main">
         <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
         <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
@@ -3160,20 +3171,30 @@ function getPendingDelayMinutes(action) {
   return delta > 0 ? Math.floor(delta / (60 * 1000)) : 0;
 }
 
+function getDelaySoftRgbByMinutes(minutes) {
+  const start = [36, 97, 206];
+  const end = [255, 214, 61];
+  const progress = Math.max(0, Math.min(1, Number(minutes || 0) / 15));
+  return start.map((component, index) => {
+    const next = end[index];
+    return Math.round(component + ((next - component) * progress));
+  }).join(", ");
+}
+
 function getDelayClassByMinutes(minutes) {
   if (minutes <= 0) {
     return "";
   }
-  if (minutes <= 5) {
+  if (minutes <= 15) {
     return " task-delay-soft";
   }
-  if (minutes <= 20) {
+  if (minutes <= 35) {
     return " task-delay-yellow";
   }
-  if (minutes <= 60) {
+  if (minutes <= 75) {
     return " task-delay-orange";
   }
-  if (minutes <= 180) {
+  if (minutes <= 195) {
     return " task-delay-red";
   }
   return " task-delay-black";
@@ -3276,8 +3297,7 @@ async function toggleActionStatus(actionId, options = {}) {
       [
         { label: "Iniciar", value: "start", primary: true },
         { label: "Adiar", value: "postpone" },
-        { label: "Remover", value: "remove" },
-        { label: "Desistir", value: "give_up" }
+        { label: "Excluir", value: "remove" }
       ]
     );
     if (!rootChoice || rootChoice === "cancel") {
@@ -3289,11 +3309,6 @@ async function toggleActionStatus(actionId, options = {}) {
     }
     if (rootChoice === "remove") {
       await apiRequest(`/api/actions/${encodeURIComponent(targetAction.id)}`, { method: "DELETE" });
-      await loadActions();
-      return;
-    }
-    if (rootChoice === "give_up") {
-      await markActionAsGivenUp(targetAction);
       await loadActions();
       return;
     }
@@ -3417,6 +3432,10 @@ function openWizard(action = null) {
 
 function closeWizard() {
   stopActionMic();
+  if (actionCategoryInterpretTimer) {
+    window.clearTimeout(actionCategoryInterpretTimer);
+    actionCategoryInterpretTimer = null;
+  }
   hideActionAiConfirmation();
   if (actionCategoryModal) {
     actionCategoryModal.classList.remove("active");
@@ -3521,7 +3540,12 @@ function renderWizard() {
     section.classList.toggle("active", isActive);
   });
 
-  wizardBackButton.style.visibility = step === 1 ? "hidden" : "visible";
+  if (wizardHeaderBackButton) {
+    wizardHeaderBackButton.hidden = step === 1;
+  }
+  if (wizardBackButton) {
+    wizardBackButton.style.visibility = step === 1 ? "hidden" : "visible";
+  }
   wizardNextButton.textContent = step === 4 ? "Salvar" : "Continuar";
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
   renderActionCategoryPicker();
@@ -3647,25 +3671,20 @@ function closeStartDecisionModalWith(value) {
 function openStartDecisionModal(targetAction, currentEntry, buttons) {
   return new Promise((resolve) => {
     startDecisionResolver = resolve;
-    if (startDecisionTarget) {
-      startDecisionTarget.innerHTML = formatTitleTwoLines(targetAction?.title || "Tarefa");
+    if (startDecisionTaskTitle) {
+      startDecisionTaskTitle.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
     }
-    if (startDecisionCurrent) {
-      const targetStart = new Date(targetAction?.startAt || 0).getTime();
-      const serverNow = getServerNowMs();
-      const diffMinutes = (Number.isFinite(targetStart) && Number.isFinite(serverNow))
-        ? Math.round((targetStart - serverNow) / (60 * 1000))
-        : 0;
-      if (Math.abs(diffMinutes) <= 0) {
-        if (startDecisionContextLabel) startDecisionContextLabel.textContent = "No horário";
-        startDecisionCurrent.textContent = "Sem atraso";
-      } else if (diffMinutes > 0) {
-        if (startDecisionContextLabel) startDecisionContextLabel.textContent = "Adiantado";
-        startDecisionCurrent.textContent = formatDurationHuman(diffMinutes);
-      } else {
-        if (startDecisionContextLabel) startDecisionContextLabel.textContent = "Atrasado";
-        startDecisionCurrent.textContent = formatDurationHuman(Math.abs(diffMinutes));
-      }
+    if (startDecisionStartAt) {
+      startDecisionStartAt.textContent = `Horário de início: ${formatTime(targetAction?.startAt || 0)}`;
+    }
+    if (startDecisionEndAt) {
+      startDecisionEndAt.textContent = `Horário final: ${formatTime(targetAction?.endAt || 0)}`;
+    }
+    if (startDecisionRepeatLabel) {
+      startDecisionRepeatLabel.textContent = `Natureza da recorrência: ${formatRepeatLabel(String(targetAction?.repeatRule || "none"), Array.isArray(targetAction?.repeatDays) ? targetAction.repeatDays : [])}`;
+    }
+    if (startDecisionMusicLabel) {
+      startDecisionMusicLabel.textContent = formatActionMusicDecisionLabel(targetAction);
     }
     if (startDecisionActions) {
       startDecisionActions.innerHTML = "";
@@ -3675,9 +3694,9 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
         const icons = {
           start: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
           start_chosen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
+          edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg>',
           postpone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm1 11.6V6h-2v7.4l5.2 3.1 1-1.7z"/></svg>',
           remove: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21a2 2 0 0 1-2-2V7h14v12a2 2 0 0 1-2 2zm2-10v8h2v-8zm4 0v8h2v-8zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
-          give_up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h7v8l9-9-9-9v8H4z"/></svg>',
           swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3 1.4-1.4L22 8l-5.6 5.4L15 12l3-3H7zm10 10H6l3 3-1.4 1.4L2 16l5.6-5.4L9 12l-3 3h11z"/></svg>',
           do_current: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
           cancel: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 6-6 1.4 1.4L9.8 11H18v2H9.8l3.6 3.6L12 18z"/></svg>'
@@ -3685,17 +3704,15 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
         const classMap = {
           start: "decision-btn decision-btn-start",
           start_chosen: "decision-btn decision-btn-start",
+          edit: "decision-btn decision-btn-edit",
           postpone: "decision-btn decision-btn-postpone",
           remove: "decision-btn decision-btn-remove",
-          give_up: "decision-btn decision-btn-giveup",
           swap: "decision-btn decision-btn-postpone",
           do_current: "decision-btn decision-btn-start",
           cancel: "decision-btn decision-btn-back"
         };
         btn.className = classMap[item.value] || (item.primary ? "primary-btn" : "ghost-btn");
-        btn.innerHTML = item.value === "cancel"
-          ? `${icons[item.value] || ""}`
-          : `${icons[item.value] || ""}<span>${escapeHtml(item.label)}</span>`;
+        btn.innerHTML = `${icons[item.value] || ""}<span>${escapeHtml(item.label)}</span>`;
         btn.addEventListener("click", () => closeStartDecisionModalWith(item.value));
         startDecisionActions.appendChild(btn);
       });
@@ -4149,34 +4166,47 @@ function renderTimePickers() {
     const type = container.dataset.timePicker;
     const hour = type === "start" ? state.wizard.startHour : state.wizard.endHour;
     const minute = type === "start" ? state.wizard.startMinute : state.wizard.endMinute;
+    const timeValue = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 
     container.innerHTML = `
-      <div class="time-row">
-        <button class="circle-nav" type="button" data-time="${type}" data-unit="hour" data-dir="-1" aria-label="Hora anterior">
-          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
+      <div class="native-time-picker">
+        <button class="native-time-trigger" type="button" data-open-native-time="${type}" aria-label="Escolher horário ${type === "start" ? "inicial" : "final"}">
+          <strong>${timeValue}</strong>
+          <span>Toque para abrir o relógio</span>
         </button>
-        <div>
-          <div class="time-value">${String(hour).padStart(2, "0")}</div>
-          <div class="time-caption">horas</div>
-        </div>
-        <button class="circle-nav" type="button" data-time="${type}" data-unit="hour" data-dir="1" aria-label="Proxima hora">
-          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
-        </button>
-      </div>
-      <div class="time-row">
-        <button class="circle-nav" type="button" data-time="${type}" data-unit="minute" data-dir="-1" aria-label="Minuto anterior">
-          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
-        </button>
-        <div>
-          <div class="time-value minute-value">${String(minute).padStart(2, "0")}</div>
-          <div class="time-caption">minutos</div>
-        </div>
-        <button class="circle-nav" type="button" data-time="${type}" data-unit="minute" data-dir="1" aria-label="Proximo minuto">
-          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
-        </button>
+        <input class="native-time-input" type="time" value="${timeValue}" step="60" data-native-time-input="${type}" aria-hidden="true" tabindex="-1" />
       </div>
     `;
   });
+}
+
+function openNativeTimePicker(type) {
+  const input = actionForm?.querySelector(`[data-native-time-input="${type}"]`);
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+  if (typeof input.showPicker === "function") {
+    input.showPicker();
+    return;
+  }
+  input.focus();
+  input.click();
+}
+
+function applyNativeTimeValue(type, value) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || "").trim());
+  if (!match) {
+    return;
+  }
+  const [, hourText, minuteText] = match;
+  if (type === "start") {
+    state.wizard.startHour = Number(hourText);
+    state.wizard.startMinute = Number(minuteText);
+  } else {
+    state.wizard.endHour = Number(hourText);
+    state.wizard.endMinute = Number(minuteText);
+  }
+  renderTimePickers();
 }
 
 function setRepeatMode(mode) {
@@ -4941,6 +4971,19 @@ function formatRepeatLabel(repeatRule, repeatDays) {
     return `Toda ${monthlyOrdinalLabels[state.wizard.monthlyOrdinalIndex]} ${monthlyWeekdayLabels[state.wizard.monthlyWeekdayIndex]}`;
   }
   return "Data única";
+}
+
+function formatActionMusicDecisionLabel(action) {
+  const mode = String(action?.musicDefaultMode || "").trim().toLowerCase();
+  const stationName = String(action?.musicStationName || "").trim();
+  const trackName = String(action?.musicTrackName || "").trim();
+  if (mode === "station" && stationName) {
+    return `Música padrão da atividade: ${stationName}`;
+  }
+  if (trackName) {
+    return `Música padrão da atividade: ${trackName}`;
+  }
+  return "Definir música";
 }
 
 function renderActionAiConfirmation(payload) {
@@ -6015,17 +6058,20 @@ taskTitle?.addEventListener("input", () => {
   }
   actionCategoryInterpretTimer = window.setTimeout(() => {
     void interpretActionCategoryFromTitle(title);
-  }, 320);
+  }, 3000);
 });
 closePlatformWizardButton?.addEventListener("click", closePlatformWizard);
 platformNameMicButton?.addEventListener("click", () => {
   void startPlatformNameMic();
 });
 
-wizardBackButton.addEventListener("click", () => {
+function stepWizardBack() {
   state.wizard.step = Math.max(1, state.wizard.step - 1);
   renderWizard();
-});
+}
+
+wizardHeaderBackButton?.addEventListener("click", stepWizardBack);
+wizardBackButton?.addEventListener("click", stepWizardBack);
 
 wizardNextButton.addEventListener("click", () => {
   if (!validateStep()) {
@@ -6237,6 +6283,11 @@ weekdayRow.addEventListener("click", (event) => {
 });
 
 actionForm.addEventListener("click", (event) => {
+  const nativeTimeButton = event.target.closest("[data-open-native-time]");
+  if (nativeTimeButton) {
+    openNativeTimePicker(nativeTimeButton.dataset.openNativeTime);
+    return;
+  }
   const button = event.target.closest("[data-time]");
 
   if (!button) {
@@ -6261,6 +6312,14 @@ actionForm.addEventListener("pointerdown", (event) => {
       moveTimeHoldFive(type, unit, dir);
     }, 500);
   }, 500);
+});
+
+actionForm.addEventListener("change", (event) => {
+  const input = event.target.closest("[data-native-time-input]");
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+  applyNativeTimeValue(input.dataset.nativeTimeInput, input.value);
 });
 
 ["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
@@ -6662,25 +6721,6 @@ runningTaskRestoreButton?.addEventListener("click", () => {
   if (!runningAction) return;
   openRunningConfirmModal("abort", runningAction, () => {
     void performRunningRestore(runningAction);
-  });
-});
-
-async function performRunningGiveUp(runningAction) {
-  try {
-    await markActionAsGivenUp(runningAction);
-    delete state.runningLocalStarts[String(runningAction.id || "")];
-    await loadActions();
-    startRunningTaskTicker();
-    closeRunningTaskModalWithFade();
-    window.setTimeout(() => openModal("actionsModal"), 500);
-  } catch {}
-}
-
-runningTaskGiveUpButton?.addEventListener("click", () => {
-  const runningAction = getRunningActionForSelectedProfile();
-  if (!runningAction) return;
-  openRunningConfirmModal("giveup", runningAction, () => {
-    void performRunningGiveUp(runningAction);
   });
 });
 
