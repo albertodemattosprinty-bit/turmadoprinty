@@ -65,9 +65,9 @@
         <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
         <span class="hub-label">Ações</span>
       </button>
-      <button class="hub-action hub-icon-only" type="button" data-open-modal="constitutionModal" aria-label="Constituição">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 3v5h4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-        <span class="hub-label">Constituição</span>
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="optionsModal" aria-label="Opções">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.8A3.2 3.2 0 1 0 12 15.2 3.2 3.2 0 0 0 12 8.8Zm9 3.2-.9-.5a8.8 8.8 0 0 0-.3-1.2l.7-.8a1 1 0 0 0-.1-1.4l-1-1a1 1 0 0 0-1.4-.1l-.8.7q-.57-.18-1.2-.3L15 3a1 1 0 0 0-1-.8h-2a1 1 0 0 0-1 .8l-.5.9q-.62.12-1.2.3l-.8-.7a1 1 0 0 0-1.4.1l-1 1a1 1 0 0 0-.1 1.4l.7.8q-.18.57-.3 1.2L3 11a1 1 0 0 0-.8 1v2a1 1 0 0 0 .8 1l.9.5q.12.62.3 1.2l-.7.8a1 1 0 0 0 .1 1.4l1 1a1 1 0 0 0 1.4.1l.8-.7q.57.18 1.2.3l.5.9a1 1 0 0 0 1 .8h2a1 1 0 0 0 1-.8l.5-.9q.62-.12 1.2-.3l.8.7a1 1 0 0 0 1.4-.1l1-1a1 1 0 0 0 .1-1.4l-.7-.8q.18-.57.3-1.2l.9-.5a1 1 0 0 0 .8-1v-2A1 1 0 0 0 21 12Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span class="hub-label">Opções</span>
       </button>
       <button class="hub-action hub-icon-only" type="button" data-open-modal="financeModal" aria-label="Plataforma">
         <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="7" cy="8" r="1"/></svg>
@@ -612,6 +612,21 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
         </button>
       </div>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal" id="optionsModal" aria-hidden="true" aria-label="Opções do aplicativo">
+    <div class="finance-content options-content">
+      <div class="running-music-default-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.8A3.2 3.2 0 1 0 12 15.2 3.2 3.2 0 0 0 12 8.8Zm9 3.2-.9-.5a8.8 8.8 0 0 0-.3-1.2l.7-.8a1 1 0 0 0-.1-1.4l-1-1a1 1 0 0 0-1.4-.1l-.8.7q-.57-.18-1.2-.3L15 3a1 1 0 0 0-1-.8h-2a1 1 0 0 0-1 .8l-.5.9q-.62.12-1.2.3l-.8-.7a1 1 0 0 0-1.4.1l-1 1a1 1 0 0 0-.1 1.4l.7.8q-.18.57-.3 1.2L3 11a1 1 0 0 0-.8 1v2a1 1 0 0 0 .8 1l.9.5q.12.62.3 1.2l-.7.8a1 1 0 0 0 .1 1.4l1 1a1 1 0 0 0 1.4.1l.8-.7q.57.18 1.2.3l.5.9a1 1 0 0 0 1 .8h2a1 1 0 0 0 1-.8l.5-.9q.62-.12 1.2-.3l.8.7a1 1 0 0 0 1.4-.1l1-1a1 1 0 0 0 .1-1.4l-.7-.8q.18-.57.3-1.2l.9-.5a1 1 0 0 0 .8-1v-2A1 1 0 0 0 21 12Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span>Opções</span>
+      </div>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="toggleFreeTimeOption">
+        <span class="running-music-default-top">Mostrar ou ocultar na lista e no fluxo</span>
+        <strong>Tempo livre</strong>
+        <span class="running-music-default-bottom" id="toggleFreeTimeHint">Mostrando</span>
+      </button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>
   </section>
 

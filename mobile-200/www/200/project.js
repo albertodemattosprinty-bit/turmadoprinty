@@ -3,6 +3,7 @@
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
 const sleepConfigKey = "project_200_sleep_v1";
+const optionsConfigKey = "project_200_options_v1";
 const defaultSaldoGoalCents = 1000000;
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const actionStatuses = {
@@ -239,6 +240,8 @@ const constitutionTextView = document.getElementById("constitutionTextView");
 const constitutionMessage = document.getElementById("constitutionMessage");
 const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
+const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption");
+const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
 const constitutionEditWrap = document.getElementById("constitutionEditWrap");
 const constitutionEditor = document.getElementById("constitutionEditor");
 const saveConstitutionEditButton = document.getElementById("saveConstitutionEdit");
@@ -542,6 +545,9 @@ const state = {
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState(),
   sleepConfig: { startHour: 23, startMinute: 0, endHour: 8, endMinute: 0 },
+  options: {
+    showFreeTime: true
+  },
   overlapResolver: null,
   overlapItems: [],
   overlapIndex: 0,
@@ -807,6 +813,7 @@ function buildActionTimelineEntries() {
   });
 
   return withoutFreeAfterSleep
+    .filter((entry) => state.options.showFreeTime || entry.kind !== "free")
     .filter((entry) => getActionDurationMinutes(entry) > 0)
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 }
@@ -2831,6 +2838,10 @@ function openModal(id) {
     void loadConstitution();
   }
 
+  if (id === "optionsModal") {
+    renderOptionsModal();
+  }
+
   if (id === "historyModal") {
     void (async () => {
       await loadHistoryFromApi();
@@ -3169,7 +3180,7 @@ function renderActions() {
         <img class="task-avatar" src="${slotAvatar}" alt="Descanso" loading="lazy" />
         <div class="task-main">
           <div class="task-title">Descanso</div>
-          <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
+          <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
         </div>
         <div class="task-time">${formatHourChip(action.startAt)}</div>
       `;
@@ -3188,7 +3199,7 @@ function renderActions() {
         <img class="task-avatar" src="${slotAvatar}" alt="Tempo livre" loading="lazy" />
         <div class="task-main">
           <div class="task-title">Tempo livre</div>
-          <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(duration)}</div>
+          <div class="task-assignee task-duration">${formatMinutesHuman(duration)}</div>
         </div>
         <div class="task-time">${formatHourChip(action.startAt)}</div>
       `;
@@ -3218,7 +3229,7 @@ function renderActions() {
       <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
         <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
-        <div class="task-assignee task-duration"><span class="task-duration-clock" aria-hidden="true"></span>${formatMinutesHuman(getActionDurationMinutes(action))}</div>
+        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
       </div>
       <div class="task-time">${formatHourChip(action.startAt)}</div>
     `;
@@ -6142,6 +6153,30 @@ if (window.history && typeof window.history.pushState === "function") {
   } catch {}
 }
 
+function loadOptionsConfig() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(optionsConfigKey) || "{}");
+    state.options.showFreeTime = parsed.showFreeTime !== false;
+  } catch {
+    state.options.showFreeTime = true;
+  }
+}
+
+function saveOptionsConfig() {
+  try {
+    window.localStorage.setItem(optionsConfigKey, JSON.stringify({
+      showFreeTime: Boolean(state.options.showFreeTime)
+    }));
+  } catch {}
+}
+
+function renderOptionsModal() {
+  if (toggleFreeTimeHint) {
+    toggleFreeTimeHint.textContent = state.options.showFreeTime ? "Mostrando" : "Ocultando";
+  }
+  toggleFreeTimeOptionButton?.classList.toggle("is-off", !state.options.showFreeTime);
+}
+
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", () => closeModal(button.closest(".workspace-modal")));
 });
@@ -6940,6 +6975,13 @@ runningMusicDefaultExecuteButton?.addEventListener("click", () => {
 runningMusicListDefaultButton?.addEventListener("click", () => {
   void saveRunningTaskDefault("track");
 });
+toggleFreeTimeOptionButton?.addEventListener("click", () => {
+  state.options.showFreeTime = !state.options.showFreeTime;
+  saveOptionsConfig();
+  renderOptionsModal();
+  renderActions();
+  renderHomeRunningTask();
+});
 startDecisionTaskTitle?.addEventListener("click", () => {
   const action = findActionById(state.startDecisionContext.actionId);
   if (!action) {
@@ -7341,6 +7383,7 @@ saveSleepConfigBtn?.addEventListener("click", () => {
 });
 
 loadSleepConfig();
+loadOptionsConfig();
 
 document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));

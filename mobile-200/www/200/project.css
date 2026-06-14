@@ -733,6 +733,16 @@ body.start-decision-open .home-running-btn {
   gap: 14px;
 }
 
+.options-content {
+  width: min(540px, 92vw);
+  display: grid;
+  gap: 14px;
+}
+
+.options-toggle-btn.is-off {
+  opacity: 0.72;
+}
+
 .running-music-default-title {
   display: flex;
   align-items: center;
@@ -2075,17 +2085,6 @@ body.running-music-standalone #actionsModal .actions-list {
 .task-duration {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.task-duration-clock {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  background-repeat: no-repeat;
-  background-size: contain;
-  opacity: 0.78;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8' fill='none' stroke='white' stroke-width='1.8'/%3E%3Cpath d='M12 12V7.3' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M12 12l3.2 2' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 @keyframes taskClockSpin {
