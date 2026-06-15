@@ -43,6 +43,7 @@ import {
 } from "./src/mini-courses.js";
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
 import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, hydrateMiniMediaLibraryFromDatabase, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
+import { insertMiniDocumentLinesAfter, replaceMiniDocumentLineRange, seedMiniDocumentFromDocxIfMissing, updateMiniDocumentLine } from "./src/mini-docs.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -92,12 +93,16 @@ const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
+const MINI_DOC_KEY_ALL_DOCS = "all-docs";
+const MINI_DOC_TITLE_ALL_DOCS = "AllDocs";
 
 const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
 const eduSongsDir = path.join(__dirname, "musicas Edu");
 const contextFilePath = path.join(__dirname, "contexto.txt");
 const contentDir = path.join(__dirname, "ConteÃºdo");
+const documentosDir = path.join(__dirname, "documentos");
+const allDocsFilePath = path.join(documentosDir, "AllDocs.docx");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
@@ -3917,6 +3922,212 @@ async function handleMiniMediaImageModelsRequest(request, response) {
     defaultModel: MINI_MEDIA_IMAGE_MODELS[0]?.id || "gpt-image-2",
     hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY)
   });
+}
+
+function splitMiniDocumentTextToLines(text) {
+  return String(text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd());
+}
+
+async function ensureAllDocsMiniDocument() {
+  return seedMiniDocumentFromDocxIfMissing(MINI_DOC_KEY_ALL_DOCS, MINI_DOC_TITLE_ALL_DOCS, allDocsFilePath);
+}
+
+async function handleMiniDocumentRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  try {
+    const document = await ensureAllDocsMiniDocument();
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      document
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o documento."
+    });
+  }
+}
+
+async function handleMiniDocumentLineUpdateRequest(request, response, lineNumber) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    await ensureAllDocsMiniDocument();
+    const document = await updateMiniDocumentLine(MINI_DOC_KEY_ALL_DOCS, lineNumber, body?.text || "");
+    if (!document) {
+      sendJson(response, 404, { error: "Documento nao encontrado." });
+      return;
+    }
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      document
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar a linha."
+    });
+  }
+}
+
+async function handleMiniDocumentInsertRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const lines = Array.isArray(body?.lines)
+    ? body.lines.map((item) => String(item || ""))
+    : splitMiniDocumentTextToLines(body?.text || "");
+
+  try {
+    await ensureAllDocsMiniDocument();
+    const document = await insertMiniDocumentLinesAfter(
+      MINI_DOC_KEY_ALL_DOCS,
+      Math.max(0, Number(body?.afterLineNumber || 0) || 0),
+      lines
+    );
+    if (!document) {
+      sendJson(response, 404, { error: "Documento nao encontrado." });
+      return;
+    }
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      document
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel inserir as linhas."
+    });
+  }
+}
+
+async function handleMiniDocumentRewriteRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const document = await ensureAllDocsMiniDocument();
+    const startLineNumber = Math.max(1, Number(body?.startLineNumber || 1) || 1);
+    const endLineNumber = Math.max(startLineNumber, Number(body?.endLineNumber || startLineNumber) || startLineNumber);
+    const selectedLines = (Array.isArray(document?.lines) ? document.lines : [])
+      .filter((line) => line.number >= startLineNumber && line.number <= endLineNumber)
+      .map((line) => String(line.text || ""));
+
+    if (!selectedLines.length) {
+      sendJson(response, 404, { error: "Trecho nao encontrado." });
+      return;
+    }
+
+    const prompt = String(body?.prompt || "").trim();
+    if (!prompt) {
+      sendJson(response, 400, { error: "Informe como a OpenAI deve editar o texto." });
+      return;
+    }
+
+    const mode = String(body?.mode || "editar").trim().toLowerCase() || "editar";
+    const completion = await createChatCompletion(apiKey, {
+      model: "gpt-4.1-mini",
+      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "Voce edita textos em portugues do Brasil para um documento infantil/cristao do projeto MINI.",
+            "Responda apenas com o texto final do trecho pedido.",
+            "Mantenha a divisao em linhas curtas; use quebras de linha reais quando fizer sentido.",
+            "Nao use markdown, cercas de codigo, numeracao ou comentarios extras."
+          ].join(" ")
+        },
+        {
+          role: "user",
+          content: [
+            `Modo pedido: ${mode}.`,
+            `Linhas atuais (${startLineNumber}-${endLineNumber}):`,
+            selectedLines.join("\n"),
+            "",
+            `Instrucao do administrador: ${prompt}`,
+            "",
+            "Entregue somente a nova versao do trecho."
+          ].join("\n")
+        }
+      ]
+    }, {
+      timeoutMs: 90000,
+      timeoutMessage: "A OpenAI demorou demais para editar o texto."
+    });
+
+    const rewrittenText = String(completion?.choices?.[0]?.message?.content || "").trim();
+    if (!rewrittenText) {
+      sendJson(response, 502, { error: "A OpenAI nao devolveu texto para substituir o trecho." });
+      return;
+    }
+
+    const replacementLines = splitMiniDocumentTextToLines(rewrittenText);
+    const updatedDocument = await replaceMiniDocumentLineRange(
+      MINI_DOC_KEY_ALL_DOCS,
+      startLineNumber,
+      endLineNumber,
+      replacementLines
+    );
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      document: updatedDocument,
+      feedback: `Trecho ${startLineNumber}-${endLineNumber} refeito com gpt-4.1-mini.`
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel refazer o trecho."
+    });
+  }
 }
 
 async function handleMiniMediaAlbumCreateRequest(request, response) {
@@ -7948,6 +8159,27 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/mini/aulas/gerar") {
     await handleMiniLessonPlanGenerate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/mini/docs/all-docs") {
+    await handleMiniDocumentRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/mini\/docs\/all-docs\/lines\/\d+$/)) {
+    const lineNumber = Number(pathname.replace(/^\/api\/mini\/docs\/all-docs\/lines\/(\d+)$/, "$1")) || 1;
+    await handleMiniDocumentLineUpdateRequest(request, response, lineNumber);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/mini/docs/all-docs/insert") {
+    await handleMiniDocumentInsertRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/mini/docs/all-docs/rewrite") {
+    await handleMiniDocumentRewriteRequest(request, response);
     return;
   }
 

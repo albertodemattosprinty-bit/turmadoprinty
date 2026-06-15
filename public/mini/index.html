@@ -1702,6 +1702,341 @@
       cursor: pointer;
       width: min(100%, 320px);
     }
+    .course-intro-media-button {
+      border: 0;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #ffbd59, #f17823);
+      color: #fff;
+      min-width: 220px;
+      min-height: 52px;
+      padding: 0 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: var(--course-ui-font);
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      width: min(100%, 320px);
+      box-shadow: 0 18px 34px rgba(241, 120, 35, .22);
+    }
+    .course-intro-media-button svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+    .media-head {
+      align-items: center;
+    }
+    .media-head-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .media-docs-btn {
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 14px;
+      background: rgba(255,255,255,.18);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      box-shadow: 0 16px 26px rgba(7, 27, 49, .22);
+    }
+    .media-docs-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+    .mini-docs-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      background:
+        radial-gradient(circle at top, rgba(104, 183, 255, .18), transparent 42%),
+        linear-gradient(180deg, #f8f7f2 0%, #f2ead9 45%, #ead8ba 100%);
+      color: #3e2e20;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(14px);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .mini-docs-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .mini-docs-head {
+      display: grid;
+      grid-template-columns: 56px 1fr 56px;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 18px 8px;
+    }
+    .mini-docs-head-center {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      text-align: center;
+    }
+    .mini-docs-head-center strong {
+      font-size: 18px;
+      letter-spacing: .01em;
+    }
+    .mini-docs-head-center span {
+      font-size: 12px;
+      color: rgba(62, 46, 32, .7);
+      text-transform: uppercase;
+      letter-spacing: .14em;
+    }
+    .mini-docs-top-btn {
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(37, 29, 18, .18);
+    }
+    .mini-docs-top-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+    .mini-docs-top-btn.copy {
+      background: linear-gradient(145deg, #49c96e, #188f43);
+    }
+    .mini-docs-top-btn.cursor {
+      background: linear-gradient(145deg, #68b7ff, #2f5fe7);
+    }
+    .mini-docs-top-btn.cursor.is-active {
+      box-shadow: 0 0 0 4px rgba(47, 95, 231, .16), 0 16px 30px rgba(47, 95, 231, .24);
+    }
+    .mini-docs-top-btn.close {
+      background: linear-gradient(145deg, #f0935d, #d95d23);
+    }
+    .mini-docs-status {
+      padding: 0 20px 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(62, 46, 32, .82);
+      text-align: center;
+    }
+    .mini-docs-lines {
+      overflow: auto;
+      padding: 8px 14px 28px;
+      overscroll-behavior: contain;
+    }
+    .mini-docs-line {
+      width: 100%;
+      border: 0;
+      background: rgba(255,255,255,.68);
+      border-radius: 18px;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) 42px;
+      align-items: start;
+      gap: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 10px 22px rgba(116, 92, 58, .09);
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+      transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+    .mini-docs-line.is-selected {
+      background: rgba(73, 201, 110, .22);
+      box-shadow: 0 14px 24px rgba(27, 123, 56, .16);
+    }
+    .mini-docs-line.is-cursor {
+      background: rgba(104, 183, 255, .18);
+      box-shadow: 0 14px 24px rgba(47, 95, 231, .12);
+    }
+    .mini-docs-line-number {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      color: rgba(62, 46, 32, .52);
+      text-transform: uppercase;
+      padding-top: 4px;
+    }
+    .mini-docs-line-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 17px;
+      line-height: 1.65;
+    }
+    .mini-docs-line-text.is-empty {
+      opacity: .42;
+      font-style: italic;
+    }
+    .mini-docs-line-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1.08em;
+      margin-left: 4px;
+      vertical-align: -0.12em;
+      background: currentColor;
+      animation: mini-docs-blink .9s steps(1, end) infinite;
+    }
+    @keyframes mini-docs-blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    .mini-docs-line-edit {
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 12px;
+      background: rgba(47, 95, 231, .12);
+      color: #2f5fe7;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .mini-docs-line-edit svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+    .mini-docs-editor {
+      display: grid;
+      gap: 10px;
+    }
+    .mini-docs-editor textarea {
+      width: 100%;
+      min-height: 120px;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 16px;
+      resize: vertical;
+      font: inherit;
+      line-height: 1.6;
+      color: #3e2e20;
+      background: rgba(255,255,255,.92);
+      box-shadow: inset 0 0 0 1px rgba(47, 95, 231, .12);
+    }
+    .mini-docs-editor-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .mini-docs-editor-actions button,
+    .mini-docs-composer button,
+    .mini-docs-ai-actions button {
+      border: 0;
+      border-radius: 14px;
+      min-height: 44px;
+      padding: 0 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .mini-docs-editor-actions .ghost,
+    .mini-docs-ai-actions .ghost {
+      background: rgba(62, 46, 32, .1);
+      color: #3e2e20;
+    }
+    .mini-docs-editor-actions .save,
+    .mini-docs-composer .save,
+    .mini-docs-ai-actions .save {
+      background: linear-gradient(145deg, #68b7ff, #2f5fe7);
+      color: #fff;
+    }
+    .mini-docs-composer {
+      display: none;
+      gap: 10px;
+      padding: 14px 16px 18px;
+      background: rgba(255,255,255,.74);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(62, 46, 32, .08);
+    }
+    .mini-docs-composer.is-active {
+      display: grid;
+    }
+    .mini-docs-composer textarea,
+    .mini-docs-ai-panel textarea {
+      width: 100%;
+      min-height: 86px;
+      border: 0;
+      border-radius: 16px;
+      padding: 14px 16px;
+      resize: vertical;
+      font: inherit;
+      line-height: 1.55;
+      color: #3e2e20;
+      background: rgba(255,255,255,.96);
+      box-shadow: inset 0 0 0 1px rgba(47, 95, 231, .12);
+    }
+    .mini-docs-composer-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: rgba(62, 46, 32, .58);
+    }
+    .mini-docs-ai-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 71;
+      background: rgba(15, 20, 28, .48);
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+    .mini-docs-ai-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .mini-docs-ai-panel {
+      width: min(680px, 100%);
+      border-radius: 28px;
+      background: linear-gradient(180deg, #fffdf7 0%, #fff4df 100%);
+      box-shadow: 0 26px 60px rgba(28, 21, 13, .22);
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+      color: #3e2e20;
+    }
+    .mini-docs-ai-panel h3 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.1;
+    }
+    .mini-docs-ai-panel p {
+      margin: 0;
+      line-height: 1.55;
+      color: rgba(62, 46, 32, .76);
+    }
+    .mini-docs-ai-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    @media (max-width: 900px) {
+      .mini-docs-head {
+        grid-template-columns: 48px 1fr 48px;
+        padding: 14px 14px 8px;
+      }
+      .mini-docs-line {
+        grid-template-columns: 48px minmax(0, 1fr) 38px;
+        padding: 12px 13px;
+      }
+      .mini-docs-line-text {
+        font-size: 16px;
+      }
+    }
     .course-page-shell {
       max-width: 960px;
       margin: 0 auto;
@@ -3364,6 +3699,11 @@
         <h2 id="mediaTitle">Midia</h2>
         <p id="mediaSubtitle"></p>
       </div>
+      <div class="media-head-actions">
+        <button id="openMiniDocsFromMedia" class="media-docs-btn" type="button" aria-label="Abrir documento indexado" hidden>
+          <svg viewBox="0 0 24 24"><path d="M7 2.75A2.75 2.75 0 0 0 4.25 5.5v13A2.75 2.75 0 0 0 7 21.25h10A2.75 2.75 0 0 0 19.75 18.5V8.56a2.74 2.74 0 0 0-.81-1.94l-3.56-3.56a2.74 2.74 0 0 0-1.94-.81Zm0 1.5h6.25v3.5a1.75 1.75 0 0 0 1.75 1.75h3.25v9a1.25 1.25 0 0 1-1.25 1.25H7a1.25 1.25 0 0 1-1.25-1.25v-13A1.25 1.25 0 0 1 7 4.25Zm7.75.69 2.81 2.81H15a.25.25 0 0 1-.25-.25Zm-6 7.31h6.5v1.5h-6.5Zm0 3.5h6.5v1.5h-6.5Zm0-7h3.5v1.5h-3.5Z"/></svg>
+        </button>
+      </div>
     </header>
     <div class="media-tabs">
       <button id="mediaTabSongs" class="media-tab is-active" type="button">Músicas</button>
@@ -3394,6 +3734,45 @@
       </button>
     </footer>
     <input id="mediaInlineTracksInput" type="file" accept="audio/*" multiple hidden>
+  </section>
+
+  <section id="miniDocsModal" class="mini-docs-modal" aria-hidden="true">
+    <header class="mini-docs-head">
+      <button id="miniDocsCopyButton" class="mini-docs-top-btn copy" type="button" aria-label="Copiar trecho selecionado" hidden>
+        <svg viewBox="0 0 24 24"><path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m0 16H10V7h9z"/></svg>
+      </button>
+      <div class="mini-docs-head-center">
+        <button id="miniDocsCursorButton" class="mini-docs-top-btn cursor" type="button" aria-label="Ativar cursor para inserir novas linhas">
+          <svg viewBox="0 0 24 24"><path d="M9 3h2v18H9zm4 0h2v18h-2zM5 5h14v2H5zm0 12h14v2H5z"/></svg>
+        </button>
+        <span>AllDocs Imersivo</span>
+      </div>
+      <button id="closeMiniDocs" class="mini-docs-top-btn close" type="button" aria-label="Fechar documento">
+        <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+      </button>
+    </header>
+    <div id="miniDocsStatus" class="mini-docs-status">Segure uma linha por 500ms para iniciar a selecao. Deslize para baixo para pedir uma nova versao com IA e para cima para cancelar.</div>
+    <div id="miniDocsLines" class="mini-docs-lines"></div>
+    <div id="miniDocsComposer" class="mini-docs-composer">
+      <div class="mini-docs-composer-title">Cursor de insercao</div>
+      <textarea id="miniDocsComposerInput" placeholder="Cole ou escreva aqui. Cada quebra de linha vira uma nova linha abaixo do cursor."></textarea>
+      <div class="mini-docs-editor-actions mini-docs-composer-actions">
+        <button id="miniDocsComposerCancel" class="ghost" type="button">Cancelar</button>
+        <button id="miniDocsComposerSave" class="save" type="button">Inserir linhas</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="miniDocsAiModal" class="mini-docs-ai-modal" aria-hidden="true">
+    <div class="mini-docs-ai-panel" role="dialog" aria-modal="true" aria-labelledby="miniDocsAiTitle">
+      <h3 id="miniDocsAiTitle">Refazer com OpenAI</h3>
+      <p id="miniDocsAiRangeLabel">Descreva como esse trecho deve ser editado ou refeito.</p>
+      <textarea id="miniDocsAiPrompt" placeholder="Ex.: deixe mais infantil, mais curto, mais emocional ou refaça do zero mantendo o tema."></textarea>
+      <div class="mini-docs-ai-actions">
+        <button id="miniDocsAiCancel" class="ghost" type="button">Cancelar</button>
+        <button id="miniDocsAiSubmit" class="save" type="button">Enviar para IA</button>
+      </div>
+    </div>
   </section>
 
   <section id="mediaUploadModal" class="mini-plans-modal" aria-hidden="true">
@@ -3866,6 +4245,18 @@
     let mediaResourceAssets = [];
     let mediaImageModels = [];
     let mediaImageDefaultModel = "gpt-image-2";
+    let miniDocsState = {
+      document: null,
+      loading: false,
+      selectionStart: 0,
+      selectionEnd: 0,
+      editingLineNumber: 0,
+      editingDraft: "",
+      cursorActive: false,
+      cursorLineNumber: 1,
+      dragStartY: 0,
+      longPressTimer: 0
+    };
     const mediaPreviewState = {
       key: "",
       song: null,
@@ -3957,6 +4348,9 @@
     function getMediaSparkSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zm7 11 1 2.7L23 18l-3 1.3L19 22l-1.1-2.7L15 18l2.9-1.3zM5 15l.9 2.3L8 18l-2.1.7L5 21l-.9-2.3L2 18l2.1-.7z"/></svg>`;
     }
+    function getMiniDocsEditSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>`;
+    }
     function buildMediaTrackKey(scopeId, songId) {
       return `${String(scopeId || "songs")}::${String(songId || "track")}`;
     }
@@ -3981,6 +4375,388 @@
       if (modal) {
         modal.classList.toggle("is-editing", Boolean(mediaAlbumEditMode));
       }
+    }
+    function updateMediaDocsButton() {
+      const button = $("openMiniDocsFromMedia");
+      if (!button) {
+        return;
+      }
+      button.hidden = !isMiniMediaAdmin();
+    }
+    function setMiniDocsStatus(text) {
+      const node = $("miniDocsStatus");
+      if (node) {
+        node.textContent = text || "";
+      }
+    }
+    function getMiniDocsLines() {
+      return Array.isArray(miniDocsState.document?.lines) ? miniDocsState.document.lines : [];
+    }
+    function isMiniDocsSelectionActive() {
+      return Number(miniDocsState.selectionStart || 0) > 0 && Number(miniDocsState.selectionEnd || 0) > 0;
+    }
+    function getMiniDocsSelectionRange() {
+      if (!isMiniDocsSelectionActive()) {
+        return null;
+      }
+      const start = Math.min(miniDocsState.selectionStart, miniDocsState.selectionEnd);
+      const end = Math.max(miniDocsState.selectionStart, miniDocsState.selectionEnd);
+      return { start, end };
+    }
+    function getMiniDocsSelectionLines() {
+      const range = getMiniDocsSelectionRange();
+      if (!range) {
+        return [];
+      }
+      return getMiniDocsLines().filter((line) => line.number >= range.start && line.number <= range.end);
+    }
+    function clearMiniDocsSelection({ keepStatus = false } = {}) {
+      miniDocsState.selectionStart = 0;
+      miniDocsState.selectionEnd = 0;
+      if (!keepStatus) {
+        setMiniDocsStatus("Selecao cancelada.");
+      }
+      renderMiniDocsModal();
+    }
+    function closeMiniDocsAiModal() {
+      $("miniDocsAiModal")?.classList.remove("show");
+      $("miniDocsAiModal")?.setAttribute("aria-hidden", "true");
+      $("miniDocsAiPrompt").value = "";
+    }
+    function getMiniDocsActiveRange() {
+      const selection = getMiniDocsSelectionRange();
+      if (selection) {
+        return selection;
+      }
+      const lineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
+      return { start: lineNumber, end: lineNumber };
+    }
+    function openMiniDocsAiModal() {
+      const range = getMiniDocsActiveRange();
+      $("miniDocsAiRangeLabel").textContent = range.start === range.end
+        ? `A IA vai editar a linha ${range.start}.`
+        : `A IA vai editar o trecho da linha ${range.start} ate a ${range.end}.`;
+      $("miniDocsAiModal")?.classList.add("show");
+      $("miniDocsAiModal")?.setAttribute("aria-hidden", "false");
+      $("miniDocsAiPrompt").focus();
+    }
+    function setMiniDocsCursorActive(active) {
+      miniDocsState.cursorActive = Boolean(active);
+      const composer = $("miniDocsComposer");
+      const cursorButton = $("miniDocsCursorButton");
+      composer?.classList.toggle("is-active", miniDocsState.cursorActive);
+      cursorButton?.classList.toggle("is-active", miniDocsState.cursorActive);
+      if (miniDocsState.cursorActive) {
+        miniDocsState.cursorLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
+        $("miniDocsComposerInput").focus();
+        setMiniDocsStatus(`Cursor ativo na linha ${miniDocsState.cursorLineNumber}. O texto inserido entra abaixo dela.`);
+      } else {
+        $("miniDocsComposerInput").value = "";
+      }
+      renderMiniDocsModal();
+    }
+    function beginMiniDocsInlineEdit(lineNumber) {
+      const line = getMiniDocsLines().find((item) => item.number === lineNumber);
+      if (!line) {
+        return;
+      }
+      miniDocsState.editingLineNumber = lineNumber;
+      miniDocsState.editingDraft = String(line.text || "");
+      renderMiniDocsModal();
+      const input = document.querySelector(`[data-mini-docs-editor="${lineNumber}"]`);
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
+      setMiniDocsStatus(`Editando somente a linha ${lineNumber}.`);
+    }
+    async function saveMiniDocsInlineEdit() {
+      const lineNumber = Number(miniDocsState.editingLineNumber || 0) || 0;
+      if (!lineNumber) {
+        return;
+      }
+      try {
+        setMiniDocsStatus(`Salvando linha ${lineNumber}...`);
+        const response = await apiMini(`/api/mini/docs/all-docs/lines/${lineNumber}`, {
+          method: "PATCH",
+          body: JSON.stringify({ text: miniDocsState.editingDraft || "" })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel salvar a linha.");
+        }
+        miniDocsState.document = payload.document || miniDocsState.document;
+        miniDocsState.editingLineNumber = 0;
+        miniDocsState.editingDraft = "";
+        renderMiniDocsModal();
+        setMiniDocsStatus(`Linha ${lineNumber} salva no Postgres.`);
+      } catch (error) {
+        setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel salvar a linha.");
+      }
+    }
+    async function insertMiniDocsComposerLines() {
+      const text = String($("miniDocsComposerInput").value || "").replace(/\r\n/g, "\n").trim();
+      if (!text) {
+        setMiniDocsStatus("Escreva ou cole algum texto antes de inserir.");
+        return;
+      }
+      try {
+        const response = await apiMini("/api/mini/docs/all-docs/insert", {
+          method: "POST",
+          body: JSON.stringify({
+            afterLineNumber: Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1),
+            text
+          })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel inserir novas linhas.");
+        }
+        miniDocsState.document = payload.document || miniDocsState.document;
+        miniDocsState.cursorLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1) + text.split(/\r?\n/).length;
+        $("miniDocsComposerInput").value = "";
+        renderMiniDocsModal();
+        setMiniDocsStatus("Novas linhas inseridas abaixo do cursor.");
+      } catch (error) {
+        setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel inserir novas linhas.");
+      }
+    }
+    async function copyMiniDocsSelection() {
+      const selectedLines = getMiniDocsSelectionLines();
+      if (!selectedLines.length) {
+        setMiniDocsStatus("Escolha ao menos uma linha para copiar.");
+        return;
+      }
+      const text = selectedLines.map((line) => line.text || "").join("\n");
+      try {
+        await navigator.clipboard.writeText(text);
+        setMiniDocsStatus(`${selectedLines.length} linha(s) copiadas.`);
+      } catch {
+        setMiniDocsStatus("Nao foi possivel copiar agora.");
+      }
+    }
+    async function submitMiniDocsAiRewrite() {
+      const prompt = String($("miniDocsAiPrompt").value || "").trim();
+      if (!prompt) {
+        setMiniDocsStatus("Descreva para a IA como o texto deve ficar.");
+        return;
+      }
+      const range = getMiniDocsActiveRange();
+      try {
+        setMiniDocsStatus(`Refazendo trecho ${range.start}-${range.end} com IA...`);
+        const response = await apiMini("/api/mini/docs/all-docs/rewrite", {
+          method: "POST",
+          body: JSON.stringify({
+            startLineNumber: range.start,
+            endLineNumber: range.end,
+            prompt,
+            mode: range.start === range.end ? "editar linha" : "refazer trecho"
+          }),
+          timeoutMs: 100000,
+          timeoutMessage: "A OpenAI demorou demais para refazer esse trecho."
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel refazer o trecho.");
+        }
+        miniDocsState.document = payload.document || miniDocsState.document;
+        miniDocsState.selectionStart = 0;
+        miniDocsState.selectionEnd = 0;
+        miniDocsState.editingLineNumber = 0;
+        closeMiniDocsAiModal();
+        renderMiniDocsModal();
+        setMiniDocsStatus(payload.feedback || "Trecho refeito com OpenAI.");
+      } catch (error) {
+        setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel refazer o trecho.");
+      }
+    }
+    function handleMiniDocsSwipe(deltaY) {
+      if (deltaY <= -70) {
+        clearMiniDocsSelection();
+        return true;
+      }
+      if (deltaY >= 90) {
+        openMiniDocsAiModal();
+        return true;
+      }
+      return false;
+    }
+    function renderMiniDocsModal() {
+      const container = $("miniDocsLines");
+      const copyButton = $("miniDocsCopyButton");
+      if (!container || !$("miniDocsModal")) {
+        return;
+      }
+      updateMediaDocsButton();
+      const lines = getMiniDocsLines();
+      copyButton.hidden = !isMiniDocsSelectionActive();
+      $("miniDocsCursorButton")?.classList.toggle("is-active", miniDocsState.cursorActive);
+      if (miniDocsState.loading) {
+        container.innerHTML = `<div class="courses-empty">Carregando documento...</div>`;
+        return;
+      }
+      if (!lines.length) {
+        container.innerHTML = `<div class="courses-empty">Nao ha linhas disponiveis.</div>`;
+        return;
+      }
+      const selection = getMiniDocsSelectionRange();
+      container.innerHTML = lines.map((line) => {
+        const isSelected = selection && line.number >= selection.start && line.number <= selection.end;
+        const isCursor = miniDocsState.cursorActive && line.number === Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
+        const isEditing = Number(miniDocsState.editingLineNumber || 0) === line.number;
+        const safeText = String(line.text || "");
+        if (isEditing) {
+          return `
+            <article class="mini-docs-line is-cursor" data-mini-docs-line="${line.number}">
+              <div class="mini-docs-line-number">#${line.number}</div>
+              <div class="mini-docs-editor">
+                <textarea data-mini-docs-editor="${line.number}">${escapeText(miniDocsState.editingDraft || safeText)}</textarea>
+                <div class="mini-docs-editor-actions">
+                  <button class="ghost" type="button" data-mini-docs-cancel-edit="${line.number}">Cancelar</button>
+                  <button class="save" type="button" data-mini-docs-save-edit="${line.number}">Salvar</button>
+                </div>
+              </div>
+              <div></div>
+            </article>
+          `;
+        }
+        return `
+          <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}" data-mini-docs-line="${line.number}" tabindex="0" role="button" aria-label="Linha ${line.number}">
+            <div class="mini-docs-line-number">#${line.number}</div>
+            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${safeText ? escapeText(safeText) : "<span>Linha vazia</span>"}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
+            <button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>
+          </article>
+        `;
+      }).join("");
+
+      container.querySelectorAll("[data-mini-docs-line]").forEach((node) => {
+        const lineNumber = Number(node.getAttribute("data-mini-docs-line") || 0) || 0;
+        node.addEventListener("pointerdown", (event) => {
+          if (!lineNumber || event.target.closest("[data-mini-docs-edit]")) {
+            return;
+          }
+          if (miniDocsState.longPressTimer) {
+            window.clearTimeout(miniDocsState.longPressTimer);
+          }
+          miniDocsState.longPressTimer = window.setTimeout(() => {
+            miniDocsState.selectionStart = lineNumber;
+            miniDocsState.selectionEnd = lineNumber;
+            miniDocsState.cursorLineNumber = lineNumber;
+            renderMiniDocsModal();
+            setMiniDocsStatus(`Selecao iniciada na linha ${lineNumber}. Toque em outra linha para fechar o trecho.`);
+            miniDocsState.longPressTimer = 0;
+          }, 500);
+        });
+        ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
+          node.addEventListener(eventName, () => {
+            if (miniDocsState.longPressTimer) {
+              window.clearTimeout(miniDocsState.longPressTimer);
+              miniDocsState.longPressTimer = 0;
+            }
+          });
+        });
+        node.addEventListener("click", (event) => {
+          if (event.target.closest("[data-mini-docs-edit]")) {
+            return;
+          }
+          if (isMiniDocsSelectionActive()) {
+            miniDocsState.selectionEnd = lineNumber;
+            renderMiniDocsModal();
+            const range = getMiniDocsSelectionRange();
+            setMiniDocsStatus(`Trecho selecionado: linhas ${range.start} ate ${range.end}.`);
+            return;
+          }
+          miniDocsState.cursorLineNumber = lineNumber;
+          if (miniDocsState.cursorActive) {
+            $("miniDocsComposerInput").focus();
+            setMiniDocsStatus(`Cursor movido para a linha ${lineNumber}. O texto novo entra abaixo dela.`);
+          } else {
+            setMiniDocsStatus(`Linha ${lineNumber} em foco.`);
+          }
+          renderMiniDocsModal();
+        });
+        node.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            node.click();
+          }
+        });
+      });
+
+      container.querySelectorAll("[data-mini-docs-edit]").forEach((button) => {
+        button.onclick = (event) => {
+          event.stopPropagation();
+          beginMiniDocsInlineEdit(Number(button.getAttribute("data-mini-docs-edit") || 0) || 0);
+        };
+      });
+      container.querySelectorAll("[data-mini-docs-editor]").forEach((textarea) => {
+        textarea.addEventListener("input", () => {
+          miniDocsState.editingDraft = textarea.value;
+        });
+        textarea.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            miniDocsState.editingLineNumber = 0;
+            miniDocsState.editingDraft = "";
+            renderMiniDocsModal();
+          }
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            void saveMiniDocsInlineEdit();
+          }
+        });
+      });
+      container.querySelectorAll("[data-mini-docs-cancel-edit]").forEach((button) => {
+        button.onclick = () => {
+          miniDocsState.editingLineNumber = 0;
+          miniDocsState.editingDraft = "";
+          renderMiniDocsModal();
+          setMiniDocsStatus("Edicao cancelada.");
+        };
+      });
+      container.querySelectorAll("[data-mini-docs-save-edit]").forEach((button) => {
+        button.onclick = () => {
+          void saveMiniDocsInlineEdit();
+        };
+      });
+    }
+    async function loadMiniDocsDocument(force = false) {
+      if (miniDocsState.loading) {
+        return;
+      }
+      if (miniDocsState.document && !force) {
+        return;
+      }
+      miniDocsState.loading = true;
+      renderMiniDocsModal();
+      try {
+        const response = await apiMini("/api/mini/docs/all-docs");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel carregar o documento.");
+        }
+        miniDocsState.document = payload.document || null;
+        miniDocsState.cursorLineNumber = Math.max(1, Number(miniDocsState.document?.lines?.[0]?.number || 1) || 1);
+        setMiniDocsStatus("Documento carregado. Segure uma linha por 500ms para selecionar um trecho.");
+      } catch (error) {
+        setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel carregar o documento.");
+      } finally {
+        miniDocsState.loading = false;
+        renderMiniDocsModal();
+      }
+    }
+    async function openMiniDocsModal() {
+      $("miniDocsModal").classList.add("show");
+      $("miniDocsModal").setAttribute("aria-hidden", "false");
+      await loadMiniDocsDocument();
+      renderMiniDocsModal();
+    }
+    function closeMiniDocsModal() {
+      $("miniDocsModal").classList.remove("show");
+      $("miniDocsModal").setAttribute("aria-hidden", "true");
+      closeMiniDocsAiModal();
+      miniDocsState.editingLineNumber = 0;
+      miniDocsState.editingDraft = "";
+      miniDocsState.selectionStart = 0;
+      miniDocsState.selectionEnd = 0;
+      setMiniDocsCursorActive(false);
     }
     function renderMediaImageModelOptions() {
       const select = $("mediaImageModelSelect");
@@ -5209,6 +5985,8 @@
         return;
       }
 
+      updateMediaDocsButton();
+
       applyMediaEditModeUi();
 
       songsTab.classList.toggle("is-active", mediaActiveTab === "songs");
@@ -5397,6 +6175,7 @@
       mediaActiveAlbumId = "";
       mediaAlbumEditMode = false;
       resetMediaPreviewState();
+      updateMediaDocsButton();
       $("mediaModal").classList.add("show");
       $("mediaModal").setAttribute("aria-hidden", "false");
       renderMediaModal();
@@ -5444,6 +6223,7 @@
       resetMediaPreviewState();
       mediaAlbumEditMode = false;
       applyMediaEditModeUi();
+      closeMiniDocsModal();
       closeMediaUploadModal();
       closeMediaImageGenModal();
       closeMediaLyricsModal();
@@ -7405,6 +8185,10 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>
                 <span>${hasStarted ? `Continuar leitura | ${progressPercent}%` : "Iniciar leitura"}</span>
               </button>
+              <button id="openMiniCourseMediaButton" class="course-intro-media-button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v10.55A4 4 0 1 0 16 17V8h4V3z"/></svg>
+                <span>Ver músicas</span>
+              </button>
               <button id="backMiniCourseButton" class="course-intro-secondary" type="button">Voltar</button>
             </div>
           </div>
@@ -7431,6 +8215,13 @@
       if (backActionButton) {
         backActionButton.onclick = () => {
           closeMiniCoursesModal();
+        };
+      }
+      const mediaButton = $("openMiniCourseMediaButton");
+      if (mediaButton) {
+        mediaButton.onclick = async () => {
+          closeMiniCoursesModal();
+          await openMediaModal();
         };
       }
     }
@@ -8818,8 +9609,14 @@
     $("openMidia").onclick = async () => {
       await openMediaModal();
     };
+    $("openMiniDocsFromMedia").onclick = async () => {
+      await openMiniDocsModal();
+    };
     $("closeMidia").onclick = () => {
       closeMediaModal();
+    };
+    $("closeMiniDocs").onclick = () => {
+      closeMiniDocsModal();
     };
     $("closeMediaUpload").onclick = () => {
       closeMediaUploadModal();
@@ -8845,6 +9642,58 @@
     $("submitMediaPlayback").onclick = async () => {
       await submitMediaPlayback();
     };
+    $("miniDocsCopyButton").onclick = async () => {
+      await copyMiniDocsSelection();
+    };
+    $("miniDocsCursorButton").onclick = () => {
+      setMiniDocsCursorActive(!miniDocsState.cursorActive);
+    };
+    $("miniDocsComposerCancel").onclick = () => {
+      setMiniDocsCursorActive(false);
+      setMiniDocsStatus("Insercao cancelada.");
+    };
+    $("miniDocsComposerSave").onclick = async () => {
+      await insertMiniDocsComposerLines();
+    };
+    $("miniDocsAiCancel").onclick = () => {
+      closeMiniDocsAiModal();
+      setMiniDocsStatus("Refacao com IA cancelada.");
+    };
+    $("miniDocsAiSubmit").onclick = async () => {
+      await submitMiniDocsAiRewrite();
+    };
+    $("miniDocsLines").addEventListener("touchstart", (event) => {
+      miniDocsState.dragStartY = event.touches?.[0]?.clientY || 0;
+    }, { passive: true });
+    $("miniDocsLines").addEventListener("touchend", (event) => {
+      const endY = event.changedTouches?.[0]?.clientY || 0;
+      const deltaY = endY - (miniDocsState.dragStartY || 0);
+      if (Math.abs(deltaY) >= 70) {
+        handleMiniDocsSwipe(deltaY);
+      }
+    }, { passive: true });
+    document.addEventListener("keydown", (event) => {
+      if ($("miniDocsModal")?.getAttribute("aria-hidden") !== "false") {
+        return;
+      }
+      if (event.key === "Escape") {
+        if ($("miniDocsAiModal")?.getAttribute("aria-hidden") === "false") {
+          closeMiniDocsAiModal();
+          setMiniDocsStatus("Refacao com IA cancelada.");
+          return;
+        }
+        if (isMiniDocsSelectionActive()) {
+          clearMiniDocsSelection();
+          return;
+        }
+        if (miniDocsState.editingLineNumber) {
+          miniDocsState.editingLineNumber = 0;
+          miniDocsState.editingDraft = "";
+          renderMiniDocsModal();
+          setMiniDocsStatus("Edicao cancelada.");
+        }
+      }
+    });
     $("mediaResourceTabText").onclick = () => {
       mediaResourceActiveTab = "text";
       renderMediaResourceModal();
