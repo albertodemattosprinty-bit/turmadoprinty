@@ -177,9 +177,15 @@
         linear-gradient(180deg, #f3f5f8 0%, #eef1f5 100%);
     }
     .media-head {
-      display: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px 2px;
     }
     .media-head-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
       min-width: 0;
     }
     .media-head-copy h2 {
@@ -1737,9 +1743,6 @@
       height: 20px;
       fill: currentColor;
     }
-    .media-head {
-      align-items: center;
-    }
     .media-head-actions {
       margin-left: auto;
       display: flex;
@@ -1751,12 +1754,12 @@
       height: 44px;
       border: 0;
       border-radius: 14px;
-      background: rgba(255,255,255,.18);
-      color: #fff;
+      background: rgba(59, 102, 255, .12);
+      color: #2f5fe7;
       display: grid;
       place-items: center;
       cursor: pointer;
-      box-shadow: 0 16px 26px rgba(7, 27, 49, .22);
+      box-shadow: 0 12px 24px rgba(47, 95, 231, .16);
     }
     .media-docs-btn svg {
       width: 22px;
