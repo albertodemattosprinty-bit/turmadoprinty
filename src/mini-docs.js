@@ -11,7 +11,7 @@ function normalizeDocKey(value) {
 }
 
 function normalizeLineText(value) {
-  return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+  return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 }
 
 function decodeXmlEntities(text) {
@@ -296,6 +296,28 @@ export async function seedMiniDocumentFromJsonIfMissing(docKey, title, filePath)
     await saveDocumentLines(client, documentRow.id, lines);
     const lineRows = await getDocumentLinesById(client, documentRow.id);
     return buildDocumentPayload(documentRow, lineRows);
+  });
+}
+
+export async function ensureMiniDocumentExists(docKey, title) {
+  await ensureMiniDocsSchema();
+
+  return withTransaction(async (client) => {
+    const existing = await getDocumentRowByKey(client, docKey);
+    if (existing) {
+      const lineRows = await getDocumentLinesById(client, existing.id);
+      return buildDocumentPayload(existing, lineRows);
+    }
+
+    const insertResult = await client.query(
+      `
+        insert into mini_documents (doc_key, title, source_path, source_hash)
+        values ($1, $2, $3, $4)
+        returning *
+      `,
+      [normalizeDocKey(docKey), String(title || "Documento").trim() || "Documento", "", ""]
+    );
+    return buildDocumentPayload(insertResult.rows[0], []);
   });
 }
 

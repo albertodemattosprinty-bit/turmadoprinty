@@ -43,7 +43,7 @@ import {
 } from "./src/mini-courses.js";
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
 import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, hydrateMiniMediaLibraryFromDatabase, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
-import { insertMiniDocumentLinesAfter, replaceMiniDocumentLineRange, seedMiniDocumentFromJsonIfMissing, updateMiniDocumentLine } from "./src/mini-docs.js";
+import { ensureMiniDocumentExists, insertMiniDocumentLinesAfter, replaceMiniDocumentLineRange, updateMiniDocumentLine } from "./src/mini-docs.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -101,7 +101,6 @@ const imagesDir = path.join(__dirname, "images");
 const eduSongsDir = path.join(__dirname, "musicas Edu");
 const contextFilePath = path.join(__dirname, "contexto.txt");
 const contentDir = path.join(__dirname, "ConteÃºdo");
-const allDocsJsonPath = path.join(__dirname, "src", "data", "mini-documents", "all-docs.json");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
@@ -3928,11 +3927,11 @@ function splitMiniDocumentTextToLines(text) {
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")
-    .map((line) => line.trimEnd());
+    .map((line) => line.trim());
 }
 
 async function ensureAllDocsMiniDocument() {
-  return seedMiniDocumentFromJsonIfMissing(MINI_DOC_KEY_ALL_DOCS, MINI_DOC_TITLE_ALL_DOCS, allDocsJsonPath);
+  return ensureMiniDocumentExists(MINI_DOC_KEY_ALL_DOCS, MINI_DOC_TITLE_ALL_DOCS);
 }
 
 async function handleMiniDocumentRequest(request, response) {

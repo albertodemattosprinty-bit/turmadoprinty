@@ -1788,7 +1788,7 @@
     }
     .mini-docs-head {
       display: grid;
-      grid-template-columns: 56px 1fr 56px;
+      grid-template-columns: 56px 1fr 56px 56px;
       align-items: center;
       gap: 12px;
       padding: 18px 18px 8px;
@@ -1828,6 +1828,9 @@
     .mini-docs-top-btn.copy {
       background: linear-gradient(145deg, #49c96e, #188f43);
     }
+    .mini-docs-top-btn.send {
+      background: linear-gradient(145deg, #5fd57e, #1f9f55);
+    }
     .mini-docs-top-btn.cursor {
       background: linear-gradient(145deg, #68b7ff, #2f5fe7);
     }
@@ -1846,47 +1849,42 @@
     }
     .mini-docs-lines {
       overflow: auto;
-      padding: 8px 14px 28px;
+      padding: 10px 26px 34px;
       overscroll-behavior: contain;
     }
     .mini-docs-line {
       width: 100%;
       border: 0;
-      background: rgba(255,255,255,.68);
-      border-radius: 18px;
-      padding: 14px 16px;
+      background: transparent;
+      border-radius: 0;
+      padding: 2px 0;
       display: grid;
-      grid-template-columns: 56px minmax(0, 1fr) 42px;
+      grid-template-columns: minmax(0, 1fr) 38px;
       align-items: start;
-      gap: 12px;
-      margin-bottom: 10px;
-      box-shadow: 0 10px 22px rgba(116, 92, 58, .09);
+      gap: 10px;
+      margin: 0;
+      box-shadow: none;
       text-align: left;
       color: inherit;
       cursor: pointer;
-      transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+      transition: background .15s ease, color .15s ease;
     }
     .mini-docs-line.is-selected {
       background: rgba(73, 201, 110, .22);
-      box-shadow: 0 14px 24px rgba(27, 123, 56, .16);
     }
     .mini-docs-line.is-cursor {
-      background: rgba(104, 183, 255, .18);
-      box-shadow: 0 14px 24px rgba(47, 95, 231, .12);
+      background: rgba(104, 183, 255, .14);
     }
     .mini-docs-line-number {
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .12em;
-      color: rgba(62, 46, 32, .52);
-      text-transform: uppercase;
-      padding-top: 4px;
+      display: none;
     }
     .mini-docs-line-text {
       white-space: pre-wrap;
       word-break: break-word;
-      font-size: 17px;
-      line-height: 1.65;
+      font-size: 22px;
+      line-height: 1.62;
+      padding: 1px 2px;
+      font-family: Georgia, "Times New Roman", serif;
     }
     .mini-docs-line-text.is-empty {
       opacity: .42;
@@ -1924,6 +1922,7 @@
     .mini-docs-editor {
       display: grid;
       gap: 10px;
+      padding: 10px 0 14px;
     }
     .mini-docs-editor textarea {
       width: 100%;
@@ -1933,7 +1932,9 @@
       padding: 14px 16px;
       resize: vertical;
       font: inherit;
-      line-height: 1.6;
+      line-height: 1.7;
+      font-size: 20px;
+      font-family: Georgia, "Times New Roman", serif;
       color: #3e2e20;
       background: rgba(255,255,255,.92);
       box-shadow: inset 0 0 0 1px rgba(47, 95, 231, .12);
@@ -1990,6 +1991,118 @@
       background: rgba(255,255,255,.96);
       box-shadow: inset 0 0 0 1px rgba(47, 95, 231, .12);
     }
+    .mini-docs-send-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 72;
+      background: rgba(15, 20, 28, .42);
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+    .mini-docs-send-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .mini-docs-send-panel {
+      width: min(760px, 100%);
+      max-height: min(84vh, 900px);
+      overflow: auto;
+      border-radius: 28px;
+      background: linear-gradient(180deg, #fffdf8 0%, #fff6e8 100%);
+      box-shadow: 0 26px 60px rgba(28, 21, 13, .22);
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+      color: #3e2e20;
+    }
+    .mini-docs-send-panel h3 {
+      margin: 0;
+      font-size: 25px;
+      line-height: 1.1;
+    }
+    .mini-docs-send-panel p {
+      margin: 0;
+      line-height: 1.55;
+      color: rgba(62, 46, 32, .76);
+    }
+    .mini-docs-send-search {
+      width: 100%;
+      min-height: 52px;
+      border: 0;
+      border-radius: 18px;
+      padding: 0 16px;
+      font: inherit;
+      font-size: 16px;
+      background: rgba(255,255,255,.96);
+      color: #3e2e20;
+      box-shadow: inset 0 0 0 1px rgba(47, 95, 231, .12);
+    }
+    .mini-docs-send-results {
+      display: grid;
+      gap: 10px;
+    }
+    .mini-docs-send-result {
+      width: 100%;
+      border: 0;
+      border-radius: 18px;
+      background: rgba(255,255,255,.78);
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 12px;
+      padding: 12px;
+      align-items: center;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(41, 34, 20, .08);
+    }
+    .mini-docs-send-result img,
+    .mini-docs-send-result-fallback {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      object-fit: cover;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, #68b7ff, #2f5fe7);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .mini-docs-send-result strong {
+      display: block;
+      font-size: 16px;
+      line-height: 1.25;
+    }
+    .mini-docs-send-result span {
+      display: block;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(62, 46, 32, .72);
+    }
+    .mini-docs-send-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .mini-docs-send-actions button {
+      border: 0;
+      border-radius: 14px;
+      min-height: 44px;
+      padding: 0 18px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .mini-docs-send-actions .ghost {
+      background: rgba(62, 46, 32, .1);
+      color: #3e2e20;
+    }
     .mini-docs-composer-title {
       font-size: 13px;
       font-weight: 800;
@@ -2040,15 +2153,15 @@
     }
     @media (max-width: 900px) {
       .mini-docs-head {
-        grid-template-columns: 48px 1fr 48px;
+        grid-template-columns: 48px 1fr 48px 48px;
         padding: 14px 14px 8px;
       }
       .mini-docs-line {
-        grid-template-columns: 48px minmax(0, 1fr) 38px;
-        padding: 12px 13px;
+        grid-template-columns: minmax(0, 1fr) 34px;
+        padding: 0;
       }
       .mini-docs-line-text {
-        font-size: 16px;
+        font-size: 19px;
       }
     }
     .course-page-shell {
@@ -3765,6 +3878,9 @@
         </button>
         <span>AllDocs Imersivo</span>
       </div>
+      <button id="miniDocsSendButton" class="mini-docs-top-btn send" type="button" aria-label="Enviar trecho para uma música" hidden>
+        <svg viewBox="0 0 24 24"><path d="M4 12h10.17l-3.58-3.59L12 7l6 6-6 6-1.41-1.41L14.17 14H4z"/></svg>
+      </button>
       <button id="closeMiniDocs" class="mini-docs-top-btn close" type="button" aria-label="Fechar documento">
         <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
       </button>
@@ -3789,6 +3905,18 @@
       <div class="mini-docs-ai-actions">
         <button id="miniDocsAiCancel" class="ghost" type="button">Cancelar</button>
         <button id="miniDocsAiSubmit" class="save" type="button">Enviar para IA</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="miniDocsSendModal" class="mini-docs-send-modal" aria-hidden="true">
+    <div class="mini-docs-send-panel" role="dialog" aria-modal="true" aria-labelledby="miniDocsSendTitle">
+      <h3 id="miniDocsSendTitle">Enviar texto para uma música</h3>
+      <p id="miniDocsSendStatus">Digite pelo menos 3 caracteres para procurar por música ou álbum. Se tocar em um álbum, você escolhe a faixa na sequência.</p>
+      <input id="miniDocsSendSearch" class="mini-docs-send-search" type="text" placeholder="Pesquisar música ou álbum por título">
+      <div id="miniDocsSendResults" class="mini-docs-send-results"></div>
+      <div class="mini-docs-send-actions">
+        <button id="miniDocsSendCancel" class="ghost" type="button">Cancelar</button>
       </div>
     </div>
   </section>
@@ -4273,7 +4401,10 @@
       cursorActive: false,
       cursorLineNumber: 1,
       dragStartY: 0,
-      longPressTimer: 0
+      longPressTimer: 0,
+      sendSearch: "",
+      sendResults: [],
+      sendAlbumId: ""
     };
     const mediaPreviewState = {
       key: "",
@@ -4388,6 +4519,45 @@
     function getMediaAlbumById(albumId) {
       return getMediaAlbumsLibrary().find((album) => album.id === albumId) || null;
     }
+    function normalizeMiniDocsSearchText(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+    }
+    function computeMiniDocsSimilarity(a, b) {
+      const left = normalizeMiniDocsSearchText(a);
+      const right = normalizeMiniDocsSearchText(b);
+      if (!left || !right) {
+        return 0;
+      }
+      if (left === right || left.includes(right) || right.includes(left)) {
+        return 1;
+      }
+      const rows = Array.from({ length: left.length + 1 }, (_, index) => index);
+      for (let y = 1; y <= right.length; y += 1) {
+        let previous = rows[0];
+        rows[0] = y;
+        for (let x = 1; x <= left.length; x += 1) {
+          const current = rows[x];
+          rows[x] = Math.min(
+            rows[x] + 1,
+            rows[x - 1] + 1,
+            previous + (left[x - 1] === right[y - 1] ? 0 : 1)
+          );
+          previous = current;
+        }
+      }
+      const distance = rows[left.length];
+      return 1 - (distance / Math.max(left.length, right.length, 1));
+    }
+    function setMiniDocsSendStatus(text) {
+      const node = $("miniDocsSendStatus");
+      if (node) {
+        node.textContent = text || "";
+      }
+    }
     function applyMediaEditModeUi() {
       const modal = $("mediaModal");
       if (modal) {
@@ -4441,6 +4611,15 @@
       $("miniDocsAiModal")?.setAttribute("aria-hidden", "true");
       $("miniDocsAiPrompt").value = "";
     }
+    function closeMiniDocsSendModal() {
+      $("miniDocsSendModal")?.classList.remove("show");
+      $("miniDocsSendModal")?.setAttribute("aria-hidden", "true");
+      miniDocsState.sendSearch = "";
+      miniDocsState.sendResults = [];
+      miniDocsState.sendAlbumId = "";
+      $("miniDocsSendSearch").value = "";
+      $("miniDocsSendResults").innerHTML = "";
+    }
     function getMiniDocsActiveRange() {
       const selection = getMiniDocsSelectionRange();
       if (selection) {
@@ -4458,6 +4637,146 @@
       $("miniDocsAiModal")?.setAttribute("aria-hidden", "false");
       $("miniDocsAiPrompt").focus();
     }
+    function getMiniDocsCopyText() {
+      return getMiniDocsSelectionLines()
+        .map((line) => String(line.text || "").replace(/^\s+/, ""))
+        .join("\n");
+    }
+    function renderMiniDocsSendResults() {
+      const resultsNode = $("miniDocsSendResults");
+      if (!resultsNode) {
+        return;
+      }
+      const query = String(miniDocsState.sendSearch || "").trim();
+      const selectedAlbum = miniDocsState.sendAlbumId ? getMediaAlbumById(miniDocsState.sendAlbumId) : null;
+      if (!selectedAlbum && query.length < 3) {
+        resultsNode.innerHTML = "";
+        setMiniDocsSendStatus("Digite pelo menos 3 caracteres para procurar por música ou álbum.");
+        return;
+      }
+      const normalizedQuery = normalizeMiniDocsSearchText(query);
+      const results = [];
+
+      if (selectedAlbum) {
+        (Array.isArray(selectedAlbum.songs) ? selectedAlbum.songs : []).forEach((song) => {
+          const normalizedTitle = normalizeMiniDocsSearchText(song.title || "");
+          const score = query.length >= 3 ? computeMiniDocsSimilarity(normalizedQuery, song.title || "") : 1;
+          if (query.length < 3 || score >= 0.8 || normalizedTitle.includes(normalizedQuery)) {
+            results.push({
+              kind: "song",
+              albumId: selectedAlbum.id,
+              songId: song.id,
+              title: song.title || "Faixa",
+              subtitle: selectedAlbum.title || "Album",
+              typeLabel: "Música",
+              imageUrl: song.coverImageUrl || selectedAlbum.coverImageUrl || ""
+            });
+          }
+        });
+      } else {
+        getMediaAlbumsLibrary().forEach((album) => {
+          const albumScore = computeMiniDocsSimilarity(normalizedQuery, album.title || "");
+          if (albumScore >= 0.8 || normalizeMiniDocsSearchText(album.title || "").includes(normalizedQuery)) {
+            results.push({
+              kind: "album",
+              albumId: album.id,
+              title: album.title || "Album",
+              subtitle: `${Math.max(0, Number(album.songs?.length || 0) || 0)} faixa(s)`,
+              typeLabel: "Álbum",
+              imageUrl: album.coverImageUrl || ""
+            });
+          }
+          (Array.isArray(album.songs) ? album.songs : []).forEach((song) => {
+            const songScore = computeMiniDocsSimilarity(normalizedQuery, song.title || "");
+            if (songScore >= 0.8 || normalizeMiniDocsSearchText(song.title || "").includes(normalizedQuery)) {
+              results.push({
+                kind: "song",
+                albumId: album.id,
+                songId: song.id,
+                title: song.title || "Faixa",
+                subtitle: album.title || "Album",
+                typeLabel: "Música",
+                imageUrl: song.coverImageUrl || album.coverImageUrl || ""
+              });
+            }
+          });
+        });
+      }
+
+      miniDocsState.sendResults = results.slice(0, 24);
+      resultsNode.innerHTML = miniDocsState.sendResults.length
+        ? miniDocsState.sendResults.map((result, index) => `
+            <button class="mini-docs-send-result" type="button" data-mini-docs-send-result="${index}">
+              ${result.imageUrl ? `<img src="${escapeAttr(result.imageUrl)}" alt="${escapeAttr(result.title)}">` : `<div class="mini-docs-send-result-fallback">Mini</div>`}
+              <div>
+                <strong>${escapeText(result.title)}</strong>
+                <span>${escapeText(result.subtitle)}</span>
+                <span>${escapeText(result.typeLabel)}</span>
+              </div>
+            </button>
+          `).join("")
+        : `<div class="section-muted">Nenhuma correspondência com 80% de semelhança por enquanto.</div>`;
+      setMiniDocsSendStatus(selectedAlbum
+        ? `Escolha a música do álbum ${selectedAlbum.title}.`
+        : "Toque em uma música para salvar o texto nela, ou toque em um álbum para entrar nas faixas.");
+      resultsNode.querySelectorAll("[data-mini-docs-send-result]").forEach((button) => {
+        button.onclick = async () => {
+          const result = miniDocsState.sendResults[Number(button.getAttribute("data-mini-docs-send-result") || -1)];
+          if (!result) {
+            return;
+          }
+          if (result.kind === "album") {
+            miniDocsState.sendAlbumId = result.albumId;
+            miniDocsState.sendSearch = "";
+            $("miniDocsSendSearch").value = "";
+            renderMiniDocsSendResults();
+            return;
+          }
+          try {
+            const copiedText = getMiniDocsCopyText();
+            if (!copiedText) {
+              setMiniDocsStatus("Selecione um trecho antes de enviar para uma música.");
+              closeMiniDocsSendModal();
+              return;
+            }
+            setMiniDocsSendStatus(`Salvando texto em ${result.title}...`);
+            const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(result.albumId)}/tracks/${encodeURIComponent(result.songId)}/lyrics`, {
+              method: "PATCH",
+              body: JSON.stringify({ lyrics: copiedText })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(payload.error || "Nao foi possivel salvar o texto na musica.");
+            }
+            if (Array.isArray(payload?.library?.albums)) {
+              mediaLibraryAlbums = payload.library.albums;
+            }
+            closeMiniDocsSendModal();
+            setMiniDocsStatus(`Texto enviado para a música ${result.title}.`);
+          } catch (error) {
+            setMiniDocsSendStatus(error instanceof Error ? error.message : "Nao foi possivel salvar o texto na musica.");
+          }
+        };
+      });
+    }
+    async function openMiniDocsSendModal() {
+      const copiedText = getMiniDocsCopyText();
+      if (!copiedText) {
+        setMiniDocsStatus("Selecione um trecho antes de enviar para uma música.");
+        return;
+      }
+      if (!mediaLibraryLoaded) {
+        await loadMiniMediaLibrary();
+      }
+      miniDocsState.sendSearch = "";
+      miniDocsState.sendResults = [];
+      miniDocsState.sendAlbumId = "";
+      $("miniDocsSendSearch").value = "";
+      $("miniDocsSendModal")?.classList.add("show");
+      $("miniDocsSendModal")?.setAttribute("aria-hidden", "false");
+      renderMiniDocsSendResults();
+      $("miniDocsSendSearch").focus();
+    }
     function setMiniDocsCursorActive(active) {
       if (!isMiniMediaAdmin()) {
         miniDocsState.cursorActive = false;
@@ -4471,9 +4790,11 @@
       composer?.classList.toggle("is-active", miniDocsState.cursorActive);
       cursorButton?.classList.toggle("is-active", miniDocsState.cursorActive);
       if (miniDocsState.cursorActive) {
-        miniDocsState.cursorLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
+        miniDocsState.cursorLineNumber = Math.max(0, Number(miniDocsState.cursorLineNumber || 0) || 0);
         $("miniDocsComposerInput").focus();
-        setMiniDocsStatus(`Cursor ativo na linha ${miniDocsState.cursorLineNumber}. O texto inserido entra abaixo dela.`);
+        setMiniDocsStatus(miniDocsState.cursorLineNumber
+          ? `Cursor ativo na linha ${miniDocsState.cursorLineNumber}. O texto inserido entra abaixo dela.`
+          : "Cursor ativo no início do documento. O texto novo será inserido como primeiras linhas.");
       } else {
         $("miniDocsComposerInput").value = "";
       }
@@ -4544,15 +4865,14 @@
       }
     }
     async function copyMiniDocsSelection() {
-      const selectedLines = getMiniDocsSelectionLines();
-      if (!selectedLines.length) {
+      const copiedText = getMiniDocsCopyText();
+      if (!copiedText) {
         setMiniDocsStatus("Escolha ao menos uma linha para copiar.");
         return;
       }
-      const text = selectedLines.map((line) => line.text || "").join("\n");
       try {
-        await navigator.clipboard.writeText(text);
-        setMiniDocsStatus(`${selectedLines.length} linha(s) copiadas.`);
+        await navigator.clipboard.writeText(copiedText);
+        setMiniDocsStatus(`${getMiniDocsSelectionLines().length} linha(s) copiadas.`);
       } catch {
         setMiniDocsStatus("Nao foi possivel copiar agora.");
       }
@@ -4606,6 +4926,7 @@
     function renderMiniDocsModal() {
       const container = $("miniDocsLines");
       const copyButton = $("miniDocsCopyButton");
+      const sendButton = $("miniDocsSendButton");
       if (!container || !$("miniDocsModal")) {
         return;
       }
@@ -4613,6 +4934,9 @@
       const lines = getMiniDocsLines();
       const isAdmin = isMiniMediaAdmin();
       copyButton.hidden = !isMiniDocsSelectionActive();
+      if (sendButton) {
+        sendButton.hidden = !isMiniDocsSelectionActive();
+      }
       const cursorButton = $("miniDocsCursorButton");
       if (cursorButton) {
         cursorButton.hidden = !isAdmin;
@@ -4624,7 +4948,7 @@
         return;
       }
       if (!lines.length) {
-        container.innerHTML = `<div class="courses-empty">Nao ha linhas disponiveis.</div>`;
+        container.innerHTML = `<div class="section-muted">Documento vazio. Use o cursor para começar a escrever.</div>`;
         return;
       }
       const selection = getMiniDocsSelectionRange();
@@ -4636,7 +4960,6 @@
         if (isEditing) {
           return `
             <article class="mini-docs-line is-cursor" data-mini-docs-line="${line.number}">
-              <div class="mini-docs-line-number">#${line.number}</div>
               <div class="mini-docs-editor">
                 <textarea data-mini-docs-editor="${line.number}">${escapeText(miniDocsState.editingDraft || safeText)}</textarea>
                 <div class="mini-docs-editor-actions">
@@ -4650,7 +4973,6 @@
         }
         return `
           <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}" data-mini-docs-line="${line.number}" tabindex="0" role="button" aria-label="Linha ${line.number}">
-            <div class="mini-docs-line-number">#${line.number}</div>
             <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${safeText ? escapeText(safeText) : "<span>Linha vazia</span>"}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
             ${isAdmin ? `<button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>` : `<div></div>`}
           </article>
@@ -4763,8 +5085,10 @@
           throw new Error(payload.error || "Nao foi possivel carregar o documento.");
         }
         miniDocsState.document = payload.document || null;
-        miniDocsState.cursorLineNumber = Math.max(1, Number(miniDocsState.document?.lines?.[0]?.number || 1) || 1);
-        setMiniDocsStatus("Documento carregado. Segure uma linha por 500ms para selecionar um trecho.");
+        miniDocsState.cursorLineNumber = Math.max(0, Number(miniDocsState.document?.lines?.length || 0) || 0);
+        setMiniDocsStatus(miniDocsState.document?.lines?.length
+          ? "Documento carregado. Segure uma linha por 500ms para selecionar um trecho."
+          : "Documento vazio. Ative o cursor para começar a escrever.");
       } catch (error) {
         setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel carregar o documento.");
       } finally {
@@ -4786,6 +5110,7 @@
       miniDocsState.editingDraft = "";
       miniDocsState.selectionStart = 0;
       miniDocsState.selectionEnd = 0;
+      closeMiniDocsSendModal();
       setMiniDocsCursorActive(false);
     }
     function renderMediaImageModelOptions() {
@@ -9664,6 +9989,9 @@
     $("miniDocsCopyButton").onclick = async () => {
       await copyMiniDocsSelection();
     };
+    $("miniDocsSendButton").onclick = async () => {
+      await openMiniDocsSendModal();
+    };
     $("miniDocsCursorButton").onclick = () => {
       setMiniDocsCursorActive(!miniDocsState.cursorActive);
     };
@@ -9681,6 +10009,14 @@
     $("miniDocsAiSubmit").onclick = async () => {
       await submitMiniDocsAiRewrite();
     };
+    $("miniDocsSendCancel").onclick = () => {
+      closeMiniDocsSendModal();
+      setMiniDocsStatus("Envio para música cancelado.");
+    };
+    $("miniDocsSendSearch").addEventListener("input", (event) => {
+      miniDocsState.sendSearch = event.target.value || "";
+      renderMiniDocsSendResults();
+    });
     $("miniDocsLines").addEventListener("touchstart", (event) => {
       miniDocsState.dragStartY = event.touches?.[0]?.clientY || 0;
     }, { passive: true });
@@ -9699,6 +10035,11 @@
         if ($("miniDocsAiModal")?.getAttribute("aria-hidden") === "false") {
           closeMiniDocsAiModal();
           setMiniDocsStatus("Refacao com IA cancelada.");
+          return;
+        }
+        if ($("miniDocsSendModal")?.getAttribute("aria-hidden") === "false") {
+          closeMiniDocsSendModal();
+          setMiniDocsStatus("Envio para música cancelado.");
           return;
         }
         if (isMiniDocsSelectionActive()) {
