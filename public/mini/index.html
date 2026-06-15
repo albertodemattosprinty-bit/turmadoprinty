@@ -1875,6 +1875,39 @@
     .mini-docs-line.is-cursor {
       background: rgba(104, 183, 255, .14);
     }
+    .mini-docs-line.is-folder {
+      padding: 6px 0;
+    }
+    .mini-docs-line.is-folder .mini-docs-line-text {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      color: #2f5fe7;
+    }
+    .mini-docs-line.is-folder-open .mini-docs-line-text {
+      color: #1f8a46;
+    }
+    .mini-docs-folder-caret {
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform .18s ease;
+    }
+    .mini-docs-line.is-folder-open .mini-docs-folder-caret {
+      transform: rotate(90deg);
+    }
+    .mini-docs-folder-caret svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    .mini-docs-line.is-folder-content .mini-docs-line-text {
+      padding-left: 28px;
+    }
     .mini-docs-line-number {
       display: none;
     }
@@ -4404,6 +4437,7 @@
       longPressTimer: 0,
       longPressLineNumber: 0,
       longPressTriggered: false,
+      expandedFolders: {},
       sendSearch: "",
       sendResults: [],
       sendAlbumId: ""
@@ -4581,6 +4615,106 @@
     }
     function getMiniDocsLines() {
       return Array.isArray(miniDocsState.document?.lines) ? miniDocsState.document.lines : [];
+    }
+    function isMiniDocsFolderLine(line) {
+      return /\.docx\b/i.test(String(line?.text || "").trim());
+    }
+    function buildMiniDocsFolderBlocks(lines) {
+      const blocks = [];
+      let activeBlock = null;
+      lines.forEach((line) => {
+        if (isMiniDocsFolderLine(line)) {
+          activeBlock = {
+            folderLine: line,
+            contentLines: []
+          };
+          blocks.push(activeBlock);
+          return;
+        }
+        if (activeBlock) {
+          activeBlock.contentLines.push(line);
+          return;
+        }
+        blocks.push({
+          folderLine: null,
+          contentLines: [line]
+        });
+      });
+      return blocks;
+    }
+    function getMiniDocsVisibleLines(lines) {
+      const hasFolders = lines.some((line) => isMiniDocsFolderLine(line));
+      if (!hasFolders) {
+        return lines.map((line) => ({
+          ...line,
+          isFolderHeader: false,
+          isFolderContent: false,
+          folderOwnerNumber: 0
+        }));
+      }
+      const visible = [];
+      buildMiniDocsFolderBlocks(lines).forEach((block) => {
+        if (!block.folderLine) {
+          block.contentLines.forEach((line) => {
+            visible.push({
+              ...line,
+              isFolderHeader: false,
+              isFolderContent: false,
+              folderOwnerNumber: 0
+            });
+          });
+          return;
+        }
+        const folderNumber = block.folderLine.number;
+        visible.push({
+          ...block.folderLine,
+          isFolderHeader: true,
+          isFolderContent: false,
+          folderOwnerNumber: folderNumber
+        });
+        if (miniDocsState.expandedFolders[String(folderNumber)]) {
+          block.contentLines.forEach((line) => {
+            visible.push({
+              ...line,
+              isFolderHeader: false,
+              isFolderContent: true,
+              folderOwnerNumber: folderNumber
+            });
+          });
+        }
+      });
+      return visible;
+    }
+    function toggleMiniDocsFolder(lineNumber) {
+      if (!lineNumber) {
+        return;
+      }
+      const key = String(lineNumber);
+      const nextExpanded = !miniDocsState.expandedFolders[key];
+      miniDocsState.expandedFolders = {
+        ...miniDocsState.expandedFolders,
+        [key]: nextExpanded
+      };
+      const visibleLines = getMiniDocsVisibleLines(getMiniDocsLines());
+      if (!nextExpanded) {
+        const hiddenLineNumbers = visibleLines
+          .filter((line) => line.folderOwnerNumber === lineNumber && line.isFolderContent)
+          .map((line) => line.number);
+        if (hiddenLineNumbers.includes(Number(miniDocsState.cursorLineNumber || 0))) {
+          miniDocsState.cursorLineNumber = lineNumber;
+        }
+        if (hiddenLineNumbers.includes(Number(miniDocsState.editingLineNumber || 0))) {
+          miniDocsState.editingLineNumber = 0;
+          miniDocsState.editingDraft = "";
+        }
+        const selection = getMiniDocsSelectionRange();
+        if (selection && hiddenLineNumbers.some((number) => number >= selection.start && number <= selection.end)) {
+          miniDocsState.selectionStart = 0;
+          miniDocsState.selectionEnd = 0;
+        }
+      }
+      renderMiniDocsModal();
+      setMiniDocsStatus(nextExpanded ? "Pasta aberta." : "Pasta fechada.");
     }
     function isMiniDocsSelectionActive() {
       return Number(miniDocsState.selectionStart || 0) > 0 && Number(miniDocsState.selectionEnd || 0) > 0;
@@ -4965,6 +5099,7 @@
       }
       updateMediaDocsButton();
       const lines = getMiniDocsLines();
+      const visibleLines = getMiniDocsVisibleLines(lines);
       const isAdmin = isMiniMediaAdmin();
       copyButton.hidden = !isAdmin || !isMiniDocsSelectionActive();
       if (sendButton) {
@@ -4985,11 +5120,13 @@
         return;
       }
       const selection = getMiniDocsSelectionRange();
-      container.innerHTML = lines.map((line) => {
+      container.innerHTML = visibleLines.map((line) => {
         const isSelected = selection && line.number >= selection.start && line.number <= selection.end;
         const isCursor = miniDocsState.cursorActive && line.number === Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
         const isEditing = Number(miniDocsState.editingLineNumber || 0) === line.number;
         const safeText = String(line.text || "");
+        const isFolderHeader = Boolean(line.isFolderHeader);
+        const isFolderOpen = isFolderHeader && Boolean(miniDocsState.expandedFolders[String(line.number)]);
         if (isEditing) {
           return `
             <article class="mini-docs-line is-cursor" data-mini-docs-line="${line.number}">
@@ -5005,17 +5142,18 @@
           `;
         }
         return `
-          <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}" data-mini-docs-line="${line.number}" tabindex="0" role="button" aria-label="Linha ${line.number}">
-            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${safeText ? escapeText(safeText) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
-            ${isAdmin ? `<button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>` : `<div></div>`}
+          <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}${isFolderHeader ? " is-folder" : ""}${isFolderOpen ? " is-folder-open" : ""}${line.isFolderContent ? " is-folder-content" : ""}" data-mini-docs-line="${line.number}"${isFolderHeader ? ` data-mini-docs-folder="${line.number}"` : ""} tabindex="0" role="button" aria-label="${isFolderHeader ? `Pasta ${escapeAttr(safeText)}` : `Linha ${line.number}`}">
+            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${isFolderHeader ? `<span class="mini-docs-folder-caret" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>` : ""}${safeText ? escapeText(safeText) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
+            ${isAdmin && !isFolderHeader ? `<button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>` : `<div></div>`}
           </article>
         `;
       }).join("");
 
       container.querySelectorAll("[data-mini-docs-line]").forEach((node) => {
         const lineNumber = Number(node.getAttribute("data-mini-docs-line") || 0) || 0;
+        const isFolderHeader = node.hasAttribute("data-mini-docs-folder");
         node.addEventListener("pointerdown", (event) => {
-          if (!isAdmin || !lineNumber || event.target.closest("[data-mini-docs-edit]")) {
+          if (!isAdmin || !lineNumber || isFolderHeader || event.target.closest("[data-mini-docs-edit]")) {
             return;
           }
           startMiniDocsLongPress(lineNumber);
@@ -5026,7 +5164,7 @@
           });
         });
         node.addEventListener("touchstart", (event) => {
-          if (!isAdmin || !lineNumber || event.target.closest("[data-mini-docs-edit]")) {
+          if (!isAdmin || !lineNumber || isFolderHeader || event.target.closest("[data-mini-docs-edit]")) {
             return;
           }
           startMiniDocsLongPress(lineNumber);
@@ -5042,6 +5180,10 @@
           }
           if (miniDocsState.longPressTriggered) {
             miniDocsState.longPressTriggered = false;
+            return;
+          }
+          if (isFolderHeader) {
+            toggleMiniDocsFolder(lineNumber);
             return;
           }
           if (isMiniDocsSelectionActive()) {
@@ -5120,11 +5262,12 @@
           throw new Error(payload.error || "Nao foi possivel carregar o documento.");
         }
         miniDocsState.document = payload.document || null;
+        miniDocsState.expandedFolders = {};
         miniDocsState.cursorLineNumber = Math.max(0, Number(miniDocsState.document?.lines?.length || 0) || 0);
         setMiniDocsStatus(miniDocsState.document?.lines?.length
           ? (isMiniMediaAdmin()
-            ? "Documento carregado. Segure uma linha por 500ms para selecionar um trecho."
-            : "Documento carregado.")
+            ? "Documento carregado. Toque nos titulos .docx para abrir as pastas e segure uma linha por 500ms para selecionar."
+            : "Documento carregado. Toque nos titulos .docx para abrir as pastas.")
           : (isMiniMediaAdmin()
             ? "Documento vazio. Ative o cursor para começar a escrever."
             : "Documento vazio."));
@@ -5149,6 +5292,7 @@
       miniDocsState.editingDraft = "";
       miniDocsState.selectionStart = 0;
       miniDocsState.selectionEnd = 0;
+      miniDocsState.expandedFolders = {};
       stopMiniDocsLongPress();
       miniDocsState.longPressTriggered = false;
       closeMiniDocsSendModal();
