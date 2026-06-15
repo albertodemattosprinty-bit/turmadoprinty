@@ -27,6 +27,25 @@ function normalizeAsset(row) {
   };
 }
 
+function normalizeLyricsSyncData(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const lines = Array.isArray(value.lines) ? value.lines.map((line, index) => ({
+    number: Math.max(1, Number(line?.number ?? (index + 1)) || (index + 1)),
+    text: String(line?.text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim(),
+    timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0)
+  })) : [];
+  return {
+    albumId: String(value.albumId || "").trim(),
+    trackId: String(value.trackId || "").trim(),
+    title: String(value.title || "").trim(),
+    playbackUrl: String(value.playbackUrl || "").trim(),
+    durationMs: Math.max(0, Number(value.durationMs || 0) || 0),
+    lines
+  };
+}
+
 export async function ensureMiniMediaSchema() {
   if (miniMediaSchemaPromise) {
     return miniMediaSchemaPromise;
@@ -55,6 +74,7 @@ export async function ensureMiniMediaSchema() {
       playback_key text not null default '',
       lyrics_key text not null default '',
       lyrics_text text not null default '',
+      lyrics_sync_json jsonb not null default '{}'::jsonb,
       lyrics_updated_at timestamptz,
       playback_song_id uuid references mini_media_songs(id) on delete set null,
       track_order integer not null default 0,
@@ -65,6 +85,7 @@ export async function ensureMiniMediaSchema() {
     );
   `);
     await query("alter table mini_media_songs add column if not exists lyrics_text text not null default '';");
+    await query("alter table mini_media_songs add column if not exists lyrics_sync_json jsonb not null default '{}'::jsonb;");
     await query("alter table mini_media_songs add column if not exists lyrics_updated_at timestamptz;");
     await query("alter table mini_media_songs add column if not exists playback_song_id uuid references mini_media_songs(id) on delete set null;");
     await query(`
@@ -136,7 +157,7 @@ export async function syncMiniMediaLibraryToDatabase(library = { albums: [] }) {
             lyrics_key = case when excluded.lyrics_key <> '' then excluded.lyrics_key else mini_media_songs.lyrics_key end,
             track_order = excluded.track_order,
             updated_at = now()
-          returning id, playback_key, lyrics_key, lyrics_text, lyrics_updated_at, playback_song_id
+          returning id, playback_key, lyrics_key, lyrics_text, lyrics_sync_json, lyrics_updated_at, playback_song_id
         `,
         [
           albumGlobalId,
@@ -153,6 +174,7 @@ export async function syncMiniMediaLibraryToDatabase(library = { albums: [] }) {
       song.playbackKey = String(songResult.rows[0]?.playback_key || song?.playbackKey || "").trim();
       song.lyricsKey = String(songResult.rows[0]?.lyrics_key || song?.lyricsKey || "").trim();
       song.lyricsText = String(songResult.rows[0]?.lyrics_text || "").trim();
+      song.lyricsSyncData = normalizeLyricsSyncData(songResult.rows[0]?.lyrics_sync_json);
       song.lyricsUpdatedAt = toIso(songResult.rows[0]?.lyrics_updated_at);
       song.playbackSongId = songResult.rows[0]?.playback_song_id || null;
       const assetCountResult = await query(
@@ -180,12 +202,13 @@ export async function hydrateMiniMediaLibraryFromDatabase(library = { albums: []
       s.legacy_id as song_legacy_id,
       s.playback_song_id,
       s.lyrics_text,
+      s.lyrics_sync_json,
       s.lyrics_updated_at,
       count(asset.id) filter (where asset.asset_type = 'score')::integer as score_count
     from mini_media_albums a
     left join mini_media_songs s on s.album_id = a.id
     left join mini_media_song_assets asset on asset.song_id = s.id
-    group by a.id, a.legacy_id, s.id, s.legacy_id, s.playback_song_id, s.lyrics_text, s.lyrics_updated_at
+    group by a.id, a.legacy_id, s.id, s.legacy_id, s.playback_song_id, s.lyrics_text, s.lyrics_sync_json, s.lyrics_updated_at
   `);
   const albums = new Map((Array.isArray(library?.albums) ? library.albums : []).map((album) => [String(album.id), album]));
   for (const row of result.rows) {
@@ -201,6 +224,7 @@ export async function hydrateMiniMediaLibraryFromDatabase(library = { albums: []
     song.globalId = row.song_global_id;
     song.playbackSongId = row.playback_song_id || null;
     song.lyricsText = String(row.lyrics_text || "").trim();
+    song.lyricsSyncData = normalizeLyricsSyncData(row.lyrics_sync_json);
     song.lyricsKey = "";
     song.lyricsUpdatedAt = toIso(row.lyrics_updated_at);
     song.scoreCount = Math.max(0, Number(row.score_count || 0) || 0);
@@ -226,20 +250,25 @@ export async function getMiniMediaSongByLegacyIds(albumLegacyId, songLegacyId) {
   return result.rows[0] || null;
 }
 
-export async function updateMiniMediaSongLyrics(songId, lyrics = "") {
+export async function updateMiniMediaSongLyrics(songId, lyrics = "", syncData = null) {
   await ensureMiniMediaSchema();
   const result = await query(
     `
       update mini_media_songs
       set
         lyrics_text = $2,
+        lyrics_sync_json = $3::jsonb,
         lyrics_key = '',
-        lyrics_updated_at = case when $2 = '' then null else now() end,
+        lyrics_updated_at = case when $2 = '' and coalesce(jsonb_array_length(coalesce($3::jsonb -> 'lines', '[]'::jsonb)), 0) = 0 then null else now() end,
         updated_at = now()
       where id = $1
       returning *
     `,
-    [songId, String(lyrics || "").replace(/\r\n/g, "\n").trim()]
+    [
+      songId,
+      String(lyrics || "").replace(/\r\n/g, "\n").trim(),
+      JSON.stringify(normalizeLyricsSyncData(syncData) || {})
+    ]
   );
   return result.rows[0] || null;
 }

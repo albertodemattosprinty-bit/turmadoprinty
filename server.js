@@ -338,6 +338,7 @@ function normalizeMiniMediaSong(raw, index = 0) {
     playbackSongId: String(raw?.playbackSongId || "").trim(),
     lyricsKey: String(raw?.lyricsKey || "").trim(),
     lyricsText: String(raw?.lyricsText || "").trim(),
+    lyricsSyncData: raw?.lyricsSyncData && typeof raw.lyricsSyncData === "object" ? raw.lyricsSyncData : null,
     lyricsUpdatedAt: raw?.lyricsUpdatedAt || null,
     scoreCount: Math.max(0, Number(raw?.scoreCount || 0) || 0),
     contentType: String(raw?.contentType || "").trim(),
@@ -413,6 +414,7 @@ function buildMiniMediaAlbumPayload(album) {
       : (song.playbackKey ? buildAlbumZipPublicUrlFromKey(song.playbackKey) : ""),
     coverImageUrl,
     hasLyrics: Boolean(song.lyricsText || song.lyricsKey),
+    lyricsSyncData: song.lyricsSyncData && typeof song.lyricsSyncData === "object" ? song.lyricsSyncData : null,
     lyricsUpdatedAt: song.lyricsUpdatedAt || null,
     hasScores: Math.max(0, Number(song.scoreCount || 0) || 0) > 0,
     scoreCount: Math.max(0, Number(song.scoreCount || 0) || 0)
@@ -4294,7 +4296,10 @@ async function handleMiniMediaTrackUploadRequest(request, response, albumId, tra
       title: songTitle,
       subtitle: `${album.title} • faixa ${trackOrder + 1}`,
       key,
+      playbackSongId: existingIndex >= 0 ? album.songs[existingIndex].playbackSongId : "",
       lyricsKey: existingIndex >= 0 ? album.songs[existingIndex].lyricsKey : "",
+      lyricsText: existingIndex >= 0 ? album.songs[existingIndex].lyricsText : "",
+      lyricsSyncData: existingIndex >= 0 ? album.songs[existingIndex].lyricsSyncData : null,
       lyricsUpdatedAt: existingIndex >= 0 ? album.songs[existingIndex].lyricsUpdatedAt : null,
       contentType: finalContentType,
       order: trackOrder,
@@ -4404,6 +4409,7 @@ async function handleMiniMediaTrackLyricsRequest(request, response, albumId, tra
         title: song.title
       },
       lyrics,
+      syncData: databaseSong.lyrics_sync_json && typeof databaseSong.lyrics_sync_json === "object" ? databaseSong.lyrics_sync_json : null,
       hasLyrics: Boolean(lyrics),
       updatedAt: databaseSong.lyrics_updated_at || null
     });
@@ -4429,6 +4435,7 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
   }
 
   const lyrics = String(body?.lyrics || "").replace(/\r\n/g, "\n").trim();
+  const syncData = body?.syncData && typeof body.syncData === "object" ? body.syncData : null;
 
   try {
     const library = await loadMiniMediaLibrary();
@@ -4444,8 +4451,9 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
     }
 
     const databaseSong = await getSyncedMiniMediaSong(library, albumId, trackId);
-    const updatedSong = await updateMiniMediaSongLyrics(databaseSong.id, lyrics);
+    const updatedSong = await updateMiniMediaSongLyrics(databaseSong.id, lyrics, syncData);
     song.lyricsText = lyrics;
+    song.lyricsSyncData = updatedSong?.lyrics_sync_json && typeof updatedSong.lyrics_sync_json === "object" ? updatedSong.lyrics_sync_json : null;
     song.lyricsKey = "";
     song.lyricsUpdatedAt = updatedSong?.lyrics_updated_at || null;
     sendJson(response, 200, {
@@ -4455,6 +4463,7 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
       library: buildMiniMediaLibraryPayload(library),
       trackId,
       lyrics,
+      syncData: song.lyricsSyncData,
       hasLyrics: Boolean(lyrics),
       updatedAt: updatedSong?.lyrics_updated_at || null,
       feedback: lyrics ? "Letra salva no Postgres com sucesso." : "Letra removida com sucesso."
