@@ -3937,16 +3937,13 @@ async function ensureAllDocsMiniDocument() {
 }
 
 async function handleMiniDocumentRequest(request, response) {
-  const adminUser = await requireAdmin(request, response);
-  if (!adminUser) {
-    return;
-  }
+  const user = await getOptionalAuthUser(request);
 
   try {
     const document = await ensureAllDocsMiniDocument();
     sendJson(response, 200, {
       ok: true,
-      user: sanitizeUser(adminUser),
+      user: user ? sanitizeUser(user) : null,
       document
     });
   } catch (error) {

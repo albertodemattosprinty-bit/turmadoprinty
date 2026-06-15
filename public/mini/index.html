@@ -90,7 +90,7 @@
     }
     .app { position: relative; z-index: 1; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 18px 16px 26px; }
     .mini-logo { width: min(88vw, 460px); max-height: 35vh; object-fit: contain; }
-    .actions-5 { width: min(92vw, 520px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+    .actions-5 { width: min(92vw, 520px); display: grid; grid-template-columns: 1fr; justify-items: center; gap: 18px; }
     .mini-home-summary {
       width: min(92vw, 520px);
       display: flex;
@@ -138,6 +138,17 @@
       gap: 16px;
       border-radius: 999px;
       padding: 18px 28px;
+    }
+    .icon-chip.is-home-media {
+      min-height: 104px;
+      display: inline-flex;
+      flex-direction: row;
+      justify-content: center;
+      gap: 16px;
+      border-radius: 999px;
+      padding: 18px 28px;
+      background: rgba(255,255,255,.22);
+      width: min(100%, 360px);
     }
     .icon-chip.is-home-hidden {
       display: none !important;
@@ -3417,6 +3428,10 @@
         min-height: 98px;
         padding: 16px 22px;
       }
+      .icon-chip.is-home-media {
+        min-height: 92px;
+        padding: 16px 22px;
+      }
       .mini-home-summary {
         width: min(92vw, 430px);
         font-size: 18px;
@@ -3679,7 +3694,7 @@
   <main class="app">
     <img class="mini-logo" src="/mini/mini.png" alt="Mini" />
     <section class="actions-5">
-      <button id="openMidia" class="icon-chip is-home-hidden" type="button"><span class="icon-ball g-red"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg></span><span>Midia</span></button>
+      <button id="openMidia" class="icon-chip is-home-media" type="button"><span class="icon-ball g-red"><svg viewBox="0 0 24 24"><path d="M14 3v10.55A4 4 0 1 0 16 17V8h4V3z"/></svg></span><span>Ver músicas</span></button>
       <button id="openCourses" class="icon-chip is-home-courses" type="button"><span class="icon-ball g-blue"><svg viewBox="0 0 24 24"><path d="M6 4.75A2.75 2.75 0 0 1 8.75 2h9.5A2.75 2.75 0 0 1 21 4.75v13.5A1.75 1.75 0 0 1 19.25 20H9a3 3 0 0 0-3 3V4.75Zm2.75-1.25A1.25 1.25 0 0 0 7.5 4.75V19.2A4.47 4.47 0 0 1 9 18.95h10.25a.25.25 0 0 0 .25-.25V4.75A1.25 1.25 0 0 0 18.25 3.5Zm1.75 3h6.5v1.5h-6.5Zm0 3.5h6.5v1.5h-6.5Zm0 3.5h4.5V15h-4.5Z"/></svg></span><span>Iniciar leituras</span></button>
       <button id="openCreate" class="icon-chip is-home-hidden" type="button"><span class="icon-ball g-purple"><svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></span><span>Criar</span></button>
       <button id="openAulas" class="icon-chip is-home-hidden" type="button"><span class="icon-ball g-gold"><svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg></span><span>Aulas</span></button>
@@ -3700,7 +3715,7 @@
         <p id="mediaSubtitle"></p>
       </div>
       <div class="media-head-actions">
-        <button id="openMiniDocsFromMedia" class="media-docs-btn" type="button" aria-label="Abrir documento indexado" hidden>
+        <button id="openMiniDocsFromMedia" class="media-docs-btn" type="button" aria-label="Abrir documento indexado">
           <svg viewBox="0 0 24 24"><path d="M7 2.75A2.75 2.75 0 0 0 4.25 5.5v13A2.75 2.75 0 0 0 7 21.25h10A2.75 2.75 0 0 0 19.75 18.5V8.56a2.74 2.74 0 0 0-.81-1.94l-3.56-3.56a2.74 2.74 0 0 0-1.94-.81Zm0 1.5h6.25v3.5a1.75 1.75 0 0 0 1.75 1.75h3.25v9a1.25 1.25 0 0 1-1.25 1.25H7a1.25 1.25 0 0 1-1.25-1.25v-13A1.25 1.25 0 0 1 7 4.25Zm7.75.69 2.81 2.81H15a.25.25 0 0 1-.25-.25Zm-6 7.31h6.5v1.5h-6.5Zm0 3.5h6.5v1.5h-6.5Zm0-7h3.5v1.5h-3.5Z"/></svg>
         </button>
       </div>
@@ -4381,7 +4396,7 @@
       if (!button) {
         return;
       }
-      button.hidden = !isMiniMediaAdmin();
+      button.hidden = false;
     }
     function setMiniDocsStatus(text) {
       const node = $("miniDocsStatus");
@@ -4441,6 +4456,12 @@
       $("miniDocsAiPrompt").focus();
     }
     function setMiniDocsCursorActive(active) {
+      if (!isMiniMediaAdmin()) {
+        miniDocsState.cursorActive = false;
+        $("miniDocsComposer")?.classList.remove("is-active");
+        $("miniDocsCursorButton")?.classList.remove("is-active");
+        return;
+      }
       miniDocsState.cursorActive = Boolean(active);
       const composer = $("miniDocsComposer");
       const cursorButton = $("miniDocsCursorButton");
@@ -4587,8 +4608,14 @@
       }
       updateMediaDocsButton();
       const lines = getMiniDocsLines();
+      const isAdmin = isMiniMediaAdmin();
       copyButton.hidden = !isMiniDocsSelectionActive();
-      $("miniDocsCursorButton")?.classList.toggle("is-active", miniDocsState.cursorActive);
+      const cursorButton = $("miniDocsCursorButton");
+      if (cursorButton) {
+        cursorButton.hidden = !isAdmin;
+        cursorButton.classList.toggle("is-active", isAdmin && miniDocsState.cursorActive);
+      }
+      $("miniDocsComposer")?.classList.toggle("is-active", isAdmin && miniDocsState.cursorActive);
       if (miniDocsState.loading) {
         container.innerHTML = `<div class="courses-empty">Carregando documento...</div>`;
         return;
@@ -4622,7 +4649,7 @@
           <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}" data-mini-docs-line="${line.number}" tabindex="0" role="button" aria-label="Linha ${line.number}">
             <div class="mini-docs-line-number">#${line.number}</div>
             <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${safeText ? escapeText(safeText) : "<span>Linha vazia</span>"}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
-            <button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>
+            ${isAdmin ? `<button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>` : `<div></div>`}
           </article>
         `;
       }).join("");
@@ -8185,10 +8212,6 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>
                 <span>${hasStarted ? `Continuar leitura | ${progressPercent}%` : "Iniciar leitura"}</span>
               </button>
-              <button id="openMiniCourseMediaButton" class="course-intro-media-button" type="button">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v10.55A4 4 0 1 0 16 17V8h4V3z"/></svg>
-                <span>Ver músicas</span>
-              </button>
               <button id="backMiniCourseButton" class="course-intro-secondary" type="button">Voltar</button>
             </div>
           </div>
@@ -8215,13 +8238,6 @@
       if (backActionButton) {
         backActionButton.onclick = () => {
           closeMiniCoursesModal();
-        };
-      }
-      const mediaButton = $("openMiniCourseMediaButton");
-      if (mediaButton) {
-        mediaButton.onclick = async () => {
-          closeMiniCoursesModal();
-          await openMediaModal();
         };
       }
     }
