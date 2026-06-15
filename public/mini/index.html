@@ -159,7 +159,7 @@
 
     .media-modal {
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr) 7dvh;
+      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
       background:
         radial-gradient(circle at 18% 14%, rgba(112, 177, 255, .30), transparent 30%),
         radial-gradient(circle at 84% 18%, rgba(255, 228, 145, .24), transparent 26%),
@@ -686,7 +686,7 @@
     .immersive { position: fixed; inset: 0; background: #fff; z-index: 20; transform: translateY(100%); opacity: 0; pointer-events: none; transition: transform .26s ease, opacity .2s ease; display: grid; grid-template-rows: auto 70vh auto 10vh; padding: 8px 12px 8px; }
     .immersive.media-modal {
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr) 7dvh;
+      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
       padding: 10px 0 0;
       gap: 10px;
     }
@@ -3885,7 +3885,7 @@
         <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
       </button>
     </header>
-    <div id="miniDocsStatus" class="mini-docs-status">Segure uma linha por 500ms para iniciar a selecao. Deslize para baixo para pedir uma nova versao com IA e para cima para cancelar.</div>
+    <div id="miniDocsStatus" class="mini-docs-status">Carregando documento...</div>
     <div id="miniDocsLines" class="mini-docs-lines"></div>
     <div id="miniDocsComposer" class="mini-docs-composer">
       <div class="mini-docs-composer-title">Cursor de insercao</div>
@@ -4402,6 +4402,8 @@
       cursorLineNumber: 1,
       dragStartY: 0,
       longPressTimer: 0,
+      longPressLineNumber: 0,
+      longPressTriggered: false,
       sendSearch: "",
       sendResults: [],
       sendAlbumId: ""
@@ -4569,7 +4571,7 @@
       if (!button) {
         return;
       }
-      button.hidden = false;
+      button.hidden = !isMiniMediaAdmin();
     }
     function setMiniDocsStatus(text) {
       const node = $("miniDocsStatus");
@@ -4601,10 +4603,38 @@
     function clearMiniDocsSelection({ keepStatus = false } = {}) {
       miniDocsState.selectionStart = 0;
       miniDocsState.selectionEnd = 0;
+      miniDocsState.longPressLineNumber = 0;
+      miniDocsState.longPressTriggered = false;
       if (!keepStatus) {
         setMiniDocsStatus("Selecao cancelada.");
       }
       renderMiniDocsModal();
+    }
+    function startMiniDocsLongPress(lineNumber) {
+      if (!isMiniMediaAdmin() || !lineNumber) {
+        return;
+      }
+      if (miniDocsState.longPressTimer) {
+        window.clearTimeout(miniDocsState.longPressTimer);
+      }
+      miniDocsState.longPressLineNumber = lineNumber;
+      miniDocsState.longPressTriggered = false;
+      miniDocsState.longPressTimer = window.setTimeout(() => {
+        miniDocsState.selectionStart = lineNumber;
+        miniDocsState.selectionEnd = lineNumber;
+        miniDocsState.cursorLineNumber = lineNumber;
+        miniDocsState.longPressTriggered = true;
+        renderMiniDocsModal();
+        setMiniDocsStatus(`Selecao iniciada na linha ${lineNumber}. Toque em outra linha para fechar o trecho.`);
+        miniDocsState.longPressTimer = 0;
+      }, 500);
+    }
+    function stopMiniDocsLongPress() {
+      if (miniDocsState.longPressTimer) {
+        window.clearTimeout(miniDocsState.longPressTimer);
+        miniDocsState.longPressTimer = 0;
+      }
+      miniDocsState.longPressLineNumber = 0;
     }
     function closeMiniDocsAiModal() {
       $("miniDocsAiModal")?.classList.remove("show");
@@ -4913,6 +4943,9 @@
       }
     }
     function handleMiniDocsSwipe(deltaY) {
+      if (!isMiniMediaAdmin()) {
+        return false;
+      }
       if (deltaY <= -70) {
         clearMiniDocsSelection();
         return true;
@@ -4933,9 +4966,9 @@
       updateMediaDocsButton();
       const lines = getMiniDocsLines();
       const isAdmin = isMiniMediaAdmin();
-      copyButton.hidden = !isMiniDocsSelectionActive();
+      copyButton.hidden = !isAdmin || !isMiniDocsSelectionActive();
       if (sendButton) {
-        sendButton.hidden = !isMiniDocsSelectionActive();
+        sendButton.hidden = !isAdmin || !isMiniDocsSelectionActive();
       }
       const cursorButton = $("miniDocsCursorButton");
       if (cursorButton) {
@@ -4948,7 +4981,7 @@
         return;
       }
       if (!lines.length) {
-        container.innerHTML = `<div class="section-muted">Documento vazio. Use o cursor para começar a escrever.</div>`;
+        container.innerHTML = `<div class="section-muted">${isAdmin ? "Documento vazio. Use o cursor para começar a escrever." : "Documento vazio."}</div>`;
         return;
       }
       const selection = getMiniDocsSelectionRange();
@@ -4973,7 +5006,7 @@
         }
         return `
           <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}" data-mini-docs-line="${line.number}" tabindex="0" role="button" aria-label="Linha ${line.number}">
-            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${safeText ? escapeText(safeText) : "<span>Linha vazia</span>"}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
+            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${safeText ? escapeText(safeText) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
             ${isAdmin ? `<button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>` : `<div></div>`}
           </article>
         `;
@@ -4982,31 +5015,33 @@
       container.querySelectorAll("[data-mini-docs-line]").forEach((node) => {
         const lineNumber = Number(node.getAttribute("data-mini-docs-line") || 0) || 0;
         node.addEventListener("pointerdown", (event) => {
-          if (!lineNumber || event.target.closest("[data-mini-docs-edit]")) {
+          if (!isAdmin || !lineNumber || event.target.closest("[data-mini-docs-edit]")) {
             return;
           }
-          if (miniDocsState.longPressTimer) {
-            window.clearTimeout(miniDocsState.longPressTimer);
-          }
-          miniDocsState.longPressTimer = window.setTimeout(() => {
-            miniDocsState.selectionStart = lineNumber;
-            miniDocsState.selectionEnd = lineNumber;
-            miniDocsState.cursorLineNumber = lineNumber;
-            renderMiniDocsModal();
-            setMiniDocsStatus(`Selecao iniciada na linha ${lineNumber}. Toque em outra linha para fechar o trecho.`);
-            miniDocsState.longPressTimer = 0;
-          }, 500);
+          startMiniDocsLongPress(lineNumber);
         });
         ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
           node.addEventListener(eventName, () => {
-            if (miniDocsState.longPressTimer) {
-              window.clearTimeout(miniDocsState.longPressTimer);
-              miniDocsState.longPressTimer = 0;
-            }
+            stopMiniDocsLongPress();
           });
+        });
+        node.addEventListener("touchstart", (event) => {
+          if (!isAdmin || !lineNumber || event.target.closest("[data-mini-docs-edit]")) {
+            return;
+          }
+          startMiniDocsLongPress(lineNumber);
+        }, { passive: true });
+        ["touchend", "touchcancel"].forEach((eventName) => {
+          node.addEventListener(eventName, () => {
+            stopMiniDocsLongPress();
+          }, { passive: true });
         });
         node.addEventListener("click", (event) => {
           if (event.target.closest("[data-mini-docs-edit]")) {
+            return;
+          }
+          if (miniDocsState.longPressTriggered) {
+            miniDocsState.longPressTriggered = false;
             return;
           }
           if (isMiniDocsSelectionActive()) {
@@ -5087,8 +5122,12 @@
         miniDocsState.document = payload.document || null;
         miniDocsState.cursorLineNumber = Math.max(0, Number(miniDocsState.document?.lines?.length || 0) || 0);
         setMiniDocsStatus(miniDocsState.document?.lines?.length
-          ? "Documento carregado. Segure uma linha por 500ms para selecionar um trecho."
-          : "Documento vazio. Ative o cursor para começar a escrever.");
+          ? (isMiniMediaAdmin()
+            ? "Documento carregado. Segure uma linha por 500ms para selecionar um trecho."
+            : "Documento carregado.")
+          : (isMiniMediaAdmin()
+            ? "Documento vazio. Ative o cursor para começar a escrever."
+            : "Documento vazio."));
       } catch (error) {
         setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel carregar o documento.");
       } finally {
@@ -5110,6 +5149,8 @@
       miniDocsState.editingDraft = "";
       miniDocsState.selectionStart = 0;
       miniDocsState.selectionEnd = 0;
+      stopMiniDocsLongPress();
+      miniDocsState.longPressTriggered = false;
       closeMiniDocsSendModal();
       setMiniDocsCursorActive(false);
     }
