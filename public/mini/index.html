@@ -1946,8 +1946,9 @@
       background: rgba(255, 202, 72, .22);
     }
     .mini-docs-line-text.is-empty {
-      opacity: .42;
-      font-style: italic;
+      opacity: 1;
+      font-style: normal;
+      min-height: 1.62em;
     }
     .mini-docs-line-cursor {
       display: inline-block;
@@ -4737,6 +4738,19 @@
       }
       return formatMediaSeconds(Math.floor((Math.max(0, Number(ms) || 0)) / 1000));
     }
+    function isMiniDocsBlankLine(line) {
+      return !String(line?.text || "").trim();
+    }
+    function getMiniDocsNextStampableLineNumber(startLineNumber) {
+      const start = Math.max(1, Number(startLineNumber || 1) || 1);
+      const lines = getMiniDocsLines();
+      const current = lines.find((line) => line.number === start);
+      if (current && !isMiniDocsBlankLine(current)) {
+        return current.number;
+      }
+      const next = lines.find((line) => Number(line.number || 0) > start && !isMiniDocsBlankLine(line));
+      return next?.number || current?.number || start;
+    }
     function getMiniDocsSyncNextLineTimestamp(lineNumber) {
       const lines = getMiniDocsLines().filter((line) => Number(line.number || 0) > Number(lineNumber || 0) && Number.isFinite(Number(line.timestampMs)));
       const next = lines.find((line) => line.timestampMs !== null && line.timestampMs !== undefined);
@@ -5403,7 +5417,8 @@
         return;
       }
       const lines = getMiniDocsLines();
-      const currentLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || miniDocsState.selectionEnd || miniDocsState.selectionStart || 1) || 1);
+      const requestedLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || miniDocsState.selectionEnd || miniDocsState.selectionStart || 1) || 1);
+      const currentLineNumber = getMiniDocsNextStampableLineNumber(requestedLineNumber);
       const currentTimeMs = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0);
       updateMiniDocsSyncLines((draftLines) => {
         const target = draftLines.find((line) => line.number === currentLineNumber);
@@ -5414,7 +5429,7 @@
       miniDocsState.selectionStart = currentLineNumber;
       miniDocsState.selectionEnd = currentLineNumber;
       const currentIndex = lines.findIndex((line) => line.number === currentLineNumber);
-      const nextLine = lines[currentIndex + 1];
+      const nextLine = lines.slice(currentIndex + 1).find((line) => !isMiniDocsBlankLine(line));
       miniDocsState.cursorLineNumber = nextLine?.number || currentLineNumber;
       renderMiniDocsModal();
       setMiniDocsStatus(`Linha ${currentLineNumber} marcada em ${formatMiniDocsTimestamp(currentTimeMs)}.`);
