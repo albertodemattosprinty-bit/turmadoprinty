@@ -6088,7 +6088,7 @@
         if (button) {
           button.innerHTML = isActive && mediaPreviewState.isPlaying ? getMediaPauseSvg() : getMediaPlaySvg();
           button.classList.toggle("is-playing", Boolean(isActive && mediaPreviewState.isPlaying));
-          button.setAttribute("aria-label", isActive && mediaPreviewState.isPlaying ? "Pausar preview" : "Tocar preview");
+          button.setAttribute("aria-label", isActive && mediaPreviewState.isPlaying ? "Pausar música" : "Tocar música");
         }
         if (fill) {
           fill.style.width = `${percent}%`;
@@ -6106,7 +6106,7 @@
       const elapsed = getMediaPreviewElapsedMs();
       if (mediaPreviewState.durationMs > 0 && elapsed >= mediaPreviewState.durationMs) {
         resetMediaPreviewState();
-        setMediaStatus("Preview concluido. Escolha outra faixa para continuar testando.");
+        setMediaStatus("Faixa concluida.");
         return;
       }
       syncMediaPreviewUi();
@@ -6172,12 +6172,12 @@
           }
         }
       } catch (_) {
-        // ignore preview audio failures and keep visual timer active
+        // ignore audio failures and keep visual timer active
       }
 
       syncMediaPreviewUi();
       mediaPreviewState.rafId = window.requestAnimationFrame(tickMediaPreview);
-      setMediaStatus(`Tocando preview: ${song?.title || "Faixa"}`);
+      setMediaStatus(`Tocando música: ${song?.title || "Faixa"}`);
     }
     function pauseMediaPreview() {
       if (!mediaPreviewState.key || !mediaPreviewState.isPlaying) {
@@ -6194,7 +6194,7 @@
       }
       teardownMediaPreviewAudio();
       syncMediaPreviewUi();
-      setMediaStatus(`Preview pausado em ${formatMediaSeconds(Math.floor(mediaPreviewState.pausedAt / 1000))}.`);
+      setMediaStatus(`Música pausada em ${formatMediaSeconds(Math.floor(mediaPreviewState.pausedAt / 1000))}.`);
     }
     function toggleMediaPreview(scopeId, songId) {
       const album = scopeId === "songs" ? null : getMediaAlbumById(scopeId);
@@ -6250,7 +6250,7 @@
             </div>
           ` : `
             <div class="media-track-actions">
-              <button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar preview">${getMediaPlaySvg()}</button>
+              <button class="media-play-btn" type="button" data-media-play="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(scopeId)}" aria-label="Tocar música">${getMediaPlaySvg()}</button>
               ${hasResources ? `<button class="media-play-btn is-add" type="button" data-media-open-resources="${escapeAttr(song.id)}" data-media-scope="${escapeAttr(resourceAlbumId)}" data-media-track-title="${escapeAttr(song.title || "Faixa")}" aria-label="Abrir textos e partituras">${getMediaPlusSvg()}</button>` : ""}
             </div>
           `}
@@ -7054,7 +7054,6 @@
       if (key === "e" && mediaActiveAlbumId) {
         event.preventDefault();
         mediaAlbumEditMode = !mediaAlbumEditMode;
-        resetMediaPreviewState();
         applyMediaEditModeUi();
         renderMediaModal();
         setMediaStatus(mediaAlbumEditMode ? "Edicao do album ativada." : "Edicao do album finalizada.");
@@ -7235,7 +7234,6 @@
       const backToAlbums = $("backToAlbums");
       if (backToAlbums) {
         backToAlbums.onclick = () => {
-          resetMediaPreviewState();
           mediaAlbumEditMode = false;
           applyMediaEditModeUi();
           mediaActiveAlbumId = "";
@@ -7245,21 +7243,20 @@
       }
       content.querySelectorAll("[data-media-album]").forEach((button) => {
         button.onclick = () => {
-          resetMediaPreviewState();
           mediaAlbumEditMode = false;
           applyMediaEditModeUi();
           mediaActiveAlbumId = button.getAttribute("data-media-album") || "";
           renderMediaModal();
-          setMediaStatus("Album aberto. Escolha uma faixa para ouvir o preview.");
+          setMediaStatus("Album aberto. Escolha uma faixa para ouvir.");
         };
       });
       syncMediaPreviewUi();
     }
     async function openMediaModal() {
-      mediaActiveTab = "songs";
-      mediaActiveAlbumId = "";
+      if (!mediaActiveTab) {
+        mediaActiveTab = "songs";
+      }
       mediaAlbumEditMode = false;
-      resetMediaPreviewState();
       updateMediaDocsButton();
       $("mediaModal").classList.add("show");
       $("mediaModal").setAttribute("aria-hidden", "false");
@@ -7305,7 +7302,6 @@
       }
     }
     function closeMediaModal() {
-      resetMediaPreviewState();
       mediaAlbumEditMode = false;
       applyMediaEditModeUi();
       closeMiniDocsModal();
@@ -10850,7 +10846,6 @@
       mediaActiveTab = "songs";
       mediaActiveAlbumId = "";
       mediaAlbumEditMode = false;
-      resetMediaPreviewState();
       renderMediaModal();
       setMediaStatus("Lista de musicas aberta.");
     };
@@ -10861,7 +10856,6 @@
       mediaActiveTab = "albums";
       mediaActiveAlbumId = "";
       mediaAlbumEditMode = false;
-      resetMediaPreviewState();
       renderMediaModal();
       setMediaStatus("Escolha um album para abrir suas musicas.");
     };
