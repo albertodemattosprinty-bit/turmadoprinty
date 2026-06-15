@@ -114,6 +114,17 @@ export async function readDocxLines(filePath) {
   return extractDocxLinesFromXml(xmlBuffer.toString("utf8"));
 }
 
+export async function readMiniDocumentJson(filePath) {
+  const rawText = await readFile(filePath, "utf8");
+  const parsed = JSON.parse(rawText);
+  const lines = Array.isArray(parsed?.lines) ? parsed.lines.map((line) => normalizeLineText(line)) : [];
+  return {
+    key: normalizeDocKey(parsed?.key || ""),
+    title: String(parsed?.title || "Documento").trim() || "Documento",
+    lines: lines.length ? lines : [""]
+  };
+}
+
 function buildDocumentPayload(documentRow, lineRows) {
   return {
     id: documentRow.id,
@@ -247,6 +258,39 @@ export async function seedMiniDocumentFromDocxIfMissing(docKey, title, filePath)
         returning *
       `,
       [normalizeDocKey(docKey), String(title || "Documento").trim() || "Documento", String(filePath || "").trim(), sourceHash]
+    );
+    const documentRow = insertResult.rows[0];
+    await saveDocumentLines(client, documentRow.id, lines);
+    const lineRows = await getDocumentLinesById(client, documentRow.id);
+    return buildDocumentPayload(documentRow, lineRows);
+  });
+}
+
+export async function seedMiniDocumentFromJsonIfMissing(docKey, title, filePath) {
+  await ensureMiniDocsSchema();
+
+  return withTransaction(async (client) => {
+    const existing = await getDocumentRowByKey(client, docKey);
+    if (existing) {
+      const lineRows = await getDocumentLinesById(client, existing.id);
+      return buildDocumentPayload(existing, lineRows);
+    }
+
+    const documentJson = await readMiniDocumentJson(filePath);
+    const lines = documentJson.lines;
+    const sourceHash = crypto.createHash("sha1").update(lines.join("\n")).digest("hex");
+    const insertResult = await client.query(
+      `
+        insert into mini_documents (doc_key, title, source_path, source_hash)
+        values ($1, $2, $3, $4)
+        returning *
+      `,
+      [
+        normalizeDocKey(docKey || documentJson.key),
+        String(title || documentJson.title || "Documento").trim() || "Documento",
+        String(filePath || "").trim(),
+        sourceHash
+      ]
     );
     const documentRow = insertResult.rows[0];
     await saveDocumentLines(client, documentRow.id, lines);
