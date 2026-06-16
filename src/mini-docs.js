@@ -14,6 +14,12 @@ function normalizeLineText(value) {
   return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 }
 
+function normalizeDocumentLineArray(lines) {
+  return (Array.isArray(lines) ? lines : [])
+    .map((line) => normalizeLineText(line))
+    .filter((line) => line.length > 0);
+}
+
 function decodeXmlEntities(text) {
   return String(text || "")
     .replace(/&lt;/g, "<")
@@ -117,26 +123,29 @@ export async function readDocxLines(filePath) {
 export async function readMiniDocumentJson(filePath) {
   const rawText = await readFile(filePath, "utf8");
   const parsed = JSON.parse(rawText);
-  const lines = Array.isArray(parsed?.lines) ? parsed.lines.map((line) => normalizeLineText(line)) : [];
+  const lines = normalizeDocumentLineArray(parsed?.lines);
   return {
     key: normalizeDocKey(parsed?.key || ""),
     title: String(parsed?.title || "Documento").trim() || "Documento",
-    lines: lines.length ? lines : [""]
+    lines
   };
 }
 
 function buildDocumentPayload(documentRow, lineRows) {
+  const normalizedLines = (Array.isArray(lineRows) ? lineRows : [])
+    .map((row) => normalizeLineText(row?.content || ""))
+    .filter((line) => line.length > 0);
   return {
     id: documentRow.id,
     key: documentRow.doc_key,
     title: documentRow.title,
     sourcePath: String(documentRow.source_path || "").trim(),
-    lineCount: lineRows.length,
+    lineCount: normalizedLines.length,
     updatedAt: documentRow.updated_at instanceof Date ? documentRow.updated_at.toISOString() : documentRow.updated_at,
-    lines: lineRows.map((row) => ({
-      id: row.id,
-      number: Math.max(1, Number(row.line_number || 1) || 1),
-      text: String(row.content || "")
+    lines: normalizedLines.map((text, index) => ({
+      id: `${documentRow.id}:${index + 1}`,
+      number: index + 1,
+      text
     }))
   };
 }
@@ -187,15 +196,16 @@ async function getDocumentLinesById(client, documentId) {
 }
 
 async function saveDocumentLines(client, documentId, lines) {
+  const normalizedLines = normalizeDocumentLineArray(lines);
   await client.query("delete from mini_document_lines where document_id = $1", [documentId]);
 
-  for (let index = 0; index < lines.length; index += 1) {
+  for (let index = 0; index < normalizedLines.length; index += 1) {
     await client.query(
       `
         insert into mini_document_lines (document_id, line_number, content)
         values ($1, $2, $3)
       `,
-      [documentId, index + 1, normalizeLineText(lines[index])]
+      [documentId, index + 1, normalizedLines[index]]
     );
   }
 
@@ -349,14 +359,14 @@ export async function updateMiniDocumentLine(docKey, lineNumber, content) {
       return null;
     }
 
-    const lines = await getDocumentLinesById(client, documentRow.id);
+    const lines = normalizeDocumentLineArray((await getDocumentLinesById(client, documentRow.id)).map((row) => row.content));
     const safeLineNumber = Math.max(1, Number(lineNumber || 1) || 1);
     const lineIndex = safeLineNumber - 1;
     if (!lines[lineIndex]) {
       throw new Error("Linha nao encontrada.");
     }
 
-    const nextLines = lines.map((row) => String(row.content || ""));
+    const nextLines = [...lines];
     nextLines[lineIndex] = normalizeLineText(content);
     await saveDocumentLines(client, documentRow.id, nextLines);
     const refreshedRows = await getDocumentLinesById(client, documentRow.id);
@@ -374,17 +384,23 @@ export async function insertMiniDocumentLinesAfter(docKey, afterLineNumber, line
       return null;
     }
 
-    const lineRows = await getDocumentLinesById(client, documentRow.id);
+    const lineRows = normalizeDocumentLineArray((await getDocumentLinesById(client, documentRow.id)).map((row) => row.content));
     const safeAfterLineNumber = Math.max(0, Number(afterLineNumber || 0) || 0);
     const safeInsertIndex = Math.min(lineRows.length, safeAfterLineNumber);
-    const normalizedInsertLines = (Array.isArray(linesToInsert) ? linesToInsert : [])
-      .map((item) => normalizeLineText(item));
+    const normalizedInsertLines = normalizeDocumentLineArray(linesToInsert);
 
     if (!normalizedInsertLines.length) {
-      return buildDocumentPayload(documentRow, lineRows);
+      return buildDocumentPayload(
+        documentRow,
+        lineRows.map((content, index) => ({
+          id: `${documentRow.id}:${index + 1}`,
+          line_number: index + 1,
+          content
+        }))
+      );
     }
 
-    const nextLines = lineRows.map((row) => String(row.content || ""));
+    const nextLines = [...lineRows];
     nextLines.splice(safeInsertIndex, 0, ...normalizedInsertLines);
     await saveDocumentLines(client, documentRow.id, nextLines);
     const refreshedRows = await getDocumentLinesById(client, documentRow.id);
@@ -402,7 +418,7 @@ export async function replaceMiniDocumentLineRange(docKey, startLineNumber, endL
       return null;
     }
 
-    const lineRows = await getDocumentLinesById(client, documentRow.id);
+    const lineRows = normalizeDocumentLineArray((await getDocumentLinesById(client, documentRow.id)).map((row) => row.content));
     if (!lineRows.length) {
       throw new Error("Documento vazio.");
     }
@@ -411,15 +427,10 @@ export async function replaceMiniDocumentLineRange(docKey, startLineNumber, endL
     const safeEnd = Math.max(safeStart, Number(endLineNumber || safeStart) || safeStart);
     const startIndex = safeStart - 1;
     const deleteCount = Math.max(1, Math.min(lineRows.length, safeEnd) - safeStart + 1);
-    const normalizedReplacementLines = (Array.isArray(replacementLines) ? replacementLines : [])
-      .map((item) => normalizeLineText(item));
+    const normalizedReplacementLines = normalizeDocumentLineArray(replacementLines);
 
-    const nextLines = lineRows.map((row) => String(row.content || ""));
+    const nextLines = [...lineRows];
     nextLines.splice(startIndex, deleteCount, ...normalizedReplacementLines);
-
-    if (!nextLines.length) {
-      nextLines.push("");
-    }
 
     await saveDocumentLines(client, documentRow.id, nextLines);
     const refreshedRows = await getDocumentLinesById(client, documentRow.id);

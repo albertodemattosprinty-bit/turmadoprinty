@@ -4411,6 +4411,8 @@ async function handleMiniMediaTrackLyricsRequest(request, response, albumId, tra
       lyrics,
       syncData: databaseSong.lyrics_sync_json && typeof databaseSong.lyrics_sync_json === "object" ? databaseSong.lyrics_sync_json : null,
       hasLyrics: Boolean(lyrics),
+      hasScores: Math.max(0, Number(databaseSong.score_count || 0) || 0) > 0,
+      scoreCount: Math.max(0, Number(databaseSong.score_count || 0) || 0),
       updatedAt: databaseSong.lyrics_updated_at || null
     });
   } catch (error) {

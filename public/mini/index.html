@@ -2048,6 +2048,33 @@
     .mini-docs-record-line.is-target {
       box-shadow: 0 0 0 2px rgba(215, 67, 116, .24), 0 10px 20px rgba(215, 67, 116, .14);
     }
+    .mini-docs-send-result-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .mini-docs-send-result-icon {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: rgba(35, 48, 72, .78);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+    .mini-docs-send-result-icon svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    .mini-docs-send-result-icon.text {
+      color: #2fc7cf;
+    }
+    .mini-docs-send-result-icon.score {
+      color: #1f4fb8;
+    }
     .mini-docs-editor textarea {
       width: 100%;
       min-height: 120px;
@@ -4694,6 +4721,12 @@
     function getMediaSparkSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zm7 11 1 2.7L23 18l-3 1.3L19 22l-1.1-2.7L15 18l2.9-1.3zM5 15l.9 2.3L8 18l-2.1.7L5 21l-.9-2.3L2 18l2.1-.7z"/></svg>`;
     }
+    function getMiniDocsTextResourceSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v2H6zm0 5h12v2H6zm0 5h8v2H6zm0 5h12v2H6z"/></svg>`;
+    }
+    function getMiniDocsScoreResourceSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3v10.55A4 4 0 1 0 18 17V7h3V3zM6 5h6v2H6zm0 4h6v2H6zm0 4h4v2H6z"/></svg>`;
+    }
     function getMiniDocsEditSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>`;
     }
@@ -4715,6 +4748,38 @@
     }
     function getMediaAlbumById(albumId) {
       return getMediaAlbumsLibrary().find((album) => album.id === albumId) || null;
+    }
+    function getMiniDocsSongResourceFlags(song) {
+      return {
+        hasLyrics: Boolean(song?.hasLyrics || String(song?.lyricsText || "").trim()),
+        hasScores: Math.max(0, Number(song?.scoreCount || 0) || 0) > 0 || Boolean(song?.hasScores),
+        scoreCount: Math.max(0, Number(song?.scoreCount || 0) || 0)
+      };
+    }
+    function getMiniDocsAlbumResourceStats(album) {
+      const songs = Array.isArray(album?.songs) ? album.songs : [];
+      const totalSongs = songs.length;
+      const songsWithLyrics = songs.filter((song) => getMiniDocsSongResourceFlags(song).hasLyrics).length;
+      const songsWithScores = songs.filter((song) => getMiniDocsSongResourceFlags(song).hasScores).length;
+      const lyricPercent = totalSongs ? Math.round((songsWithLyrics / totalSongs) * 100) : 0;
+      const scorePercent = totalSongs ? Math.round((songsWithScores / totalSongs) * 100) : 0;
+      return { totalSongs, songsWithLyrics, songsWithScores, lyricPercent, scorePercent };
+    }
+    function renderMiniDocsResourceMeta(result) {
+      if (result.kind === "album") {
+        return `
+          <div class="mini-docs-send-result-meta">
+            <span class="mini-docs-send-result-icon text" aria-label="Percentual de letras">${getMiniDocsTextResourceSvg()}<small>${escapeText(`${result.lyricPercent}%`)}</small></span>
+            <span class="mini-docs-send-result-icon score" aria-label="Percentual de partituras">${getMiniDocsScoreResourceSvg()}<small>${escapeText(`${result.scorePercent}%`)}</small></span>
+          </div>
+        `;
+      }
+      return `
+        <div class="mini-docs-send-result-meta">
+          ${result.hasLyrics ? `<span class="mini-docs-send-result-icon text" aria-label="Possui letra">${getMiniDocsTextResourceSvg()}</span>` : ``}
+          ${result.hasScores ? `<span class="mini-docs-send-result-icon score" aria-label="Possui partitura">${getMiniDocsScoreResourceSvg()}</span>` : ``}
+        </div>
+      `;
     }
     function normalizeMiniDocsSearchText(value) {
       return String(value || "")
@@ -4774,21 +4839,33 @@
         node.textContent = text || "";
       }
     }
+    function normalizeMiniDocsLineText(value) {
+      return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    }
+    function normalizeMiniDocsLineList(lines) {
+      return (Array.isArray(lines) ? lines : [])
+        .map((line) => ({
+          number: 0,
+          text: normalizeMiniDocsLineText(line?.text || ""),
+          timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0)
+        }))
+        .filter((line) => line.text)
+        .map((line, index) => ({
+          ...line,
+          number: index + 1
+        }));
+    }
     function getMiniDocsLines() {
       if (miniDocsState.mode === "sync") {
-        return Array.isArray(miniDocsState.syncLines) ? miniDocsState.syncLines : [];
+        return normalizeMiniDocsLineList(miniDocsState.syncLines);
       }
-      return Array.isArray(miniDocsState.document?.lines) ? miniDocsState.document.lines : [];
+      return normalizeMiniDocsLineList(miniDocsState.document?.lines);
     }
     function isMiniDocsSyncMode() {
       return miniDocsState.mode === "sync" && !!miniDocsState.syncSong;
     }
     function cloneMiniDocsSyncLines(lines) {
-      return (Array.isArray(lines) ? lines : []).map((line, index) => ({
-        number: Math.max(1, Number(line?.number ?? (index + 1)) || (index + 1)),
-        text: String(line?.text || ""),
-        timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0)
-      }));
+      return normalizeMiniDocsLineList(lines);
     }
     function buildMiniDocsSyncPayload() {
       if (!isMiniDocsSyncMode()) {
@@ -4830,7 +4907,7 @@
     function updateMiniDocsSyncLines(mutator) {
       const nextLines = cloneMiniDocsSyncLines(getMiniDocsLines());
       mutator(nextLines);
-      miniDocsState.syncLines = nextLines;
+      miniDocsState.syncLines = normalizeMiniDocsLineList(nextLines);
     }
     function toggleMiniDocsSyncSheepMode() {
       if (!isMiniDocsSyncMode()) {
@@ -5230,24 +5307,14 @@
       }
       renderMiniDocsModal();
     }
-    function startMiniDocsLongPress(lineNumber) {
+    function startMiniDocsLineSelection(lineNumber) {
       if (!isMiniMediaAdmin() || !lineNumber) {
         return;
       }
-      if (miniDocsState.longPressTimer) {
-        window.clearTimeout(miniDocsState.longPressTimer);
-      }
-      miniDocsState.longPressLineNumber = lineNumber;
-      miniDocsState.longPressTriggered = false;
-      miniDocsState.longPressTimer = window.setTimeout(() => {
-        miniDocsState.selectionStart = lineNumber;
-        miniDocsState.selectionEnd = lineNumber;
-        miniDocsState.cursorLineNumber = lineNumber;
-        miniDocsState.longPressTriggered = true;
-        renderMiniDocsModal();
-        setMiniDocsStatus(`Selecao iniciada na linha ${lineNumber}. Toque em outra linha para fechar o trecho.`);
-        miniDocsState.longPressTimer = 0;
-      }, 500);
+      miniDocsState.selectionStart = lineNumber;
+      miniDocsState.selectionEnd = lineNumber;
+      miniDocsState.cursorLineNumber = lineNumber;
+      renderMiniDocsModal();
     }
     function stopMiniDocsLongPress() {
       if (miniDocsState.longPressTimer) {
@@ -5600,7 +5667,7 @@
       const selectedAlbum = miniDocsState.syncAlbumId ? getMediaAlbumById(miniDocsState.syncAlbumId) : null;
       if (!selectedAlbum && query.length < 3) {
         resultsNode.innerHTML = "";
-        setMiniDocsSyncStatus("Digite pelo menos 3 caracteres para procurar por música ou álbum.");
+        setMiniDocsSyncStatus("");
         return;
       }
       const normalizedQuery = normalizeMiniDocsSearchText(query);
@@ -5617,12 +5684,14 @@
               title: song.title || "Faixa",
               subtitle: selectedAlbum.title || "Album",
               imageUrl: song.coverImageUrl || selectedAlbum.coverImageUrl || "",
-              url: song.url || ""
+              url: song.url || "",
+              ...getMiniDocsSongResourceFlags(song)
             });
           }
         });
       } else {
         getMediaAlbumsLibrary().forEach((album) => {
+          const albumStats = getMiniDocsAlbumResourceStats(album);
           const albumScore = computeMiniDocsSimilarity(normalizedQuery, album.title || "");
           if (albumScore >= 0.8 || normalizeMiniDocsSearchText(album.title || "").includes(normalizedQuery)) {
             results.push({
@@ -5630,7 +5699,9 @@
               albumId: album.id,
               title: album.title || "Album",
               subtitle: `${Math.max(0, Number(album.songs?.length || 0) || 0)} faixa(s)`,
-              imageUrl: album.coverImageUrl || ""
+              imageUrl: album.coverImageUrl || "",
+              lyricPercent: albumStats.lyricPercent,
+              scorePercent: albumStats.scorePercent
             });
           }
           (Array.isArray(album.songs) ? album.songs : []).forEach((song) => {
@@ -5643,7 +5714,8 @@
                 title: song.title || "Faixa",
                 subtitle: album.title || "Album",
                 imageUrl: song.coverImageUrl || album.coverImageUrl || "",
-                url: song.url || ""
+                url: song.url || "",
+                ...getMiniDocsSongResourceFlags(song)
               });
             }
           });
@@ -5657,14 +5729,12 @@
               <div>
                 <strong>${escapeText(result.title)}</strong>
                 <span>${escapeText(result.subtitle)}</span>
-                <span>${escapeText(result.kind === "song" ? "Música" : "Álbum")}</span>
+                ${renderMiniDocsResourceMeta(result)}
               </div>
             </button>
           `).join("")
         : `<div class="section-muted">Nenhuma correspondência com 80% de semelhança por enquanto.</div>`;
-      setMiniDocsSyncStatus(selectedAlbum
-        ? `Escolha a música do álbum ${selectedAlbum.title}.`
-        : "Toque em uma música para entrar no modo sync, ou toque em um álbum para ver as faixas.");
+      setMiniDocsSyncStatus("");
       resultsNode.querySelectorAll("[data-mini-docs-sync-result]").forEach((button) => {
         button.onclick = async () => {
           const result = miniDocsState.syncResults[Number(button.getAttribute("data-mini-docs-sync-result") || -1)];
@@ -5679,25 +5749,38 @@
             return;
           }
           try {
-            const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(result.albumId)}/tracks/${encodeURIComponent(result.songId)}/lyrics`);
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
+            const [lyricsResponse, assetsResponse] = await Promise.all([
+              apiMini(`/api/mini/media/albums/${encodeURIComponent(result.albumId)}/tracks/${encodeURIComponent(result.songId)}/lyrics`),
+              apiMini(`/api/mini/media/albums/${encodeURIComponent(result.albumId)}/tracks/${encodeURIComponent(result.songId)}/assets`, {
+                timeoutMessage: "As partituras demoraram demais para carregar para o sync."
+              })
+            ]);
+            const payload = await lyricsResponse.json().catch(() => ({}));
+            const assetsPayload = await assetsResponse.json().catch(() => ({}));
+            if (!lyricsResponse.ok) {
               throw new Error(payload.error || "Nao foi possivel carregar a letra para sync.");
+            }
+            if (!assetsResponse.ok) {
+              throw new Error(assetsPayload.error || "Nao foi possivel carregar as partituras para sync.");
             }
             const syncLines = Array.isArray(payload?.syncData?.lines) && payload.syncData.lines.length
               ? cloneMiniDocsSyncLines(payload.syncData.lines)
               : String(payload?.lyrics || "")
                 .replace(/\r\n/g, "\n")
                 .split("\n")
-                .map((text, index) => ({ number: index + 1, text: String(text || "").trim(), timestampMs: null }));
+                .map((text, index) => ({ number: index + 1, text: normalizeMiniDocsLineText(text || ""), timestampMs: null }));
             miniDocsState.mode = "sync";
             miniDocsState.syncSong = {
               albumId: result.albumId,
               songId: result.songId,
               title: result.title,
-              url: result.url || payload?.syncData?.playbackUrl || ""
+              url: result.url || payload?.syncData?.playbackUrl || "",
+              hasLyrics: Boolean(payload?.hasLyrics),
+              hasScores: Math.max(0, Number(payload?.scoreCount || 0) || 0) > 0,
+              scoreCount: Math.max(0, Number(payload?.scoreCount || 0) || 0),
+              scores: Array.isArray(assetsPayload?.assets) ? assetsPayload.assets.filter((asset) => asset?.type === "score") : []
             };
-            miniDocsState.syncLines = syncLines.length ? syncLines : [{ number: 1, text: "", timestampMs: null }];
+            miniDocsState.syncLines = syncLines;
             miniDocsState.syncDurationMs = Math.max(0, Number(payload?.syncData?.durationMs || 0) || 0);
             miniDocsState.syncPausedAt = 0;
             miniDocsState.syncCurrentTimeMs = 0;
@@ -5836,7 +5919,7 @@
         updateMiniDocsSyncLines((draftLines) => {
           const target = draftLines.find((line) => line.number === lineNumber);
           if (target) {
-            target.text = String(miniDocsState.editingDraft || "");
+            target.text = normalizeMiniDocsLineText(miniDocsState.editingDraft || "");
           }
         });
         miniDocsState.editingLineNumber = 0;
@@ -5874,12 +5957,17 @@
         setMiniDocsStatus("Escreva ou cole algum texto antes de inserir.");
         return;
       }
+      const normalizedLines = text.split("\n").map((line) => normalizeMiniDocsLineText(line)).filter(Boolean);
+      if (!normalizedLines.length) {
+        setMiniDocsStatus("As linhas vazias sao ignoradas. Escreva algum texto valido antes de inserir.");
+        return;
+      }
       try {
         const response = await apiMini("/api/mini/docs/all-docs/insert", {
           method: "POST",
           body: JSON.stringify({
             afterLineNumber: Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1),
-            text
+            lines: normalizedLines
           })
         });
         const payload = await response.json().catch(() => ({}));
@@ -5887,7 +5975,7 @@
           throw new Error(payload.error || "Nao foi possivel inserir novas linhas.");
         }
         miniDocsState.document = payload.document || miniDocsState.document;
-        miniDocsState.cursorLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1) + text.split(/\r?\n/).length;
+        miniDocsState.cursorLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1) + normalizedLines.length;
         $("miniDocsComposerInput").value = "";
         renderMiniDocsModal();
         setMiniDocsStatus("Novas linhas inseridas abaixo do cursor.");
@@ -6066,37 +6154,11 @@
       container.querySelectorAll("[data-mini-docs-line]").forEach((node) => {
         const lineNumber = Number(node.getAttribute("data-mini-docs-line") || 0) || 0;
         const isFolderHeader = node.hasAttribute("data-mini-docs-folder");
-        node.addEventListener("pointerdown", (event) => {
-          if ((isMiniDocsSyncMode() && miniDocsState.syncPlaying) || !isAdmin || !lineNumber || isFolderHeader || event.target.closest("[data-mini-docs-edit]")) {
-            return;
-          }
-          startMiniDocsLongPress(lineNumber);
-        });
-        ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
-          node.addEventListener(eventName, () => {
-            stopMiniDocsLongPress();
-          });
-        });
-        node.addEventListener("touchstart", (event) => {
-          if ((isMiniDocsSyncMode() && miniDocsState.syncPlaying) || !isAdmin || !lineNumber || isFolderHeader || event.target.closest("[data-mini-docs-edit]")) {
-            return;
-          }
-          startMiniDocsLongPress(lineNumber);
-        }, { passive: true });
-        ["touchend", "touchcancel"].forEach((eventName) => {
-          node.addEventListener(eventName, () => {
-            stopMiniDocsLongPress();
-          }, { passive: true });
-        });
         node.addEventListener("click", (event) => {
           if (event.target.closest("[data-mini-docs-edit]")) {
             return;
           }
           if (isMiniDocsSyncMode() && miniDocsState.syncPlaying) {
-            return;
-          }
-          if (miniDocsState.longPressTriggered) {
-            miniDocsState.longPressTriggered = false;
             return;
           }
           if (isFolderHeader) {
@@ -6107,19 +6169,32 @@
             cloneMiniDocsSyncLineToEnd(lineNumber);
             return;
           }
+          if (!isMiniDocsSelectionActive() && !miniDocsState.cursorActive) {
+            startMiniDocsLineSelection(lineNumber);
+            setMiniDocsStatus("");
+            return;
+          }
           if (isMiniDocsSelectionActive()) {
+            if (miniDocsState.selectionStart === lineNumber && miniDocsState.selectionEnd === lineNumber) {
+              clearMiniDocsSelection({ keepStatus: true });
+              miniDocsState.cursorLineNumber = lineNumber;
+              renderMiniDocsModal();
+              setMiniDocsStatus("");
+              return;
+            }
             miniDocsState.selectionEnd = lineNumber;
             renderMiniDocsModal();
-            const range = getMiniDocsSelectionRange();
-            setMiniDocsStatus(`Trecho selecionado: linhas ${range.start} ate ${range.end}.`);
+            setMiniDocsStatus("");
             return;
           }
           miniDocsState.cursorLineNumber = lineNumber;
           if (miniDocsState.cursorActive) {
             $("miniDocsComposerInput").focus();
-            setMiniDocsStatus(`Cursor movido para a linha ${lineNumber}. O texto novo entra abaixo dela.`);
+            setMiniDocsStatus("");
           } else {
-            setMiniDocsStatus(`Linha ${lineNumber} em foco.`);
+            startMiniDocsLineSelection(lineNumber);
+            setMiniDocsStatus("");
+            return;
           }
           renderMiniDocsModal();
         });
@@ -6185,13 +6260,7 @@
         miniDocsState.document = payload.document || null;
         miniDocsState.expandedFolders = {};
         miniDocsState.cursorLineNumber = Math.max(0, Number(miniDocsState.document?.lines?.length || 0) || 0);
-        setMiniDocsStatus(miniDocsState.document?.lines?.length
-          ? (isMiniMediaAdmin()
-            ? "Documento carregado. Toque nos titulos .docx para abrir as pastas e segure uma linha por 500ms para selecionar."
-            : "Documento carregado. Toque nos titulos .docx para abrir as pastas.")
-          : (isMiniMediaAdmin()
-            ? "Documento vazio. Ative o cursor para começar a escrever."
-            : "Documento vazio."));
+        setMiniDocsStatus("");
       } catch (error) {
         setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel carregar o documento.");
       } finally {
@@ -11193,9 +11262,16 @@
       if ($("miniDocsModal")?.getAttribute("aria-hidden") !== "false") {
         return;
       }
+      if (isMiniDocsSyncMode() && event.key === "F4") {
+        event.preventDefault();
+        if (window.confirm("Sair do modo sync agora?")) {
+          exitMiniDocsSyncMode();
+        }
+        return;
+      }
       if ($("miniDocsSyncModal")?.getAttribute("aria-hidden") === "false" && event.key === "Escape") {
         closeMiniDocsSyncModal();
-        setMiniDocsStatus("Sync cancelado.");
+        setMiniDocsStatus("");
         return;
       }
       if ($("miniDocsRecordModal")?.getAttribute("aria-hidden") === "false" && event.key === "Escape") {
@@ -11212,7 +11288,10 @@
       if (event.key === "Escape") {
         if (isMiniDocsSyncMode()) {
           event.preventDefault();
-          exitMiniDocsSyncMode();
+          if (isMiniDocsSelectionActive()) {
+            clearMiniDocsSelection({ keepStatus: true });
+            setMiniDocsStatus("");
+          }
           return;
         }
         if ($("miniDocsAiModal")?.getAttribute("aria-hidden") === "false") {
