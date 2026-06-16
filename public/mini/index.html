@@ -4706,7 +4706,8 @@
       recordMediaStream: null,
       sendSearch: "",
       sendResults: [],
-      sendAlbumId: ""
+      sendAlbumId: "",
+      sendRecentAlbumIds: loadMiniDocsRecentAlbumIds()
     };
     const mediaPreviewState = {
       key: "",
@@ -4724,7 +4725,8 @@
     };
     const miniCourseUiSoundUrls = {
       point: "/mini/sounds/point.mp3",
-      page: "/mini/sounds/page.mp3"
+      page: "/mini/sounds/page.mp3",
+      success: "/mini/sounds/success.mp3"
     };
     let miniCourseReaderThemeIndex = 1;
     let miniCourseReaderFontSizeIndex = 0;
@@ -4735,6 +4737,7 @@
     const miniSessionKey = "turma_do_printy_token";
     const miniPlannerDraftKey = "turma_do_printy_mini_planner_draft";
     const miniCourseDownloadsKey = "turma_do_printy_mini_course_downloads";
+    const miniDocsRecentAlbumsKey = "turma_do_printy_mini_docs_recent_albums";
     const miniCourseDefaultCoverUrl = "/mini/images/default-course-cover.jpg";
     const miniCourseReaderThemes = [
       { id: 0, name: "Tema principal" },
@@ -4951,6 +4954,40 @@
         node.textContent = text || "";
       }
     }
+    function loadMiniDocsRecentAlbumIds() {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(miniDocsRecentAlbumsKey) || "[]");
+        return Array.isArray(parsed)
+          ? parsed.map((value) => String(value || "").trim()).filter(Boolean).slice(0, 3)
+          : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    function persistMiniDocsRecentAlbumIds() {
+      try {
+        window.localStorage.setItem(
+          miniDocsRecentAlbumsKey,
+          JSON.stringify((Array.isArray(miniDocsState.sendRecentAlbumIds) ? miniDocsState.sendRecentAlbumIds : []).slice(0, 3))
+        );
+      } catch (_) {}
+    }
+    function rememberMiniDocsRecentAlbum(albumId) {
+      const safeAlbumId = String(albumId || "").trim();
+      if (!safeAlbumId) {
+        return;
+      }
+      miniDocsState.sendRecentAlbumIds = [
+        safeAlbumId,
+        ...(Array.isArray(miniDocsState.sendRecentAlbumIds) ? miniDocsState.sendRecentAlbumIds : []).filter((value) => value !== safeAlbumId)
+      ].slice(0, 3);
+      persistMiniDocsRecentAlbumIds();
+    }
+    function getMiniDocsRecentAlbums() {
+      return (Array.isArray(miniDocsState.sendRecentAlbumIds) ? miniDocsState.sendRecentAlbumIds : [])
+        .map((albumId) => getMediaAlbumById(albumId))
+        .filter(Boolean);
+    }
     function applyMediaEditModeUi() {
       const modal = $("mediaModal");
       if (modal) {
@@ -5066,6 +5103,38 @@
         miniDocsState.cursorLineNumber = insertedLineNumber;
       }
       renderMiniDocsModal();
+      return insertedLineNumber;
+    }
+    function cloneMiniDocsSyncLineBelowCurrent(sourceLineNumber) {
+      if (!isMiniDocsSyncMode()) {
+        return 0;
+      }
+      const source = getMiniDocsLines().find((line) => line.number === sourceLineNumber);
+      if (!source) {
+        return 0;
+      }
+      const anchorLineNumber = Math.max(1, Number(miniDocsState.syncCurrentLineNumber || miniDocsState.cursorLineNumber || sourceLineNumber || 1) || 1);
+      let insertedLineNumber = 0;
+      updateMiniDocsSyncLines((draftLines) => {
+        const anchorIndex = draftLines.findIndex((line) => line.number === anchorLineNumber);
+        const insertIndex = anchorIndex >= 0 ? anchorIndex + 1 : draftLines.length;
+        draftLines.splice(insertIndex, 0, {
+          number: 0,
+          text: String(source.text || ""),
+          timestampMs: null,
+          tag: ""
+        });
+        draftLines.forEach((line, index) => {
+          line.number = index + 1;
+        });
+        insertedLineNumber = Math.max(1, insertIndex + 1);
+      });
+      if (insertedLineNumber) {
+        miniDocsState.syncCurrentLineNumber = insertedLineNumber;
+        miniDocsState.cursorLineNumber = insertedLineNumber;
+      }
+      renderMiniDocsModal();
+      scrollMiniDocsCursorIntoView();
       return insertedLineNumber;
     }
     function updateMiniDocsSyncLines(mutator) {
@@ -5810,9 +5879,52 @@
       }
       const query = String(miniDocsState.sendSearch || "").trim();
       const selectedAlbum = miniDocsState.sendAlbumId ? getMediaAlbumById(miniDocsState.sendAlbumId) : null;
+      const recentAlbumResults = !selectedAlbum && query.length < 3
+        ? getMiniDocsRecentAlbums().map((album) => {
+            const albumStats = getMiniDocsAlbumResourceStats(album);
+            return {
+              kind: "album",
+              albumId: album.id,
+              title: album.title || "Album",
+              subtitle: `${Math.max(0, Number(album.songs?.length || 0) || 0)} faixa(s)`,
+              typeLabel: "Álbum recente",
+              imageUrl: album.coverImageUrl || "",
+              lyricPercent: albumStats.lyricPercent,
+              scorePercent: albumStats.scorePercent
+            };
+          })
+        : [];
       if (!selectedAlbum && query.length < 3) {
-        resultsNode.innerHTML = "";
-        setMiniDocsSendStatus("Digite pelo menos 3 caracteres para procurar por música ou álbum.");
+        miniDocsState.sendResults = recentAlbumResults;
+        resultsNode.innerHTML = miniDocsState.sendResults.length
+          ? miniDocsState.sendResults.map((result, index) => `
+              <button class="mini-docs-send-result" type="button" data-mini-docs-send-result="${index}">
+                ${result.imageUrl ? `<img src="${escapeAttr(result.imageUrl)}" alt="${escapeAttr(result.title)}">` : `<div class="mini-docs-send-result-fallback">Mini</div>`}
+                <div>
+                  <strong>${escapeText(result.title)}</strong>
+                  <span>${escapeText(result.subtitle)}</span>
+                  <span>${escapeText(result.typeLabel)}</span>
+                  ${renderMiniDocsResourceMeta(result)}
+                </div>
+              </button>
+            `).join("")
+          : "";
+        setMiniDocsSendStatus(miniDocsState.sendResults.length
+          ? "Ultimos 3 albuns acessados."
+          : "Digite pelo menos 3 caracteres para procurar por música ou álbum.");
+        resultsNode.querySelectorAll("[data-mini-docs-send-result]").forEach((button) => {
+          button.onclick = () => {
+            const result = miniDocsState.sendResults[Number(button.getAttribute("data-mini-docs-send-result") || -1)];
+            if (!result || result.kind !== "album") {
+              return;
+            }
+            rememberMiniDocsRecentAlbum(result.albumId);
+            miniDocsState.sendAlbumId = result.albumId;
+            miniDocsState.sendSearch = "";
+            $("miniDocsSendSearch").value = "";
+            renderMiniDocsSendResults();
+          };
+        });
         return;
       }
       const normalizedQuery = normalizeMiniDocsSearchText(query);
@@ -5823,6 +5935,7 @@
           const normalizedTitle = normalizeMiniDocsSearchText(song.title || "");
           const score = query.length >= 3 ? computeMiniDocsSimilarity(normalizedQuery, song.title || "") : 1;
           if (query.length < 3 || score >= 0.8 || normalizedTitle.includes(normalizedQuery)) {
+            const flags = getMiniDocsSongResourceFlags(song);
             results.push({
               kind: "song",
               albumId: selectedAlbum.id,
@@ -5830,12 +5943,14 @@
               title: song.title || "Faixa",
               subtitle: selectedAlbum.title || "Album",
               typeLabel: "Música",
-              imageUrl: song.coverImageUrl || selectedAlbum.coverImageUrl || ""
+              imageUrl: song.coverImageUrl || selectedAlbum.coverImageUrl || "",
+              ...flags
             });
           }
         });
       } else {
         getMediaAlbumsLibrary().forEach((album) => {
+          const albumStats = getMiniDocsAlbumResourceStats(album);
           const albumScore = computeMiniDocsSimilarity(normalizedQuery, album.title || "");
           if (albumScore >= 0.8 || normalizeMiniDocsSearchText(album.title || "").includes(normalizedQuery)) {
             results.push({
@@ -5844,12 +5959,15 @@
               title: album.title || "Album",
               subtitle: `${Math.max(0, Number(album.songs?.length || 0) || 0)} faixa(s)`,
               typeLabel: "Álbum",
-              imageUrl: album.coverImageUrl || ""
+              imageUrl: album.coverImageUrl || "",
+              lyricPercent: albumStats.lyricPercent,
+              scorePercent: albumStats.scorePercent
             });
           }
           (Array.isArray(album.songs) ? album.songs : []).forEach((song) => {
             const songScore = computeMiniDocsSimilarity(normalizedQuery, song.title || "");
             if (songScore >= 0.8 || normalizeMiniDocsSearchText(song.title || "").includes(normalizedQuery)) {
+              const flags = getMiniDocsSongResourceFlags(song);
               results.push({
                 kind: "song",
                 albumId: album.id,
@@ -5857,7 +5975,8 @@
                 title: song.title || "Faixa",
                 subtitle: album.title || "Album",
                 typeLabel: "Música",
-                imageUrl: song.coverImageUrl || album.coverImageUrl || ""
+                imageUrl: song.coverImageUrl || album.coverImageUrl || "",
+                ...flags
               });
             }
           });
@@ -5873,6 +5992,7 @@
                 <strong>${escapeText(result.title)}</strong>
                 <span>${escapeText(result.subtitle)}</span>
                 <span>${escapeText(result.typeLabel)}</span>
+                ${renderMiniDocsResourceMeta(result)}
               </div>
             </button>
           `).join("")
@@ -5887,6 +6007,7 @@
             return;
           }
           if (result.kind === "album") {
+            rememberMiniDocsRecentAlbum(result.albumId);
             miniDocsState.sendAlbumId = result.albumId;
             miniDocsState.sendSearch = "";
             $("miniDocsSendSearch").value = "";
@@ -5912,8 +6033,10 @@
             if (Array.isArray(payload?.library?.albums)) {
               mediaLibraryAlbums = payload.library.albums;
             }
+            rememberMiniDocsRecentAlbum(result.albumId);
             closeMiniDocsSendModal();
             setMiniDocsStatus(`Texto enviado para a música ${result.title}.`);
+            void playMiniCourseUiSound("success");
           } catch (error) {
             setMiniDocsSendStatus(error instanceof Error ? error.message : "Nao foi possivel salvar o texto na musica.");
           }
@@ -6022,6 +6145,7 @@
             return;
           }
           if (result.kind === "album") {
+            rememberMiniDocsRecentAlbum(result.albumId);
             miniDocsState.syncAlbumId = result.albumId;
             miniDocsState.syncSearch = "";
             $("miniDocsSyncSearch").value = "";
@@ -6029,6 +6153,7 @@
             return;
           }
           if (miniDocsState.modalPurpose === "playback") {
+            rememberMiniDocsRecentAlbum(result.albumId);
             miniDocsState.docsPlaybackSong = {
               albumId: result.albumId,
               songId: result.songId,
@@ -6085,6 +6210,7 @@
             miniDocsState.selectionStart = 0;
             miniDocsState.selectionEnd = 0;
             miniDocsState.cursorLineNumber = 1;
+            rememberMiniDocsRecentAlbum(result.albumId);
             closeMiniDocsSyncModal();
             renderMiniDocsModal();
             setMiniDocsStatus(`Modo sync ativo para ${result.title}. Use espaço ou o botão roxo para marcar timestamps.`);
@@ -6478,10 +6604,15 @@
             return;
           }
           if (isSync) {
-            const insertedLineNumber = insertMiniDocsSyncCloneAtCurrentTime(lineNumber);
-            if (miniDocsState.syncPlaying && miniDocsState.syncAudio && insertedLineNumber) {
-              miniDocsState.syncAudio.currentTime = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0) / 1000;
+            if (miniDocsState.syncPlaying) {
+              const insertedLineNumber = insertMiniDocsSyncCloneAtCurrentTime(lineNumber);
+              if (miniDocsState.syncAudio && insertedLineNumber) {
+                miniDocsState.syncAudio.currentTime = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0) / 1000;
+              }
+              setMiniDocsStatus("");
+              return;
             }
+            cloneMiniDocsSyncLineBelowCurrent(lineNumber);
             setMiniDocsStatus("");
             return;
           }
