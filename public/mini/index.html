@@ -5114,6 +5114,46 @@
       renderMiniDocsModal();
       return insertedLineNumber;
     }
+    function insertMiniDocsSyncCloneAtCurrentTimeOrdered(sourceLineNumber) {
+      if (!isMiniDocsSyncMode() || !miniDocsState.syncPlaying || !miniDocsState.syncAudio) {
+        return 0;
+      }
+      const source = getMiniDocsLines().find((line) => line.number === sourceLineNumber);
+      if (!source) {
+        return 0;
+      }
+      let insertedLineNumber = 0;
+      const currentTimeMs = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0);
+      updateMiniDocsSyncLines((draftLines) => {
+        let insertIndex = draftLines.findIndex((line) => {
+          if (line.timestampMs === null || line.timestampMs === undefined) {
+            return true;
+          }
+          return Math.max(0, Number(line.timestampMs) || 0) > currentTimeMs;
+        });
+        if (insertIndex < 0) {
+          insertIndex = draftLines.length;
+        }
+        draftLines.splice(insertIndex, 0, {
+          number: 0,
+          text: String(source.text || ""),
+          timestampMs: currentTimeMs,
+          tag: ""
+        });
+        draftLines.forEach((line, index) => {
+          line.number = index + 1;
+        });
+        insertedLineNumber = Math.max(1, insertIndex + 1);
+      });
+      if (insertedLineNumber) {
+        miniDocsState.syncCurrentLineNumber = insertedLineNumber;
+        miniDocsState.cursorLineNumber = insertedLineNumber;
+        miniDocsState.syncLastCenteredLineNumber = 0;
+      }
+      renderMiniDocsModal();
+      centerMiniDocsSyncCurrentLine({ behavior: "smooth", force: true });
+      return insertedLineNumber;
+    }
     function cloneMiniDocsSyncLineBelowCurrent(sourceLineNumber) {
       if (!isMiniDocsSyncMode()) {
         return 0;
@@ -5159,7 +5199,7 @@
       miniDocsState.syncSheepMode = !miniDocsState.syncSheepMode;
       renderMiniDocsModal();
       setMiniDocsStatus(miniDocsState.syncSheepMode
-        ? "Modo ovelha ativo. Toque em uma frase para clonar no final."
+        ? "Modo ovelha ativo. Toque em uma frase para clonar."
         : "Modo ovelha desativado.");
     }
     function cloneMiniDocsSyncLineToEnd(lineNumber) {
@@ -5167,7 +5207,7 @@
         return;
       }
       if (miniDocsState.syncPlaying) {
-        const insertedLineNumber = insertMiniDocsSyncCloneAtCurrentTime(lineNumber);
+        const insertedLineNumber = insertMiniDocsSyncCloneAtCurrentTimeOrdered(lineNumber);
         if (insertedLineNumber) {
           setMiniDocsStatus("");
         }
@@ -6695,15 +6735,20 @@
             return;
           }
           if (isSync) {
-            if (miniDocsState.syncPlaying) {
-              const insertedLineNumber = insertMiniDocsSyncCloneAtCurrentTime(lineNumber);
-              if (miniDocsState.syncAudio && insertedLineNumber) {
-                miniDocsState.syncAudio.currentTime = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0) / 1000;
+            miniDocsState.syncCurrentLineNumber = lineNumber;
+            miniDocsState.cursorLineNumber = lineNumber;
+            const clickedLine = getMiniDocsLines().find((line) => line.number === lineNumber);
+            if (!miniDocsState.syncPlaying && clickedLine && clickedLine.timestampMs !== null && clickedLine.timestampMs !== undefined) {
+              const nextMs = Math.max(0, Number(clickedLine.timestampMs) || 0);
+              miniDocsState.syncCurrentTimeMs = nextMs;
+              miniDocsState.syncPausedAt = nextMs;
+              if (miniDocsState.syncAudio) {
+                miniDocsState.syncAudio.currentTime = nextMs / 1000;
               }
-              setMiniDocsStatus("");
-              return;
             }
-            cloneMiniDocsSyncLineBelowCurrent(lineNumber);
+            miniDocsState.syncLastCenteredLineNumber = 0;
+            renderMiniDocsModal();
+            centerMiniDocsSyncCurrentLine({ behavior: miniDocsState.syncPlaying ? "smooth" : "auto", force: true });
             setMiniDocsStatus("");
             return;
           }
