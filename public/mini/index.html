@@ -1846,6 +1846,9 @@
     .mini-docs-top-btn.sheep {
       background: linear-gradient(145deg, #7be7e5, #33b8c4);
     }
+    .mini-docs-top-btn.clear-time {
+      background: linear-gradient(145deg, #ff9c77, #d94841);
+    }
     .mini-docs-top-btn.cursor.is-active {
       box-shadow: 0 0 0 4px rgba(47, 95, 231, .16), 0 16px 30px rgba(47, 95, 231, .24);
     }
@@ -3986,6 +3989,9 @@
       <button id="miniDocsSyncSheepButton" class="mini-docs-top-btn sheep" type="button" aria-label="Ativar modo ovelha no sync" hidden>
         <svg viewBox="0 0 24 24"><path d="M7 8a3 3 0 0 1 5.72-1.28A4.5 4.5 0 0 1 19 10.5 3.5 3.5 0 0 1 18.5 17H8a4 4 0 1 1-.74-7.93A3 3 0 0 1 7 8zm2.5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
       </button>
+      <button id="miniDocsSyncClearTimeButton" class="mini-docs-top-btn clear-time" type="button" aria-label="Excluir timelapse das linhas selecionadas" hidden>
+        <svg viewBox="0 0 24 24"><path d="M6 7h12l-1 13H7L6 7zm3-3h6l1 2H8l1-2zm1 6h2v7h-2zm4 0h2v7h-2z"/></svg>
+      </button>
       <button id="closeMiniDocs" class="mini-docs-top-btn close" type="button" aria-label="Fechar documento">
         <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
       </button>
@@ -4807,6 +4813,31 @@
       renderMiniDocsModal();
       setMiniDocsStatus("Frase clonada no final do sync.");
     }
+    function clearMiniDocsSyncTimestamps() {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      const range = getMiniDocsSelectionRange();
+      const targetStart = range?.start || Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
+      const targetEnd = range?.end || targetStart;
+      let clearedCount = 0;
+      updateMiniDocsSyncLines((draftLines) => {
+        draftLines.forEach((line) => {
+          if (line.number >= targetStart && line.number <= targetEnd && line.timestampMs !== null && line.timestampMs !== undefined) {
+            line.timestampMs = null;
+            clearedCount += 1;
+          }
+        });
+      });
+      if (!range) {
+        miniDocsState.selectionStart = targetStart;
+        miniDocsState.selectionEnd = targetEnd;
+      }
+      renderMiniDocsModal();
+      setMiniDocsStatus(clearedCount
+        ? `${clearedCount} timelapse(s) removido(s).`
+        : "Nenhum timelapse para remover nesse trecho.");
+    }
     function isMiniDocsFolderLine(line) {
       return /\.docx\b/i.test(String(line?.text || "").trim());
     }
@@ -4998,19 +5029,19 @@
       $("miniDocsSyncSearch").value = "";
       $("miniDocsSyncResults").innerHTML = "";
     }
-    function teardownMiniDocsSyncAudio() {
+    function teardownMiniDocsSyncAudio({ release = true } = {}) {
       if (miniDocsState.syncRafId) {
         window.cancelAnimationFrame(miniDocsState.syncRafId);
         miniDocsState.syncRafId = 0;
       }
-      if (miniDocsState.syncAudio) {
+      if (miniDocsState.syncAudio && release) {
         try {
           miniDocsState.syncAudio.pause();
           miniDocsState.syncAudio.src = "";
           miniDocsState.syncAudio.load();
         } catch (_) {}
+        miniDocsState.syncAudio = null;
       }
-      miniDocsState.syncAudio = null;
       miniDocsState.syncPlaying = false;
     }
     function syncMiniDocsPlaybackUi() {
@@ -5058,7 +5089,7 @@
         } catch (_) {}
       }
       miniDocsState.syncPausedAt = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0);
-      teardownMiniDocsSyncAudio();
+      teardownMiniDocsSyncAudio({ release: false });
       setMiniDocsStatus(`Sync pausado em ${formatMiniDocsTimestamp(miniDocsState.syncPausedAt)}.`);
       syncMiniDocsPlaybackUi();
     }
@@ -5067,8 +5098,16 @@
         setMiniDocsStatus("Escolha uma música com áudio para iniciar o sync.");
         return;
       }
-      teardownMiniDocsSyncAudio();
-      const audio = new Audio(miniDocsState.syncSong.url);
+      const desiredAudioUrl = new URL(miniDocsState.syncSong.url, window.location.href).href;
+      const existingAudio = miniDocsState.syncAudio;
+      if (existingAudio && existingAudio.src !== desiredAudioUrl) {
+        teardownMiniDocsSyncAudio();
+      } else if (!existingAudio) {
+        teardownMiniDocsSyncAudio();
+      }
+      const audio = existingAudio && existingAudio.src === desiredAudioUrl
+        ? existingAudio
+        : new Audio(miniDocsState.syncSong.url);
       const range = getMiniDocsSelectionRange();
       let startMs = Math.max(0, Number(miniDocsState.syncPausedAt || 0) || 0);
       let endMs = 0;
@@ -5092,18 +5131,22 @@
       miniDocsState.syncDurationMs = Math.max(0, Number(miniDocsState.syncDurationMs || 0) || 0);
       audio.preload = "auto";
       audio.currentTime = startMs / 1000;
-      audio.addEventListener("loadedmetadata", () => {
+      audio.onloadedmetadata = () => {
         const durationMs = Math.max(0, Number(audio.duration || 0) || 0) * 1000;
         if (durationMs > 0) {
           miniDocsState.syncDurationMs = durationMs;
         }
         syncMiniDocsPlaybackUi();
-      }, { once: true });
-      audio.addEventListener("ended", () => {
+      };
+      audio.onended = () => {
         teardownMiniDocsSyncAudio();
         miniDocsState.syncCurrentLineNumber = 0;
         syncMiniDocsPlaybackUi();
-      }, { once: true });
+      };
+      audio.onerror = () => {
+        pauseMiniDocsSyncPlayback();
+        setMiniDocsStatus("Nao foi possivel continuar essa música agora.");
+      };
       void audio.play().catch(() => {
         setMiniDocsStatus("Nao foi possivel reproduzir essa música agora.");
       });
@@ -5663,6 +5706,7 @@
       const syncPlayButton = $("miniDocsSyncPlayButton");
       const syncSaveButton = $("miniDocsSyncSaveButton");
       const syncSheepButton = $("miniDocsSyncSheepButton");
+      const syncClearTimeButton = $("miniDocsSyncClearTimeButton");
       const syncTapButton = $("miniDocsSyncTapButton");
       if (!container || !$("miniDocsModal")) {
         return;
@@ -5688,6 +5732,9 @@
       if (syncSheepButton) {
         syncSheepButton.hidden = !isSync;
         syncSheepButton.classList.toggle("is-active", Boolean(isSync && miniDocsState.syncSheepMode));
+      }
+      if (syncClearTimeButton) {
+        syncClearTimeButton.hidden = !isSync;
       }
       if (syncTapButton) {
         const shouldShowTap = isSync && window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
@@ -10806,6 +10853,9 @@
     };
     $("miniDocsSyncSheepButton").onclick = () => {
       toggleMiniDocsSyncSheepMode();
+    };
+    $("miniDocsSyncClearTimeButton").onclick = () => {
+      clearMiniDocsSyncTimestamps();
     };
     $("miniDocsCursorButton").onclick = () => {
       setMiniDocsCursorActive(!miniDocsState.cursorActive);
