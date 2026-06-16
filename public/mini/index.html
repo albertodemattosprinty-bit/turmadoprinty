@@ -2052,6 +2052,33 @@
       height: 24px;
       fill: currentColor;
     }
+    .mini-docs-sync-footer {
+      position: sticky;
+      bottom: 0;
+      z-index: 12;
+      display: none;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+      background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(244, 248, 255, .96));
+      backdrop-filter: blur(14px);
+      box-shadow: 0 -10px 24px rgba(44, 59, 94, .12);
+    }
+    .mini-docs-sync-footer.show {
+      display: grid;
+    }
+    .mini-docs-sync-footer-time {
+      min-width: 40px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #3154b6;
+      text-align: center;
+    }
+    .mini-docs-sync-footer input[type="range"] {
+      width: 100%;
+      accent-color: #4c84ff;
+    }
     .mini-docs-record-list {
       display: grid;
       gap: 10px;
@@ -4149,6 +4176,12 @@
     </div>
   </section>
 
+  <div id="miniDocsSyncFooter" class="mini-docs-sync-footer" aria-hidden="true">
+    <div id="miniDocsSyncFooterCurrent" class="mini-docs-sync-footer-time">0:00</div>
+    <input id="miniDocsSyncFooterRange" type="range" min="0" max="0" step="0.1" value="0" aria-label="Posição da música no sync">
+    <div id="miniDocsSyncFooterDuration" class="mini-docs-sync-footer-time">0:00</div>
+  </div>
+
   <section id="mediaUploadModal" class="mini-plans-modal" aria-hidden="true">
     <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="mediaUploadTitle">
       <div class="mini-plans-head">
@@ -5004,6 +5037,37 @@
       const next = lines.find((line) => line.timestampMs !== null && line.timestampMs !== undefined);
       return next ? Math.max(0, Number(next.timestampMs) || 0) : Math.max(0, Number(miniDocsState.syncDurationMs || 0) || 0);
     }
+    function insertMiniDocsSyncCloneAtCurrentTime(sourceLineNumber) {
+      if (!isMiniDocsSyncMode()) {
+        return 0;
+      }
+      const source = getMiniDocsLines().find((line) => line.number === sourceLineNumber);
+      if (!source) {
+        return 0;
+      }
+      let insertedLineNumber = 0;
+      const currentTimeMs = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0);
+      updateMiniDocsSyncLines((draftLines) => {
+        const sourceIndex = draftLines.findIndex((line) => line.number === sourceLineNumber);
+        const insertIndex = sourceIndex >= 0 ? sourceIndex + 1 : draftLines.length;
+        draftLines.splice(insertIndex, 0, {
+          number: 0,
+          text: String(source.text || ""),
+          timestampMs: currentTimeMs,
+          tag: ""
+        });
+        draftLines.forEach((line, index) => {
+          line.number = index + 1;
+        });
+        insertedLineNumber = Math.max(1, insertIndex + 1);
+      });
+      if (insertedLineNumber) {
+        miniDocsState.syncCurrentLineNumber = insertedLineNumber;
+        miniDocsState.cursorLineNumber = insertedLineNumber;
+      }
+      renderMiniDocsModal();
+      return insertedLineNumber;
+    }
     function updateMiniDocsSyncLines(mutator) {
       const nextLines = cloneMiniDocsSyncLines(getMiniDocsLines());
       mutator(nextLines);
@@ -5022,6 +5086,13 @@
     }
     function cloneMiniDocsSyncLineToEnd(lineNumber) {
       if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      if (miniDocsState.syncPlaying) {
+        const insertedLineNumber = insertMiniDocsSyncCloneAtCurrentTime(lineNumber);
+        if (insertedLineNumber) {
+          setMiniDocsStatus("");
+        }
         return;
       }
       const source = getMiniDocsLines().find((line) => line.number === lineNumber);
@@ -5067,8 +5138,8 @@
         return;
       }
       const range = getMiniDocsSelectionRange();
-      const targetStart = range?.start || Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
-      const targetEnd = range?.end || targetStart;
+      const targetStart = Math.max(1, Number(isMiniDocsSyncMode() ? (miniDocsState.syncCurrentLineNumber || miniDocsState.cursorLineNumber || 1) : (range?.start || miniDocsState.cursorLineNumber || 1)) || 1);
+      const targetEnd = isMiniDocsSyncMode() ? targetStart : (range?.end || targetStart);
       let clearedCount = 0;
       updateMiniDocsSyncLines((draftLines) => {
         draftLines.forEach((line) => {
@@ -5078,14 +5149,13 @@
           }
         });
       });
-      if (!range) {
+      if (!range && !isMiniDocsSyncMode()) {
         miniDocsState.selectionStart = targetStart;
         miniDocsState.selectionEnd = targetEnd;
       }
+      miniDocsState.syncCurrentLineNumber = targetStart;
       renderMiniDocsModal();
-      setMiniDocsStatus(clearedCount
-        ? `${clearedCount} timelapse(s) removido(s).`
-        : "Nenhum timelapse para remover nesse trecho.");
+      setMiniDocsStatus("");
     }
     function scrollMiniDocsCursorIntoView() {
       if (!miniDocsState.cursorActive) {
@@ -5494,6 +5564,19 @@
           : `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
       }
       syncMiniDocsPlayButtonSpeedBadge();
+      const syncFooter = $("miniDocsSyncFooter");
+      const syncFooterRange = $("miniDocsSyncFooterRange");
+      const syncFooterCurrent = $("miniDocsSyncFooterCurrent");
+      const syncFooterDuration = $("miniDocsSyncFooterDuration");
+      if (syncFooter && syncFooterRange && syncFooterCurrent && syncFooterDuration) {
+        const shouldShow = isMiniDocsSyncMode() && Boolean(miniDocsState.syncSong?.url);
+        syncFooter.classList.toggle("show", shouldShow);
+        syncFooter.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+        syncFooterRange.max = String(Math.max(0, Number(miniDocsState.syncDurationMs || 0) || 0) / 1000);
+        syncFooterRange.value = String(Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0) / 1000);
+        syncFooterCurrent.textContent = formatMiniDocsTimestamp(miniDocsState.syncCurrentTimeMs || 0) || "0:00";
+        syncFooterDuration.textContent = formatMiniDocsTimestamp(miniDocsState.syncDurationMs || 0) || "0:00";
+      }
     }
     function tickMiniDocsSyncPlayback() {
       if (!miniDocsState.syncPlaying || !miniDocsState.syncAudio) {
@@ -5502,7 +5585,7 @@
       }
       const currentMs = Math.max(0, Number(miniDocsState.syncAudio.currentTime || 0) || 0) * 1000;
       miniDocsState.syncCurrentTimeMs = currentMs;
-      const currentLine = getMiniDocsLines().find((line) => {
+      const currentLine = [...getMiniDocsLines()].reverse().find((line) => {
         if (line.timestampMs === null || line.timestampMs === undefined) {
           return false;
         }
@@ -6386,9 +6469,6 @@
           if (event.target.closest("[data-mini-docs-edit]")) {
             return;
           }
-          if (isMiniDocsSyncMode() && miniDocsState.syncPlaying) {
-            return;
-          }
           if (isFolderHeader) {
             toggleMiniDocsFolder(lineNumber);
             return;
@@ -6398,14 +6478,10 @@
             return;
           }
           if (isSync) {
-            miniDocsState.syncCurrentLineNumber = lineNumber;
-            miniDocsState.cursorLineNumber = lineNumber;
-            const target = getMiniDocsLines().find((line) => line.number === lineNumber);
-            if (miniDocsState.syncPlaying && miniDocsState.syncAudio && target?.timestampMs !== null && target?.timestampMs !== undefined) {
-              miniDocsState.syncAudio.currentTime = Math.max(0, Number(target.timestampMs) || 0) / 1000;
-              miniDocsState.syncCurrentTimeMs = Math.max(0, Number(target.timestampMs) || 0);
+            const insertedLineNumber = insertMiniDocsSyncCloneAtCurrentTime(lineNumber);
+            if (miniDocsState.syncPlaying && miniDocsState.syncAudio && insertedLineNumber) {
+              miniDocsState.syncAudio.currentTime = Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0) / 1000;
             }
-            renderMiniDocsModal();
             setMiniDocsStatus("");
             return;
           }
@@ -11502,6 +11578,28 @@
     $("miniDocsSyncTapButton").onclick = () => {
       stampMiniDocsSyncCurrentLine();
     };
+    $("miniDocsSyncFooterRange").addEventListener("input", (event) => {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      const nextSeconds = Math.max(0, Number(event.target.value || 0) || 0);
+      const nextMs = nextSeconds * 1000;
+      miniDocsState.syncCurrentTimeMs = nextMs;
+      miniDocsState.syncPausedAt = nextMs;
+      if (miniDocsState.syncAudio) {
+        miniDocsState.syncAudio.currentTime = nextSeconds;
+      }
+      const currentLine = [...getMiniDocsLines()].reverse().find((line) => {
+        if (line.timestampMs === null || line.timestampMs === undefined) {
+          return false;
+        }
+        const startMs = Math.max(0, Number(line.timestampMs) || 0);
+        const endMs = getMiniDocsSyncNextLineTimestamp(line.number);
+        return nextMs >= startMs && nextMs < Math.max(startMs + 300, endMs || (startMs + 300));
+      });
+      miniDocsState.syncCurrentLineNumber = currentLine?.number || 0;
+      renderMiniDocsModal();
+    });
     $("miniDocsRecordStart").onclick = async () => {
       await startMiniDocsVoiceRecording();
     };
