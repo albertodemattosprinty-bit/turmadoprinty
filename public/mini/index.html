@@ -1843,6 +1843,9 @@
     .mini-docs-top-btn.save {
       background: linear-gradient(145deg, #70db93, #23995a);
     }
+    .mini-docs-top-btn.sheep {
+      background: linear-gradient(145deg, #7be7e5, #33b8c4);
+    }
     .mini-docs-top-btn.cursor.is-active {
       box-shadow: 0 0 0 4px rgba(47, 95, 231, .16), 0 16px 30px rgba(47, 95, 231, .24);
     }
@@ -1855,6 +1858,13 @@
       line-height: 1.5;
       color: rgba(62, 46, 32, .82);
       text-align: center;
+    }
+    .mini-docs-modal.is-sheep-sync {
+      background:
+        radial-gradient(circle at 18% 14%, rgba(146, 220, 255, .34), transparent 30%),
+        radial-gradient(circle at 84% 18%, rgba(196, 244, 255, .28), transparent 26%),
+        radial-gradient(circle at 50% 86%, rgba(173, 234, 255, .24), transparent 32%),
+        linear-gradient(180deg, #eefbff 0%, #e6f7ff 56%, #dcf3ff 100%);
     }
     .mini-docs-lines {
       overflow: auto;
@@ -3973,6 +3983,9 @@
       <button id="miniDocsSyncSaveButton" class="mini-docs-top-btn save" type="button" aria-label="Salvar sync" hidden>
         <svg viewBox="0 0 24 24"><path d="M17 3H5a2 2 0 0 0-2 2v14h18V7zm-5 14a3 3 0 1 1 0-6 3 3 0 0 1 0 6M6 8V5h8v3z"/></svg>
       </button>
+      <button id="miniDocsSyncSheepButton" class="mini-docs-top-btn sheep" type="button" aria-label="Ativar modo ovelha no sync" hidden>
+        <svg viewBox="0 0 24 24"><path d="M7 8a3 3 0 0 1 5.72-1.28A4.5 4.5 0 0 1 19 10.5 3.5 3.5 0 0 1 18.5 17H8a4 4 0 1 1-.74-7.93A3 3 0 0 1 7 8zm2.5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm5 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
+      </button>
       <button id="closeMiniDocs" class="mini-docs-top-btn close" type="button" aria-label="Fechar documento">
         <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
       </button>
@@ -4528,6 +4541,7 @@
       syncCurrentLineNumber: 0,
       syncAudio: null,
       syncRafId: 0,
+      syncSheepMode: false,
       sendSearch: "",
       sendResults: [],
       sendAlbumId: ""
@@ -4760,6 +4774,38 @@
       const nextLines = cloneMiniDocsSyncLines(getMiniDocsLines());
       mutator(nextLines);
       miniDocsState.syncLines = nextLines;
+    }
+    function toggleMiniDocsSyncSheepMode() {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      miniDocsState.syncSheepMode = !miniDocsState.syncSheepMode;
+      renderMiniDocsModal();
+      setMiniDocsStatus(miniDocsState.syncSheepMode
+        ? "Modo ovelha ativo. Toque em uma frase para clonar no final."
+        : "Modo ovelha desativado.");
+    }
+    function cloneMiniDocsSyncLineToEnd(lineNumber) {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      const source = getMiniDocsLines().find((line) => line.number === lineNumber);
+      if (!source) {
+        return;
+      }
+      const nextNumber = getMiniDocsLines().reduce((max, line) => Math.max(max, Number(line.number || 0) || 0), 0) + 1;
+      updateMiniDocsSyncLines((draftLines) => {
+        draftLines.push({
+          number: nextNumber,
+          text: String(source.text || ""),
+          timestampMs: null
+        });
+      });
+      miniDocsState.cursorLineNumber = nextNumber;
+      miniDocsState.selectionStart = nextNumber;
+      miniDocsState.selectionEnd = nextNumber;
+      renderMiniDocsModal();
+      setMiniDocsStatus("Frase clonada no final do sync.");
     }
     function isMiniDocsFolderLine(line) {
       return /\.docx\b/i.test(String(line?.text || "").trim());
@@ -5357,6 +5403,7 @@
             miniDocsState.syncPausedAt = 0;
             miniDocsState.syncCurrentTimeMs = 0;
             miniDocsState.syncCurrentLineNumber = 0;
+            miniDocsState.syncSheepMode = false;
             miniDocsState.cursorActive = false;
             miniDocsState.selectionStart = 0;
             miniDocsState.selectionEnd = 0;
@@ -5615,6 +5662,7 @@
       const sendButton = $("miniDocsSendButton");
       const syncPlayButton = $("miniDocsSyncPlayButton");
       const syncSaveButton = $("miniDocsSyncSaveButton");
+      const syncSheepButton = $("miniDocsSyncSheepButton");
       const syncTapButton = $("miniDocsSyncTapButton");
       if (!container || !$("miniDocsModal")) {
         return;
@@ -5637,6 +5685,10 @@
       if (syncSaveButton) {
         syncSaveButton.hidden = !isSync;
       }
+      if (syncSheepButton) {
+        syncSheepButton.hidden = !isSync;
+        syncSheepButton.classList.toggle("is-active", Boolean(isSync && miniDocsState.syncSheepMode));
+      }
       if (syncTapButton) {
         const shouldShowTap = isSync && window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
         syncTapButton.hidden = !shouldShowTap;
@@ -5654,6 +5706,7 @@
           ? `Sync • ${miniDocsState.syncSong?.title || "Música"}`
           : "AllDocs Imersivo";
       }
+      $("miniDocsModal")?.classList.toggle("is-sheep-sync", Boolean(isSync && miniDocsState.syncSheepMode));
       if (miniDocsState.loading) {
         container.innerHTML = `<div class="courses-empty">Carregando documento...</div>`;
         return;
@@ -5734,6 +5787,10 @@
           }
           if (isFolderHeader) {
             toggleMiniDocsFolder(lineNumber);
+            return;
+          }
+          if (isSync && miniDocsState.syncSheepMode) {
+            cloneMiniDocsSyncLineToEnd(lineNumber);
             return;
           }
           if (isMiniDocsSelectionActive()) {
@@ -5851,6 +5908,7 @@
       miniDocsState.syncCurrentTimeMs = 0;
       miniDocsState.syncPausedAt = 0;
       miniDocsState.syncDurationMs = 0;
+      miniDocsState.syncSheepMode = false;
       miniDocsState.cursorActive = false;
       stopMiniDocsLongPress();
       miniDocsState.longPressTriggered = false;
@@ -10745,6 +10803,9 @@
     };
     $("miniDocsSyncSaveButton").onclick = async () => {
       await saveMiniDocsSyncData();
+    };
+    $("miniDocsSyncSheepButton").onclick = () => {
+      toggleMiniDocsSyncSheepMode();
     };
     $("miniDocsCursorButton").onclick = () => {
       setMiniDocsCursorActive(!miniDocsState.cursorActive);
