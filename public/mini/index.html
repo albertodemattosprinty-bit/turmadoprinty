@@ -5217,28 +5217,12 @@
       if (!source) {
         return;
       }
-      const cursorAnchor = miniDocsState.cursorActive
-        ? Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1)
-        : 0;
       updateMiniDocsSyncLines((draftLines) => {
-        const insertIndex = cursorAnchor
-          ? draftLines.findIndex((line) => line.number === cursorAnchor)
-          : -1;
         const nextNumber = Math.max(1, Number(draftLines[draftLines.length - 1]?.number || 0) || 0) + 1;
         const clonedLine = {
           text: String(source.text || ""),
           timestampMs: null
         };
-        if (insertIndex >= 0) {
-          draftLines.splice(insertIndex + 1, 0, { ...clonedLine, number: cursorAnchor + 1 });
-          draftLines.forEach((line, index) => {
-            line.number = index + 1;
-          });
-          miniDocsState.cursorLineNumber = Math.min(draftLines.length, cursorAnchor + 1);
-          miniDocsState.selectionStart = miniDocsState.cursorLineNumber;
-          miniDocsState.selectionEnd = miniDocsState.cursorLineNumber;
-          return;
-        }
         draftLines.push({
           ...clonedLine,
           number: nextNumber
@@ -5246,10 +5230,12 @@
         miniDocsState.cursorLineNumber = nextNumber;
         miniDocsState.selectionStart = nextNumber;
         miniDocsState.selectionEnd = nextNumber;
+        miniDocsState.syncCurrentLineNumber = nextNumber;
+        miniDocsState.syncLastCenteredLineNumber = 0;
       });
       renderMiniDocsModal();
-      scrollMiniDocsCursorIntoView();
-      setMiniDocsStatus(cursorAnchor ? "Frase clonada abaixo do cursor." : "Frase clonada no final do sync.");
+      centerMiniDocsSyncCurrentLine({ behavior: "auto", force: true });
+      setMiniDocsStatus("Frase clonada no final do sync.");
     }
     function clearMiniDocsSyncTimestamps() {
       if (!isMiniDocsSyncMode()) {
