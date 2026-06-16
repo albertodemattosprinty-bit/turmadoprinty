@@ -4413,7 +4413,8 @@ async function handleMiniMediaTrackLyricsRequest(request, response, albumId, tra
       hasLyrics: Boolean(lyrics),
       hasScores: Math.max(0, Number(databaseSong.score_count || 0) || 0) > 0,
       scoreCount: Math.max(0, Number(databaseSong.score_count || 0) || 0),
-      updatedAt: databaseSong.lyrics_updated_at || null
+      updatedAt: databaseSong.lyrics_updated_at || null,
+      serverNow: new Date().toISOString()
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -4468,6 +4469,7 @@ async function handleMiniMediaTrackLyricsUpdateRequest(request, response, albumI
       syncData: song.lyricsSyncData,
       hasLyrics: Boolean(lyrics),
       updatedAt: updatedSong?.lyrics_updated_at || null,
+      serverNow: new Date().toISOString(),
       feedback: lyrics ? "Letra salva no Postgres com sucesso." : "Letra removida com sucesso."
     });
   } catch (error) {

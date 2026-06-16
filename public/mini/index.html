@@ -1825,6 +1825,24 @@
       height: 22px;
       fill: currentColor;
     }
+    .mini-docs-top-btn.play {
+      position: relative;
+    }
+    .mini-docs-top-btn.play::after {
+      content: attr(data-speed);
+      position: absolute;
+      right: -4px;
+      bottom: -5px;
+      min-width: 28px;
+      padding: 2px 5px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.95);
+      color: #2753cf;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: 0 6px 14px rgba(37, 29, 18, .16);
+    }
     .mini-docs-top-btn.copy {
       background: linear-gradient(145deg, #49c96e, #188f43);
     }
@@ -1908,10 +1926,10 @@
       align-items: center;
       gap: 10px;
       font-weight: 700;
-      color: #2f5fe7;
+      color: #7b4b2a;
     }
     .mini-docs-line.is-folder-open .mini-docs-line-text {
-      color: #1f8a46;
+      color: #7b4b2a;
     }
     .mini-docs-folder-caret {
       flex: 0 0 auto;
@@ -1961,6 +1979,13 @@
     .mini-docs-line.is-sync-current {
       background: rgba(255, 202, 72, .22);
     }
+    .mini-docs-line.is-sync-unsynced {
+      opacity: .6;
+    }
+    .mini-docs-line.is-sync-flagged {
+      opacity: 1;
+      background: rgba(255, 172, 77, .28);
+    }
     .mini-docs-line-text.is-empty {
       opacity: 1;
       font-style: normal;
@@ -1994,6 +2019,10 @@
       width: 18px;
       height: 18px;
       fill: currentColor;
+    }
+    .mini-docs-line-edit.is-alert {
+      background: rgba(255, 172, 77, .2);
+      color: #111;
     }
     .mini-docs-editor {
       display: grid;
@@ -4590,6 +4619,7 @@
     let mediaResourceAssets = [];
     let mediaImageModels = [];
     let mediaImageDefaultModel = "gpt-image-2";
+    const MINI_DOCS_PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2];
     let miniDocsState = {
       document: null,
       loading: false,
@@ -4605,6 +4635,7 @@
       longPressTriggered: false,
       expandedFolders: {},
       mode: "docs",
+      modalPurpose: "sync",
       syncSearch: "",
       syncResults: [],
       syncAlbumId: "",
@@ -4621,6 +4652,20 @@
       syncAudio: null,
       syncRafId: 0,
       syncSheepMode: false,
+      docsPlaybackSong: null,
+      docsPlaying: false,
+      docsPausedAt: 0,
+      docsDurationMs: 0,
+      docsAudio: null,
+      docsRafId: 0,
+      playbackRateIndex: 0,
+      playButtonHoldTimer: 0,
+      playButtonLongPressHandled: false,
+      syncDirty: false,
+      syncSaving: false,
+      syncLastSavedServerMs: 0,
+      serverNowMs: 0,
+      serverNowCapturedAtMs: 0,
       recordDraftLines: [],
       recordTargetIndex: -1,
       recordIsRecording: false,
@@ -4727,6 +4772,9 @@
     function getMiniDocsScoreResourceSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3v10.55A4 4 0 1 0 18 17V7h3V3zM6 5h6v2H6zm0 4h6v2H6zm0 4h4v2H6z"/></svg>`;
     }
+    function getMiniDocsAlertSvg() {
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3zm-1 5h2v6h-2zm0 8h2v2h-2z"/></svg>`;
+    }
     function getMiniDocsEditSvg() {
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7zM4 5h2v14H4z"/></svg>`;
     }
@@ -4780,6 +4828,56 @@
           ${result.hasScores ? `<span class="mini-docs-send-result-icon score" aria-label="Possui partitura">${getMiniDocsScoreResourceSvg()}</span>` : ``}
         </div>
       `;
+    }
+    function getMiniDocsPlaybackRate() {
+      return MINI_DOCS_PLAYBACK_SPEEDS[Math.max(0, Math.min(MINI_DOCS_PLAYBACK_SPEEDS.length - 1, Number(miniDocsState.playbackRateIndex || 0) || 0))] || 1;
+    }
+    function syncMiniDocsServerClock(serverNow) {
+      const parsed = new Date(serverNow || "").getTime();
+      if (Number.isFinite(parsed) && parsed > 0) {
+        miniDocsState.serverNowMs = parsed;
+        miniDocsState.serverNowCapturedAtMs = Date.now();
+      }
+    }
+    function getMiniDocsServerNowMs() {
+      if (Number.isFinite(miniDocsState.serverNowMs) && miniDocsState.serverNowMs > 0 && Number.isFinite(miniDocsState.serverNowCapturedAtMs) && miniDocsState.serverNowCapturedAtMs > 0) {
+        return miniDocsState.serverNowMs + (Date.now() - miniDocsState.serverNowCapturedAtMs);
+      }
+      return Date.now();
+    }
+    function syncMiniDocsPlayButtonSpeedBadge() {
+      const playButton = $("miniDocsSyncPlayButton");
+      if (playButton) {
+        playButton.setAttribute("data-speed", `${getMiniDocsPlaybackRate().toFixed(2)}x`);
+      }
+      if (miniDocsState.syncAudio) {
+        miniDocsState.syncAudio.playbackRate = getMiniDocsPlaybackRate();
+      }
+      if (miniDocsState.docsAudio) {
+        miniDocsState.docsAudio.playbackRate = getMiniDocsPlaybackRate();
+      }
+    }
+    function cycleMiniDocsPlaybackSpeed() {
+      miniDocsState.playbackRateIndex = (Number(miniDocsState.playbackRateIndex || 0) + 1) % MINI_DOCS_PLAYBACK_SPEEDS.length;
+      syncMiniDocsPlayButtonSpeedBadge();
+      setMiniDocsStatus(`Velocidade ${getMiniDocsPlaybackRate().toFixed(2)}x.`);
+    }
+    function startMiniDocsPlayButtonLongPress() {
+      if (miniDocsState.playButtonHoldTimer) {
+        window.clearTimeout(miniDocsState.playButtonHoldTimer);
+      }
+      miniDocsState.playButtonLongPressHandled = false;
+      miniDocsState.playButtonHoldTimer = window.setTimeout(() => {
+        miniDocsState.playButtonLongPressHandled = true;
+        cycleMiniDocsPlaybackSpeed();
+        miniDocsState.playButtonHoldTimer = 0;
+      }, 500);
+    }
+    function stopMiniDocsPlayButtonLongPress() {
+      if (miniDocsState.playButtonHoldTimer) {
+        window.clearTimeout(miniDocsState.playButtonHoldTimer);
+        miniDocsState.playButtonHoldTimer = 0;
+      }
     }
     function normalizeMiniDocsSearchText(value) {
       return String(value || "")
@@ -4837,6 +4935,7 @@
       const node = $("miniDocsStatus");
       if (node) {
         node.textContent = text || "";
+        node.hidden = !String(text || "").trim() || isMiniDocsSyncMode();
       }
     }
     function normalizeMiniDocsLineText(value) {
@@ -4847,7 +4946,8 @@
         .map((line) => ({
           number: 0,
           text: normalizeMiniDocsLineText(line?.text || ""),
-          timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0)
+          timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
+          tag: String(line?.tag || "").trim() === "correct32" ? "correct32" : ""
         }))
         .filter((line) => line.text)
         .map((line, index) => ({
@@ -4908,6 +5008,7 @@
       const nextLines = cloneMiniDocsSyncLines(getMiniDocsLines());
       mutator(nextLines);
       miniDocsState.syncLines = normalizeMiniDocsLineList(nextLines);
+      miniDocsState.syncDirty = true;
     }
     function toggleMiniDocsSyncSheepMode() {
       if (!isMiniDocsSyncMode()) {
@@ -5346,11 +5447,27 @@
     function closeMiniDocsSyncModal() {
       $("miniDocsSyncModal")?.classList.remove("show");
       $("miniDocsSyncModal")?.setAttribute("aria-hidden", "true");
+      miniDocsState.modalPurpose = "sync";
       miniDocsState.syncSearch = "";
       miniDocsState.syncResults = [];
       miniDocsState.syncAlbumId = "";
       $("miniDocsSyncSearch").value = "";
       $("miniDocsSyncResults").innerHTML = "";
+    }
+    function teardownMiniDocsDocsPlayback({ release = true } = {}) {
+      if (miniDocsState.docsRafId) {
+        window.cancelAnimationFrame(miniDocsState.docsRafId);
+        miniDocsState.docsRafId = 0;
+      }
+      if (miniDocsState.docsAudio && release) {
+        try {
+          miniDocsState.docsAudio.pause();
+          miniDocsState.docsAudio.src = "";
+          miniDocsState.docsAudio.load();
+        } catch (_) {}
+        miniDocsState.docsAudio = null;
+      }
+      miniDocsState.docsPlaying = false;
     }
     function teardownMiniDocsSyncAudio({ release = true } = {}) {
       if (miniDocsState.syncRafId) {
@@ -5368,16 +5485,15 @@
       miniDocsState.syncPlaying = false;
     }
     function syncMiniDocsPlaybackUi() {
-      if (!isMiniDocsSyncMode()) {
-        return;
-      }
       renderMiniDocsModal();
       const playButton = $("miniDocsSyncPlayButton");
       if (playButton) {
-        playButton.innerHTML = miniDocsState.syncPlaying
+        const isPlaying = isMiniDocsSyncMode() ? miniDocsState.syncPlaying : miniDocsState.docsPlaying;
+        playButton.innerHTML = isPlaying
           ? `<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>`
           : `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
       }
+      syncMiniDocsPlayButtonSpeedBadge();
     }
     function tickMiniDocsSyncPlayback() {
       if (!miniDocsState.syncPlaying || !miniDocsState.syncAudio) {
@@ -5404,6 +5520,18 @@
       }
       syncMiniDocsPlaybackUi();
       miniDocsState.syncRafId = window.requestAnimationFrame(tickMiniDocsSyncPlayback);
+    }
+    function toggleMiniDocsSyncLineFlag(lineNumber) {
+      if (!isMiniDocsSyncMode() || !isMiniMediaAdmin() || !lineNumber) {
+        return;
+      }
+      updateMiniDocsSyncLines((draftLines) => {
+        const target = draftLines.find((line) => line.number === lineNumber);
+        if (target) {
+          target.tag = target.tag === "correct32" ? "" : "correct32";
+        }
+      });
+      renderMiniDocsModal();
     }
     function pauseMiniDocsSyncPlayback() {
       if (miniDocsState.syncAudio) {
@@ -5443,6 +5571,12 @@
         if (last) {
           endMs = getMiniDocsSyncNextLineTimestamp(last.number);
         }
+      } else {
+        const requestedLineNumber = Math.max(1, Number(miniDocsState.syncCurrentLineNumber || miniDocsState.cursorLineNumber || 1) || 1);
+        const requestedLine = getMiniDocsLines().find((line) => line.number === requestedLineNumber);
+        if (requestedLine?.timestampMs !== null && requestedLine?.timestampMs !== undefined) {
+          startMs = Math.max(0, Number(requestedLine.timestampMs) || 0);
+        }
       }
       miniDocsState.syncPlaybackStartMs = startMs;
       miniDocsState.syncPlaybackEndMs = Math.max(0, Number(endMs || 0) || 0);
@@ -5453,6 +5587,7 @@
       miniDocsState.syncPlaying = true;
       miniDocsState.syncDurationMs = Math.max(0, Number(miniDocsState.syncDurationMs || 0) || 0);
       audio.preload = "auto";
+      audio.playbackRate = getMiniDocsPlaybackRate();
       audio.currentTime = startMs / 1000;
       audio.onloadedmetadata = () => {
         const durationMs = Math.max(0, Number(audio.duration || 0) || 0) * 1000;
@@ -5475,7 +5610,69 @@
       });
       syncMiniDocsPlaybackUi();
       miniDocsState.syncRafId = window.requestAnimationFrame(tickMiniDocsSyncPlayback);
-      setMiniDocsStatus(`Tocando sync: ${miniDocsState.syncSong.title}.`);
+      setMiniDocsStatus("");
+    }
+    function startMiniDocsDocsPlayback() {
+      if (!miniDocsState.docsPlaybackSong?.url) {
+        setMiniDocsStatus("Escolha uma música para tocar junto com os textos.");
+        void openMiniDocsSyncModal("playback");
+        return;
+      }
+      const desiredAudioUrl = new URL(miniDocsState.docsPlaybackSong.url, window.location.href).href;
+      const existingAudio = miniDocsState.docsAudio;
+      if (existingAudio && existingAudio.src !== desiredAudioUrl) {
+        teardownMiniDocsDocsPlayback();
+      } else if (!existingAudio) {
+        teardownMiniDocsDocsPlayback();
+      }
+      const audio = existingAudio && existingAudio.src === desiredAudioUrl
+        ? existingAudio
+        : new Audio(miniDocsState.docsPlaybackSong.url);
+      const startMs = Math.max(0, Number(miniDocsState.docsPausedAt || 0) || 0);
+      miniDocsState.docsAudio = audio;
+      miniDocsState.docsPlaying = true;
+      audio.preload = "auto";
+      audio.playbackRate = getMiniDocsPlaybackRate();
+      audio.currentTime = startMs / 1000;
+      audio.onloadedmetadata = () => {
+        miniDocsState.docsDurationMs = Math.max(0, Number(audio.duration || 0) || 0) * 1000;
+        syncMiniDocsPlaybackUi();
+      };
+      audio.onended = () => {
+        miniDocsState.docsPausedAt = 0;
+        teardownMiniDocsDocsPlayback();
+        syncMiniDocsPlaybackUi();
+      };
+      audio.onerror = () => {
+        pauseMiniDocsDocsPlayback();
+        setMiniDocsStatus("Nao foi possivel reproduzir essa música agora.");
+      };
+      void audio.play().catch(() => {
+        setMiniDocsStatus("Nao foi possivel reproduzir essa música agora.");
+      });
+      syncMiniDocsPlaybackUi();
+      setMiniDocsStatus("");
+    }
+    function pauseMiniDocsDocsPlayback() {
+      if (miniDocsState.docsAudio) {
+        try {
+          miniDocsState.docsAudio.pause();
+        } catch (_) {}
+      }
+      miniDocsState.docsPausedAt = Math.max(0, Number(miniDocsState.docsAudio?.currentTime || 0) || 0) * 1000;
+      teardownMiniDocsDocsPlayback({ release: false });
+      syncMiniDocsPlaybackUi();
+    }
+    function toggleMiniDocsDocsPlayback() {
+      if (miniDocsState.docsPlaying) {
+        pauseMiniDocsDocsPlayback();
+        return;
+      }
+      if (!miniDocsState.docsPlaybackSong) {
+        void openMiniDocsSyncModal("playback");
+        return;
+      }
+      startMiniDocsDocsPlayback();
     }
     function toggleMiniDocsSyncPlayback() {
       if (miniDocsState.syncPlaying) {
@@ -5499,7 +5696,7 @@
       miniDocsState.editingDraft = "";
       closeMiniDocsSyncModal();
       renderMiniDocsModal();
-      setMiniDocsStatus("Voltando para os textos .docx.");
+      setMiniDocsStatus("Voltando para os textos.");
     }
     function getMiniDocsActiveRange() {
       const selection = getMiniDocsSelectionRange();
@@ -5748,6 +5945,18 @@
             renderMiniDocsSyncResults();
             return;
           }
+          if (miniDocsState.modalPurpose === "playback") {
+            miniDocsState.docsPlaybackSong = {
+              albumId: result.albumId,
+              songId: result.songId,
+              title: result.title,
+              url: result.url || ""
+            };
+            miniDocsState.docsPausedAt = 0;
+            closeMiniDocsSyncModal();
+            startMiniDocsDocsPlayback();
+            return;
+          }
           try {
             const [lyricsResponse, assetsResponse] = await Promise.all([
               apiMini(`/api/mini/media/albums/${encodeURIComponent(result.albumId)}/tracks/${encodeURIComponent(result.songId)}/lyrics`),
@@ -5785,6 +5994,9 @@
             miniDocsState.syncPausedAt = 0;
             miniDocsState.syncCurrentTimeMs = 0;
             miniDocsState.syncCurrentLineNumber = 0;
+            miniDocsState.syncDirty = false;
+            syncMiniDocsServerClock(payload?.serverNow);
+            miniDocsState.syncLastSavedServerMs = getMiniDocsServerNowMs();
             miniDocsState.syncSheepMode = false;
             miniDocsState.cursorActive = false;
             miniDocsState.selectionStart = 0;
@@ -5799,29 +6011,35 @@
         };
       });
     }
-    async function openMiniDocsSyncModal() {
-      if (!isMiniMediaAdmin()) {
+    async function openMiniDocsSyncModal(purpose = "sync") {
+      if (purpose !== "playback" && !isMiniMediaAdmin()) {
         return;
       }
       if (!mediaLibraryLoaded) {
         await loadMiniMediaLibrary();
       }
+      miniDocsState.modalPurpose = purpose === "playback" ? "playback" : "sync";
       miniDocsState.syncSearch = "";
       miniDocsState.syncResults = [];
       miniDocsState.syncAlbumId = "";
       $("miniDocsSyncSearch").value = "";
+      $("miniDocsSyncTitle").textContent = miniDocsState.modalPurpose === "playback" ? "Escolher música para tocar" : "Syncar letra com música";
+      $("miniDocsSyncStatus").textContent = "";
       $("miniDocsSyncModal")?.classList.add("show");
       $("miniDocsSyncModal")?.setAttribute("aria-hidden", "false");
       renderMiniDocsSyncResults();
       $("miniDocsSyncSearch").focus();
     }
-    async function saveMiniDocsSyncData() {
+    async function saveMiniDocsSyncData({ silent = false } = {}) {
       if (!isMiniDocsSyncMode()) {
         return;
       }
+      if (miniDocsState.syncSaving) {
+        return;
+      }
+      miniDocsState.syncSaving = true;
       try {
         const lyrics = getMiniDocsLines().map((line) => String(line.text || "").trim()).join("\n").trim();
-        setMiniDocsStatus(`Salvando sync de ${miniDocsState.syncSong.title}...`);
         const response = await apiMini(`/api/mini/media/albums/${encodeURIComponent(miniDocsState.syncSong.albumId)}/tracks/${encodeURIComponent(miniDocsState.syncSong.songId)}/lyrics`, {
           method: "PATCH",
           body: JSON.stringify({
@@ -5833,12 +6051,21 @@
         if (!response.ok) {
           throw new Error(payload.error || "Nao foi possivel salvar o sync.");
         }
+        syncMiniDocsServerClock(payload?.serverNow);
         if (Array.isArray(payload?.library?.albums)) {
           mediaLibraryAlbums = payload.library.albums;
         }
-        setMiniDocsStatus(`Sync salvo em ${miniDocsState.syncSong.title}.`);
+        miniDocsState.syncDirty = false;
+        miniDocsState.syncLastSavedServerMs = getMiniDocsServerNowMs();
+        if (!silent) {
+          setMiniDocsStatus("");
+        }
       } catch (error) {
-        setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel salvar o sync.");
+        if (!silent) {
+          setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel salvar o sync.");
+        }
+      } finally {
+        miniDocsState.syncSaving = false;
       }
     }
     function stampMiniDocsSyncCurrentLine() {
@@ -5855,13 +6082,12 @@
           target.timestampMs = currentTimeMs;
         }
       });
-      miniDocsState.selectionStart = currentLineNumber;
-      miniDocsState.selectionEnd = currentLineNumber;
       const currentIndex = lines.findIndex((line) => line.number === currentLineNumber);
       const nextLine = lines.slice(currentIndex + 1).find((line) => !isMiniDocsBlankLine(line));
       miniDocsState.cursorLineNumber = nextLine?.number || currentLineNumber;
+      miniDocsState.syncCurrentLineNumber = currentLineNumber;
       renderMiniDocsModal();
-      setMiniDocsStatus(`Linha ${currentLineNumber} marcada em ${formatMiniDocsTimestamp(currentTimeMs)}.`);
+      setMiniDocsStatus("");
     }
     function setMiniDocsCursorActive(active) {
       if (!isMiniMediaAdmin()) {
@@ -6076,7 +6302,7 @@
         sendButton.hidden = isSync || !isAdmin || !isMiniDocsSelectionActive();
       }
       if (syncPlayButton) {
-        syncPlayButton.hidden = !isSync;
+        syncPlayButton.hidden = false;
       }
       if (syncSaveButton) {
         syncSaveButton.hidden = !isSync;
@@ -6104,10 +6330,9 @@
       $("miniDocsComposer")?.classList.toggle("is-active", !isSync && isAdmin && miniDocsState.cursorActive);
       const centerLabel = document.querySelector(".mini-docs-head-center span");
       if (centerLabel) {
-        centerLabel.textContent = isSync
-          ? `Sync • ${miniDocsState.syncSong?.title || "Música"}`
-          : "AllDocs Imersivo";
+        centerLabel.textContent = "";
       }
+      syncMiniDocsPlayButtonSpeedBadge();
       $("miniDocsModal")?.classList.toggle("is-sheep-sync", Boolean(isSync && miniDocsState.syncSheepMode));
       if (miniDocsState.loading) {
         container.innerHTML = `<div class="courses-empty">Carregando documento...</div>`;
@@ -6117,7 +6342,7 @@
         container.innerHTML = `<div class="section-muted">${isAdmin ? "Documento vazio. Use o cursor para começar a escrever." : "Documento vazio."}</div>`;
         return;
       }
-      const selection = getMiniDocsSelectionRange();
+      const selection = !isSync ? getMiniDocsSelectionRange() : null;
       container.innerHTML = visibleLines.map((line) => {
         const isSelected = selection && line.number >= selection.start && line.number <= selection.end;
         const isCursor = miniDocsState.cursorActive && line.number === Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
@@ -6126,6 +6351,8 @@
         const isFolderHeader = Boolean(line.isFolderHeader);
         const isFolderOpen = isFolderHeader && Boolean(miniDocsState.expandedFolders[String(line.number)]);
         const isSyncCurrent = isSync && Number(miniDocsState.syncCurrentLineNumber || 0) === line.number;
+        const isSyncFlagged = isSync && String(line.tag || "") === "correct32";
+        const isSyncUnsynced = isSync && !isFolderHeader && !isSyncFlagged && (line.timestampMs === null || line.timestampMs === undefined);
         const timestampLabel = isSync ? formatMiniDocsTimestamp(line.timestampMs) : "";
         if (isEditing) {
           return `
@@ -6142,11 +6369,12 @@
             </article>
           `;
         }
+        const folderLabel = isFolderHeader ? safeText.replace(/\.docx\b/gi, "").trim() || safeText : safeText;
         return `
-          <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}${isFolderHeader ? " is-folder" : ""}${isFolderOpen ? " is-folder-open" : ""}${line.isFolderContent ? " is-folder-content" : ""}${isSyncCurrent ? " is-sync-current" : ""}" data-mini-docs-line="${line.number}"${isFolderHeader ? ` data-mini-docs-folder="${line.number}"` : ""} tabindex="0" role="button" aria-label="${isFolderHeader ? `Pasta ${escapeAttr(safeText)}` : `Linha ${line.number}`}">
-            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${isFolderHeader ? `<span class="mini-docs-folder-caret" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>` : ""}${safeText ? escapeText(safeText) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
+          <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}${isFolderHeader ? " is-folder" : ""}${isFolderOpen ? " is-folder-open" : ""}${line.isFolderContent ? " is-folder-content" : ""}${isSyncCurrent ? " is-sync-current" : ""}${isSyncUnsynced ? " is-sync-unsynced" : ""}${isSyncFlagged ? " is-sync-flagged" : ""}" data-mini-docs-line="${line.number}"${isFolderHeader ? ` data-mini-docs-folder="${line.number}"` : ""} tabindex="0" role="button" aria-label="${isFolderHeader ? `Pasta ${escapeAttr(safeText)}` : `Linha ${line.number}`}">
+            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${isFolderHeader ? `<span class="mini-docs-folder-caret" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>` : ""}${folderLabel ? escapeText(folderLabel) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
             <div class="mini-docs-line-timestamp">${escapeText(timestampLabel)}</div>
-            ${isAdmin && !isFolderHeader && !(isSync && miniDocsState.syncPlaying) ? `<button class="mini-docs-line-edit" type="button" data-mini-docs-edit="${line.number}" aria-label="Editar linha ${line.number}">${getMiniDocsEditSvg()}</button>` : `<div></div>`}
+            ${isAdmin && !isFolderHeader ? `<button class="mini-docs-line-edit${isSync ? " is-alert" : ""}" type="button" data-mini-docs-edit="${line.number}" aria-label="${isSync ? `Marcar alerta na linha ${line.number}` : `Editar linha ${line.number}`}">${isSync ? getMiniDocsAlertSvg() : getMiniDocsEditSvg()}</button>` : `<div></div>`}
           </article>
         `;
       }).join("");
@@ -6167,6 +6395,18 @@
           }
           if (isSync && miniDocsState.syncSheepMode) {
             cloneMiniDocsSyncLineToEnd(lineNumber);
+            return;
+          }
+          if (isSync) {
+            miniDocsState.syncCurrentLineNumber = lineNumber;
+            miniDocsState.cursorLineNumber = lineNumber;
+            const target = getMiniDocsLines().find((line) => line.number === lineNumber);
+            if (miniDocsState.syncPlaying && miniDocsState.syncAudio && target?.timestampMs !== null && target?.timestampMs !== undefined) {
+              miniDocsState.syncAudio.currentTime = Math.max(0, Number(target.timestampMs) || 0) / 1000;
+              miniDocsState.syncCurrentTimeMs = Math.max(0, Number(target.timestampMs) || 0);
+            }
+            renderMiniDocsModal();
+            setMiniDocsStatus("");
             return;
           }
           if (!isMiniDocsSelectionActive() && !miniDocsState.cursorActive) {
@@ -6209,7 +6449,12 @@
       container.querySelectorAll("[data-mini-docs-edit]").forEach((button) => {
         button.onclick = (event) => {
           event.stopPropagation();
-          beginMiniDocsInlineEdit(Number(button.getAttribute("data-mini-docs-edit") || 0) || 0);
+          const lineNumber = Number(button.getAttribute("data-mini-docs-edit") || 0) || 0;
+          if (isMiniDocsSyncMode()) {
+            toggleMiniDocsSyncLineFlag(lineNumber);
+            return;
+          }
+          beginMiniDocsInlineEdit(lineNumber);
         };
       });
       container.querySelectorAll("[data-mini-docs-editor]").forEach((textarea) => {
@@ -6275,7 +6520,9 @@
       renderMiniDocsModal();
     }
     function closeMiniDocsModal() {
+      teardownMiniDocsDocsPlayback();
       teardownMiniDocsSyncAudio();
+      stopMiniDocsPlayButtonLongPress();
       void stopMiniDocsVoiceCaptureTracks();
       $("miniDocsModal").classList.remove("show");
       $("miniDocsModal").setAttribute("aria-hidden", "true");
@@ -6294,6 +6541,9 @@
       miniDocsState.syncPausedAt = 0;
       miniDocsState.syncDurationMs = 0;
       miniDocsState.syncSheepMode = false;
+      miniDocsState.docsPlaybackSong = null;
+      miniDocsState.docsPausedAt = 0;
+      miniDocsState.docsDurationMs = 0;
       miniDocsState.cursorActive = false;
       stopMiniDocsLongPress();
       miniDocsState.longPressTriggered = false;
@@ -11184,8 +11434,26 @@
       await openMiniDocsSendModal();
     };
     $("miniDocsSyncPlayButton").onclick = () => {
-      toggleMiniDocsSyncPlayback();
+      if (miniDocsState.playButtonLongPressHandled) {
+        miniDocsState.playButtonLongPressHandled = false;
+        return;
+      }
+      if (isMiniDocsSyncMode()) {
+        toggleMiniDocsSyncPlayback();
+        return;
+      }
+      toggleMiniDocsDocsPlayback();
     };
+    ["pointerdown"].forEach((eventName) => {
+      $("miniDocsSyncPlayButton").addEventListener(eventName, () => {
+        startMiniDocsPlayButtonLongPress();
+      });
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
+      $("miniDocsSyncPlayButton").addEventListener(eventName, () => {
+        stopMiniDocsPlayButtonLongPress();
+      });
+    });
     $("miniDocsSyncSaveButton").onclick = async () => {
       await saveMiniDocsSyncData();
     };
@@ -11316,6 +11584,18 @@
         }
       }
     });
+    window.setInterval(() => {
+      if (!isMiniDocsSyncMode() || !miniDocsState.syncDirty || miniDocsState.syncSaving) {
+        return;
+      }
+      const lastSavedMs = Math.max(0, Number(miniDocsState.syncLastSavedServerMs || 0) || 0);
+      if (!lastSavedMs) {
+        return;
+      }
+      if ((getMiniDocsServerNowMs() - lastSavedMs) >= 120000) {
+        void saveMiniDocsSyncData({ silent: true });
+      }
+    }, 15000);
     $("mediaResourceTabText").onclick = () => {
       mediaResourceActiveTab = "text";
       renderMediaResourceModal();

@@ -34,7 +34,8 @@ function normalizeLyricsSyncData(value) {
   const lines = Array.isArray(value.lines) ? value.lines.map((line, index) => ({
     number: Math.max(1, Number(line?.number ?? (index + 1)) || (index + 1)),
     text: String(line?.text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim(),
-    timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0)
+    timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
+    tag: String(line?.tag || "").trim() === "correct32" ? "correct32" : ""
   })) : [];
   return {
     albumId: String(value.albumId || "").trim(),
