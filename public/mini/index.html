@@ -1895,6 +1895,9 @@
       padding: 10px 26px 34px;
       overscroll-behavior: contain;
     }
+    .mini-docs-modal.is-sync-mode .mini-docs-lines {
+      padding-bottom: calc(10vh + env(safe-area-inset-bottom, 0px));
+    }
     .mini-docs-line {
       width: 100%;
       border: 0;
@@ -2053,13 +2056,16 @@
       fill: currentColor;
     }
     .mini-docs-sync-footer {
-      position: sticky;
+      position: fixed;
+      left: 0;
+      right: 0;
       bottom: 0;
-      z-index: 12;
+      z-index: 90;
       display: none;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
       gap: 10px;
+      min-height: calc(6vh + env(safe-area-inset-bottom, 0px));
       padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
       background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(244, 248, 255, .96));
       backdrop-filter: blur(14px);
@@ -4682,6 +4688,7 @@
       syncPlaybackStartMs: 0,
       syncPlaybackEndMs: 0,
       syncCurrentLineNumber: 0,
+      syncLastCenteredLineNumber: 0,
       syncAudio: null,
       syncRafId: 0,
       syncSheepMode: false,
@@ -4694,6 +4701,8 @@
       playbackRateIndex: 0,
       playButtonHoldTimer: 0,
       playButtonLongPressHandled: false,
+      syncClearHoldTimer: 0,
+      syncClearLongPressHandled: false,
       syncDirty: false,
       syncSaving: false,
       syncLastSavedServerMs: 0,
@@ -5075,7 +5084,7 @@
       return next ? Math.max(0, Number(next.timestampMs) || 0) : Math.max(0, Number(miniDocsState.syncDurationMs || 0) || 0);
     }
     function insertMiniDocsSyncCloneAtCurrentTime(sourceLineNumber) {
-      if (!isMiniDocsSyncMode()) {
+      if (!isMiniDocsSyncMode() || !miniDocsState.syncPlaying || !miniDocsState.syncAudio) {
         return 0;
       }
       const source = getMiniDocsLines().find((line) => line.number === sourceLineNumber);
@@ -5226,6 +5235,53 @@
       renderMiniDocsModal();
       setMiniDocsStatus("");
     }
+    function deleteMiniDocsSyncCurrentLine() {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      const targetLineNumber = Math.max(1, Number(miniDocsState.syncCurrentLineNumber || miniDocsState.cursorLineNumber || 1) || 1);
+      let nextCurrentLineNumber = 0;
+      let removed = false;
+      updateMiniDocsSyncLines((draftLines) => {
+        const removeIndex = draftLines.findIndex((line) => line.number === targetLineNumber);
+        if (removeIndex < 0) {
+          return;
+        }
+        draftLines.splice(removeIndex, 1);
+        draftLines.forEach((line, index) => {
+          line.number = index + 1;
+        });
+        removed = true;
+        const fallbackLine = draftLines[removeIndex] || draftLines[Math.max(0, removeIndex - 1)] || null;
+        nextCurrentLineNumber = Number(fallbackLine?.number || 0) || 0;
+      });
+      if (!removed) {
+        return;
+      }
+      miniDocsState.syncCurrentLineNumber = nextCurrentLineNumber;
+      miniDocsState.cursorLineNumber = nextCurrentLineNumber || 1;
+      miniDocsState.syncLastCenteredLineNumber = 0;
+      renderMiniDocsModal();
+      centerMiniDocsSyncCurrentLine({ behavior: "auto", force: true });
+      setMiniDocsStatus("");
+    }
+    function startMiniDocsSyncClearLongPress() {
+      if (miniDocsState.syncClearHoldTimer) {
+        window.clearTimeout(miniDocsState.syncClearHoldTimer);
+      }
+      miniDocsState.syncClearLongPressHandled = false;
+      miniDocsState.syncClearHoldTimer = window.setTimeout(() => {
+        miniDocsState.syncClearLongPressHandled = true;
+        deleteMiniDocsSyncCurrentLine();
+        miniDocsState.syncClearHoldTimer = 0;
+      }, 500);
+    }
+    function stopMiniDocsSyncClearLongPress() {
+      if (miniDocsState.syncClearHoldTimer) {
+        window.clearTimeout(miniDocsState.syncClearHoldTimer);
+        miniDocsState.syncClearHoldTimer = 0;
+      }
+    }
     function scrollMiniDocsCursorIntoView() {
       if (!miniDocsState.cursorActive) {
         return;
@@ -5233,6 +5289,33 @@
       window.requestAnimationFrame(() => {
         const activeLine = document.querySelector(`.mini-docs-line.is-cursor[data-mini-docs-line="${Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1)}"]`);
         activeLine?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
+    function centerMiniDocsSyncCurrentLine({ behavior = "smooth", force = false } = {}) {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      const lineNumber = Math.max(0, Number(miniDocsState.syncCurrentLineNumber || 0) || 0);
+      if (!lineNumber) {
+        return;
+      }
+      if (!force && miniDocsState.syncLastCenteredLineNumber === lineNumber) {
+        return;
+      }
+      miniDocsState.syncLastCenteredLineNumber = lineNumber;
+      window.requestAnimationFrame(() => {
+        const container = $("miniDocsLines");
+        const targetLine = container?.querySelector(`[data-mini-docs-line="${lineNumber}"]`);
+        if (!container || !targetLine) {
+          return;
+        }
+        const footerHeight = $("miniDocsSyncFooter")?.offsetHeight || Math.round(window.innerHeight * 0.06);
+        const visibleHeight = Math.max(120, container.clientHeight - footerHeight);
+        const targetTop = targetLine.offsetTop - Math.max(0, (visibleHeight / 2) - (targetLine.offsetHeight / 2));
+        container.scrollTo({
+          top: Math.max(0, targetTop),
+          behavior
+        });
       });
     }
     async function blobToBase64(blob) {
@@ -5662,6 +5745,7 @@
         const endMs = getMiniDocsSyncNextLineTimestamp(line.number);
         return currentMs >= startMs && currentMs < Math.max(startMs + 300, endMs || (startMs + 300));
       });
+      const previousLineNumber = Math.max(0, Number(miniDocsState.syncCurrentLineNumber || 0) || 0);
       miniDocsState.syncCurrentLineNumber = currentLine?.number || 0;
       if (miniDocsState.syncPlaybackEndMs > 0 && currentMs >= miniDocsState.syncPlaybackEndMs) {
         pauseMiniDocsSyncPlayback();
@@ -5671,6 +5755,9 @@
         return;
       }
       syncMiniDocsPlaybackUi();
+      if (miniDocsState.syncCurrentLineNumber && miniDocsState.syncCurrentLineNumber !== previousLineNumber) {
+        centerMiniDocsSyncCurrentLine();
+      }
       miniDocsState.syncRafId = window.requestAnimationFrame(tickMiniDocsSyncPlayback);
     }
     function toggleMiniDocsSyncLineFlag(lineNumber) {
@@ -6503,6 +6590,7 @@
       const visibleLines = getMiniDocsVisibleLines(lines);
       const isAdmin = isMiniMediaAdmin();
       const isSync = isMiniDocsSyncMode();
+      $("miniDocsModal")?.classList.toggle("is-sync-mode", Boolean(isSync));
       copyButton.hidden = isSync || !isAdmin || !isMiniDocsSelectionActive();
       if (syncButton) {
         syncButton.hidden = isSync || !isAdmin;
@@ -6587,6 +6675,9 @@
           </article>
         `;
       }).join("");
+      if (isSync && miniDocsState.syncCurrentLineNumber) {
+        centerMiniDocsSyncCurrentLine({ behavior: miniDocsState.syncPlaying ? "smooth" : "auto" });
+      }
 
       container.querySelectorAll("[data-mini-docs-line]").forEach((node) => {
         const lineNumber = Number(node.getAttribute("data-mini-docs-line") || 0) || 0;
@@ -11667,7 +11758,21 @@
     $("miniDocsSyncSheepButton").onclick = () => {
       toggleMiniDocsSyncSheepMode();
     };
+    ["pointerdown"].forEach((eventName) => {
+      $("miniDocsSyncClearTimeButton").addEventListener(eventName, () => {
+        startMiniDocsSyncClearLongPress();
+      });
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
+      $("miniDocsSyncClearTimeButton").addEventListener(eventName, () => {
+        stopMiniDocsSyncClearLongPress();
+      });
+    });
     $("miniDocsSyncClearTimeButton").onclick = () => {
+      if (miniDocsState.syncClearLongPressHandled) {
+        miniDocsState.syncClearLongPressHandled = false;
+        return;
+      }
       clearMiniDocsSyncTimestamps();
     };
     $("miniDocsSyncRecordButton").onclick = () => {
@@ -11729,7 +11834,9 @@
         return nextMs >= startMs && nextMs < Math.max(startMs + 300, endMs || (startMs + 300));
       });
       miniDocsState.syncCurrentLineNumber = currentLine?.number || 0;
+      miniDocsState.syncLastCenteredLineNumber = 0;
       renderMiniDocsModal();
+      centerMiniDocsSyncCurrentLine({ behavior: "auto", force: true });
     });
     $("miniDocsRecordStart").onclick = async () => {
       await startMiniDocsVoiceRecording();
