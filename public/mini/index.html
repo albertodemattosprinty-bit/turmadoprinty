@@ -1849,6 +1849,9 @@
     .mini-docs-top-btn.clear-time {
       background: linear-gradient(145deg, #ff9c77, #d94841);
     }
+    .mini-docs-top-btn.record {
+      background: linear-gradient(145deg, #ff8fb8, #d74374);
+    }
     .mini-docs-top-btn.cursor.is-active {
       box-shadow: 0 0 0 4px rgba(47, 95, 231, .16), 0 16px 30px rgba(47, 95, 231, .24);
     }
@@ -2019,6 +2022,31 @@
       width: 24px;
       height: 24px;
       fill: currentColor;
+    }
+    .mini-docs-record-list {
+      display: grid;
+      gap: 10px;
+    }
+    .mini-docs-record-line {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      background: rgba(255,255,255,.82);
+      text-align: left;
+      padding: 12px 14px;
+      color: #3e2e20;
+      box-shadow: 0 8px 18px rgba(41, 34, 20, .07);
+    }
+    .mini-docs-record-line strong {
+      display: block;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(62, 46, 32, .54);
+      margin-bottom: 4px;
+    }
+    .mini-docs-record-line.is-target {
+      box-shadow: 0 0 0 2px rgba(215, 67, 116, .24), 0 10px 20px rgba(215, 67, 116, .14);
     }
     .mini-docs-editor textarea {
       width: 100%;
@@ -3992,6 +4020,9 @@
       <button id="miniDocsSyncClearTimeButton" class="mini-docs-top-btn clear-time" type="button" aria-label="Excluir timelapse das linhas selecionadas" hidden>
         <svg viewBox="0 0 24 24"><path d="M6 7h12l-1 13H7L6 7zm3-3h6l1 2H8l1-2zm1 6h2v7h-2zm4 0h2v7h-2z"/></svg>
       </button>
+      <button id="miniDocsSyncRecordButton" class="mini-docs-top-btn record" type="button" aria-label="Gravar linhas por voz no cursor" hidden>
+        <svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m5-4a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg>
+      </button>
       <button id="closeMiniDocs" class="mini-docs-top-btn close" type="button" aria-label="Fechar documento">
         <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
       </button>
@@ -4046,6 +4077,21 @@
   <button id="miniDocsSyncTapButton" class="mini-docs-sync-tap" type="button" aria-label="Marcar timestamp da linha atual" hidden>
     <svg viewBox="0 0 24 24"><path d="M7 2h10v2H7zm0 4h10v2H7zm-2 4h14v10H5zm2 2v6h10v-6z"/></svg>
   </button>
+  <section id="miniDocsRecordModal" class="mini-docs-send-modal" aria-hidden="true">
+    <div class="mini-docs-send-panel" role="dialog" aria-modal="true" aria-labelledby="miniDocsRecordTitle">
+      <h3 id="miniDocsRecordTitle">Gravar linhas pelo microfone</h3>
+      <p id="miniDocsRecordStatus">Use iniciar para gravar. Diga "nova linha" para quebrar as frases em linhas separadas.</p>
+      <div class="mini-docs-send-actions">
+        <button id="miniDocsRecordStart" class="ghost" type="button">Iniciar gravação</button>
+        <button id="miniDocsRecordStop" class="ghost" type="button">Finalizar gravação</button>
+      </div>
+      <div id="miniDocsRecordLines" class="mini-docs-record-list"></div>
+      <div class="mini-docs-send-actions">
+        <button id="miniDocsRecordCancel" class="ghost" type="button">Cancelar</button>
+        <button id="miniDocsRecordSave" type="button">Salvar linhas</button>
+      </div>
+    </div>
+  </section>
 
   <section id="mediaUploadModal" class="mini-plans-modal" aria-hidden="true">
     <div class="mini-plans-panel course-admin-panel" role="dialog" aria-modal="true" aria-labelledby="mediaUploadTitle">
@@ -4548,6 +4594,11 @@
       syncAudio: null,
       syncRafId: 0,
       syncSheepMode: false,
+      recordDraftLines: [],
+      recordTargetIndex: -1,
+      recordIsRecording: false,
+      recordMediaRecorder: null,
+      recordMediaStream: null,
       sendSearch: "",
       sendResults: [],
       sendAlbumId: ""
@@ -4799,19 +4850,39 @@
       if (!source) {
         return;
       }
-      const nextNumber = getMiniDocsLines().reduce((max, line) => Math.max(max, Number(line.number || 0) || 0), 0) + 1;
+      const cursorAnchor = miniDocsState.cursorActive
+        ? Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1)
+        : 0;
       updateMiniDocsSyncLines((draftLines) => {
-        draftLines.push({
-          number: nextNumber,
+        const insertIndex = cursorAnchor
+          ? draftLines.findIndex((line) => line.number === cursorAnchor)
+          : -1;
+        const nextNumber = Math.max(1, Number(draftLines[draftLines.length - 1]?.number || 0) || 0) + 1;
+        const clonedLine = {
           text: String(source.text || ""),
           timestampMs: null
+        };
+        if (insertIndex >= 0) {
+          draftLines.splice(insertIndex + 1, 0, { ...clonedLine, number: cursorAnchor + 1 });
+          draftLines.forEach((line, index) => {
+            line.number = index + 1;
+          });
+          miniDocsState.cursorLineNumber = Math.min(draftLines.length, cursorAnchor + 1);
+          miniDocsState.selectionStart = miniDocsState.cursorLineNumber;
+          miniDocsState.selectionEnd = miniDocsState.cursorLineNumber;
+          return;
+        }
+        draftLines.push({
+          ...clonedLine,
+          number: nextNumber
         });
+        miniDocsState.cursorLineNumber = nextNumber;
+        miniDocsState.selectionStart = nextNumber;
+        miniDocsState.selectionEnd = nextNumber;
       });
-      miniDocsState.cursorLineNumber = nextNumber;
-      miniDocsState.selectionStart = nextNumber;
-      miniDocsState.selectionEnd = nextNumber;
       renderMiniDocsModal();
-      setMiniDocsStatus("Frase clonada no final do sync.");
+      scrollMiniDocsCursorIntoView();
+      setMiniDocsStatus(cursorAnchor ? "Frase clonada abaixo do cursor." : "Frase clonada no final do sync.");
     }
     function clearMiniDocsSyncTimestamps() {
       if (!isMiniDocsSyncMode()) {
@@ -4837,6 +4908,191 @@
       setMiniDocsStatus(clearedCount
         ? `${clearedCount} timelapse(s) removido(s).`
         : "Nenhum timelapse para remover nesse trecho.");
+    }
+    function scrollMiniDocsCursorIntoView() {
+      if (!miniDocsState.cursorActive) {
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        const activeLine = document.querySelector(`.mini-docs-line.is-cursor[data-mini-docs-line="${Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1)}"]`);
+        activeLine?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    }
+    async function blobToBase64(blob) {
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || "");
+          const commaIndex = result.indexOf(",");
+          resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+        };
+        reader.onerror = () => reject(new Error("Nao foi possivel preparar o audio para transcricao."));
+        reader.readAsDataURL(blob);
+      });
+    }
+    function splitMiniDocsTranscriptLines(text) {
+      return String(text || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .split(/\bnova linha\b/gi)
+        .map((line) => String(line || "").replace(/\n/g, " ").trim())
+        .filter(Boolean);
+    }
+    function renderMiniDocsRecordDraftLines() {
+      const node = $("miniDocsRecordLines");
+      if (!node) {
+        return;
+      }
+      const lines = Array.isArray(miniDocsState.recordDraftLines) ? miniDocsState.recordDraftLines : [];
+      node.innerHTML = lines.length
+        ? lines.map((line, index) => `
+            <button class="mini-docs-record-line${Number(miniDocsState.recordTargetIndex || -1) === index ? " is-target" : ""}" type="button" data-mini-docs-record-line="${index}">
+              <strong>Linha ${index + 1}</strong>
+              <span>${escapeText(line)}</span>
+            </button>
+          `).join("")
+        : `<div class="section-muted">Nenhuma linha transcrita ainda.</div>`;
+      node.querySelectorAll("[data-mini-docs-record-line]").forEach((button) => {
+        button.onclick = async () => {
+          miniDocsState.recordTargetIndex = Number(button.getAttribute("data-mini-docs-record-line") || -1);
+          renderMiniDocsRecordDraftLines();
+          await startMiniDocsVoiceRecording();
+        };
+      });
+    }
+    function setMiniDocsRecordStatus(text) {
+      const node = $("miniDocsRecordStatus");
+      if (node) {
+        node.textContent = text || "";
+      }
+    }
+    function closeMiniDocsRecordModal() {
+      $("miniDocsRecordModal")?.classList.remove("show");
+      $("miniDocsRecordModal")?.setAttribute("aria-hidden", "true");
+      miniDocsState.recordDraftLines = [];
+      miniDocsState.recordTargetIndex = -1;
+      miniDocsState.recordIsRecording = false;
+    }
+    async function stopMiniDocsVoiceCaptureTracks() {
+      if (miniDocsState.recordMediaStream) {
+        miniDocsState.recordMediaStream.getTracks().forEach((track) => track.stop());
+      }
+      miniDocsState.recordMediaStream = null;
+      miniDocsState.recordMediaRecorder = null;
+      miniDocsState.recordIsRecording = false;
+    }
+    async function transcribeMiniDocsAudioBlob(blob) {
+      const audioBase64 = await blobToBase64(blob);
+      const response = await apiMini("/api/audio/transcribe", {
+        method: "POST",
+        body: JSON.stringify({
+          audioBase64,
+          mimeType: blob.type || "audio/webm",
+          fileName: "mini-sync-voice.webm"
+        }),
+        timeoutMs: 100000,
+        timeoutMessage: "A OpenAI demorou demais para transcrever esse audio."
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Nao foi possivel transcrever o audio.");
+      }
+      return splitMiniDocsTranscriptLines(payload.text || "");
+    }
+    async function startMiniDocsVoiceRecording() {
+      if (!isMiniDocsSyncMode() || !miniDocsState.cursorActive) {
+        setMiniDocsStatus("Ative o cursor no sync antes de usar o microfone.");
+        return;
+      }
+      if (miniDocsState.recordIsRecording) {
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks = [];
+      miniDocsState.recordMediaStream = stream;
+      miniDocsState.recordMediaRecorder = mediaRecorder;
+      miniDocsState.recordIsRecording = true;
+      setMiniDocsRecordStatus(Number(miniDocsState.recordTargetIndex || -1) >= 0
+        ? `Gravando correção da linha ${Number(miniDocsState.recordTargetIndex || 0) + 1}...`
+        : "Gravando... diga 'nova linha' para quebrar as frases.");
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data?.size) {
+          chunks.push(event.data);
+        }
+      };
+      mediaRecorder.onstop = async () => {
+        try {
+          const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+          const transcriptLines = await transcribeMiniDocsAudioBlob(blob);
+          if (Number(miniDocsState.recordTargetIndex || -1) >= 0) {
+            if (transcriptLines.length) {
+              miniDocsState.recordDraftLines[miniDocsState.recordTargetIndex] = transcriptLines.join(" ");
+            }
+            miniDocsState.recordTargetIndex = -1;
+          } else if (transcriptLines.length) {
+            miniDocsState.recordDraftLines = [...miniDocsState.recordDraftLines, ...transcriptLines];
+          }
+          renderMiniDocsRecordDraftLines();
+          setMiniDocsRecordStatus("Transcrição concluída. Toque em uma linha para corrigir só ela ou salve para inserir abaixo do cursor.");
+        } catch (error) {
+          setMiniDocsRecordStatus(error instanceof Error ? error.message : "Nao foi possivel transcrever o audio.");
+        } finally {
+          await stopMiniDocsVoiceCaptureTracks();
+        }
+      };
+      mediaRecorder.start();
+    }
+    async function stopMiniDocsVoiceRecording() {
+      const recorder = miniDocsState.recordMediaRecorder;
+      if (!recorder || recorder.state === "inactive") {
+        return;
+      }
+      setMiniDocsRecordStatus("Finalizando gravação e enviando para transcrição...");
+      recorder.stop();
+    }
+    function openMiniDocsRecordModal() {
+      if (!isMiniDocsSyncMode() || !miniDocsState.cursorActive) {
+        setMiniDocsStatus("Ative o cursor no sync para gravar novas linhas.");
+        return;
+      }
+      miniDocsState.recordDraftLines = [];
+      miniDocsState.recordTargetIndex = -1;
+      $("miniDocsRecordModal")?.classList.add("show");
+      $("miniDocsRecordModal")?.setAttribute("aria-hidden", "false");
+      setMiniDocsRecordStatus("Use iniciar para gravar. Diga 'nova linha' para criar linhas separadas.");
+      renderMiniDocsRecordDraftLines();
+    }
+    function saveMiniDocsRecordedLinesBelowCursor() {
+      const draftLines = Array.isArray(miniDocsState.recordDraftLines)
+        ? miniDocsState.recordDraftLines.map((line) => String(line || "").trim()).filter(Boolean)
+        : [];
+      if (!draftLines.length) {
+        setMiniDocsRecordStatus("Grave pelo menos uma linha antes de salvar.");
+        return;
+      }
+      const anchorLineNumber = Math.max(1, Number(miniDocsState.cursorLineNumber || 1) || 1);
+      updateMiniDocsSyncLines((draft) => {
+        const insertIndex = draft.findIndex((line) => line.number === anchorLineNumber);
+        const payload = draftLines.map((text, index) => ({
+          number: anchorLineNumber + 1 + index,
+          text,
+          timestampMs: null
+        }));
+        if (insertIndex >= 0) {
+          draft.splice(insertIndex + 1, 0, ...payload);
+        } else {
+          draft.push(...payload);
+        }
+        draft.forEach((line, index) => {
+          line.number = index + 1;
+        });
+      });
+      miniDocsState.cursorLineNumber = Math.min(getMiniDocsLines().length, anchorLineNumber + draftLines.length);
+      closeMiniDocsRecordModal();
+      renderMiniDocsModal();
+      scrollMiniDocsCursorIntoView();
+      setMiniDocsStatus(`${draftLines.length} linha(s) inserida(s) abaixo do cursor.`);
     }
     function isMiniDocsFolderLine(line) {
       return /\.docx\b/i.test(String(line?.text || "").trim());
@@ -5538,14 +5794,21 @@
       cursorButton?.classList.toggle("is-active", miniDocsState.cursorActive && !isMiniDocsSyncMode());
       if (miniDocsState.cursorActive) {
         miniDocsState.cursorLineNumber = Math.max(0, Number(miniDocsState.cursorLineNumber || 0) || 0);
-        $("miniDocsComposerInput").focus();
+        if (!isMiniDocsSyncMode()) {
+          $("miniDocsComposerInput").focus();
+        }
         setMiniDocsStatus(miniDocsState.cursorLineNumber
           ? `Cursor ativo na linha ${miniDocsState.cursorLineNumber}. O texto inserido entra abaixo dela.`
           : "Cursor ativo no início do documento. O texto novo será inserido como primeiras linhas.");
       } else {
-        $("miniDocsComposerInput").value = "";
+        if ($("miniDocsComposerInput")) {
+          $("miniDocsComposerInput").value = "";
+        }
       }
       renderMiniDocsModal();
+      if (miniDocsState.cursorActive) {
+        scrollMiniDocsCursorIntoView();
+      }
     }
     function beginMiniDocsInlineEdit(lineNumber) {
       if (isMiniDocsSyncMode() && miniDocsState.syncPlaying) {
@@ -5707,6 +5970,7 @@
       const syncSaveButton = $("miniDocsSyncSaveButton");
       const syncSheepButton = $("miniDocsSyncSheepButton");
       const syncClearTimeButton = $("miniDocsSyncClearTimeButton");
+      const syncRecordButton = $("miniDocsSyncRecordButton");
       const syncTapButton = $("miniDocsSyncTapButton");
       if (!container || !$("miniDocsModal")) {
         return;
@@ -5734,7 +5998,10 @@
         syncSheepButton.classList.toggle("is-active", Boolean(isSync && miniDocsState.syncSheepMode));
       }
       if (syncClearTimeButton) {
-        syncClearTimeButton.hidden = !isSync;
+        syncClearTimeButton.hidden = !isSync || Boolean(miniDocsState.cursorActive);
+      }
+      if (syncRecordButton) {
+        syncRecordButton.hidden = !isSync || !miniDocsState.cursorActive;
       }
       if (syncTapButton) {
         const shouldShowTap = isSync && window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
@@ -5743,8 +6010,8 @@
       }
       const cursorButton = $("miniDocsCursorButton");
       if (cursorButton) {
-        cursorButton.hidden = isSync || !isAdmin;
-        cursorButton.classList.toggle("is-active", !isSync && isAdmin && miniDocsState.cursorActive);
+        cursorButton.hidden = !isAdmin;
+        cursorButton.classList.toggle("is-active", isAdmin && miniDocsState.cursorActive);
       }
       $("miniDocsComposer")?.classList.toggle("is-active", !isSync && isAdmin && miniDocsState.cursorActive);
       const centerLabel = document.querySelector(".mini-docs-head-center span");
@@ -5940,9 +6207,11 @@
     }
     function closeMiniDocsModal() {
       teardownMiniDocsSyncAudio();
+      void stopMiniDocsVoiceCaptureTracks();
       $("miniDocsModal").classList.remove("show");
       $("miniDocsModal").setAttribute("aria-hidden", "true");
       closeMiniDocsAiModal();
+      closeMiniDocsRecordModal();
       miniDocsState.editingLineNumber = 0;
       miniDocsState.editingDraft = "";
       miniDocsState.selectionStart = 0;
@@ -10857,6 +11126,9 @@
     $("miniDocsSyncClearTimeButton").onclick = () => {
       clearMiniDocsSyncTimestamps();
     };
+    $("miniDocsSyncRecordButton").onclick = () => {
+      openMiniDocsRecordModal();
+    };
     $("miniDocsCursorButton").onclick = () => {
       setMiniDocsCursorActive(!miniDocsState.cursorActive);
     };
@@ -10893,6 +11165,20 @@
     $("miniDocsSyncTapButton").onclick = () => {
       stampMiniDocsSyncCurrentLine();
     };
+    $("miniDocsRecordStart").onclick = async () => {
+      await startMiniDocsVoiceRecording();
+    };
+    $("miniDocsRecordStop").onclick = async () => {
+      await stopMiniDocsVoiceRecording();
+    };
+    $("miniDocsRecordCancel").onclick = async () => {
+      await stopMiniDocsVoiceCaptureTracks();
+      closeMiniDocsRecordModal();
+      setMiniDocsStatus("Gravacao cancelada.");
+    };
+    $("miniDocsRecordSave").onclick = () => {
+      saveMiniDocsRecordedLinesBelowCursor();
+    };
     $("miniDocsLines").addEventListener("touchstart", (event) => {
       miniDocsState.dragStartY = event.touches?.[0]?.clientY || 0;
     }, { passive: true });
@@ -10910,6 +11196,12 @@
       if ($("miniDocsSyncModal")?.getAttribute("aria-hidden") === "false" && event.key === "Escape") {
         closeMiniDocsSyncModal();
         setMiniDocsStatus("Sync cancelado.");
+        return;
+      }
+      if ($("miniDocsRecordModal")?.getAttribute("aria-hidden") === "false" && event.key === "Escape") {
+        void stopMiniDocsVoiceCaptureTracks();
+        closeMiniDocsRecordModal();
+        setMiniDocsStatus("Gravacao cancelada.");
         return;
       }
       if (isMiniDocsSyncMode() && event.key === " ") {
