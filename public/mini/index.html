@@ -5028,7 +5028,6 @@
           timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
           tag: String(line?.tag || "").trim() === "correct32" ? "correct32" : ""
         }))
-        .filter((line) => line.text)
         .map((line, index) => ({
           ...line,
           number: index + 1
@@ -6131,7 +6130,6 @@
             const copiedText = getMiniDocsCopyText();
             if (!copiedText) {
               setMiniDocsStatus("Selecione um trecho antes de enviar para uma música.");
-              closeMiniDocsSendModal();
               return;
             }
             setMiniDocsSendStatus(`Salvando texto em ${result.title}...`);
@@ -6147,8 +6145,8 @@
               mediaLibraryAlbums = payload.library.albums;
             }
             rememberMiniDocsRecentAlbum(result.albumId);
-            closeMiniDocsSendModal();
             setMiniDocsStatus(`Texto enviado para a música ${result.title}.`);
+            setMiniDocsSendStatus(`Texto vinculado com sucesso em ${result.title}. Use Cancelar para fechar.`);
             void playMiniCourseUiSound("success");
           } catch (error) {
             setMiniDocsSendStatus(error instanceof Error ? error.message : "Nao foi possivel salvar o texto na musica.");
@@ -6672,6 +6670,7 @@
         const isEditing = Number(miniDocsState.editingLineNumber || 0) === line.number;
         const safeText = String(line.text || "");
         const isFolderHeader = Boolean(line.isFolderHeader);
+        const isVisualSpacer = !isSync && !isFolderHeader && !safeText;
         const isFolderOpen = isFolderHeader && Boolean(miniDocsState.expandedFolders[String(line.number)]);
         const isSyncCurrent = isSync && Number(miniDocsState.syncCurrentLineNumber || 0) === line.number;
         const isSyncFlagged = isSync && String(line.tag || "") === "correct32";
@@ -6693,11 +6692,20 @@
           `;
         }
         const folderLabel = isFolderHeader ? safeText.replace(/\.docx\b/gi, "").trim() || safeText : safeText;
+        if (isVisualSpacer) {
+          return `
+            <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}${line.isFolderContent ? " is-folder-content" : ""}">
+              <div class="mini-docs-line-text is-empty" aria-hidden="true"><span>&nbsp;</span>${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
+              <div class="mini-docs-line-timestamp"></div>
+              <div></div>
+            </article>
+          `;
+        }
         return `
           <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}${isFolderHeader ? " is-folder" : ""}${isFolderOpen ? " is-folder-open" : ""}${line.isFolderContent ? " is-folder-content" : ""}${isSyncCurrent ? " is-sync-current" : ""}${isSyncUnsynced ? " is-sync-unsynced" : ""}${isSyncFlagged ? " is-sync-flagged" : ""}" data-mini-docs-line="${line.number}"${isFolderHeader ? ` data-mini-docs-folder="${line.number}"` : ""} tabindex="0" role="button" aria-label="${isFolderHeader ? `Pasta ${escapeAttr(safeText)}` : `Linha ${line.number}`}">
             <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${isFolderHeader ? `<span class="mini-docs-folder-caret" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>` : ""}${folderLabel ? escapeText(folderLabel) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
             <div class="mini-docs-line-timestamp">${escapeText(timestampLabel)}</div>
-            ${isAdmin && !isFolderHeader ? `<button class="mini-docs-line-edit${isSync ? " is-alert" : ""}" type="button" data-mini-docs-edit="${line.number}" aria-label="${isSync ? `Marcar alerta na linha ${line.number}` : `Editar linha ${line.number}`}">${isSync ? getMiniDocsAlertSvg() : getMiniDocsEditSvg()}</button>` : `<div></div>`}
+            ${isAdmin && !isFolderHeader && safeText ? `<button class="mini-docs-line-edit${isSync ? " is-alert" : ""}" type="button" data-mini-docs-edit="${line.number}" aria-label="${isSync ? `Marcar alerta na linha ${line.number}` : `Editar linha ${line.number}`}">${isSync ? getMiniDocsAlertSvg() : getMiniDocsEditSvg()}</button>` : `<div></div>`}
           </article>
         `;
       }).join("");
@@ -11935,8 +11943,7 @@
           return;
         }
         if ($("miniDocsSendModal")?.getAttribute("aria-hidden") === "false") {
-          closeMiniDocsSendModal();
-          setMiniDocsStatus("Envio para música cancelado.");
+          event.preventDefault();
           return;
         }
         if (isMiniDocsSelectionActive()) {

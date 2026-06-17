@@ -16,8 +16,7 @@ function normalizeLineText(value) {
 
 function normalizeDocumentLineArray(lines) {
   return (Array.isArray(lines) ? lines : [])
-    .map((line) => normalizeLineText(line))
-    .filter((line) => line.length > 0);
+    .map((line) => normalizeLineText(line));
 }
 
 function decodeXmlEntities(text) {
@@ -133,8 +132,7 @@ export async function readMiniDocumentJson(filePath) {
 
 function buildDocumentPayload(documentRow, lineRows) {
   const normalizedLines = (Array.isArray(lineRows) ? lineRows : [])
-    .map((row) => normalizeLineText(row?.content || ""))
-    .filter((line) => line.length > 0);
+    .map((row) => normalizeLineText(row?.content || ""));
   return {
     id: documentRow.id,
     key: documentRow.doc_key,
@@ -362,7 +360,7 @@ export async function updateMiniDocumentLine(docKey, lineNumber, content) {
     const lines = normalizeDocumentLineArray((await getDocumentLinesById(client, documentRow.id)).map((row) => row.content));
     const safeLineNumber = Math.max(1, Number(lineNumber || 1) || 1);
     const lineIndex = safeLineNumber - 1;
-    if (!lines[lineIndex]) {
+    if (lineIndex < 0 || lineIndex >= lines.length) {
       throw new Error("Linha nao encontrada.");
     }
 
