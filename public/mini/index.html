@@ -5042,7 +5042,7 @@
       if (!button) {
         return;
       }
-      const isVisible = !isMiniMediaAdmin();
+      const isVisible = isMiniMediaAdmin();
       button.hidden = !isVisible;
       const actions = button.parentElement;
       if (actions) {
