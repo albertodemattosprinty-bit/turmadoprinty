@@ -138,6 +138,10 @@
       gap: 16px;
       border-radius: 999px;
       padding: 18px 28px;
+      width: min(100%, 360px);
+      background: var(--g-blue);
+      color: #fff;
+      backdrop-filter: none;
     }
     .icon-chip.is-home-media {
       min-height: 104px;
@@ -147,14 +151,29 @@
       gap: 16px;
       border-radius: 999px;
       padding: 18px 28px;
-      background: rgba(255,255,255,.22);
+      background: var(--g-red);
       width: min(100%, 360px);
+      color: #fff;
+      backdrop-filter: none;
     }
     .icon-chip.is-home-hidden {
       display: none !important;
     }
     .icon-ball { width: 70px; height: 70px; border-radius: 22px; display: grid; place-items: center; box-shadow: 0 10px 18px rgba(0, 0, 0, .12); }
     .icon-ball svg { width: 36px; height: 36px; fill: #fff; }
+    .icon-chip.is-home-courses .icon-ball,
+    .icon-chip.is-home-media .icon-ball {
+      width: auto;
+      height: auto;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .icon-chip.is-home-courses .icon-ball svg,
+    .icon-chip.is-home-media .icon-ball svg {
+      width: 32px;
+      height: 32px;
+    }
     .g-red { background: var(--g-red); } .g-blue { background: var(--g-blue); } .g-purple { background: var(--g-purple); } .g-gold { background: var(--g-gold); } .g-navy { background: var(--g-navy); }
 
     .media-modal {
@@ -1591,6 +1610,12 @@
     .course-card-action.is-cover {
       background: rgba(82, 171, 255, .26);
     }
+    .course-card-action.is-visibility {
+      background: rgba(255, 215, 102, .24);
+    }
+    .course-card-action.is-hidden {
+      background: rgba(255, 138, 107, .24);
+    }
     .course-card-action.is-loading {
       pointer-events: none;
     }
@@ -1750,16 +1775,19 @@
       gap: 10px;
     }
     .media-docs-btn {
-      width: 44px;
+      min-width: 44px;
       height: 44px;
       border: 0;
       border-radius: 14px;
       background: rgba(59, 102, 255, .12);
       color: #2f5fe7;
-      display: grid;
-      place-items: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       cursor: pointer;
       box-shadow: 0 12px 24px rgba(47, 95, 231, .16);
+      padding: 0 14px;
     }
     .media-docs-btn svg {
       width: 22px;
@@ -4048,7 +4076,7 @@
         <p id="mediaSubtitle"></p>
       </div>
       <div class="media-head-actions">
-        <button id="openMiniDocsFromMedia" class="media-docs-btn" type="button" aria-label="Abrir documento indexado">
+        <button id="openMiniDocsFromMedia" class="media-docs-btn" type="button" aria-label="Abrir documento indexado" hidden>
           <svg viewBox="0 0 24 24"><path d="M7 2.75A2.75 2.75 0 0 0 4.25 5.5v13A2.75 2.75 0 0 0 7 21.25h10A2.75 2.75 0 0 0 19.75 18.5V8.56a2.74 2.74 0 0 0-.81-1.94l-3.56-3.56a2.74 2.74 0 0 0-1.94-.81Zm0 1.5h6.25v3.5a1.75 1.75 0 0 0 1.75 1.75h3.25v9a1.25 1.25 0 0 1-1.25 1.25H7a1.25 1.25 0 0 1-1.25-1.25v-13A1.25 1.25 0 0 1 7 4.25Zm7.75.69 2.81 2.81H15a.25.25 0 0 1-.25-.25Zm-6 7.31h6.5v1.5h-6.5Zm0 3.5h6.5v1.5h-6.5Zm0-7h3.5v1.5h-3.5Z"/></svg>
         </button>
       </div>
@@ -4640,6 +4668,7 @@
     let miniCourseDownloadStates = {};
     let miniCourseCoverUploadStates = {};
     let miniCourseQuizGenerationStates = {};
+    let miniCourseVisibilityStates = {};
     let miniCourseCoverUploadTargetId = "";
     let currentMiniCourseQuizIndex = -1;
     let currentMiniCourseQuizAnswers = [];
@@ -5013,7 +5042,12 @@
       if (!button) {
         return;
       }
-      button.hidden = !isMiniMediaAdmin();
+      const isVisible = !isMiniMediaAdmin();
+      button.hidden = !isVisible;
+      const actions = button.parentElement;
+      if (actions) {
+        actions.hidden = !isVisible;
+      }
     }
     function setMiniDocsStatus(text) {
       const node = $("miniDocsStatus");
@@ -8492,12 +8526,15 @@
         fontSizeButton.setAttribute("aria-label", `Mudar tamanho da fonte. Próximo: ${nextFontSize.label}`);
       }
       if (forwardButton) {
-        const totalPages = Math.max(Number(currentMiniCourse?.pageCount || currentMiniCourse?.pages?.length || 1) || 1, 1);
-        const unlockedPage = Math.max(1, Math.min(totalPages, Number(currentMiniCourse?.progress?.pagesRead || currentMiniCoursePage || 1) || 1));
-        const canAdvance = Boolean(currentMiniCourse) && currentMiniCourseViewMode === "reading" && currentMiniCoursePage < unlockedPage;
+        const visiblePages = getMiniCourseVisiblePageNumbers(currentMiniCourse);
+        const currentPosition = getMiniCourseVisiblePagePosition(currentMiniCourse, currentMiniCoursePage);
+        const pagesRead = Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0);
+        const unlockedPage = visiblePages.filter((pageNumber) => pageNumber <= pagesRead).pop() || currentPosition.actualPage;
+        const unlockedPosition = Math.max(0, visiblePages.indexOf(unlockedPage));
+        const canAdvance = Boolean(currentMiniCourse) && currentMiniCourseViewMode === "reading" && currentPosition.index < unlockedPosition;
         forwardButton.disabled = !canAdvance;
         forwardButton.setAttribute("aria-label", canAdvance
-          ? `Avançar até a página ${unlockedPage} já desbloqueada`
+          ? `Avançar até a página ${unlockedPosition + 1} já desbloqueada`
           : "Você já está no limite liberado");
       }
       if (themeButton) {
@@ -8615,8 +8652,9 @@
       if (!currentMiniCourse || currentMiniCourseViewMode !== "reading") {
         return;
       }
-      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
-      const unlockedPage = Math.max(1, Math.min(totalPages, Number(currentMiniCourse?.progress?.pagesRead || currentMiniCoursePage || 1) || 1));
+      const visiblePages = getMiniCourseVisiblePageNumbers(currentMiniCourse);
+      const pagesRead = Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0);
+      const unlockedPage = visiblePages.filter((pageNumber) => pageNumber <= pagesRead).pop() || currentMiniCoursePage;
       if (unlockedPage <= currentMiniCoursePage) {
         return;
       }
@@ -8667,7 +8705,7 @@
       if (!currentMiniCourse) {
         return 1;
       }
-      const basePages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const basePages = Math.max(1, getMiniCourseVisiblePageNumbers(currentMiniCourse).length || 1);
       const quizQuestions = getMiniCourseQuizQuestions();
       return quizQuestions.length ? basePages + quizQuestions.length + 1 : basePages;
     }
@@ -8675,10 +8713,11 @@
       if (!currentMiniCourse) {
         return 1;
       }
-      const basePages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const pagePosition = getMiniCourseVisiblePagePosition(currentMiniCourse, currentMiniCoursePage);
+      const basePages = Math.max(1, pagePosition.total || 1);
       const quizQuestions = getMiniCourseQuizQuestions();
       if (!quizQuestions.length || currentMiniCourseQuizIndex < 0) {
-        return currentMiniCoursePage;
+        return pagePosition.index + 1;
       }
       if (currentMiniCourseQuizResult) {
         return basePages + quizQuestions.length + 1;
@@ -8725,7 +8764,7 @@
       const pages = Array.isArray(currentMiniCourse.pages) ? currentMiniCourse.pages : [];
       const currentIndex = Math.max(0, Math.min(pages.length - 1, Number(currentMiniCoursePage || 1) - 1));
       const currentKind = String(pages[currentIndex]?.kind || "").trim().toLowerCase();
-      if (!pages.length || currentKind === "course-map") {
+      if (!pages.length || currentKind === "course-map" || currentKind === "chapter_open") {
         return { percent: 0, totalCharacters: 0, readCharacters: 0, active: false };
       }
       let chapterStart = currentIndex;
@@ -8776,7 +8815,7 @@
     function getMiniCourseBlockRequiredMs() {
       const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
       const currentKind = String(currentPage?.kind || "").trim().toLowerCase();
-      if (currentKind === "course-map") {
+      if (currentKind === "course-map" || currentKind === "chapter_open") {
         return 0;
       }
       const totalChars = getMiniCourseActiveBlockText().length;
@@ -9200,6 +9239,12 @@
       return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4zm1 6h2v8h-2zm4 0h2v8h-2zM7 9h2v8H7zm-1 11h12l1-13H5z"/></svg>`;
     }
 
+    function getVisibilitySvg(isVisible = true) {
+      return isVisible
+        ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c4.97 0 9.27 3.11 11 7-1.73 3.89-6.03 7-11 7S2.73 15.89 1 12c1.73-3.89 6.03-7 11-7m0 2C8.41 7 5.16 9.06 3.27 12 5.16 14.94 8.41 17 12 17s6.84-2.06 8.73-5C18.84 9.06 15.59 7 12 7m0 2.25A2.75 2.75 0 1 1 9.25 12 2.75 2.75 0 0 1 12 9.25"/></svg>`
+        : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.28 2 18.72 18.72-1.41 1.41-3.1-3.1A12.9 12.9 0 0 1 12 20C7.03 20 2.73 16.89 1 13c1.11-2.49 3.08-4.64 5.55-6.01L1.86 2.3zm6.06 6.06A2.75 2.75 0 0 0 12 16.75c.71 0 1.36-.27 1.86-.72zM12 6c4.97 0 9.27 3.11 11 7-.74 1.68-1.89 3.21-3.33 4.45l-1.43-1.43A10.6 10.6 0 0 0 20.73 13C18.84 10.06 15.59 8 12 8c-.96 0-1.88.15-2.74.43L7.63 6.8C9 6.28 10.47 6 12 6"/></svg>`;
+    }
+
     function getMiniChatIconSvg() {
       return `<svg class="create-chat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C7.59 3 4 5.91 4 9.5c0 1.98 1.02 3.74 2.72 4.92L6 18l3.78-1.98c.7.16 1.42.24 2.22.24 4.41 0 8-2.91 8-6.5S16.41 3 12 3zm-3 7h6v1.5H9V10zm0-2.5h10V9H9V7.5zm0 5H16V14H9v-1.5z"/></svg>`;
     }
@@ -9265,6 +9310,7 @@
       const actions = [
         getMiniCourseCoverUploadButtonMarkup(course?.id || ""),
         getMiniCourseQuizAdminButtonMarkup(course),
+        getMiniCourseVisibilityButtonMarkup(course),
         isMiniCourseAdmin ? `<button class="course-card-action is-danger" type="button" data-delete-course-id="${escapeAttr(course?.id || "")}" aria-label="Excluir curso">${getTrashSvg()}</button>` : ""
       ].filter(Boolean);
       if (!actions.length) {
@@ -9291,6 +9337,27 @@
         classNames.push("is-success");
       }
       return `<button class="${classNames.join(" ")}" type="button" data-generate-quiz-course-id="${escapeAttr(safeCourseId)}" aria-label="${escapeAttr(label)}" ${isGenerating ? "disabled" : ""}>${icon}</button>`;
+    }
+
+    function getMiniCourseVisibilityButtonMarkup(course) {
+      if (!isMiniCourseAdmin) {
+        return "";
+      }
+      const safeCourseId = String(course?.id || "").trim();
+      const isVisible = course?.isVisible !== false;
+      const isSaving = Boolean(miniCourseVisibilityStates[safeCourseId]);
+      const classNames = ["course-card-action", "is-visibility"];
+      if (!isVisible) {
+        classNames.push("is-hidden");
+      }
+      if (isSaving) {
+        classNames.push("is-loading");
+      }
+      const icon = isSaving ? getSpinnerSvg() : getVisibilitySvg(isVisible);
+      const label = isSaving
+        ? "Salvando visibilidade do curso"
+        : (isVisible ? "Ocultar curso do público" : "Mostrar curso ao público");
+      return `<button class="${classNames.join(" ")}" type="button" data-toggle-course-visibility-id="${escapeAttr(safeCourseId)}" aria-label="${escapeAttr(label)}" ${isSaving ? "disabled" : ""}>${icon}</button>`;
     }
 
     function playMiniCourseTone(type = "success") {
@@ -10262,14 +10329,60 @@
     }
 
     function getMiniCourseProgressPercent(course) {
-      const totalPages = Math.max(Number(course?.pageCount || course?.pages?.length || 1) || 1, 1);
-      const pagesRead = Math.max(0, Number(course?.progress?.pagesRead || 0) || 0);
+      const visiblePages = getMiniCourseVisiblePageNumbers(course);
+      const totalPages = Math.max(1, visiblePages.length || 1);
+      const pagesRead = getMiniCourseVisiblePagesRead(course);
       return Math.max(0, Math.min(100, Math.round((pagesRead / totalPages) * 100)));
     }
 
-    function getMiniCourseProgressMarkup(course) {
-      const totalPages = Math.max(Number(course?.pageCount || course?.pages?.length || 1) || 1, 1);
+    function isMiniCourseMapPage(page) {
+      return String(page?.kind || "").trim().toLowerCase() === "course-map";
+    }
+
+    function getMiniCourseVisiblePageNumbers(course = currentMiniCourse) {
+      const pages = Array.isArray(course?.pages) ? course.pages : [];
+      const visiblePages = pages
+        .map((page, index) => (!isMiniCourseMapPage(page) ? index + 1 : 0))
+        .filter(Boolean);
+      return visiblePages.length ? visiblePages : [1];
+    }
+
+    function resolveMiniCourseVisiblePageNumber(pageNumber, direction = 1, course = currentMiniCourse) {
+      const visiblePages = getMiniCourseVisiblePageNumbers(course);
+      if (!visiblePages.length) {
+        return 1;
+      }
+      const safePage = Math.max(1, Number(pageNumber || visiblePages[0]) || visiblePages[0]);
+      if (visiblePages.includes(safePage)) {
+        return safePage;
+      }
+      if (direction < 0) {
+        return [...visiblePages].reverse().find((value) => value < safePage) || visiblePages[visiblePages.length - 1] || visiblePages[0];
+      }
+      return visiblePages.find((value) => value > safePage) || visiblePages[0];
+    }
+
+    function getMiniCourseVisiblePagePosition(course = currentMiniCourse, pageNumber = currentMiniCoursePage) {
+      const visiblePages = getMiniCourseVisiblePageNumbers(course);
+      const actualPage = resolveMiniCourseVisiblePageNumber(pageNumber, 1, course);
+      const index = Math.max(0, visiblePages.indexOf(actualPage));
+      return {
+        actualPage,
+        index,
+        total: Math.max(1, visiblePages.length || 1),
+        visiblePages
+      };
+    }
+
+    function getMiniCourseVisiblePagesRead(course = currentMiniCourse) {
+      const visiblePages = getMiniCourseVisiblePageNumbers(course);
       const pagesRead = Math.max(0, Number(course?.progress?.pagesRead || 0) || 0);
+      return visiblePages.filter((pageNumber) => pageNumber <= pagesRead).length;
+    }
+
+    function getMiniCourseProgressMarkup(course) {
+      const totalPages = Math.max(1, getMiniCourseVisiblePageNumbers(course).length || 1);
+      const pagesRead = getMiniCourseVisiblePagesRead(course);
       if (pagesRead <= 0) {
         return "";
       }
@@ -10378,6 +10491,7 @@
       const progressPercent = getMiniCourseProgressPercent(course);
       const hasStarted = Math.max(0, Number(course?.progress?.pagesRead || 0) || 0) > 0;
       const buttonLabel = hasStarted ? `Continuar leitura | ${progressPercent}%` : "Iniciar leitura";
+      const actionsMarkup = getMiniCourseCardActionsMarkup(course);
       return `
         <article class="mobile-course-slide-card" data-course-id="${escapeAttr(course.id)}">
           <button class="mobile-course-open" type="button" data-open-mobile-course="${escapeAttr(course.id)}" aria-label="Abrir curso ${escapeAttr(course.title || "Curso")}">
@@ -10387,6 +10501,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.75A2.75 2.75 0 0 1 8.75 2h9.5A2.75 2.75 0 0 1 21 4.75v13.5A1.75 1.75 0 0 1 19.25 20H9a3 3 0 0 0-3 3V4.75Zm2.75-1.25A1.25 1.25 0 0 0 7.5 4.75V19.2A4.47 4.47 0 0 1 9 18.95h10.25a.25.25 0 0 0 .25-.25V4.75A1.25 1.25 0 0 0 18.25 3.5Zm1.75 3h6.5v1.5h-6.5Zm0 3.5h6.5v1.5h-6.5Zm0 3.5h4.5V15h-4.5Z"/></svg>
             <span>${escapeText(buttonLabel)}</span>
           </button>
+          ${actionsMarkup ? `<div class="mobile-course-actions">${actionsMarkup}</div>` : ""}
         </article>
       `;
     }
@@ -10411,6 +10526,16 @@
         button.onclick = async (event) => {
           event.stopPropagation();
           await generateMiniCourseQuizAdmin(button.getAttribute("data-generate-quiz-course-id") || "");
+        };
+      });
+      container.querySelectorAll("[data-toggle-course-visibility-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          try {
+            await toggleMiniCourseVisibilityAdmin(button.getAttribute("data-toggle-course-visibility-id") || "");
+          } catch (error) {
+            setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao atualizar a visibilidade do curso.");
+          }
         };
       });
       container.querySelectorAll("[data-delete-course-id]").forEach((button) => {
@@ -10586,7 +10711,9 @@
         return;
       }
 
-      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      const pagePosition = getMiniCourseVisiblePagePosition(currentMiniCourse, currentMiniCoursePage);
+      const totalPages = Math.max(1, pagePosition.total || 1);
+      const currentDisplayPage = pagePosition.index + 1;
       const quizQuestions = getMiniCourseQuizQuestions();
       const totalBlocks = Math.max(0, currentMiniCourseRenderedBlocks.length || 0);
       const currentBlock = totalBlocks ? clampMiniCourseBlockIndex(currentMiniCourseBlockIndex) + 1 : 0;
@@ -10599,7 +10726,7 @@
       if (chapterProgressFill) {
         chapterProgressFill.style.width = `${chapterProgressState.percent}%`;
       }
-      prev.disabled = currentMiniCoursePage <= 1 && currentMiniCourseQuizIndex < 0 && currentBlock <= 1;
+      prev.disabled = currentDisplayPage <= 1 && currentMiniCourseQuizIndex < 0 && currentBlock <= 1;
       next.disabled = false;
       if (currentMiniCourseQuizResult) {
         setCourseFooterStatus(`${currentMiniCourse.title} • Resultado do quiz`);
@@ -10609,10 +10736,10 @@
         next.hidden = true;
       } else {
         setCourseFooterStatus(totalBlocks
-          ? `${currentMiniCourse.title} • ${currentMiniCoursePage}/${totalPages} • bloco ${currentBlock}/${totalBlocks}`
-          : `${currentMiniCourse.title} • ${currentMiniCoursePage}/${totalPages}`);
+          ? `${currentMiniCourse.title} • ${currentDisplayPage}/${totalPages} • bloco ${currentBlock}/${totalBlocks}`
+          : `${currentMiniCourse.title} • ${currentDisplayPage}/${totalPages}`);
         next.hidden = false;
-        next.setAttribute("aria-label", currentMiniCoursePage >= totalPages
+        next.setAttribute("aria-label", currentDisplayPage >= totalPages
           ? (quizQuestions.length ? "Iniciar quiz" : "Concluir curso")
           : (currentBlock && currentBlock < totalBlocks ? "Próximo bloco" : "Próxima página"));
       }
@@ -10697,6 +10824,16 @@
         button.onclick = async (event) => {
           event.stopPropagation();
           await generateMiniCourseQuizAdmin(button.getAttribute("data-generate-quiz-course-id") || "");
+        };
+      });
+      listView.querySelectorAll("[data-toggle-course-visibility-id]").forEach((button) => {
+        button.onclick = async (event) => {
+          event.stopPropagation();
+          try {
+            await toggleMiniCourseVisibilityAdmin(button.getAttribute("data-toggle-course-visibility-id") || "");
+          } catch (error) {
+            setCourseFooterStatus(error instanceof Error ? error.message : "Falha ao atualizar a visibilidade do curso.");
+          }
         };
       });
       listView.querySelectorAll("[data-delete-course-id]").forEach((button) => {
@@ -10832,15 +10969,15 @@
         return;
       }
 
-      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
-      currentMiniCoursePage = Math.max(1, Math.min(totalPages, Number(currentMiniCoursePage || 1) || 1));
+      const rawTotalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
+      currentMiniCoursePage = resolveMiniCourseVisiblePageNumber(Math.max(1, Math.min(rawTotalPages, Number(currentMiniCoursePage || 1) || 1)), 1, currentMiniCourse);
       const quizQuestions = getMiniCourseQuizQuestions();
       const currentPage = currentMiniCourse.pages?.[currentMiniCoursePage - 1] || {};
       const currentPageKind = String(currentPage.kind || "").trim().toLowerCase();
       const bullets = Array.isArray(currentPage.bullets) ? currentPage.bullets : [];
       const tableRows = Array.isArray(currentPage.tableRows) ? currentPage.tableRows : [];
       const computedBlocks = buildMiniCourseReaderBlocks(currentPage);
-      currentMiniCourseRenderedBlocks = computedBlocks;
+      currentMiniCourseRenderedBlocks = currentPageKind === "chapter_open" ? [] : computedBlocks;
       currentMiniCourseBlockIndex = clampMiniCourseBlockIndex(currentMiniCourseBlockIndex);
 
       clearMiniCourseAnimationTimers();
@@ -10890,20 +11027,7 @@
       }
 
       syncMiniCourseReadGate();
-      if (currentPageKind === "course-map") {
-        readerView.innerHTML = `
-          <div class="course-map-shell">
-            <div class="course-page-top-spacer" aria-hidden="true"></div>
-            <h2 class="course-map-title">${escapeText(currentPage.title || "Mapa do curso")}</h2>
-            ${currentPage.subtitle ? `<p class="course-map-subtitle">${escapeText(currentPage.subtitle)}</p>` : ""}
-            <div class="course-page-divider" aria-hidden="true"></div>
-            ${currentPage.logline ? `<p class="course-page-paragraph">${escapeText(currentPage.logline)}</p>` : ""}
-            <div class="course-map-grid">
-              ${tableRows.map((row) => `<div class="course-map-row"><strong>${escapeText(row.label)}</strong><span>${escapeText(row.value)}</span></div>`).join("")}
-            </div>
-          </div>
-        `;
-      } else if (currentPageKind === "chapter_open") {
+      if (currentPageKind === "chapter_open") {
         readerView.innerHTML = `
           <div class="course-chapter-open-shell">
             <div class="course-page-top-spacer" aria-hidden="true"></div>
@@ -10912,7 +11036,7 @@
             ${currentPage.subtitle ? `<p class="course-chapter-open-subtitle">${escapeText(currentPage.subtitle)}</p>` : ""}
             <div class="course-page-divider" aria-hidden="true"></div>
             <div class="course-blocks-shell">
-              ${computedBlocks.map((block, index) => `<p class="course-chapter-open-logline course-text-block${index === currentMiniCourseBlockIndex ? " is-active" : ""}" data-course-block-index="${index}">${escapeText(block)}</p>`).join("")}
+              ${computedBlocks.map((block) => `<p class="course-chapter-open-logline">${escapeText(block)}</p>`).join("")}
             </div>
           </div>
         `;
@@ -10930,7 +11054,7 @@
           </div>
         `;
       }
-      if (currentPageKind === "course-map") {
+      if (currentPageKind === "chapter_open") {
         readerView.scrollTop = 0;
       } else {
         updateMiniCourseActiveBlockUi({ anchor: true });
@@ -11517,6 +11641,48 @@
       setCourseFooterStatus(String(payload?.feedback || "Curso excluído com sucesso."));
     }
 
+    async function toggleMiniCourseVisibilityAdmin(courseId) {
+      if (!isMiniCourseAdmin) {
+        return;
+      }
+
+      const safeCourseId = String(courseId || "").trim();
+      if (!safeCourseId || miniCourseVisibilityStates[safeCourseId]) {
+        return;
+      }
+
+      const course = miniCourses.find((item) => item.id === safeCourseId);
+      if (!course) {
+        return;
+      }
+
+      const nextVisible = course.isVisible === false;
+      miniCourseVisibilityStates[safeCourseId] = true;
+      renderMiniCoursesList();
+      setCourseFooterStatus(nextVisible ? `Tornando ${course.title} visível ao público...` : `Ocultando ${course.title} do público...`);
+      try {
+        const response = await apiMini(`/api/mini/courses/${encodeURIComponent(safeCourseId)}/visibility`, {
+          method: "PATCH",
+          body: JSON.stringify({ isVisible: nextVisible })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao atualizar a visibilidade do curso.");
+        }
+        const updatedCourse = payload?.course || null;
+        if (updatedCourse) {
+          miniCourses = miniCourses.map((item) => item.id === safeCourseId ? { ...item, ...updatedCourse } : item);
+          if (currentMiniCourse?.id === safeCourseId) {
+            currentMiniCourse = { ...currentMiniCourse, ...updatedCourse };
+          }
+        }
+        setCourseFooterStatus(String(payload?.feedback || "Visibilidade do curso atualizada."));
+      } finally {
+        delete miniCourseVisibilityStates[safeCourseId];
+        renderMiniCoursesList();
+      }
+    }
+
     async function persistMiniCourseProgress(nextPage) {
       if (!currentMiniCourse) {
         return;
@@ -11530,7 +11696,11 @@
       }
 
       const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
-      const safePage = Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1));
+      const safePage = resolveMiniCourseVisiblePageNumber(
+        Math.max(1, Math.min(totalPages, Number(nextPage || 1) || 1)),
+        Number(nextPage || 1) < Number(currentMiniCoursePage || 1) ? -1 : 1,
+        currentMiniCourse
+      );
       miniCourseProgressSaving = true;
       setCourseFooterStatus("Salvando progresso...");
 
@@ -11607,7 +11777,8 @@
         if (direction < 0) {
           if (currentMiniCourseQuizIndex === 0) {
             currentMiniCourseQuizIndex = -1;
-            currentMiniCoursePage = Math.max(1, Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1);
+            const visiblePages = getMiniCourseVisiblePageNumbers(currentMiniCourse);
+            currentMiniCoursePage = visiblePages[visiblePages.length - 1] || 1;
           } else {
             currentMiniCourseQuizIndex -= 1;
           }
@@ -11616,9 +11787,12 @@
         return;
       }
 
+      const visiblePages = getMiniCourseVisiblePageNumbers(currentMiniCourse);
+      const currentPosition = getMiniCourseVisiblePagePosition(currentMiniCourse, currentMiniCoursePage);
+      currentMiniCoursePage = currentPosition.actualPage;
       const currentPage = currentMiniCourse?.pages?.[Math.max(0, currentMiniCoursePage - 1)] || null;
       const currentPageKind = String(currentPage?.kind || "").trim().toLowerCase();
-      if (currentPageKind !== "course-map" && currentMiniCourseRenderedBlocks.length) {
+      if (currentPageKind !== "chapter_open" && currentMiniCourseRenderedBlocks.length) {
         const lastBlockIndex = Math.max(0, currentMiniCourseRenderedBlocks.length - 1);
         if (direction > 0 && currentMiniCourseBlockIndex < lastBlockIndex) {
           await moveMiniCourseBlock(1);
@@ -11630,17 +11804,16 @@
         }
       }
 
-      const totalPages = Math.max(Number(currentMiniCourse.pageCount || currentMiniCourse.pages?.length || 1) || 1, 1);
-      const targetPage = Math.max(1, Math.min(totalPages, currentMiniCoursePage + direction));
-      const pagesRead = Math.max(0, Number(currentMiniCourse?.progress?.pagesRead || 0) || 0);
-      const targetPageAlreadyUnlocked = targetPage <= pagesRead;
+      const totalPages = Math.max(1, visiblePages.length || 1);
+      const targetIndex = Math.max(0, Math.min(totalPages - 1, currentPosition.index + direction));
+      const targetPage = visiblePages[targetIndex] || currentMiniCoursePage;
 
-      if (direction < 0 && targetPage === currentMiniCoursePage) {
+      if (direction < 0 && targetIndex === currentPosition.index) {
         return;
       }
 
-      if (direction > 0 && currentMiniCoursePage >= totalPages) {
-        await persistMiniCourseProgress(totalPages);
+      if (direction > 0 && currentPosition.index >= totalPages - 1) {
+        await persistMiniCourseProgress(visiblePages[totalPages - 1] || currentMiniCoursePage);
         if (quizQuestions.length) {
           currentMiniCourseQuizIndex = 0;
           renderMiniCourseReader();

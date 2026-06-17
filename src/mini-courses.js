@@ -198,6 +198,7 @@ function normalizeCourse(row) {
     id: row.id,
     title: row.title || "Curso MINI",
     context: row.context || "",
+    isVisible: row.is_visible !== false,
     pageCount,
     contentPageCount,
     chapterCount,
@@ -262,6 +263,7 @@ export async function ensureMiniCoursesSchema() {
       quiz_questions jsonb not null default '[]'::jsonb,
       cover_image_url text not null default '',
       cover_image_prompt text not null default '',
+      is_visible boolean not null default true,
       created_by_user_id uuid references users(id) on delete set null,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
@@ -271,6 +273,7 @@ export async function ensureMiniCoursesSchema() {
   await query("alter table mini_courses add column if not exists content_page_count smallint not null default 1;");
   await query("alter table mini_courses add column if not exists chapter_count smallint not null default 1;");
   await query("alter table mini_courses add column if not exists course_style text not null default 'course';");
+  await query("alter table mini_courses add column if not exists is_visible boolean not null default true;");
 
   await query(`
     create table if not exists mini_course_progress (
@@ -344,9 +347,10 @@ export async function ensureMiniCoursesSchema() {
   await query("create index if not exists idx_mini_course_jobs_status_created_at on mini_course_jobs(status, created_at asc);");
 }
 
-export async function listMiniCourses(userId = "") {
+export async function listMiniCourses(userId = "", { includeHidden = false } = {}) {
   await ensureMiniCoursesSchema();
   const safeUserId = String(userId || "").trim();
+  const visibilityClause = includeHidden ? "" : "where c.is_visible = true";
   const result = safeUserId
     ? await query(
       `
@@ -354,6 +358,7 @@ export async function listMiniCourses(userId = "") {
           c.id,
           c.title,
           c.context,
+          c.is_visible,
           c.page_count,
           c.content_page_count,
           c.chapter_count,
@@ -382,6 +387,7 @@ export async function listMiniCourses(userId = "") {
         left join mini_course_quiz_results q
           on q.course_id = c.id
          and q.user_id = $1
+        ${visibilityClause}
         order by c.updated_at desc, c.created_at desc
       `,
       [safeUserId]
@@ -392,6 +398,7 @@ export async function listMiniCourses(userId = "") {
           c.id,
           c.title,
           c.context,
+          c.is_visible,
           c.page_count,
           c.content_page_count,
           c.chapter_count,
@@ -414,6 +421,7 @@ export async function listMiniCourses(userId = "") {
           null::integer as quiz_attempts_count,
           null::timestamptz as quiz_updated_at
         from mini_courses c
+        ${visibilityClause}
         order by c.updated_at desc, c.created_at desc
       `
     );
@@ -434,6 +442,7 @@ export async function getMiniCourseById(courseId, userId = "") {
           c.id,
           c.title,
           c.context,
+          c.is_visible,
           c.page_count,
           c.content_page_count,
           c.chapter_count,
@@ -473,6 +482,7 @@ export async function getMiniCourseById(courseId, userId = "") {
           c.id,
           c.title,
           c.context,
+          c.is_visible,
           c.page_count,
           c.content_page_count,
           c.chapter_count,
@@ -594,6 +604,22 @@ export async function updateMiniCourseCover(courseId, coverImageUrl = "") {
       courseId,
       String(coverImageUrl || "").trim().slice(0, 2000)
     ]
+  );
+  return result.rows[0] ? normalizeCourse(result.rows[0]) : null;
+}
+
+export async function updateMiniCourseVisibility(courseId, isVisible = true) {
+  await ensureMiniCoursesSchema();
+  const result = await query(
+    `
+      update mini_courses
+      set
+        is_visible = $2,
+        updated_at = now()
+      where id = $1
+      returning *
+    `,
+    [courseId, Boolean(isVisible)]
   );
   return result.rows[0] ? normalizeCourse(result.rows[0]) : null;
 }

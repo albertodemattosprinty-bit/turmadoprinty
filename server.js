@@ -37,6 +37,7 @@ import {
   saveMiniCourseQuizResult,
   startMiniCourse,
   updateMiniCourseCover,
+  updateMiniCourseVisibility,
   updateMiniCourseQuiz,
   updateMiniCourseJobProgress,
   updateMiniCourseProgress
@@ -3851,10 +3852,11 @@ async function bootstrapMiniCourseJobsQueue() {
 
 async function handleMiniCoursesListRequest(request, response) {
   const user = await getOptionalAuthUser(request);
+  const includeHidden = Boolean(user && isAdminUser(user));
 
   try {
     const [courses, summary] = await Promise.all([
-      listMiniCourses(user?.id || ""),
+      listMiniCourses(user?.id || "", { includeHidden }),
       user ? getMiniCourseUserSummary(user.id) : Promise.resolve({ completedCourses: 0, startedCourses: 0, totalPoints: 0 })
     ]);
     const courseSummaries = courses.map((course) => ({
@@ -5018,7 +5020,7 @@ async function handleMiniCourseDetailRequest(request, response, courseId) {
 
   try {
     const course = await getMiniCourseById(courseId, user?.id || "");
-    if (!course) {
+    if (!course || (course.isVisible === false && !isAdminUser(user))) {
       sendJson(response, 404, { error: "Curso nao encontrado." });
       return;
     }
@@ -5324,6 +5326,42 @@ async function handleMiniCourseDeleteRequest(request, response, courseId) {
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel excluir o curso."
+    });
+  }
+}
+
+async function handleMiniCourseVisibilityRequest(request, response, courseId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const updatedCourse = await updateMiniCourseVisibility(courseId, body?.isVisible !== false);
+    if (!updatedCourse) {
+      sendJson(response, 404, { error: "Curso nao encontrado." });
+      return;
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      course: updatedCourse,
+      feedback: updatedCourse.isVisible === false
+        ? "Curso ocultado do público com sucesso."
+        : "Curso visível ao público novamente."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a visibilidade do curso."
     });
   }
 }
@@ -8359,6 +8397,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PUT" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/cover")) {
     const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/cover$/, ""));
     await handleMiniCourseCoverUploadRequest(request, response, courseId);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.startsWith("/api/mini/courses/") && pathname.endsWith("/visibility")) {
+    const courseId = decodeURIComponent(pathname.replace("/api/mini/courses/", "").replace(/\/visibility$/, ""));
+    await handleMiniCourseVisibilityRequest(request, response, courseId);
     return;
   }
 
