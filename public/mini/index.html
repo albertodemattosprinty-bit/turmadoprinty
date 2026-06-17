@@ -1965,6 +1965,10 @@
       padding: 1px 2px;
       font-family: Georgia, "Times New Roman", serif;
     }
+    .mini-docs-line-text.is-leading-numbered {
+      font-weight: 700;
+      color: #2f5fe7;
+    }
     .mini-docs-line-timestamp {
       min-width: 58px;
       padding-top: 7px;
@@ -6670,6 +6674,7 @@
         const isEditing = Number(miniDocsState.editingLineNumber || 0) === line.number;
         const safeText = String(line.text || "");
         const isFolderHeader = Boolean(line.isFolderHeader);
+        const hasLeadingDigits = !isFolderHeader && /\d/.test(safeText.slice(0, 7));
         const isVisualSpacer = !isSync && !isFolderHeader && !safeText;
         const isFolderOpen = isFolderHeader && Boolean(miniDocsState.expandedFolders[String(line.number)]);
         const isSyncCurrent = isSync && Number(miniDocsState.syncCurrentLineNumber || 0) === line.number;
@@ -6703,7 +6708,7 @@
         }
         return `
           <article class="mini-docs-line${isSelected ? " is-selected" : ""}${isCursor ? " is-cursor" : ""}${isFolderHeader ? " is-folder" : ""}${isFolderOpen ? " is-folder-open" : ""}${line.isFolderContent ? " is-folder-content" : ""}${isSyncCurrent ? " is-sync-current" : ""}${isSyncUnsynced ? " is-sync-unsynced" : ""}${isSyncFlagged ? " is-sync-flagged" : ""}" data-mini-docs-line="${line.number}"${isFolderHeader ? ` data-mini-docs-folder="${line.number}"` : ""} tabindex="0" role="button" aria-label="${isFolderHeader ? `Pasta ${escapeAttr(safeText)}` : `Linha ${line.number}`}">
-            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}">${isFolderHeader ? `<span class="mini-docs-folder-caret" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>` : ""}${folderLabel ? escapeText(folderLabel) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
+            <div class="mini-docs-line-text${safeText ? "" : " is-empty"}${hasLeadingDigits ? " is-leading-numbered" : ""}">${isFolderHeader ? `<span class="mini-docs-folder-caret" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>` : ""}${folderLabel ? escapeText(folderLabel) : `<span aria-hidden="true">&nbsp;</span>`}${isCursor ? `<span class="mini-docs-line-cursor"></span>` : ""}</div>
             <div class="mini-docs-line-timestamp">${escapeText(timestampLabel)}</div>
             ${isAdmin && !isFolderHeader && safeText ? `<button class="mini-docs-line-edit${isSync ? " is-alert" : ""}" type="button" data-mini-docs-edit="${line.number}" aria-label="${isSync ? `Marcar alerta na linha ${line.number}` : `Editar linha ${line.number}`}">${isSync ? getMiniDocsAlertSvg() : getMiniDocsEditSvg()}</button>` : `<div></div>`}
           </article>
@@ -7694,6 +7699,7 @@
       }
 
       setMediaStatus("Adicionando faixas ao album...");
+      let lastUploadedTrackId = "";
       for (let index = 0; index < trackFiles.length; index += 1) {
         const track = trackFiles[index];
         const trackTitle = track.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
@@ -7715,9 +7721,17 @@
         if (payload?.library?.albums) {
           mediaLibraryAlbums = payload.library.albums;
         }
+        lastUploadedTrackId = String(payload?.album?.songs?.find((song) => String(song?.id || "") === trackId)?.id || trackId).trim();
       }
       mediaActiveAlbumId = safeAlbumId;
       renderMediaModal();
+      const uploadedAlbum = getMediaAlbumById(safeAlbumId);
+      const uploadedSong = (Array.isArray(uploadedAlbum?.songs) ? uploadedAlbum.songs : []).find((song) => String(song?.id || "") === lastUploadedTrackId);
+      if (uploadedSong?.id) {
+        startMediaPreview(buildMediaTrackKey(safeAlbumId, uploadedSong.id), uploadedSong, 0, safeAlbumId);
+        setMediaStatus(`Faixas adicionadas com sucesso. Tocando ${uploadedSong.title || "a nova faixa"}.`);
+        return;
+      }
       setMediaStatus("Faixas adicionadas com sucesso.");
     }
     async function handleMediaInlineTracksInputChange() {
