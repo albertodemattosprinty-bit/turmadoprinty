@@ -4741,6 +4741,7 @@
       page: "/mini/sounds/page.mp3",
       success: "/mini/sounds/success.mp3"
     };
+    const miniCourseUiSoundPlayers = {};
     let miniCourseReaderThemeIndex = 1;
     let miniCourseReaderFontSizeIndex = 0;
 
@@ -8839,8 +8840,14 @@
         return Promise.resolve();
       }
       try {
-        const audio = new Audio(src);
-        audio.preload = "auto";
+        const audio = miniCourseUiSoundPlayers[kind] || (() => {
+          const nextAudio = new Audio(src);
+          nextAudio.preload = "auto";
+          miniCourseUiSoundPlayers[kind] = nextAudio;
+          return nextAudio;
+        })();
+        audio.pause();
+        audio.currentTime = 0;
         audio.volume = kind === "point" ? 0.9 : 0.72;
         const playback = audio.play().catch(() => {});
         if (waitForTimeMs <= 0) {
