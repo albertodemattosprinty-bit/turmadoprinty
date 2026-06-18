@@ -2457,6 +2457,72 @@
     .mini-docs-edit-status:empty {
       display: none;
     }
+    .mini-docs-edit-line-list {
+      display: grid;
+      gap: 10px;
+    }
+    .mini-docs-edit-insert-row {
+      display: flex;
+      justify-content: center;
+    }
+    .mini-docs-edit-insert-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: rgba(36, 74, 216, .10);
+      color: #244ad8;
+      font-family: "Open Sans", sans-serif;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .mini-docs-edit-line {
+      display: grid;
+      gap: 8px;
+      padding: 14px 16px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.88);
+      box-shadow: inset 0 0 0 1px rgba(36, 74, 216, .08);
+    }
+    .mini-docs-edit-line.is-locked {
+      background: linear-gradient(145deg, #24439a, #17337c);
+      color: #fff;
+      box-shadow: none;
+    }
+    .mini-docs-edit-line-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .mini-docs-edit-line-label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(36, 48, 72, .56);
+    }
+    .mini-docs-edit-line.is-locked .mini-docs-edit-line-label {
+      color: rgba(255,255,255,.76);
+    }
+    .mini-docs-edit-line-time {
+      font-size: 12px;
+      font-weight: 800;
+      color: #244ad8;
+      background: rgba(36, 74, 216, .10);
+      border-radius: 999px;
+      padding: 4px 10px;
+    }
+    .mini-docs-edit-line.is-locked .mini-docs-edit-line-time {
+      color: #17337c;
+      background: rgba(255,255,255,.92);
+    }
+    .mini-docs-edit-line-text {
+      font-size: 17px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     .mini-docs-edit-textarea {
       width: 100%;
       min-height: 180px;
@@ -2470,6 +2536,9 @@
       font-size: 18px;
       line-height: 1.6;
       box-shadow: inset 0 0 0 1px rgba(36, 74, 216, .08);
+    }
+    .mini-docs-edit-textarea[hidden] {
+      display: none !important;
     }
     .mini-docs-edit-player {
       display: grid;
@@ -4422,7 +4491,8 @@
         </button>
       </div>
       <div id="miniDocsEditStatus" class="mini-docs-edit-status"></div>
-      <textarea id="miniDocsEditTextarea" class="mini-docs-edit-textarea" placeholder="Edite o texto desta linha."></textarea>
+      <div id="miniDocsEditLineList" class="mini-docs-edit-line-list"></div>
+      <textarea id="miniDocsEditTextarea" class="mini-docs-edit-textarea" placeholder="Edite o texto desta linha." hidden></textarea>
       <div id="miniDocsEditPlayer" class="mini-docs-edit-player" hidden>
         <div class="mini-docs-edit-player-top">
           <button id="miniDocsEditPlayButton" class="mini-docs-edit-player-toggle" type="button" aria-label="Tocar ou pausar a música desta edição">
@@ -4975,6 +5045,7 @@
       editingDraft: "",
       editModalOpen: false,
       editModalStatus: "",
+      editModalDraftLines: [],
       cursorActive: false,
       cursorLineNumber: 1,
       dragStartY: 0,
@@ -5368,14 +5439,33 @@
       }
       return lines.find((item) => !item.isFolderHeader) || lines[0] || null;
     }
+    function setMiniDocsEditModalDraftLines(lines) {
+      miniDocsState.editModalDraftLines = normalizeMiniDocsLineList(cloneMiniDocsSyncLines(lines));
+    }
+    function insertMiniDocsEditDraftLine(afterLineNumber = 0) {
+      const nextLines = cloneMiniDocsSyncLines(miniDocsState.editModalDraftLines);
+      const insertIndex = afterLineNumber > 0
+        ? nextLines.findIndex((line) => line.number === afterLineNumber) + 1
+        : 0;
+      nextLines.splice(Math.max(0, insertIndex), 0, {
+        number: 0,
+        text: "",
+        timestampMs: null,
+        tag: ""
+      });
+      setMiniDocsEditModalDraftLines(nextLines);
+      const insertedLine = miniDocsState.editModalDraftLines[Math.max(0, insertIndex)] || null;
+      return Number(insertedLine?.number || 0) || 0;
+    }
     function renderMiniDocsEditModal() {
       const modal = $("miniDocsEditModal");
+      const lineList = $("miniDocsEditLineList");
       const textarea = $("miniDocsEditTextarea");
       const status = $("miniDocsEditStatus");
       const subtitle = $("miniDocsEditSubtitle");
       const player = $("miniDocsEditPlayer");
       const titleNode = $("miniDocsEditTitle");
-      if (!modal || !textarea || !status || !subtitle || !titleNode) {
+      if (!modal || !lineList || !textarea || !status || !subtitle || !titleNode) {
         return;
       }
       const activeLine = getMiniDocsTargetEditableLine();
@@ -5388,9 +5478,71 @@
         ? `Linha ${lineNumber || 1}${syncSong?.title ? ` • ${syncSong.title}` : ""}`
         : `Linha ${lineNumber || 1} do documento principal`;
       status.textContent = miniDocsState.editModalStatus || "";
-      const nextDraft = miniDocsState.editingDraft || String(activeLine?.text || "");
-      if (textarea.value !== nextDraft) {
-        textarea.value = nextDraft;
+      if (isMiniDocsSyncMode()) {
+        textarea.hidden = true;
+        lineList.hidden = false;
+        const draftLines = miniDocsState.editModalDraftLines.length
+          ? miniDocsState.editModalDraftLines
+          : normalizeMiniDocsLineList(getMiniDocsLines());
+        const syncSignature = draftLines.map((line) => `${line.number}|${line.timestampMs ?? ""}|${line.tag || ""}|${String(line.text || "")}`).join("\u241F");
+        if (lineList.dataset.syncSignature !== syncSignature) {
+          lineList.innerHTML = [
+            `<div class="mini-docs-edit-insert-row"><button class="mini-docs-edit-insert-btn" type="button" data-mini-docs-edit-insert-after="0">Inserir linha no início</button></div>`,
+            ...draftLines.flatMap((line) => {
+              const isLocked = line.timestampMs !== null && line.timestampMs !== undefined;
+              const card = isLocked
+                ? `
+                  <article class="mini-docs-edit-line is-locked" data-mini-docs-edit-line="${line.number}">
+                    <div class="mini-docs-edit-line-head">
+                      <span class="mini-docs-edit-line-label">Linha ${line.number} protegida</span>
+                      <span class="mini-docs-edit-line-time">${escapeText(formatMiniDocsTimestamp(line.timestampMs) || "0:00")}</span>
+                    </div>
+                    <div class="mini-docs-edit-line-text">${escapeText(line.text || "") || "&nbsp;"}</div>
+                  </article>
+                `
+                : `
+                  <article class="mini-docs-edit-line" data-mini-docs-edit-line="${line.number}">
+                    <div class="mini-docs-edit-line-head">
+                      <span class="mini-docs-edit-line-label">Linha ${line.number} editável</span>
+                      <span class="mini-docs-edit-line-time">Sem timestamp</span>
+                    </div>
+                    <textarea class="mini-docs-edit-textarea" data-mini-docs-edit-draft="${line.number}" placeholder="Digite a nova linha aqui.">${escapeText(line.text || "")}</textarea>
+                  </article>
+                `;
+              const insertRow = `<div class="mini-docs-edit-insert-row"><button class="mini-docs-edit-insert-btn" type="button" data-mini-docs-edit-insert-after="${line.number}">Inserir linha abaixo</button></div>`;
+              return [card, insertRow];
+            })
+          ].join("");
+          lineList.dataset.syncSignature = syncSignature;
+          lineList.querySelectorAll("[data-mini-docs-edit-insert-after]").forEach((button) => {
+            button.onclick = () => {
+              const insertedLineNumber = insertMiniDocsEditDraftLine(Number(button.getAttribute("data-mini-docs-edit-insert-after") || 0) || 0);
+              renderMiniDocsEditModal();
+              window.requestAnimationFrame(() => {
+                const target = lineList.querySelector(`[data-mini-docs-edit-draft="${insertedLineNumber}"]`);
+                target?.focus();
+              });
+            };
+          });
+          lineList.querySelectorAll("[data-mini-docs-edit-draft]").forEach((input) => {
+            input.addEventListener("input", () => {
+              const lineId = Number(input.getAttribute("data-mini-docs-edit-draft") || 0) || 0;
+              const target = miniDocsState.editModalDraftLines.find((line) => line.number === lineId);
+              if (target && (target.timestampMs === null || target.timestampMs === undefined)) {
+                target.text = String(input.value || "");
+              }
+              miniDocsState.editModalStatus = "";
+            });
+          });
+        }
+      } else {
+        lineList.hidden = true;
+        delete lineList.dataset.syncSignature;
+        textarea.hidden = false;
+        const nextDraft = miniDocsState.editingDraft || String(activeLine?.text || "");
+        if (textarea.value !== nextDraft) {
+          textarea.value = nextDraft;
+        }
       }
       if (player) {
         player.hidden = !(isMiniDocsSyncMode() && syncSong?.url);
@@ -5410,22 +5562,33 @@
       if (!isMiniMediaAdmin()) {
         return;
       }
-      const line = getMiniDocsTargetEditableLine();
-      if (!line) {
+      const lines = getMiniDocsLines().filter((line) => !line.isFolderHeader);
+      if (!lines.length) {
         setMiniDocsStatus("Escolha uma linha para editar primeiro.");
         return;
       }
-      miniDocsState.editingLineNumber = Number(line.number || 0) || 0;
-      miniDocsState.editingDraft = String(line.text || "");
+      const line = getMiniDocsTargetEditableLine();
+      miniDocsState.editingLineNumber = Number(line?.number || lines[0]?.number || 0) || 0;
+      miniDocsState.editingDraft = String(line?.text || "");
+      if (isMiniDocsSyncMode()) {
+        setMiniDocsEditModalDraftLines(lines);
+      }
       miniDocsState.editModalStatus = "";
       miniDocsState.editModalOpen = true;
       renderMiniDocsEditModal();
       window.requestAnimationFrame(() => {
+        if (isMiniDocsSyncMode()) {
+          const firstEditable = $("miniDocsEditLineList")?.querySelector("[data-mini-docs-edit-draft]");
+          firstEditable?.focus();
+          return;
+        }
         const textarea = $("miniDocsEditTextarea");
         textarea?.focus();
         textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
       });
-      setMiniDocsStatus(`Editando a linha ${miniDocsState.editingLineNumber}.`);
+      setMiniDocsStatus(isMiniDocsSyncMode()
+        ? "Editando o texto completo do sync. Linhas com timestamp ficam protegidas."
+        : `Editando a linha ${miniDocsState.editingLineNumber}.`);
     }
     function closeMiniDocsEditModal({ keepDraft = false } = {}) {
       miniDocsState.editModalOpen = false;
@@ -5433,6 +5596,7 @@
       if (!keepDraft) {
         miniDocsState.editingDraft = "";
         miniDocsState.editingLineNumber = 0;
+        miniDocsState.editModalDraftLines = [];
       }
       renderMiniDocsEditModal();
     }
@@ -6810,19 +6974,14 @@
     }
     async function saveMiniDocsEditModal() {
       const lineNumber = Number(miniDocsState.editingLineNumber || 0) || 0;
-      if (!lineNumber) {
+      if (!lineNumber && !isMiniDocsSyncMode()) {
         return;
       }
-      const nextText = normalizeMiniDocsLineText(miniDocsState.editingDraft || "");
       if (isMiniDocsSyncMode()) {
         miniDocsState.editModalStatus = "Salvando texto da música...";
         renderMiniDocsEditModal();
-        updateMiniDocsSyncLines((draftLines) => {
-          const target = draftLines.find((line) => line.number === lineNumber);
-          if (target) {
-            target.text = nextText;
-          }
-        });
+        miniDocsState.syncLines = normalizeMiniDocsLineList(cloneMiniDocsSyncLines(miniDocsState.editModalDraftLines));
+        miniDocsState.syncDirty = true;
         const saved = await saveMiniDocsSyncData({ silent: true });
         if (!saved) {
           miniDocsState.editModalStatus = "Nao foi possivel salvar o texto agora.";
@@ -6831,9 +6990,10 @@
         }
         closeMiniDocsEditModal();
         renderMiniDocsModal();
-        setMiniDocsStatus(`Texto da linha ${lineNumber} salvo na música.`);
+        setMiniDocsStatus("Texto do sync salvo na música sem alterar os timestamps protegidos.");
         return;
       }
+      const nextText = normalizeMiniDocsLineText(miniDocsState.editingDraft || "");
       try {
         miniDocsState.editModalStatus = `Salvando linha ${lineNumber}...`;
         renderMiniDocsEditModal();
