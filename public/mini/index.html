@@ -2385,7 +2385,7 @@
       background: rgba(12, 18, 36, .46);
       display: grid;
       place-items: center;
-      padding: 18px;
+      padding: 0;
       opacity: 0;
       pointer-events: none;
       transition: opacity .24s ease;
@@ -2395,17 +2395,20 @@
       pointer-events: auto;
     }
     .mini-docs-edit-panel {
-      width: min(760px, 100%);
-      max-height: min(86vh, 760px);
+      width: 100vw;
+      height: 100vh;
+      max-width: none;
+      max-height: none;
       overflow: auto;
       display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
       gap: 16px;
-      padding: 22px;
-      border-radius: 28px;
+      padding: 22px 22px calc(22px + env(safe-area-inset-bottom, 0px));
+      border-radius: 0;
       background:
         radial-gradient(circle at top, rgba(111, 198, 255, .22), transparent 42%),
         linear-gradient(180deg, #ffffff 0%, #f6fbff 100%);
-      box-shadow: 0 30px 54px rgba(20, 35, 86, .22);
+      box-shadow: none;
     }
     .mini-docs-edit-head {
       display: flex;
@@ -2460,6 +2463,10 @@
     .mini-docs-edit-line-list {
       display: grid;
       gap: 10px;
+      min-height: 0;
+      align-content: start;
+      overflow: auto;
+      padding-right: 4px;
     }
     .mini-docs-edit-insert-row {
       display: flex;
@@ -2525,6 +2532,8 @@
     }
     .mini-docs-edit-textarea {
       width: 100%;
+      min-height: 0;
+      height: 100%;
       min-height: 180px;
       border: 0;
       border-radius: 24px;
@@ -2700,12 +2709,13 @@
         padding: 14px 14px 8px;
       }
       .mini-docs-edit-panel {
-        width: min(100%, 640px);
-        padding: 18px;
-        border-radius: 24px;
+        width: 100vw;
+        height: 100vh;
+        padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+        border-radius: 0;
       }
       .mini-docs-edit-textarea {
-        min-height: 150px;
+        min-height: 0;
         font-size: 17px;
       }
       .mini-docs-line {
