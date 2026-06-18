@@ -5479,61 +5479,13 @@
         : `Linha ${lineNumber || 1} do documento principal`;
       status.textContent = miniDocsState.editModalStatus || "";
       if (isMiniDocsSyncMode()) {
-        textarea.hidden = true;
-        lineList.hidden = false;
-        const draftLines = miniDocsState.editModalDraftLines.length
-          ? miniDocsState.editModalDraftLines
-          : normalizeMiniDocsLineList(getMiniDocsLines());
-        const syncSignature = draftLines.map((line) => `${line.number}|${line.timestampMs ?? ""}|${line.tag || ""}|${String(line.text || "")}`).join("\u241F");
-        if (lineList.dataset.syncSignature !== syncSignature) {
-          lineList.innerHTML = [
-            `<div class="mini-docs-edit-insert-row"><button class="mini-docs-edit-insert-btn" type="button" data-mini-docs-edit-insert-after="0">Inserir linha no início</button></div>`,
-            ...draftLines.flatMap((line) => {
-              const isLocked = line.timestampMs !== null && line.timestampMs !== undefined;
-              const card = isLocked
-                ? `
-                  <article class="mini-docs-edit-line is-locked" data-mini-docs-edit-line="${line.number}">
-                    <div class="mini-docs-edit-line-head">
-                      <span class="mini-docs-edit-line-label">Linha ${line.number} protegida</span>
-                      <span class="mini-docs-edit-line-time">${escapeText(formatMiniDocsTimestamp(line.timestampMs) || "0:00")}</span>
-                    </div>
-                    <div class="mini-docs-edit-line-text">${escapeText(line.text || "") || "&nbsp;"}</div>
-                  </article>
-                `
-                : `
-                  <article class="mini-docs-edit-line" data-mini-docs-edit-line="${line.number}">
-                    <div class="mini-docs-edit-line-head">
-                      <span class="mini-docs-edit-line-label">Linha ${line.number} editável</span>
-                      <span class="mini-docs-edit-line-time">Sem timestamp</span>
-                    </div>
-                    <textarea class="mini-docs-edit-textarea" data-mini-docs-edit-draft="${line.number}" placeholder="Digite a nova linha aqui.">${escapeText(line.text || "")}</textarea>
-                  </article>
-                `;
-              const insertRow = `<div class="mini-docs-edit-insert-row"><button class="mini-docs-edit-insert-btn" type="button" data-mini-docs-edit-insert-after="${line.number}">Inserir linha abaixo</button></div>`;
-              return [card, insertRow];
-            })
-          ].join("");
-          lineList.dataset.syncSignature = syncSignature;
-          lineList.querySelectorAll("[data-mini-docs-edit-insert-after]").forEach((button) => {
-            button.onclick = () => {
-              const insertedLineNumber = insertMiniDocsEditDraftLine(Number(button.getAttribute("data-mini-docs-edit-insert-after") || 0) || 0);
-              renderMiniDocsEditModal();
-              window.requestAnimationFrame(() => {
-                const target = lineList.querySelector(`[data-mini-docs-edit-draft="${insertedLineNumber}"]`);
-                target?.focus();
-              });
-            };
-          });
-          lineList.querySelectorAll("[data-mini-docs-edit-draft]").forEach((input) => {
-            input.addEventListener("input", () => {
-              const lineId = Number(input.getAttribute("data-mini-docs-edit-draft") || 0) || 0;
-              const target = miniDocsState.editModalDraftLines.find((line) => line.number === lineId);
-              if (target && (target.timestampMs === null || target.timestampMs === undefined)) {
-                target.text = String(input.value || "");
-              }
-              miniDocsState.editModalStatus = "";
-            });
-          });
+        lineList.hidden = true;
+        lineList.innerHTML = "";
+        delete lineList.dataset.syncSignature;
+        textarea.hidden = false;
+        const nextDraft = miniDocsState.editingDraft || getMiniDocsLines().map((line) => String(line.text || "")).join("\n");
+        if (textarea.value !== nextDraft) {
+          textarea.value = nextDraft;
         }
       } else {
         lineList.hidden = true;
@@ -5569,25 +5521,22 @@
       }
       const line = getMiniDocsTargetEditableLine();
       miniDocsState.editingLineNumber = Number(line?.number || lines[0]?.number || 0) || 0;
-      miniDocsState.editingDraft = String(line?.text || "");
+      miniDocsState.editingDraft = isMiniDocsSyncMode()
+        ? lines.map((item) => String(item.text || "")).join("\n")
+        : String(line?.text || "");
       if (isMiniDocsSyncMode()) {
-        setMiniDocsEditModalDraftLines(lines);
+        miniDocsState.editModalDraftLines = [];
       }
       miniDocsState.editModalStatus = "";
       miniDocsState.editModalOpen = true;
       renderMiniDocsEditModal();
       window.requestAnimationFrame(() => {
-        if (isMiniDocsSyncMode()) {
-          const firstEditable = $("miniDocsEditLineList")?.querySelector("[data-mini-docs-edit-draft]");
-          firstEditable?.focus();
-          return;
-        }
         const textarea = $("miniDocsEditTextarea");
         textarea?.focus();
         textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
       });
       setMiniDocsStatus(isMiniDocsSyncMode()
-        ? "Editando o texto completo do sync. Linhas com timestamp ficam protegidas."
+        ? "Editando o texto completo do sync. Ao salvar, todos os timestamps serão removidos."
         : `Editando a linha ${miniDocsState.editingLineNumber}.`);
     }
     function closeMiniDocsEditModal({ keepDraft = false } = {}) {
@@ -6978,9 +6927,19 @@
         return;
       }
       if (isMiniDocsSyncMode()) {
-        miniDocsState.editModalStatus = "Salvando texto da música...";
+        miniDocsState.editModalStatus = "Salvando texto da música e limpando os timestamps...";
         renderMiniDocsEditModal();
-        miniDocsState.syncLines = normalizeMiniDocsLineList(cloneMiniDocsSyncLines(miniDocsState.editModalDraftLines));
+        const nextLines = String(miniDocsState.editingDraft || "")
+          .replace(/\r\n/g, "\n")
+          .replace(/\r/g, "\n")
+          .split("\n")
+          .map((text) => ({
+            number: 0,
+            text: normalizeMiniDocsLineText(text),
+            timestampMs: null,
+            tag: ""
+          }));
+        miniDocsState.syncLines = normalizeMiniDocsLineList(nextLines);
         miniDocsState.syncDirty = true;
         const saved = await saveMiniDocsSyncData({ silent: true });
         if (!saved) {
@@ -6990,7 +6949,7 @@
         }
         closeMiniDocsEditModal();
         renderMiniDocsModal();
-        setMiniDocsStatus("Texto do sync salvo na música sem alterar os timestamps protegidos.");
+        setMiniDocsStatus("Texto do sync salvo na música. Todos os timestamps foram removidos.");
         return;
       }
       const nextText = normalizeMiniDocsLineText(miniDocsState.editingDraft || "");
