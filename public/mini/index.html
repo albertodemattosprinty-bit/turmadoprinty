@@ -1884,6 +1884,9 @@
     .mini-docs-top-btn.sync {
       background: linear-gradient(145deg, #b670ff, #6f3ee8);
     }
+    .mini-docs-top-btn.edit {
+      background: linear-gradient(145deg, #68b7ff, #2f5fe7);
+    }
     .mini-docs-top-btn.cursor {
       background: linear-gradient(145deg, #68b7ff, #2f5fe7);
     }
@@ -2375,6 +2378,228 @@
       opacity: 1;
       pointer-events: auto;
     }
+    .mini-docs-edit-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 78;
+      background: rgba(12, 18, 36, .46);
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .24s ease;
+    }
+    .mini-docs-edit-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .mini-docs-edit-panel {
+      width: min(760px, 100%);
+      max-height: min(86vh, 760px);
+      overflow: auto;
+      display: grid;
+      gap: 16px;
+      padding: 22px;
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at top, rgba(111, 198, 255, .22), transparent 42%),
+        linear-gradient(180deg, #ffffff 0%, #f6fbff 100%);
+      box-shadow: 0 30px 54px rgba(20, 35, 86, .22);
+    }
+    .mini-docs-edit-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .mini-docs-edit-copy {
+      display: grid;
+      gap: 6px;
+    }
+    .mini-docs-edit-copy h3 {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 28px);
+      line-height: 1.08;
+      font-family: "Open Sans", sans-serif;
+      color: #244ad8;
+    }
+    .mini-docs-edit-copy p {
+      margin: 0;
+      color: rgba(35, 48, 72, .72);
+      font-size: 13px;
+      line-height: 1.5;
+      font-weight: 700;
+    }
+    .mini-docs-edit-close {
+      width: 46px;
+      height: 46px;
+      border: 0;
+      border-radius: 16px;
+      background: rgba(36, 74, 216, .10);
+      color: #244ad8;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .mini-docs-edit-close svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+    .mini-docs-edit-status {
+      min-height: 18px;
+      color: rgba(35, 48, 72, .72);
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+    .mini-docs-edit-status:empty {
+      display: none;
+    }
+    .mini-docs-edit-textarea {
+      width: 100%;
+      min-height: 180px;
+      border: 0;
+      border-radius: 24px;
+      background: rgba(255,255,255,.94);
+      color: #243048;
+      padding: 18px 20px;
+      resize: vertical;
+      font-family: "Open Sans", sans-serif;
+      font-size: 18px;
+      line-height: 1.6;
+      box-shadow: inset 0 0 0 1px rgba(36, 74, 216, .08);
+    }
+    .mini-docs-edit-player {
+      display: grid;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 22px;
+      background: rgba(99, 163, 255, .10);
+      box-shadow: inset 0 0 0 1px rgba(36, 74, 216, .08);
+    }
+    .mini-docs-edit-player[hidden] {
+      display: none !important;
+    }
+    .mini-docs-edit-player-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .mini-docs-edit-player-toggle {
+      width: 54px;
+      height: 54px;
+      border: 0;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #5ec9ff, #2c73f2);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      box-shadow: 0 18px 30px rgba(44, 115, 242, .24);
+      flex: 0 0 auto;
+    }
+    .mini-docs-edit-player-toggle svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+    .mini-docs-edit-player-meta {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+      flex: 1 1 auto;
+    }
+    .mini-docs-edit-player-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #243048;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mini-docs-edit-player-subtitle {
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(36, 48, 72, .68);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mini-docs-edit-player-range {
+      width: 100%;
+      accent-color: #2c73f2;
+    }
+    .mini-docs-edit-player-times {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: rgba(36, 48, 72, .68);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .mini-docs-edit-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .mini-docs-edit-actions button {
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 18px;
+      cursor: pointer;
+      font-family: "Open Sans", sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .mini-docs-edit-actions .ghost {
+      background: rgba(36, 74, 216, .10);
+      color: #244ad8;
+    }
+    .mini-docs-edit-actions .save {
+      background: linear-gradient(145deg, #70db93, #23995a);
+      color: #fff;
+      box-shadow: 0 14px 26px rgba(35, 153, 90, .22);
+    }
+    @media (min-width: 901px) {
+      .mini-docs-head {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        padding: 18px 0 8px;
+      }
+      .mini-docs-head-center {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 18px;
+        background: rgba(255,255,255,.58);
+        border-left: 1px solid rgba(36, 74, 216, .08);
+        border-right: 1px solid rgba(36, 74, 216, .08);
+        gap: 10px;
+      }
+      .mini-docs-head-center span {
+        white-space: nowrap;
+      }
+      .mini-docs-top-btn {
+        width: 56px;
+        height: auto;
+        min-height: 48px;
+        border-radius: 0;
+        box-shadow: none;
+        flex: 0 0 56px;
+      }
+      .mini-docs-top-btn.play::after {
+        right: 2px;
+        bottom: 2px;
+        border-radius: 8px;
+      }
+    }
     .mini-docs-ai-panel {
       width: min(680px, 100%);
       border-radius: 28px;
@@ -2404,6 +2629,15 @@
       .mini-docs-head {
         grid-template-columns: 48px 48px 1fr 48px 48px 48px;
         padding: 14px 14px 8px;
+      }
+      .mini-docs-edit-panel {
+        width: min(100%, 640px);
+        padding: 18px;
+        border-radius: 24px;
+      }
+      .mini-docs-edit-textarea {
+        min-height: 150px;
+        font-size: 17px;
       }
       .mini-docs-line {
         grid-template-columns: minmax(0, 1fr) auto 34px;
@@ -4125,8 +4359,8 @@
         <svg viewBox="0 0 24 24"><path d="M12 1a9 9 0 1 0 9 9h-2a7 7 0 1 1-2.05-4.95L14 8h8V0l-3.64 3.64A8.96 8.96 0 0 0 12 1zm-1 5h2v7l5 3-1 1.73-6-3.73z"/></svg>
       </button>
       <div class="mini-docs-head-center">
-        <button id="miniDocsCursorButton" class="mini-docs-top-btn cursor" type="button" aria-label="Ativar cursor para inserir novas linhas">
-          <svg viewBox="0 0 24 24"><path d="M9 3h2v18H9zm4 0h2v18h-2zM5 5h14v2H5zm0 12h14v2H5z"/></svg>
+        <button id="miniDocsCursorButton" class="mini-docs-top-btn edit" type="button" aria-label="Editar texto da linha atual">
+          <svg viewBox="0 0 24 24"><path d="M4 17.25V20h2.75L17.81 8.94l-2.75-2.75zm14.71-9.04a1 1 0 0 0 0-1.42l-1.5-1.5a1 1 0 0 0-1.42 0l-1.17 1.17 2.75 2.75zM4 5h8v2H4zm0 4h6v2H4zm0 4h5v2H4z"/></svg>
         </button>
         <span>AllDocs Imersivo</span>
       </div>
@@ -4172,6 +4406,42 @@
       <div class="mini-docs-ai-actions">
         <button id="miniDocsAiCancel" class="ghost" type="button">Cancelar</button>
         <button id="miniDocsAiSubmit" class="save" type="button">Enviar para IA</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="miniDocsEditModal" class="mini-docs-edit-modal" aria-hidden="true">
+    <div class="mini-docs-edit-panel" role="dialog" aria-modal="true" aria-labelledby="miniDocsEditTitle">
+      <div class="mini-docs-edit-head">
+        <div class="mini-docs-edit-copy">
+          <h3 id="miniDocsEditTitle">Editar texto da música</h3>
+          <p id="miniDocsEditSubtitle">Ajuste a linha atual e salve direto na música.</p>
+        </div>
+        <button id="miniDocsEditClose" class="mini-docs-edit-close" type="button" aria-label="Fechar edição do texto">
+          <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z"/></svg>
+        </button>
+      </div>
+      <div id="miniDocsEditStatus" class="mini-docs-edit-status"></div>
+      <textarea id="miniDocsEditTextarea" class="mini-docs-edit-textarea" placeholder="Edite o texto desta linha."></textarea>
+      <div id="miniDocsEditPlayer" class="mini-docs-edit-player" hidden>
+        <div class="mini-docs-edit-player-top">
+          <button id="miniDocsEditPlayButton" class="mini-docs-edit-player-toggle" type="button" aria-label="Tocar ou pausar a música desta edição">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <div class="mini-docs-edit-player-meta">
+            <div id="miniDocsEditPlayerTitle" class="mini-docs-edit-player-title">Música do sync</div>
+            <div id="miniDocsEditPlayerSubtitle" class="mini-docs-edit-player-subtitle">Use o slider para arrastar o ponto da música.</div>
+          </div>
+        </div>
+        <input id="miniDocsEditPlayerRange" class="mini-docs-edit-player-range" type="range" min="0" max="0" step="0.1" value="0" aria-label="Posição da música no editor">
+        <div class="mini-docs-edit-player-times">
+          <span id="miniDocsEditPlayerCurrent">0:00</span>
+          <span id="miniDocsEditPlayerDuration">0:00</span>
+        </div>
+      </div>
+      <div class="mini-docs-edit-actions">
+        <button id="miniDocsEditCancel" class="ghost" type="button">Cancelar</button>
+        <button id="miniDocsEditSave" class="save" type="button">Salvar texto</button>
       </div>
     </div>
   </section>
@@ -4703,6 +4973,8 @@
       selectionEnd: 0,
       editingLineNumber: 0,
       editingDraft: "",
+      editModalOpen: false,
+      editModalStatus: "",
       cursorActive: false,
       cursorLineNumber: 1,
       dragStartY: 0,
@@ -5075,6 +5347,94 @@
           ...line,
           number: index + 1
         }));
+    }
+    function getMiniDocsTargetEditableLine() {
+      const lines = getMiniDocsLines();
+      if (!lines.length) {
+        return null;
+      }
+      const selection = !isMiniDocsSyncMode() ? getMiniDocsSelectionRange() : null;
+      const preferredNumbers = [
+        Number(miniDocsState.editingLineNumber || 0) || 0,
+        isMiniDocsSyncMode() ? (Number(miniDocsState.syncCurrentLineNumber || 0) || 0) : 0,
+        selection && selection.start === selection.end ? selection.start : 0,
+        Number(miniDocsState.cursorLineNumber || 0) || 0
+      ].filter((value, index, list) => value > 0 && list.indexOf(value) === index);
+      for (const lineNumber of preferredNumbers) {
+        const line = lines.find((item) => item.number === lineNumber && !item.isFolderHeader);
+        if (line) {
+          return line;
+        }
+      }
+      return lines.find((item) => !item.isFolderHeader) || lines[0] || null;
+    }
+    function renderMiniDocsEditModal() {
+      const modal = $("miniDocsEditModal");
+      const textarea = $("miniDocsEditTextarea");
+      const status = $("miniDocsEditStatus");
+      const subtitle = $("miniDocsEditSubtitle");
+      const player = $("miniDocsEditPlayer");
+      const titleNode = $("miniDocsEditTitle");
+      if (!modal || !textarea || !status || !subtitle || !titleNode) {
+        return;
+      }
+      const activeLine = getMiniDocsTargetEditableLine();
+      const lineNumber = Number(miniDocsState.editingLineNumber || activeLine?.number || 0) || 0;
+      const syncSong = miniDocsState.syncSong;
+      modal.classList.toggle("show", Boolean(miniDocsState.editModalOpen));
+      modal.setAttribute("aria-hidden", miniDocsState.editModalOpen ? "false" : "true");
+      titleNode.textContent = isMiniDocsSyncMode() ? "Editar texto da música" : "Editar linha do documento";
+      subtitle.textContent = isMiniDocsSyncMode()
+        ? `Linha ${lineNumber || 1}${syncSong?.title ? ` • ${syncSong.title}` : ""}`
+        : `Linha ${lineNumber || 1} do documento principal`;
+      status.textContent = miniDocsState.editModalStatus || "";
+      const nextDraft = miniDocsState.editingDraft || String(activeLine?.text || "");
+      if (textarea.value !== nextDraft) {
+        textarea.value = nextDraft;
+      }
+      if (player) {
+        player.hidden = !(isMiniDocsSyncMode() && syncSong?.url);
+      }
+      const playerTitle = $("miniDocsEditPlayerTitle");
+      const playerSubtitle = $("miniDocsEditPlayerSubtitle");
+      if (playerTitle) {
+        playerTitle.textContent = syncSong?.title || "Música do sync";
+      }
+      if (playerSubtitle) {
+        playerSubtitle.textContent = syncSong?.albumTitle
+          ? `${syncSong.albumTitle} • use o slider para ajustar a posição`
+          : "Use o slider para ajustar a posição";
+      }
+    }
+    function openMiniDocsEditModal() {
+      if (!isMiniMediaAdmin()) {
+        return;
+      }
+      const line = getMiniDocsTargetEditableLine();
+      if (!line) {
+        setMiniDocsStatus("Escolha uma linha para editar primeiro.");
+        return;
+      }
+      miniDocsState.editingLineNumber = Number(line.number || 0) || 0;
+      miniDocsState.editingDraft = String(line.text || "");
+      miniDocsState.editModalStatus = "";
+      miniDocsState.editModalOpen = true;
+      renderMiniDocsEditModal();
+      window.requestAnimationFrame(() => {
+        const textarea = $("miniDocsEditTextarea");
+        textarea?.focus();
+        textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
+      });
+      setMiniDocsStatus(`Editando a linha ${miniDocsState.editingLineNumber}.`);
+    }
+    function closeMiniDocsEditModal({ keepDraft = false } = {}) {
+      miniDocsState.editModalOpen = false;
+      miniDocsState.editModalStatus = "";
+      if (!keepDraft) {
+        miniDocsState.editingDraft = "";
+        miniDocsState.editingLineNumber = 0;
+      }
+      renderMiniDocsEditModal();
     }
     function getMiniDocsLines() {
       if (miniDocsState.mode === "sync") {
@@ -5797,6 +6157,21 @@
         syncFooterCurrent.textContent = formatMiniDocsTimestamp(miniDocsState.syncCurrentTimeMs || 0) || "0:00";
         syncFooterDuration.textContent = formatMiniDocsTimestamp(miniDocsState.syncDurationMs || 0) || "0:00";
       }
+      const editPlayButton = $("miniDocsEditPlayButton");
+      const editRange = $("miniDocsEditPlayerRange");
+      const editCurrent = $("miniDocsEditPlayerCurrent");
+      const editDuration = $("miniDocsEditPlayerDuration");
+      if (editPlayButton) {
+        editPlayButton.innerHTML = miniDocsState.syncPlaying
+          ? `<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>`
+          : `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+      }
+      if (editRange && editCurrent && editDuration) {
+        editRange.max = String(Math.max(0, Number(miniDocsState.syncDurationMs || 0) || 0) / 1000);
+        editRange.value = String(Math.max(0, Number(miniDocsState.syncCurrentTimeMs || 0) || 0) / 1000);
+        editCurrent.textContent = formatMiniDocsTimestamp(miniDocsState.syncCurrentTimeMs || 0) || "0:00";
+        editDuration.textContent = formatMiniDocsTimestamp(miniDocsState.syncDurationMs || 0) || "0:00";
+      }
     }
     function tickMiniDocsSyncPlayback() {
       if (!miniDocsState.syncPlaying || !miniDocsState.syncAudio) {
@@ -6395,10 +6770,10 @@
     }
     async function saveMiniDocsSyncData({ silent = false } = {}) {
       if (!isMiniDocsSyncMode()) {
-        return;
+        return false;
       }
       if (miniDocsState.syncSaving) {
-        return;
+        return false;
       }
       miniDocsState.syncSaving = true;
       try {
@@ -6423,12 +6798,60 @@
         if (!silent) {
           setMiniDocsStatus("");
         }
+        return true;
       } catch (error) {
         if (!silent) {
           setMiniDocsStatus(error instanceof Error ? error.message : "Nao foi possivel salvar o sync.");
         }
+        return false;
       } finally {
         miniDocsState.syncSaving = false;
+      }
+    }
+    async function saveMiniDocsEditModal() {
+      const lineNumber = Number(miniDocsState.editingLineNumber || 0) || 0;
+      if (!lineNumber) {
+        return;
+      }
+      const nextText = normalizeMiniDocsLineText(miniDocsState.editingDraft || "");
+      if (isMiniDocsSyncMode()) {
+        miniDocsState.editModalStatus = "Salvando texto da música...";
+        renderMiniDocsEditModal();
+        updateMiniDocsSyncLines((draftLines) => {
+          const target = draftLines.find((line) => line.number === lineNumber);
+          if (target) {
+            target.text = nextText;
+          }
+        });
+        const saved = await saveMiniDocsSyncData({ silent: true });
+        if (!saved) {
+          miniDocsState.editModalStatus = "Nao foi possivel salvar o texto agora.";
+          renderMiniDocsEditModal();
+          return;
+        }
+        closeMiniDocsEditModal();
+        renderMiniDocsModal();
+        setMiniDocsStatus(`Texto da linha ${lineNumber} salvo na música.`);
+        return;
+      }
+      try {
+        miniDocsState.editModalStatus = `Salvando linha ${lineNumber}...`;
+        renderMiniDocsEditModal();
+        const response = await apiMini(`/api/mini/docs/all-docs/lines/${lineNumber}`, {
+          method: "PATCH",
+          body: JSON.stringify({ text: nextText })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || "Nao foi possivel salvar a linha.");
+        }
+        miniDocsState.document = payload.document || miniDocsState.document;
+        closeMiniDocsEditModal();
+        renderMiniDocsModal();
+        setMiniDocsStatus(`Linha ${lineNumber} salva no Postgres.`);
+      } catch (error) {
+        miniDocsState.editModalStatus = error instanceof Error ? error.message : "Nao foi possivel salvar a linha.";
+        renderMiniDocsEditModal();
       }
     }
     function stampMiniDocsSyncCurrentLine() {
@@ -6689,7 +7112,8 @@
       const cursorButton = $("miniDocsCursorButton");
       if (cursorButton) {
         cursorButton.hidden = !isAdmin;
-        cursorButton.classList.toggle("is-active", isAdmin && miniDocsState.cursorActive);
+        cursorButton.classList.toggle("is-active", isAdmin && !isSync && miniDocsState.cursorActive);
+        cursorButton.setAttribute("aria-label", isSync ? "Editar texto da linha atual" : "Ativar cursor para inserir novas linhas");
       }
       $("miniDocsComposer")?.classList.toggle("is-active", !isSync && isAdmin && miniDocsState.cursorActive);
       const centerLabel = document.querySelector(".mini-docs-head-center span");
@@ -6697,6 +7121,7 @@
         centerLabel.textContent = "";
       }
       syncMiniDocsPlayButtonSpeedBadge();
+      renderMiniDocsEditModal();
       $("miniDocsModal")?.classList.toggle("is-sheep-sync", Boolean(isSync && miniDocsState.syncSheepMode));
       if (miniDocsState.loading) {
         container.innerHTML = `<div class="courses-empty">Carregando documento...</div>`;
@@ -6908,6 +7333,7 @@
       $("miniDocsModal").classList.remove("show");
       $("miniDocsModal").setAttribute("aria-hidden", "true");
       closeMiniDocsAiModal();
+      closeMiniDocsEditModal();
       closeMiniDocsRecordModal();
       miniDocsState.editingLineNumber = 0;
       miniDocsState.editingDraft = "";
@@ -12016,8 +12442,61 @@
       openMiniDocsRecordModal();
     };
     $("miniDocsCursorButton").onclick = () => {
+      if (isMiniDocsSyncMode()) {
+        openMiniDocsEditModal();
+        return;
+      }
       setMiniDocsCursorActive(!miniDocsState.cursorActive);
     };
+    $("miniDocsEditClose").onclick = () => {
+      closeMiniDocsEditModal();
+      setMiniDocsStatus("Edição do texto cancelada.");
+    };
+    $("miniDocsEditCancel").onclick = () => {
+      closeMiniDocsEditModal();
+      setMiniDocsStatus("Edição do texto cancelada.");
+    };
+    $("miniDocsEditSave").onclick = async () => {
+      await saveMiniDocsEditModal();
+    };
+    $("miniDocsEditTextarea").addEventListener("input", (event) => {
+      miniDocsState.editingDraft = event.target.value || "";
+      miniDocsState.editModalStatus = "";
+    });
+    $("miniDocsEditTextarea").addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeMiniDocsEditModal();
+        setMiniDocsStatus("Edição do texto cancelada.");
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        void saveMiniDocsEditModal();
+      }
+    });
+    $("miniDocsEditPlayButton").onclick = () => {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      if (miniDocsState.syncPlaying) {
+        pauseMiniDocsSyncPlayback();
+      } else {
+        startMiniDocsSyncPlayback();
+      }
+    };
+    $("miniDocsEditPlayerRange").addEventListener("input", (event) => {
+      if (!isMiniDocsSyncMode()) {
+        return;
+      }
+      const nextSeconds = Math.max(0, Number(event.target.value || 0) || 0);
+      const nextMs = nextSeconds * 1000;
+      miniDocsState.syncCurrentTimeMs = nextMs;
+      miniDocsState.syncPausedAt = nextMs;
+      if (miniDocsState.syncAudio) {
+        miniDocsState.syncAudio.currentTime = nextSeconds;
+      }
+      syncMiniDocsPlaybackUi();
+    });
     $("miniDocsComposerCancel").onclick = () => {
       setMiniDocsCursorActive(false);
       setMiniDocsStatus("Insercao cancelada.");
@@ -12119,6 +12598,11 @@
         void stopMiniDocsVoiceCaptureTracks();
         closeMiniDocsRecordModal();
         setMiniDocsStatus("Gravacao cancelada.");
+        return;
+      }
+      if ($("miniDocsEditModal")?.getAttribute("aria-hidden") === "false" && event.key === "Escape") {
+        closeMiniDocsEditModal();
+        setMiniDocsStatus("Edição do texto cancelada.");
         return;
       }
       if (isMiniDocsSyncMode() && event.key === " ") {
