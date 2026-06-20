@@ -242,6 +242,11 @@ const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
 const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption");
 const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
+const openProject200ExportModalButton = document.getElementById("openProject200ExportModal");
+const project200ExportModal = document.getElementById("project200ExportModal");
+const project200ExportUsernameInput = document.getElementById("project200ExportUsername");
+const project200ExportMessage = document.getElementById("project200ExportMessage");
+const project200ExportConfirmButton = document.getElementById("project200ExportConfirm");
 const constitutionEditWrap = document.getElementById("constitutionEditWrap");
 const constitutionEditor = document.getElementById("constitutionEditor");
 const saveConstitutionEditButton = document.getElementById("saveConstitutionEdit");
@@ -2843,6 +2848,11 @@ function openModal(id) {
     renderOptionsModal();
   }
 
+  if (id === "project200ExportModal") {
+    resetProject200ExportModal();
+    window.setTimeout(() => project200ExportUsernameInput?.focus(), 40);
+  }
+
   if (id === "historyModal") {
     void (async () => {
       await loadHistoryFromApi();
@@ -2906,6 +2916,9 @@ function closeModal(modal) {
 
   if (modal.id === "historyModal") {
     closeHistoryTextComposer();
+  }
+  if (modal.id === "project200ExportModal") {
+    resetProject200ExportModal();
   }
   if (modal.id === "calendarModal") {
     closeFinanceEntryConfirm(false);
@@ -6178,6 +6191,63 @@ function renderOptionsModal() {
   toggleFreeTimeOptionButton?.classList.toggle("is-off", !state.options.showFreeTime);
 }
 
+function resetProject200ExportModal() {
+  if (project200ExportUsernameInput) {
+    project200ExportUsernameInput.value = "";
+  }
+  if (project200ExportMessage) {
+    project200ExportMessage.textContent = "";
+  }
+  if (project200ExportConfirmButton) {
+    project200ExportConfirmButton.disabled = false;
+  }
+}
+
+function renderProject200ExportSuccess(payload) {
+  if (!project200ExportMessage) {
+    return;
+  }
+  const targetName = String(payload?.targetUser?.username || payload?.targetUser?.name || "destino").trim();
+  const actionsCount = Number(payload?.summary?.actions || 0);
+  const historyCount = Number(payload?.summary?.historyEntries || 0);
+  const financeCount = Number(payload?.summary?.financeOccurrences || 0);
+  project200ExportMessage.textContent = `Exportado para ${targetName}: ${actionsCount} tarefas, ${historyCount} históricos e ${financeCount} lançamentos/copias financeiras.`;
+}
+
+async function submitProject200Export() {
+  const username = String(project200ExportUsernameInput?.value || "").trim();
+  if (!username) {
+    if (project200ExportMessage) {
+      project200ExportMessage.textContent = "Digite o nome de usuário da conta destino.";
+    }
+    return;
+  }
+
+  if (project200ExportMessage) {
+    project200ExportMessage.textContent = "Exportando...";
+  }
+  if (project200ExportConfirmButton) {
+    project200ExportConfirmButton.disabled = true;
+  }
+
+  try {
+    const payload = await apiRequest("/api/200/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username })
+    });
+    renderProject200ExportSuccess(payload);
+  } catch (error) {
+    if (project200ExportMessage) {
+      project200ExportMessage.textContent = error instanceof Error ? error.message : "Falha ao exportar.";
+    }
+  } finally {
+    if (project200ExportConfirmButton) {
+      project200ExportConfirmButton.disabled = false;
+    }
+  }
+}
+
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", () => closeModal(button.closest(".workspace-modal")));
 });
@@ -6982,6 +7052,23 @@ toggleFreeTimeOptionButton?.addEventListener("click", () => {
   renderOptionsModal();
   renderActions();
   renderHomeRunningTask();
+});
+openProject200ExportModalButton?.addEventListener("click", () => {
+  if (!getToken()) {
+    window.location.href = "/auth.html?next=/200";
+    return;
+  }
+  openModal("project200ExportModal");
+});
+project200ExportConfirmButton?.addEventListener("click", () => {
+  void submitProject200Export();
+});
+project200ExportUsernameInput?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  void submitProject200Export();
 });
 startDecisionTaskTitle?.addEventListener("click", () => {
   const action = findActionById(state.startDecisionContext.actionId);

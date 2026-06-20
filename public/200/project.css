@@ -743,6 +743,17 @@ body.start-decision-open .home-running-btn {
   opacity: 0.72;
 }
 
+.options-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.options-text-field {
+  width: min(420px, 100%);
+}
+
 .running-music-default-title {
   display: flex;
   align-items: center;

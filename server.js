@@ -57,6 +57,7 @@ import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } f
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
+import { exportProject200DataToUser } from "./src/project200-export.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1321,6 +1322,38 @@ async function getProject200AssignedProfile(userId) {
     [userId]
   );
   return normalizeProject200Profile(result.rows[0]?.assigned_profile || "");
+}
+
+async function findUserByUsernameOrNameInput(usernameInput) {
+  const normalizedInput = String(usernameInput || "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+
+  if (!normalizedInput) {
+    return null;
+  }
+
+  const searchResult = await query(
+    `
+      select id, name, username, created_at
+      from users
+      where username = $1
+         or lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2
+         or username ilike $3
+         or name ilike $3
+      order by
+        case
+          when username = $1 then 0
+          when lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2 then 1
+          else 2
+        end,
+        created_at asc
+      limit 1
+    `,
+    [normalizedInput, normalizedInput, `%${String(usernameInput || "").trim()}%`]
+  );
+
+  return searchResult.rows[0] || null;
 }
 
 function isValidUsername(username) {
@@ -8781,27 +8814,7 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const normalized = usernameInput.toLocaleLowerCase("pt-BR");
-      const searchResult = await query(
-        `
-          select id, name, username, created_at
-          from users
-          where username = $1
-             or lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2
-             or username ilike $3
-             or name ilike $3
-          order by
-            case
-              when username = $1 then 0
-              when lower(regexp_replace(coalesce(name, ''), '\\s+', ' ', 'g')) = $2 then 1
-              else 2
-            end,
-            created_at asc
-          limit 1
-        `,
-        [normalized, normalized, `%${usernameInput}%`]
-      );
-      const targetUser = searchResult.rows[0] || null;
+      const targetUser = await findUserByUsernameOrNameInput(usernameInput);
 
       if (!targetUser) {
         sendJson(response, 404, { error: "Usuário não encontrado no banco principal." });
@@ -8833,6 +8846,53 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Erro ao salvar vínculo."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/export") {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+
+      const body = await parseJsonBody(request);
+      const usernameInput = String(body?.username || "").trim();
+      if (!usernameInput) {
+        sendJson(response, 400, { error: "Digite o nome de usuário da conta destino." });
+        return;
+      }
+
+      const targetUser = await findUserByUsernameOrNameInput(usernameInput);
+      if (!targetUser) {
+        sendJson(response, 404, { error: "Usuário destino não encontrado." });
+        return;
+      }
+
+      if (String(targetUser.id || "") === String(authUser.id || "")) {
+        sendJson(response, 400, { error: "Escolha outra conta para exportar." });
+        return;
+      }
+
+      const summary = await exportProject200DataToUser({
+        sourceUserId: authUser.id,
+        targetUserId: targetUser.id
+      });
+
+      sendJson(response, 200, {
+        ok: true,
+        targetUser: {
+          id: targetUser.id,
+          username: targetUser.username || null,
+          name: targetUser.name || targetUser.username || "Usuário"
+        },
+        summary
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Não foi possível exportar os dados do /200."
       });
     }
     return;

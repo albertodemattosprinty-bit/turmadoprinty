@@ -626,6 +626,26 @@
         <strong>Tempo livre</strong>
         <span class="running-music-default-bottom" id="toggleFreeTimeHint">Mostrando</span>
       </button>
+      <button class="running-music-default-option" type="button" id="openProject200ExportModal">
+        <span class="running-music-default-top">Duplicar todos os dados do /200</span>
+        <strong>Exportar</strong>
+        <span class="running-music-default-bottom">Substitui o /200 da conta destino</span>
+      </button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal" id="project200ExportModal" aria-hidden="true" aria-label="Exportar dados do Projeto 200">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
+    <div class="finance-content options-content">
+      <div class="running-music-default-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5a2 2 0 0 0-2 2v14l4-3 4 3 4-3 4 3V8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 8h7M9 12h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>Exportar /200</span>
+      </div>
+      <p class="options-note">Digite o nome de usuário da conta destino. O bloco do <strong>/200</strong> dessa conta será substituído pelos dados da conta atual.</p>
+      <input class="text-field options-text-field" type="text" id="project200ExportUsername" maxlength="80" autocomplete="off" placeholder="Nome de usuário" />
+      <p class="finance-status" id="project200ExportMessage" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="project200ExportConfirm">Exportar</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>
   </section>
