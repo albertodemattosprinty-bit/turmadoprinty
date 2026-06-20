@@ -8858,7 +8858,7 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const body = await parseJsonBody(request);
+      const body = await readJsonBody(request);
       const usernameInput = String(body?.username || "").trim();
       if (!usernameInput) {
         sendJson(response, 400, { error: "Digite o nome de usuário da conta destino." });
