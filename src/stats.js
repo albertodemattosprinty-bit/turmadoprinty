@@ -1,6 +1,5 @@
 import { query } from "./db.js";
-
-const ASSIGNEES = ["Geral", "Rose", "Alberto", "Lucas", "Thainan"];
+import { normalizeStoredProject200ProfileName } from "./project200-profiles.js";
 const DEFAULT_SALDO_GOAL_CENTS = 1000000;
 
 function startOfDay(date) {
@@ -237,7 +236,7 @@ async function buildStatsSummary(userId, range) {
 
   const byAssignee = {};
   for (const row of actionsResult.rows) {
-    const assignee = ASSIGNEES.includes(row.assignee) ? row.assignee : "Geral";
+    const assignee = normalizeStoredProject200ProfileName(row.assignee);
     byAssignee[assignee] = {
       totalMinutes: Number(row.total_minutes || 0),
       completedMinutes: Number(row.completed_minutes || 0),

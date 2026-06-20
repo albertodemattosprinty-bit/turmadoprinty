@@ -58,6 +58,7 @@ import { approveConstitutionVersion, createConstitutionVersion, ensureConstituti
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
+import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1293,13 +1294,6 @@ function sanitizeUser(user) {
     createdAt: user.created_at,
     sessionExpiresAt: user.expires_at || null
   };
-}
-
-const PROJECT200_ALLOWED_PROFILES = new Set(["Rose", "Alberto", "Lucas", "Thainan"]);
-
-function normalizeProject200Profile(value) {
-  const input = String(value || "").trim();
-  return PROJECT200_ALLOWED_PROFILES.has(input) ? input : "";
 }
 
 async function ensureProject200ProfileLinksSchema() {
@@ -2576,6 +2570,13 @@ async function handleProject200ActionInterpret(request, response) {
   }
 
   try {
+    const authUser = await requireAuth(request, response);
+    if (!authUser) {
+      return;
+    }
+
+    const profileNames = await listProject200ProfileNames(authUser.id);
+    const assigneePrompt = profileNames.length ? profileNames.join("|") : PROJECT200_DEFAULT_PROFILE_NAME;
     const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
     const completion = await createChatCompletion(apiKey, {
       model,
@@ -2583,7 +2584,7 @@ async function handleProject200ActionInterpret(request, response) {
       messages: [
         {
           role: "system",
-          content: "Interprete pedido de tarefa em pt-BR. Responda JSON puro com: title(max 25 chars, minimo possivel), startHour(0-23), startMinute(0-59), endHour(0-23), endMinute(0-59), repeatRule(none|daily|custom), repeatDays(array com 0=dom..6=sab), assignee(Rose|Alberto|Lucas|Thainan|Geral|\"\"), assigneeDetected(boolean). Se horario final nao ficar claro, infira pelo contexto da tarefa (ex: treino/caminhada tende a 60-120 min; higiene matinal 20-60 min; leitura/estudo 30-90 min), mantendo inicio e fim coerentes. Se ainda assim faltar horario: use proxima hora cheia e +1h no fim. Se pessoa nao for citada: assignee vazio e assigneeDetected false. Se texto disser todo dia: daily. Se citar dias da semana (ex: terÃ§a e quinta): custom com repeatDays. Se nao mencionar recorrencia: none."
+          content: `Interprete pedido de tarefa em pt-BR. Responda JSON puro com: title(max 25 chars, minimo possivel), startHour(0-23), startMinute(0-59), endHour(0-23), endMinute(0-59), repeatRule(none|daily|custom), repeatDays(array com 0=dom..6=sab), assignee(${assigneePrompt}|""), assigneeDetected(boolean). Se horario final nao ficar claro, infira pelo contexto da tarefa (ex: treino/caminhada tende a 60-120 min; higiene matinal 20-60 min; leitura/estudo 30-90 min), mantendo inicio e fim coerentes. Se ainda assim faltar horario: use proxima hora cheia e +1h no fim. Se pessoa nao for citada: assignee vazio e assigneeDetected false. Se texto disser todo dia: daily. Se citar dias da semana: custom com repeatDays. Se nao mencionar recorrencia: none.`
         },
         { role: "user", content: text.slice(0, 1200) }
       ]
@@ -2624,7 +2625,9 @@ async function handleProject200ActionInterpret(request, response) {
     const repeatDays = Array.isArray(parsed?.repeatDays)
       ? [...new Set(parsed.repeatDays.map((day) => Number(day)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))].sort((a, b) => a - b)
       : [];
-    const assignee = String(parsed?.assignee || "").trim();
+    const assignee = String(parsed?.assignee || "").trim()
+      ? await resolveProject200ProfileName(authUser.id, parsed?.assignee, { fallbackToDefault: false }).catch(() => "")
+      : "";
     const assigneeDetected = Boolean(parsed?.assigneeDetected && assignee);
 
     sendJson(response, 200, {
@@ -8802,18 +8805,12 @@ const server = http.createServer(async (request, response) => {
         .normalize("NFC")
         .replace(/\s+/gu, " ")
         .trim();
-      const assignedProfile = normalizeProject200Profile(body.profile);
+      const assignedProfile = await resolveProject200ProfileName(authUser.id, body.profile, { fallbackToDefault: false });
 
       if (!usernameInput || usernameInput.length < 2) {
         sendJson(response, 400, { error: "Nome de usuário inválido." });
         return;
       }
-
-      if (!assignedProfile) {
-        sendJson(response, 400, { error: "Perfil inválido para vínculo." });
-        return;
-      }
-
       const targetUser = await findUserByUsernameOrNameInput(usernameInput);
 
       if (!targetUser) {
@@ -8846,6 +8843,77 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Erro ao salvar vínculo."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/profiles") {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+
+      const profiles = await listProject200Profiles(authUser.id);
+      sendJson(response, 200, { ok: true, profiles });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: error instanceof Error ? error.message : "Erro ao carregar usuários."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/profiles") {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const profile = await createProject200Profile(authUser.id, body);
+      sendJson(response, 201, { ok: true, profile });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Erro ao criar usuário."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/profiles/reassign") {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const summary = await reassignProject200ProfileTasks(authUser.id, body);
+      sendJson(response, 200, { ok: true, summary });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Erro ao copiar tarefas."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/200/profiles/")) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+
+      const profileId = decodeURIComponent(pathname.slice("/api/200/profiles/".length));
+      const result = await deleteProject200Profile(authUser.id, profileId);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Erro ao excluir usuário."
       });
     }
     return;

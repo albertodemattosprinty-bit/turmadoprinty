@@ -28,17 +28,22 @@
       <p id="project200LoginMessage" class="project-login-message"></p>
     </div>
   </section>
-  <section class="project-login-overlay" id="profileLinkOverlay" aria-hidden="true">
+  <section class="project-login-overlay" id="profileManageOverlay" aria-hidden="true">
     <div class="project-login-card">
-      <h2>Vincular Usuário</h2>
-      <p id="profileLinkTargetLabel">Perfil selecionado</p>
-      <form id="profileLinkForm">
-        <label for="profileLinkUsername">Nome de usuário</label>
-        <input id="profileLinkUsername" type="text" autocomplete="username" required />
-        <button type="submit" class="primary-btn">Vincular</button>
-        <button type="button" class="ghost-btn" id="profileLinkCancel">Cancelar</button>
-      </form>
-      <p id="profileLinkMessage" class="project-login-message"></p>
+      <h2 id="profileManageTitle">Gerenciar usuário</h2>
+      <p id="profileManageTargetLabel">Usuário selecionado</p>
+      <div class="profile-manage-section">
+        <label for="profileReassignSelect">Copiar tarefas para</label>
+        <select id="profileReassignSelect" class="text-field profile-manage-select"></select>
+        <button type="button" class="primary-btn" id="profileReassignConfirm">Copiar tarefas</button>
+      </div>
+      <div class="profile-manage-section">
+        <label for="profileDeleteConfirmInput">Digite Excluir para liberar</label>
+        <input id="profileDeleteConfirmInput" type="text" autocomplete="off" />
+        <button type="button" class="primary-btn profile-delete-btn is-disabled" id="profileDeleteConfirm">Excluir</button>
+      </div>
+      <button type="button" class="ghost-btn" id="profileManageCancel">Cancelar</button>
+      <p id="profileManageMessage" class="project-login-message"></p>
     </div>
   </section>
   <section class="workspace-modal simple-modal" id="sleepConfigModal" aria-hidden="true" aria-label="Horario do sono">
@@ -92,20 +97,7 @@
     <button class="home-running-btn" id="openRunningTaskModal" type="button" data-open-modal="runningTaskModal" aria-label="Tarefa em execução" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
     </button>
-    <section class="profile-selector profile-footer" aria-label="Usuários">
-      <button class="profile-chip" type="button" data-profile="Alberto" aria-label="Alberto">
-        <img class="task-avatar" src="/200/avatars/alberto.png" alt="Alberto" />
-      </button>
-      <button class="profile-chip active" type="button" data-profile="Rose" aria-label="Rose">
-        <img class="task-avatar" src="/200/avatars/rose.png" alt="Rose" />
-      </button>
-      <button class="profile-chip" type="button" data-profile="Lucas" aria-label="Lucas">
-        <img class="task-avatar" src="/200/avatars/lucas.png" alt="Lucas" />
-      </button>
-      <button class="profile-chip" type="button" data-profile="Thainan" aria-label="Thainan">
-        <img class="task-avatar" src="/200/avatars/thainan.png" alt="Thainan" />
-      </button>
-    </section>
+    <section class="profile-selector profile-footer" id="profileFooter" aria-label="Usuários"></section>
   </main>
 
   <section class="workspace-modal simple-modal" id="runningTaskModal" aria-hidden="true" aria-label="Tarefa em execução">
@@ -631,6 +623,26 @@
         <strong>Exportar</strong>
         <span class="running-music-default-bottom">Substitui o /200 da conta destino</span>
       </button>
+      <button class="running-music-default-option" type="button" id="openProject200CreateProfileModal">
+        <span class="running-music-default-top">Adicionar um novo usuário local do /200</span>
+        <strong>Criar usuario</strong>
+        <span class="running-music-default-bottom">Cada usuário terá as próprias tarefas e persona</span>
+      </button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal" id="project200CreateProfileModal" aria-hidden="true" aria-label="Criar usuário do Projeto 200">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
+    <div class="finance-content options-content">
+      <div class="running-music-default-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Criar usuario</span>
+      </div>
+      <p class="options-note">Digite o nome do novo usuário para usar no fluxo de tarefas do <strong>/200</strong>.</p>
+      <input class="text-field options-text-field" type="text" id="project200CreateProfileName" maxlength="40" autocomplete="off" placeholder="Nome do usuário" />
+      <p class="finance-status" id="project200CreateProfileMessage" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="project200CreateProfileConfirm">Criar usuario</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>
   </section>
@@ -884,12 +896,7 @@
           <form id="historyTextForm">
             <section class="wizard-step active" data-history-text-step="1">
               <label class="step-label">Quem está falando?</label>
-              <div class="history-avatar-grid" id="historyTextAvatarGrid">
-                <button class="history-avatar-btn" type="button" data-history-speaker="Rose"><img class="task-avatar" src="/200/avatars/rose.png" alt="Rose" /><span>Rose</span></button>
-                <button class="history-avatar-btn" type="button" data-history-speaker="Alberto"><img class="task-avatar" src="/200/avatars/alberto.png" alt="Alberto" /><span>Alberto</span></button>
-                <button class="history-avatar-btn" type="button" data-history-speaker="Lucas"><img class="task-avatar" src="/200/avatars/lucas.png" alt="Lucas" /><span>Lucas</span></button>
-                <button class="history-avatar-btn" type="button" data-history-speaker="Thainan"><img class="task-avatar" src="/200/avatars/thainan.png" alt="Thainan" /><span>Thainan</span></button>
-              </div>
+              <div class="history-avatar-grid" id="historyTextAvatarGrid"></div>
             </section>
             <section class="wizard-step" data-history-text-step="2">
               <label class="step-label">Fale com o microfone</label>
@@ -925,7 +932,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260529-linkfix"></script>
+  <script type="module" src="/200/project.js?v=20260620-profiles"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

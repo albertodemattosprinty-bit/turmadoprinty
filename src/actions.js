@@ -1,13 +1,13 @@
 import crypto from "node:crypto";
 
 import { query } from "./db.js";
+import { PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName } from "./project200-profiles.js";
 
 const MAX_OCCURRENCES = 370;
 const ACTION_STATUS_PENDING = "PENDING";
 const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
-const DEFAULT_ASSIGNEE = "Geral";
-const ALLOWED_ASSIGNEES = new Set(["Rose", "Geral", "Alberto", "Lucas", "Thainan"]);
+const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
 const DEFAULT_CATEGORY_ID = "";
 
 function toIso(value) {
@@ -38,14 +38,10 @@ function normalizeAssignee(value) {
   if (!input) {
     return DEFAULT_ASSIGNEE;
   }
-
-  for (const name of ALLOWED_ASSIGNEES) {
-    if (name.toLowerCase() === input.toLowerCase()) {
-      return name;
-    }
+  if (input.localeCompare("Geral", "pt-BR", { sensitivity: "accent" }) === 0) {
+    return DEFAULT_ASSIGNEE;
   }
-
-  throw new Error("Pessoa da tarefa invalida.");
+  return input;
 }
 
 function normalizeCategoryId(value) {
@@ -327,7 +323,7 @@ export async function createUserAction(userId, payload) {
   await ensureActionsSchema();
 
   const title = String(payload?.title || "").trim();
-  const assignee = normalizeAssignee(payload?.assignee);
+  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
   const categoryId = normalizeCategoryId(payload?.categoryId);
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
@@ -445,7 +441,7 @@ export async function updateUserAction(userId, actionId, payload) {
   }
 
   const title = String(payload?.title || "").trim();
-  const assignee = normalizeAssignee(payload?.assignee);
+  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
   const categoryId = normalizeCategoryId(payload?.categoryId || action?.categoryId);
   const occurrence = Array.isArray(payload?.occurrences) && payload.occurrences.length
     ? payload.occurrences[0]

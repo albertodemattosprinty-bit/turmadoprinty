@@ -1,4 +1,5 @@
 import { query } from "./db.js";
+import { PROJECT200_DEFAULT_PROFILE_NAME, normalizeStoredProject200ProfileName, resolveProject200ProfileName } from "./project200-profiles.js";
 
 function toIso(value) {
   if (!value) {
@@ -40,7 +41,7 @@ function normalizeSystemEntry(row) {
   return {
     id: row.id,
     type: row.event_type || "start",
-    assignee: row.assignee || "Geral",
+    assignee: normalizeStoredProject200ProfileName(row.assignee),
     taskTitle: row.task_title || "",
     occurredAt: toIso(row.occurred_at) || toIso(row.created_at),
     percent: Number(row.percent || 0),
@@ -53,7 +54,7 @@ function normalizeSystemEntry(row) {
 function normalizeTextEntry(row) {
   return {
     id: row.id,
-    speaker: row.speaker || "Rose",
+    speaker: normalizeStoredProject200ProfileName(row.speaker),
     title: row.title || "Texto novo",
     text: row.body_text || "",
     createdAt: toIso(row.occurred_at) || toIso(row.created_at)
@@ -90,7 +91,7 @@ export async function listProject200History(userId, { from, to }) {
 export async function createProject200SystemEvent(userId, payload) {
   await ensureProject200HistorySchema();
   const eventType = String(payload?.type || "start").trim().toLowerCase();
-  const assignee = String(payload?.assignee || "Geral").trim() || "Geral";
+  const assignee = await resolveProject200ProfileName(userId, String(payload?.assignee || PROJECT200_DEFAULT_PROFILE_NAME).trim(), { fallbackToDefault: true });
   const taskTitle = String(payload?.taskTitle || "").trim();
   const occurredAt = toIso(payload?.occurredAt) || new Date().toISOString();
   const scopeDate = String(payload?.scopeDate || "").trim() || null;
@@ -133,7 +134,7 @@ export async function createProject200SystemEvent(userId, payload) {
 
 export async function createProject200TextEntry(userId, payload) {
   await ensureProject200HistorySchema();
-  const speaker = String(payload?.speaker || "Rose").trim() || "Rose";
+  const speaker = await resolveProject200ProfileName(userId, String(payload?.speaker || PROJECT200_DEFAULT_PROFILE_NAME).trim(), { fallbackToDefault: true });
   const title = String(payload?.title || "Texto novo").trim() || "Texto novo";
   const text = String(payload?.text || "").trim();
   const occurredAt = toIso(payload?.createdAt) || new Date().toISOString();

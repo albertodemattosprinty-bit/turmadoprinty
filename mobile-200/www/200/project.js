@@ -11,7 +11,7 @@ const actionStatuses = {
   inProgress: "IN_PROGRESS",
   completed: "COMPLETED"
 };
-const assigneeOptions = ["Rose", "Geral", "Alberto", "Lucas", "Thainan"];
+const defaultProjectProfileName = "Usuario";
 const statsScopes = [
   { key: "general", label: "Geral" },
   { key: "today", label: "Hoje" },
@@ -31,13 +31,13 @@ const statsScopes = [
   { key: "month-11", label: "Novembro" },
   { key: "month-12", label: "Dezembro" }
 ];
-const actionAvatarByAssignee = {
-  Rose: "/200/avatars/rose.png",
-  Geral: "/200/avatars/familyplan.png",
-  Alberto: "/200/avatars/alberto.png",
-  Lucas: "/200/avatars/lucas.png",
-  Thainan: "/200/avatars/thainan.png",
-  Wilton: "/200/avatars/wilton.png"
+const avatarPresetToPath = {
+  rose: "/200/avatars/rose.png",
+  alberto: "/200/avatars/alberto.png",
+  lucas: "/200/avatars/lucas.png",
+  thainan: "/200/avatars/thainan.png",
+  wilton: "/200/avatars/wilton.png",
+  "default-user": ""
 };
 const taskCategoryDefinitions = [
   { id: "fe_espiritualidade", name: "Fé" },
@@ -107,8 +107,6 @@ const recurrenceDays = {
   weekly: [],
   weekdays: [1, 2, 3, 4, 5]
 };
-const historySpeakerOptions = ["Rose", "Alberto", "Lucas", "Thainan"];
-const selectableProfiles = ["Rose", "Alberto", "Lucas", "Thainan"];
 const runningMusicStationSeeds = {
   Calm: [
     "Untitled (1).mp3", "Untitled (2).mp3", "Untitled (16).mp3", "Untitled (17).mp3",
@@ -401,13 +399,20 @@ const project200LoginForm = document.getElementById("project200LoginForm");
 const project200Username = document.getElementById("project200Username");
 const project200Password = document.getElementById("project200Password");
 const project200LoginMessage = document.getElementById("project200LoginMessage");
-const profileLinkOverlay = document.getElementById("profileLinkOverlay");
-const profileLinkForm = document.getElementById("profileLinkForm");
-const profileLinkUsername = document.getElementById("profileLinkUsername");
-const profileLinkTargetLabel = document.getElementById("profileLinkTargetLabel");
-const profileLinkMessage = document.getElementById("profileLinkMessage");
-const profileLinkCancel = document.getElementById("profileLinkCancel");
-const profileButtons = Array.from(document.querySelectorAll("[data-profile]"));
+const profileManageOverlay = document.getElementById("profileManageOverlay");
+const profileManageTitle = document.getElementById("profileManageTitle");
+const profileManageTargetLabel = document.getElementById("profileManageTargetLabel");
+const profileManageMessage = document.getElementById("profileManageMessage");
+const profileManageCancel = document.getElementById("profileManageCancel");
+const profileDeleteConfirmInput = document.getElementById("profileDeleteConfirmInput");
+const profileDeleteConfirmButton = document.getElementById("profileDeleteConfirm");
+const profileReassignSelect = document.getElementById("profileReassignSelect");
+const profileReassignConfirmButton = document.getElementById("profileReassignConfirm");
+const profileFooter = document.getElementById("profileFooter");
+const openProject200CreateProfileModalButton = document.getElementById("openProject200CreateProfileModal");
+const project200CreateProfileNameInput = document.getElementById("project200CreateProfileName");
+const project200CreateProfileMessage = document.getElementById("project200CreateProfileMessage");
+const project200CreateProfileConfirmButton = document.getElementById("project200CreateProfileConfirm");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
@@ -458,7 +463,7 @@ let platformNameLastSpeechAt = 0;
 let overlapCarouselTimer = null;
 let profileHoldTimer = null;
 let profileLongPressHandledProfile = "";
-let profileLinkTarget = "";
+let profileManageTargetId = "";
 let profilePressStartedAt = 0;
 let profilePressProfile = "";
 let sleepNavHoldTimer = null;
@@ -536,12 +541,13 @@ const state = {
   actions: [],
   historySystem: [],
   historyTexts: [],
-  selectedProfile: "Rose",
+  profiles: [],
+  selectedProfile: defaultProjectProfileName,
   profileLock: "",
   historyOffset: 0,
   historyTextComposer: {
     step: 1,
-    speaker: "Rose",
+    speaker: defaultProjectProfileName,
     liveText: "",
     organizedText: "",
     organizedTitle: "",
@@ -630,6 +636,56 @@ const state = {
   runningLocalStarts: {}
 };
 
+function buildDefaultProfileAvatarDataUrl() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+      <defs>
+        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#e9f2ff"/>
+          <stop offset="100%" stop-color="#8ec5ff"/>
+        </linearGradient>
+      </defs>
+      <rect width="96" height="96" rx="48" fill="url(#g)"/>
+      <circle cx="48" cy="35" r="17" fill="#0b3da8"/>
+      <path d="M22 79c4-16 15-24 26-24s22 8 26 24" fill="#0b3da8"/>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+const defaultProfileAvatarDataUrl = buildDefaultProfileAvatarDataUrl();
+
+function getProfilesList() {
+  return Array.isArray(state.profiles) ? state.profiles : [];
+}
+
+function getDefaultProfile() {
+  return getProfilesList().find((profile) => profile?.isImmutable) || getProfilesList()[0] || null;
+}
+
+function getDefaultProfileName() {
+  return getDefaultProfile()?.name || defaultProjectProfileName;
+}
+
+function getProfileByName(name) {
+  const input = String(name || "").trim();
+  if (!input) {
+    return getDefaultProfile();
+  }
+  return getProfilesList().find((profile) => String(profile?.name || "").localeCompare(input, "pt-BR", { sensitivity: "accent" }) === 0) || null;
+}
+
+function getProfileById(profileId) {
+  const input = String(profileId || "").trim();
+  return getProfilesList().find((profile) => String(profile?.id || "") === input) || null;
+}
+
+function getProfileAvatarPath(profileOrName) {
+  const profile = typeof profileOrName === "string" ? getProfileByName(profileOrName) : profileOrName;
+  const preset = String(profile?.avatarPreset || "").trim().toLowerCase();
+  return avatarPresetToPath[preset] || defaultProfileAvatarDataUrl;
+}
+
 function loadSleepConfig() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(sleepConfigKey) || "{}");
@@ -657,18 +713,19 @@ function setToken(token) {
 }
 
 function readSelectedProfile() {
-  const saved = String(window.localStorage.getItem(projectProfileKey) || "Rose");
-  return selectableProfiles.includes(saved) ? saved : "Rose";
+  const saved = String(window.localStorage.getItem(projectProfileKey) || "");
+  const matched = getProfileByName(saved);
+  return matched?.name || getDefaultProfileName();
 }
 
 function refreshProfileLockFromAuth(authUser) {
   const lockedProfile = String(authUser?.project200Profile || "").trim();
-  state.profileLock = selectableProfiles.includes(lockedProfile) ? lockedProfile : "";
+  state.profileLock = lockedProfile;
 }
 
 function renderProfileFooterVisibility() {
   const lockedProfile = String(state.profileLock || "").trim();
-  profileButtons.forEach((button) => {
+  profileFooter?.querySelectorAll("[data-profile]").forEach((button) => {
     if (!lockedProfile) {
       button.hidden = false;
       return;
@@ -678,18 +735,66 @@ function renderProfileFooterVisibility() {
 }
 
 function applySelectedProfile(profile) {
-  if (state.profileLock && profile !== state.profileLock) {
+  const matched = getProfileByName(profile);
+  const next = matched?.name || getDefaultProfileName();
+  if (state.profileLock && next !== state.profileLock) {
     return;
   }
-  const next = selectableProfiles.includes(profile) ? profile : "Rose";
   state.selectedProfile = next;
   document.body.dataset.profile = next;
   window.localStorage.setItem(projectProfileKey, next);
-  profileButtons.forEach((button) => {
+  profileFooter?.querySelectorAll("[data-profile]").forEach((button) => {
     button.classList.toggle("active", button.dataset.profile === next);
   });
   renderProfileFooterVisibility();
   renderHomeRunningTask();
+}
+
+function renderProfileFooter() {
+  if (!profileFooter) {
+    return;
+  }
+  profileFooter.innerHTML = getProfilesList().map((profile) => `
+    <button class="profile-chip${profile.name === state.selectedProfile ? " active" : ""}" type="button" data-profile="${escapeHtml(profile.name)}" aria-label="${escapeHtml(profile.name)}">
+      <img class="task-avatar" src="${getProfileAvatarPath(profile)}" alt="${escapeHtml(profile.name)}" />
+    </button>
+  `).join("");
+  renderProfileFooterVisibility();
+}
+
+function renderHistorySpeakerSelectionOptions() {
+  if (!historyTextAvatarGrid) {
+    return;
+  }
+  historyTextAvatarGrid.innerHTML = getProfilesList().map((profile) => `
+    <button class="history-avatar-btn${profile.name === state.historyTextComposer.speaker ? " active" : ""}" type="button" data-history-speaker="${escapeHtml(profile.name)}">
+      <img class="task-avatar" src="${getProfileAvatarPath(profile)}" alt="${escapeHtml(profile.name)}" />
+      <span>${escapeHtml(profile.name)}</span>
+    </button>
+  `).join("");
+}
+
+function renderProfileManageOverlay() {
+  const profile = getProfileById(profileManageTargetId) || getProfileByName(state.selectedProfile);
+  if (!profile) {
+    return;
+  }
+  if (profileManageTitle) {
+    profileManageTitle.textContent = `Gerenciar ${profile.name}`;
+  }
+  if (profileManageTargetLabel) {
+    profileManageTargetLabel.textContent = `Usuário selecionado: ${profile.name}`;
+  }
+  if (profileReassignSelect) {
+    profileReassignSelect.innerHTML = getProfilesList().map((item) => `
+      <option value="${escapeHtml(item.id)}"${item.id === profile.id ? " selected" : ""}>${escapeHtml(item.name)}</option>
+    `).join("");
+  }
+  const canDelete = !profile.isImmutable && String(profileDeleteConfirmInput?.value || "").trim() === "Excluir";
+  profileDeleteConfirmButton?.classList.toggle("is-disabled", !canDelete);
+  if (profileDeleteConfirmButton) {
+    profileDeleteConfirmButton.disabled = !canDelete;
+  }
 }
 
 function todayStart() {
@@ -2571,19 +2676,21 @@ function normalizeAssigneeName(value) {
   const input = String(value || "").trim();
 
   if (!input) {
-    return "Geral";
+    return getDefaultProfileName();
   }
-
-  const found = assigneeOptions.find((name) => name.toLowerCase() === input.toLowerCase());
-  return found || "Geral";
+  if (input.toLowerCase() === "geral") {
+    return getDefaultProfileName();
+  }
+  const found = getProfileByName(input);
+  return found?.name || getDefaultProfileName();
 }
 
 function getWizardAssigneeName() {
-  return normalizeAssigneeName(state.selectedProfile || "Rose");
+  return normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
 }
 
 function getActionAvatarPath(assignee) {
-  return actionAvatarByAssignee[assignee] || actionAvatarByAssignee.Geral;
+  return getProfileAvatarPath(assignee);
 }
 
 function getTaskCategoryIconPath(categoryId) {
@@ -4219,9 +4326,6 @@ async function ensureProject200Session() {
       return false;
     }
     refreshProfileLockFromAuth(payload?.user || null);
-    if (state.profileLock) {
-      applySelectedProfile(state.profileLock);
-    }
     project200LoginOverlay?.classList.remove("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
     return true;
@@ -4233,35 +4337,108 @@ async function ensureProject200Session() {
   }
 }
 
-async function createProfileLink(username, profile) {
-  const payload = await apiRequest("/api/200/profile-links", {
+async function loadProject200Profiles() {
+  const payload = await apiRequest("/api/200/profiles");
+  state.profiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
+  state.profileLock = getProfileByName(state.profileLock)?.name || "";
+  applySelectedProfile(state.profileLock || readSelectedProfile());
+  renderProfileFooter();
+  renderHistorySpeakerSelectionOptions();
+}
+
+async function createProject200ProfileFromModal() {
+  const name = String(project200CreateProfileNameInput?.value || "").trim();
+  if (!name) {
+    if (project200CreateProfileMessage) {
+      project200CreateProfileMessage.textContent = "Digite o nome do usuário.";
+    }
+    return;
+  }
+  const payload = await apiRequest("/api/200/profiles", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, profile })
+    body: JSON.stringify({ name })
   });
-  return payload?.link || null;
+  if (project200CreateProfileMessage) {
+    project200CreateProfileMessage.textContent = "";
+  }
+  if (project200CreateProfileNameInput) {
+    project200CreateProfileNameInput.value = "";
+  }
+  if (payload?.profile) {
+    state.profiles = [...getProfilesList(), payload.profile];
+  }
+  renderProfileFooter();
+  renderHistorySpeakerSelectionOptions();
+  closeModal("project200CreateProfileModal");
 }
 
-function openProfileLinkOverlay(profile) {
-  profileLinkTarget = String(profile || "").trim();
-  if (!profileLinkTarget) return;
-  if (profileLinkTargetLabel) {
-    profileLinkTargetLabel.textContent = `Perfil selecionado: ${profileLinkTarget}`;
+function openProfileManageOverlay(profileName) {
+  const profile = getProfileByName(profileName);
+  profileManageTargetId = String(profile?.id || "").trim();
+  if (!profileManageTargetId) {
+    return;
   }
-  if (profileLinkMessage) {
-    profileLinkMessage.textContent = "";
+  if (profileManageMessage) {
+    profileManageMessage.textContent = "";
   }
-  if (profileLinkUsername) {
-    profileLinkUsername.value = "";
+  if (profileDeleteConfirmInput) {
+    profileDeleteConfirmInput.value = "";
   }
-  profileLinkOverlay?.classList.add("active");
-  profileLinkOverlay?.setAttribute("aria-hidden", "false");
-  window.setTimeout(() => profileLinkUsername?.focus(), 40);
+  renderProfileManageOverlay();
+  profileManageOverlay?.classList.add("active");
+  profileManageOverlay?.setAttribute("aria-hidden", "false");
+  window.setTimeout(() => profileReassignSelect?.focus(), 40);
 }
 
-function closeProfileLinkOverlay() {
-  profileLinkOverlay?.classList.remove("active");
-  profileLinkOverlay?.setAttribute("aria-hidden", "true");
+function closeProfileManageOverlay() {
+  profileManageOverlay?.classList.remove("active");
+  profileManageOverlay?.setAttribute("aria-hidden", "true");
+  profileManageTargetId = "";
+}
+
+async function deleteManagedProfile() {
+  const profile = getProfileById(profileManageTargetId);
+  if (!profile) {
+    return;
+  }
+  await apiRequest(`/api/200/profiles/${encodeURIComponent(profile.id)}`, {
+    method: "DELETE"
+  });
+  state.profiles = getProfilesList().filter((item) => item.id !== profile.id);
+  if (state.selectedProfile === profile.name) {
+    applySelectedProfile(getDefaultProfileName());
+  }
+  if (state.historyTextComposer.speaker === profile.name) {
+    state.historyTextComposer.speaker = getDefaultProfileName();
+  }
+  renderProfileFooter();
+  renderHistorySpeakerSelectionOptions();
+  closeProfileManageOverlay();
+  await loadActions();
+}
+
+async function reassignManagedProfileTasks() {
+  const source = getProfileById(profileManageTargetId);
+  const targetId = String(profileReassignSelect?.value || "").trim();
+  const target = getProfileById(targetId);
+  if (!source || !target) {
+    return;
+  }
+  const payload = await apiRequest("/api/200/profiles/reassign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sourceProfileId: source.id,
+      targetProfileId: target.id
+    })
+  });
+  if (profileManageMessage) {
+    profileManageMessage.textContent = payload?.summary
+      ? `${payload.summary.movedTasks} tarefa(s) agora estão com ${payload.summary.targetProfileName}.`
+      : "";
+  }
+  await loadActions();
 }
 
 function renderRepeatControls() {
@@ -5330,7 +5507,7 @@ function renderStatsGoals() {
 function buildStatsRankingFromSummary() {
   const byAssignee = state.statsSummary?.byAssignee || {};
   const ranking = [];
-  const orderedNames = assigneeOptions;
+  const orderedNames = getProfilesList().map((profile) => profile.name);
   for (const name of orderedNames) {
     const item = byAssignee[name] || { totalMinutes: 0, completedMinutes: 0 };
     const total = Number(item.totalMinutes || 0);
@@ -5345,7 +5522,7 @@ function buildStatsRankingFromSummary() {
       lateStartMinutes
     };
 
-    if (name === "Geral") {
+    if (name === getDefaultProfileName()) {
       state.statsGeneral = payload;
     } else {
       ranking.push(payload);
@@ -5367,7 +5544,7 @@ function buildStatsRankingFromSummary() {
 
 function renderStatsRanking() {
   const general = state.statsGeneral || { percent: 0, completed: 0, total: 0, lateStartMinutes: 0 };
-  statsGeneralAvatar.src = actionAvatarByAssignee.Geral;
+  statsGeneralAvatar.src = getActionAvatarPath(getDefaultProfileName());
   statsGeneralDetail.textContent = general.lateStartMinutes > 0
     ? `${general.percent}% • atraso ${general.lateStartMinutes}m`
     : `${general.percent}%`;
@@ -5655,7 +5832,7 @@ function hasSystemEventForTask(actionId, type) {
 }
 
 function buildSystemMessage(entry) {
-  const person = escapeHtml(entry.assignee || "Geral");
+  const person = escapeHtml(entry.assignee || getDefaultProfileName());
   const task = `<strong>${escapeHtml(entry.taskTitle || "Tarefa")}</strong>`;
   if (entry.type === "start") {
     if (Number(entry.lateStartMinutes || 0) > 0) {
@@ -5797,7 +5974,7 @@ function registerDayCloseEventIfNeeded() {
   }
   void pushSystemHistoryEvent({
     type: "day_close",
-    assignee: "Geral",
+    assignee: getDefaultProfileName(),
     pendingCount: pending.length,
     percent,
     scopeDate: dateKey,
@@ -5845,6 +6022,7 @@ function setHistoryTextStep(step) {
 }
 
 function renderHistorySpeakerSelection() {
+  renderHistorySpeakerSelectionOptions();
   historyTextAvatarGrid?.querySelectorAll("[data-history-speaker]").forEach((button) => {
     button.classList.toggle("active", button.dataset.historySpeaker === state.historyTextComposer.speaker);
   });
@@ -5857,7 +6035,7 @@ function renderHistoryLiveText() {
 function openHistoryTextComposer() {
   state.historyTextComposer = {
     step: 1,
-    speaker: "Rose",
+    speaker: state.selectedProfile || getDefaultProfileName(),
     liveText: "",
     organizedText: "",
     organizedTitle: "",
@@ -6826,7 +7004,7 @@ historyTextAvatarGrid?.addEventListener("click", (event) => {
   if (!button) {
     return;
   }
-  state.historyTextComposer.speaker = button.dataset.historySpeaker || "Rose";
+  state.historyTextComposer.speaker = button.dataset.historySpeaker || getDefaultProfileName();
   renderHistorySpeakerSelection();
 });
 
@@ -7203,63 +7381,115 @@ applySelectedProfile(readSelectedProfile());
 void (async () => {
   const ok = await ensureProject200Session();
   if (ok) {
+    await loadProject200Profiles();
     await loadActions();
   } else {
     renderHomeRunningTask();
   }
 })();
 
-profileButtons.forEach((button) => {
-  button.addEventListener("contextmenu", (event) => {
+profileFooter?.addEventListener("contextmenu", (event) => {
+  const button = event.target.closest("[data-profile]");
+  if (button) {
     event.preventDefault();
-  });
-  const avatar = button.querySelector("img");
-  if (avatar) {
-    avatar.setAttribute("draggable", "false");
   }
-  button.addEventListener("click", () => {
-    const profile = String(button.dataset.profile || "Rose");
-    if (profileLongPressHandledProfile === profile) {
-      profileLongPressHandledProfile = "";
-      return;
-    }
-    applySelectedProfile(profile);
-    renderActions();
-  });
-  button.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    const profile = String(button.dataset.profile || "").trim();
-    if (!profile) return;
-    profilePressStartedAt = Date.now();
-    profilePressProfile = profile;
-    if (profileHoldTimer) {
-      window.clearTimeout(profileHoldTimer);
-      profileHoldTimer = null;
-    }
-  });
-  button.addEventListener("pointerup", () => {
-    const heldMs = profilePressStartedAt ? (Date.now() - profilePressStartedAt) : 0;
-    const profile = profilePressProfile;
+});
+profileFooter?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-profile]");
+  if (!button) {
+    return;
+  }
+  const profile = String(button.dataset.profile || "").trim();
+  if (!profile) {
+    return;
+  }
+  if (profileLongPressHandledProfile === profile) {
+    profileLongPressHandledProfile = "";
+    return;
+  }
+  applySelectedProfile(profile);
+  renderActions();
+});
+profileFooter?.addEventListener("pointerdown", (event) => {
+  const button = event.target.closest("[data-profile]");
+  if (!button) {
+    return;
+  }
+  event.preventDefault();
+  profilePressStartedAt = Date.now();
+  profilePressProfile = String(button.dataset.profile || "").trim();
+});
+profileFooter?.addEventListener("pointerup", (event) => {
+  const button = event.target.closest("[data-profile]");
+  if (!button) {
+    return;
+  }
+  const heldMs = profilePressStartedAt ? (Date.now() - profilePressStartedAt) : 0;
+  const profile = profilePressProfile;
+  profilePressStartedAt = 0;
+  profilePressProfile = "";
+  if (heldMs >= 500 && profile) {
+    profileLongPressHandledProfile = profile;
+    openProfileManageOverlay(profile);
+  }
+});
+["pointerleave", "pointercancel"].forEach((evt) => {
+  profileFooter?.addEventListener(evt, () => {
     profilePressStartedAt = 0;
     profilePressProfile = "";
-    if (heldMs >= 500 && profile) {
-      profileLongPressHandledProfile = profile;
-      openProfileLinkOverlay(profile);
-    }
-  });
-  ["pointerleave", "pointercancel"].forEach((evt) => {
-    button.addEventListener(evt, () => {
-      profilePressStartedAt = 0;
-      profilePressProfile = "";
-      if (profileHoldTimer) {
-        window.clearTimeout(profileHoldTimer);
-        profileHoldTimer = null;
-      }
-    });
   });
 });
 
-profileLinkCancel?.addEventListener("click", closeProfileLinkOverlay);
+profileManageCancel?.addEventListener("click", closeProfileManageOverlay);
+profileDeleteConfirmInput?.addEventListener("input", renderProfileManageOverlay);
+profileDeleteConfirmButton?.addEventListener("click", () => {
+  void (async () => {
+    try {
+      await deleteManagedProfile();
+    } catch (error) {
+      if (profileManageMessage) {
+        profileManageMessage.textContent = error instanceof Error ? error.message : "Falha ao excluir usuário.";
+      }
+    }
+  })();
+});
+profileReassignConfirmButton?.addEventListener("click", () => {
+  void (async () => {
+    try {
+      await reassignManagedProfileTasks();
+    } catch (error) {
+      if (profileManageMessage) {
+        profileManageMessage.textContent = error instanceof Error ? error.message : "Falha ao copiar tarefas.";
+      }
+    }
+  })();
+});
+openProject200CreateProfileModalButton?.addEventListener("click", () => {
+  project200CreateProfileMessage.textContent = "";
+  project200CreateProfileNameInput.value = "";
+  openModal("project200CreateProfileModal");
+});
+project200CreateProfileConfirmButton?.addEventListener("click", () => {
+  void (async () => {
+    try {
+      await createProject200ProfileFromModal();
+    } catch (error) {
+      if (project200CreateProfileMessage) {
+        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuário.";
+      }
+    }
+  })();
+});
+project200CreateProfileNameInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void createProject200ProfileFromModal().catch((error) => {
+      if (project200CreateProfileMessage) {
+        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuário.";
+      }
+    });
+  }
+});
 closeStartDecisionModal?.addEventListener("click", () => closeStartDecisionModalWith("cancel"));
 closePostponeTaskModal?.addEventListener("click", closePostponeTaskModalView);
 closePostponeReplaceModal?.addEventListener("click", closePostponeReplaceModalView);
@@ -7332,38 +7562,6 @@ document.querySelectorAll("[data-postpone-nav]").forEach((button) => {
       }
     });
   });
-});
-
-profileLinkForm?.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const username = String(profileLinkUsername?.value || "").trim();
-  if (!profileLinkTarget) {
-    if (profileLinkMessage) profileLinkMessage.textContent = "Selecione um perfil.";
-    return;
-  }
-  if (!username) {
-    if (profileLinkMessage) profileLinkMessage.textContent = "Digite um nome de usuário.";
-    return;
-  }
-  if (profileLinkMessage) profileLinkMessage.textContent = "Validando...";
-  void (async () => {
-    try {
-      const foundUser = await createProfileLink(username, profileLinkTarget);
-      if (!foundUser?.username) {
-        throw new Error("Usuário não encontrado.");
-      }
-      state.profileLock = "";
-      renderActions();
-      if (profileLinkMessage) profileLinkMessage.textContent = "Vínculo realizado com sucesso.";
-      window.setTimeout(() => {
-        closeProfileLinkOverlay();
-      }, 450);
-    } catch (error) {
-      if (profileLinkMessage) {
-        profileLinkMessage.textContent = error instanceof Error ? error.message : "Falha ao vincular.";
-      }
-    }
-  })();
 });
 
 project200LoginForm?.addEventListener("submit", (event) => {

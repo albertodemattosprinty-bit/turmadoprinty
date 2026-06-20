@@ -5,6 +5,7 @@ import { db } from "./db.js";
 import { ensurePlatformFinanceSchema } from "./platform-finance.js";
 import { ensureProject200HistorySchema } from "./project200-history.js";
 import { ensureProject200MusicSchema } from "./project200-music.js";
+import { ensureProject200ProfilesSchema, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 import { ensureStatsSchema } from "./stats.js";
 
 async function clearTargetProject200Data(client, userId) {
@@ -14,6 +15,7 @@ async function clearTargetProject200Data(client, userId) {
   await client.query("delete from project_200_history_entries where user_id = $1", [userId]);
   await client.query("delete from project200_music_favorites where user_id = $1", [userId]);
   await client.query("delete from project200_music_task_defaults where user_id = $1", [userId]);
+  await client.query("delete from project200_profiles where user_id = $1", [userId]);
   await client.query("delete from platform_daily_reports where user_id = $1", [userId]);
   await client.query("delete from platform_stats_goals where user_id = $1", [userId]);
   await client.query("delete from platform_finance_occurrences where user_id = $1", [userId]);
@@ -42,6 +44,7 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
     ensurePlatformFinanceSchema(),
     ensureProject200HistorySchema(),
     ensureProject200MusicSchema(),
+    ensureProject200ProfilesSchema(),
     ensureStatsSchema()
   ]);
 
@@ -53,6 +56,7 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
       sourceActionsResult,
       sourceOverridesResult,
       sourceRuntimeResult,
+      sourceProfilesResult,
       sourceEntriesResult,
       sourceOccurrencesResult,
       sourceBalancesResult
@@ -60,6 +64,7 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
       client.query("select * from actions where user_id = $1 order by created_at asc, start_at asc", [fromUserId]),
       client.query("select * from action_status_overrides where user_id = $1 order by created_at asc, updated_at asc", [fromUserId]),
       client.query("select * from project200_runtime_state where user_id = $1 limit 1", [fromUserId]),
+      client.query("select * from project200_profiles where user_id = $1 and deleted_at is null order by sort_order asc, created_at asc", [fromUserId]),
       client.query("select * from platform_finance_entries where user_id = $1 order by created_at asc", [fromUserId]),
       client.query("select * from platform_finance_occurrences where user_id = $1 order by created_at asc, occurred_at asc", [fromUserId]),
       client.query("select * from platform_finance_balances where user_id = $1 limit 1", [fromUserId])
@@ -185,6 +190,47 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
         ]
       );
     }
+
+    for (const row of sourceProfilesResult.rows) {
+      await client.query(
+        `
+          insert into project200_profiles (
+            id, user_id, name, avatar_preset, is_immutable, is_system, sort_order, created_at, updated_at, deleted_at
+          )
+          values ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9::timestamptz, null)
+        `,
+        [
+          crypto.randomUUID(),
+          toUserId,
+          row.name,
+          row.avatar_preset || "default-user",
+          Boolean(row.is_immutable),
+          Boolean(row.is_system),
+          Number(row.sort_order || 100),
+          row.created_at || new Date().toISOString(),
+          row.updated_at || row.created_at || new Date().toISOString()
+        ]
+      );
+    }
+
+    await client.query(
+      `
+        update project200_profile_links
+        set assigned_profile = case
+          when exists (
+            select 1
+            from project200_profiles
+            where user_id = $1
+              and deleted_at is null
+              and lower(name) = lower(project200_profile_links.assigned_profile)
+          ) then assigned_profile
+          else $2
+        end,
+        updated_at = now()
+        where user_id = $1
+      `,
+      [toUserId, PROJECT200_DEFAULT_PROFILE_NAME]
+    );
 
     await client.query(
       `

@@ -337,6 +337,27 @@ body.start-decision-open .home-running-btn {
 }
 .project-login-card button { width: 100%; margin-top: 14px; }
 .project-login-message { min-height: 22px; font-weight: 700; }
+.profile-manage-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.profile-manage-select {
+  text-align: left;
+  font-size: 1rem;
+  padding: 14px 16px;
+}
+
+.profile-delete-btn {
+  background: #cf253c;
+  color: #fff;
+  opacity: 1;
+}
+
+.profile-delete-btn.is-disabled {
+  opacity: 0.6;
+}
 
 .running-task-title-row {
   display: flex;
