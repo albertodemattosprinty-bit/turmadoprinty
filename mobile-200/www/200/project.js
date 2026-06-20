@@ -719,27 +719,19 @@ function readSelectedProfile() {
 }
 
 function refreshProfileLockFromAuth(authUser) {
-  const lockedProfile = String(authUser?.project200Profile || "").trim();
-  state.profileLock = lockedProfile;
+  void authUser;
+  state.profileLock = "";
 }
 
 function renderProfileFooterVisibility() {
-  const lockedProfile = String(state.profileLock || "").trim();
   profileFooter?.querySelectorAll("[data-profile]").forEach((button) => {
-    if (!lockedProfile) {
-      button.hidden = false;
-      return;
-    }
-    button.hidden = button.dataset.profile !== lockedProfile;
+    button.hidden = false;
   });
 }
 
 function applySelectedProfile(profile) {
   const matched = getProfileByName(profile);
   const next = matched?.name || getDefaultProfileName();
-  if (state.profileLock && next !== state.profileLock) {
-    return;
-  }
   state.selectedProfile = next;
   document.body.dataset.profile = next;
   window.localStorage.setItem(projectProfileKey, next);
@@ -4340,8 +4332,7 @@ async function ensureProject200Session() {
 async function loadProject200Profiles() {
   const payload = await apiRequest("/api/200/profiles");
   state.profiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
-  state.profileLock = getProfileByName(state.profileLock)?.name || "";
-  applySelectedProfile(state.profileLock || readSelectedProfile());
+  applySelectedProfile(readSelectedProfile());
   renderProfileFooter();
   renderHistorySpeakerSelectionOptions();
 }
@@ -7586,12 +7577,10 @@ project200LoginForm?.addEventListener("submit", (event) => {
       }
       setToken(String(data.token));
       refreshProfileLockFromAuth(data?.user || null);
-      if (state.profileLock) {
-        applySelectedProfile(state.profileLock);
-      }
       if (project200LoginMessage) project200LoginMessage.textContent = "Acesso liberado.";
       project200LoginOverlay?.classList.remove("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
+      await loadProject200Profiles();
       await loadActions();
     } catch (error) {
       if (project200LoginMessage) {
