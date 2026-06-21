@@ -428,6 +428,7 @@ const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption
 const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
 const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
 const toggleBackgroundThemeHint = document.getElementById("toggleBackgroundThemeHint");
+const logoutProject200Button = document.getElementById("logoutProject200Button");
 const profileAvatarModal = document.getElementById("profileAvatarModal");
 const profileAvatarModalTitle = document.getElementById("profileAvatarModalTitle");
 const profileAvatarModalHint = document.getElementById("profileAvatarModalHint");
@@ -752,6 +753,58 @@ function readTokenCookie() {
   }
 }
 
+function getCapacitorPlugin(name) {
+  return window.Capacitor?.Plugins?.[name] || null;
+}
+
+function isNativeCapacitorApp() {
+  const capacitor = window.Capacitor;
+  if (typeof capacitor?.isNativePlatform === "function") {
+    return capacitor.isNativePlatform();
+  }
+  const platform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "";
+  return platform === "android" || platform === "ios";
+}
+
+async function hydrateNativeToken() {
+  if (!isNativeCapacitorApp()) {
+    return;
+  }
+  if (window.localStorage.getItem(tokenKey)) {
+    return;
+  }
+  const preferencesPlugin = getCapacitorPlugin("Preferences");
+  if (!preferencesPlugin?.get) {
+    return;
+  }
+  try {
+    const result = await preferencesPlugin.get({ key: tokenKey });
+    const token = String(result?.value || "").trim();
+    if (token) {
+      window.localStorage.setItem(tokenKey, token);
+    }
+  } catch {}
+}
+
+function persistTokenToNative(token) {
+  if (!isNativeCapacitorApp()) {
+    return;
+  }
+  const preferencesPlugin = getCapacitorPlugin("Preferences");
+  if (!preferencesPlugin) {
+    return;
+  }
+  Promise.resolve().then(async () => {
+    try {
+      if (token) {
+        await preferencesPlugin.set?.({ key: tokenKey, value: token });
+      } else {
+        await preferencesPlugin.remove?.({ key: tokenKey });
+      }
+    } catch {}
+  });
+}
+
 function getToken() {
   const localToken = window.localStorage.getItem(tokenKey) || "";
   if (localToken) {
@@ -774,6 +827,7 @@ function setToken(token) {
     window.localStorage.removeItem(tokenKey);
     document.cookie = `${tokenKey}=; path=/; max-age=0; SameSite=Lax`;
   }
+  persistTokenToNative(token);
 }
 
 function readSelectedProfile() {
@@ -3197,6 +3251,21 @@ function closeModal(modal) {
   updateRunningPlayerOverlayState();
 }
 
+function navigateToProjectHome() {
+  Array.from(document.querySelectorAll(".workspace-modal.active")).forEach((modal) => {
+    closeModal(modal);
+  });
+  closeProfileManageOverlay();
+  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open");
+}
+
+function isProjectHomeVisible() {
+  const hasWorkspaceModal = Boolean(document.querySelector(".workspace-modal.active"));
+  const hasProfileManageOverlay = profileManageOverlay?.classList.contains("active");
+  const hasLoginOverlay = project200LoginOverlay?.classList.contains("active");
+  return !hasWorkspaceModal && !hasProfileManageOverlay && !hasLoginOverlay;
+}
+
 function getActiveConstitutionVersion() {
   if (!state.constitutionVersions.length) {
     return null;
@@ -4478,10 +4547,12 @@ async function ensureProject200Session() {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      setToken("");
-      state.profileLock = "";
-      project200LoginOverlay?.classList.add("active");
-      project200LoginOverlay?.setAttribute("aria-hidden", "false");
+      if (response.status === 401) {
+        setToken("");
+        state.profileLock = "";
+        project200LoginOverlay?.classList.add("active");
+        project200LoginOverlay?.setAttribute("aria-hidden", "false");
+      }
       return false;
     }
     refreshProfileLockFromAuth(payload?.user || null);
@@ -6639,14 +6710,6 @@ function preventEdgeSwipeNavigation() {
   let fromEdge = false;
   let shouldGoHome = false;
 
-  const returnToProjectHome = () => {
-    Array.from(document.querySelectorAll(".workspace-modal.active")).forEach((modal) => {
-      closeModal(modal);
-    });
-    closeProfileManageOverlay();
-    document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open");
-  };
-
   document.addEventListener("touchstart", (event) => {
     const touch = event.changedTouches?.[0];
     startX = Number(touch?.clientX || 0);
@@ -6674,7 +6737,7 @@ function preventEdgeSwipeNavigation() {
     const endX = Number(touch?.clientX || 0);
     const deltaX = endX - startX;
     if (fromEdge && shouldGoHome && Math.abs(deltaX) >= 42) {
-      returnToProjectHome();
+      navigateToProjectHome();
     }
     fromEdge = false;
     shouldGoHome = false;
@@ -6684,6 +6747,95 @@ function preventEdgeSwipeNavigation() {
     fromEdge = false;
     shouldGoHome = false;
   }, { passive: true });
+}
+
+function registerNativeBackButtonHandler() {
+  if (!isNativeCapacitorApp()) {
+    return;
+  }
+  const appPlugin = getCapacitorPlugin("App");
+  if (!appPlugin?.addListener) {
+    return;
+  }
+  appPlugin.addListener("backButton", async () => {
+    if (!isProjectHomeVisible()) {
+      navigateToProjectHome();
+      return;
+    }
+    const shouldExit = window.confirm("Deseja fechar o Projeto 200?");
+    if (!shouldExit) {
+      return;
+    }
+    try {
+      await appPlugin.exitApp?.();
+    } catch {}
+  });
+}
+
+function isAuthErrorMessage(message) {
+  const text = String(message || "").trim().toLowerCase();
+  return text.includes("sessao invalida") || text.includes("sessão inválida") || text.includes("token ausente");
+}
+
+function openProject200LoginOverlay(message = "") {
+  if (project200LoginMessage) {
+    project200LoginMessage.textContent = message;
+  }
+  project200LoginOverlay?.classList.add("active");
+  project200LoginOverlay?.setAttribute("aria-hidden", "false");
+}
+
+function clearProject200SessionState() {
+  setToken("");
+  state.profileLock = "";
+  state.actions = [];
+  state.profiles = [];
+  state.historySystem = [];
+  state.historyTexts = [];
+  renderProfileFooter();
+  renderHistorySpeakerSelectionOptions();
+  renderActions();
+  renderHistory();
+  renderHomeRunningTask();
+}
+
+async function bootstrapProject200App() {
+  await hydrateNativeToken();
+  const token = getToken();
+  if (!token) {
+    openProject200LoginOverlay("");
+    renderHomeRunningTask();
+    return;
+  }
+
+  const sessionOk = await ensureProject200Session();
+  if (sessionOk) {
+    try {
+      await loadProject200Profiles();
+      await loadActions();
+      return;
+    } catch (error) {
+      if (isAuthErrorMessage(error?.message)) {
+        clearProject200SessionState();
+        openProject200LoginOverlay("Sua sessão expirou. Entre novamente.");
+        return;
+      }
+    }
+  }
+
+  try {
+    await loadProject200Profiles();
+    await loadActions();
+    project200LoginOverlay?.classList.remove("active");
+    project200LoginOverlay?.setAttribute("aria-hidden", "true");
+  } catch (error) {
+    if (isAuthErrorMessage(error?.message)) {
+      clearProject200SessionState();
+      openProject200LoginOverlay("Sua sessão expirou. Entre novamente.");
+    } else {
+      renderHomeRunningTask();
+    }
+  }
 }
 
 document.querySelectorAll("[data-open-modal]").forEach((button) => {
@@ -7661,6 +7813,15 @@ toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
   saveOptionsConfig();
   renderOptionsModal();
 });
+logoutProject200Button?.addEventListener("click", () => {
+  const shouldLogout = window.confirm("Deseja sair do login salvo neste aparelho?");
+  if (!shouldLogout) {
+    return;
+  }
+  clearProject200SessionState();
+  closeModal("optionsModal");
+  openProject200LoginOverlay("Login removido deste aparelho.");
+});
 openProject200ExportModalButton?.addEventListener("click", () => {
   if (!getToken()) {
     window.location.href = "/auth.html?next=/200";
@@ -7808,15 +7969,7 @@ historyTextForm?.addEventListener("submit", (event) => {
 });
 state.profileLock = "";
 applySelectedProfile(readSelectedProfile());
-void (async () => {
-  const ok = await ensureProject200Session();
-  if (ok) {
-    await loadProject200Profiles();
-    await loadActions();
-  } else {
-    renderHomeRunningTask();
-  }
-})();
+void bootstrapProject200App();
 
 profileFooter?.addEventListener("contextmenu", (event) => {
   const button = event.target.closest("[data-profile]");
@@ -8194,6 +8347,7 @@ document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
 handleSwipe(historyDateLabel, moveHistoryDate);
 handleSwipe(historyTimelineList, moveHistoryDate);
 preventEdgeSwipeNavigation();
+registerNativeBackButtonHandler();
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     startRunningTaskTicker();
