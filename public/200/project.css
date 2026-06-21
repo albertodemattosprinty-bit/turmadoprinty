@@ -48,6 +48,24 @@ body {
   filter: saturate(1.02) contrast(1.04) brightness(0.78);
 }
 
+.app-background-light {
+  position: fixed;
+  inset: 0;
+  background: url("/200/background-light.png") center center / cover no-repeat;
+  pointer-events: none;
+  z-index: -3;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+body[data-background-theme="light"] .app-background-light {
+  opacity: 1;
+}
+
+body[data-background-theme="light"] .app-background-video {
+  opacity: 0;
+}
+
 button,
 input {
   font: inherit;
@@ -382,6 +400,17 @@ body.start-decision-open .home-running-btn {
 
 .profile-delete-btn.is-disabled {
   opacity: 0.6;
+}
+
+.profile-avatar-preview {
+  width: min(220px, 62vw);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  justify-self: center;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
 }
 
 .running-task-title-row {

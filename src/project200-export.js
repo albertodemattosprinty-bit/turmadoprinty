@@ -195,15 +195,16 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
       await client.query(
         `
           insert into project200_profiles (
-            id, user_id, name, avatar_preset, is_immutable, is_system, sort_order, created_at, updated_at, deleted_at
+            id, user_id, name, avatar_preset, avatar_data_url, is_immutable, is_system, sort_order, created_at, updated_at, deleted_at
           )
-          values ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9::timestamptz, null)
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::timestamptz, null)
         `,
         [
           crypto.randomUUID(),
           toUserId,
           row.name,
           row.avatar_preset || "default-user",
+          row.avatar_data_url || "",
           Boolean(row.is_immutable),
           Boolean(row.is_system),
           Number(row.sort_order || 100),

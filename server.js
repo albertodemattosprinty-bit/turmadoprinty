@@ -58,7 +58,7 @@ import { approveConstitutionVersion, createConstitutionVersion, ensureConstituti
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
-import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks } from "./src/project200-profiles.js";
+import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -6503,6 +6503,101 @@ async function handleCreateTerm(request, response) {
   }
 }
 
+async function handleProject200ProfileAvatarGenerateRequest(request, response, profileId) {
+  const authUser = await requireAuth(request, response);
+  if (!authUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  const contentTypeHeader = String(request.headers["content-type"] || "").trim().toLowerCase();
+  const contentType = contentTypeHeader.split(";")[0] || "image/png";
+  if (!contentType.startsWith("image/")) {
+    sendJson(response, 400, { error: "Envie uma imagem valida para gerar o avatar." });
+    return;
+  }
+
+  let uploadedReferenceBuffer = null;
+  try {
+    uploadedReferenceBuffer = await readBinaryBody(request, MAX_MINI_COURSE_COVER_BYTES);
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Falha ao ler a imagem enviada." });
+    return;
+  }
+
+  if (!uploadedReferenceBuffer?.length) {
+    sendJson(response, 400, { error: "Imagem de referencia vazia." });
+    return;
+  }
+
+  try {
+    const prompt = [
+      "Crie um avatar quadrado estilizado para foto de perfil.",
+      "Use a imagem enviada apenas como referencia da pessoa.",
+      "Transforme em uma ilustracao premium inspirada em animacao disney pixar, com acabamento cinematografico tipo 4k.",
+      "Mostre somente uma pessoa, centralizada, do peito para cima ou close no rosto.",
+      "Mantenha semelhanca facial, simpatia e expressao acolhedora.",
+      "Nao escreva texto, letras, numeros, molduras ou marcas."
+    ].join(" ");
+
+    const formData = new FormData();
+    formData.append("model", "gpt-image-1");
+    formData.append("prompt", prompt);
+    formData.append("size", "1024x1024");
+    formData.append("quality", "high");
+    formData.append(
+      "image[]",
+      new Blob([uploadedReferenceBuffer], { type: contentType }),
+      "project200-profile-reference.png"
+    );
+
+    const openAiResponse = await fetch("https://api.openai.com/v1/images/edits", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: formData
+    });
+
+    const payload = await openAiResponse.json().catch(() => ({}));
+    if (!openAiResponse.ok) {
+      sendJson(response, openAiResponse.status || 502, {
+        error: payload?.error?.message || payload?.error || "Nao foi possivel gerar a foto do usuario."
+      });
+      return;
+    }
+
+    const b64 = String(payload?.data?.[0]?.b64_json || "").trim();
+    if (!b64) {
+      sendJson(response, 502, { error: "A OpenAI nao devolveu a imagem gerada." });
+      return;
+    }
+
+    const profile = await updateProject200ProfileAvatar(authUser.id, profileId, {
+      avatarDataUrl: `data:image/png;base64,${b64}`
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      model: "gpt-image-1",
+      profile,
+      feedback: `Avatar atualizado com gpt-image-1 para ${profile.name}.`
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a foto do usuario."
+    });
+  }
+}
+
 async function handleTermStripeCheckout(request, response) {
   let body;
   try {
@@ -8898,6 +8993,14 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Erro ao copiar tarefas."
       });
     }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/200/profiles/") && pathname.endsWith("/avatar/generate")) {
+    const profileId = decodeURIComponent(
+      pathname.slice("/api/200/profiles/".length, pathname.length - "/avatar/generate".length)
+    );
+    await handleProject200ProfileAvatarGenerateRequest(request, response, profileId);
     return;
   }
 

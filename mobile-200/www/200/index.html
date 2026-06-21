@@ -13,6 +13,7 @@
   <video class="app-background-video" autoplay muted loop playsinline webkit-playsinline preload="auto" aria-hidden="true">
     <source src="/200/background.mp4" type="video/mp4" />
   </video>
+  <div class="app-background-light" aria-hidden="true"></div>
   <section class="project-login-overlay" id="project200LoginOverlay" aria-hidden="true">
     <div class="project-login-card">
       <img class="project-login-logo" src="/200/avatars/familyplan.png" alt="Projeto 200" />
@@ -629,6 +630,11 @@
         <strong>Beep final</strong>
         <span class="running-music-default-bottom" id="toggleTaskBeepHint">Nenhum</span>
       </button>
+      <button class="running-music-default-option" type="button" id="toggleBackgroundThemeOption">
+        <span class="running-music-default-top">Alternar entre o visual atual e o novo fundo claro</span>
+        <strong>Background</strong>
+        <span class="running-music-default-bottom" id="toggleBackgroundThemeHint">Modern</span>
+      </button>
       <button class="running-music-default-option" type="button" id="openProject200ExportModal">
         <span class="running-music-default-top">Duplicar todos os dados do /200</span>
         <strong>Exportar</strong>
@@ -639,6 +645,27 @@
         <strong>Criar usuario</strong>
         <span class="running-music-default-bottom">Cada usuário terá as próprias tarefas e persona</span>
       </button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal" id="profileAvatarModal" aria-hidden="true" aria-label="Foto do usuario">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
+    <div class="finance-content options-content">
+      <div class="running-music-default-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 10c4.1 0 7.5 2.4 8.8 5.9H3.2C4.5 17.4 7.9 15 12 15Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="profileAvatarModalTitle">Foto do usuario</span>
+      </div>
+      <p class="options-note" id="profileAvatarModalHint">Envie uma foto da pessoa para gerar uma versao estilo Disney Pixar com o gpt-image-1.</p>
+      <img class="profile-avatar-preview" id="profileAvatarPreview" src="/200/avatars/familyplan.png" alt="Preview do usuario" />
+      <input id="profileAvatarFileInput" type="file" accept="image/*" hidden />
+      <button class="running-music-default-option" type="button" id="profileAvatarChooseButton">
+        <span class="running-music-default-top">Selecione uma foto da pessoa</span>
+        <strong>Escolher foto</strong>
+        <span class="running-music-default-bottom" id="profileAvatarFileName">Nenhum arquivo selecionado</span>
+      </button>
+      <p class="finance-status" id="profileAvatarMessage" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="profileAvatarGenerateButton">Gerar foto Pixar</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>
   </section>
@@ -943,7 +970,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260620-profiles"></script>
+  <script type="module" src="/200/project.js?v=20260621-avatar-theme"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

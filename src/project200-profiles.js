@@ -42,6 +42,7 @@ function normalizeProfileRow(row) {
     userId: row.user_id,
     name: row.name,
     avatarPreset: row.avatar_preset || PROJECT200_DEFAULT_PROFILE_AVATAR,
+    avatarDataUrl: String(row.avatar_data_url || "").trim(),
     isImmutable: Boolean(row.is_immutable),
     isSystem: Boolean(row.is_system),
     createdAt: toIso(row.created_at),
@@ -157,6 +158,7 @@ export async function ensureProject200ProfilesSchema() {
       user_id uuid not null references users(id) on delete cascade,
       name text not null,
       avatar_preset text not null default 'default-user',
+      avatar_data_url text not null default '',
       is_immutable boolean not null default false,
       is_system boolean not null default false,
       sort_order integer not null default 100,
@@ -165,6 +167,7 @@ export async function ensureProject200ProfilesSchema() {
       deleted_at timestamptz
     );
   `);
+  await query("alter table project200_profiles add column if not exists avatar_data_url text not null default '';");
   await query("create unique index if not exists idx_project200_profiles_unique_name on project200_profiles (user_id, lower(name)) where deleted_at is null;");
   await query("create index if not exists idx_project200_profiles_user_sort on project200_profiles (user_id, sort_order, created_at);");
 }
@@ -288,6 +291,49 @@ export async function deleteProject200Profile(userId, profileId) {
 
     await client.query("commit");
     return { deleted: true, fallbackProfileName: PROJECT200_DEFAULT_PROFILE_NAME };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateProject200ProfileAvatar(userId, profileId, payload = {}) {
+  await ensureProject200ProfilesSchema();
+  const avatarDataUrl = String(payload?.avatarDataUrl || "").trim();
+  if (!avatarDataUrl.startsWith("data:image/")) {
+    throw new Error("A imagem do usuário é inválida.");
+  }
+  if (avatarDataUrl.length > 14 * 1024 * 1024) {
+    throw new Error("A imagem do usuário ficou grande demais.");
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    await seedDefaultProfiles(client, userId);
+
+    const profile = await getProfileByIdWithClient(client, userId, profileId);
+    if (!profile) {
+      throw new Error("Usuário não encontrado.");
+    }
+
+    const result = await client.query(
+      `
+        update project200_profiles
+        set avatar_data_url = $3,
+            updated_at = now()
+        where user_id = $1
+          and id = $2
+          and deleted_at is null
+        returning *
+      `,
+      [userId, profile.id, avatarDataUrl]
+    );
+
+    await client.query("commit");
+    return normalizeProfileRow(result.rows[0]);
   } catch (error) {
     await client.query("rollback");
     throw error;

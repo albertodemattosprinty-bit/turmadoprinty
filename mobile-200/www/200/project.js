@@ -426,6 +426,17 @@ const homeProfileAvatar = document.getElementById("homeProfileAvatar");
 const homeProfileName = document.getElementById("homeProfileName");
 const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption");
 const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
+const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
+const toggleBackgroundThemeHint = document.getElementById("toggleBackgroundThemeHint");
+const profileAvatarModal = document.getElementById("profileAvatarModal");
+const profileAvatarModalTitle = document.getElementById("profileAvatarModalTitle");
+const profileAvatarModalHint = document.getElementById("profileAvatarModalHint");
+const profileAvatarPreview = document.getElementById("profileAvatarPreview");
+const profileAvatarFileInput = document.getElementById("profileAvatarFileInput");
+const profileAvatarChooseButton = document.getElementById("profileAvatarChooseButton");
+const profileAvatarFileName = document.getElementById("profileAvatarFileName");
+const profileAvatarMessage = document.getElementById("profileAvatarMessage");
+const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
@@ -479,6 +490,10 @@ let profileLongPressHandledProfile = "";
 let profileManageTargetId = "";
 let profilePressStartedAt = 0;
 let profilePressProfile = "";
+let profileAvatarTargetId = "";
+let profileAvatarReferenceFile = null;
+let profileAvatarReferenceDataUrl = "";
+let profileAvatarBusy = false;
 let sleepNavHoldTimer = null;
 let sleepNavHoldInterval = null;
 let sleepNavLongPressHandled = false;
@@ -572,7 +587,8 @@ const state = {
   sleepConfig: { startHour: 23, startMinute: 0, endHour: 8, endMinute: 0 },
   options: {
     showFreeTime: true,
-    completionBeepCycles: 0
+    completionBeepCycles: 0,
+    backgroundTheme: "modern"
   },
   overlapResolver: null,
   overlapItems: [],
@@ -697,8 +713,20 @@ function getProfileById(profileId) {
 
 function getProfileAvatarPath(profileOrName) {
   const profile = typeof profileOrName === "string" ? getProfileByName(profileOrName) : profileOrName;
+  const customAvatar = String(profile?.avatarDataUrl || "").trim();
+  if (customAvatar.startsWith("data:image/")) {
+    return customAvatar;
+  }
   const preset = String(profile?.avatarPreset || "").trim().toLowerCase();
   return avatarPresetToPath[preset] || defaultProfileAvatarDataUrl;
+}
+
+function normalizeBackgroundTheme(value) {
+  return String(value || "").trim().toLowerCase() === "light" ? "light" : "modern";
+}
+
+function applyBackgroundTheme() {
+  document.body.dataset.backgroundTheme = normalizeBackgroundTheme(state.options.backgroundTheme);
 }
 
 function loadSleepConfig() {
@@ -3145,6 +3173,10 @@ function closeModal(modal) {
   if (modal.id === "historyModal") {
     closeHistoryTextComposer();
   }
+  if (modal.id === "profileAvatarModal") {
+    resetProfileAvatarModal();
+    profileAvatarTargetId = "";
+  }
   if (modal.id === "project200ExportModal") {
     resetProject200ExportModal();
   }
@@ -4525,6 +4557,141 @@ function closeProfileManageOverlay() {
     document.body.classList.remove("modal-open");
   }
   profileManageTargetId = "";
+}
+
+function updateProfileInState(nextProfile) {
+  if (!nextProfile?.id) {
+    return;
+  }
+  state.profiles = getProfilesList().map((profile) => (
+    profile.id === nextProfile.id
+      ? { ...profile, ...nextProfile }
+      : profile
+  ));
+}
+
+function resetProfileAvatarModal() {
+  profileAvatarReferenceFile = null;
+  profileAvatarReferenceDataUrl = "";
+  profileAvatarBusy = false;
+  if (profileAvatarFileInput) {
+    profileAvatarFileInput.value = "";
+  }
+  if (profileAvatarFileName) {
+    profileAvatarFileName.textContent = "Nenhum arquivo selecionado";
+  }
+  if (profileAvatarMessage) {
+    profileAvatarMessage.textContent = "";
+  }
+}
+
+function renderProfileAvatarModal() {
+  const profile = getProfileById(profileAvatarTargetId) || getProfileByName(state.selectedProfile) || getDefaultProfile();
+  if (!profile) {
+    return;
+  }
+  if (profileAvatarModalTitle) {
+    profileAvatarModalTitle.textContent = `Foto de ${profile.name}`;
+  }
+  if (profileAvatarModalHint) {
+    profileAvatarModalHint.textContent = `Envie uma foto de ${profile.name} para gerar uma versao estilo Disney Pixar com o gpt-image-1.`;
+  }
+  if (profileAvatarPreview) {
+    profileAvatarPreview.src = profileAvatarReferenceDataUrl || getProfileAvatarPath(profile);
+    profileAvatarPreview.alt = `Preview de ${profile.name}`;
+  }
+  if (profileAvatarFileName) {
+    profileAvatarFileName.textContent = profileAvatarReferenceFile?.name || "Nenhum arquivo selecionado";
+  }
+  if (profileAvatarGenerateButton) {
+    profileAvatarGenerateButton.disabled = profileAvatarBusy || !profileAvatarReferenceFile;
+    profileAvatarGenerateButton.textContent = profileAvatarBusy ? "Gerando..." : "Gerar foto Pixar";
+  }
+}
+
+async function readFileAsDataUrl(file) {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Nao foi possivel ler a foto."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function openProfileAvatarModal(profileName) {
+  const profile = getProfileByName(profileName);
+  profileAvatarTargetId = String(profile?.id || "").trim();
+  if (!profileAvatarTargetId) {
+    return;
+  }
+  resetProfileAvatarModal();
+  renderProfileAvatarModal();
+  openModal("profileAvatarModal");
+}
+
+async function submitProfileAvatarGeneration() {
+  const profile = getProfileById(profileAvatarTargetId) || getProfileByName(state.selectedProfile);
+  if (!profile) {
+    return;
+  }
+  if (!profileAvatarReferenceFile) {
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = "Escolha uma foto antes de gerar.";
+    }
+    renderProfileAvatarModal();
+    return;
+  }
+
+  const token = getToken();
+  if (!token) {
+    window.location.href = "/auth.html?next=/200";
+    return;
+  }
+
+  profileAvatarBusy = true;
+  if (profileAvatarMessage) {
+    profileAvatarMessage.textContent = "Gerando foto Pixar...";
+  }
+  renderProfileAvatarModal();
+
+  try {
+    const response = await fetch(getApiUrl(`/api/200/profiles/${encodeURIComponent(profile.id)}/avatar/generate`), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": profileAvatarReferenceFile.type || "application/octet-stream"
+      },
+      body: profileAvatarReferenceFile
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || "Nao foi possivel gerar a foto do usuario.");
+    }
+    if (payload?.profile) {
+      updateProfileInState(payload.profile);
+      renderProfileFooter();
+      renderHistorySpeakerSelectionOptions();
+      renderActions();
+      renderHistory();
+      renderHomeRunningTask();
+    }
+    profileAvatarReferenceFile = null;
+    profileAvatarReferenceDataUrl = "";
+    if (profileAvatarFileInput) {
+      profileAvatarFileInput.value = "";
+    }
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = "Foto atualizada com sucesso.";
+    }
+    renderProfileAvatarModal();
+  } catch (error) {
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = error instanceof Error ? error.message : "Falha ao gerar a foto.";
+    }
+  } finally {
+    profileAvatarBusy = false;
+    renderProfileAvatarModal();
+  }
 }
 
 async function deleteManagedProfile() {
@@ -6470,6 +6637,15 @@ function preventEdgeSwipeNavigation() {
   let startX = 0;
   let startY = 0;
   let fromEdge = false;
+  let shouldGoHome = false;
+
+  const returnToProjectHome = () => {
+    Array.from(document.querySelectorAll(".workspace-modal.active")).forEach((modal) => {
+      closeModal(modal);
+    });
+    closeProfileManageOverlay();
+    document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open");
+  };
 
   document.addEventListener("touchstart", (event) => {
     const touch = event.changedTouches?.[0];
@@ -6477,6 +6653,7 @@ function preventEdgeSwipeNavigation() {
     startY = Number(touch?.clientY || 0);
     const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
     fromEdge = startX <= 28 || (viewportWidth > 0 && startX >= viewportWidth - 28);
+    shouldGoHome = false;
   }, { passive: true });
 
   document.addEventListener("touchmove", (event) => {
@@ -6487,16 +6664,25 @@ function preventEdgeSwipeNavigation() {
     const deltaX = Number(touch?.clientX || 0) - startX;
     const deltaY = Number(touch?.clientY || 0) - startY;
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+      shouldGoHome = true;
       event.preventDefault();
     }
   }, { passive: false });
 
-  document.addEventListener("touchend", () => {
+  document.addEventListener("touchend", (event) => {
+    const touch = event.changedTouches?.[0];
+    const endX = Number(touch?.clientX || 0);
+    const deltaX = endX - startX;
+    if (fromEdge && shouldGoHome && Math.abs(deltaX) >= 42) {
+      returnToProjectHome();
+    }
     fromEdge = false;
+    shouldGoHome = false;
   }, { passive: true });
 
   document.addEventListener("touchcancel", () => {
     fromEdge = false;
+    shouldGoHome = false;
   }, { passive: true });
 }
 
@@ -6568,17 +6754,21 @@ function loadOptionsConfig() {
     state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
       ? Number(parsed.completionBeepCycles)
       : 0;
+    state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
+    state.options.backgroundTheme = "modern";
   }
+  applyBackgroundTheme();
 }
 
 function saveOptionsConfig() {
   try {
     window.localStorage.setItem(optionsConfigKey, JSON.stringify({
       showFreeTime: Boolean(state.options.showFreeTime),
-      completionBeepCycles: Number(state.options.completionBeepCycles || 0)
+      completionBeepCycles: Number(state.options.completionBeepCycles || 0),
+      backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme)
     }));
   } catch {}
 }
@@ -6590,6 +6780,9 @@ function renderOptionsModal() {
   toggleFreeTimeOptionButton?.classList.toggle("is-off", !state.options.showFreeTime);
   if (toggleTaskBeepHint) {
     toggleTaskBeepHint.textContent = taskBeepOptionLabels.get(Number(state.options.completionBeepCycles || 0)) || "Nenhum";
+  }
+  if (toggleBackgroundThemeHint) {
+    toggleBackgroundThemeHint.textContent = normalizeBackgroundTheme(state.options.backgroundTheme) === "light" ? "Light" : "Modern";
   }
 }
 
@@ -7462,6 +7655,12 @@ toggleTaskBeepOptionButton?.addEventListener("click", () => {
   saveOptionsConfig();
   renderOptionsModal();
 });
+toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
+  state.options.backgroundTheme = normalizeBackgroundTheme(state.options.backgroundTheme) === "light" ? "modern" : "light";
+  applyBackgroundTheme();
+  saveOptionsConfig();
+  renderOptionsModal();
+});
 openProject200ExportModalButton?.addEventListener("click", () => {
   if (!getToken()) {
     window.location.href = "/auth.html?next=/200";
@@ -7635,7 +7834,9 @@ homeProfileButton?.addEventListener("click", () => {
   }
   if (profileLongPressHandledProfile === profile) {
     profileLongPressHandledProfile = "";
+    return;
   }
+  openProfileAvatarModal(profile);
 });
 homeProfileButton?.addEventListener("pointerdown", (event) => {
   event.preventDefault();
@@ -7665,6 +7866,35 @@ homeProfileButton?.addEventListener("pointerdown", (event) => {
     profilePressStartedAt = 0;
     profilePressProfile = "";
   });
+});
+profileAvatarChooseButton?.addEventListener("click", () => {
+  profileAvatarFileInput?.click();
+});
+profileAvatarFileInput?.addEventListener("change", () => {
+  const file = profileAvatarFileInput.files?.[0] || null;
+  profileAvatarReferenceFile = file;
+  if (!file) {
+    profileAvatarReferenceDataUrl = "";
+    renderProfileAvatarModal();
+    return;
+  }
+  void (async () => {
+    try {
+      profileAvatarReferenceDataUrl = await readFileAsDataUrl(file);
+      if (profileAvatarMessage) {
+        profileAvatarMessage.textContent = "";
+      }
+    } catch (error) {
+      profileAvatarReferenceDataUrl = "";
+      if (profileAvatarMessage) {
+        profileAvatarMessage.textContent = error instanceof Error ? error.message : "Falha ao ler a foto.";
+      }
+    }
+    renderProfileAvatarModal();
+  })();
+});
+profileAvatarGenerateButton?.addEventListener("click", () => {
+  void submitProfileAvatarGeneration();
 });
 profileFooter?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-profile]");
