@@ -414,6 +414,7 @@ const profileManageCancel = document.getElementById("profileManageCancel");
 const profileDeleteConfirmInput = document.getElementById("profileDeleteConfirmInput");
 const profileDeleteConfirmButton = document.getElementById("profileDeleteConfirm");
 const profileReassignSelect = document.getElementById("profileReassignSelect");
+const profileReassignTargetHint = document.getElementById("profileReassignTargetHint");
 const profileReassignConfirmButton = document.getElementById("profileReassignConfirm");
 const profileFooter = document.getElementById("profileFooter");
 const openProject200CreateProfileModalButton = document.getElementById("openProject200CreateProfileModal");
@@ -779,6 +780,7 @@ function renderHistorySpeakerSelectionOptions() {
 
 function renderProfileManageOverlay() {
   const profile = getProfileById(profileManageTargetId) || getProfileByName(state.selectedProfile);
+  const selectedProfile = getProfileByName(state.selectedProfile) || profile;
   if (!profile) {
     return;
   }
@@ -792,6 +794,9 @@ function renderProfileManageOverlay() {
     profileReassignSelect.innerHTML = getProfilesList().map((item) => `
       <option value="${escapeHtml(item.id)}"${item.id === profile.id ? " selected" : ""}>${escapeHtml(item.name)}</option>
     `).join("");
+  }
+  if (profileReassignTargetHint) {
+    profileReassignTargetHint.textContent = `Destino: ${selectedProfile?.name || state.selectedProfile || "usuário selecionado"}`;
   }
   const canDelete = !profile.isImmutable && String(profileDeleteConfirmInput?.value || "").trim() === "Excluir";
   profileDeleteConfirmButton?.classList.toggle("is-disabled", !canDelete);
@@ -4499,7 +4504,7 @@ async function deleteManagedProfile() {
 }
 
 async function reassignManagedProfileTasks() {
-  const target = getProfileById(profileManageTargetId);
+  const target = getProfileByName(state.selectedProfile) || getProfileById(profileManageTargetId);
   const sourceId = String(profileReassignSelect?.value || "").trim();
   const source = getProfileById(sourceId);
   if (!source || !target) {
@@ -7559,23 +7564,39 @@ profileFooter?.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   profilePressStartedAt = Date.now();
   profilePressProfile = String(button.dataset.profile || "").trim();
+  if (profileHoldTimer) {
+    window.clearTimeout(profileHoldTimer);
+    profileHoldTimer = null;
+  }
+  if (profilePressProfile) {
+    profileHoldTimer = window.setTimeout(() => {
+      profileHoldTimer = null;
+      if (!profilePressProfile) {
+        return;
+      }
+      profileLongPressHandledProfile = profilePressProfile;
+      openProfileManageOverlay(profilePressProfile);
+    }, 500);
+  }
 });
 profileFooter?.addEventListener("pointerup", (event) => {
   const button = event.target.closest("[data-profile]");
   if (!button) {
     return;
   }
-  const heldMs = profilePressStartedAt ? (Date.now() - profilePressStartedAt) : 0;
-  const profile = profilePressProfile;
+  if (profileHoldTimer) {
+    window.clearTimeout(profileHoldTimer);
+    profileHoldTimer = null;
+  }
   profilePressStartedAt = 0;
   profilePressProfile = "";
-  if (heldMs >= 500 && profile) {
-    profileLongPressHandledProfile = profile;
-    openProfileManageOverlay(profile);
-  }
 });
 ["pointerleave", "pointercancel"].forEach((evt) => {
   profileFooter?.addEventListener(evt, () => {
+    if (profileHoldTimer) {
+      window.clearTimeout(profileHoldTimer);
+      profileHoldTimer = null;
+    }
     profilePressStartedAt = 0;
     profilePressProfile = "";
   });
