@@ -5,6 +5,13 @@ const projectProfileKey = "project_200_profile_v1";
 const sleepConfigKey = "project_200_sleep_v1";
 const optionsConfigKey = "project_200_options_v1";
 const defaultSaldoGoalCents = 1000000;
+const taskBeepOptionCycles = [0, 3, 5, 10];
+const taskBeepOptionLabels = new Map([
+  [0, "Nenhum"],
+  [3, "Três vezes"],
+  [5, "Cinco vezes"],
+  [10, "Dez vezes"]
+]);
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const actionStatuses = {
   pending: "PENDING",
@@ -413,6 +420,8 @@ const openProject200CreateProfileModalButton = document.getElementById("openProj
 const project200CreateProfileNameInput = document.getElementById("project200CreateProfileName");
 const project200CreateProfileMessage = document.getElementById("project200CreateProfileMessage");
 const project200CreateProfileConfirmButton = document.getElementById("project200CreateProfileConfirm");
+const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption");
+const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
@@ -502,6 +511,7 @@ if (runningPunctualityDownAudio) {
 }
 let runningMusicProgressTicker = null;
 let runningNextMetricTimer = null;
+let taskBeepAudioContext = null;
 const runningMinuteCueMap = new Map([
   [180, "0001.mp3"], [175, "0002.mp3"], [170, "0003.mp3"], [165, "0004.mp3"], [160, "0005.mp3"],
   [155, "0006.mp3"], [150, "0007.mp3"], [145, "0008.mp3"], [140, "0009.mp3"], [135, "0010.mp3"],
@@ -557,7 +567,8 @@ const state = {
   wizard: buildInitialWizardState(),
   sleepConfig: { startHour: 23, startMinute: 0, endHour: 8, endMinute: 0 },
   options: {
-    showFreeTime: true
+    showFreeTime: true,
+    completionBeepCycles: 0
   },
   overlapResolver: null,
   overlapItems: [],
@@ -1015,6 +1026,40 @@ function getNextActionForRunning(action) {
   return list[0] || null;
 }
 
+function isRelatedRunningAction(source, candidate) {
+  if (!source || !candidate) {
+    return false;
+  }
+  if (String(source.id || "") === String(candidate.id || "")) {
+    return false;
+  }
+  const sourceRepeatGroupId = String(source.repeatGroupId || "").trim();
+  const candidateRepeatGroupId = String(candidate.repeatGroupId || "").trim();
+  if (sourceRepeatGroupId && candidateRepeatGroupId) {
+    return sourceRepeatGroupId === candidateRepeatGroupId;
+  }
+  return normalizeAssigneeName(source.assignee) === normalizeAssigneeName(candidate.assignee)
+    && String(source.title || "").trim().localeCompare(String(candidate.title || "").trim(), "pt-BR", { sensitivity: "accent" }) === 0;
+}
+
+function getNextRelatedActionForRunning(action) {
+  if (!action) {
+    return null;
+  }
+  const runningStartMs = new Date(action.startAt).getTime();
+  if (!Number.isFinite(runningStartMs)) {
+    return null;
+  }
+  return getVisibleActions()
+    .filter((item) => isRelatedRunningAction(action, item))
+    .filter((item) => normalizeActionStatus(item.status) === actionStatuses.pending)
+    .filter((item) => {
+      const startMs = new Date(item.startAt).getTime();
+      return Number.isFinite(startMs) && startMs > runningStartMs;
+    })
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0] || null;
+}
+
 function getNextTimelineEntryForRunning(action) {
   if (!action) return null;
   const currentStart = new Date(action.startAt).getTime();
@@ -1416,12 +1461,18 @@ async function playRunningPunctualityDownCue() {
 }
 
 async function playRunningEndBellCue(actionId) {
-  if (!runningEndBellAudio || !actionId) return;
+  if (!actionId) return;
   if (state.runningEndBell.actionId === actionId && state.runningEndBell.played) {
     return;
   }
   state.runningEndBell.actionId = actionId;
   state.runningEndBell.played = true;
+  const cycleCount = Number(state.options.completionBeepCycles || 0);
+  if (cycleCount > 0) {
+    await playCompletionBeeps(cycleCount);
+    return;
+  }
+  if (!runningEndBellAudio) return;
   const baseRunningVolume = Math.max(0.2, Number(runningAudio?.volume || 1) || 1);
   const nextVolume = Math.min(1, Math.max(0.2, baseRunningVolume * 1.8));
   try {
@@ -1595,6 +1646,22 @@ function anchorToCurrentActionOnce() {
   row.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+function anchorToCurrentAction() {
+  if (!actionsList) {
+    return;
+  }
+  const runningAction = getRunningActionForSelectedProfile();
+  const targetId = String(runningAction?.id || pendingActionsAnchorId || "").trim();
+  if (!targetId) {
+    return;
+  }
+  const row = actionsList.querySelector(`[data-action-id="${targetId}"]`);
+  if (!row) {
+    return;
+  }
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function renderHomeRunningTask() {
   if (state.runningCompletion.active) {
     if (openRunningTaskModalButton) {
@@ -1668,7 +1735,7 @@ function renderHomeRunningTask() {
     runningTaskNextLabel.classList.add("running-fade");
     runningTaskNextLabel.classList.remove("is-hidden");
   }
-  const nextAction = getNextTimelineEntryForRunning(action);
+  const nextAction = getNextRelatedActionForRunning(action);
   runningTaskName.innerHTML = formatRunningTaskTitleMarkup(action.title);
   if (runningTaskCategoryIcon) {
     runningTaskCategoryIcon.hidden = true;
@@ -1690,7 +1757,7 @@ function renderHomeRunningTask() {
   const punctualitySummary = getCompletionSummaryForSelectedProfile();
   renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes);
   if (nextAction) {
-    const nextLabel = nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title);
+    const nextLabel = formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
   } else {
     setRunningNextDisplay("Descanso", getSleepDurationMinutesForDay());
@@ -2476,6 +2543,22 @@ async function executeRunningTaskDefaultPreference() {
   } else {
     primeRunningTrackBuffer();
   }
+}
+
+async function autoPlayRunningTaskDefaultPreference(action) {
+  const taskTitle = String(action?.title || "").trim();
+  if (!taskTitle) {
+    return;
+  }
+  state.runningPlayer.currentTaskTitle = taskTitle;
+  const preference = getRunningDefaultPreferenceForTaskTitle(taskTitle);
+  if (!preference) {
+    return;
+  }
+  if (!Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) {
+    await loadRunningMusicStations();
+  }
+  await executeRunningTaskDefaultPreference();
 }
 
 async function saveRunningTaskDefault(mode = "track") {
@@ -3351,6 +3434,11 @@ function renderActions() {
 
   renderActionsProgress();
   renderHomeRunningTask();
+  if (document.getElementById("actionsModal")?.classList.contains("active")) {
+    window.requestAnimationFrame(() => {
+      anchorToCurrentAction();
+    });
+  }
 }
 
 function getActionDurationMinutes(action) {
@@ -3565,6 +3653,7 @@ async function toggleActionStatus(actionId, options = {}) {
     if (currentStatus === actionStatuses.pending && nextStatus === actionStatuses.inProgress) {
       resetRunningCompletionState();
       state.runningLocalStarts[String(targetId)] = getServerNowMs();
+      await autoPlayRunningTaskDefaultPreference(updated);
       openModal("runningTaskModal");
       closeActionsModalWithFade();
     }
@@ -4410,9 +4499,9 @@ async function deleteManagedProfile() {
 }
 
 async function reassignManagedProfileTasks() {
-  const source = getProfileById(profileManageTargetId);
-  const targetId = String(profileReassignSelect?.value || "").trim();
-  const target = getProfileById(targetId);
+  const target = getProfileById(profileManageTargetId);
+  const sourceId = String(profileReassignSelect?.value || "").trim();
+  const source = getProfileById(sourceId);
   if (!source || !target) {
     return;
   }
@@ -4426,7 +4515,7 @@ async function reassignManagedProfileTasks() {
   });
   if (profileManageMessage) {
     profileManageMessage.textContent = payload?.summary
-      ? `${payload.summary.movedTasks} tarefa(s) agora estão com ${payload.summary.targetProfileName}.`
+      ? `${payload.summary.movedTasks} tarefa(s) de ${payload.summary.sourceProfileName} agora estão com ${payload.summary.targetProfileName}.`
       : "";
   }
   await loadActions();
@@ -6336,19 +6425,70 @@ if (window.history && typeof window.history.pushState === "function") {
   } catch {}
 }
 
+function getTaskBeepAudioContext() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextCtor) {
+    return null;
+  }
+  if (!taskBeepAudioContext) {
+    taskBeepAudioContext = new AudioContextCtor();
+  }
+  return taskBeepAudioContext;
+}
+
+async function playCompletionBeeps(cycleCount) {
+  const audioContext = getTaskBeepAudioContext();
+  if (!audioContext) {
+    return;
+  }
+  try {
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+  } catch {}
+  const baseAt = Math.max(audioContext.currentTime + 0.02, audioContext.currentTime);
+  for (let cycleIndex = 0; cycleIndex < cycleCount; cycleIndex += 1) {
+    const cycleOffset = cycleIndex * 0.5;
+    const beepOffsets = [0, 0.14];
+    for (const beepOffset of beepOffsets) {
+      const startAt = baseAt + cycleOffset + beepOffset;
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = "square";
+      oscillator.frequency.setValueAtTime(2240, startAt);
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.95, startAt + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.1);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + 0.105);
+    }
+  }
+  await wait(Math.max(250, cycleCount * 500 + 180));
+}
+
 function loadOptionsConfig() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(optionsConfigKey) || "{}");
     state.options.showFreeTime = parsed.showFreeTime !== false;
+    state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
+      ? Number(parsed.completionBeepCycles)
+      : 0;
   } catch {
     state.options.showFreeTime = true;
+    state.options.completionBeepCycles = 0;
   }
 }
 
 function saveOptionsConfig() {
   try {
     window.localStorage.setItem(optionsConfigKey, JSON.stringify({
-      showFreeTime: Boolean(state.options.showFreeTime)
+      showFreeTime: Boolean(state.options.showFreeTime),
+      completionBeepCycles: Number(state.options.completionBeepCycles || 0)
     }));
   } catch {}
 }
@@ -6358,6 +6498,9 @@ function renderOptionsModal() {
     toggleFreeTimeHint.textContent = state.options.showFreeTime ? "Mostrando" : "Ocultando";
   }
   toggleFreeTimeOptionButton?.classList.toggle("is-off", !state.options.showFreeTime);
+  if (toggleTaskBeepHint) {
+    toggleTaskBeepHint.textContent = taskBeepOptionLabels.get(Number(state.options.completionBeepCycles || 0)) || "Nenhum";
+  }
 }
 
 function resetProject200ExportModal() {
@@ -7107,8 +7250,8 @@ async function performRunningFinalize(runningAction) {
   await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
   const after = state.actions.find((item) => item.id === runningAction.id);
   if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
-    const nextAction = getNextTimelineEntryForRunning(runningAction);
-    const nextOfNext = nextAction ? getNextTimelineEntryForRunning(nextAction) : null;
+    const nextAction = getNextRelatedActionForRunning(runningAction);
+    const nextOfNext = nextAction ? getNextRelatedActionForRunning(nextAction) : null;
     const summary = getCompletionSummaryForSelectedProfile();
     runningCarryOverMinutes = savedMinutes;
     startRunningCompletionTransition({
@@ -7221,6 +7364,13 @@ toggleFreeTimeOptionButton?.addEventListener("click", () => {
   renderOptionsModal();
   renderActions();
   renderHomeRunningTask();
+});
+toggleTaskBeepOptionButton?.addEventListener("click", () => {
+  const currentIndex = Math.max(0, taskBeepOptionCycles.indexOf(Number(state.options.completionBeepCycles || 0)));
+  const nextIndex = (currentIndex + 1) % taskBeepOptionCycles.length;
+  state.options.completionBeepCycles = taskBeepOptionCycles[nextIndex];
+  saveOptionsConfig();
+  renderOptionsModal();
 });
 openProject200ExportModalButton?.addEventListener("click", () => {
   if (!getToken()) {
