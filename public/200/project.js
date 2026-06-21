@@ -20,7 +20,7 @@ const actionStatuses = {
 };
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
-  { key: "general", label: "Geral" },
+  { key: "general", label: "Global" },
   { key: "today", label: "Hoje" },
   { key: "week", label: "Esta semana" },
   { key: "last15", label: "Ultimos 15 dias" },
@@ -421,6 +421,9 @@ const openProject200CreateProfileModalButton = document.getElementById("openProj
 const project200CreateProfileNameInput = document.getElementById("project200CreateProfileName");
 const project200CreateProfileMessage = document.getElementById("project200CreateProfileMessage");
 const project200CreateProfileConfirmButton = document.getElementById("project200CreateProfileConfirm");
+const homeProfileButton = document.getElementById("homeProfileButton");
+const homeProfileAvatar = document.getElementById("homeProfileAvatar");
+const homeProfileName = document.getElementById("homeProfileName");
 const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption");
 const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -712,15 +715,36 @@ function saveSleepConfig() {
   window.localStorage.setItem(sleepConfigKey, JSON.stringify(state.sleepConfig));
 }
 
+function readTokenCookie() {
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)turma_do_printy_token=([^;]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
 function getToken() {
-  return window.localStorage.getItem(tokenKey) || "";
+  const localToken = window.localStorage.getItem(tokenKey) || "";
+  if (localToken) {
+    return localToken;
+  }
+  const cookieToken = readTokenCookie();
+  if (cookieToken) {
+    try {
+      window.localStorage.setItem(tokenKey, cookieToken);
+    } catch {}
+  }
+  return cookieToken;
 }
 
 function setToken(token) {
   if (token) {
     window.localStorage.setItem(tokenKey, token);
+    document.cookie = `${tokenKey}=${encodeURIComponent(token)}; path=/; max-age=31536000; SameSite=Lax`;
   } else {
     window.localStorage.removeItem(tokenKey);
+    document.cookie = `${tokenKey}=; path=/; max-age=0; SameSite=Lax`;
   }
 }
 
@@ -736,6 +760,10 @@ function refreshProfileLockFromAuth(authUser) {
 }
 
 function renderProfileFooterVisibility() {
+  const profiles = getProfilesList();
+  if (profileFooter) {
+    profileFooter.hidden = profiles.length <= 1;
+  }
   profileFooter?.querySelectorAll("[data-profile]").forEach((button) => {
     button.hidden = false;
   });
@@ -750,8 +778,20 @@ function applySelectedProfile(profile) {
   profileFooter?.querySelectorAll("[data-profile]").forEach((button) => {
     button.classList.toggle("active", button.dataset.profile === next);
   });
+  renderHomeProfileHero();
   renderProfileFooterVisibility();
   renderHomeRunningTask();
+}
+
+function renderHomeProfileHero() {
+  const profile = getProfileByName(state.selectedProfile) || getDefaultProfile();
+  if (homeProfileAvatar) {
+    homeProfileAvatar.src = getProfileAvatarPath(profile);
+    homeProfileAvatar.alt = profile?.name ? `Avatar de ${profile.name}` : "Avatar";
+  }
+  if (homeProfileName) {
+    homeProfileName.textContent = profile?.name || getDefaultProfileName();
+  }
 }
 
 function renderProfileFooter() {
@@ -763,6 +803,7 @@ function renderProfileFooter() {
       <img class="task-avatar" src="${getProfileAvatarPath(profile)}" alt="${escapeHtml(profile.name)}" />
     </button>
   `).join("");
+  renderHomeProfileHero();
   renderProfileFooterVisibility();
 }
 
@@ -4473,12 +4514,16 @@ function openProfileManageOverlay(profileName) {
   renderProfileManageOverlay();
   profileManageOverlay?.classList.add("active");
   profileManageOverlay?.setAttribute("aria-hidden", "false");
-  window.setTimeout(() => profileReassignSelect?.focus(), 40);
+  document.body.classList.add("modal-open");
+  window.setTimeout(() => profileManageCancel?.focus(), 40);
 }
 
 function closeProfileManageOverlay() {
   profileManageOverlay?.classList.remove("active");
   profileManageOverlay?.setAttribute("aria-hidden", "true");
+  if (!document.querySelector(".workspace-modal.active")) {
+    document.body.classList.remove("modal-open");
+  }
   profileManageTargetId = "";
 }
 
@@ -5591,8 +5636,19 @@ function renderStatsGoals() {
 
 function buildStatsRankingFromSummary() {
   const byAssignee = state.statsSummary?.byAssignee || {};
+  const totals = state.statsSummary?.totals || {};
   const ranking = [];
-  const orderedNames = getProfilesList().map((profile) => profile.name);
+  const orderedNames = [...new Set([
+    ...getProfilesList().map((profile) => profile.name),
+    ...Object.keys(byAssignee || {})
+  ])];
+  state.statsGeneral = {
+    name: "Global",
+    total: Number(totals.totalMinutes || 0),
+    completed: Number(totals.completedMinutes || 0),
+    percent: Number(totals.completionPercent || 0),
+    lateStartMinutes: Number(totals.lateStartMinutes || 0)
+  };
   for (const name of orderedNames) {
     const item = byAssignee[name] || { totalMinutes: 0, completedMinutes: 0 };
     const total = Number(item.totalMinutes || 0);
@@ -5606,12 +5662,7 @@ function buildStatsRankingFromSummary() {
       percent,
       lateStartMinutes
     };
-
-    if (name === getDefaultProfileName()) {
-      state.statsGeneral = payload;
-    } else {
-      ranking.push(payload);
-    }
+    ranking.push(payload);
   }
 
   ranking.sort((left, right) => {
@@ -6412,6 +6463,40 @@ function handleSwipe(element, callback) {
     if (Math.abs(delta) >= 48) {
       callback(delta > 0 ? -1 : 1);
     }
+  }, { passive: true });
+}
+
+function preventEdgeSwipeNavigation() {
+  let startX = 0;
+  let startY = 0;
+  let fromEdge = false;
+
+  document.addEventListener("touchstart", (event) => {
+    const touch = event.changedTouches?.[0];
+    startX = Number(touch?.clientX || 0);
+    startY = Number(touch?.clientY || 0);
+    const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
+    fromEdge = startX <= 28 || (viewportWidth > 0 && startX >= viewportWidth - 28);
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (event) => {
+    if (!fromEdge) {
+      return;
+    }
+    const touch = event.changedTouches?.[0];
+    const deltaX = Number(touch?.clientX || 0) - startX;
+    const deltaY = Number(touch?.clientY || 0) - startY;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  document.addEventListener("touchend", () => {
+    fromEdge = false;
+  }, { passive: true });
+
+  document.addEventListener("touchcancel", () => {
+    fromEdge = false;
   }, { passive: true });
 }
 
@@ -7540,6 +7625,47 @@ profileFooter?.addEventListener("contextmenu", (event) => {
     event.preventDefault();
   }
 });
+homeProfileButton?.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+homeProfileButton?.addEventListener("click", () => {
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  if (!profile) {
+    return;
+  }
+  if (profileLongPressHandledProfile === profile) {
+    profileLongPressHandledProfile = "";
+  }
+});
+homeProfileButton?.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  profilePressStartedAt = Date.now();
+  profilePressProfile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  if (profileHoldTimer) {
+    window.clearTimeout(profileHoldTimer);
+    profileHoldTimer = null;
+  }
+  if (profilePressProfile) {
+    profileHoldTimer = window.setTimeout(() => {
+      profileHoldTimer = null;
+      if (!profilePressProfile) {
+        return;
+      }
+      profileLongPressHandledProfile = profilePressProfile;
+      openProfileManageOverlay(profilePressProfile);
+    }, 500);
+  }
+});
+["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+  homeProfileButton?.addEventListener(evt, () => {
+    if (profileHoldTimer) {
+      window.clearTimeout(profileHoldTimer);
+      profileHoldTimer = null;
+    }
+    profilePressStartedAt = 0;
+    profilePressProfile = "";
+  });
+});
 profileFooter?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-profile]");
   if (!button) {
@@ -7837,6 +7963,7 @@ document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
 
 handleSwipe(historyDateLabel, moveHistoryDate);
 handleSwipe(historyTimelineList, moveHistoryDate);
+preventEdgeSwipeNavigation();
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     startRunningTaskTicker();

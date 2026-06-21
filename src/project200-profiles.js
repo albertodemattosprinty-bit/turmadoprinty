@@ -7,11 +7,8 @@ export const PROJECT200_DEFAULT_PROFILE_AVATAR = "default-user";
 
 const LEGACY_SEED_PROFILES = [
   { name: PROJECT200_DEFAULT_PROFILE_NAME, avatarPreset: PROJECT200_DEFAULT_PROFILE_AVATAR, isImmutable: true, isSystem: true, sortOrder: 0 },
-  { name: "Rose", avatarPreset: "rose", isImmutable: false, isSystem: true, sortOrder: 10 },
-  { name: "Alberto", avatarPreset: "alberto", isImmutable: false, isSystem: true, sortOrder: 20 },
-  { name: "Lucas", avatarPreset: "lucas", isImmutable: false, isSystem: true, sortOrder: 30 },
-  { name: "Thainan", avatarPreset: "thainan", isImmutable: false, isSystem: true, sortOrder: 40 }
 ];
+const LEGACY_REMOVED_PROFILE_KEYS = ["geral", "rose", "alberto", "lucas", "thainan"];
 
 function normalizeProfileName(value) {
   return String(value || "")
@@ -54,16 +51,31 @@ function normalizeProfileRow(row) {
 
 async function migrateLegacyGeneralToUsuario(client, userId) {
   await client.query(
-    `update actions set assignee = $2 where user_id = $1 and lower(trim(coalesce(assignee, ''))) = 'geral'`,
-    [userId, PROJECT200_DEFAULT_PROFILE_NAME]
+    `update actions set assignee = $2 where user_id = $1 and lower(trim(coalesce(assignee, ''))) = any($3::text[])`,
+    [userId, PROJECT200_DEFAULT_PROFILE_NAME, LEGACY_REMOVED_PROFILE_KEYS]
   );
   await client.query(
-    `update project_200_history_entries set assignee = $2 where user_id = $1 and lower(trim(coalesce(assignee, ''))) = 'geral'`,
-    [userId, PROJECT200_DEFAULT_PROFILE_NAME]
+    `update project_200_history_entries set assignee = $2 where user_id = $1 and lower(trim(coalesce(assignee, ''))) = any($3::text[])`,
+    [userId, PROJECT200_DEFAULT_PROFILE_NAME, LEGACY_REMOVED_PROFILE_KEYS]
   );
   await client.query(
-    `update project_200_history_entries set speaker = $2 where user_id = $1 and lower(trim(coalesce(speaker, ''))) = 'geral'`,
-    [userId, PROJECT200_DEFAULT_PROFILE_NAME]
+    `update project_200_history_entries set speaker = $2 where user_id = $1 and lower(trim(coalesce(speaker, ''))) = any($3::text[])`,
+    [userId, PROJECT200_DEFAULT_PROFILE_NAME, LEGACY_REMOVED_PROFILE_KEYS]
+  );
+  await client.query(
+    `update project200_profile_links set assigned_profile = $2, updated_at = now() where user_id = $1 and lower(trim(coalesce(assigned_profile, ''))) = any($3::text[])`,
+    [userId, PROJECT200_DEFAULT_PROFILE_NAME, LEGACY_REMOVED_PROFILE_KEYS]
+  );
+  await client.query(
+    `
+      update project200_profiles
+      set deleted_at = now(),
+          updated_at = now()
+      where user_id = $1
+        and deleted_at is null
+        and lower(trim(coalesce(name, ''))) = any($2::text[])
+    `,
+    [userId, LEGACY_REMOVED_PROFILE_KEYS.filter((name) => name !== "geral")]
   );
 }
 

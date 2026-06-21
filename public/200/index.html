@@ -35,6 +35,7 @@
       <div class="profile-manage-section">
         <label for="profileReassignSelect">Copiar tarefas de</label>
         <select id="profileReassignSelect" class="text-field profile-manage-select"></select>
+        <p class="options-note" id="profileReassignTargetHint">Destino: usuário selecionado</p>
         <button type="button" class="primary-btn" id="profileReassignConfirm">Copiar tarefas</button>
       </div>
       <div class="profile-manage-section">
@@ -64,7 +65,12 @@
     </div>
   </section>
   <main class="project-shell">
-    <img class="home-top-logo" src="/200/avatars/familyplan.png" alt="Logo geral" />
+    <section class="home-profile-hero">
+      <button class="home-profile-button" id="homeProfileButton" type="button" aria-label="Usuário atual">
+        <img class="home-top-logo" id="homeProfileAvatar" src="/200/avatars/familyplan.png" alt="Usuário atual" />
+      </button>
+      <span class="home-profile-name" id="homeProfileName">Usuario</span>
+    </section>
     <section class="project-hub" aria-label="Projeto 200">
       <button class="hub-action hub-icon-only" type="button" data-open-modal="actionsModal" aria-label="Ações">
         <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
@@ -829,13 +835,13 @@
 
       <div class="actions-list">
         <article class="task-row stats-general-card" id="statsGeneralCard">
-          <div class="stats-avatar-wrap">
-            <img class="task-avatar" id="statsGeneralAvatar" src="/200/avatars/familyplan.png" alt="Avatar geral" />
-          </div>
-          <div class="task-main">
-            <div class="task-title">Geral</div>
-            <div class="task-assignee" id="statsGeneralDetail">0%</div>
-          </div>
+      <div class="stats-avatar-wrap">
+        <img class="task-avatar" id="statsGeneralAvatar" src="/200/avatars/familyplan.png" alt="Avatar global" />
+      </div>
+      <div class="task-main">
+        <div class="task-title">Global</div>
+        <div class="task-assignee" id="statsGeneralDetail">0%</div>
+      </div>
         </article>
         <div id="statsRankingList"></div>
       </div>

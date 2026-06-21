@@ -134,12 +134,36 @@ body.project-no-select textarea {
   height: 36px;
 }
 
+.home-profile-hero {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: calc(clamp(4px, 2vh, 16px) + 20px);
+}
+
+.home-profile-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
 .home-top-logo {
-  width: min(250px, 60vw);
-  height: auto;
-  object-fit: contain;
+  width: min(128px, 34vw);
+  height: min(128px, 34vw);
+  object-fit: cover;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.32));
-  margin-top: calc(clamp(4px, 2vh, 16px) + 30px);
+}
+
+.home-profile-name {
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-align: center;
 }
 
 @keyframes projectBgDrift {
@@ -256,6 +280,7 @@ body.running-confirm-open #runningTaskModal .running-task-content {
   pointer-events: none;
 }
 
+body.start-decision-open .home-profile-hero,
 body.start-decision-open .home-top-logo,
 body.start-decision-open .project-hub,
 body.start-decision-open .home-datetime,
@@ -3001,9 +3026,13 @@ body.running-music-standalone #actionsModal .actions-list {
     gap: 8px;
   }
 
+  .home-profile-hero {
+    margin-top: 28px;
+  }
+
   .home-top-logo {
-    width: min(190px, 64vw);
-    margin-top: 32px;
+    width: min(116px, 32vw);
+    height: min(116px, 32vw);
   }
 
   .hub-icon-image {
