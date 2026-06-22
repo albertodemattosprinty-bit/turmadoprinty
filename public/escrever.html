@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Turma do Printy | Escrever</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page="escrever">
+  <main id="escrever-app" class="escrever-app" aria-live="polite">
+    <div id="escrever-recording-dot" class="escrever-recording-dot" hidden aria-hidden="true"></div>
+    <div id="escrever-toast" class="escrever-toast" hidden></div>
+
+    <section id="escrever-loading" class="escrever-center-state">
+      <p id="escrever-loading-text">Carregando...</p>
+    </section>
+
+    <section id="escrever-surface" class="escrever-surface" hidden>
+      <div id="escrever-empty" class="escrever-center-state escrever-empty" hidden>
+        <p>Duplo toque rapido para começar a escrever por voz.</p>
+      </div>
+
+      <div id="escrever-live" class="escrever-live" hidden>
+        <p id="escrever-live-text" class="escrever-live-text"></p>
+        <p id="escrever-live-status" class="escrever-live-status"></p>
+      </div>
+
+      <div id="escrever-list" class="escrever-list" aria-label="Paragrafos salvos"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/escrever.js"></script>
+</body>
+</html>

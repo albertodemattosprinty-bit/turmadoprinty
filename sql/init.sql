@@ -181,3 +181,14 @@ create table if not exists actions (
 
 create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);
 create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);
+
+create table if not exists escrever_paragraphs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  text text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_escrever_paragraphs_user_created_at on escrever_paragraphs(user_id, created_at asc);
+create index if not exists idx_escrever_paragraphs_user_updated_at on escrever_paragraphs(user_id, updated_at desc);

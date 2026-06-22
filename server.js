@@ -45,6 +45,7 @@ import {
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
 import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, hydrateMiniMediaLibraryFromDatabase, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
 import { ensureMiniDocumentExists, insertMiniDocumentLinesAfter, replaceMiniDocumentLineRange, updateMiniDocumentLine } from "./src/mini-docs.js";
+import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema, listEscreverParagraphs } from "./src/escrever.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
@@ -2313,6 +2314,60 @@ async function handleAudioSpeech(request, response, user = null) {
     sendJson(response, 500, {
       error: "Erro interno ao gerar audio.",
       details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
+async function handleEscreverParagraphsList(request, response) {
+  try {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    const paragraphs = await listEscreverParagraphs(user.id);
+    sendJson(response, 200, { ok: true, paragraphs });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os paragrafos."
+    });
+  }
+}
+
+async function handleEscreverParagraphCreate(request, response) {
+  try {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    const body = await readJsonBody(request);
+    const paragraph = await createEscreverParagraph(user.id, body);
+    sendJson(response, 201, { ok: true, paragraph });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar o paragrafo."
+    });
+  }
+}
+
+async function handleEscreverParagraphDelete(request, response, paragraphId) {
+  try {
+    const user = await requireAuth(request, response);
+
+    if (!user) {
+      return;
+    }
+
+    const deleted = await deleteEscreverParagraph(user.id, paragraphId);
+    sendJson(response, deleted ? 200 : 404, {
+      ok: deleted
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir o paragrafo."
     });
   }
 }
@@ -8281,6 +8336,22 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/escrever/paragraphs") {
+    await handleEscreverParagraphsList(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/escrever/paragraphs") {
+    await handleEscreverParagraphCreate(request, response);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/escrever\/paragraphs\/[^/]+$/)) {
+    const paragraphId = decodeURIComponent(pathname.replace(/^\/api\/escrever\/paragraphs\/([^/]+)$/, "$1"));
+    await handleEscreverParagraphDelete(request, response, paragraphId);
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/audio/speak") {
     const user = await requireAuth(request, response);
 
@@ -9846,6 +9917,9 @@ const server = http.createServer(async (request, response) => {
 });
 
 void bootstrapMiniCourseJobsQueue();
+void ensureEscreverSchema().catch((error) => {
+  console.error("Falha ao preparar a area /escrever:", error);
+});
 
 server.listen(PORT, () => {
   console.log(`Servidor online em http://localhost:${PORT}`);
