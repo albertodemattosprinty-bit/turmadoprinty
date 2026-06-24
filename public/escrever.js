@@ -37,6 +37,10 @@ function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
 }
 
+function redirectToEscreverAuth() {
+  window.location.href = `/auth.html?next=${encodeURIComponent("/escrever.html")}`;
+}
+
 function authHeaders() {
   return {
     Authorization: `Bearer ${getToken()}`
@@ -143,22 +147,34 @@ async function loadSession() {
   const token = getToken();
 
   if (!token) {
-    window.location.href = `/auth.html?next=${encodeURIComponent("/escrever")}`;
-    return;
+    redirectToEscreverAuth();
+    return false;
   }
 
-  const response = await fetch(getApiUrl("/api/auth/me"), {
-    headers: authHeaders()
-  });
-  const data = await response.json();
+  let response;
+  let data;
+
+  try {
+    response = await fetch(getApiUrl("/api/auth/me"), {
+      headers: authHeaders()
+    });
+    data = await response.json();
+  } catch (error) {
+    throw new Error("Nao foi possivel validar sua sessao agora.");
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    window.localStorage.removeItem(sessionStorageKey);
+    redirectToEscreverAuth();
+    return false;
+  }
 
   if (!response.ok || !data?.user) {
-    window.localStorage.removeItem(sessionStorageKey);
-    window.location.href = `/auth.html?next=${encodeURIComponent("/escrever")}`;
-    return;
+    throw new Error(data?.error || "Nao foi possivel validar sua sessao.");
   }
 
   currentUser = data.user;
+  return true;
 }
 
 async function loadParagraphs(selectedId = "") {
@@ -167,6 +183,11 @@ async function loadParagraphs(selectedId = "") {
   });
   const data = await response.json();
 
+  if (response.status === 401 || response.status === 403) {
+    redirectToEscreverAuth();
+    return false;
+  }
+
   if (!response.ok) {
     throw new Error(data?.error || "Falha ao carregar paragrafos.");
   }
@@ -174,6 +195,7 @@ async function loadParagraphs(selectedId = "") {
   paragraphs = Array.isArray(data?.paragraphs) ? data.paragraphs : [];
   selectedParagraphId = selectedId || selectedParagraphId || paragraphs[paragraphs.length - 1]?.id || "";
   renderParagraphs();
+  return true;
 }
 
 function updateSurfaceMode() {
@@ -518,9 +540,15 @@ function handleGlobalPointerUp(event) {
 async function bootstrap() {
   try {
     setLoading("Validando sua conta...");
-    await loadSession();
+    const sessionReady = await loadSession();
+    if (!sessionReady) {
+      return;
+    }
     setLoading("Carregando seus paragrafos...");
-    await loadParagraphs();
+    const paragraphsReady = await loadParagraphs();
+    if (!paragraphsReady) {
+      return;
+    }
     loadingSection.hidden = true;
     surface.hidden = false;
     renderParagraphs();
