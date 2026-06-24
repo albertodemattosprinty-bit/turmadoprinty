@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Portfólio Institucional</title>
+  <style>
+    :root {
+      --ink: #1f2430;
+      --muted: #596273;
+      --line: #d8dce5;
+      --panel: #ffffff;
+      --panel-soft: #f5f7fb;
+      --brand: #d94b34;
+      --brand-deep: #a63224;
+      --brand-soft: #ffe5df;
+      --gold: #f2bb4a;
+      --navy: #24364f;
+      --green: #2f7260;
+      --shadow: 0 18px 48px rgba(36, 54, 79, 0.14);
+      --radius: 22px;
+      --page-width: 1100px;
+      --font-body: "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+      --font-display: "Georgia", "Cambria", serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background:
+        radial-gradient(circle at top left, rgba(242, 187, 74, 0.24), transparent 28%),
+        linear-gradient(180deg, #fefaf6 0%, #f7f8fc 52%, #eef2f8 100%);
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.55;
+    }
+
+    body {
+      margin: 0;
+      padding: 36px 18px 72px;
+    }
+
+    .document {
+      max-width: var(--page-width);
+      margin: 0 auto;
+      display: grid;
+      gap: 22px;
+    }
+
+    .sheet {
+      background: var(--panel);
+      border: 1px solid rgba(36, 54, 79, 0.08);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .sheet-inner {
+      padding: 40px;
+    }
+
+    .video-hero {
+      background:
+        radial-gradient(circle at top right, rgba(242, 187, 74, 0.18), transparent 24%),
+        linear-gradient(135deg, #18385f 0%, #1f5ea2 55%, #2a79cf 100%);
+      color: #fff;
+    }
+
+    .video-shell {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .video-copy h2 {
+      color: #fff;
+      font-size: 38px;
+    }
+
+    .video-copy p {
+      margin: 14px 0 0;
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 16px;
+      max-width: 560px;
+    }
+
+    .video-stage {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 26px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(7, 29, 55, 0.1), rgba(7, 29, 55, 0.42)),
+        linear-gradient(135deg, #0f4277 0%, #0d5db0 100%);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .video-stage video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      background: #0f4f92;
+    }
+
+    .video-loading {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        linear-gradient(180deg, rgba(10, 43, 79, 0.4), rgba(10, 43, 79, 0.86)),
+        linear-gradient(135deg, #0d4f93 0%, #0a3c72 100%);
+      transition: opacity 300ms ease, visibility 300ms ease;
+    }
+
+    .video-loading.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .video-loading-card {
+      width: min(320px, 100%);
+      padding: 28px 24px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.11);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(8px);
+      text-align: center;
+    }
+
+    .video-loading-card strong {
+      display: block;
+      font-size: 38px;
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .video-loading-card span {
+      display: block;
+      margin-top: 10px;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 14px;
+    }
+
+    .video-progress {
+      width: 100%;
+      height: 10px;
+      margin-top: 18px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      overflow: hidden;
+    }
+
+    .video-progress-bar {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #f2bb4a 0%, #ffe7a4 100%);
+      transition: width 120ms linear;
+    }
+
+    .hero {
+      position: relative;
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(36, 54, 79, 0.95), rgba(217, 75, 52, 0.9)),
+        linear-gradient(180deg, #33425c, #bc3f2d);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -18% auto;
+      width: 360px;
+      height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 62%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 28px;
+      align-items: end;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.08;
+    }
+
+    h1 {
+      margin-top: 18px;
+      font-family: var(--font-display);
+      font-size: 54px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p.lead {
+      margin: 18px 0 0;
+      max-width: 740px;
+      font-size: 19px;
+      color: rgba(255, 255, 255, 0.94);
+    }
+
+    .hero-side {
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero-card {
+      padding: 18px 20px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+    }
+
+    .hero-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hero-card span {
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .section-header {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .section-kicker {
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 34px;
+      color: var(--navy);
+    }
+
+    .section-copy {
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 900px;
+    }
+
+    .stats,
+    .pillars,
+    .offers,
+    .proof-grid,
+    .timeline,
+    .closing-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .stat {
+      padding: 22px;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, #ffffff 0%, #f7f8fb 100%);
+      border: 1px solid rgba(36, 54, 79, 0.08);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 34px;
+      color: var(--brand-deep);
+      line-height: 1;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .pillars {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .card {
+      padding: 24px;
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+      border: 1px solid rgba(36, 54, 79, 0.08);
+    }
+
+    .card h3 {
+      font-size: 21px;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .card ul {
+      margin: 10px 0 0;
+      padding-left: 18px;
+    }
+
+    .offers {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .offer {
+      padding: 24px;
+      border-radius: var(--radius);
+      background: #fff;
+      border: 1px solid rgba(36, 54, 79, 0.08);
+      box-shadow: 0 10px 24px rgba(36, 54, 79, 0.06);
+    }
+
+    .offer h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: var(--navy);
+    }
+
+    .offer p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .accent-band {
+      padding: 28px;
+      border-radius: 24px;
+      background:
+        linear-gradient(135deg, rgba(217, 75, 52, 0.08), rgba(47, 114, 96, 0.08)),
+        #fff;
+      border: 1px solid rgba(217, 75, 52, 0.12);
+    }
+
+    .accent-band h3 {
+      margin-bottom: 12px;
+      font-size: 24px;
+      color: var(--navy);
+    }
+
+    .accent-band p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .proof-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .proof {
+      padding: 24px;
+      border-radius: var(--radius);
+      background: #fff;
+      border: 1px solid rgba(36, 54, 79, 0.08);
+    }
+
+    .proof h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: var(--navy);
+    }
+
+    .proof ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .timeline {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .timeline-item {
+      border-radius: 24px;
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid rgba(36, 54, 79, 0.08);
+      display: grid;
+      grid-template-rows: 240px auto;
+    }
+
+    .timeline-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #e8edf5;
+      display: block;
+    }
+
+    .timeline-copy {
+      padding: 18px 20px 22px;
+    }
+
+    .timeline-year {
+      display: inline-block;
+      padding: 6px 11px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand-deep);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .timeline-copy h3 {
+      font-size: 21px;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+
+    .timeline-copy p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .closing-grid {
+      grid-template-columns: 1.2fr 0.8fr;
+      align-items: start;
+    }
+
+    .closing-note {
+      padding: 26px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #24364f 0%, #314764 100%);
+      color: #fff;
+    }
+
+    .closing-note h3 {
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .closing-note p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .fit-list {
+      padding: 26px;
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid rgba(36, 54, 79, 0.08);
+    }
+
+    .fit-list h3 {
+      margin-bottom: 14px;
+      font-size: 22px;
+      color: var(--navy);
+    }
+
+    .fit-list ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .footer-note {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.18);
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    @media (max-width: 920px) {
+      .hero-grid,
+      .video-shell,
+      .stats,
+      .pillars,
+      .offers,
+      .proof-grid,
+      .timeline,
+      .closing-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .sheet-inner {
+        padding: 28px;
+      }
+    }
+
+    @media print {
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+
+      html {
+        background: #fff;
+      }
+
+      body {
+        padding: 0;
+        background: #fff;
+      }
+
+      .document {
+        max-width: none;
+        gap: 12px;
+      }
+
+      .sheet {
+        box-shadow: none;
+        border: 1px solid #d7dbe3;
+        break-inside: avoid;
+      }
+
+      .sheet-inner {
+        padding: 22px;
+      }
+
+      .timeline-item {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="document">
+    <section class="sheet video-hero">
+      <div class="sheet-inner">
+        <div class="video-shell">
+          <div class="video-copy">
+            <div class="eyebrow">Vídeo de Apresentação</div>
+            <h2>Release institucional em destaque</h2>
+            <p>
+              Antes do portfólio completo, este vídeo apresenta a atmosfera, a identidade e a
+              trajetória artística que sustentam a Turma do Printy. O carregamento é liberado
+              assim que o primeiro bloco essencial do arquivo estiver disponível para início.
+            </p>
+          </div>
+          <div class="video-stage">
+            <video
+              id="releaseVideo"
+              playsinline
+              muted
+              controls
+              preload="metadata"
+              poster=""
+            ></video>
+            <div class="video-loading" id="videoLoading">
+              <div class="video-loading-card">
+                <strong id="videoPercent">0%</strong>
+                <span id="videoStatus">Preparando vídeo institucional</span>
+                <div class="video-progress">
+                  <div class="video-progress-bar" id="videoProgressBar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet hero">
+      <div class="sheet-inner">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Portfólio Institucional</div>
+            <h1>Turma do Printy</h1>
+            <p class="lead">
+              Cultura, educação, música, teatro e experiências participativas para crianças,
+              famílias, escolas, comunidades e projetos públicos.
+            </p>
+          </div>
+          <div class="hero-side">
+            <div class="hero-card">
+              <strong>Posicionamento</strong>
+              <span>Projeto artístico-educativo com linguagem infantil, foco em participação e experiência prática.</span>
+            </div>
+            <div class="hero-card">
+              <strong>Aplicação pública</strong>
+              <span>Atuações adaptáveis para escolas, secretarias, campanhas, semanas temáticas, ações comunitárias e eventos culturais.</span>
+            </div>
+            <div class="hero-card">
+              <strong>Trajetória</strong>
+              <span>Histórico contínuo desde 1989, com repertório, personagens, treinamentos, espetáculos e produções audiovisuais.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Quem somos</div>
+          <h2>Uma trajetória construída na infância, na arte e na educação</h2>
+          <div class="section-copy">
+            A Turma do Printy reúne mais de três décadas de experiência no desenvolvimento de projetos
+            voltados à infância, utilizando música, teatro, personagens, conteúdos audiovisuais,
+            treinamentos e atividades participativas como ferramentas de educação, cultura e convivência.
+            Ao longo dessa trajetória, o grupo realizou projetos educativos, gravações musicais e audiovisuais,
+            apresentações presenciais, espetáculos teatrais, formações para educadores e ações sociais
+            direcionadas ao público infantil.
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <strong>1989</strong>
+            <span>Início da trajetória registrada em projetos com crianças.</span>
+          </div>
+          <div class="stat">
+            <strong>30+</strong>
+            <span>Anos de atuação contínua com linguagem artística e educativa.</span>
+          </div>
+          <div class="stat">
+            <strong>20</strong>
+            <span>Marcos documentados nesta apresentação institucional.</span>
+          </div>
+          <div class="stat">
+            <strong>Multiformato</strong>
+            <span>Espetáculos, treinamentos, campanhas, ações comunitárias e audiovisual.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Nossa proposta</div>
+          <h2>Experiências que fazem a criança participar de verdade</h2>
+          <div class="section-copy">
+            A essência do trabalho da Turma do Printy é criar experiências leves, criativas e participativas.
+            Em vez de apenas assistir, as crianças são convidadas a cantar, responder, brincar, interagir com
+            personagens, participar de histórias e viver momentos que unem diversão, aprendizagem e convivência.
+          </div>
+        </div>
+
+        <div class="pillars">
+          <article class="card">
+            <h3>Linguagem infantil com propósito</h3>
+            <p>Os conteúdos são pensados para comunicar com clareza, humor, música e imaginação, respeitando o universo da infância.</p>
+          </article>
+          <article class="card">
+            <h3>Integração entre cultura e educação</h3>
+            <p>As ações combinam arte, convivência, criatividade e recursos pedagógicos, criando ambientes mais vivos e memoráveis.</p>
+          </article>
+          <article class="card">
+            <h3>Formatos adaptáveis</h3>
+            <p>O repertório pode ser organizado para escolas, secretarias, campanhas, eventos municipais, semanas temáticas e projetos sociais.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Frentes de entrega</div>
+          <h2>Soluções que dialogam com o setor público</h2>
+          <div class="section-copy">
+            A Turma do Printy pode colaborar com prefeituras, secretarias e instituições públicas em ações voltadas
+            à infância, à cidadania, à cultura e à formação de educadores.
+          </div>
+        </div>
+
+        <div class="offers">
+          <article class="offer">
+            <h3>Espetáculos e apresentações infantis</h3>
+            <p>Programações para semanas da criança, festivais, eventos municipais, datas comemorativas e encontros com famílias.</p>
+          </article>
+          <article class="offer">
+            <h3>Projetos educativos em escolas e comunidades</h3>
+            <p>Vivências com personagens, histórias, música e participação coletiva para fortalecer aprendizagem e convivência.</p>
+          </article>
+          <article class="offer">
+            <h3>Campanhas públicas de conscientização</h3>
+            <p>Ações temáticas com linguagem lúdica para saúde, cidadania, prevenção, cuidado coletivo e participação social.</p>
+          </article>
+          <article class="offer">
+            <h3>Treinamento e formação para educadores</h3>
+            <p>Encontros práticos com estratégias de comunicação, musicalização, criatividade, dinâmica de grupo e engajamento infantil.</p>
+          </article>
+        </div>
+
+        <div class="accent-band" style="margin-top: 18px;">
+          <h3>Aplicabilidade imediata</h3>
+          <p>
+            O repertório e os formatos da Turma do Printy podem ser adaptados para projetos escolares, campanhas de
+            conscientização, ações em comunidades, festas municipais, eventos em equipamentos públicos e formações
+            voltadas a profissionais da infância.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Credibilidade</div>
+          <h2>Evidências de atuação e capacidade de execução</h2>
+        </div>
+
+        <div class="proof-grid">
+          <article class="proof">
+            <h3>Histórico consistente</h3>
+            <ul>
+              <li>Projetos com crianças em ambiente escolar e comunitário desde o final da década de 1980.</li>
+              <li>Produções em música, vídeo, teatro e ações presenciais ao longo de várias fases do projeto.</li>
+              <li>Presença em diferentes cidades, contextos e formatos de público.</li>
+            </ul>
+          </article>
+          <article class="proof">
+            <h3>Capacidade de adaptação</h3>
+            <ul>
+              <li>Linguagem ajustável para escolas, famílias, igrejas, eventos cívicos, campanhas e programas públicos.</li>
+              <li>Integração entre espetáculo, mediação, formação e material de apoio.</li>
+              <li>Possibilidade de customização por tema, faixa etária e objetivo do contratante.</li>
+            </ul>
+          </article>
+          <article class="proof">
+            <h3>Metodologia participativa</h3>
+            <ul>
+              <li>Interação real com crianças por meio de personagens, perguntas, música e atividade coletiva.</li>
+              <li>Engajamento afetivo sem perder clareza educativa.</li>
+              <li>Experiências pensadas para gerar memória, envolvimento e mensagem compreensível.</li>
+            </ul>
+          </article>
+          <article class="proof">
+            <h3>Frentes atuais de relevância pública</h3>
+            <ul>
+              <li>Espetáculos infantis com valores de convivência, amizade, respeito e responsabilidade.</li>
+              <li>Treinamentos para professores e educadores.</li>
+              <li>Projetos temáticos, como ações de prevenção e conscientização em linguagem lúdica.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Linha do tempo</div>
+          <h2>Marcos da trajetória institucional</h2>
+          <div class="section-copy">
+            A seguir, uma seleção cronológica de registros e experiências que evidenciam continuidade,
+            repertório e atualização ao longo do tempo.
+          </div>
+        </div>
+
+        <div class="timeline">
+          <article class="timeline-item">
+            <img src="./images/01.png" alt="1989 | Projeto Educativo com Escola Shallon">
+            <div class="timeline-copy">
+              <div class="timeline-year">1989</div>
+              <h3>Projeto Educativo com Escola Shallon</h3>
+              <p>Início de uma trajetória marcada pelo trabalho direto com crianças em ambiente escolar, utilizando atividades participativas, música e interação.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/02.png" alt="1992 | Projeto Educativo com Crianças | Anhangabaú">
+            <div class="timeline-copy">
+              <div class="timeline-year">1992</div>
+              <h3>Projeto Educativo com Crianças | Anhangabaú, São Paulo - SP</h3>
+              <p>Atividade desenvolvida em espaço público, aproximando cultura, recreação e educação de crianças de diferentes realidades.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/03.webp" alt="1994 | Gravação de VHS Educativo Infantil">
+            <div class="timeline-copy">
+              <div class="timeline-year">1994</div>
+              <h3>Gravação de VHS Educativo Infantil</h3>
+              <p>Produção audiovisual voltada ao público infantil, ampliando a presença da Turma do Printy em conteúdos educativos e culturais.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/04.png" alt="1997 | Gravação de LP com Crianças">
+            <div class="timeline-copy">
+              <div class="timeline-year">1997</div>
+              <h3>Gravação de LP com Crianças</h3>
+              <p>Registro musical com participação infantil, fortalecendo a música como ferramenta de expressão, aprendizado e memória afetiva.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/05.png" alt="1999 | Projeto Educar | Colégio CECOG">
+            <div class="timeline-copy">
+              <div class="timeline-year">1999</div>
+              <h3>Projeto Educar | Colégio CECOG</h3>
+              <p>Projeto realizado em ambiente escolar, com propostas de convivência, criatividade e participação das crianças.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/06.png" alt="2000 | Projeto Crescer | Colégio CECOG">
+            <div class="timeline-copy">
+              <div class="timeline-year">2000</div>
+              <h3>Projeto Crescer | Colégio CECOG</h3>
+              <p>Continuidade das atividades educativas, utilizando linguagem acessível, música e momentos coletivos voltados ao desenvolvimento infantil.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/07.png" alt="2005 | Gravação de DVD Infantil Educativo">
+            <div class="timeline-copy">
+              <div class="timeline-year">2005</div>
+              <h3>Gravação de DVD Infantil Educativo</h3>
+              <p>Nova etapa de produção audiovisual, levando conteúdos infantis para um formato moderno e acessível a famílias e escolas.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/08.png" alt="2009 | Apresentação para Crianças | Heliópolis">
+            <div class="timeline-copy">
+              <div class="timeline-year">2009</div>
+              <h3>Apresentação para Crianças | Comunidade de Heliópolis, São Paulo - SP</h3>
+              <p>Apresentação interativa com música, personagens e brincadeiras, aproximando o projeto de crianças da comunidade.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/09.png" alt="2016 | Treinamento para Professores de Crianças">
+            <div class="timeline-copy">
+              <div class="timeline-year">2016</div>
+              <h3>Treinamento para Professores de Crianças</h3>
+              <p>Encontro de formação com educadores, compartilhando ferramentas práticas para desenvolver aulas, atividades e encontros mais participativos.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/10.png" alt="2018 | Apresentação para Crianças | Belo Horizonte">
+            <div class="timeline-copy">
+              <div class="timeline-year">2018</div>
+              <h3>Apresentação para Crianças | Belo Horizonte - MG</h3>
+              <p>Experiência cultural e recreativa voltada ao público infantil, com participação coletiva e linguagem adequada às diferentes idades.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/11.png" alt="2019 | Simpósio da Família | Goiânia">
+            <div class="timeline-copy">
+              <div class="timeline-year">2019</div>
+              <h3>Simpósio da Família | Goiânia - GO</h3>
+              <p>Participação em programação voltada à infância e à convivência familiar, reunindo música, comunicação e atividades interativas.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/12.png" alt="2020 | Gravação de Programa Infantil | EBC">
+            <div class="timeline-copy">
+              <div class="timeline-year">2020</div>
+              <h3>Gravação de Programa Infantil | EBC</h3>
+              <p>Produção audiovisual com crianças, fortalecendo a presença da Turma do Printy em conteúdos infantis para meios de comunicação.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/13.png" alt="2022 | Gravação do Clipe Musical Porque">
+            <div class="timeline-copy">
+              <div class="timeline-year">2022</div>
+              <h3>Gravação do Clipe Musical “Porque” | Mogi das Cruzes - SP</h3>
+              <p>Produção musical contemporânea que une vídeo, música, personagens e participação infantil em uma linguagem atual.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/14.png" alt="2023 | Lançamento do Teatro Fábrica de Heróis">
+            <div class="timeline-copy">
+              <div class="timeline-year">2023</div>
+              <h3>Lançamento do Teatro “Fábrica de Heróis” | São Paulo - SP</h3>
+              <p>Estreia de espetáculo infantil com humor, personagens marcantes, músicas interativas e mensagens sobre amizade, respeito, ética e convivência.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/15.png" alt="2024 | Treinamento ELEVA para Professores de Crianças">
+            <div class="timeline-copy">
+              <div class="timeline-year">2024</div>
+              <h3>Treinamento ELEVA para Professores de Crianças</h3>
+              <p>Formação voltada a educadores, com estratégias para ampliar o engajamento infantil e organizar experiências pedagógicas mais criativas.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/16.png" alt="2025 | Projeto Fábrica de Heróis com Crianças da Comunidade">
+            <div class="timeline-copy">
+              <div class="timeline-year">2025</div>
+              <h3>Projeto “Fábrica de Heróis” com Crianças da Comunidade</h3>
+              <p>Vivência teatral e educativa que utiliza personagens, histórias e música para envolver crianças em uma experiência coletiva.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/17.jpg" alt="2025 | Todos Contra a Dengue | Prefeitura de Duque de Caxias">
+            <div class="timeline-copy">
+              <div class="timeline-year">2025</div>
+              <h3>Todos Contra a Dengue | Projeto Prefeitura de Duque de Caxias - RJ</h3>
+              <p>Ação educativa de conscientização infantil sobre prevenção à dengue, utilizando linguagem lúdica, personagens e participação do público.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/18.png" alt="2025 | Treinamento para Professores de Crianças | São Paulo">
+            <div class="timeline-copy">
+              <div class="timeline-year">2025</div>
+              <h3>Treinamento para Professores de Crianças | São Paulo - SP</h3>
+              <p>Encontro de capacitação com educadores, reunindo técnicas de comunicação, criatividade, dinâmica de grupo e planejamento de atividades.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/19.png" alt="2025 | O Natal das Crianças | DiGaspi">
+            <div class="timeline-copy">
+              <div class="timeline-year">2025</div>
+              <h3>Apresentação “O Natal das Crianças” | DiGaspi</h3>
+              <p>Apresentação especial para crianças e famílias, com música, personagens e clima de celebração em ação beneficente anual.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="./images/20.png" alt="2026 | Simpósio de Musicalização Infantil | São Paulo">
+            <div class="timeline-copy">
+              <div class="timeline-year">2026</div>
+              <h3>Simpósio de Musicalização Infantil | São Paulo - SP</h3>
+              <p>Participação em encontro voltado à importância da música no desenvolvimento infantil, com troca de experiências e valorização de práticas educativas.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="closing-grid">
+          <div class="closing-note">
+            <h3>Nosso compromisso com o futuro</h3>
+            <p>
+              Mais do que realizar apresentações, a Turma do Printy busca criar experiências que deixam
+              marcas positivas: crianças que participam, famílias que se envolvem, professores que encontram
+              novas ferramentas e comunidades que reconhecem a infância como prioridade.
+            </p>
+            <div class="footer-note">
+              Material institucional para apresentação, prospecção e diálogo com prefeituras, secretarias,
+              escolas, instituições e parceiros públicos ou privados.
+            </div>
+          </div>
+          <div class="fit-list">
+            <h3>Ideal para contratação em</h3>
+            <ul>
+              <li>Semanas da criança e calendários culturais</li>
+              <li>Campanhas educativas e de conscientização</li>
+              <li>Projetos em escolas e equipamentos públicos</li>
+              <li>Formações para professores e equipes da infância</li>
+              <li>Eventos com famílias, comunidades e ações territoriais</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      const videoUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Capas/Release%20Alberto%20de%20Mattos.mp4";
+      const bufferTargetBytes = 1024 * 1024;
+      const video = document.getElementById("releaseVideo");
+      const loading = document.getElementById("videoLoading");
+      const percent = document.getElementById("videoPercent");
+      const status = document.getElementById("videoStatus");
+      const bar = document.getElementById("videoProgressBar");
+
+      function setProgress(value, label) {
+        const clamped = Math.max(0, Math.min(100, Math.round(value)));
+        percent.textContent = clamped + "%";
+        bar.style.width = clamped + "%";
+        if (label) {
+          status.textContent = label;
+        }
+      }
+
+      function releaseVideo() {
+        if (video.dataset.released === "1") return;
+        video.dataset.released = "1";
+        setProgress(100, "Vídeo pronto para iniciar");
+        video.src = videoUrl;
+        video.load();
+      }
+
+      function hideLoader() {
+        loading.classList.add("is-hidden");
+      }
+
+      async function warmupVideo() {
+        if (!window.fetch || !window.ReadableStream) {
+          setProgress(100, "Iniciando vídeo");
+          releaseVideo();
+          return;
+        }
+
+        try {
+          const response = await fetch(videoUrl, {
+            headers: { Range: "bytes=0-1048575" }
+          });
+
+          if (!response.ok || !response.body) {
+            setProgress(100, "Iniciando vídeo");
+            releaseVideo();
+            return;
+          }
+
+          const reader = response.body.getReader();
+          let loaded = 0;
+
+          setProgress(0, "Carregando buffer inicial");
+
+          while (loaded < bufferTargetBytes) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            loaded += value ? value.byteLength : 0;
+            setProgress((loaded / bufferTargetBytes) * 100, "Carregando buffer inicial");
+          }
+
+          releaseVideo();
+        } catch (error) {
+          setProgress(100, "Iniciando vídeo");
+          releaseVideo();
+        }
+      }
+
+      video.addEventListener("loadeddata", function () {
+        setProgress(100, "Vídeo liberado");
+      });
+
+      video.addEventListener("canplay", function () {
+        hideLoader();
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.catch === "function") {
+          playAttempt.catch(function () {});
+        }
+      });
+
+      video.addEventListener("error", function () {
+        setProgress(100, "Clique em play para carregar o vídeo");
+        hideLoader();
+      });
+
+      warmupVideo();
+    })();
+  </script>
+</body>
+</html>

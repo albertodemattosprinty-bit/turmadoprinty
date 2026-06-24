@@ -89,7 +89,7 @@
 
     .video-stage {
       position: relative;
-      min-height: 360px;
+      aspect-ratio: 16 / 9;
       border-radius: 26px;
       overflow: hidden;
       background:
@@ -103,7 +103,7 @@
       width: 100%;
       height: 100%;
       display: block;
-      object-fit: cover;
+      object-fit: contain;
       background: #0f4f92;
     }
 
@@ -164,22 +164,6 @@
       border-radius: inherit;
       background: linear-gradient(90deg, #f2bb4a 0%, #ffe7a4 100%);
       transition: width 120ms linear;
-    }
-
-    .video-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 16px;
-    }
-
-    .video-chip {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 13px;
-      font-weight: 700;
     }
 
     .hero {
@@ -594,11 +578,6 @@
               trajetória artística que sustentam a Turma do Printy. O carregamento é liberado
               assim que o primeiro bloco essencial do arquivo estiver disponível para início.
             </p>
-            <div class="video-meta">
-              <div class="video-chip">Abertura institucional</div>
-              <div class="video-chip">Carregamento progressivo</div>
-              <div class="video-chip">Buffer inicial de 1 MB</div>
-            </div>
           </div>
           <div class="video-stage">
             <video
