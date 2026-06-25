@@ -403,7 +403,8 @@ function buildMiniCourseCoverFolder(courseId) {
   return `${MINI_COURSE_COVERS_PREFIX}/${String(courseId || "").trim()}`;
 }
 
-function buildMiniMediaAlbumPayload(album) {
+function buildMiniMediaAlbumPayload(album, options = {}) {
+  const includeExtended = options?.includeExtended === true;
   const coverImageUrl = album?.coverKey ? buildAlbumZipPublicUrlFromKey(album.coverKey) : "";
   const songs = Array.isArray(album?.songs) ? album.songs.map((song) => ({
     id: song.id,
@@ -412,12 +413,14 @@ function buildMiniMediaAlbumPayload(album) {
     subtitle: song.subtitle,
     order: Math.max(0, Number(song.order || 0) || 0),
     url: song.key ? buildAlbumZipPublicUrlFromKey(song.key) : "",
+    songJsonUrl: buildAlbumZipPublicUrlFromKey(`${buildMiniMediaAlbumFolder(album.id)}/songs/${song.globalId || song.id}/song.json`),
     playbackSongId: song.playbackSongId || "",
     playbackUrl: song.playbackSongId
       ? buildAlbumZipPublicUrlFromKey(album.songs.find((candidate) => candidate.globalId === song.playbackSongId)?.key || "")
       : (song.playbackKey ? buildAlbumZipPublicUrlFromKey(song.playbackKey) : ""),
     coverImageUrl,
     hasLyrics: Boolean(song.lyricsText || song.lyricsKey),
+    ...(includeExtended ? { lyricsText: String(song.lyricsText || "").trim() } : {}),
     lyricsSyncData: song.lyricsSyncData && typeof song.lyricsSyncData === "object" ? song.lyricsSyncData : null,
     lyricsUpdatedAt: song.lyricsUpdatedAt || null,
     hasScores: Math.max(0, Number(song.scoreCount || 0) || 0) > 0,
@@ -434,10 +437,10 @@ function buildMiniMediaAlbumPayload(album) {
   };
 }
 
-function buildMiniMediaLibraryPayload(library) {
+function buildMiniMediaLibraryPayload(library, options = {}) {
   const normalized = normalizeMiniMediaLibrary(library);
   return {
-    albums: normalized.albums.map((album) => buildMiniMediaAlbumPayload(album))
+    albums: normalized.albums.map((album) => buildMiniMediaAlbumPayload(album, options))
   };
 }
 
@@ -1109,6 +1112,134 @@ function buildTrackUrl(albumName, trackNumber) {
   return `${CONTENT_BASE_URL}/${encodeURIComponent(albumName)}/mp3/${String(trackNumber).padStart(3, "0")}.mp3`;
 }
 
+function normalizeStoreCatalogText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+const MINI_PRODUCT_ALBUM_ALIASES = {
+  [normalizeStoreCatalogText("Coletânea de dia das mães")]: [
+    "De repente mãe",
+    "Mãe inesquecível",
+    "Simplesmente Mãe",
+    "Um presente chamado mãe"
+  ],
+  [normalizeStoreCatalogText("Coletânea de Dia dos Pais")]: [
+    "Aprendi com meu Pai",
+    "Meu pai, meu amigo"
+  ],
+  [normalizeStoreCatalogText("Coletânea de Natal")]: [
+    "É Natal",
+    "A Verdadeira Historia do Natal",
+    "Jesus, a alegria do Natal",
+    "Já Nasceu",
+    "O nascimento do Rei",
+    "O Sentido do Natal 2",
+    "Um presente para todos",
+    "Em busca do presente maior"
+  ]
+};
+
+function getMiniTrackType(song = {}) {
+  const normalizedTitle = normalizeStoreCatalogText(song?.title || "");
+  if (normalizedTitle.includes("playback") || normalizedTitle.includes("trilha")) {
+    return "playback";
+  }
+  return "full";
+}
+
+function getMiniMediaAlbumsByTitleMap(library) {
+  const map = new Map();
+  const albums = Array.isArray(library?.albums) ? library.albums : [];
+  for (const album of albums) {
+    map.set(normalizeStoreCatalogText(album?.title || ""), album);
+  }
+  return map;
+}
+
+function resolveMiniMediaAlbumsForProduct(product, library) {
+  const titleMap = getMiniMediaAlbumsByTitleMap(library);
+  const normalizedProductName = normalizeStoreCatalogText(product?.name || "");
+  const exact = titleMap.get(normalizedProductName);
+  if (exact) {
+    return [exact];
+  }
+
+  const aliases = MINI_PRODUCT_ALBUM_ALIASES[normalizedProductName] || [];
+  const resolved = aliases
+    .map((title) => titleMap.get(normalizeStoreCatalogText(title)))
+    .filter(Boolean);
+  if (resolved.length) {
+    return resolved;
+  }
+
+  return [];
+}
+
+function buildMiniBackedStoreTracks(product, library) {
+  const sourceAlbums = resolveMiniMediaAlbumsForProduct(product, library);
+  let runningNumber = 1;
+  const tracks = [];
+
+  for (const album of sourceAlbums) {
+    const songs = Array.isArray(album?.songs) ? [...album.songs] : [];
+    songs.sort((left, right) => (Number(left?.order || 0) || 0) - (Number(right?.order || 0) || 0));
+
+    for (const song of songs) {
+      const number = runningNumber;
+      runningNumber += 1;
+      tracks.push({
+        number,
+        code: String(number).padStart(3, "0"),
+        label: String(song?.title || `Faixa ${String(number).padStart(3, "0")}`).trim() || `Faixa ${String(number).padStart(3, "0")}`,
+        title: String(song?.title || `Faixa ${String(number).padStart(3, "0")}`).trim() || `Faixa ${String(number).padStart(3, "0")}`,
+        type: getMiniTrackType(song),
+        durationSeconds: Number(song?.durationSeconds || 0) || 0,
+        publicUrl: String(song?.url || "").trim(),
+        streamUrl: String(song?.url || "").trim(),
+        downloadUrl: String(song?.url || "").trim(),
+        playbackTrackNumber: null,
+        playbackTrackCode: null,
+        playbackUrl: String(song?.playbackUrl || "").trim(),
+        lyrics: String(song?.lyricsText || "").trim(),
+        lyricsSyncData: song?.lyricsSyncData && typeof song.lyricsSyncData === "object" ? song.lyricsSyncData : null,
+        lyricsUpdatedAt: song?.lyricsUpdatedAt || null,
+        hasLyrics: Boolean(song?.hasLyrics),
+        hasScores: Boolean(song?.hasScores),
+        scoreCount: Math.max(0, Number(song?.scoreCount || 0) || 0),
+        coverUrl: String(song?.coverImageUrl || album?.coverImageUrl || "").trim(),
+        sourceAlbumId: String(album?.id || "").trim(),
+        sourceAlbumTitle: String(album?.title || "").trim() || String(product?.name || "").trim() || "Álbum",
+        sourceSongId: String(song?.id || "").trim(),
+        sourceSongGlobalId: String(song?.globalId || "").trim(),
+        songJsonUrl: String(song?.songJsonUrl || "").trim(),
+        miniResources: {
+          songJsonUrl: String(song?.songJsonUrl || "").trim(),
+          lyricsApiUrl: `/api/mini/media/albums/${encodeURIComponent(String(album?.id || "").trim())}/tracks/${encodeURIComponent(String(song?.id || "").trim())}/lyrics`,
+          assetsApiUrl: `/api/mini/media/albums/${encodeURIComponent(String(album?.id || "").trim())}/tracks/${encodeURIComponent(String(song?.id || "").trim())}/assets`
+        }
+      });
+    }
+  }
+
+  return {
+    sourceAlbums,
+    tracks
+  };
+}
+
+function buildStoreCoverUrl(product, miniSourceAlbums = []) {
+  const firstMiniCover = miniSourceAlbums.find((album) => String(album?.coverImageUrl || "").trim());
+  if (firstMiniCover) {
+    return String(firstMiniCover.coverImageUrl || "").trim();
+  }
+  return buildCoverUrl(product.name);
+}
+
 function getBaseUrl(request) {
   const forwardedProto = request.headers["x-forwarded-proto"];
   const forwardedHost = request.headers["x-forwarded-host"];
@@ -1135,23 +1266,29 @@ function getStorePayload() {
   }));
 }
 
-async function buildStoreProductCard(product, pricing, albumZipLinks = {}) {
+async function buildStoreProductCard(product, pricing, albumZipLinks = {}, miniLibrary = { albums: [] }) {
   const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
   const albumZipUrl = resolveAlbumZipUrl(manifest, product.id, albumZipLinks);
+  const miniBacked = buildMiniBackedStoreTracks(product, miniLibrary);
+  const trackCount = miniBacked.tracks.length || Number(product.tracks) || 0;
 
   return {
     ...product,
+    description: trackCount > 0 ? `${trackCount} faixas conectadas ao MINI` : product.description,
     priceLabel: formatPriceFromCents(product.unitAmount),
-    coverUrl: buildCoverUrl(product.name),
+    coverUrl: buildStoreCoverUrl(product, miniBacked.sourceAlbums),
     href: `/produto.html?album=${encodeURIComponent(product.id)}`,
     albumZipUrl,
-    hasAlbumZip: albumZipUrl !== "[none]"
+    hasAlbumZip: albumZipUrl !== "[none]",
+    trackCount,
+    catalogSource: miniBacked.tracks.length ? "mini" : "legacy"
   };
 }
 
 async function buildStoreProductsResponse(pricing, albumZipLinks = {}) {
   const storeProducts = buildStoreProducts(pricing.albumPriceCents, pricing.albumOverrides);
-  return Promise.all(storeProducts.map((product) => buildStoreProductCard(product, pricing, albumZipLinks)));
+  const miniLibrary = buildMiniMediaLibraryPayload(await loadMiniMediaLibrary().catch(() => ({ albums: [] })), { includeExtended: true });
+  return Promise.all(storeProducts.map((product) => buildStoreProductCard(product, pricing, albumZipLinks, miniLibrary)));
 }
 
 function getAlbumPriceCents(pricing, productId) {
@@ -1177,22 +1314,35 @@ async function buildAlbumDetailResponse(product, pricing, albumZipLinks = {}) {
   const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
   const unitAmount = getAlbumPriceCents(pricing, product.id);
   const albumZipUrl = resolveAlbumZipUrl(manifest, product.id, albumZipLinks);
+  const miniLibrary = buildMiniMediaLibraryPayload(await loadMiniMediaLibrary().catch(() => ({ albums: [] })), { includeExtended: true });
+  const miniBacked = buildMiniBackedStoreTracks(product, miniLibrary);
+  const tracks = miniBacked.tracks.length
+    ? miniBacked.tracks
+    : manifest.tracks.map((track) => ({
+      ...serializeManifestTrack(track),
+      streamUrl: buildTrackUrl(product.name, track.number),
+      downloadUrl: buildTrackUrl(product.name, track.number)
+    }));
 
   return {
     ...product,
     unitAmount,
     priceLabel: formatPriceFromCents(unitAmount),
-    coverUrl: buildCoverUrl(product.name),
+    coverUrl: buildStoreCoverUrl(product, miniBacked.sourceAlbums),
     href: `/produto.html?album=${encodeURIComponent(product.id)}`,
     albumZipUrl,
     hasAlbumZip: albumZipUrl !== "[none]",
     lyricsZipUrl: manifest.lyricsZipUrl,
-    tracks: manifest.tracks.map((track) => ({
-      ...serializeManifestTrack(track),
-      streamUrl: buildTrackUrl(product.name, track.number),
-      downloadUrl: buildTrackUrl(product.name, track.number)
+    tracks,
+    trackCount: tracks.length,
+    catalogSource: miniBacked.tracks.length ? "mini" : "legacy",
+    sourceAlbums: miniBacked.sourceAlbums.map((album) => ({
+      id: album.id,
+      title: album.title,
+      coverImageUrl: album.coverImageUrl || "",
+      songCount: Array.isArray(album.songs) ? album.songs.length : 0
     })),
-    hasManifest: manifest.tracks.some((track) => String(track.title || "").trim())
+    hasManifest: miniBacked.tracks.length ? true : manifest.tracks.some((track) => String(track.title || "").trim())
   };
 }
 
@@ -1837,8 +1987,8 @@ async function ensurePaymentsReady(response) {
   return true;
 }
 
-function getTrackDownloadUrl(productName, trackNumber) {
-  return buildTrackUrl(productName, trackNumber);
+function getTrackDownloadUrl(track = {}, productName = "", trackNumber = 0) {
+  return String(track?.downloadUrl || track?.streamUrl || track?.publicUrl || "").trim() || buildTrackUrl(productName, trackNumber);
 }
 
 function getStripeEnvironment() {
@@ -7325,18 +7475,20 @@ async function handleAdminAlbumUpdate(request, response, pathname) {
 
   const tracks = Array.isArray(body.tracks) ? body.tracks : [];
   const priceCents = Number(body.priceCents);
+  const miniLibrary = buildMiniMediaLibraryPayload(await loadMiniMediaLibrary().catch(() => ({ albums: [] })), { includeExtended: true });
+  const miniBacked = buildMiniBackedStoreTracks(product, miniLibrary);
 
   if (!Number.isInteger(priceCents) || priceCents < 0) {
     sendJson(response, 400, { error: "Preco do album invalido." });
     return;
   }
 
-  if (tracks.length !== product.tracks) {
+  if (!miniBacked.tracks.length && tracks.length !== product.tracks) {
     sendJson(response, 400, { error: "Quantidade de faixas invalida para este album." });
     return;
   }
 
-  const nextTracks = tracks.map((track, index) => {
+  const nextTracks = miniBacked.tracks.length ? null : tracks.map((track, index) => {
     const number = index + 1;
     const type = String(track?.type || "full").trim().toLowerCase() === "playback" ? "playback" : "full";
     const playbackTrackNumber = type === "full" ? Number(track?.playbackTrackNumber) || null : null;
@@ -7356,7 +7508,9 @@ async function handleAdminAlbumUpdate(request, response, pathname) {
   });
 
   try {
-    await albumManifestStore.writeAlbumManifest(product.name, nextTracks);
+    if (nextTracks) {
+      await albumManifestStore.writeAlbumManifest(product.name, nextTracks);
+    }
 
     const albumOverrides = {
       ...(pricing.albumOverrides || {}),
@@ -7629,8 +7783,10 @@ async function handleProtectedTrackDownload(request, response, pathname) {
   const trackNumber = Number(match[2]);
   const pricing = await getSitePricingSettings();
   const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+  const albumZipLinks = await getAlbumZipLinks();
+  const detail = product ? await buildAlbumDetailResponse(product, pricing, albumZipLinks) : null;
 
-  if (!product || !Number.isInteger(trackNumber) || trackNumber < 1 || trackNumber > product.tracks) {
+  if (!product || !detail || !Number.isInteger(trackNumber) || trackNumber < 1 || trackNumber > detail.tracks.length) {
     sendJson(response, 404, { error: "Faixa nao encontrada." });
     return;
   }
@@ -7638,8 +7794,7 @@ async function handleProtectedTrackDownload(request, response, pathname) {
   try {
     const accessState = await getUserAccessState(user.id);
     const hasAlbumPurchase = accessState.purchasedAlbumIds.includes(product.id);
-    const manifest = await albumManifestStore.readAlbumManifest(product.name, product.tracks);
-    const track = manifest.tracks.find((item) => Number(item.number) === trackNumber);
+    const track = detail.tracks.find((item) => Number(item.number) === trackNumber);
 
     if (!track) {
       sendJson(response, 404, { error: "Faixa nao encontrada." });
@@ -7658,7 +7813,7 @@ async function handleProtectedTrackDownload(request, response, pathname) {
       return;
     }
 
-    const assetResponse = await fetch(getTrackDownloadUrl(product.name, trackNumber));
+    const assetResponse = await fetch(getTrackDownloadUrl(track, product.name, trackNumber));
 
     if (!assetResponse.ok || !assetResponse.body) {
       sendJson(response, assetResponse.status || 502, {

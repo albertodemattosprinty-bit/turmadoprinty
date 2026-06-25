@@ -1086,6 +1086,7 @@ function bindAdminTrackEditor(card, album, track) {
 
 async function renderTracks(album) {
   trackList.innerHTML = "";
+  const canEditTracksHere = isAdmin() && album?.catalogSource !== "mini";
 
   if (!Array.isArray(album.tracks) || !album.tracks.length) {
     trackList.innerHTML = `
@@ -1102,6 +1103,9 @@ async function renderTracks(album) {
     article.dataset.trackNumber = String(track.number);
     article.dataset.trackMode = getTrackModeLabel(track);
     article.dataset.previewLimitSeconds = shouldLimitFreePreview(album.id, album.name, track) ? String(freePreviewSeconds) : "0";
+    article.dataset.songJsonUrl = track.songJsonUrl || "";
+    article.dataset.sourceAlbumId = track.sourceAlbumId || "";
+    article.dataset.sourceSongId = track.sourceSongId || "";
 
     const playbackOptions = album.tracks
       .filter((item) => item.number !== track.number)
@@ -1110,6 +1114,7 @@ async function renderTracks(album) {
 
     article.innerHTML = `
       <h3 class="track-title">${track.label}</h3>
+      ${track.sourceAlbumTitle ? `<p class="section-muted">Álbum de origem: ${track.sourceAlbumTitle}</p>` : ""}
       <div class="track-player-shell">
         <audio class="track-native-audio" preload="none"></audio>
         <button class="track-play-button" type="button" data-role="play" aria-label="Tocar faixa">
@@ -1135,7 +1140,7 @@ async function renderTracks(album) {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1m-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1"/></svg>
         </button>
       </div>
-      ${isAdmin() ? `
+      ${canEditTracksHere ? `
         <div class="track-admin-tools">
           <div class="track-copy">
             <h3 class="track-title-display">${track.label}</h3>
@@ -1147,7 +1152,7 @@ async function renderTracks(album) {
           </div>
         </div>
       ` : ""}
-      ${isAdmin() ? `
+      ${canEditTracksHere ? `
         <div class="track-editor-panel" hidden>
           <div class="track-editor-row">
             <label>Playback desta faixa
@@ -1206,7 +1211,9 @@ async function renderTracks(album) {
       setDownloadUi(article, { downloaded: true });
     }
 
-    bindAdminTrackEditor(article, album, track);
+    if (canEditTracksHere) {
+      bindAdminTrackEditor(article, album, track);
+    }
     trackList.appendChild(article);
   }
 
@@ -1223,6 +1230,9 @@ function syncAdminPanel(album) {
   albumAdminPanel.hidden = false;
   albumAdminPanel.style.display = "grid";
   albumPriceInput.value = String(album.unitAmount || 0);
+  albumAdminStatus.textContent = album?.catalogSource === "mini"
+    ? "Preço editável aqui. Faixas, letras e timestamps agora vêm do catálogo do MINI."
+    : "";
 }
 
 async function saveAlbumAdminChanges() {
