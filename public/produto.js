@@ -715,6 +715,68 @@ function openTrackTextsModal(track) {
   modal.classList.add("show");
 }
 
+function getTrackLyricsLines(track) {
+  const syncLines = Array.isArray(track?.lyricsSyncData?.lines) ? track.lyricsSyncData.lines : [];
+  if (syncLines.length) {
+    return syncLines.map((line, index) => ({
+      number: Number(line?.number || index + 1) || (index + 1),
+      text: String(line?.text || "").trim(),
+      timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0)
+    })).filter((line) => line.text);
+  }
+
+  return String(track?.lyrics || "")
+    .split(/\r?\n/)
+    .map((text, index) => ({
+      number: index + 1,
+      text: String(text || "").trim(),
+      timestampMs: null
+    }))
+    .filter((line) => line.text);
+}
+
+function renderTrackLyrics(track) {
+  const lines = getTrackLyricsLines(track);
+  if (!lines.length) {
+    return "";
+  }
+
+  return `
+    <div class="track-lyrics-panel" data-role="lyrics-panel">
+      ${lines.map((line, index) => `
+        <div class="track-lyrics-line" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
+          ${escapeHtml(line.text)}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function syncTrackLyricsHighlight(card, track, currentTimeSeconds) {
+  const panel = card?.querySelector("[data-role='lyrics-panel']");
+  if (!panel) {
+    return;
+  }
+
+  const lines = getTrackLyricsLines(track);
+  const hasTimedLines = lines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
+  const currentMs = Math.max(0, Number(currentTimeSeconds || 0) * 1000);
+  let activeIndex = -1;
+
+  if (hasTimedLines) {
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (line.timestampMs !== null && line.timestampMs !== undefined && currentMs >= line.timestampMs) {
+        activeIndex = index;
+      }
+    }
+  }
+
+  panel.querySelectorAll(".track-lyrics-line").forEach((node, index) => {
+    node.classList.toggle("is-active", hasTimedLines && index === activeIndex);
+  });
+}
+
 function syncTrackCarouselUi() {
   const cards = Array.from(trackList.querySelectorAll(".track-card"));
   const total = cards.length;
@@ -786,6 +848,11 @@ function updatePlayerButtons() {
 
     if (durationLabel) {
       durationLabel.textContent = formatTime(duration);
+    }
+
+    const track = currentAlbum?.tracks?.find((item) => Number(item.number) === trackNumber) || null;
+    if (track) {
+      syncTrackLyricsHighlight(card, track, currentTime);
     }
   });
 }
@@ -1265,6 +1332,7 @@ async function renderTracks(album) {
           </button>
         </div>
       </div>
+      ${renderTrackLyrics(track)}
       ${canEditTracksHere ? `
         <div class="track-admin-tools">
           <div class="track-copy">

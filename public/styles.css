@@ -2195,8 +2195,8 @@ body[data-page="produtos"] {
 body[data-page="produto"] {
   color: #ffffff;
   background:
-    radial-gradient(140% 72% at 50% 0%, #4fd0bf 0%, #48cbbd 42%, rgba(72, 203, 189, 0) 43%),
-    linear-gradient(180deg, #34a9ed 0%, #2590d8 44%, #1f86cf 45%, #2188d1 100%);
+    radial-gradient(140% 72% at 50% 0%, #4ccfbc 0%, #43c7b7 38%, rgba(67, 199, 183, 0) 39%),
+    linear-gradient(180deg, #3dbecc 0%, #2f9fe1 44%, #1f86cf 45%, #1f86cf 100%);
 }
 
 body[data-page="produto"] .section-card,
@@ -2661,11 +2661,18 @@ body[data-page="eventos-pagamento"] {
   min-width: 52px;
   padding: 0;
   border-radius: 999px;
+  color: #ffffff !important;
 }
 
 .track-nav-button[disabled] {
   opacity: 0.45;
   cursor: default;
+}
+
+.track-nav-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
 }
 
 .track-card {
@@ -2716,6 +2723,27 @@ body[data-page="eventos-pagamento"] {
   padding: 0 14px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+.track-lyrics-panel {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.track-lyrics-line {
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.82);
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.track-lyrics-line.is-active {
+  color: #ffd54a;
+  font-weight: 800;
+  transform: translateX(4px);
 }
 
 .track-title-display {
