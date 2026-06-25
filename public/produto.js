@@ -9,6 +9,9 @@ const productPrice = document.getElementById("product-price");
 const buyAlbumButton = document.getElementById("buy-album-button");
 const lyricsDownloadButton = document.getElementById("lyrics-download-button");
 const trackList = document.getElementById("track-list");
+const trackPrevButton = document.getElementById("track-prev-button");
+const trackNextButton = document.getElementById("track-next-button");
+const trackPositionLabel = document.getElementById("track-position-label");
 const albumAdminPanel = document.getElementById("album-admin-panel");
 const albumPriceInput = document.getElementById("album-price-input");
 const albumSaveButton = document.getElementById("album-save-button");
@@ -23,6 +26,7 @@ let accessState = {
 
 let currentAudio = null;
 let currentTrackNumber = null;
+let currentTrackIndex = 0;
 let currentUser = null;
 let currentAlbum = null;
 let activeSpeechRecognition = null;
@@ -33,6 +37,15 @@ let albumShortcutTimer = null;
 const adminUsername = "rosemattos";
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function normalizeCatalogText(value) {
   return String(value || "")
@@ -639,6 +652,105 @@ async function isTrackDownloaded(albumId, trackNumber) {
   return Boolean(await cache.match(getOfflineCacheKey(albumId, trackNumber)));
 }
 
+function ensureTrackTextsModal() {
+  let modal = document.getElementById("track-texts-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "track-texts-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-texts"></div>
+    <div class="track-texts-panel" role="dialog" aria-modal="true" aria-labelledby="track-texts-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Textos da faixa</p>
+          <h3 id="track-texts-title" class="section-title small">Carregando...</h3>
+        </div>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-texts" aria-label="Fechar textos">Fechar</button>
+      </div>
+      <div id="track-texts-meta" class="track-texts-meta"></div>
+      <pre id="track-texts-body" class="track-texts-body"></pre>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-role='close-texts']").forEach((node) => {
+    node.addEventListener("click", () => {
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    });
+  });
+  return modal;
+}
+
+function openTrackTextsModal(track) {
+  const modal = ensureTrackTextsModal();
+  const title = modal.querySelector("#track-texts-title");
+  const meta = modal.querySelector("#track-texts-meta");
+  const body = modal.querySelector("#track-texts-body");
+  if (!title || !meta || !body) {
+    return;
+  }
+
+  const lines = Array.isArray(track?.lyricsSyncData?.lines) ? track.lyricsSyncData.lines : [];
+  const syncedCount = lines.filter((line) => line?.timestampMs !== null && line?.timestampMs !== undefined).length;
+  const parts = [];
+  if (track?.hasScores) {
+    parts.push(`${track.scoreCount || 0} partituras`);
+  }
+  if (lines.length) {
+    parts.push(`${syncedCount}/${lines.length} timestamps`);
+  }
+  if (track?.songJsonUrl) {
+    parts.push("song.json conectado");
+  }
+
+  title.textContent = track?.title || "Textos da faixa";
+  meta.innerHTML = parts.length ? parts.map((item) => `<span class="status-pill">${escapeHtml(item)}</span>`).join("") : "";
+  body.textContent = track?.lyrics || "Essa faixa ainda não tem texto salvo.";
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+}
+
+function syncTrackCarouselUi() {
+  const cards = Array.from(trackList.querySelectorAll(".track-card"));
+  const total = cards.length;
+  if (!total) {
+    if (trackPositionLabel) {
+      trackPositionLabel.textContent = "Faixa 0 de 0";
+    }
+    if (trackPrevButton) trackPrevButton.disabled = true;
+    if (trackNextButton) trackNextButton.disabled = true;
+    return;
+  }
+
+  currentTrackIndex = Math.max(0, Math.min(currentTrackIndex, total - 1));
+  cards.forEach((card, index) => {
+    const isActive = index === currentTrackIndex;
+    card.hidden = !isActive;
+    card.classList.toggle("is-current", isActive);
+  });
+
+  const activeCard = cards[currentTrackIndex] || null;
+  const activeTrackNumber = Number(activeCard?.dataset.trackNumber || 0);
+  if (currentAudio && currentTrackNumber && activeTrackNumber && currentTrackNumber !== activeTrackNumber) {
+    currentAudio.pause();
+  }
+
+  if (trackPositionLabel) {
+    trackPositionLabel.textContent = `Faixa ${currentTrackIndex + 1} de ${total}`;
+  }
+  if (trackPrevButton) {
+    trackPrevButton.disabled = currentTrackIndex <= 0;
+  }
+  if (trackNextButton) {
+    trackNextButton.disabled = currentTrackIndex >= total - 1;
+  }
+}
+
 function updatePlayerButtons() {
   document.querySelectorAll(".track-card").forEach((card) => {
     const trackNumber = Number(card.dataset.trackNumber);
@@ -765,6 +877,7 @@ async function playTrack(card, albumId, track) {
 function setDownloadUi(card, { downloading = false, progress = 0, downloaded = false, label = "" } = {}) {
   const actionLabel = card.querySelector(".track-download-label");
   const downloadButton = card.querySelector("[data-role='download']");
+  const textsButton = card.querySelector("[data-role='texts']");
 
   if (!actionLabel || !downloadButton) {
     return;
@@ -773,11 +886,17 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
   if (downloading) {
     actionLabel.textContent = label || `Baixando ${Math.round(progress)}%`;
     downloadButton.disabled = true;
+    if (textsButton) {
+      textsButton.hidden = true;
+    }
     return;
   }
 
   actionLabel.textContent = downloaded ? "Download concluido, voce pode acessar sem internet" : label || card.dataset.trackMode || "Full";
   downloadButton.disabled = false;
+  if (textsButton) {
+    textsButton.hidden = !downloaded;
+  }
 }
 
 async function downloadTrackForOffline(card, albumId, track) {
@@ -1087,6 +1206,7 @@ function bindAdminTrackEditor(card, album, track) {
 async function renderTracks(album) {
   trackList.innerHTML = "";
   const canEditTracksHere = isAdmin() && album?.catalogSource !== "mini";
+  currentTrackIndex = Math.max(0, Math.min(currentTrackIndex, Math.max((album?.tracks?.length || 1) - 1, 0)));
 
   if (!Array.isArray(album.tracks) || !album.tracks.length) {
     trackList.innerHTML = `
@@ -1113,8 +1233,10 @@ async function renderTracks(album) {
       .join("");
 
     article.innerHTML = `
-      <h3 class="track-title">${track.label}</h3>
-      ${track.sourceAlbumTitle ? `<p class="section-muted">Álbum de origem: ${track.sourceAlbumTitle}</p>` : ""}
+      <div class="track-title-row">
+        <h3 class="track-title">${track.label}</h3>
+        ${track.type === "playback" ? `<span class="status-pill">Playback</span>` : ""}
+      </div>
       <div class="track-player-shell">
         <audio class="track-native-audio" preload="none"></audio>
         <button class="track-play-button" type="button" data-role="play" aria-label="Tocar faixa">
@@ -1136,9 +1258,12 @@ async function renderTracks(album) {
               ? "Playback"
               : "Preview"
         }</span>
-        <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="Baixar faixa">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1m-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1"/></svg>
-        </button>
+        <div class="track-download-actions">
+          <button class="ghost-button track-texts-button" type="button" data-role="texts" hidden>Ver textos</button>
+          <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="Baixar faixa">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1m-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1"/></svg>
+          </button>
+        </div>
       </div>
       ${canEditTracksHere ? `
         <div class="track-admin-tools">
@@ -1199,6 +1324,10 @@ async function renderTracks(album) {
       }
     });
 
+    article.querySelector("[data-role='texts']")?.addEventListener("click", () => {
+      openTrackTextsModal(track);
+    });
+
     setDownloadUi(article, {
       label: canDownloadTrack(album.id, album.name, track)
         ? "Download disponivel"
@@ -1217,6 +1346,7 @@ async function renderTracks(album) {
     trackList.appendChild(article);
   }
 
+  syncTrackCarouselUi();
   updatePlayerButtons();
 }
 
@@ -1317,6 +1447,7 @@ async function loadAlbumDetail() {
     syncLyricsDownloadButton(album);
     setPurchaseStatus(album.id);
     syncAdminPanel(album);
+    currentTrackIndex = 0;
     await renderTracks(album);
 
     if (hasPurchasedAlbum(album.id)) {
@@ -1351,6 +1482,17 @@ async function loadAlbumDetail() {
 
 albumSaveButton?.addEventListener("click", async () => {
   await saveAlbumAdminChanges();
+});
+
+trackPrevButton?.addEventListener("click", () => {
+  currentTrackIndex = Math.max(0, currentTrackIndex - 1);
+  syncTrackCarouselUi();
+});
+
+trackNextButton?.addEventListener("click", () => {
+  const total = Array.isArray(currentAlbum?.tracks) ? currentAlbum.tracks.length : 0;
+  currentTrackIndex = Math.min(Math.max(total - 1, 0), currentTrackIndex + 1);
+  syncTrackCarouselUi();
 });
 
 document.addEventListener("keydown", handleAlbumAdminShortcuts);

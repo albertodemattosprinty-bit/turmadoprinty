@@ -645,7 +645,6 @@ async function loadAlbums(siteConfig, user) {
           <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
           <div class="album-body">
             <h3>${album.name}</h3>
-            ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
           </div>
         `;
         grid.appendChild(card);
@@ -663,7 +662,6 @@ async function loadAlbums(siteConfig, user) {
         <img class="album-cover" src="${album.coverUrl}" alt="Capa do album ${album.name}">
         <div class="album-body">
           <h3>${album.name}</h3>
-          ${album.priceLabel ? `<p class="album-price">${album.priceLabel}</p>` : ""}
         </div>
         ${renderOwnedCardAction(album)}
       `;
@@ -832,10 +830,14 @@ function whenImageReady(image) {
   });
 }
 
-function initPageBanner() {
+function initPageBanner(user = null) {
   const config = bannerConfigByPage[page];
 
   if (!config) {
+    return;
+  }
+
+  if (page === "produtos" && !isRoseMattosUser(user)) {
     return;
   }
 
@@ -1079,7 +1081,6 @@ async function loadSchedule(siteConfig, user) {
 }
 
 markActiveNav();
-initPageBanner();
 await registerProductsOfflineShell();
 const headerUser = await initSiteHeader().catch(() => null);
 
@@ -1087,6 +1088,8 @@ const [siteConfig, currentUser] = await Promise.all([
   loadSiteConfig().catch(() => ({ pricing: { albumPriceCents: 4990, planPrices: {} }, schedule: [], banners: {}, textOverrides: {} })),
   Promise.resolve(headerUser || null)
 ]);
+
+initPageBanner(currentUser);
 
 initContentAdmin({
   user: currentUser,
