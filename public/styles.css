@@ -2368,6 +2368,13 @@ body[data-page="produto"] .inline-link {
   color: rgba(255, 216, 77, 0.94);
 }
 
+#track-texts-title {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
 .track-texts-save-sync {
   min-height: 42px;
   padding: 0 16px;

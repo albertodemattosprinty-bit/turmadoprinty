@@ -1399,13 +1399,10 @@ async function saveTrackTextsSyncDraft() {
     };
     updateTrackInCurrentAlbum(updatedTrack);
     clearTrackSyncDraft(track);
-    trackTextsSyncDraft = buildTrackSyncDraft(updatedTrack, {
-      lines: updatedTrack.lyricsSyncData?.lines || trackTextsSyncDraft.lines,
-      syncMode: true
-    });
+    trackTextsSyncDraft = null;
     await renderTracks(currentAlbum);
+    trackTextsSyncMode = false;
     openTrackTextsModal(updatedTrack);
-    trackTextsSyncMode = true;
     syncTrackTextsModeUi(updatedTrack);
     showFloatingNotice("Sync salva no Postgres com sucesso.");
   } catch (error) {
