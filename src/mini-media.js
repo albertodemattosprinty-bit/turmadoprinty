@@ -35,7 +35,8 @@ function normalizeLyricsSyncData(value) {
     number: Math.max(1, Number(line?.number ?? (index + 1)) || (index + 1)),
     text: String(line?.text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim(),
     timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
-    tag: String(line?.tag || "").trim() === "correct32" ? "correct32" : ""
+    tag: String(line?.tag || "").trim() === "correct32" ? "correct32" : "",
+    characterId: String(line?.characterId || "").trim()
   })) : [];
   return {
     albumId: String(value.albumId || "").trim(),
@@ -44,6 +45,25 @@ function normalizeLyricsSyncData(value) {
     playbackUrl: String(value.playbackUrl || "").trim(),
     durationMs: Math.max(0, Number(value.durationMs || 0) || 0),
     lines
+  };
+}
+
+function normalizeAlbumCharacters(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((item, index) => ({
+      id: String(item?.id || `character-${index + 1}`).trim() || `character-${index + 1}`,
+      name: String(item?.name || "").trim(),
+      color: String(item?.color || "").trim(),
+      group: String(item?.group || "").trim()
+    }))
+    .filter((item) => item.name && item.color);
+}
+
+function normalizeAlbumMetadata(value) {
+  const metadata = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    ...metadata,
+    characters: normalizeAlbumCharacters(metadata.characters)
   };
 }
 
@@ -121,21 +141,23 @@ export async function syncMiniMediaLibraryToDatabase(library = { albums: [] }) {
   for (const album of albums) {
     const albumResult = await query(
       `
-        insert into mini_media_albums (legacy_id, title, subtitle, cover_key, updated_at)
-        values ($1, $2, $3, $4, now())
-        on conflict (legacy_id)
-        do update set
-          title = excluded.title,
-          subtitle = excluded.subtitle,
-          cover_key = excluded.cover_key,
-          updated_at = now()
-        returning id
+        insert into mini_media_albums (legacy_id, title, subtitle, cover_key, metadata, updated_at)
+        values ($1, $2, $3, $4, $5::jsonb, now())
+      on conflict (legacy_id)
+      do update set
+        title = excluded.title,
+        subtitle = excluded.subtitle,
+        cover_key = excluded.cover_key,
+        metadata = excluded.metadata,
+        updated_at = now()
+      returning id
       `,
       [
         String(album?.id || "").trim(),
         String(album?.title || "Album").trim() || "Album",
         String(album?.subtitle || "").trim(),
-        String(album?.coverKey || "").trim()
+        String(album?.coverKey || "").trim(),
+        JSON.stringify(normalizeAlbumMetadata(album?.metadata || { characters: album?.characters }))
       ]
     );
     const albumGlobalId = albumResult.rows[0]?.id || null;
@@ -199,6 +221,7 @@ export async function hydrateMiniMediaLibraryFromDatabase(library = { albums: []
     select
       a.id as album_global_id,
       a.legacy_id as album_legacy_id,
+      a.metadata as album_metadata,
       s.id as song_global_id,
       s.legacy_id as song_legacy_id,
       s.playback_song_id,
@@ -209,7 +232,7 @@ export async function hydrateMiniMediaLibraryFromDatabase(library = { albums: []
     from mini_media_albums a
     left join mini_media_songs s on s.album_id = a.id
     left join mini_media_song_assets asset on asset.song_id = s.id
-    group by a.id, a.legacy_id, s.id, s.legacy_id, s.playback_song_id, s.lyrics_text, s.lyrics_sync_json, s.lyrics_updated_at
+    group by a.id, a.legacy_id, a.metadata, s.id, s.legacy_id, s.playback_song_id, s.lyrics_text, s.lyrics_sync_json, s.lyrics_updated_at
   `);
   const albums = new Map((Array.isArray(library?.albums) ? library.albums : []).map((album) => [String(album.id), album]));
   for (const row of result.rows) {
@@ -218,6 +241,8 @@ export async function hydrateMiniMediaLibraryFromDatabase(library = { albums: []
       continue;
     }
     album.globalId = row.album_global_id;
+    album.metadata = normalizeAlbumMetadata(row.album_metadata);
+    album.characters = normalizeAlbumCharacters(row.album_metadata?.characters);
     const song = album.songs?.find((item) => String(item.id) === String(row.song_legacy_id));
     if (!song) {
       continue;
@@ -269,6 +294,23 @@ export async function updateMiniMediaSongLyrics(songId, lyrics = "", syncData = 
       songId,
       String(lyrics || "").replace(/\r\n/g, "\n").trim(),
       JSON.stringify(normalizeLyricsSyncData(syncData) || {})
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+export async function updateMiniMediaAlbumMetadata(albumId, metadata = {}) {
+  await ensureMiniMediaSchema();
+  const result = await query(
+    `
+      update mini_media_albums
+      set metadata = $2::jsonb, updated_at = now()
+      where legacy_id = $1
+      returning *
+    `,
+    [
+      String(albumId || "").trim(),
+      JSON.stringify(normalizeAlbumMetadata(metadata))
     ]
   );
   return result.rows[0] || null;

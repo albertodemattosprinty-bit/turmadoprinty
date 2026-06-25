@@ -2199,6 +2199,23 @@ body[data-page="produto"] {
     linear-gradient(180deg, #3dbecc 0%, #2f9fe1 44%, #1f86cf 45%, #1f86cf 100%);
 }
 
+body[data-page="produto"] .site-header {
+  width: 100%;
+  max-width: 100%;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+
+body[data-page="produto"] .brand {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-page="produto"] .brand-mark {
+  max-width: 100%;
+}
+
 body[data-page="produto"] .section-card,
 body[data-page="produto"] .product-overview,
 body[data-page="produto"] .track-card,
@@ -2250,6 +2267,34 @@ body[data-page="produto"] .product-shell {
   gap: 26px;
 }
 
+body[data-page="produto"] .page-shell,
+body[data-page="produto"] .product-shell,
+body[data-page="produto"] .product-overview,
+body[data-page="produto"] .product-hero,
+body[data-page="produto"] .product-summary,
+body[data-page="produto"] .section-card,
+body[data-page="produto"] .track-list,
+body[data-page="produto"] .track-card,
+body[data-page="produto"] .track-player-shell,
+body[data-page="produto"] .track-progress-shell,
+body[data-page="produto"] .track-download-row,
+body[data-page="produto"] .track-download-actions,
+body[data-page="produto"] .track-carousel-head,
+body[data-page="produto"] .track-texts-head,
+body[data-page="produto"] .track-texts-player,
+body[data-page="produto"] .track-texts-body {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-page="produto"] .section-title,
+body[data-page="produto"] .track-title,
+body[data-page="produto"] .track-download-label,
+body[data-page="produto"] .inline-link {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .track-texts-modal {
   position: fixed;
   inset: 0;
@@ -2273,6 +2318,8 @@ body[data-page="produto"] .product-shell {
   position: absolute;
   inset: 0;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   max-width: 100%;
@@ -2281,7 +2328,7 @@ body[data-page="produto"] .product-shell {
   margin: 0;
   padding: 22px 22px 30px;
   border-radius: 0;
-  overflow: auto;
+  overflow: hidden;
   box-sizing: border-box;
   background:
     radial-gradient(circle at top center, rgba(75, 205, 188, 0.2), transparent 34%),
@@ -2299,11 +2346,14 @@ body[data-page="produto"] .product-shell {
 }
 
 .track-texts-player {
+  order: 3;
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: 48px 48px minmax(0, 1fr) 48px;
   gap: 12px;
   align-items: center;
-  margin-bottom: 18px;
+  margin-top: auto;
+  padding-top: 18px;
 }
 
 .track-texts-player-button {
@@ -2388,8 +2438,12 @@ body[data-page="produto"] .product-shell {
 }
 
 .track-texts-body {
+  order: 2;
+  flex: 1 1 auto;
   margin: 0;
   color: #ffffff;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .track-texts-lines {
@@ -2405,16 +2459,16 @@ body[data-page="produto"] .product-shell {
   background: transparent;
   text-align: left;
   line-height: 1.85;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 1.02rem;
+  color: var(--line-character-color, rgba(255, 255, 255, 0.88));
+  font-size: 1.74rem;
   cursor: pointer;
   transition: color 0.18s ease, transform 0.18s ease;
 }
 
 .track-texts-line.is-active {
-  color: #ffd54a;
   font-weight: 800;
   transform: translateX(4px);
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
 .track-texts-empty {
@@ -2450,6 +2504,53 @@ body[data-page="produto"] .product-shell {
   margin: 0;
   color: rgba(255, 255, 255, 0.88);
   line-height: 1.7;
+}
+
+.track-character-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.track-character-field {
+  display: grid;
+  gap: 8px;
+  color: #ffffff;
+}
+
+.track-character-field input,
+.track-character-field select,
+.track-character-select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  padding: 10px 14px;
+  font: inherit;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.track-character-divider {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.track-character-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.track-character-color-chip {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  background: var(--character-chip);
+  cursor: pointer;
 }
 
 .track-generation-progress {
@@ -5476,8 +5577,44 @@ body[data-page="explorar"] #chat-auth-status {
 }
 
 @media (max-width: 980px) {
+  html,
   body[data-page="produto"] {
+    width: 100%;
+    max-width: 100%;
     overflow-x: hidden;
+  }
+
+  body[data-page="produto"] .site-header {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+    overflow: hidden;
+  }
+
+  body[data-page="produto"] .brand {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  body[data-page="produto"] .brand-mark {
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    height: 64px;
+  }
+
+  body[data-page="produto"] .page-shell {
+    width: min(100%, calc(100% - 20px));
+    overflow-x: clip;
+  }
+
+  body[data-page="produto"] .section-card,
+  body[data-page="produto"] .product-overview,
+  body[data-page="produto"] .track-card {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   .hero-home,
@@ -5496,6 +5633,48 @@ body[data-page="explorar"] #chat-auth-status {
 
   .track-card {
     grid-template-columns: 1fr;
+  }
+
+  body[data-page="produto"] .track-download-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body[data-page="produto"] .track-download-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  body[data-page="produto"] .track-player-shell {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  body[data-page="produto"] .track-carousel-head {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    gap: 8px;
+  }
+
+  body[data-page="produto"] .track-nav-button {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  body[data-page="produto"] .track-nav-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  body[data-page="produto"] .track-play-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  body[data-page="produto"] .track-play-button svg {
+    width: 16px;
+    height: 16px;
   }
 
   .track-texts-panel {

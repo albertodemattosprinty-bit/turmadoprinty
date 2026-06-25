@@ -36,8 +36,16 @@ let albumShortcutBuffer = "";
 let albumShortcutTimer = null;
 let trackGenerationProgressTimer = null;
 let trackGenerationProgressValue = 0;
+let modalManualLineIndex = -1;
+let trackTextsTouchState = null;
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
+const characterPalettes = {
+  boys: ["#7FDBFF", "#9EE8FF", "#61D2FF", "#8CCBFF"],
+  girls: ["#FF79C6", "#FF9BE0", "#D38BFF", "#F09CFF"],
+  men: ["#FFFFFF"],
+  women: ["#FFF3A6"]
+};
 
 function escapeHtml(value) {
   return String(value || "")
@@ -64,6 +72,28 @@ function normalizeAdminIdentity(value) {
     .replace(/[^a-z0-9]/gi, "")
     .trim()
     .toLowerCase();
+}
+
+function normalizeCharacterGroup(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["boys", "girls", "men", "women"].includes(normalized) ? normalized : "boys";
+}
+
+function getTrackCharacters(track) {
+  return Array.isArray(track?.albumCharacters) ? track.albumCharacters : [];
+}
+
+function getCharacterById(track, characterId) {
+  return getTrackCharacters(track).find((item) => String(item?.id || "") === String(characterId || "")) || null;
+}
+
+function getLineDisplayColor(track, line) {
+  const character = getCharacterById(track, line?.characterId);
+  return character?.color || "";
+}
+
+function isDesktopPointer() {
+  return typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(pointer:fine)").matches : false;
 }
 
 function hasFullCatalogAccess() {
@@ -774,6 +804,79 @@ function ensureTrackGenerationModal() {
   return modal;
 }
 
+function ensureTrackCharacterModal() {
+  let modal = document.getElementById("track-character-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "track-character-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-character-modal"></div>
+    <div class="track-texts-panel track-generation-panel track-character-panel" role="dialog" aria-modal="true" aria-labelledby="track-character-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Personagem da linha</p>
+          <h3 id="track-character-title" class="section-title small">Adicionar personagem</h3>
+        </div>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-character-modal" aria-label="Fechar modal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+        </button>
+      </div>
+      <p id="track-character-line-preview" class="track-generation-message"></p>
+      <label class="track-character-field">Personagem do album
+        <select id="track-character-select" class="track-character-select"></select>
+      </label>
+      <div class="track-character-divider">ou crie um novo</div>
+      <label class="track-character-field">Nome
+        <input id="track-character-name" type="text" maxlength="40" placeholder="Ex.: Menino 1">
+      </label>
+      <label class="track-character-field">Grupo
+        <select id="track-character-group" class="track-character-select">
+          <option value="boys">Meninos</option>
+          <option value="girls">Meninas</option>
+          <option value="men">Homens</option>
+          <option value="women">Mulheres</option>
+        </select>
+      </label>
+      <div id="track-character-palette" class="track-character-palette"></div>
+      <label class="track-character-field">Cor
+        <input id="track-character-color" type="color" value="#7FDBFF">
+      </label>
+      <div class="bulk-track-title-actions">
+        <button id="track-character-cancel" class="ghost-button" type="button">Cancelar</button>
+        <button id="track-character-save" class="primary-button" type="button">Salvar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-role='close-character-modal']").forEach((node) => {
+    node.addEventListener("click", () => {
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    });
+  });
+
+  modal.querySelector("#track-character-cancel")?.addEventListener("click", () => {
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+  });
+
+  modal.querySelector("#track-character-group")?.addEventListener("change", () => {
+    syncCharacterPaletteOptions();
+  });
+
+  modal.querySelector("#track-character-save")?.addEventListener("click", async () => {
+    await submitTrackCharacterModal();
+  });
+
+  return modal;
+}
+
 function setTrackGenerationModalState({ open = true, title = "Preparando...", message = "", progress = 0 } = {}) {
   const modal = ensureTrackGenerationModal();
   const titleNode = modal.querySelector("#track-generation-title");
@@ -797,6 +900,133 @@ function setTrackGenerationModalState({ open = true, title = "Preparando...", me
 
   modal.setAttribute("aria-hidden", open ? "false" : "true");
   modal.classList.toggle("show", open);
+}
+
+function syncCharacterPaletteOptions() {
+  const modal = ensureTrackCharacterModal();
+  const groupSelect = modal.querySelector("#track-character-group");
+  const colorInput = modal.querySelector("#track-character-color");
+  const paletteNode = modal.querySelector("#track-character-palette");
+  const group = normalizeCharacterGroup(groupSelect?.value);
+  const colors = characterPalettes[group] || characterPalettes.boys;
+
+  if (paletteNode) {
+    paletteNode.innerHTML = colors.map((color) => `
+      <button class="track-character-color-chip" type="button" data-color="${color}" style="--character-chip:${color}"></button>
+    `).join("");
+    paletteNode.querySelectorAll("[data-color]").forEach((node) => {
+      node.addEventListener("click", () => {
+        if (colorInput) {
+          colorInput.value = String(node.dataset.color || "#7FDBFF");
+        }
+      });
+    });
+  }
+
+  if (colorInput && !colors.includes(colorInput.value.toUpperCase())) {
+    colorInput.value = colors[0];
+  }
+}
+
+function openTrackCharacterModal(track, lineIndex) {
+  const modal = ensureTrackCharacterModal();
+  const line = getTrackLyricsLines(track)[lineIndex] || null;
+  const preview = modal.querySelector("#track-character-line-preview");
+  const select = modal.querySelector("#track-character-select");
+  const nameInput = modal.querySelector("#track-character-name");
+  const groupSelect = modal.querySelector("#track-character-group");
+  const colorInput = modal.querySelector("#track-character-color");
+  if (!line || !preview || !select || !nameInput || !groupSelect || !colorInput) {
+    return;
+  }
+
+  const characters = getTrackCharacters(track);
+  const currentCharacter = getCharacterById(track, line.characterId);
+  preview.textContent = line.text;
+  modal.dataset.albumId = String(track?.sourceAlbumId || "");
+  modal.dataset.trackId = String(track?.sourceSongId || "");
+  modal.dataset.trackNumber = String(track?.number || "");
+  modal.dataset.lineNumber = String(line.number || lineIndex + 1);
+
+  select.innerHTML = `
+    <option value="">Sem personagem</option>
+    ${characters.map((item) => `<option value="${escapeHtml(item.id)}" ${currentCharacter?.id === item.id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+    <option value="__new__">Criar novo</option>
+  `;
+  nameInput.value = "";
+  groupSelect.value = currentCharacter?.group ? normalizeCharacterGroup(currentCharacter.group) : "boys";
+  colorInput.value = currentCharacter?.color || (characterPalettes.boys[0]);
+  syncCharacterPaletteOptions();
+
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+}
+
+async function submitTrackCharacterModal() {
+  const modal = ensureTrackCharacterModal();
+  const albumId = String(modal.dataset.albumId || "");
+  const trackId = String(modal.dataset.trackId || "");
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const lineNumber = Number(modal.dataset.lineNumber || 0);
+  const select = modal.querySelector("#track-character-select");
+  const nameInput = modal.querySelector("#track-character-name");
+  const groupSelect = modal.querySelector("#track-character-group");
+  const colorInput = modal.querySelector("#track-character-color");
+  if (!albumId || !trackId || !trackNumber || !lineNumber || !select || !nameInput || !groupSelect || !colorInput) {
+    return;
+  }
+
+  try {
+    let characterId = String(select.value || "").trim();
+    if (characterId === "__new__" || (!characterId && nameInput.value.trim())) {
+      const createResponse = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/characters`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+          name: nameInput.value.trim(),
+          group: groupSelect.value,
+          color: colorInput.value
+        })
+      });
+      const createData = await createResponse.json().catch(() => ({}));
+      if (!createResponse.ok) {
+        throw new Error(createData.error || "Nao foi possivel criar o personagem.");
+      }
+      characterId = String(createData.character?.id || "").trim();
+      const updatedTrack = getTrackByNumber(trackNumber);
+      if (updatedTrack) {
+        updatedTrack.albumCharacters = Array.isArray(createData.album?.characters) ? createData.album.characters : updatedTrack.albumCharacters;
+      }
+    }
+
+    const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics/lines/${lineNumber}/character`), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({ characterId })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel salvar o personagem da linha.");
+    }
+
+    const updatedTrack = getTrackByNumber(trackNumber);
+    if (updatedTrack) {
+      updatedTrack.albumCharacters = Array.isArray(data.characters) ? data.characters : updatedTrack.albumCharacters;
+      updatedTrack.lyricsSyncData = data.syncData || updatedTrack.lyricsSyncData;
+      openTrackTextsModal(updatedTrack);
+    }
+
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar personagem.");
+  }
 }
 
 function stopTrackGenerationProgress() {
@@ -845,7 +1075,7 @@ function renderLyricsLinesHtml(track, lines) {
   return `
     <div class="track-texts-lines" data-role="track-texts-lines">
       ${lines.map((line, index) => `
-        <button class="track-texts-line" type="button" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
+        <button class="track-texts-line" type="button" data-lyrics-index="${index}" data-line-number="${line.number}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}" data-character-id="${escapeHtml(line.characterId || "")}" style="${getLineDisplayColor(track, line) ? `--line-character-color:${getLineDisplayColor(track, line)};` : ""}">
           ${escapeHtml(line.text)}
         </button>
       `).join("")}
@@ -868,6 +1098,11 @@ function getTrackByNumber(trackNumber) {
 function getModalTrack() {
   const body = document.getElementById("track-texts-body");
   return getTrackByNumber(body?.dataset.trackNumber || "");
+}
+
+function getModalLines() {
+  const track = getModalTrack();
+  return track ? getTrackLyricsLines(track) : [];
 }
 
 function getTrackCardByNumber(trackNumber) {
@@ -1003,12 +1238,71 @@ function openTrackTextsModal(track) {
   title.textContent = track?.title || "Textos da faixa";
   body.dataset.trackNumber = String(track?.number || "");
   body.innerHTML = renderLyricsLinesHtml(track, getTrackLyricsLines(track));
+  const allLines = getTrackLyricsLines(track);
+  modalManualLineIndex = allLines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined) ? -1 : 0;
   body.querySelectorAll(".track-texts-line").forEach((node) => {
-    node.addEventListener("click", async () => {
+    const lineIndex = Number(node.dataset.lyricsIndex || 0);
+    const openCharacterEditor = () => {
+      if (isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
+        openTrackCharacterModal(track, lineIndex);
+      }
+    };
+
+    node.addEventListener("click", async (event) => {
+      if (isAdmin() && isDesktopPointer()) {
+        event.preventDefault();
+        openCharacterEditor();
+        return;
+      }
       const timestampMs = Number(node.dataset.timestampMs || 0);
       await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
     });
+    node.addEventListener("pointerdown", (event) => {
+      if (!isAdmin() || isDesktopPointer()) {
+        return;
+      }
+      trackTextsTouchState = {
+        startX: Number(event.clientX || 0),
+        startY: Number(event.clientY || 0),
+        opened: false,
+        timer: window.setTimeout(() => {
+          trackTextsTouchState.opened = true;
+          openCharacterEditor();
+        }, 520)
+      };
+    });
+    node.addEventListener("pointerup", () => {
+      if (trackTextsTouchState?.timer) {
+        window.clearTimeout(trackTextsTouchState.timer);
+      }
+      trackTextsTouchState = null;
+    });
+    node.addEventListener("pointercancel", () => {
+      if (trackTextsTouchState?.timer) {
+        window.clearTimeout(trackTextsTouchState.timer);
+      }
+      trackTextsTouchState = null;
+    });
   });
+  body.onpointerdown = (event) => {
+    trackTextsTouchState = {
+      ...(trackTextsTouchState || {}),
+      startX: Number(event.clientX || 0),
+      startY: Number(event.clientY || 0)
+    };
+  };
+  body.onpointerup = async (event) => {
+    const state = trackTextsTouchState;
+    if (!state) {
+      return;
+    }
+    const deltaX = Number(event.clientX || 0) - Number(state.startX || 0);
+    const deltaY = Number(event.clientY || 0) - Number(state.startY || 0);
+    if (Math.abs(deltaY) > 44 && Math.abs(deltaY) > Math.abs(deltaX)) {
+      await moveTrackTextsLineBy(deltaY < 0 ? 1 : -1);
+    }
+    trackTextsTouchState = null;
+  };
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
   syncTrackTextsModalUi(track);
@@ -1020,7 +1314,8 @@ function getTrackLyricsLines(track) {
     return syncLines.map((line, index) => ({
       number: Number(line?.number || index + 1) || (index + 1),
       text: String(line?.text || "").trim(),
-      timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0)
+      timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
+      characterId: String(line?.characterId || "").trim()
     })).filter((line) => line.text);
   }
 
@@ -1029,7 +1324,8 @@ function getTrackLyricsLines(track) {
     .map((text, index) => ({
       number: index + 1,
       text: String(text || "").trim(),
-      timestampMs: null
+      timestampMs: null,
+      characterId: ""
     }))
     .filter((line) => line.text);
 }
@@ -1054,8 +1350,9 @@ function renderTrackLyrics(track) {
 function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
   const modal = document.getElementById("track-texts-modal");
   const body = modal?.querySelector("#track-texts-body");
+  const panel = modal?.querySelector(".track-texts-panel");
   const isVisible = modal?.classList.contains("show") && modal?.getAttribute("aria-hidden") === "false";
-  if (!body || !isVisible) {
+  if (!body || !panel || !isVisible) {
     return;
   }
 
@@ -1066,7 +1363,7 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
   const lines = getTrackLyricsLines(track);
   const hasTimedLines = lines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
   const currentMs = Math.max(0, Number(currentTimeSeconds || 0) * 1000);
-  let activeIndex = -1;
+  let activeIndex = hasTimedLines ? -1 : Math.max(0, Math.min(modalManualLineIndex, Math.max(lines.length - 1, 0)));
 
   if (hasTimedLines) {
     for (let index = 0; index < lines.length; index += 1) {
@@ -1077,9 +1374,51 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
     }
   }
 
+  let activeNode = null;
   body.querySelectorAll(".track-texts-line").forEach((node, index) => {
-    node.classList.toggle("is-active", hasTimedLines && index === activeIndex);
+    const isActive = index === activeIndex;
+    node.classList.toggle("is-active", isActive);
+    if (isActive) {
+      activeNode = node;
+    }
   });
+
+  if (activeNode) {
+    const panelRect = panel.getBoundingClientRect();
+    const nodeRect = activeNode.getBoundingClientRect();
+    const currentScrollTop = panel.scrollTop;
+    const nodeOffsetTop = nodeRect.top - panelRect.top + currentScrollTop;
+    const targetScrollTop = Math.max(
+      0,
+      nodeOffsetTop - (panel.clientHeight / 2) + (activeNode.clientHeight / 2)
+    );
+    panel.scrollTo({
+      top: targetScrollTop,
+      behavior: "smooth"
+    });
+  }
+}
+
+async function moveTrackTextsLineBy(delta) {
+  const track = getModalTrack();
+  const lines = getModalLines();
+  if (!track || !lines.length) {
+    return;
+  }
+
+  const hasTimedLines = lines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
+  let baseIndex = hasTimedLines ? lines.findIndex((line) => Number(line.timestampMs || 0) >= Math.max(0, Number(currentAudio?.currentTime || 0) * 1000)) : modalManualLineIndex;
+  if (baseIndex < 0) {
+    baseIndex = hasTimedLines ? 0 : 0;
+  }
+  const nextIndex = Math.max(0, Math.min(lines.length - 1, baseIndex + delta));
+  modalManualLineIndex = nextIndex;
+  const targetLine = lines[nextIndex];
+  if (hasTimedLines && targetLine?.timestampMs !== null && targetLine?.timestampMs !== undefined) {
+    await seekTrackAudio(track, Math.max(0, Number(targetLine.timestampMs || 0)) / 1000, { autoplay: true });
+    return;
+  }
+  syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
 }
 
 function syncTrackTextsModalUi(track) {

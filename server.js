@@ -43,7 +43,7 @@ import {
   updateMiniCourseProgress
 } from "./src/mini-courses.js";
 import { createMiniLessonPlan, deleteMiniLessonPlan, ensureMiniLessonPlansSchema, getMiniLessonPlanById, listMiniLessonPlans, updateMiniLessonPlan } from "./src/mini-plans.js";
-import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, hydrateMiniMediaLibraryFromDatabase, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
+import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAlbumByLegacyId, deleteMiniMediaSongAsset, deleteMiniMediaSongByLegacyIds, getMiniMediaSongByLegacyIds, hydrateMiniMediaLibraryFromDatabase, listMiniMediaSongAssets, syncMiniMediaLibraryToDatabase, updateMiniMediaAlbumMetadata, updateMiniMediaSongLyrics, updateMiniMediaSongPlayback } from "./src/mini-media.js";
 import { ensureMiniDocumentExists, insertMiniDocumentLinesAfter, replaceMiniDocumentLineRange, updateMiniDocumentLine } from "./src/mini-docs.js";
 import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema, listEscreverParagraphs } from "./src/escrever.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
@@ -363,9 +363,24 @@ function normalizeMiniMediaSong(raw, index = 0) {
   };
 }
 
+function normalizeMiniMediaAlbumCharacters(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((item, index) => ({
+      id: String(item?.id || `character-${index + 1}`).trim() || `character-${index + 1}`,
+      name: sanitizeMiniMediaTitle(item?.name || `Personagem ${index + 1}`, `Personagem ${index + 1}`),
+      color: String(item?.color || "").trim(),
+      group: String(item?.group || "").trim()
+    }))
+    .filter((item) => item.name && item.color);
+}
+
 function normalizeMiniMediaAlbum(raw, index = 0) {
   const songs = Array.isArray(raw?.songs) ? raw.songs.map((song, songIndex) => normalizeMiniMediaSong(song, songIndex)) : [];
   songs.sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  const metadata = raw?.metadata && typeof raw.metadata === "object" && !Array.isArray(raw.metadata)
+    ? raw.metadata
+    : {};
+  const characters = normalizeMiniMediaAlbumCharacters(raw?.characters || metadata.characters);
 
   return {
     id: String(raw?.id || `album-${index + 1}`).trim() || `album-${index + 1}`,
@@ -374,6 +389,11 @@ function normalizeMiniMediaAlbum(raw, index = 0) {
     subtitle: sanitizeMiniMediaTitle(raw?.subtitle || `${songs.length} musicas`, `${songs.length} musicas`),
     coverKey: String(raw?.coverKey || "").trim(),
     coverContentType: String(raw?.coverContentType || "").trim(),
+    metadata: {
+      ...metadata,
+      characters
+    },
+    characters,
     createdAt: raw?.createdAt || null,
     updatedAt: raw?.updatedAt || null,
     songs
@@ -417,6 +437,7 @@ function buildMiniCourseCoverFolder(courseId) {
 function buildMiniMediaAlbumPayload(album, options = {}) {
   const includeExtended = options?.includeExtended === true;
   const coverImageUrl = album?.coverKey ? buildAlbumZipPublicUrlFromKey(album.coverKey) : "";
+  const characters = normalizeMiniMediaAlbumCharacters(album?.characters || album?.metadata?.characters);
   const songs = Array.isArray(album?.songs) ? album.songs.map((song) => ({
     id: song.id,
     globalId: song.globalId || "",
@@ -444,6 +465,7 @@ function buildMiniMediaAlbumPayload(album, options = {}) {
     title: album.title,
     subtitle: album.subtitle || `${songs.length} musicas`,
     coverImageUrl,
+    characters,
     songs
   };
 }
@@ -1222,6 +1244,7 @@ function buildMiniBackedStoreTracks(product, library) {
         hasLyrics: Boolean(song?.hasLyrics),
         hasScores: Boolean(song?.hasScores),
         scoreCount: Math.max(0, Number(song?.scoreCount || 0) || 0),
+        albumCharacters: normalizeMiniMediaAlbumCharacters(album?.characters),
         coverUrl: String(song?.coverImageUrl || album?.coverImageUrl || "").trim(),
         sourceAlbumId: String(album?.id || "").trim(),
         sourceAlbumTitle: String(album?.title || "").trim() || String(product?.name || "").trim() || "Álbum",
@@ -1448,10 +1471,35 @@ function normalizeLyricsSyncLines(lines) {
       return {
         number: index + 1,
         text,
-        timestampMs
+        timestampMs,
+        characterId: String(line?.characterId || "").trim()
       };
     })
     .filter(Boolean);
+}
+
+const MINI_CHARACTER_GROUPS = {
+  boys: ["#7FDBFF", "#9EE8FF", "#61D2FF", "#8CCBFF"],
+  girls: ["#FF79C6", "#FF9BE0", "#D38BFF", "#F09CFF"],
+  men: ["#FFFFFF"],
+  women: ["#FFF3A6"]
+};
+
+function normalizeCharacterGroup(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["boys", "girls", "men", "women"].includes(normalized)) {
+    return normalized;
+  }
+  return "boys";
+}
+
+function pickNextCharacterColor(existingCharacters, group) {
+  const safeGroup = normalizeCharacterGroup(group);
+  const palette = MINI_CHARACTER_GROUPS[safeGroup] || MINI_CHARACTER_GROUPS.boys;
+  const usedCount = (Array.isArray(existingCharacters) ? existingCharacters : [])
+    .filter((item) => normalizeCharacterGroup(item?.group) === safeGroup)
+    .length;
+  return palette[Math.min(usedCount, palette.length - 1)];
 }
 
 function buildLyricsTextFromSyncLines(lines) {
@@ -5016,6 +5064,149 @@ async function handleStoreTrackTextsGenerateRequest(request, response, productId
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel gerar os textos desta faixa."
+    });
+  }
+}
+
+async function handleMiniMediaAlbumCharacterCreateRequest(request, response, albumId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const name = sanitizeMiniMediaTitle(body?.name || "", "").trim();
+  const group = normalizeCharacterGroup(body?.group);
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+
+    const characters = normalizeMiniMediaAlbumCharacters(album.characters || album.metadata?.characters);
+    const colorInput = String(body?.color || "").trim();
+    const color = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(colorInput)
+      ? colorInput.toUpperCase()
+      : pickNextCharacterColor(characters, group);
+
+    if (!name) {
+      sendJson(response, 400, { error: "Informe o nome do personagem." });
+      return;
+    }
+
+    const character = {
+      id: crypto.randomUUID(),
+      name,
+      color,
+      group
+    };
+
+    album.characters = [...characters, character];
+    album.metadata = {
+      ...(album.metadata && typeof album.metadata === "object" ? album.metadata : {}),
+      characters: album.characters
+    };
+
+    if (hasDatabase()) {
+      await updateMiniMediaAlbumMetadata(albumId, album.metadata);
+    }
+
+    const saved = await saveMiniMediaLibrary(library);
+    const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+    sendJson(response, 201, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      album: buildMiniMediaAlbumPayload(savedAlbum, { includeExtended: true }),
+      character
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel criar o personagem."
+    });
+  }
+}
+
+async function handleMiniMediaTrackLineCharacterUpdateRequest(request, response, albumId, trackId, lineNumber) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const characterId = String(body?.characterId || "").trim();
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+    const song = album.songs.find((item) => item.id === trackId);
+    if (!song) {
+      sendJson(response, 404, { error: "Faixa nao encontrada." });
+      return;
+    }
+
+    const characters = normalizeMiniMediaAlbumCharacters(album.characters || album.metadata?.characters);
+    if (characterId && !characters.some((item) => item.id === characterId)) {
+      sendJson(response, 400, { error: "Personagem nao pertence a este album." });
+      return;
+    }
+
+    const databaseSong = await getSyncedMiniMediaSong(library, albumId, trackId);
+    const lines = normalizeLyricsSyncLines(song.lyricsSyncData?.lines || databaseSong.lyrics_sync_json?.lines || []);
+    const targetIndex = Math.max(0, Number(lineNumber || 1) - 1);
+    if (!lines[targetIndex]) {
+      sendJson(response, 404, { error: "Linha nao encontrada." });
+      return;
+    }
+
+    lines[targetIndex] = {
+      ...lines[targetIndex],
+      characterId
+    };
+
+    const nextSyncData = {
+      ...(song.lyricsSyncData && typeof song.lyricsSyncData === "object" ? song.lyricsSyncData : {}),
+      albumId,
+      trackId,
+      title: song.title,
+      lines
+    };
+
+    const updatedSong = await updateMiniMediaSongLyrics(databaseSong.id, song.lyricsText || buildLyricsTextFromSyncLines(lines), nextSyncData);
+    song.lyricsSyncData = updatedSong?.lyrics_sync_json && typeof updatedSong.lyrics_sync_json === "object"
+      ? updatedSong.lyrics_sync_json
+      : nextSyncData;
+
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      lineNumber: targetIndex + 1,
+      syncData: song.lyricsSyncData,
+      characters
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel vincular o personagem."
     });
   }
 }
@@ -8978,6 +9169,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname.startsWith("/api/mini/media/albums/") && pathname.endsWith("/characters")) {
+    const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", "").replace(/\/characters$/, ""));
+    await handleMiniMediaAlbumCharacterCreateRequest(request, response, albumId);
+    return;
+  }
+
   if (request.method === "PUT" && pathname.startsWith("/api/mini/media/albums/") && pathname.endsWith("/cover")) {
     const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", "").replace(/\/cover$/, ""));
     await handleMiniMediaAlbumCoverUploadRequest(request, response, albumId);
@@ -8997,6 +9194,18 @@ const server = http.createServer(async (request, response) => {
     const albumId = decodeURIComponent(parts[0] || "");
     const trackId = decodeURIComponent(parts[1] || "");
     await handleMiniMediaTrackLyricsUpdateRequest(request, response, albumId, trackId);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/tracks/") && pathname.includes("/lyrics/lines/") && pathname.endsWith("/character")) {
+    const match = pathname.match(/^\/api\/mini\/media\/albums\/([^/]+)\/tracks\/([^/]+)\/lyrics\/lines\/(\d+)\/character$/);
+    await handleMiniMediaTrackLineCharacterUpdateRequest(
+      request,
+      response,
+      decodeURIComponent(match?.[1] || ""),
+      decodeURIComponent(match?.[2] || ""),
+      Number(match?.[3] || 0)
+    );
     return;
   }
 
