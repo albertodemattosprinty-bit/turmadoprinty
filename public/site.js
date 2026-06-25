@@ -147,6 +147,15 @@ function normalizeUsername(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeAdminIdentity(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .trim()
+    .toLowerCase();
+}
+
 async function registerProductsOfflineShell() {
   if (page !== "produtos") {
     return;
@@ -164,7 +173,13 @@ async function registerProductsOfflineShell() {
 }
 
 function isRoseMattosUser(user) {
-  return Boolean(user?.isAdmin) && normalizeUsername(user?.username) === "rosemattos";
+  if (!user?.isAdmin) {
+    return false;
+  }
+
+  const username = normalizeAdminIdentity(user?.username);
+  const name = normalizeAdminIdentity(user?.name);
+  return username === "rosemattos" || name === "rosemattos";
 }
 
 function buildProductsAuthRedirect(filter) {

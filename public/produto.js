@@ -36,7 +36,6 @@ let albumShortcutBuffer = "";
 let albumShortcutTimer = null;
 let trackGenerationProgressTimer = null;
 let trackGenerationProgressValue = 0;
-const adminUsername = "rosemattos";
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
 
@@ -54,6 +53,15 @@ function normalizeCatalogText(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeAdminIdentity(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
     .trim()
     .toLowerCase();
 }
@@ -97,7 +105,9 @@ function canStreamTrack(albumId, albumName, track) {
 }
 
 function isRoseMattosUser() {
-  return String(currentUser?.username || "").trim().toLowerCase() === adminUsername;
+  const username = normalizeAdminIdentity(currentUser?.username);
+  const name = normalizeAdminIdentity(currentUser?.name);
+  return username === "rosemattos" || name === "rosemattos";
 }
 
 function canDownloadTrack(albumId, albumName, track) {
@@ -217,7 +227,7 @@ function showFloatingNotice(message) {
 function isAdmin() {
   return Boolean(
     currentUser?.isAdmin &&
-    String(currentUser?.username || "").trim().toLowerCase() === adminUsername
+    isRoseMattosUser()
   );
 }
 

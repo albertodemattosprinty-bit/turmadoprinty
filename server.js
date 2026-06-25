@@ -151,8 +151,19 @@ const allowedCorsOrigins = new Set([
   "ionic://localhost"
 ]);
 
+function normalizeAdminIdentity(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .trim()
+    .toLowerCase();
+}
+
 function isAdminUser(user) {
-  return String(user?.username || "").trim().toLowerCase() === ADMIN_USERNAME;
+  const username = normalizeAdminIdentity(user?.username);
+  const name = normalizeAdminIdentity(user?.name);
+  return username === ADMIN_USERNAME || name === ADMIN_USERNAME;
 }
 
 function isAllowedCorsOrigin(origin) {
