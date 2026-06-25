@@ -2255,6 +2255,7 @@ body[data-page="produto"] .product-shell {
   inset: 0;
   z-index: 60;
   display: none;
+  overflow: hidden;
 }
 
 .track-texts-modal.show {
@@ -2269,15 +2270,19 @@ body[data-page="produto"] .product-shell {
 }
 
 .track-texts-panel {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 1;
-  width: 100vw;
-  height: 100vh;
-  max-height: 100vh;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 100dvh;
   margin: 0;
   padding: 22px 22px 30px;
   border-radius: 0;
   overflow: auto;
+  box-sizing: border-box;
   background:
     radial-gradient(circle at top center, rgba(75, 205, 188, 0.2), transparent 34%),
     linear-gradient(180deg, rgba(72, 202, 181, 0.96) 0%, rgba(35, 147, 206, 0.96) 42%, rgba(22, 116, 198, 0.98) 100%);
@@ -2438,6 +2443,7 @@ body[data-page="produto"] .product-shell {
   margin-left: auto;
   margin-right: auto;
   border-radius: 32px;
+  inset: auto;
 }
 
 .track-generation-message {
@@ -5470,6 +5476,10 @@ body[data-page="explorar"] #chat-auth-status {
 }
 
 @media (max-width: 980px) {
+  body[data-page="produto"] {
+    overflow-x: hidden;
+  }
+
   .hero-home,
   .chat-layout,
   .info-grid,
@@ -5486,6 +5496,26 @@ body[data-page="explorar"] #chat-auth-status {
 
   .track-card {
     grid-template-columns: 1fr;
+  }
+
+  .track-texts-panel {
+    padding: 18px 16px 26px;
+  }
+
+  .track-texts-player {
+    grid-template-columns: 40px 40px minmax(0, 1fr) 40px;
+    gap: 8px;
+  }
+
+  .track-texts-player-button {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .track-texts-player-button svg {
+    width: 18px;
+    height: 18px;
   }
 
   .admin-form-inline,

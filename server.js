@@ -1460,6 +1460,67 @@ function buildLyricsTextFromSyncLines(lines) {
     .join("\n");
 }
 
+function splitTextIntoShortLyricsLines(text, maxChars = 30) {
+  const safeMax = Math.max(8, Number(maxChars) || 30);
+  const normalized = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  const rawParts = normalized
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=[,;:.!?])\s+/))
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const output = [];
+
+  for (const part of rawParts) {
+    if (part.length <= safeMax) {
+      output.push(part);
+      continue;
+    }
+
+    const words = part.split(/\s+/).filter(Boolean);
+    let buffer = "";
+
+    for (const word of words) {
+      const candidate = buffer ? `${buffer} ${word}` : word;
+      if (candidate.length <= safeMax) {
+        buffer = candidate;
+        continue;
+      }
+
+      if (buffer) {
+        output.push(buffer);
+      }
+
+      if (word.length <= safeMax) {
+        buffer = word;
+        continue;
+      }
+
+      let remaining = word;
+      while (remaining.length > safeMax) {
+        output.push(remaining.slice(0, safeMax));
+        remaining = remaining.slice(safeMax).trim();
+      }
+      buffer = remaining;
+    }
+
+    if (buffer) {
+      output.push(buffer);
+    }
+  }
+
+  return output.map((line) => line.trim()).filter(Boolean);
+}
+
 function extractTranscriptSegments(payload) {
   if (!Array.isArray(payload?.segments)) {
     return [];
@@ -1508,8 +1569,7 @@ async function generateTimedLyricsForTrack(apiKey, track) {
   const formData = new FormData();
   formData.append("model", OPENAI_TRANSCRIBE_MODEL);
   formData.append("language", "pt");
-  formData.append("response_format", "verbose_json");
-  formData.append("timestamp_granularities[]", "segment");
+  formData.append("response_format", "json");
   formData.append("file", new Blob([audioBuffer], { type: "audio/mpeg" }), safeFileName);
 
   const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
@@ -1531,92 +1591,114 @@ async function generateTimedLyricsForTrack(apiKey, track) {
   }
 
   const fullText = String(transcriptionPayload?.text || "").trim();
-  const segments = extractTranscriptSegments(transcriptionPayload);
   if (!fullText) {
     throw new Error("A OpenAI nao retornou texto para esta faixa.");
   }
 
-  let syncLines = normalizeLyricsSyncLines(segments.map((segment) => ({
-    text: segment.text,
-    timestampMs: segment.startMs
-  })));
-
-  if (segments.length) {
-    const jsonSchema = {
-      name: "mini_track_lyrics_sync",
-      strict: true,
-      schema: {
-        type: "object",
-        additionalProperties: false,
-        required: ["lines"],
-        properties: {
-          lines: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["text", "startMs"],
-              properties: {
-                text: { type: "string" },
-                startMs: { type: "integer" }
-              }
+  const jsonSchema = {
+    name: "mini_track_lyrics_lines",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["lines"],
+      properties: {
+        lines: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["text"],
+            properties: {
+              text: { type: "string" }
             }
           }
         }
       }
-    };
-
-    const completion = await createChatCompletion(apiKey, {
-      model: OPENAI_INSTANT_MODEL || OPENAI_MODEL,
-      reasoning_effort: "low",
-      temperature: 0.15,
-      max_completion_tokens: 1800,
-      response_format: {
-        type: "json_schema",
-        json_schema: jsonSchema
-      },
-      messages: [
-        {
-          role: "system",
-          content: "Voce organiza letras em pt-BR. Responda somente JSON valido. Nao invente palavras. Preserve o sentido do transcript. Quebre em frases naturais e limpas. startMs deve marcar o instante em que a frase comeca."
-        },
-        {
-          role: "user",
-          content: [
-            `Faixa: ${String(track?.title || track?.label || "Faixa").trim() || "Faixa"}`,
-            "Use o transcript completo abaixo como fonte principal.",
-            `Transcript completo:\n${fullText}`,
-            `Segmentos com inicio e fim em milissegundos:\n${JSON.stringify(segments)}`
-          ].join("\n\n")
-        }
-      ]
-    }, {
-      timeoutMs: 120000,
-      timeoutMessage: "A organizacao dos timestamps demorou demais e foi interrompida."
-    });
-
-    const structured = parseStructuredJsonText(extractChatCompletionText(completion));
-    const candidateLines = normalizeLyricsSyncLines(structured?.lines || []);
-    if (candidateLines.length) {
-      syncLines = candidateLines;
     }
+  };
+
+  let syncLines = [];
+
+  const completion = await createChatCompletion(apiKey, {
+    model: OPENAI_INSTANT_MODEL || OPENAI_MODEL,
+    reasoning_effort: "low",
+    temperature: 0.1,
+    max_completion_tokens: 1800,
+    response_format: {
+      type: "json_schema",
+      json_schema: jsonSchema
+    },
+    messages: [
+      {
+        role: "system",
+        content: [
+          "Voce organiza letras em pt-BR.",
+          "Responda somente JSON valido.",
+          "Nao invente palavras que nao estejam no transcript.",
+          "Divida o texto em frases curtas e bem respiradas.",
+          "Cada frase deve ter no maximo 30 caracteres.",
+          "Nunca ultrapasse 30 caracteres por linha.",
+          "Se precisar, quebre uma frase longa em varias linhas naturais.",
+          "Nao inclua timestamps, numeros ou comentarios."
+        ].join(" ")
+      },
+      {
+        role: "user",
+        content: [
+          `Faixa: ${String(track?.title || track?.label || "Faixa").trim() || "Faixa"}`,
+          "Use o transcript completo abaixo como fonte unica.",
+          `Transcript completo:\n${fullText}`
+        ].join("\n\n")
+      }
+    ]
+  }, {
+    timeoutMs: 120000,
+    timeoutMessage: "A organizacao das frases demorou demais e foi interrompida."
+  });
+
+  const structured = parseStructuredJsonText(extractChatCompletionText(completion));
+  const candidateLines = normalizeLyricsSyncLines(
+    Array.isArray(structured?.lines)
+      ? structured.lines.map((line) => ({
+        text: String(line?.text || "").trim(),
+        timestampMs: null
+      }))
+      : []
+  );
+  if (candidateLines.length) {
+    syncLines = candidateLines.map((line) => ({
+      ...line,
+      timestampMs: null
+    }));
   }
 
   if (!syncLines.length) {
-    syncLines = normalizeLyricsSyncLines(fullText.split(/\r?\n+/).map((text, index) => ({
-      text,
-      timestampMs: index * 1000
-    })));
+    syncLines = normalizeLyricsSyncLines(
+      splitTextIntoShortLyricsLines(fullText, 30).map((text) => ({
+        text,
+        timestampMs: null
+      }))
+    );
   }
+
+  syncLines = syncLines.map((line) => ({
+    ...line,
+    text: String(line.text || "").slice(0, 30).trim(),
+    timestampMs: null
+  })).filter((line) => line.text);
 
   return {
     lyrics: buildLyricsTextFromSyncLines(syncLines),
     syncData: {
+      title: String(track?.title || track?.label || "").trim(),
       lines: syncLines,
       generatedAt: new Date().toISOString(),
       generatedBy: "openai",
       transcriptionModel: OPENAI_TRANSCRIBE_MODEL,
-      organizerModel: OPENAI_INSTANT_MODEL || OPENAI_MODEL
+      organizerModel: OPENAI_INSTANT_MODEL || OPENAI_MODEL,
+      mode: "phrases-only",
+      maxCharsPerLine: 30
     }
   };
 }
