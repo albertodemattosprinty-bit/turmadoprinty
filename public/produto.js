@@ -38,6 +38,7 @@ let trackGenerationProgressTimer = null;
 let trackGenerationProgressValue = 0;
 let modalManualLineIndex = -1;
 let trackTextsTouchState = null;
+let trackTextsLastActiveIndex = -1;
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
 const characterPalettes = {
@@ -727,9 +728,6 @@ function ensureTrackTextsModal() {
         </button>
       </div>
       <div class="track-texts-player" data-role="modal-player">
-        <button class="ghost-button track-texts-player-button" type="button" data-role="modal-prev" aria-label="Faixa anterior">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-        </button>
         <button class="ghost-button track-texts-player-button" type="button" data-role="modal-play" aria-label="Tocar faixa">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
         </button>
@@ -740,28 +738,43 @@ function ensureTrackTextsModal() {
             <span id="track-texts-duration">00:00</span>
           </div>
         </div>
-        <button class="ghost-button track-texts-player-button" type="button" data-role="modal-next" aria-label="Proxima faixa">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.59 16.59 1.41 1.41 6-6-6-6-1.41 1.41L13.17 12z"/></svg>
+        <button class="ghost-button track-texts-player-button" type="button" data-role="modal-list" aria-label="Escolher outra faixa">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 6.5m0 5.5A1.5 1.5 0 0 1 5.5 10h13a1.5 1.5 0 1 1 0 3h-13A1.5 1.5 0 0 1 4 12m1.5 5A1.5 1.5 0 1 0 5.5 20h13a1.5 1.5 0 1 0 0-3z"/></svg>
         </button>
       </div>
       <div id="track-texts-body" class="track-texts-body"></div>
+      <div class="track-texts-track-picker" data-role="track-picker" hidden>
+        <div class="track-texts-track-picker-backdrop" data-role="close-track-picker"></div>
+        <div class="track-texts-track-picker-sheet" role="dialog" aria-modal="true" aria-labelledby="track-picker-title">
+          <div class="track-texts-track-picker-head">
+            <h4 id="track-picker-title">Faixas do album</h4>
+            <button class="ghost-button track-texts-close" type="button" data-role="close-track-picker" aria-label="Fechar lista de faixas">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+            </button>
+          </div>
+          <div class="track-texts-track-picker-list" data-role="track-picker-list"></div>
+        </div>
+      </div>
     </div>
   `;
   document.body.appendChild(modal);
   modal.querySelectorAll("[data-role='close-texts']").forEach((node) => {
     node.addEventListener("click", () => {
+      closeTrackTextsTrackPicker();
       modal.setAttribute("aria-hidden", "true");
       modal.classList.remove("show");
     });
   });
-  modal.querySelector("[data-role='modal-prev']")?.addEventListener("click", async () => {
-    await moveTrackTextsModal(-1);
-  });
-  modal.querySelector("[data-role='modal-next']")?.addEventListener("click", async () => {
-    await moveTrackTextsModal(1);
+  modal.querySelectorAll("[data-role='close-track-picker']").forEach((node) => {
+    node.addEventListener("click", () => {
+      closeTrackTextsTrackPicker();
+    });
   });
   modal.querySelector("[data-role='modal-play']")?.addEventListener("click", async () => {
     await toggleTrackTextsModalPlayback();
+  });
+  modal.querySelector("[data-role='modal-list']")?.addEventListener("click", () => {
+    openTrackTextsTrackPicker();
   });
   modal.querySelector("[data-role='modal-progress']")?.addEventListener("input", async (event) => {
     const currentTrack = getModalTrack();
@@ -1105,6 +1118,55 @@ function getModalLines() {
   return track ? getTrackLyricsLines(track) : [];
 }
 
+function closeTrackTextsTrackPicker() {
+  const modal = document.getElementById("track-texts-modal");
+  const picker = modal?.querySelector("[data-role='track-picker']");
+  if (!picker) {
+    return;
+  }
+  picker.hidden = true;
+  picker.classList.remove("show");
+}
+
+function openTrackTextsTrackPicker() {
+  const modal = ensureTrackTextsModal();
+  const picker = modal.querySelector("[data-role='track-picker']");
+  const list = modal.querySelector("[data-role='track-picker-list']");
+  const modalTrack = getModalTrack();
+  if (!picker || !list || !Array.isArray(currentAlbum?.tracks)) {
+    return;
+  }
+
+  list.innerHTML = currentAlbum.tracks.map((track) => {
+    const isCurrent = Number(track?.number || 0) === Number(modalTrack?.number || 0);
+    return `
+      <button class="track-texts-track-picker-item ${isCurrent ? "is-active" : ""}" type="button" data-role="track-picker-item" data-track-number="${Number(track?.number || 0)}">
+        <span class="track-texts-track-picker-number">${String(track?.number || 0).padStart(2, "0")}</span>
+        <span class="track-texts-track-picker-title">${escapeHtml(track?.title || track?.label || `Faixa ${track?.number || ""}`)}</span>
+      </button>
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-role='track-picker-item']").forEach((node) => {
+    node.addEventListener("click", () => {
+      const nextTrack = getTrackByNumber(node.dataset.trackNumber || "");
+      closeTrackTextsTrackPicker();
+      if (!nextTrack) {
+        return;
+      }
+      const nextIndex = getTrackIndexByNumber(nextTrack.number);
+      if (nextIndex >= 0) {
+        currentTrackIndex = nextIndex;
+        syncTrackCarouselUi();
+      }
+      openTrackTextsModal(nextTrack);
+    });
+  });
+
+  picker.hidden = false;
+  picker.classList.add("show");
+}
+
 function getTrackCardByNumber(trackNumber) {
   return trackList?.querySelector(`.track-card[data-track-number="${String(trackNumber)}"]`) || null;
 }
@@ -1238,6 +1300,8 @@ function openTrackTextsModal(track) {
   title.textContent = track?.title || "Textos da faixa";
   body.dataset.trackNumber = String(track?.number || "");
   body.innerHTML = renderLyricsLinesHtml(track, getTrackLyricsLines(track));
+  trackTextsLastActiveIndex = -1;
+  closeTrackTextsTrackPicker();
   const allLines = getTrackLyricsLines(track);
   modalManualLineIndex = allLines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined) ? -1 : 0;
   body.querySelectorAll(".track-texts-line").forEach((node) => {
@@ -1254,8 +1318,14 @@ function openTrackTextsModal(track) {
         openCharacterEditor();
         return;
       }
-      const timestampMs = Number(node.dataset.timestampMs || 0);
-      await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
+      const timestampValue = String(node.dataset.timestampMs || "").trim();
+      if (timestampValue) {
+        const timestampMs = Number(timestampValue || 0);
+        await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
+        return;
+      }
+      modalManualLineIndex = lineIndex;
+      syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
     });
     node.addEventListener("pointerdown", (event) => {
       if (!isAdmin() || isDesktopPointer()) {
@@ -1350,9 +1420,8 @@ function renderTrackLyrics(track) {
 function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
   const modal = document.getElementById("track-texts-modal");
   const body = modal?.querySelector("#track-texts-body");
-  const panel = modal?.querySelector(".track-texts-panel");
   const isVisible = modal?.classList.contains("show") && modal?.getAttribute("aria-hidden") === "false";
-  if (!body || !panel || !isVisible) {
+  if (!body || !isVisible) {
     return;
   }
 
@@ -1377,26 +1446,30 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
   let activeNode = null;
   body.querySelectorAll(".track-texts-line").forEach((node, index) => {
     const isActive = index === activeIndex;
+    const relativeOffset = activeIndex >= 0 ? Math.max(-4, Math.min(4, index - activeIndex)) : 0;
     node.classList.toggle("is-active", isActive);
+    node.style.setProperty("--line-offset-y", `${relativeOffset * 12}px`);
+    node.style.setProperty("--line-depth", String(Math.min(Math.abs(relativeOffset), 4)));
     if (isActive) {
       activeNode = node;
     }
   });
 
-  if (activeNode) {
-    const panelRect = panel.getBoundingClientRect();
+  if (activeNode && activeIndex !== trackTextsLastActiveIndex) {
+    const bodyRect = body.getBoundingClientRect();
     const nodeRect = activeNode.getBoundingClientRect();
-    const currentScrollTop = panel.scrollTop;
-    const nodeOffsetTop = nodeRect.top - panelRect.top + currentScrollTop;
+    const currentScrollTop = body.scrollTop;
+    const nodeOffsetTop = nodeRect.top - bodyRect.top + currentScrollTop;
     const targetScrollTop = Math.max(
       0,
-      nodeOffsetTop - (panel.clientHeight / 2) + (activeNode.clientHeight / 2)
+      nodeOffsetTop - (body.clientHeight / 2) + (activeNode.clientHeight / 2)
     );
-    panel.scrollTo({
+    body.scrollTo({
       top: targetScrollTop,
       behavior: "smooth"
     });
   }
+  trackTextsLastActiveIndex = activeIndex;
 }
 
 async function moveTrackTextsLineBy(delta) {
@@ -1427,14 +1500,11 @@ function syncTrackTextsModalUi(track) {
   const playButton = modal?.querySelector("[data-role='modal-play']");
   const currentTimeLabel = modal?.querySelector("#track-texts-current-time");
   const durationLabel = modal?.querySelector("#track-texts-duration");
-  const prevButton = modal?.querySelector("[data-role='modal-prev']");
-  const nextButton = modal?.querySelector("[data-role='modal-next']");
+  const listButton = modal?.querySelector("[data-role='modal-list']");
   if (!modal || modal.getAttribute("aria-hidden") !== "false" || !track) {
     return;
   }
 
-  const trackIndex = getTrackIndexByNumber(track.number);
-  const total = Array.isArray(currentAlbum?.tracks) ? currentAlbum.tracks.length : 0;
   const audio = getTrackAudioByNumber(track.number);
   const duration = Number.isFinite(audio?.duration) ? audio.duration : 0;
   const currentTime = currentTrackNumber === track.number && Number.isFinite(currentAudio?.currentTime) ? currentAudio.currentTime : 0;
@@ -1457,11 +1527,8 @@ function syncTrackTextsModalUi(track) {
   if (durationLabel) {
     durationLabel.textContent = formatTime(duration);
   }
-  if (prevButton) {
-    prevButton.disabled = trackIndex <= 0;
-  }
-  if (nextButton) {
-    nextButton.disabled = trackIndex < 0 || trackIndex >= total - 1;
+  if (listButton) {
+    listButton.disabled = !Array.isArray(currentAlbum?.tracks) || currentAlbum.tracks.length <= 1;
   }
 
   syncTrackTextsModalHighlight(track, currentTime);
