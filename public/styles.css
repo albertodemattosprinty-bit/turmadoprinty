@@ -2580,6 +2580,10 @@ body[data-page="produto"] .inline-link {
   gap: 14px;
 }
 
+.track-text-confirm-panel {
+  gap: 14px;
+}
+
 .track-text-edit-input {
   width: 100%;
   min-height: 150px;

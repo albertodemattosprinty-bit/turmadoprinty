@@ -918,6 +918,71 @@ function ensureTrackGenerationModal() {
   return modal;
 }
 
+function ensureTrackTextsConfirmModal() {
+  let modal = document.getElementById("track-texts-confirm-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "track-texts-confirm-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-track-confirm"></div>
+    <div class="track-texts-panel track-generation-panel track-text-confirm-panel" role="dialog" aria-modal="true" aria-labelledby="track-text-confirm-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Recriar textos</p>
+          <h3 id="track-text-confirm-title" class="section-title small">Deseja excluir o timestamp atual?</h3>
+        </div>
+      </div>
+      <p id="track-text-confirm-message" class="track-generation-message">Os textos serao recriados pela OpenAI e a faixa ficara somente com texto simples, sem a syncagem atual.</p>
+      <div class="bulk-track-title-actions">
+        <button id="track-text-confirm-cancel" class="ghost-button" type="button">Cancelar</button>
+        <button id="track-text-confirm-accept" class="primary-button" type="button">Continuar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelectorAll("[data-role='close-track-confirm']").forEach((node) => {
+    node.addEventListener("click", () => {
+      resolveTrackTextsConfirm(false);
+    });
+  });
+  modal.querySelector("#track-text-confirm-cancel")?.addEventListener("click", () => {
+    resolveTrackTextsConfirm(false);
+  });
+  modal.querySelector("#track-text-confirm-accept")?.addEventListener("click", () => {
+    resolveTrackTextsConfirm(true);
+  });
+  return modal;
+}
+
+let trackTextsConfirmResolver = null;
+
+function resolveTrackTextsConfirm(accepted) {
+  const modal = document.getElementById("track-texts-confirm-modal");
+  if (modal) {
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+  }
+  if (typeof trackTextsConfirmResolver === "function") {
+    const resolver = trackTextsConfirmResolver;
+    trackTextsConfirmResolver = null;
+    resolver(Boolean(accepted));
+  }
+}
+
+function confirmTrackTextsReset() {
+  const modal = ensureTrackTextsConfirmModal();
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+  return new Promise((resolve) => {
+    trackTextsConfirmResolver = resolve;
+  });
+}
+
 function ensureTrackCharacterModal() {
   let modal = document.getElementById("track-character-modal");
   if (modal) {
@@ -1148,6 +1213,15 @@ function openTrackTextEditModal(track, lineIndex) {
   }, 20);
 }
 
+function splitEditedTrackText(value) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => String(line || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
 async function submitTrackTextEditModal() {
   const modal = ensureTrackTextEditModal();
   const albumId = String(modal.dataset.albumId || "");
@@ -1160,20 +1234,43 @@ async function submitTrackTextEditModal() {
     return;
   }
 
-  const nextText = String(input.value || "").trim();
-  if (!nextText) {
+  const nextLinesText = splitEditedTrackText(input.value);
+  if (!nextLinesText.length) {
     showFloatingNotice("Digite algum texto para a linha.");
     return;
   }
 
   const lines = cloneLyricsLines(getTrackModalWorkingLines(track));
-  if (!lines[lineIndex]) {
+  const originalLine = lines[lineIndex];
+  if (!originalLine) {
     return;
   }
-  lines[lineIndex] = {
-    ...lines[lineIndex],
-    text: nextText
-  };
+
+  const replacementLines = nextLinesText.map((text, index) => ({
+    ...originalLine,
+    number: lineIndex + index + 1,
+    text,
+    timestampMs: index === 0 ? originalLine.timestampMs : null
+  }));
+  lines.splice(lineIndex, 1, ...replacementLines);
+  const normalizedLines = lines.map((line, index) => ({
+    ...line,
+    number: index + 1
+  }));
+
+  if (trackTextsSyncMode) {
+    trackTextsSyncDraft = buildTrackSyncDraft(track, {
+      lines: normalizedLines,
+      syncMode: true
+    });
+    persistTrackTextsSyncDraft(track);
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+    modalManualLineIndex = lineIndex;
+    openTrackTextsModal(track);
+    showFloatingNotice("Texto atualizado no modo sync.");
+    return;
+  }
 
   try {
     const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics`), {
@@ -1183,13 +1280,13 @@ async function submitTrackTextEditModal() {
         Authorization: `Bearer ${getToken()}`
       },
       body: JSON.stringify({
-        lyrics: lines.map((line) => line.text).join("\n"),
+        lyrics: normalizedLines.map((line) => line.text).join("\n"),
         syncData: {
           ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
           albumId,
           trackId,
           title: track.title,
-          lines
+          lines: normalizedLines
         }
       })
     });
@@ -1200,10 +1297,10 @@ async function submitTrackTextEditModal() {
 
     const updatedTrack = {
       ...track,
-      lyrics: data.lyrics || lines.map((line) => line.text).join("\n"),
+      lyrics: data.lyrics || normalizedLines.map((line) => line.text).join("\n"),
       lyricsSyncData: data.syncData || {
         ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
-        lines
+        lines: normalizedLines
       }
     };
     updateTrackInCurrentAlbum(updatedTrack);
@@ -1732,7 +1829,7 @@ function openTrackTextsModal(track) {
   body.querySelectorAll(".track-texts-line").forEach((node) => {
     const lineIndex = Number(node.dataset.lyricsIndex || 0);
     const openTextEditor = () => {
-      if (!trackTextsSyncMode && isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
+      if (isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
         openTrackTextEditModal(track, lineIndex);
       }
     };
@@ -1764,9 +1861,13 @@ function openTrackTextsModal(track) {
         }
         const isPaused = !currentAudio || currentAudio.paused || currentTrackNumber !== track.number;
         if (isPaused) {
+          const anchorTimestampMs = lineIndex <= 0
+            ? 0
+            : Math.max(0, Number(trackTextsSyncDraft.lines[lineIndex]?.timestampMs || 0));
           resetTrackSyncDraftFromLine(lineIndex);
           persistTrackTextsSyncDraft(track);
           modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
+          await seekTrackAudio(track, anchorTimestampMs / 1000, { autoplay: false });
           openTrackTextsModal(track);
           return;
         }
@@ -1801,7 +1902,7 @@ function openTrackTextsModal(track) {
       syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
     });
     node.addEventListener("pointerdown", (event) => {
-      if (trackTextsSyncMode || !isAdmin()) {
+      if (!isAdmin()) {
         return;
       }
       trackTextsTouchState = {
@@ -2262,6 +2363,14 @@ async function createTrackTexts(card, album, track) {
   if (!canGenerateTrackTexts(track)) {
     showFloatingNotice("Essa faixa ainda nao esta conectada ao fluxo completo do MINI.");
     return;
+  }
+
+  const hasExistingTimestamps = getTrackLyricsLines(track).some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
+  if (hasExistingTimestamps) {
+    const accepted = await confirmTrackTextsReset();
+    if (!accepted) {
+      return;
+    }
   }
 
   startTrackGenerationProgress();
