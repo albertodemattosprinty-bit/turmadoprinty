@@ -504,6 +504,8 @@ async function loadAccessState() {
   if (meResponse?.ok) {
     const meData = await meResponse.json();
     currentUser = meData.user || null;
+  } else if (accessData?.user) {
+    currentUser = accessData.user;
   }
 }
 
@@ -648,10 +650,7 @@ function hasTrackTexts(track) {
 }
 
 function canGenerateTrackTexts(track) {
-  return isRoseMattosUser()
-    && String(track?.sourceAlbumId || "").trim()
-    && String(track?.sourceSongId || "").trim()
-    && String(track?.streamUrl || "").trim();
+  return isAdmin() && String(track?.streamUrl || "").trim();
 }
 
 function getOfflineCacheKey(albumId, trackNumber) {
@@ -697,7 +696,24 @@ function ensureTrackTextsModal() {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
         </button>
       </div>
-      <div id="track-texts-meta" class="track-texts-meta"></div>
+      <div class="track-texts-player" data-role="modal-player">
+        <button class="ghost-button track-texts-player-button" type="button" data-role="modal-prev" aria-label="Faixa anterior">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </button>
+        <button class="ghost-button track-texts-player-button" type="button" data-role="modal-play" aria-label="Tocar faixa">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="track-texts-player-progress">
+          <input id="track-texts-progress" class="track-texts-progress-input" type="range" min="0" max="100" value="0" step="0.1" data-role="modal-progress" aria-label="Tempo da faixa">
+          <div class="track-texts-time-row">
+            <span id="track-texts-current-time">00:00</span>
+            <span id="track-texts-duration">00:00</span>
+          </div>
+        </div>
+        <button class="ghost-button track-texts-player-button" type="button" data-role="modal-next" aria-label="Proxima faixa">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.59 16.59 1.41 1.41 6-6-6-6-1.41 1.41L13.17 12z"/></svg>
+        </button>
+      </div>
       <div id="track-texts-body" class="track-texts-body"></div>
     </div>
   `;
@@ -707,6 +723,23 @@ function ensureTrackTextsModal() {
       modal.setAttribute("aria-hidden", "true");
       modal.classList.remove("show");
     });
+  });
+  modal.querySelector("[data-role='modal-prev']")?.addEventListener("click", async () => {
+    await moveTrackTextsModal(-1);
+  });
+  modal.querySelector("[data-role='modal-next']")?.addEventListener("click", async () => {
+    await moveTrackTextsModal(1);
+  });
+  modal.querySelector("[data-role='modal-play']")?.addEventListener("click", async () => {
+    await toggleTrackTextsModalPlayback();
+  });
+  modal.querySelector("[data-role='modal-progress']")?.addEventListener("input", async (event) => {
+    const currentTrack = getModalTrack();
+    if (!currentTrack) {
+      return;
+    }
+    const progressValue = Number(event.target?.value || 0);
+    await seekTrackAudio(currentTrack, null, { progressPercent: progressValue, autoplay: false });
   });
   return modal;
 }
@@ -812,43 +845,173 @@ function renderLyricsLinesHtml(track, lines) {
   return `
     <div class="track-texts-lines" data-role="track-texts-lines">
       ${lines.map((line, index) => `
-        <div class="track-texts-line" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
+        <button class="track-texts-line" type="button" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
           ${escapeHtml(line.text)}
-        </div>
+        </button>
       `).join("")}
     </div>
   `;
 }
 
-function openTrackTextsModal(track) {
-  const modal = ensureTrackTextsModal();
-  const title = modal.querySelector("#track-texts-title");
-  const meta = modal.querySelector("#track-texts-meta");
-  const body = modal.querySelector("#track-texts-body");
-  if (!title || !meta || !body) {
+function getTrackIndexByNumber(trackNumber) {
+  return Array.isArray(currentAlbum?.tracks)
+    ? currentAlbum.tracks.findIndex((track) => Number(track?.number || 0) === Number(trackNumber || 0))
+    : -1;
+}
+
+function getTrackByNumber(trackNumber) {
+  return Array.isArray(currentAlbum?.tracks)
+    ? currentAlbum.tracks.find((track) => Number(track?.number || 0) === Number(trackNumber || 0)) || null
+    : null;
+}
+
+function getModalTrack() {
+  const body = document.getElementById("track-texts-body");
+  return getTrackByNumber(body?.dataset.trackNumber || "");
+}
+
+function getTrackCardByNumber(trackNumber) {
+  return trackList?.querySelector(`.track-card[data-track-number="${String(trackNumber)}"]`) || null;
+}
+
+function getTrackAudioByNumber(trackNumber) {
+  return getTrackCardByNumber(trackNumber)?.querySelector("audio") || null;
+}
+
+async function ensureTrackReady(track, { autoplay = false } = {}) {
+  if (!track || !currentAlbum) {
+    return null;
+  }
+
+  const trackIndex = getTrackIndexByNumber(track.number);
+  if (trackIndex >= 0) {
+    currentTrackIndex = trackIndex;
+    syncTrackCarouselUi();
+  }
+
+  const card = getTrackCardByNumber(track.number);
+  const audio = card?.querySelector("audio");
+  if (!card || !audio) {
+    return null;
+  }
+
+  if (!canStreamTrack(currentAlbum.id, currentAlbum?.name, track)) {
+    showFloatingNotice("Seu plano nao libera ouvir esta faixa.");
+    return null;
+  }
+
+  if (currentAudio && currentAudio !== audio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+  }
+
+  if (!audio.dataset.ready) {
+    const offlineUrl = await getOfflineTrackUrl(currentAlbum.id, track.number);
+    audio.src = offlineUrl || track.streamUrl;
+    audio.dataset.ready = "true";
+  }
+
+  if (audio.readyState < 1) {
+    await new Promise((resolve) => {
+      const finalize = () => resolve();
+      audio.addEventListener("loadedmetadata", finalize, { once: true });
+      window.setTimeout(finalize, 1200);
+    });
+  }
+
+  currentAudio = audio;
+  currentTrackNumber = track.number;
+
+  if (autoplay) {
+    await audio.play();
+  } else {
+    updatePlayerButtons();
+  }
+
+  return { card, audio };
+}
+
+async function seekTrackAudio(track, timeSeconds = null, options = {}) {
+  const autoplay = Boolean(options?.autoplay);
+  const progressPercent = Number.isFinite(options?.progressPercent) ? Number(options.progressPercent) : null;
+  const resolved = await ensureTrackReady(track, { autoplay });
+  if (!resolved?.audio) {
     return;
   }
 
-  const lines = Array.isArray(track?.lyricsSyncData?.lines) ? track.lyricsSyncData.lines : [];
-  const syncedCount = lines.filter((line) => line?.timestampMs !== null && line?.timestampMs !== undefined).length;
-  const parts = [];
-  if (track?.hasScores) {
-    parts.push(`${track.scoreCount || 0} partituras`);
+  const { audio } = resolved;
+  if (progressPercent !== null) {
+    const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+    audio.currentTime = duration > 0 ? (Math.max(0, Math.min(100, progressPercent)) / 100) * duration : 0;
+  } else if (timeSeconds !== null && timeSeconds !== undefined) {
+    audio.currentTime = Math.max(0, Number(timeSeconds) || 0);
   }
-  if (lines.length) {
-    parts.push(`${syncedCount}/${lines.length} timestamps`);
+
+  if (autoplay && audio.paused) {
+    await audio.play();
   }
-  if (track?.songJsonUrl) {
-    parts.push("song.json conectado");
+
+  updatePlayerButtons();
+}
+
+async function toggleTrackTextsModalPlayback() {
+  const track = getModalTrack();
+  if (!track) {
+    return;
+  }
+
+  if (currentTrackNumber === track.number && currentAudio) {
+    if (currentAudio.paused) {
+      await currentAudio.play();
+    } else {
+      currentAudio.pause();
+    }
+    updatePlayerButtons();
+    return;
+  }
+
+  await seekTrackAudio(track, currentAudio?.currentTime || 0, { autoplay: true });
+}
+
+async function moveTrackTextsModal(direction) {
+  const track = getModalTrack();
+  const trackIndex = track ? getTrackIndexByNumber(track.number) : currentTrackIndex;
+  const total = Array.isArray(currentAlbum?.tracks) ? currentAlbum.tracks.length : 0;
+  if (!total) {
+    return;
+  }
+
+  const nextIndex = Math.max(0, Math.min(total - 1, trackIndex + direction));
+  const nextTrack = currentAlbum.tracks[nextIndex] || null;
+  if (!nextTrack) {
+    return;
+  }
+
+  currentTrackIndex = nextIndex;
+  syncTrackCarouselUi();
+  openTrackTextsModal(nextTrack);
+}
+
+function openTrackTextsModal(track) {
+  const modal = ensureTrackTextsModal();
+  const title = modal.querySelector("#track-texts-title");
+  const body = modal.querySelector("#track-texts-body");
+  if (!title || !body) {
+    return;
   }
 
   title.textContent = track?.title || "Textos da faixa";
-  meta.innerHTML = parts.length ? parts.map((item) => `<span class="status-pill">${escapeHtml(item)}</span>`).join("") : "";
   body.dataset.trackNumber = String(track?.number || "");
   body.innerHTML = renderLyricsLinesHtml(track, getTrackLyricsLines(track));
+  body.querySelectorAll(".track-texts-line").forEach((node) => {
+    node.addEventListener("click", async () => {
+      const timestampMs = Number(node.dataset.timestampMs || 0);
+      await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
+    });
+  });
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
-  syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
+  syncTrackTextsModalUi(track);
 }
 
 function getTrackLyricsLines(track) {
@@ -917,6 +1080,52 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
   body.querySelectorAll(".track-texts-line").forEach((node, index) => {
     node.classList.toggle("is-active", hasTimedLines && index === activeIndex);
   });
+}
+
+function syncTrackTextsModalUi(track) {
+  const modal = document.getElementById("track-texts-modal");
+  const progressInput = modal?.querySelector("[data-role='modal-progress']");
+  const playButton = modal?.querySelector("[data-role='modal-play']");
+  const currentTimeLabel = modal?.querySelector("#track-texts-current-time");
+  const durationLabel = modal?.querySelector("#track-texts-duration");
+  const prevButton = modal?.querySelector("[data-role='modal-prev']");
+  const nextButton = modal?.querySelector("[data-role='modal-next']");
+  if (!modal || modal.getAttribute("aria-hidden") !== "false" || !track) {
+    return;
+  }
+
+  const trackIndex = getTrackIndexByNumber(track.number);
+  const total = Array.isArray(currentAlbum?.tracks) ? currentAlbum.tracks.length : 0;
+  const audio = getTrackAudioByNumber(track.number);
+  const duration = Number.isFinite(audio?.duration) ? audio.duration : 0;
+  const currentTime = currentTrackNumber === track.number && Number.isFinite(currentAudio?.currentTime) ? currentAudio.currentTime : 0;
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const isPlaying = currentTrackNumber === track.number && currentAudio && !currentAudio.paused;
+
+  if (progressInput) {
+    progressInput.value = String(progress);
+    progressInput.style.setProperty("--track-progress", `${progress}%`);
+  }
+  if (playButton) {
+    playButton.innerHTML = isPlaying
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+    playButton.setAttribute("aria-label", isPlaying ? "Pausar faixa" : "Tocar faixa");
+  }
+  if (currentTimeLabel) {
+    currentTimeLabel.textContent = formatTime(currentTime);
+  }
+  if (durationLabel) {
+    durationLabel.textContent = formatTime(duration);
+  }
+  if (prevButton) {
+    prevButton.disabled = trackIndex <= 0;
+  }
+  if (nextButton) {
+    nextButton.disabled = trackIndex < 0 || trackIndex >= total - 1;
+  }
+
+  syncTrackTextsModalHighlight(track, currentTime);
 }
 
 function syncTrackLyricsHighlight(card, track, currentTimeSeconds) {
@@ -1024,6 +1233,11 @@ function updatePlayerButtons() {
       syncTrackLyricsHighlight(card, track, currentTime);
     }
   });
+
+  const modalTrack = getModalTrack();
+  if (modalTrack) {
+    syncTrackTextsModalUi(modalTrack);
+  }
 }
 
 function bindAudioToCard(card, audio) {
