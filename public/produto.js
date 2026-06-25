@@ -39,6 +39,11 @@ let trackGenerationProgressValue = 0;
 let modalManualLineIndex = -1;
 let trackTextsTouchState = null;
 let trackTextsLastActiveIndex = -1;
+let trackTextsSyncMode = false;
+let trackTextsSyncDraft = null;
+let trackTextsTitleHoldTimer = null;
+let trackTextsLastTap = { index: -1, time: 0 };
+let trackTextsSaveInFlight = false;
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
 const characterPalettes = {
@@ -91,6 +96,91 @@ function getCharacterById(track, characterId) {
 function getLineDisplayColor(track, line) {
   const character = getCharacterById(track, line?.characterId);
   return character?.color || "";
+}
+
+function cloneLyricsLines(lines) {
+  return Array.isArray(lines)
+    ? lines.map((line, index) => ({
+      number: Number(line?.number || index + 1) || (index + 1),
+      text: String(line?.text || "").trim(),
+      timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
+      characterId: String(line?.characterId || "").trim()
+    })).filter((line) => line.text)
+    : [];
+}
+
+function getTrackSyncDraftStorageKey(track) {
+  const albumId = String(track?.sourceAlbumId || currentAlbum?.id || "");
+  const trackId = String(track?.sourceSongId || track?.number || "");
+  return albumId && trackId ? `produto-track-sync:${albumId}:${trackId}` : "";
+}
+
+function readTrackSyncDraft(track) {
+  const key = getTrackSyncDraftStorageKey(track);
+  if (!key) {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object"
+      ? {
+        ...parsed,
+        lines: cloneLyricsLines(parsed.lines)
+      }
+      : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeTrackSyncDraft(track, draft) {
+  const key = getTrackSyncDraftStorageKey(track);
+  if (!key || !draft) {
+    return;
+  }
+  const payload = {
+    ...draft,
+    lines: cloneLyricsLines(draft.lines),
+    updatedAt: new Date().toISOString()
+  };
+  trackTextsSyncDraft = payload;
+  window.localStorage.setItem(key, JSON.stringify(payload));
+}
+
+function clearTrackSyncDraft(track) {
+  const key = getTrackSyncDraftStorageKey(track);
+  if (key) {
+    window.localStorage.removeItem(key);
+  }
+}
+
+function buildTrackSyncDraft(track, draft = null) {
+  const baseLines = cloneLyricsLines(draft?.lines?.length ? draft.lines : getTrackLyricsLines(track));
+  return {
+    albumId: String(track?.sourceAlbumId || ""),
+    trackId: String(track?.sourceSongId || ""),
+    trackNumber: Number(track?.number || 0),
+    title: String(track?.title || ""),
+    lyrics: baseLines.map((line) => line.text).join("\n"),
+    lines: baseLines,
+    syncMode: Boolean(draft?.syncMode)
+  };
+}
+
+function getTrackModalWorkingLines(track) {
+  const modalTrack = getModalTrack();
+  if (
+    trackTextsSyncDraft &&
+    String(trackTextsSyncDraft.trackNumber || "") === String(modalTrack?.number || "") &&
+    String(trackTextsSyncDraft.trackId || "") === String(modalTrack?.sourceSongId || "")
+  ) {
+    return cloneLyricsLines(trackTextsSyncDraft.lines);
+  }
+  return getTrackLyricsLines(track);
 }
 
 function isDesktopPointer() {
@@ -722,10 +812,14 @@ function ensureTrackTextsModal() {
         <div>
           <p class="eyebrow">Textos da faixa</p>
           <h3 id="track-texts-title" class="section-title small">Carregando...</h3>
+          <p id="track-texts-sync-status" class="track-texts-sync-status" hidden>Modo sync ativo</p>
         </div>
+        <div class="track-texts-head-actions">
+          <button id="track-texts-save-sync" class="ghost-button track-texts-save-sync" type="button" hidden>Salvar sync</button>
         <button class="ghost-button track-texts-close" type="button" data-role="close-texts" aria-label="Voltar aos detalhes">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
         </button>
+        </div>
       </div>
       <div class="track-texts-player" data-role="modal-player">
         <button class="ghost-button track-texts-player-button" type="button" data-role="modal-play" aria-label="Tocar faixa">
@@ -760,6 +854,10 @@ function ensureTrackTextsModal() {
   document.body.appendChild(modal);
   modal.querySelectorAll("[data-role='close-texts']").forEach((node) => {
     node.addEventListener("click", () => {
+      if (trackTextsTitleHoldTimer) {
+        window.clearTimeout(trackTextsTitleHoldTimer);
+        trackTextsTitleHoldTimer = null;
+      }
       closeTrackTextsTrackPicker();
       modal.setAttribute("aria-hidden", "true");
       modal.classList.remove("show");
@@ -775,6 +873,9 @@ function ensureTrackTextsModal() {
   });
   modal.querySelector("[data-role='modal-list']")?.addEventListener("click", () => {
     openTrackTextsTrackPicker();
+  });
+  modal.querySelector("#track-texts-save-sync")?.addEventListener("click", async () => {
+    await saveTrackTextsSyncDraft();
   });
   modal.querySelector("[data-role='modal-progress']")?.addEventListener("input", async (event) => {
     const currentTrack = getModalTrack();
@@ -1088,7 +1189,7 @@ function renderLyricsLinesHtml(track, lines) {
   return `
     <div class="track-texts-lines" data-role="track-texts-lines">
       ${lines.map((line, index) => `
-        <button class="track-texts-line" type="button" data-lyrics-index="${index}" data-line-number="${line.number}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}" data-character-id="${escapeHtml(line.characterId || "")}" style="${getLineDisplayColor(track, line) ? `--line-character-color:${getLineDisplayColor(track, line)};` : ""}">
+        <button class="track-texts-line ${line.timestampMs !== null && line.timestampMs !== undefined ? "is-synced" : ""}" type="button" data-lyrics-index="${index}" data-line-number="${line.number}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}" data-character-id="${escapeHtml(line.characterId || "")}" style="${getLineDisplayColor(track, line) ? `--line-character-color:${getLineDisplayColor(track, line)};` : ""}">
           ${escapeHtml(line.text)}
         </button>
       `).join("")}
@@ -1115,7 +1216,7 @@ function getModalTrack() {
 
 function getModalLines() {
   const track = getModalTrack();
-  return track ? getTrackLyricsLines(track) : [];
+  return track ? getTrackModalWorkingLines(track) : [];
 }
 
 function closeTrackTextsTrackPicker() {
@@ -1165,6 +1266,154 @@ function openTrackTextsTrackPicker() {
 
   picker.hidden = false;
   picker.classList.add("show");
+}
+
+function syncTrackTextsModeUi(track) {
+  const modal = document.getElementById("track-texts-modal");
+  const panel = modal?.querySelector(".track-texts-panel");
+  const status = modal?.querySelector("#track-texts-sync-status");
+  const saveButton = modal?.querySelector("#track-texts-save-sync");
+  if (!modal || !panel) {
+    return;
+  }
+
+  panel.classList.toggle("is-sync-mode", trackTextsSyncMode);
+  if (status) {
+    status.hidden = !trackTextsSyncMode;
+    status.textContent = trackTextsSyncMode ? "Modo sync ativo" : "";
+  }
+  if (saveButton) {
+    saveButton.hidden = !(trackTextsSyncMode && isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || ""));
+    saveButton.disabled = trackTextsSaveInFlight;
+    saveButton.textContent = trackTextsSaveInFlight ? "Salvando..." : "Salvar sync";
+  }
+}
+
+async function enterTrackTextsSyncMode(track) {
+  if (!isAdmin() || !track) {
+    return;
+  }
+  const draft = readTrackSyncDraft(track);
+  trackTextsSyncMode = true;
+  trackTextsSyncDraft = buildTrackSyncDraft(track, draft);
+  trackTextsSyncDraft.syncMode = true;
+  writeTrackSyncDraft(track, trackTextsSyncDraft);
+  openTrackTextsModal(track);
+  syncTrackTextsModeUi(track);
+  await seekTrackAudio(track, currentTrackNumber === track.number ? currentAudio?.currentTime || 0 : 0, { autoplay: true });
+}
+
+function exitTrackTextsSyncMode(track, { keepDraft = true } = {}) {
+  trackTextsSyncMode = false;
+  if (trackTextsSyncDraft && track) {
+    trackTextsSyncDraft.syncMode = false;
+    if (keepDraft) {
+      writeTrackSyncDraft(track, trackTextsSyncDraft);
+    }
+  }
+  syncTrackTextsModeUi(track);
+}
+
+function persistTrackTextsSyncDraft(track) {
+  if (!trackTextsSyncDraft || !track) {
+    return;
+  }
+  trackTextsSyncDraft.lines = cloneLyricsLines(trackTextsSyncDraft.lines).map((line, index) => ({
+    ...line,
+    number: index + 1
+  }));
+  trackTextsSyncDraft.lyrics = trackTextsSyncDraft.lines.map((line) => line.text).join("\n");
+  trackTextsSyncDraft.syncMode = trackTextsSyncMode;
+  writeTrackSyncDraft(track, trackTextsSyncDraft);
+}
+
+function resetTrackSyncDraftFromLine(lineIndex) {
+  if (!trackTextsSyncDraft) {
+    return;
+  }
+  trackTextsSyncDraft.lines = trackTextsSyncDraft.lines.map((line, index) => ({
+    ...line,
+    timestampMs: index > lineIndex ? null : line.timestampMs
+  }));
+}
+
+function mergeTrackSyncDraftLine(lineIndex) {
+  if (!trackTextsSyncDraft || lineIndex <= 0 || !trackTextsSyncDraft.lines[lineIndex]) {
+    return false;
+  }
+  const lines = cloneLyricsLines(trackTextsSyncDraft.lines);
+  const previousLine = lines[lineIndex - 1];
+  const currentLine = lines[lineIndex];
+  previousLine.text = `${previousLine.text}${previousLine.text && currentLine.text ? " " : ""}${currentLine.text}`.trim();
+  if (!previousLine.characterId && currentLine.characterId) {
+    previousLine.characterId = currentLine.characterId;
+  }
+  lines.splice(lineIndex, 1);
+  trackTextsSyncDraft.lines = lines.map((line, index) => ({
+    ...line,
+    number: index + 1
+  }));
+  return true;
+}
+
+async function saveTrackTextsSyncDraft() {
+  const track = getModalTrack();
+  if (!track || !trackTextsSyncDraft || !isAdmin() || trackTextsSaveInFlight) {
+    return;
+  }
+
+  trackTextsSaveInFlight = true;
+  syncTrackTextsModeUi(track);
+  persistTrackTextsSyncDraft(track);
+
+  try {
+    const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(track.sourceAlbumId)}/tracks/${encodeURIComponent(track.sourceSongId)}/lyrics`), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        lyrics: trackTextsSyncDraft.lyrics,
+        syncData: {
+          ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+          albumId: track.sourceAlbumId,
+          trackId: track.sourceSongId,
+          title: track.title,
+          lines: cloneLyricsLines(trackTextsSyncDraft.lines)
+        }
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel salvar a syncagem.");
+    }
+
+    const updatedTrack = {
+      ...track,
+      lyrics: data.lyrics || trackTextsSyncDraft.lyrics,
+      lyricsSyncData: data.syncData || {
+        ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+        lines: cloneLyricsLines(trackTextsSyncDraft.lines)
+      }
+    };
+    updateTrackInCurrentAlbum(updatedTrack);
+    clearTrackSyncDraft(track);
+    trackTextsSyncDraft = buildTrackSyncDraft(updatedTrack, {
+      lines: updatedTrack.lyricsSyncData?.lines || trackTextsSyncDraft.lines,
+      syncMode: true
+    });
+    await renderTracks(currentAlbum);
+    openTrackTextsModal(updatedTrack);
+    trackTextsSyncMode = true;
+    syncTrackTextsModeUi(updatedTrack);
+    showFloatingNotice("Sync salva no Postgres com sucesso.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar a syncagem.");
+  } finally {
+    trackTextsSaveInFlight = false;
+    syncTrackTextsModeUi(getModalTrack() || track);
+  }
 }
 
 function getTrackCardByNumber(trackNumber) {
@@ -1299,20 +1548,94 @@ function openTrackTextsModal(track) {
 
   title.textContent = track?.title || "Textos da faixa";
   body.dataset.trackNumber = String(track?.number || "");
-  body.innerHTML = renderLyricsLinesHtml(track, getTrackLyricsLines(track));
+  const storedDraft = isAdmin() ? readTrackSyncDraft(track) : null;
+  if (storedDraft) {
+    trackTextsSyncDraft = buildTrackSyncDraft(track, storedDraft);
+    trackTextsSyncMode = Boolean(storedDraft.syncMode);
+  } else if (!trackTextsSyncMode || String(trackTextsSyncDraft?.trackId || "") !== String(track?.sourceSongId || "")) {
+    trackTextsSyncDraft = null;
+    trackTextsSyncMode = false;
+  }
+  const renderLines = trackTextsSyncDraft ? cloneLyricsLines(trackTextsSyncDraft.lines) : getTrackLyricsLines(track);
+  body.innerHTML = renderLyricsLinesHtml(track, renderLines);
   trackTextsLastActiveIndex = -1;
   closeTrackTextsTrackPicker();
-  const allLines = getTrackLyricsLines(track);
-  modalManualLineIndex = allLines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined) ? -1 : 0;
+  const allLines = renderLines;
+  if (trackTextsSyncMode) {
+    const firstUnsyncedIndex = allLines.findIndex((line) => line.timestampMs === null || line.timestampMs === undefined);
+    modalManualLineIndex = firstUnsyncedIndex >= 0 ? firstUnsyncedIndex : Math.max(allLines.length - 1, 0);
+  } else {
+    modalManualLineIndex = allLines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined) ? -1 : 0;
+  }
+  syncTrackTextsModeUi(track);
+  title.onpointerdown = null;
+  title.onpointerup = null;
+  title.onpointerleave = null;
+  title.onpointercancel = null;
+  if (isAdmin()) {
+    const clearTitleHold = () => {
+      if (trackTextsTitleHoldTimer) {
+        window.clearTimeout(trackTextsTitleHoldTimer);
+        trackTextsTitleHoldTimer = null;
+      }
+    };
+    title.onpointerdown = () => {
+      clearTitleHold();
+      trackTextsTitleHoldTimer = window.setTimeout(async () => {
+        await enterTrackTextsSyncMode(track);
+      }, 2000);
+    };
+    title.onpointerup = clearTitleHold;
+    title.onpointerleave = clearTitleHold;
+    title.onpointercancel = clearTitleHold;
+  }
   body.querySelectorAll(".track-texts-line").forEach((node) => {
     const lineIndex = Number(node.dataset.lyricsIndex || 0);
     const openCharacterEditor = () => {
-      if (isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
+      if (!trackTextsSyncMode && isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
         openTrackCharacterModal(track, lineIndex);
       }
     };
 
     node.addEventListener("click", async (event) => {
+      const now = Date.now();
+      const isDoubleTap = trackTextsLastTap.index === lineIndex && (now - trackTextsLastTap.time) < 360;
+      trackTextsLastTap = { index: lineIndex, time: now };
+
+      if (trackTextsSyncMode && isDoubleTap) {
+        event.preventDefault();
+        if (mergeTrackSyncDraftLine(lineIndex)) {
+          persistTrackTextsSyncDraft(track);
+          modalManualLineIndex = Math.max(0, lineIndex - 1);
+          openTrackTextsModal(track);
+          showFloatingNotice("Linha unida com a de cima.");
+        }
+        return;
+      }
+
+      if (trackTextsSyncMode) {
+        event.preventDefault();
+        if (!trackTextsSyncDraft) {
+          trackTextsSyncDraft = buildTrackSyncDraft(track);
+        }
+        const isPaused = !currentAudio || currentAudio.paused || currentTrackNumber !== track.number;
+        if (isPaused) {
+          resetTrackSyncDraftFromLine(lineIndex);
+          persistTrackTextsSyncDraft(track);
+          modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
+          openTrackTextsModal(track);
+          return;
+        }
+        const nowMs = Math.max(0, Math.round((currentAudio?.currentTime || 0) * 1000));
+        if (trackTextsSyncDraft.lines[lineIndex]) {
+          trackTextsSyncDraft.lines[lineIndex].timestampMs = nowMs;
+        }
+        persistTrackTextsSyncDraft(track);
+        modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
+        openTrackTextsModal(track);
+        return;
+      }
+
       if (isAdmin() && isDesktopPointer()) {
         event.preventDefault();
         openCharacterEditor();
@@ -1328,7 +1651,7 @@ function openTrackTextsModal(track) {
       syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
     });
     node.addEventListener("pointerdown", (event) => {
-      if (!isAdmin() || isDesktopPointer()) {
+      if (trackTextsSyncMode || !isAdmin() || isDesktopPointer()) {
         return;
       }
       trackTextsTouchState = {
@@ -1429,12 +1752,16 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
     return;
   }
 
-  const lines = getTrackLyricsLines(track);
+  const lines = getTrackModalWorkingLines(track);
   const hasTimedLines = lines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
   const currentMs = Math.max(0, Number(currentTimeSeconds || 0) * 1000);
   let activeIndex = hasTimedLines ? -1 : Math.max(0, Math.min(modalManualLineIndex, Math.max(lines.length - 1, 0)));
 
-  if (hasTimedLines) {
+  if (trackTextsSyncMode) {
+    activeIndex = Math.max(0, Math.min(modalManualLineIndex, Math.max(lines.length - 1, 0)));
+  }
+
+  if (hasTimedLines && !trackTextsSyncMode) {
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index];
       if (line.timestampMs !== null && line.timestampMs !== undefined && currentMs >= line.timestampMs) {
@@ -1447,7 +1774,9 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
   body.querySelectorAll(".track-texts-line").forEach((node, index) => {
     const isActive = index === activeIndex;
     const relativeOffset = activeIndex >= 0 ? Math.max(-4, Math.min(4, index - activeIndex)) : 0;
+    const isSynced = lines[index]?.timestampMs !== null && lines[index]?.timestampMs !== undefined;
     node.classList.toggle("is-active", isActive);
+    node.classList.toggle("is-synced", Boolean(isSynced));
     node.style.setProperty("--line-offset-y", `${relativeOffset * 12}px`);
     node.style.setProperty("--line-depth", String(Math.min(Math.abs(relativeOffset), 4)));
     if (isActive) {
@@ -1541,7 +1870,7 @@ function syncTrackLyricsHighlight(card, track, currentTimeSeconds) {
     return;
   }
 
-  const lines = getTrackLyricsLines(track);
+  const lines = getTrackModalWorkingLines(track);
   const hasTimedLines = lines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
   const currentMs = Math.max(0, Number(currentTimeSeconds || 0) * 1000);
   let activeIndex = -1;

@@ -2337,12 +2337,44 @@ body[data-page="produto"] .inline-link {
   box-shadow: 0 28px 54px rgba(0, 0, 0, 0.26);
 }
 
+.track-texts-panel.is-sync-mode {
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.99) 0%, rgba(2, 2, 2, 0.995) 100%);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.42);
+}
+
 .track-texts-head {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.track-texts-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.track-texts-sync-status {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 216, 77, 0.94);
+}
+
+.track-texts-save-sync {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: #ffe16b !important;
+  border-color: rgba(255, 225, 107, 0.4) !important;
+  background: rgba(255, 225, 107, 0.08) !important;
 }
 
 .track-texts-player {
@@ -2476,6 +2508,15 @@ body[data-page="produto"] .inline-link {
   transform: translate3d(0, 0, 0);
   filter: blur(0);
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+.track-texts-panel.is-sync-mode .track-texts-line.is-synced {
+  color: #ffe16b;
+  opacity: 1;
+}
+
+.track-texts-panel.is-sync-mode .track-texts-line.is-active {
+  text-shadow: 0 0 24px rgba(255, 225, 107, 0.22);
 }
 
 .track-texts-track-picker {
