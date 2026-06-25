@@ -1413,6 +1413,203 @@ function parseStructuredJsonText(text) {
   return null;
 }
 
+function getAlbumTrackByNumber(album, trackNumber) {
+  if (!album || !Array.isArray(album.tracks)) {
+    return null;
+  }
+
+  return album.tracks.find((track) => Number(track?.number || 0) === Number(trackNumber || 0)) || null;
+}
+
+function normalizeLyricsSyncLines(lines) {
+  if (!Array.isArray(lines)) {
+    return [];
+  }
+
+  return lines
+    .map((line, index) => {
+      const text = String(line?.text || "").replace(/\s+/g, " ").trim();
+      const timestampMs = Math.max(0, Number(line?.timestampMs ?? line?.startMs ?? 0) || 0);
+      if (!text) {
+        return null;
+      }
+
+      return {
+        number: index + 1,
+        text,
+        timestampMs
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildLyricsTextFromSyncLines(lines) {
+  return normalizeLyricsSyncLines(lines)
+    .map((line) => line.text)
+    .join("\n");
+}
+
+function extractTranscriptSegments(payload) {
+  if (!Array.isArray(payload?.segments)) {
+    return [];
+  }
+
+  return payload.segments
+    .map((segment, index) => {
+      const text = String(segment?.text || "").replace(/\s+/g, " ").trim();
+      const startMs = Math.max(0, Math.round((Number(segment?.start) || 0) * 1000));
+      const endMs = Math.max(startMs, Math.round((Number(segment?.end) || 0) * 1000));
+      if (!text) {
+        return null;
+      }
+
+      return {
+        index: index + 1,
+        text,
+        startMs,
+        endMs
+      };
+    })
+    .filter(Boolean);
+}
+
+async function generateTimedLyricsForTrack(apiKey, track) {
+  const audioUrl = String(track?.streamUrl || "").trim();
+  if (!audioUrl) {
+    throw new Error("A faixa nao possui streamUrl publico para transcrever.");
+  }
+
+  const audioResponse = await fetch(audioUrl);
+  const { data: audioErrorPayload, text: audioErrorText } = audioResponse.ok
+    ? { data: null, text: "" }
+    : await readApiResponse(audioResponse);
+
+  if (!audioResponse.ok) {
+    throw new Error(audioErrorPayload?.error || audioErrorText || "Nao foi possivel baixar o MP3 publico desta faixa.");
+  }
+
+  const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+  if (!audioBuffer.length) {
+    throw new Error("O MP3 desta faixa veio vazio.");
+  }
+
+  const safeFileName = `${String(track?.title || track?.label || "faixa").replace(/[^a-z0-9_-]+/gi, "-").toLowerCase() || "faixa"}.mp3`;
+  const formData = new FormData();
+  formData.append("model", OPENAI_TRANSCRIBE_MODEL);
+  formData.append("language", "pt");
+  formData.append("response_format", "verbose_json");
+  formData.append("timestamp_granularities[]", "segment");
+  formData.append("file", new Blob([audioBuffer], { type: "audio/mpeg" }), safeFileName);
+
+  const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: formData
+  });
+  const { data: transcriptionPayload, text: transcriptionText } = await readApiResponse(transcriptionResponse);
+
+  if (!transcriptionResponse.ok) {
+    throw new Error(
+      transcriptionPayload?.error?.message
+      || transcriptionPayload?.error
+      || transcriptionText
+      || "Falha ao transcrever o MP3 da faixa."
+    );
+  }
+
+  const fullText = String(transcriptionPayload?.text || "").trim();
+  const segments = extractTranscriptSegments(transcriptionPayload);
+  if (!fullText) {
+    throw new Error("A OpenAI nao retornou texto para esta faixa.");
+  }
+
+  let syncLines = normalizeLyricsSyncLines(segments.map((segment) => ({
+    text: segment.text,
+    timestampMs: segment.startMs
+  })));
+
+  if (segments.length) {
+    const jsonSchema = {
+      name: "mini_track_lyrics_sync",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["lines"],
+        properties: {
+          lines: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["text", "startMs"],
+              properties: {
+                text: { type: "string" },
+                startMs: { type: "integer" }
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const completion = await createChatCompletion(apiKey, {
+      model: OPENAI_INSTANT_MODEL || OPENAI_MODEL,
+      reasoning_effort: "low",
+      temperature: 0.15,
+      max_completion_tokens: 1800,
+      response_format: {
+        type: "json_schema",
+        json_schema: jsonSchema
+      },
+      messages: [
+        {
+          role: "system",
+          content: "Voce organiza letras em pt-BR. Responda somente JSON valido. Nao invente palavras. Preserve o sentido do transcript. Quebre em frases naturais e limpas. startMs deve marcar o instante em que a frase comeca."
+        },
+        {
+          role: "user",
+          content: [
+            `Faixa: ${String(track?.title || track?.label || "Faixa").trim() || "Faixa"}`,
+            "Use o transcript completo abaixo como fonte principal.",
+            `Transcript completo:\n${fullText}`,
+            `Segmentos com inicio e fim em milissegundos:\n${JSON.stringify(segments)}`
+          ].join("\n\n")
+        }
+      ]
+    }, {
+      timeoutMs: 120000,
+      timeoutMessage: "A organizacao dos timestamps demorou demais e foi interrompida."
+    });
+
+    const structured = parseStructuredJsonText(extractChatCompletionText(completion));
+    const candidateLines = normalizeLyricsSyncLines(structured?.lines || []);
+    if (candidateLines.length) {
+      syncLines = candidateLines;
+    }
+  }
+
+  if (!syncLines.length) {
+    syncLines = normalizeLyricsSyncLines(fullText.split(/\r?\n+/).map((text, index) => ({
+      text,
+      timestampMs: index * 1000
+    })));
+  }
+
+  return {
+    lyrics: buildLyricsTextFromSyncLines(syncLines),
+    syncData: {
+      lines: syncLines,
+      generatedAt: new Date().toISOString(),
+      generatedBy: "openai",
+      transcriptionModel: OPENAI_TRANSCRIBE_MODEL,
+      organizerModel: OPENAI_INSTANT_MODEL || OPENAI_MODEL
+    }
+  };
+}
+
 async function readJsonBody(request) {
   const raw = await readTextBody(request);
 
@@ -4662,6 +4859,70 @@ async function handleMiniMediaTrackLyricsRequest(request, response, albumId, tra
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel carregar a letra."
+    });
+  }
+}
+
+async function handleStoreTrackTextsGenerateRequest(request, response, productId, trackNumber) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  try {
+    const pricing = await getSitePricingSettings();
+    const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+    if (!product) {
+      sendJson(response, 404, { error: "Produto nao encontrado." });
+      return;
+    }
+
+    const albumZipLinks = await getAlbumZipLinks();
+    const album = await buildAlbumDetailResponse(product, pricing, albumZipLinks);
+    const track = getAlbumTrackByNumber(album, trackNumber);
+    if (!track) {
+      sendJson(response, 404, { error: "Faixa nao encontrada." });
+      return;
+    }
+
+    const sourceAlbumId = String(track?.sourceAlbumId || "").trim();
+    const sourceSongId = String(track?.sourceSongId || "").trim();
+    if (!sourceAlbumId || !sourceSongId) {
+      sendJson(response, 400, { error: "Essa faixa nao esta vinculada ao catalogo do MINI." });
+      return;
+    }
+
+    const library = await loadMiniMediaLibrary();
+    const databaseSong = await getSyncedMiniMediaSong(library, sourceAlbumId, sourceSongId);
+    const generated = await generateTimedLyricsForTrack(apiKey, track);
+    const updatedSong = await updateMiniMediaSongLyrics(databaseSong.id, generated.lyrics, generated.syncData);
+
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      albumId: productId,
+      trackNumber: Number(trackNumber || 0),
+      sourceAlbumId,
+      sourceSongId,
+      lyrics: generated.lyrics,
+      syncData: updatedSong?.lyrics_sync_json && typeof updatedSong.lyrics_sync_json === "object"
+        ? updatedSong.lyrics_sync_json
+        : generated.syncData,
+      updatedAt: updatedSong?.lyrics_updated_at || null,
+      feedback: "Textos e timestamps gerados com sucesso."
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel gerar os textos desta faixa."
     });
   }
 }
@@ -8438,6 +8699,17 @@ const server = http.createServer(async (request, response) => {
       items: storeProducts,
       total: storeProducts.length
     });
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/store\/products\/[^/]+\/tracks\/\d+\/generate-texts$/)) {
+    const generateTextsMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/tracks\/(\d+)\/generate-texts$/);
+    await handleStoreTrackTextsGenerateRequest(
+      request,
+      response,
+      decodeURIComponent(generateTextsMatch?.[1] || ""),
+      Number(generateTextsMatch?.[2] || 0)
+    );
     return;
   }
 

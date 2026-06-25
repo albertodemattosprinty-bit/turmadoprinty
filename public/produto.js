@@ -34,6 +34,8 @@ let lyricsSilenceTimer = null;
 let floatingNoticeTimer = null;
 let albumShortcutBuffer = "";
 let albumShortcutTimer = null;
+let trackGenerationProgressTimer = null;
+let trackGenerationProgressValue = 0;
 const adminUsername = "rosemattos";
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
@@ -631,6 +633,17 @@ function formatTime(seconds) {
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
+function hasTrackTexts(track) {
+  return Boolean(getTrackLyricsLines(track).length || String(track?.lyrics || "").trim());
+}
+
+function canGenerateTrackTexts(track) {
+  return isRoseMattosUser()
+    && String(track?.sourceAlbumId || "").trim()
+    && String(track?.sourceSongId || "").trim()
+    && String(track?.streamUrl || "").trim();
+}
+
 function getOfflineCacheKey(albumId, trackNumber) {
   return `/offline-tracks/${encodeURIComponent(albumId)}/${trackNumber}.mp3`;
 }
@@ -670,10 +683,12 @@ function ensureTrackTextsModal() {
           <p class="eyebrow">Textos da faixa</p>
           <h3 id="track-texts-title" class="section-title small">Carregando...</h3>
         </div>
-        <button class="ghost-button track-texts-close" type="button" data-role="close-texts" aria-label="Fechar textos">Fechar</button>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-texts" aria-label="Voltar aos detalhes">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+        </button>
       </div>
       <div id="track-texts-meta" class="track-texts-meta"></div>
-      <pre id="track-texts-body" class="track-texts-body"></pre>
+      <div id="track-texts-body" class="track-texts-body"></div>
     </div>
   `;
   document.body.appendChild(modal);
@@ -684,6 +699,115 @@ function ensureTrackTextsModal() {
     });
   });
   return modal;
+}
+
+function ensureTrackGenerationModal() {
+  let modal = document.getElementById("track-generation-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "track-generation-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop"></div>
+    <div class="track-texts-panel track-generation-panel" role="dialog" aria-modal="true" aria-labelledby="track-generation-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Criar textos</p>
+          <h3 id="track-generation-title" class="section-title small">Preparando...</h3>
+        </div>
+      </div>
+      <p id="track-generation-message" class="track-generation-message">Conectando o audio ao fluxo do MINI...</p>
+      <div class="track-generation-progress">
+        <div id="track-generation-bar" class="track-generation-progress-bar"></div>
+      </div>
+      <div id="track-generation-percent" class="track-generation-percent">0%</div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function setTrackGenerationModalState({ open = true, title = "Preparando...", message = "", progress = 0 } = {}) {
+  const modal = ensureTrackGenerationModal();
+  const titleNode = modal.querySelector("#track-generation-title");
+  const messageNode = modal.querySelector("#track-generation-message");
+  const barNode = modal.querySelector("#track-generation-bar");
+  const percentNode = modal.querySelector("#track-generation-percent");
+  const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+
+  if (titleNode) {
+    titleNode.textContent = title;
+  }
+  if (messageNode) {
+    messageNode.textContent = message;
+  }
+  if (barNode) {
+    barNode.style.width = `${safeProgress}%`;
+  }
+  if (percentNode) {
+    percentNode.textContent = `${Math.round(safeProgress)}%`;
+  }
+
+  modal.setAttribute("aria-hidden", open ? "false" : "true");
+  modal.classList.toggle("show", open);
+}
+
+function stopTrackGenerationProgress() {
+  if (trackGenerationProgressTimer) {
+    window.clearInterval(trackGenerationProgressTimer);
+    trackGenerationProgressTimer = null;
+  }
+}
+
+function startTrackGenerationProgress() {
+  trackGenerationProgressValue = 8;
+  setTrackGenerationModalState({
+    title: "Lendo o audio",
+    message: "Estamos preparando a faixa para transcrever e montar os timestamps.",
+    progress: trackGenerationProgressValue
+  });
+
+  stopTrackGenerationProgress();
+  trackGenerationProgressTimer = window.setInterval(() => {
+    trackGenerationProgressValue = Math.min(92, trackGenerationProgressValue + (trackGenerationProgressValue < 38 ? 8 : 4));
+
+    let title = "Lendo o audio";
+    let message = "Estamos preparando a faixa para transcrever e montar os timestamps.";
+    if (trackGenerationProgressValue >= 35) {
+      title = "Transcrevendo";
+      message = "A OpenAI esta ouvindo o MP3 e montando o texto base.";
+    }
+    if (trackGenerationProgressValue >= 68) {
+      title = "Alinhando frases";
+      message = "Agora estamos organizando as frases e o instante em que cada uma comeca.";
+    }
+
+    setTrackGenerationModalState({
+      title,
+      message,
+      progress: trackGenerationProgressValue
+    });
+  }, 900);
+}
+
+function renderLyricsLinesHtml(track, lines) {
+  if (!lines.length) {
+    return `<div class="track-texts-empty">Essa faixa ainda nao tem texto salvo.</div>`;
+  }
+
+  return `
+    <div class="track-texts-lines" data-role="track-texts-lines">
+      ${lines.map((line, index) => `
+        <div class="track-texts-line" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
+          ${escapeHtml(line.text)}
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function openTrackTextsModal(track) {
@@ -710,9 +834,11 @@ function openTrackTextsModal(track) {
 
   title.textContent = track?.title || "Textos da faixa";
   meta.innerHTML = parts.length ? parts.map((item) => `<span class="status-pill">${escapeHtml(item)}</span>`).join("") : "";
-  body.textContent = track?.lyrics || "Essa faixa ainda não tem texto salvo.";
+  body.dataset.trackNumber = String(track?.number || "");
+  body.innerHTML = renderLyricsLinesHtml(track, getTrackLyricsLines(track));
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
+  syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
 }
 
 function getTrackLyricsLines(track) {
@@ -752,9 +878,41 @@ function renderTrackLyrics(track) {
   `;
 }
 
+function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
+  const modal = document.getElementById("track-texts-modal");
+  const body = modal?.querySelector("#track-texts-body");
+  const isVisible = modal?.classList.contains("show") && modal?.getAttribute("aria-hidden") === "false";
+  if (!body || !isVisible) {
+    return;
+  }
+
+  if (String(body.dataset.trackNumber || "") !== String(track?.number || "")) {
+    return;
+  }
+
+  const lines = getTrackLyricsLines(track);
+  const hasTimedLines = lines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
+  const currentMs = Math.max(0, Number(currentTimeSeconds || 0) * 1000);
+  let activeIndex = -1;
+
+  if (hasTimedLines) {
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (line.timestampMs !== null && line.timestampMs !== undefined && currentMs >= line.timestampMs) {
+        activeIndex = index;
+      }
+    }
+  }
+
+  body.querySelectorAll(".track-texts-line").forEach((node, index) => {
+    node.classList.toggle("is-active", hasTimedLines && index === activeIndex);
+  });
+}
+
 function syncTrackLyricsHighlight(card, track, currentTimeSeconds) {
   const panel = card?.querySelector("[data-role='lyrics-panel']");
   if (!panel) {
+    syncTrackTextsModalHighlight(track, currentTimeSeconds);
     return;
   }
 
@@ -775,6 +933,7 @@ function syncTrackLyricsHighlight(card, track, currentTimeSeconds) {
   panel.querySelectorAll(".track-lyrics-line").forEach((node, index) => {
     node.classList.toggle("is-active", hasTimedLines && index === activeIndex);
   });
+  syncTrackTextsModalHighlight(track, currentTimeSeconds);
 }
 
 function syncTrackCarouselUi() {
@@ -945,6 +1104,7 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
   const actionLabel = card.querySelector(".track-download-label");
   const downloadButton = card.querySelector("[data-role='download']");
   const textsButton = card.querySelector("[data-role='texts']");
+  const generateTextsButton = card.querySelector("[data-role='generate-texts']");
 
   if (!actionLabel || !downloadButton) {
     return;
@@ -954,7 +1114,10 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
     actionLabel.textContent = label || `Baixando ${Math.round(progress)}%`;
     downloadButton.disabled = true;
     if (textsButton) {
-      textsButton.hidden = true;
+      textsButton.disabled = true;
+    }
+    if (generateTextsButton) {
+      generateTextsButton.disabled = true;
     }
     return;
   }
@@ -962,7 +1125,73 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
   actionLabel.textContent = downloaded ? "Download concluido, voce pode acessar sem internet" : label || card.dataset.trackMode || "Full";
   downloadButton.disabled = false;
   if (textsButton) {
-    textsButton.hidden = !downloaded;
+    textsButton.disabled = false;
+  }
+  if (generateTextsButton) {
+    generateTextsButton.disabled = false;
+  }
+}
+
+function updateTrackInCurrentAlbum(updatedTrack) {
+  if (!currentAlbum || !Array.isArray(currentAlbum.tracks)) {
+    return;
+  }
+
+  currentAlbum = {
+    ...currentAlbum,
+    tracks: currentAlbum.tracks.map((track) => (
+      track.number === updatedTrack.number
+        ? { ...track, ...updatedTrack }
+        : track
+    ))
+  };
+}
+
+async function createTrackTexts(card, album, track) {
+  if (!canGenerateTrackTexts(track)) {
+    showFloatingNotice("Essa faixa ainda nao esta conectada ao fluxo completo do MINI.");
+    return;
+  }
+
+  startTrackGenerationProgress();
+
+  try {
+    const response = await fetch(getApiUrl(`/api/store/products/${encodeURIComponent(album.id)}/tracks/${track.number}/generate-texts`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel criar os textos desta faixa.");
+    }
+
+    stopTrackGenerationProgress();
+    setTrackGenerationModalState({
+      title: "Tudo pronto",
+      message: "Os textos e os timestamps foram gerados e ligados ao catalogo do MINI.",
+      progress: 100
+    });
+
+    const updatedTrack = {
+      ...track,
+      lyrics: data.lyrics || "",
+      lyricsSyncData: data.syncData || null
+    };
+    updateTrackInCurrentAlbum(updatedTrack);
+    await renderTracks(currentAlbum);
+    openTrackTextsModal(updatedTrack);
+    showFloatingNotice("Textos criados com sucesso.");
+    window.setTimeout(() => {
+      setTrackGenerationModalState({ open: false });
+    }, 900);
+  } catch (error) {
+    stopTrackGenerationProgress();
+    setTrackGenerationModalState({ open: false });
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel criar os textos.");
   }
 }
 
@@ -1326,7 +1555,8 @@ async function renderTracks(album) {
               : "Preview"
         }</span>
         <div class="track-download-actions">
-          <button class="ghost-button track-texts-button" type="button" data-role="texts" hidden>Ver textos</button>
+          <button class="ghost-button track-texts-button" type="button" data-role="texts" ${hasTrackTexts(track) ? "" : "hidden"}>Ver textos</button>
+          ${canGenerateTrackTexts(track) ? `<button class="ghost-button track-texts-button" type="button" data-role="generate-texts">Criar textos</button>` : ""}
           <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="Baixar faixa">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1m-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1"/></svg>
           </button>
@@ -1394,6 +1624,10 @@ async function renderTracks(album) {
 
     article.querySelector("[data-role='texts']")?.addEventListener("click", () => {
       openTrackTextsModal(track);
+    });
+
+    article.querySelector("[data-role='generate-texts']")?.addEventListener("click", async () => {
+      await createTrackTexts(article, album, track);
     });
 
     setDownloadUi(article, {
