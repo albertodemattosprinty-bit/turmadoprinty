@@ -991,6 +991,57 @@ function ensureTrackCharacterModal() {
   return modal;
 }
 
+function ensureTrackTextEditModal() {
+  let modal = document.getElementById("track-text-edit-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "track-text-edit-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-text-edit"></div>
+    <div class="track-texts-panel track-generation-panel track-text-edit-panel" role="dialog" aria-modal="true" aria-labelledby="track-text-edit-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Editar texto</p>
+          <h3 id="track-text-edit-title" class="section-title small">Linha da faixa</h3>
+        </div>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-text-edit" aria-label="Fechar modal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+        </button>
+      </div>
+      <label class="track-character-field">Texto da linha
+        <textarea id="track-text-edit-input" class="track-text-edit-input" rows="5" maxlength="240" placeholder="Edite somente o texto desta linha"></textarea>
+      </label>
+      <p class="track-generation-message">O timestamp atual sera mantido.</p>
+      <div class="bulk-track-title-actions">
+        <button id="track-text-edit-cancel" class="ghost-button" type="button">Cancelar</button>
+        <button id="track-text-edit-save" class="primary-button" type="button">Salvar texto</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-role='close-text-edit']").forEach((node) => {
+    node.addEventListener("click", () => {
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    });
+  });
+  modal.querySelector("#track-text-edit-cancel")?.addEventListener("click", () => {
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+  });
+  modal.querySelector("#track-text-edit-save")?.addEventListener("click", async () => {
+    await submitTrackTextEditModal();
+  });
+
+  return modal;
+}
+
 function setTrackGenerationModalState({ open = true, title = "Preparando...", message = "", progress = 0 } = {}) {
   const modal = ensureTrackGenerationModal();
   const titleNode = modal.querySelector("#track-generation-title");
@@ -1074,6 +1125,96 @@ function openTrackCharacterModal(track, lineIndex) {
 
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
+}
+
+function openTrackTextEditModal(track, lineIndex) {
+  const modal = ensureTrackTextEditModal();
+  const line = getTrackModalWorkingLines(track)[lineIndex] || null;
+  const input = modal.querySelector("#track-text-edit-input");
+  if (!line || !input) {
+    return;
+  }
+
+  modal.dataset.albumId = String(track?.sourceAlbumId || "");
+  modal.dataset.trackId = String(track?.sourceSongId || "");
+  modal.dataset.trackNumber = String(track?.number || "");
+  modal.dataset.lineIndex = String(lineIndex);
+  input.value = line.text || "";
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+  window.setTimeout(() => {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }, 20);
+}
+
+async function submitTrackTextEditModal() {
+  const modal = ensureTrackTextEditModal();
+  const albumId = String(modal.dataset.albumId || "");
+  const trackId = String(modal.dataset.trackId || "");
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const lineIndex = Number(modal.dataset.lineIndex || -1);
+  const input = modal.querySelector("#track-text-edit-input");
+  const track = getTrackByNumber(trackNumber);
+  if (!albumId || !trackId || !track || lineIndex < 0 || !input) {
+    return;
+  }
+
+  const nextText = String(input.value || "").trim();
+  if (!nextText) {
+    showFloatingNotice("Digite algum texto para a linha.");
+    return;
+  }
+
+  const lines = cloneLyricsLines(getTrackModalWorkingLines(track));
+  if (!lines[lineIndex]) {
+    return;
+  }
+  lines[lineIndex] = {
+    ...lines[lineIndex],
+    text: nextText
+  };
+
+  try {
+    const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics`), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        lyrics: lines.map((line) => line.text).join("\n"),
+        syncData: {
+          ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+          albumId,
+          trackId,
+          title: track.title,
+          lines
+        }
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel atualizar o texto.");
+    }
+
+    const updatedTrack = {
+      ...track,
+      lyrics: data.lyrics || lines.map((line) => line.text).join("\n"),
+      lyricsSyncData: data.syncData || {
+        ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+        lines
+      }
+    };
+    updateTrackInCurrentAlbum(updatedTrack);
+    await renderTracks(currentAlbum);
+    openTrackTextsModal(updatedTrack);
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+    showFloatingNotice("Texto da linha atualizado.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel atualizar o texto.");
+  }
 }
 
 async function submitTrackCharacterModal() {
@@ -1333,7 +1474,9 @@ function resetTrackSyncDraftFromLine(lineIndex) {
   }
   trackTextsSyncDraft.lines = trackTextsSyncDraft.lines.map((line, index) => ({
     ...line,
-    timestampMs: index > lineIndex ? null : line.timestampMs
+    timestampMs: lineIndex <= 0
+      ? null
+      : (index > lineIndex ? null : line.timestampMs)
   }));
 }
 
@@ -1588,13 +1731,17 @@ function openTrackTextsModal(track) {
   }
   body.querySelectorAll(".track-texts-line").forEach((node) => {
     const lineIndex = Number(node.dataset.lyricsIndex || 0);
-    const openCharacterEditor = () => {
+    const openTextEditor = () => {
       if (!trackTextsSyncMode && isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
-        openTrackCharacterModal(track, lineIndex);
+        openTrackTextEditModal(track, lineIndex);
       }
     };
 
     node.addEventListener("click", async (event) => {
+      if (trackTextsTouchState?.opened) {
+        trackTextsTouchState = null;
+        return;
+      }
       const now = Date.now();
       const isDoubleTap = trackTextsLastTap.index === lineIndex && (now - trackTextsLastTap.time) < 360;
       trackTextsLastTap = { index: lineIndex, time: now };
@@ -1634,8 +1781,14 @@ function openTrackTextsModal(track) {
       }
 
       if (isAdmin() && isDesktopPointer()) {
-        event.preventDefault();
-        openCharacterEditor();
+        const timestampValue = String(node.dataset.timestampMs || "").trim();
+        if (timestampValue) {
+          const timestampMs = Number(timestampValue || 0);
+          await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
+          return;
+        }
+        modalManualLineIndex = lineIndex;
+        syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
         return;
       }
       const timestampValue = String(node.dataset.timestampMs || "").trim();
@@ -1648,7 +1801,7 @@ function openTrackTextsModal(track) {
       syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
     });
     node.addEventListener("pointerdown", (event) => {
-      if (trackTextsSyncMode || !isAdmin() || isDesktopPointer()) {
+      if (trackTextsSyncMode || !isAdmin()) {
         return;
       }
       trackTextsTouchState = {
@@ -1656,8 +1809,10 @@ function openTrackTextsModal(track) {
         startY: Number(event.clientY || 0),
         opened: false,
         timer: window.setTimeout(() => {
-          trackTextsTouchState.opened = true;
-          openCharacterEditor();
+          if (trackTextsTouchState) {
+            trackTextsTouchState.opened = true;
+          }
+          openTextEditor();
         }, 520)
       };
     });
