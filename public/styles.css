@@ -2592,6 +2592,12 @@ body[data-page="produto"] .inline-link {
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
+.track-texts-line.is-character-selected {
+  color: #ffe16b;
+  opacity: 1;
+  text-shadow: 0 0 18px rgba(255, 225, 107, 0.2);
+}
+
 .track-texts-panel.is-sync-mode .track-texts-line.is-synced {
   color: #ffe16b;
   opacity: 1;

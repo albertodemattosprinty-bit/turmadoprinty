@@ -45,6 +45,10 @@ let trackTextsSyncDraft = null;
 let trackTextsTitleHoldTimer = null;
 let trackTextsLastTap = { index: -1, time: 0 };
 let trackTextsSaveInFlight = false;
+let trackCharacterSelectionActive = false;
+let trackCharacterSelectionTrackId = "";
+let trackCharacterSelectedLineIndexes = new Set();
+let trackCharacterDesktopHoldState = null;
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
 const characterPalettes = {
@@ -128,6 +132,63 @@ function applyCharacterRemovalSyncUpdates(syncUpdates) {
 
 function getCharacterById(track, characterId) {
   return getTrackCharacters(track).find((item) => String(item?.id || "") === String(characterId || "")) || null;
+}
+
+function getTrackCharacterSelectionKey(track) {
+  return track ? `${String(track?.sourceSongId || "")}:${String(track?.number || "")}` : "";
+}
+
+function clearTrackCharacterSelection({ refresh = true } = {}) {
+  trackCharacterSelectionActive = false;
+  trackCharacterSelectionTrackId = "";
+  trackCharacterSelectedLineIndexes = new Set();
+  if (trackCharacterDesktopHoldState?.timer) {
+    window.clearTimeout(trackCharacterDesktopHoldState.timer);
+  }
+  trackCharacterDesktopHoldState = null;
+  if (refresh) {
+    refreshTrackCharacterSelectionUi();
+  }
+}
+
+function ensureTrackCharacterSelectionTrack(track) {
+  const nextKey = getTrackCharacterSelectionKey(track);
+  if (trackCharacterSelectionTrackId && trackCharacterSelectionTrackId !== nextKey) {
+    clearTrackCharacterSelection({ refresh: false });
+  }
+  if (nextKey) {
+    trackCharacterSelectionTrackId = nextKey;
+  }
+}
+
+function toggleTrackCharacterSelection(track, lineIndex) {
+  ensureTrackCharacterSelectionTrack(track);
+  trackCharacterSelectionActive = true;
+  if (trackCharacterSelectedLineIndexes.has(lineIndex)) {
+    trackCharacterSelectedLineIndexes.delete(lineIndex);
+  } else {
+    trackCharacterSelectedLineIndexes.add(lineIndex);
+  }
+}
+
+function getTrackCharacterSelectedLineIndexes(track) {
+  if (!trackCharacterSelectionActive || trackCharacterSelectionTrackId !== getTrackCharacterSelectionKey(track)) {
+    return [];
+  }
+  return Array.from(trackCharacterSelectedLineIndexes).sort((left, right) => left - right);
+}
+
+function refreshTrackCharacterSelectionUi() {
+  const track = getModalTrack();
+  const body = document.getElementById("track-texts-body");
+  if (!body) {
+    return;
+  }
+  const selectedIndexes = new Set(getTrackCharacterSelectedLineIndexes(track));
+  body.querySelectorAll(".track-texts-line").forEach((node) => {
+    const lineIndex = Number(node.dataset.lyricsIndex || -1);
+    node.classList.toggle("is-character-selected", selectedIndexes.has(lineIndex));
+  });
 }
 
 function getLineDisplayColor(track, line) {
@@ -576,6 +637,13 @@ function handleAlbumAdminShortcuts(event) {
     return;
   }
 
+  if (event.key === "Escape" && trackCharacterSelectionActive) {
+    event.preventDefault();
+    clearTrackCharacterSelection();
+    showFloatingNotice("Selecao multipla cancelada.");
+    return;
+  }
+
   const modal = document.getElementById("track-texts-modal");
   const modalVisible = modal?.classList.contains("show") && modal?.getAttribute("aria-hidden") === "false";
   const target = event.target;
@@ -918,6 +986,7 @@ function ensureTrackTextsModal() {
         trackTextsTitleHoldTimer = null;
       }
       closeTrackTextsTrackPicker();
+      clearTrackCharacterSelection({ refresh: false });
       modal.setAttribute("aria-hidden", "true");
       modal.classList.remove("show");
     });
@@ -1293,6 +1362,7 @@ function openTrackCharacterModal(track, lineIndex) {
   modal.dataset.trackId = String(track?.sourceSongId || "");
   modal.dataset.trackNumber = String(track?.number || "");
   modal.dataset.lineNumber = String(line.number || lineIndex + 1);
+  modal.dataset.selectedLineIndexes = getTrackCharacterSelectedLineIndexes(track).join(",");
 
   select.innerHTML = `
     <option value="">Sem personagem</option>
@@ -1303,6 +1373,9 @@ function openTrackCharacterModal(track, lineIndex) {
   groupSelect.value = currentCharacter?.group ? normalizeCharacterGroup(currentCharacter.group) : "boys";
   colorInput.value = currentCharacter?.color || (characterPalettes.boys[0]);
   syncCharacterPaletteOptions();
+  if (trackCharacterSelectionActive && getTrackCharacterSelectedLineIndexes(track).length > 1) {
+    preview.textContent = `${getTrackCharacterSelectedLineIndexes(track).length} frases selecionadas para personagem.`;
+  }
 
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
@@ -1589,6 +1662,17 @@ async function submitTrackCharacterModal() {
     return;
   }
 
+  const selectedLineNumbers = String(modal.dataset.selectedLineIndexes || "")
+    .split(",")
+    .map((value) => Number(value || -1))
+    .filter((value) => value >= 0)
+    .map((index) => {
+      const lines = getTrackLyricsLines(getTrackByNumber(trackNumber));
+      return Number(lines[index]?.number || 0);
+    })
+    .filter((value) => value > 0);
+  const targetLineNumbers = selectedLineNumbers.length ? selectedLineNumbers : [lineNumber];
+
   try {
     saveButton.disabled = true;
     saveButton.textContent = "Salvando...";
@@ -1619,30 +1703,39 @@ async function submitTrackCharacterModal() {
         updatedTrack.albumCharacters = Array.isArray(createData.album?.characters) ? createData.album.characters : updatedTrack.albumCharacters;
       }
     }
-
-    const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics/lines/${lineNumber}/character`), {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
-      },
-      body: JSON.stringify({ characterId })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error || "Nao foi possivel salvar o personagem da linha.");
+    let latestData = null;
+    for (const targetLineNumber of targetLineNumbers) {
+      const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics/lines/${targetLineNumber}/character`), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({ characterId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Nao foi possivel salvar o personagem da linha.");
+      }
+      latestData = data;
     }
 
     const updatedTrack = getTrackByNumber(trackNumber);
-    if (updatedTrack) {
-      updatedTrack.albumCharacters = Array.isArray(data.characters) ? data.characters : updatedTrack.albumCharacters;
-      updatedTrack.lyricsSyncData = data.syncData || updatedTrack.lyricsSyncData;
+    if (updatedTrack && latestData) {
+      updatedTrack.albumCharacters = Array.isArray(latestData.characters) ? latestData.characters : updatedTrack.albumCharacters;
+      updatedTrack.lyricsSyncData = latestData.syncData || updatedTrack.lyricsSyncData;
       openTrackTextsModal(updatedTrack);
     }
 
     modal.setAttribute("aria-hidden", "true");
     modal.classList.remove("show");
-    showFloatingNotice(characterId ? "Personagem salvo na linha." : "Personagem removido da linha.");
+    const batchUpdate = targetLineNumbers.length > 1;
+    clearTrackCharacterSelection({ refresh: false });
+    showFloatingNotice(
+      characterId
+        ? (batchUpdate ? "Personagem salvo nas frases selecionadas." : "Personagem salvo na linha.")
+        : (batchUpdate ? "Personagem removido das frases selecionadas." : "Personagem removido da linha.")
+    );
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar personagem.");
   } finally {
@@ -2181,9 +2274,40 @@ function openTrackTextsModal(track) {
         return;
       }
       event.preventDefault();
+      if (trackCharacterDesktopHoldState?.activated && trackCharacterDesktopHoldState.lineIndex === lineIndex) {
+        trackCharacterDesktopHoldState = null;
+        return;
+      }
+      if (trackCharacterSelectionActive && trackCharacterSelectionTrackId === getTrackCharacterSelectionKey(track)) {
+        toggleTrackCharacterSelection(track, lineIndex);
+        refreshTrackCharacterSelectionUi();
+        return;
+      }
       openCharacterEditor();
     });
     node.addEventListener("pointerdown", (event) => {
+      if (isAdmin() && isDesktopPointer() && event.pointerType === "mouse" && event.button === 2) {
+        if (trackCharacterDesktopHoldState?.timer) {
+          window.clearTimeout(trackCharacterDesktopHoldState.timer);
+        }
+        trackCharacterDesktopHoldState = {
+          lineIndex,
+          activated: false,
+          timer: window.setTimeout(() => {
+            const selectedIndexes = getTrackCharacterSelectedLineIndexes(track);
+            if (trackCharacterSelectionActive && selectedIndexes.includes(lineIndex) && selectedIndexes.length > 0) {
+              trackCharacterDesktopHoldState = { lineIndex, activated: true, timer: null };
+              openTrackCharacterModal(track, lineIndex);
+              return;
+            }
+            toggleTrackCharacterSelection(track, lineIndex);
+            trackCharacterDesktopHoldState = { lineIndex, activated: true, timer: null };
+            refreshTrackCharacterSelectionUi();
+            showFloatingNotice("Selecao multipla ativa. Botao direito seleciona linhas e Esc cancela.");
+          }, 500)
+        };
+        return;
+      }
       if (!isAdmin() || isDesktopPointer() || event.pointerType === "mouse") {
         return;
       }
@@ -2200,12 +2324,20 @@ function openTrackTextsModal(track) {
       };
     });
     node.addEventListener("pointerup", () => {
+      if (trackCharacterDesktopHoldState?.timer) {
+        window.clearTimeout(trackCharacterDesktopHoldState.timer);
+        trackCharacterDesktopHoldState = null;
+      }
       if (trackTextsTouchState?.timer) {
         window.clearTimeout(trackTextsTouchState.timer);
       }
       trackTextsTouchState = null;
     });
     node.addEventListener("pointercancel", () => {
+      if (trackCharacterDesktopHoldState?.timer) {
+        window.clearTimeout(trackCharacterDesktopHoldState.timer);
+        trackCharacterDesktopHoldState = null;
+      }
       if (trackTextsTouchState?.timer) {
         window.clearTimeout(trackTextsTouchState.timer);
       }
@@ -2233,6 +2365,7 @@ function openTrackTextsModal(track) {
   };
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
+  refreshTrackCharacterSelectionUi();
   syncTrackTextsModalUi(track);
 }
 
