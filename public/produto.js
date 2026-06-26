@@ -16,6 +16,7 @@ const albumAdminPanel = document.getElementById("album-admin-panel");
 const albumPriceInput = document.getElementById("album-price-input");
 const albumSaveButton = document.getElementById("album-save-button");
 const albumAdminStatus = document.getElementById("album-admin-status");
+const pageLoadingOverlay = document.getElementById("page-loading-overlay");
 
 let accessState = {
   authenticated: false,
@@ -352,6 +353,13 @@ function isAdmin() {
   );
 }
 
+function setProductPageLoading(isLoading) {
+  document.body.classList.toggle("page-is-loading", isLoading);
+  if (pageLoadingOverlay) {
+    pageLoadingOverlay.setAttribute("aria-hidden", isLoading ? "false" : "true");
+  }
+}
+
 function clearAlbumShortcutBuffer() {
   albumShortcutBuffer = "";
   if (albumShortcutTimer) {
@@ -532,6 +540,8 @@ function handleAlbumAdminShortcuts(event) {
     return;
   }
 
+  const modal = document.getElementById("track-texts-modal");
+  const modalVisible = modal?.classList.contains("show") && modal?.getAttribute("aria-hidden") === "false";
   const target = event.target;
   if (target instanceof HTMLElement) {
     const tagName = target.tagName;
@@ -539,6 +549,15 @@ function handleAlbumAdminShortcuts(event) {
     if (isTypingField) {
       return;
     }
+  }
+
+  if (event.key === "F10" && modalVisible) {
+    event.preventDefault();
+    const track = getModalTrack();
+    if (track) {
+      openTrackFullTextEditModal(track);
+    }
+    return;
   }
 
   const key = String(event.key || "").toLowerCase();
@@ -1111,6 +1130,57 @@ function ensureTrackTextEditModal() {
   return modal;
 }
 
+function ensureTrackFullTextEditModal() {
+  let modal = document.getElementById("track-full-text-edit-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "track-full-text-edit-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-full-text-edit"></div>
+    <div class="track-texts-panel track-generation-panel track-full-text-edit-panel" role="dialog" aria-modal="true" aria-labelledby="track-full-text-edit-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Editar texto completo</p>
+          <h3 id="track-full-text-edit-title" class="section-title small">Texto da musica</h3>
+        </div>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-full-text-edit" aria-label="Fechar modal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+        </button>
+      </div>
+      <label class="track-character-field">Texto completo
+        <textarea id="track-full-text-edit-input" class="track-text-edit-input track-full-text-edit-input" rows="14" placeholder="Edite livremente o texto da musica"></textarea>
+      </label>
+      <p class="track-generation-message">Cada quebra de linha vira uma linha da musica. Timestamps existentes serao mantidos somente por indice correspondente.</p>
+      <div class="bulk-track-title-actions">
+        <button id="track-full-text-edit-cancel" class="ghost-button" type="button">Cancelar</button>
+        <button id="track-full-text-edit-save" class="primary-button" type="button">Salvar texto</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-role='close-full-text-edit']").forEach((node) => {
+    node.addEventListener("click", () => {
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    });
+  });
+  modal.querySelector("#track-full-text-edit-cancel")?.addEventListener("click", () => {
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+  });
+  modal.querySelector("#track-full-text-edit-save")?.addEventListener("click", async () => {
+    await submitTrackFullTextEditModal();
+  });
+
+  return modal;
+}
+
 function setTrackGenerationModalState({ open = true, title = "Preparando...", message = "", progress = 0 } = {}) {
   const modal = ensureTrackGenerationModal();
   const titleNode = modal.querySelector("#track-generation-title");
@@ -1226,6 +1296,16 @@ function splitEditedTrackText(value) {
     .filter(Boolean);
 }
 
+function buildTrackLinesFromMultilineText(sourceLines, value) {
+  const nextLinesText = splitEditedTrackText(value);
+  return nextLinesText.map((text, index) => ({
+    number: index + 1,
+    text,
+    timestampMs: sourceLines[index]?.timestampMs ?? null,
+    characterId: sourceLines[index]?.characterId || ""
+  }));
+}
+
 async function submitTrackTextEditModal() {
   const modal = ensureTrackTextEditModal();
   const albumId = String(modal.dataset.albumId || "");
@@ -1315,6 +1395,99 @@ async function submitTrackTextEditModal() {
     showFloatingNotice("Texto da linha atualizado.");
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel atualizar o texto.");
+  }
+}
+
+function openTrackFullTextEditModal(track) {
+  const modal = ensureTrackFullTextEditModal();
+  const input = modal.querySelector("#track-full-text-edit-input");
+  const lines = getTrackModalWorkingLines(track);
+  if (!input) {
+    return;
+  }
+
+  modal.dataset.albumId = String(track?.sourceAlbumId || "");
+  modal.dataset.trackId = String(track?.sourceSongId || "");
+  modal.dataset.trackNumber = String(track?.number || "");
+  input.value = lines.map((line) => line.text).join("\n");
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+  window.setTimeout(() => {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }, 20);
+}
+
+async function submitTrackFullTextEditModal() {
+  const modal = ensureTrackFullTextEditModal();
+  const albumId = String(modal.dataset.albumId || "");
+  const trackId = String(modal.dataset.trackId || "");
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const input = modal.querySelector("#track-full-text-edit-input");
+  const track = getTrackByNumber(trackNumber);
+  if (!albumId || !trackId || !track || !input) {
+    return;
+  }
+
+  const sourceLines = cloneLyricsLines(getTrackModalWorkingLines(track));
+  const lines = buildTrackLinesFromMultilineText(sourceLines, input.value);
+  if (!lines.length) {
+    showFloatingNotice("Digite algum texto para a musica.");
+    return;
+  }
+
+  if (trackTextsSyncMode) {
+    trackTextsSyncDraft = buildTrackSyncDraft(track, {
+      lines,
+      syncMode: true
+    });
+    persistTrackTextsSyncDraft(track);
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+    openTrackTextsModal(track);
+    showFloatingNotice("Texto completo atualizado no modo sync.");
+    return;
+  }
+
+  try {
+    const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/tracks/${encodeURIComponent(trackId)}/lyrics`), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        lyrics: lines.map((line) => line.text).join("\n"),
+        syncData: {
+          ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+          albumId,
+          trackId,
+          title: track.title,
+          lines
+        }
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel atualizar o texto completo.");
+    }
+
+    const updatedTrack = {
+      ...track,
+      lyrics: data.lyrics || lines.map((line) => line.text).join("\n"),
+      lyricsSyncData: data.syncData || {
+        ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+        lines
+      }
+    };
+    updateTrackInCurrentAlbum(updatedTrack);
+    await renderTracks(currentAlbum);
+    openTrackTextsModal(updatedTrack);
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+    showFloatingNotice("Texto completo atualizado.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel atualizar o texto completo.");
   }
 }
 
@@ -2168,12 +2341,13 @@ function syncTrackCarouselUi() {
 
   const activeCard = cards[currentTrackIndex] || null;
   const activeTrackNumber = Number(activeCard?.dataset.trackNumber || 0);
+  const activeTrack = Array.isArray(currentAlbum?.tracks) ? currentAlbum.tracks[currentTrackIndex] || null : null;
   if (currentAudio && currentTrackNumber && activeTrackNumber && currentTrackNumber !== activeTrackNumber) {
     currentAudio.pause();
   }
 
   if (trackPositionLabel) {
-    trackPositionLabel.textContent = `Faixa ${currentTrackIndex + 1} de ${total}`;
+    trackPositionLabel.textContent = activeTrack?.title || activeTrack?.label || `Faixa ${currentTrackIndex + 1}`;
   }
   if (trackPrevButton) {
     trackPrevButton.disabled = currentTrackIndex <= 0;
@@ -3014,10 +3188,12 @@ async function loadAlbumDetail() {
       disabled: true,
       ariaLabel: "Comprar album"
     });
+    setProductPageLoading(false);
     return;
   }
 
   try {
+    setProductPageLoading(true);
     await confirmReturnedCheckoutIfNeeded(albumId);
     await loadAccessState();
 
@@ -3074,6 +3250,8 @@ async function loadAlbumDetail() {
       disabled: true,
       ariaLabel: "Comprar album"
     });
+  } finally {
+    setProductPageLoading(false);
   }
 }
 

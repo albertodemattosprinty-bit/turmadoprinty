@@ -1366,8 +1366,67 @@ body[data-page="cronograma"].cronograma-live-mode .site-footer-nav {
   fill: currentColor;
 }
 
-body[data-page="produtos"] {
-  background: #ffffff;
+body[data-page="produtos"],
+body[data-page="produto"] {
+  background: linear-gradient(180deg, #47c8b7 0%, #35a8d9 46%, #197ec9 100%);
+}
+
+.page-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  backdrop-filter: blur(14px);
+  background: rgba(15, 86, 148, 0.2);
+}
+
+body.page-is-loading .page-loading-overlay {
+  display: flex;
+}
+
+body.page-is-loading .site-header,
+body.page-is-loading .page-shell,
+body.page-is-loading .site-footer-nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.page-loading-spinner {
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  border: 5px solid rgba(255, 255, 255, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.96);
+  animation: page-loading-spin 0.85s linear infinite;
+}
+
+.page-loading-copy {
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.page-loading-copy strong {
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.page-loading-copy span {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+@keyframes page-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .page-top-banner {
@@ -1975,10 +2034,10 @@ body[data-page="produtos"] {
   min-height: 46px;
   width: 100%;
   padding: 0 18px;
-  border: 1px solid rgba(27, 83, 187, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 0;
-  background: rgba(47, 124, 255, 0.12);
-  color: var(--blue-dark);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
   font: inherit;
   font-weight: 800;
   cursor: pointer;
@@ -1990,9 +2049,9 @@ body[data-page="produtos"] {
 }
 
 .products-filter-button.is-active {
-  background: linear-gradient(135deg, #1b53bb 0%, #2f7cff 100%);
+  background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  box-shadow: 0 14px 24px rgba(27, 83, 187, 0.2);
+  box-shadow: 0 14px 24px rgba(5, 52, 97, 0.22);
 }
 
 .album-grid {
@@ -2018,6 +2077,11 @@ body[data-page="produtos"] {
   object-fit: cover;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.1);
+}
+
+body[data-page="produtos"] .album-body h3,
+body[data-page="produtos"] .section-muted {
+  color: #ffffff;
 }
 
 .album-cover-missing-zip {
@@ -2580,6 +2644,10 @@ body[data-page="produto"] .inline-link {
   gap: 14px;
 }
 
+.track-full-text-edit-panel {
+  gap: 14px;
+}
+
 .track-text-confirm-panel {
   gap: 14px;
 }
@@ -2594,6 +2662,10 @@ body[data-page="produto"] .inline-link {
   font: inherit;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
+}
+
+.track-full-text-edit-input {
+  min-height: 320px;
 }
 
 .track-texts-track-picker-list {
@@ -3078,9 +3150,10 @@ body[data-page="eventos-pagamento"] {
 
 .track-carousel-head {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 52px;
+  grid-template-columns: 44px minmax(0, auto) 44px;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 8px;
   margin-bottom: 18px;
 }
 
@@ -3088,12 +3161,16 @@ body[data-page="eventos-pagamento"] {
   text-align: center;
   font-weight: 800;
   letter-spacing: 0.04em;
+  max-width: min(70vw, 360px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .track-nav-button {
-  width: 52px;
-  height: 52px;
-  min-width: 52px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   padding: 0;
   border-radius: 999px;
   color: #ffffff !important;

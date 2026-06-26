@@ -1522,8 +1522,31 @@ function splitTextIntoShortLyricsLines(text, maxChars = 30) {
 
   const rawParts = normalized
     .split(/\n+/)
-    .flatMap((line) => line.split(/(?<=[,;:.!?])\s+/))
-    .map((part) => part.trim())
+    .flatMap((line) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) {
+        return [];
+      }
+      if (trimmedLine.length <= safeMax) {
+        return [trimmedLine];
+      }
+
+      const sentenceParts = trimmedLine
+        .split(/(?<=[.!?])\s+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+      return sentenceParts.flatMap((part) => {
+        if (part.length <= safeMax) {
+          return [part];
+        }
+
+        return part
+          .split(/(?<=[,;:])\s+/)
+          .map((segment) => segment.trim())
+          .filter(Boolean);
+      });
+    })
     .filter(Boolean);
 
   const output = [];
@@ -1566,7 +1589,22 @@ function splitTextIntoShortLyricsLines(text, maxChars = 30) {
     }
   }
 
-  return output.map((line) => line.trim()).filter(Boolean);
+  const mergedOutput = [];
+  for (const line of output.map((item) => item.trim()).filter(Boolean)) {
+    const previous = mergedOutput[mergedOutput.length - 1] || "";
+    const canMerge = previous
+      && `${previous} ${line}`.length <= safeMax
+      && !/[.!?]$/.test(previous);
+
+    if (canMerge) {
+      mergedOutput[mergedOutput.length - 1] = `${previous} ${line}`.trim();
+      continue;
+    }
+
+    mergedOutput.push(line);
+  }
+
+  return mergedOutput;
 }
 
 function extractTranscriptSegments(payload) {
