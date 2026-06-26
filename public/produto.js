@@ -1744,10 +1744,12 @@ async function submitTrackCharacterModal() {
     if (updatedTrack && latestData) {
       updatedTrack.albumCharacters = Array.isArray(latestData.characters) ? latestData.characters : updatedTrack.albumCharacters;
       updatedTrack.lyricsSyncData = latestData.syncData || updatedTrack.lyricsSyncData;
+      updateTrackInCurrentAlbum(updatedTrack);
       await renderTracks(currentAlbum);
-      openTrackTextsModal(updatedTrack);
+      const refreshedTrack = getTrackByNumber(trackNumber) || updatedTrack;
+      openTrackTextsModal(refreshedTrack);
       resetTrackCharacterModalActionButtons();
-      openTrackCharacterModal(updatedTrack, focusLineIndex);
+      openTrackCharacterModal(refreshedTrack, focusLineIndex);
     }
     const batchUpdate = targetLineNumbers.length > 1;
     clearTrackCharacterSelection({ refresh: false });
