@@ -3141,10 +3141,20 @@ body[data-page="eventos-pagamento"] {
   padding: 0 18px;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .buy-album-button svg {
   width: 18px;
   height: 18px;
   fill: currentColor;
+}
+
+.rehearse-album-button {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .album-admin-panel {
@@ -3276,6 +3286,11 @@ body[data-page="eventos-pagamento"] {
 
 .track-action-icon-button {
   color: #ffffff !important;
+}
+
+.track-action-rehearsal {
+  background: rgba(114, 246, 203, 0.12);
+  border-color: rgba(114, 246, 203, 0.26) !important;
 }
 
 .track-action-danger {
@@ -3570,6 +3585,70 @@ body[data-page="eventos-pagamento"] {
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.rehearsal-modal-panel {
+  width: min(560px, calc(100vw - 28px));
+}
+
+.rehearsal-modal-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.rehearsal-modal-copy p,
+.rehearsal-modal-copy strong {
+  margin: 0;
+}
+
+.rehearsal-modal-copy small {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.rehearsal-code-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.rehearsal-code-value {
+  font-size: clamp(1.3rem, 4vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.rehearsal-remaining {
+  color: #fff4ad;
+  font-weight: 700;
+}
+
+.rehearsal-helper {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.rehearsal-field {
+  display: grid;
+  gap: 8px;
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.rehearsal-field input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rehearsal-field input::placeholder {
+  color: rgba(255, 255, 255, 0.46);
 }
 
 .plans-grid {

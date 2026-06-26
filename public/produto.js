@@ -7,6 +7,7 @@ const productCover = document.getElementById("product-cover");
 const productTitle = document.getElementById("product-title");
 const productPrice = document.getElementById("product-price");
 const buyAlbumButton = document.getElementById("buy-album-button");
+const rehearseAlbumButton = document.getElementById("rehearse-album-button");
 const lyricsDownloadButton = document.getElementById("lyrics-download-button");
 const trackList = document.getElementById("track-list");
 const trackPrevButton = document.getElementById("track-prev-button");
@@ -22,7 +23,8 @@ let accessState = {
   authenticated: false,
   planId: "gratis",
   canDownloadAll: false,
-  purchasedAlbumIds: []
+  purchasedAlbumIds: [],
+  rehearsalAlbumIds: []
 };
 
 let currentAudio = null;
@@ -49,6 +51,8 @@ let trackCharacterSelectionActive = false;
 let trackCharacterSelectionTrackId = "";
 let trackCharacterSelectedLineIndexes = new Set();
 let trackCharacterDesktopHoldState = null;
+let rehearsalRedeemInFlight = false;
+let rehearsalOwnerLoadInFlight = false;
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
 const characterPalettes = {
@@ -312,7 +316,7 @@ function isPlusPlaybackAlbumName(albumName) {
 }
 
 function canStreamTrack(albumId, albumName, track) {
-  if (hasPurchasedAlbum(albumId) || hasFullCatalogAccess()) {
+  if (hasPurchasedAlbum(albumId) || hasRehearsalAlbumAccess(albumId) || hasFullCatalogAccess()) {
     return true;
   }
 
@@ -347,6 +351,7 @@ function canDownloadTrack(albumId, albumName, track) {
 
 function shouldLimitFreePreview(albumId, albumName, track) {
   return !hasPurchasedAlbum(albumId)
+    && !hasRehearsalAlbumAccess(albumId)
     && normalizeCatalogText(accessState.planId) === "gratis"
     && canStreamTrack(albumId, albumName, track);
 }
@@ -387,12 +392,39 @@ function setBuyButtonState({ label, onClick, disabled = false, ariaLabel = "" })
   buyAlbumButton.onclick = onClick || null;
 }
 
+function setRehearseButtonState({ label, onClick, disabled = false, ariaLabel = "" }) {
+  if (!rehearseAlbumButton) {
+    return;
+  }
+
+  const nextLabel = String(label || "").trim() || "Ensaiar";
+  rehearseAlbumButton.disabled = disabled;
+  rehearseAlbumButton.setAttribute("aria-label", ariaLabel || nextLabel);
+  rehearseAlbumButton.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v1.07A7.001 7.001 0 0 1 19 12a7 7 0 1 1-8-6.93V4a1 1 0 0 1 1-1m0 4a5 5 0 1 0 5 5 5.01 5.01 0 0 0-5-5m-.75 2.5a1 1 0 0 1 1 1v1.63l1.65.95a1 1 0 1 1-1 1.73l-2.15-1.24a1 1 0 0 1-.5-.86v-2.21a1 1 0 0 1 1-1"/></svg>
+    <span>${nextLabel}</span>
+  `;
+  rehearseAlbumButton.onclick = onClick || null;
+}
+
 function hasPurchasedAlbum(albumId) {
   return accessState.purchasedAlbumIds.includes(albumId);
 }
 
+function hasRehearsalAlbumAccess(albumId) {
+  return accessState.rehearsalAlbumIds.includes(albumId);
+}
+
 function canUseDownloads(albumId) {
   return accessState.canDownloadAll || hasPurchasedAlbum(albumId);
+}
+
+function canManageAlbumRehearsal(albumId) {
+  return hasPurchasedAlbum(albumId);
+}
+
+function canAccessAlbumByRehearsal(albumId) {
+  return hasRehearsalAlbumAccess(albumId);
 }
 
 function hasLyricsZip(album) {
@@ -702,7 +734,8 @@ async function loadAccessState() {
       authenticated: false,
       planId: "gratis",
       canDownloadAll: false,
-      purchasedAlbumIds: []
+      purchasedAlbumIds: [],
+      rehearsalAlbumIds: []
     };
     currentUser = null;
     return;
@@ -728,7 +761,8 @@ async function loadAccessState() {
       authenticated: false,
       planId: "gratis",
       canDownloadAll: false,
-      purchasedAlbumIds: []
+      purchasedAlbumIds: [],
+      rehearsalAlbumIds: []
     };
     currentUser = null;
     return;
@@ -742,7 +776,8 @@ async function loadAccessState() {
     authenticated: true,
     planId: accessData.access?.plan?.id || accessData.access?.planId || "gratis",
     canDownloadAll: Boolean(accessData.access.canDownloadAll),
-    purchasedAlbumIds: Array.isArray(accessData.access.purchasedAlbumIds) ? accessData.access.purchasedAlbumIds : []
+    purchasedAlbumIds: Array.isArray(accessData.access.purchasedAlbumIds) ? accessData.access.purchasedAlbumIds : [],
+    rehearsalAlbumIds: Array.isArray(accessData.access.rehearsalAlbumIds) ? accessData.access.rehearsalAlbumIds : []
   };
 
   if (meResponse?.ok) {
@@ -810,6 +845,11 @@ function setPurchaseStatus(albumId) {
     purchaseStatus.textContent = accessState.authenticated
       ? "Download liberado para este album na sua conta."
       : "Faca login para acessar seus downloads.";
+    return;
+  }
+
+  if (canAccessAlbumByRehearsal(albumId)) {
+    purchaseStatus.textContent = "Ensaio liberado nesta conta. As faixas ficam disponiveis para ouvir, sem download.";
     return;
   }
 
@@ -1109,6 +1149,311 @@ function confirmTrackTextsReset() {
   return new Promise((resolve) => {
     trackTextsConfirmResolver = resolve;
   });
+}
+
+function getRehearsalStorageKey(albumId) {
+  return albumId ? `produto-rehearsal-access:${albumId}` : "";
+}
+
+function rememberRehearsalAccess(albumId, payload = {}) {
+  const key = getRehearsalStorageKey(albumId);
+  if (!key) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify({
+      albumId,
+      ownerLogin: String(payload.ownerLogin || ""),
+      rehearsalCode: String(payload.rehearsalCode || ""),
+      grantedAt: new Date().toISOString()
+    }));
+  } catch {
+    // noop
+  }
+}
+
+function ensureRehearsalOwnerModal() {
+  let modal = document.getElementById("album-rehearsal-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "album-rehearsal-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-rehearsal-owner"></div>
+    <div class="track-texts-panel track-generation-panel rehearsal-modal-panel" role="dialog" aria-modal="true" aria-labelledby="album-rehearsal-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Codigo de ensaio</p>
+          <h3 id="album-rehearsal-title" class="section-title small">Liberar ensaio para seus alunos</h3>
+        </div>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-rehearsal-owner" aria-label="Fechar modal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+        </button>
+      </div>
+      <div class="rehearsal-modal-copy">
+        <p>Peça aos seus alunos para entrarem no site, tocarem em <strong>Ensaiar</strong> e informarem o seu login junto com este codigo.</p>
+        <div class="rehearsal-code-card">
+          <span id="album-rehearsal-owner-login" class="rehearsal-helper">Login: -</span>
+          <strong id="album-rehearsal-code-value" class="rehearsal-code-value">--------</strong>
+          <span id="album-rehearsal-remaining" class="rehearsal-remaining">Voce tem 20 acessos restantes.</span>
+          <small id="album-rehearsal-helper" class="rehearsal-helper">20 pessoas ainda podem ensaiar com este album.</small>
+        </div>
+      </div>
+      <div class="bulk-track-title-actions">
+        <button id="album-rehearsal-refresh" class="ghost-button" type="button">Atualizar</button>
+        <button class="primary-button" type="button" data-role="close-rehearsal-owner">Fechar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-role='close-rehearsal-owner']").forEach((node) => {
+    node.addEventListener("click", () => {
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    });
+  });
+  modal.querySelector("#album-rehearsal-refresh")?.addEventListener("click", async () => {
+    await openAlbumRehearsalOwnerModal({ forceReload: true });
+  });
+
+  return modal;
+}
+
+function ensureRehearsalEntryModal() {
+  let modal = document.getElementById("album-rehearsal-entry-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "album-rehearsal-entry-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-rehearsal-entry"></div>
+    <div class="track-texts-panel track-generation-panel rehearsal-modal-panel" role="dialog" aria-modal="true" aria-labelledby="album-rehearsal-entry-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Ensaiar</p>
+          <h3 id="album-rehearsal-entry-title" class="section-title small">Entrar com codigo de ensaio</h3>
+        </div>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-rehearsal-entry" aria-label="Fechar modal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+        </button>
+      </div>
+      <div class="rehearsal-modal-copy">
+        <p>Informe o login do usuario dono do album e o codigo de ensaio que ele compartilhou com a turma.</p>
+      </div>
+      <label class="rehearsal-field">Login do usuario
+        <input id="album-rehearsal-entry-login" type="text" placeholder="Ex.: rosemattos" autocomplete="username">
+      </label>
+      <label class="rehearsal-field">Codigo de ensaio
+        <input id="album-rehearsal-entry-code" type="text" maxlength="12" placeholder="Digite o codigo">
+      </label>
+      <div class="bulk-track-title-actions">
+        <button class="ghost-button" type="button" data-role="close-rehearsal-entry">Cancelar</button>
+        <button id="album-rehearsal-entry-submit" class="primary-button" type="button">Liberar ensaio</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-role='close-rehearsal-entry']").forEach((node) => {
+    node.addEventListener("click", () => {
+      if (rehearsalRedeemInFlight) {
+        return;
+      }
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    });
+  });
+  modal.querySelector("#album-rehearsal-entry-submit")?.addEventListener("click", async () => {
+    await submitAlbumRehearsalEntry();
+  });
+
+  return modal;
+}
+
+async function openAlbumRehearsalOwnerModal({ forceReload = false } = {}) {
+  if (!currentAlbum?.id) {
+    return;
+  }
+  if (!getToken()) {
+    redirectToAuth(currentAlbum.id);
+    return;
+  }
+  if (!canManageAlbumRehearsal(currentAlbum.id)) {
+    showFloatingNotice("Esse codigo so aparece para quem possui este album.");
+    return;
+  }
+  if (rehearsalOwnerLoadInFlight && !forceReload) {
+    return;
+  }
+
+  const modal = ensureRehearsalOwnerModal();
+  const loginNode = modal.querySelector("#album-rehearsal-owner-login");
+  const codeNode = modal.querySelector("#album-rehearsal-code-value");
+  const remainingNode = modal.querySelector("#album-rehearsal-remaining");
+  const helperNode = modal.querySelector("#album-rehearsal-helper");
+  const refreshButton = modal.querySelector("#album-rehearsal-refresh");
+
+  rehearsalOwnerLoadInFlight = true;
+  if (refreshButton) {
+    refreshButton.disabled = true;
+    refreshButton.textContent = "Atualizando...";
+  }
+  if (loginNode) {
+    loginNode.textContent = `Login: ${currentUser?.username || "-"}`;
+  }
+  if (codeNode) {
+    codeNode.textContent = "Carregando...";
+  }
+
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+
+  try {
+    const response = await fetch(getApiUrl(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/rehearsal-code`), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getToken()}`
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel carregar o codigo de ensaio.");
+    }
+
+    const remainingUses = Number(data.rehearsal?.remainingUses || 0);
+    const totalUses = Number(data.rehearsal?.totalUses || 20);
+    if (loginNode) {
+      loginNode.textContent = `Login: ${data.owner?.username || currentUser?.username || "-"}`;
+    }
+    if (codeNode) {
+      codeNode.textContent = String(data.rehearsal?.rehearsalCode || "--------");
+    }
+    if (remainingNode) {
+      remainingNode.textContent = `Voce tem ${remainingUses} acessos restantes.`;
+    }
+    if (helperNode) {
+      helperNode.textContent = `${remainingUses} pessoas ainda podem ensaiar com este album de um total de ${totalUses}.`;
+    }
+  } catch (error) {
+    if (codeNode) {
+      codeNode.textContent = "--------";
+    }
+    if (remainingNode) {
+      remainingNode.textContent = error instanceof Error ? error.message : "Nao foi possivel carregar o codigo.";
+    }
+    if (helperNode) {
+      helperNode.textContent = "Confira se este album ja esta atribuido na sua conta.";
+    }
+  } finally {
+    rehearsalOwnerLoadInFlight = false;
+    if (refreshButton) {
+      refreshButton.disabled = false;
+      refreshButton.textContent = "Atualizar";
+    }
+  }
+}
+
+function openAlbumRehearsalEntryModal() {
+  if (!currentAlbum?.id) {
+    return;
+  }
+  if (!getToken()) {
+    redirectToAuth(currentAlbum.id);
+    return;
+  }
+
+  const modal = ensureRehearsalEntryModal();
+  const loginInput = modal.querySelector("#album-rehearsal-entry-login");
+  const codeInput = modal.querySelector("#album-rehearsal-entry-code");
+  const remembered = (() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(getRehearsalStorageKey(currentAlbum.id)) || "null");
+    } catch {
+      return null;
+    }
+  })();
+
+  if (loginInput && !loginInput.value) {
+    loginInput.value = String(remembered?.ownerLogin || "");
+  }
+  if (codeInput && !codeInput.value) {
+    codeInput.value = String(remembered?.rehearsalCode || "");
+  }
+
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+}
+
+async function submitAlbumRehearsalEntry() {
+  if (!currentAlbum?.id || rehearsalRedeemInFlight) {
+    return;
+  }
+
+  const modal = ensureRehearsalEntryModal();
+  const loginInput = modal.querySelector("#album-rehearsal-entry-login");
+  const codeInput = modal.querySelector("#album-rehearsal-entry-code");
+  const submitButton = modal.querySelector("#album-rehearsal-entry-submit");
+  const ownerLogin = String(loginInput?.value || "").trim();
+  const rehearsalCode = String(codeInput?.value || "").trim().toUpperCase();
+
+  if (!ownerLogin || !rehearsalCode) {
+    showFloatingNotice("Informe o login e o codigo de ensaio.");
+    return;
+  }
+
+  rehearsalRedeemInFlight = true;
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Liberando...";
+  }
+
+  try {
+    const response = await fetch(getApiUrl(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/rehearsal-enter`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        ownerLogin,
+        rehearsalCode
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel liberar o ensaio.");
+    }
+
+    rememberRehearsalAccess(currentAlbum.id, { ownerLogin, rehearsalCode });
+    await loadAccessState();
+    setPurchaseStatus(currentAlbum.id);
+    await renderTracks(currentAlbum);
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+    if (trackPositionLabel && Array.isArray(currentAlbum?.tracks) && currentAlbum.tracks[currentTrackIndex]) {
+      trackPositionLabel.textContent = currentAlbum.tracks[currentTrackIndex].label || "";
+    }
+    showFloatingNotice(data.redemption?.alreadyGranted
+      ? "Esse ensaio ja estava liberado na sua conta."
+      : "Ensaio liberado para este album.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel liberar o ensaio.");
+  } finally {
+    rehearsalRedeemInFlight = false;
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Liberar ensaio";
+    }
+  }
 }
 
 function ensureTrackCharacterModal() {
@@ -3326,6 +3671,8 @@ async function renderTracks(album) {
         <span class="track-download-label">${
           canDownloadTrack(album.id, album.name, track)
             ? "Download disponivel"
+            : canAccessAlbumByRehearsal(album.id)
+              ? "Ensaio liberado"
             : track.type === "playback"
               ? "Playback"
               : "Preview"
@@ -3334,6 +3681,7 @@ async function renderTracks(album) {
           <button class="ghost-button download-icon-button track-action-icon-button" type="button" data-role="texts" aria-label="Ver textos" ${hasTrackTexts(track) ? "" : "hidden"}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2h9A2.5 2.5 0 0 1 19 4.5v15a.5.5 0 0 1-.8.4L12 15.2 5.8 19.9a.5.5 0 0 1-.8-.4zm3 2a1 1 0 0 0 0 2h8a1 1 0 1 0 0-2zm0 4a1 1 0 0 0 0 2h8a1 1 0 1 0 0-2z"/></svg>
           </button>
+          ${canManageAlbumRehearsal(album.id) ? `<button class="ghost-button download-icon-button track-action-icon-button track-action-rehearsal" type="button" data-role="rehearsal-code" aria-label="Codigo de ensaio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5a1 1 0 0 1 2 0v5h5a1 1 0 1 1 0 2h-5v5a1 1 0 1 1-2 0v-5H6a1 1 0 1 1 0-2h5z"/></svg></button>` : ""}
           ${canGenerateTrackTexts(track) ? `<button class="ghost-button download-icon-button track-action-icon-button" type="button" data-role="generate-texts" aria-label="Criar textos com OpenAI"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a1 1 0 0 1 1 1v2.05a6.5 6.5 0 0 1 3.7 1.53l1.45-1.45a1 1 0 1 1 1.42 1.41l-1.46 1.46A6.47 6.47 0 0 1 18.95 11H21a1 1 0 1 1 0 2h-2.05a6.5 6.5 0 0 1-1.53 3.7l1.45 1.45a1 1 0 0 1-1.41 1.42l-1.46-1.46A6.47 6.47 0 0 1 13 18.95V21a1 1 0 1 1-2 0v-2.05a6.5 6.5 0 0 1-3.7-1.53l-1.45 1.45a1 1 0 1 1-1.42-1.41l1.46-1.46A6.47 6.47 0 0 1 5.05 13H3a1 1 0 1 1 0-2h2.05a6.5 6.5 0 0 1 1.53-3.7L5.13 5.85a1 1 0 0 1 1.41-1.42l1.46 1.46A6.47 6.47 0 0 1 11 5.05V3a1 1 0 0 1 1-1m0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10"/></svg></button>` : ""}
           ${isAdmin() ? `<button class="ghost-button download-icon-button track-action-icon-button track-action-danger" type="button" data-role="clear-timestamps" aria-label="Remover timestamps" ${hasTrackTimestamps(track) ? "" : "hidden"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h.72l.95 11.36A2 2 0 0 0 8.66 20h6.68a2 2 0 0 0 1.99-1.64L18.28 7H19a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1zm1 2V5h4V5zm-.28 4a1 1 0 0 1 1 .92l.5 6a1 1 0 1 1-1.99.16l-.5-6a1 1 0 0 1 .91-1.08m4.56 0a1 1 0 0 1 .91 1.08l-.5 6a1 1 0 1 1-1.99-.16l.5-6a1 1 0 0 1 1.08-.92"/></svg></button>` : ""}
           <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="Baixar faixa">
@@ -3405,6 +3753,10 @@ async function renderTracks(album) {
       openTrackTextsModal(track);
     });
 
+    article.querySelector("[data-role='rehearsal-code']")?.addEventListener("click", async () => {
+      await openAlbumRehearsalOwnerModal();
+    });
+
     article.querySelector("[data-role='generate-texts']")?.addEventListener("click", async () => {
       await createTrackTexts(article, album, track);
     });
@@ -3416,6 +3768,8 @@ async function renderTracks(album) {
     setDownloadUi(article, {
       label: canDownloadTrack(album.id, album.name, track)
         ? "Download disponivel"
+        : canAccessAlbumByRehearsal(album.id)
+          ? "Ensaio liberado"
         : track.type === "playback"
           ? "Playback"
           : "Faixa"
@@ -3502,6 +3856,11 @@ async function loadAlbumDetail() {
       disabled: true,
       ariaLabel: "Comprar album"
     });
+    setRehearseButtonState({
+      label: "Ensaiar",
+      disabled: true,
+      ariaLabel: "Ensaiar album"
+    });
     setProductPageLoading(false);
     return;
   }
@@ -3554,6 +3913,14 @@ async function loadAlbumDetail() {
         ariaLabel: "Comprar album"
       });
     }
+
+    setRehearseButtonState({
+      label: "Ensaiar",
+      onClick: () => {
+        openAlbumRehearsalEntryModal();
+      },
+      ariaLabel: "Ensaiar album"
+    });
   } catch (error) {
     productTitle.textContent = "Nao foi possivel abrir o album";
     if (purchaseStatus) {
@@ -3563,6 +3930,11 @@ async function loadAlbumDetail() {
       label: "Comprar",
       disabled: true,
       ariaLabel: "Comprar album"
+    });
+    setRehearseButtonState({
+      label: "Ensaiar",
+      disabled: true,
+      ariaLabel: "Ensaiar album"
     });
   } finally {
     setProductPageLoading(false);

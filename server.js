@@ -47,7 +47,7 @@ import { clearMiniMediaSongPlayback, createMiniMediaSongAsset, deleteMiniMediaAl
 import { ensureMiniDocumentExists, insertMiniDocumentLinesAfter, replaceMiniDocumentLineRange, updateMiniDocumentLine } from "./src/mini-docs.js";
 import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema, listEscreverParagraphs } from "./src/escrever.js";
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
-import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent } from "./src/payments.js";
+import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getAlbumRehearsalCodeForOwner, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent, redeemAlbumRehearsalCode } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
@@ -8182,6 +8182,146 @@ function canAccessAlbumZip(accessState, productId) {
   return Boolean(accessState?.canDownloadAll || accessState?.purchasedAlbumIds?.includes(productId));
 }
 
+function canManageAlbumRehearsal(accessState, productId) {
+  return Boolean(accessState?.purchasedAlbumIds?.includes(productId));
+}
+
+async function handleAlbumRehearsalCodeRequest(request, response, productId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  try {
+    const accessState = await getUserAccessState(user.id);
+
+    if (!canManageAlbumRehearsal(accessState, product.id)) {
+      sendJson(response, 403, {
+        error: "Esse codigo de ensaio so pode ser criado por quem possui este album."
+      });
+      return;
+    }
+
+    const rehearsal = await getAlbumRehearsalCodeForOwner({
+      ownerUserId: user.id,
+      productId: product.id,
+      createIfMissing: true
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      rehearsal,
+      owner: {
+        username: user.username || null,
+        name: user.name || null
+      }
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o codigo de ensaio."
+    });
+  }
+}
+
+async function handleAlbumRehearsalRedeemRequest(request, response, productId) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+
+  if (!product) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "JSON invalido." });
+    return;
+  }
+
+  const ownerLogin = String(body?.ownerLogin || "").trim();
+  const rehearsalCode = String(body?.rehearsalCode || "").trim().toUpperCase();
+
+  if (!ownerLogin || !rehearsalCode) {
+    sendJson(response, 400, {
+      error: "Informe o login do usuario e o codigo de ensaio."
+    });
+    return;
+  }
+
+  try {
+    const ownerUser = await findUserByUsername(ownerLogin);
+    if (!ownerUser) {
+      sendJson(response, 404, { error: "Usuario do ensaio nao encontrado." });
+      return;
+    }
+
+    const currentAccessState = await getUserAccessState(user.id);
+    if (currentAccessState.canDownloadAll || currentAccessState.purchasedAlbumIds.includes(product.id) || currentAccessState.rehearsalAlbumIds?.includes(product.id)) {
+      sendJson(response, 200, {
+        ok: true,
+        access: currentAccessState,
+        redemption: {
+          alreadyGranted: true,
+          accessCreatedAt: null,
+          remainingUses: null,
+          totalUses: null,
+          rehearsalCode: rehearsalCode
+        },
+        owner: {
+          username: ownerUser.username || null,
+          name: ownerUser.name || null
+        }
+      });
+      return;
+    }
+
+    const redemption = await redeemAlbumRehearsalCode({
+      userId: user.id,
+      ownerUserId: ownerUser.id,
+      productId: product.id,
+      rehearsalCode
+    });
+
+    const accessState = await getUserAccessState(user.id);
+    sendJson(response, 200, {
+      ok: true,
+      access: accessState,
+      redemption,
+      owner: {
+        username: ownerUser.username || null,
+        name: ownerUser.name || null
+      }
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel liberar o ensaio."
+    });
+  }
+}
+
 async function handleAdminAlbumZipUpload(request, response, pathname) {
   const user = await requireAdmin(request, response);
 
@@ -9093,6 +9233,18 @@ const server = http.createServer(async (request, response) => {
       decodeURIComponent(generateTextsMatch?.[1] || ""),
       Number(generateTextsMatch?.[2] || 0)
     );
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/store\/products\/[^/]+\/rehearsal-code$/)) {
+    const rehearsalMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/rehearsal-code$/);
+    await handleAlbumRehearsalCodeRequest(request, response, decodeURIComponent(rehearsalMatch?.[1] || ""));
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/store\/products\/[^/]+\/rehearsal-enter$/)) {
+    const rehearsalEnterMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/rehearsal-enter$/);
+    await handleAlbumRehearsalRedeemRequest(request, response, decodeURIComponent(rehearsalEnterMatch?.[1] || ""));
     return;
   }
 
