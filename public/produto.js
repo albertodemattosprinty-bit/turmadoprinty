@@ -90,6 +90,42 @@ function getTrackCharacters(track) {
   return Array.isArray(track?.albumCharacters) ? track.albumCharacters : [];
 }
 
+function applyAlbumCharactersToCurrentAlbum(characters) {
+  if (!currentAlbum || !Array.isArray(currentAlbum.tracks)) {
+    return;
+  }
+
+  currentAlbum = {
+    ...currentAlbum,
+    tracks: currentAlbum.tracks.map((track) => ({
+      ...track,
+      albumCharacters: Array.isArray(characters) ? characters : []
+    }))
+  };
+}
+
+function applyCharacterRemovalSyncUpdates(syncUpdates) {
+  if (!currentAlbum || !Array.isArray(currentAlbum.tracks) || !Array.isArray(syncUpdates)) {
+    return;
+  }
+
+  const updatesByTrackId = new Map(
+    syncUpdates
+      .filter((item) => String(item?.trackId || "").trim())
+      .map((item) => [String(item.trackId), item.syncData || null])
+  );
+
+  currentAlbum = {
+    ...currentAlbum,
+    tracks: currentAlbum.tracks.map((track) => {
+      const nextSyncData = updatesByTrackId.get(String(track?.sourceSongId || ""));
+      return nextSyncData
+        ? { ...track, lyricsSyncData: nextSyncData }
+        : track;
+    })
+  };
+}
+
 function getCharacterById(track, characterId) {
   return getTrackCharacters(track).find((item) => String(item?.id || "") === String(characterId || "")) || null;
 }
@@ -1032,6 +1068,9 @@ function ensureTrackCharacterModal() {
       <label class="track-character-field">Personagem do album
         <select id="track-character-select" class="track-character-select"></select>
       </label>
+      <div class="track-character-manage">
+        <button id="track-character-manage-button" class="ghost-button track-character-manage-button" type="button">Excluir personagens</button>
+      </div>
       <div class="track-character-divider">ou crie um novo</div>
       <label class="track-character-field">Nome
         <input id="track-character-name" type="text" maxlength="40" placeholder="Ex.: Menino 1">
@@ -1052,6 +1091,17 @@ function ensureTrackCharacterModal() {
         <button id="track-character-cancel" class="ghost-button" type="button">Cancelar</button>
         <button id="track-character-save" class="primary-button" type="button">Salvar</button>
       </div>
+      <div id="track-character-delete-sheet" class="track-character-delete-sheet" hidden>
+        <div class="track-character-delete-card">
+          <div class="track-character-delete-head">
+            <strong>Excluir personagens</strong>
+            <button id="track-character-delete-close" class="ghost-button track-texts-close" type="button" aria-label="Fechar lista de exclusao">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+            </button>
+          </div>
+          <div id="track-character-delete-list" class="track-character-delete-list"></div>
+        </div>
+      </div>
     </div>
   `;
   document.body.appendChild(modal);
@@ -1070,6 +1120,12 @@ function ensureTrackCharacterModal() {
 
   modal.querySelector("#track-character-group")?.addEventListener("change", () => {
     syncCharacterPaletteOptions();
+  });
+  modal.querySelector("#track-character-manage-button")?.addEventListener("click", () => {
+    openTrackCharacterDeleteSheet();
+  });
+  modal.querySelector("#track-character-delete-close")?.addEventListener("click", () => {
+    closeTrackCharacterDeleteSheet();
   });
 
   modal.querySelector("#track-character-save")?.addEventListener("click", async () => {
@@ -1261,9 +1317,97 @@ function openTrackCharacterModal(track, lineIndex) {
   groupSelect.value = currentCharacter?.group ? normalizeCharacterGroup(currentCharacter.group) : "boys";
   colorInput.value = currentCharacter?.color || (characterPalettes.boys[0]);
   syncCharacterPaletteOptions();
+  closeTrackCharacterDeleteSheet();
+  renderTrackCharacterDeleteSheet(track);
 
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
+}
+
+function closeTrackCharacterDeleteSheet() {
+  const modal = ensureTrackCharacterModal();
+  const sheet = modal.querySelector("#track-character-delete-sheet");
+  if (!sheet) {
+    return;
+  }
+  sheet.hidden = true;
+  sheet.classList.remove("show");
+}
+
+function renderTrackCharacterDeleteSheet(track) {
+  const modal = ensureTrackCharacterModal();
+  const list = modal.querySelector("#track-character-delete-list");
+  if (!list) {
+    return;
+  }
+
+  const characters = getTrackCharacters(track);
+  if (!characters.length) {
+    list.innerHTML = `<div class="track-character-delete-empty">Nenhum personagem criado neste album.</div>`;
+    return;
+  }
+
+  list.innerHTML = characters.map((character) => `
+    <button class="track-character-delete-item" type="button" data-character-id="${escapeHtml(character.id)}">
+      <span class="track-character-delete-swatch" style="--character-delete-color:${escapeHtml(character.color || "#FFFFFF")}"></span>
+      <span class="track-character-delete-name">${escapeHtml(character.name)}</span>
+    </button>
+  `).join("");
+
+  list.querySelectorAll("[data-character-id]").forEach((node) => {
+    node.addEventListener("click", async () => {
+      await deleteTrackCharacter(String(node.dataset.characterId || "").trim());
+    });
+  });
+}
+
+function openTrackCharacterDeleteSheet() {
+  const modal = ensureTrackCharacterModal();
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const track = getTrackByNumber(trackNumber);
+  const sheet = modal.querySelector("#track-character-delete-sheet");
+  if (!track || !sheet) {
+    return;
+  }
+  renderTrackCharacterDeleteSheet(track);
+  sheet.hidden = false;
+  sheet.classList.add("show");
+}
+
+async function deleteTrackCharacter(characterId) {
+  const modal = ensureTrackCharacterModal();
+  const albumId = String(modal.dataset.albumId || "");
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const lineNumber = Number(modal.dataset.lineNumber || 0);
+  const track = getTrackByNumber(trackNumber);
+  if (!albumId || !track || !characterId) {
+    return;
+  }
+
+  try {
+    const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/characters/${encodeURIComponent(characterId)}`), {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${getToken()}`
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel excluir o personagem.");
+    }
+
+    applyAlbumCharactersToCurrentAlbum(Array.isArray(data.characters) ? data.characters : []);
+    applyCharacterRemovalSyncUpdates(Array.isArray(data.syncUpdates) ? data.syncUpdates : []);
+    const nextTrack = getTrackByNumber(trackNumber);
+    closeTrackCharacterDeleteSheet();
+    if (nextTrack) {
+      openTrackCharacterModal(nextTrack, Math.max(0, lineNumber - 1));
+    }
+    await renderTracks(currentAlbum);
+    showFloatingNotice("Personagem excluido do album.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel excluir o personagem.");
+  }
 }
 
 function openTrackTextEditModal(track, lineIndex) {

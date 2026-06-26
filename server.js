@@ -5117,6 +5117,108 @@ async function handleMiniMediaAlbumCharacterCreateRequest(request, response, alb
   }
 }
 
+async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, albumId, characterId) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  const safeCharacterId = String(characterId || "").trim();
+  if (!safeCharacterId) {
+    sendJson(response, 400, { error: "Personagem invalido." });
+    return;
+  }
+
+  try {
+    const library = await loadMiniMediaLibrary();
+    const album = library.albums.find((item) => item.id === albumId);
+    if (!album) {
+      sendJson(response, 404, { error: "Album nao encontrado." });
+      return;
+    }
+
+    const characters = normalizeMiniMediaAlbumCharacters(album.characters || album.metadata?.characters);
+    const nextCharacters = characters.filter((item) => item.id !== safeCharacterId);
+    if (nextCharacters.length === characters.length) {
+      sendJson(response, 404, { error: "Personagem nao encontrado." });
+      return;
+    }
+
+    album.characters = nextCharacters;
+    album.metadata = {
+      ...(album.metadata && typeof album.metadata === "object" ? album.metadata : {}),
+      characters: nextCharacters
+    };
+
+    const syncUpdates = [];
+    for (const song of Array.isArray(album.songs) ? album.songs : []) {
+      const databaseSong = await getSyncedMiniMediaSong(library, albumId, song.id);
+      const lines = normalizeLyricsSyncLines(song.lyricsSyncData?.lines || databaseSong.lyrics_sync_json?.lines || []);
+      if (!lines.length) {
+        continue;
+      }
+
+      let changed = false;
+      const nextLines = lines.map((line) => {
+        if (String(line?.characterId || "").trim() !== safeCharacterId) {
+          return line;
+        }
+        changed = true;
+        return {
+          ...line,
+          characterId: ""
+        };
+      });
+
+      if (!changed) {
+        continue;
+      }
+
+      const nextSyncData = {
+        ...(song.lyricsSyncData && typeof song.lyricsSyncData === "object" ? song.lyricsSyncData : {}),
+        albumId,
+        trackId: song.id,
+        title: song.title,
+        lines: nextLines
+      };
+
+      const updatedSong = await updateMiniMediaSongLyrics(
+        databaseSong.id,
+        song.lyricsText || buildLyricsTextFromSyncLines(nextLines),
+        nextSyncData
+      );
+
+      song.lyricsSyncData = updatedSong?.lyrics_sync_json && typeof updatedSong.lyrics_sync_json === "object"
+        ? updatedSong.lyrics_sync_json
+        : nextSyncData;
+
+      syncUpdates.push({
+        trackId: song.id,
+        syncData: song.lyricsSyncData
+      });
+    }
+
+    if (hasDatabase()) {
+      await updateMiniMediaAlbumMetadata(albumId, album.metadata);
+    }
+
+    const saved = await saveMiniMediaLibrary(library);
+    const savedAlbum = saved.albums.find((item) => item.id === albumId) || album;
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(adminUser),
+      album: buildMiniMediaAlbumPayload(savedAlbum, { includeExtended: true }),
+      characters: nextCharacters,
+      removedCharacterId: safeCharacterId,
+      syncUpdates
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir o personagem."
+    });
+  }
+}
+
 async function handleMiniMediaTrackLineCharacterUpdateRequest(request, response, albumId, trackId, lineNumber) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -9138,7 +9240,18 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && !pathname.includes("/tracks/") && !pathname.endsWith("/cover") && !pathname.endsWith("/cover/generate")) {
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && pathname.includes("/characters/")) {
+    const match = pathname.match(/^\/api\/mini\/media\/albums\/([^/]+)\/characters\/([^/]+)$/);
+    await handleMiniMediaAlbumCharacterDeleteRequest(
+      request,
+      response,
+      decodeURIComponent(match?.[1] || ""),
+      decodeURIComponent(match?.[2] || "")
+    );
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && !pathname.includes("/tracks/") && !pathname.includes("/characters/") && !pathname.endsWith("/cover") && !pathname.endsWith("/cover/generate")) {
     const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", ""));
     await handleMiniMediaAlbumDeleteRequest(request, response, albumId);
     return;
