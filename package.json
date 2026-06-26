@@ -17,6 +17,7 @@
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "@napi-rs/canvas": "^1.0.0",
+    "jszip": "^3.10.1",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.0.227",
     "pg": "^8.16.3",

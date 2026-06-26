@@ -489,24 +489,24 @@ async function loadAlbums(siteConfig, user) {
       `;
     }
 
-    return `
-      <div class="album-card-action${isSelected ? " is-visible" : ""}">
-        <button
-          class="primary-button album-zip-button"
-          type="button"
-          data-role="album-zip-action"
-          data-album-id="${album.id}"
-          ${!isSelected ? "disabled" : ""}
-        >Download</button>
-      </div>
-    `;
+    return "";
   };
 
   const bindOwnedCardEvents = () => {
     grid.querySelectorAll(".album-card-owned").forEach((card) => {
       card.addEventListener("click", () => {
-        selectedAlbumId = card.dataset.albumId || "";
-        renderProducts();
+        const albumId = card.dataset.albumId || "";
+        if (!albumId) {
+          return;
+        }
+
+        if (isRose) {
+          selectedAlbumId = albumId;
+          renderProducts();
+          return;
+        }
+
+        window.location.href = `/produto.html?album=${encodeURIComponent(albumId)}&view=texts`;
       });
     });
 

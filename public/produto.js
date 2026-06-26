@@ -53,6 +53,7 @@ let trackCharacterSelectedLineIndexes = new Set();
 let trackCharacterDesktopHoldState = null;
 let rehearsalRedeemInFlight = false;
 let rehearsalOwnerLoadInFlight = false;
+let downloadOptionInFlight = false;
 const freePreviewSeconds = 30;
 const freePreviewFadeSeconds = 4;
 const characterPalettes = {
@@ -444,6 +445,10 @@ function syncRehearseAlbumButton(albumId) {
   setRehearseButtonState({
     label: "Ensaiar",
     onClick: () => {
+      if (canManageAlbumRehearsal(albumId)) {
+        void openAlbumRehearsalOwnerModal();
+        return;
+      }
       if (canAccessAlbumByRehearsal(albumId)) {
         openAlbumRehearsalTexts();
         return;
@@ -452,6 +457,40 @@ function syncRehearseAlbumButton(albumId) {
     },
     ariaLabel: canAccessAlbumByRehearsal(albumId) ? "Abrir tela imersiva do album" : "Ensaiar album"
   });
+}
+
+async function downloadProtectedFile(url, fallbackName) {
+  const token = getToken();
+  if (!token) {
+    redirectToAuth(currentAlbum?.id || getAlbumId());
+    return;
+  }
+
+  const response = await fetch(getApiUrl(url), {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (response.status === 401) {
+    redirectToAuth(currentAlbum?.id || getAlbumId());
+    return;
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.error || "Nao foi possivel baixar o arquivo.");
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fallbackName || "download";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
 }
 
 function hasLyricsZip(album) {
@@ -1331,6 +1370,62 @@ function ensureRehearsalEntryModal() {
   return modal;
 }
 
+function ensureTrackDownloadModal() {
+  let modal = document.getElementById("track-download-modal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("section");
+  modal.id = "track-download-modal";
+  modal.className = "track-texts-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="track-texts-backdrop" data-role="close-download-modal"></div>
+    <div class="track-texts-panel track-generation-panel track-download-modal-panel" role="dialog" aria-modal="true" aria-labelledby="track-download-title">
+      <div class="track-texts-head">
+        <div>
+          <p class="eyebrow">Download</p>
+          <h3 id="track-download-title" class="section-title small">Escolha o que baixar</h3>
+        </div>
+        <button class="ghost-button track-texts-close" type="button" data-role="close-download-modal" aria-label="Fechar modal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+        </button>
+      </div>
+      <div class="rehearsal-modal-copy">
+        <p id="track-download-copy">Baixar os arquivos deste album ou somente a faixa atual.</p>
+      </div>
+      <div class="track-download-choice-list">
+        <button id="track-download-album" class="primary-button track-download-choice" type="button">Baixar album</button>
+        <button id="track-download-track" class="ghost-button track-download-choice" type="button">Baixar musica</button>
+        <button id="track-download-pdf" class="ghost-button track-download-choice" type="button">Baixar PDF</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-role='close-download-modal']").forEach((node) => {
+    node.addEventListener("click", () => {
+      if (downloadOptionInFlight) {
+        return;
+      }
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    });
+  });
+  modal.querySelector("#track-download-album")?.addEventListener("click", async () => {
+    await submitTrackDownloadOption("album");
+  });
+  modal.querySelector("#track-download-track")?.addEventListener("click", async () => {
+    await submitTrackDownloadOption("track");
+  });
+  modal.querySelector("#track-download-pdf")?.addEventListener("click", async () => {
+    await submitTrackDownloadOption("pdf");
+  });
+
+  return modal;
+}
+
 async function openAlbumRehearsalOwnerModal({ forceReload = false } = {}) {
   if (!currentAlbum?.id) {
     return;
@@ -1428,6 +1523,93 @@ function openAlbumRehearsalEntryModal() {
 
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
+}
+
+function openTrackDownloadModal(track) {
+  if (!currentAlbum?.id || !track) {
+    return;
+  }
+  if (!canUseDownloads(currentAlbum.id)) {
+    showFloatingNotice("Esse download real fica liberado apenas para quem possui o album.");
+    return;
+  }
+
+  const modal = ensureTrackDownloadModal();
+  modal.dataset.trackNumber = String(track.number || 0);
+  const copy = modal.querySelector("#track-download-copy");
+  if (copy) {
+    copy.textContent = `Album: ${currentAlbum.name}. Faixa atual: ${track.title || track.label || `Faixa ${track.number}`}.`;
+  }
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+}
+
+async function submitTrackDownloadOption(kind) {
+  if (!currentAlbum?.id || downloadOptionInFlight) {
+    return;
+  }
+
+  const modal = ensureTrackDownloadModal();
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const track = getTrackByNumber(trackNumber) || currentAlbum?.tracks?.[currentTrackIndex] || null;
+  const albumButton = modal.querySelector("#track-download-album");
+  const trackButton = modal.querySelector("#track-download-track");
+  const pdfButton = modal.querySelector("#track-download-pdf");
+
+  if (!track) {
+    return;
+  }
+
+  downloadOptionInFlight = true;
+  [albumButton, trackButton, pdfButton].forEach((button) => {
+    if (button) {
+      button.disabled = true;
+    }
+  });
+
+  if (albumButton) {
+    albumButton.textContent = kind === "album" ? "Baixando..." : "Baixar album";
+  }
+  if (trackButton) {
+    trackButton.textContent = kind === "track" ? "Baixando..." : "Baixar musica";
+  }
+  if (pdfButton) {
+    pdfButton.textContent = kind === "pdf" ? "Baixando..." : "Baixar PDF";
+  }
+
+  try {
+    if (kind === "album") {
+      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/bundle/download`, `${currentAlbum.name}.zip`);
+      showFloatingNotice("Pacote do album em download.");
+    } else if (kind === "pdf") {
+      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/pdf/download`, `${currentAlbum.name}.pdf`);
+      showFloatingNotice("PDF do album em download.");
+    } else {
+      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/tracks/${track.number}/download`, `${track.title || track.label || "faixa"}.mp3`);
+      showFloatingNotice("Musica em download.");
+    }
+
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel baixar agora.");
+  } finally {
+    downloadOptionInFlight = false;
+    [albumButton, trackButton, pdfButton].forEach((button) => {
+      if (button) {
+        button.disabled = false;
+      }
+    });
+    if (albumButton) {
+      albumButton.textContent = "Baixar album";
+    }
+    if (trackButton) {
+      trackButton.textContent = "Baixar musica";
+    }
+    if (pdfButton) {
+      pdfButton.textContent = "Baixar PDF";
+    }
+  }
 }
 
 async function submitAlbumRehearsalEntry() {
@@ -3785,7 +3967,7 @@ async function renderTracks(album) {
 
     article.querySelector("[data-role='download']")?.addEventListener("click", async () => {
       try {
-        await downloadTrackForOffline(article, album.id, track);
+        openTrackDownloadModal(track);
       } catch (error) {
         setDownloadUi(article, {
           label: track.type === "playback" ? "Playback" : "Faixa"
@@ -3942,6 +4124,9 @@ async function loadAlbumDetail() {
     await renderTracks(album);
 
     if (hasPurchasedAlbum(album.id)) {
+      if (buyAlbumButton) {
+        buyAlbumButton.hidden = true;
+      }
       setBuyButtonState({
         label: "Acessar",
         onClick: () => {
@@ -3950,6 +4135,9 @@ async function loadAlbumDetail() {
         ariaLabel: "Acessar meus albuns"
       });
     } else {
+      if (buyAlbumButton) {
+        buyAlbumButton.hidden = false;
+      }
       setBuyButtonState({
         label: "Comprar",
         onClick: async () => {
@@ -3960,6 +4148,13 @@ async function loadAlbumDetail() {
     }
 
     syncRehearseAlbumButton(album.id);
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "texts" && (hasPurchasedAlbum(album.id) || canAccessAlbumByRehearsal(album.id) || hasFullCatalogAccess())) {
+      window.setTimeout(() => {
+        openAlbumRehearsalTexts();
+      }, 60);
+    }
   } catch (error) {
     productTitle.textContent = "Nao foi possivel abrir o album";
     if (purchaseStatus) {

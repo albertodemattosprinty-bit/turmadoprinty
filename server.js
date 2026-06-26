@@ -9,7 +9,8 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createCanvas } from "@napi-rs/canvas";
-import { PDFDocument } from "pdf-lib";
+import JSZip from "jszip";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { getDocument as getPdfDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import sharp from "sharp";
 import Stripe from "stripe";
@@ -219,6 +220,222 @@ function buildAlbumZipPublicUrlFromKey(key) {
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join("/")}`;
+}
+
+function buildSafeDownloadBaseName(value, fallback = "arquivo") {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized || fallback;
+}
+
+function getAlbumTrackLinesForPdf(track) {
+  const syncLines = Array.isArray(track?.lyricsSyncData?.lines) ? track.lyricsSyncData.lines : [];
+  if (syncLines.length) {
+    return syncLines
+      .map((line) => ({
+        text: String(line?.text || "").trim(),
+        characterId: String(line?.characterId || "").trim()
+      }))
+      .filter((line) => line.text);
+  }
+
+  return String(track?.lyrics || "")
+    .split(/\r?\n/)
+    .map((text) => ({
+      text: String(text || "").trim(),
+      characterId: ""
+    }))
+    .filter((line) => line.text);
+}
+
+function getTrackCharacterName(track, characterId) {
+  if (!characterId) {
+    return "";
+  }
+  const characters = Array.isArray(track?.albumCharacters) ? track.albumCharacters : [];
+  const match = characters.find((item) => String(item?.id || "") === String(characterId));
+  return String(match?.name || "").trim();
+}
+
+function wrapPdfText(text, maxChars = 86) {
+  const source = String(text || "").trim();
+  if (!source) {
+    return [""];
+  }
+
+  const words = source.split(/\s+/);
+  const lines = [];
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines;
+}
+
+async function buildAlbumPdfBuffer(albumDetail) {
+  const pdf = await PDFDocument.create();
+  const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const pageSize = { width: 595.28, height: 841.89 };
+  const marginX = 46;
+  const marginTop = 54;
+  const marginBottom = 44;
+  const textColor = rgb(0.24, 0.26, 0.29);
+  const softBackground = rgb(0.985, 0.985, 0.975);
+  const dividerColor = rgb(0.9, 0.91, 0.92);
+
+  let page = pdf.addPage([pageSize.width, pageSize.height]);
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: pageSize.width,
+    height: pageSize.height,
+    color: softBackground
+  });
+
+  let cursorY = pageSize.height - marginTop;
+
+  const ensureSpace = (heightNeeded = 24) => {
+    if (cursorY - heightNeeded >= marginBottom) {
+      return;
+    }
+    page = pdf.addPage([pageSize.width, pageSize.height]);
+    page.drawRectangle({
+      x: 0,
+      y: 0,
+      width: pageSize.width,
+      height: pageSize.height,
+      color: softBackground
+    });
+    cursorY = pageSize.height - marginTop;
+  };
+
+  const drawLine = (text, {
+    font = regularFont,
+    size = 12,
+    color = textColor,
+    lineGap = 6
+  } = {}) => {
+    ensureSpace(size + lineGap);
+    page.drawText(String(text || ""), {
+      x: marginX,
+      y: cursorY,
+      size,
+      font,
+      color
+    });
+    cursorY -= size + lineGap;
+  };
+
+  drawLine(albumDetail?.name || "Album", {
+    font: boldFont,
+    size: 24,
+    lineGap: 14
+  });
+
+  for (const track of Array.isArray(albumDetail?.tracks) ? albumDetail.tracks : []) {
+    ensureSpace(42);
+    page.drawLine({
+      start: { x: marginX, y: cursorY + 10 },
+      end: { x: pageSize.width - marginX, y: cursorY + 10 },
+      thickness: 1,
+      color: dividerColor
+    });
+    cursorY -= 18;
+
+    drawLine(track?.title || track?.label || `Faixa ${track?.number || ""}`, {
+      font: boldFont,
+      size: 18,
+      lineGap: 10
+    });
+
+    const lines = getAlbumTrackLinesForPdf(track);
+    if (!lines.length) {
+      drawLine("Sem texto disponivel.", {
+        size: 11,
+        color: rgb(0.45, 0.46, 0.49),
+        lineGap: 12
+      });
+      continue;
+    }
+
+    for (const line of lines) {
+      const characterName = getTrackCharacterName(track, line.characterId);
+      if (characterName) {
+        drawLine(characterName, {
+          size: 9,
+          color: rgb(0.48, 0.49, 0.52),
+          lineGap: 4
+        });
+      }
+      for (const wrappedLine of wrapPdfText(line.text, 84)) {
+        drawLine(wrappedLine, {
+          size: 12,
+          lineGap: 5
+        });
+      }
+      cursorY -= 5;
+    }
+
+    cursorY -= 8;
+  }
+
+  return Buffer.from(await pdf.save());
+}
+
+async function fetchTrackDownloadAsset(track, albumName, trackNumber) {
+  const assetResponse = await fetch(getTrackDownloadUrl(track, albumName, trackNumber));
+  if (!assetResponse.ok) {
+    throw new Error(`Nao foi possivel baixar a faixa ${track?.title || trackNumber}.`);
+  }
+  const buffer = Buffer.from(await assetResponse.arrayBuffer());
+  return {
+    buffer,
+    contentType: assetResponse.headers.get("content-type") || "audio/mpeg"
+  };
+}
+
+async function buildAlbumBundleZipBuffer(product, albumDetail, pdfBuffer) {
+  const zip = new JSZip();
+  const rootFolder = zip.folder(buildSafeDownloadBaseName(product?.name || "Album", "Album"));
+  const audioFolder = rootFolder.folder("Audios");
+  const textFolder = rootFolder.folder("Textos");
+
+  textFolder.file("Pdf do Album.pdf", pdfBuffer, {
+    binary: true
+  });
+
+  const tracks = Array.isArray(albumDetail?.tracks) ? albumDetail.tracks : [];
+  for (const track of tracks) {
+    const trackNumber = Number(track?.number || 0) || 0;
+    const { buffer } = await fetchTrackDownloadAsset(track, product?.name || "", trackNumber);
+    const fileName = `${String(trackNumber).padStart(3, "0")} - ${buildSafeDownloadBaseName(track?.title || track?.label || `Faixa ${trackNumber}`, `Faixa ${trackNumber}`)}.mp3`;
+    audioFolder.file(fileName, buffer, {
+      binary: true
+    });
+  }
+
+  return zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 }
+  });
 }
 
 async function readR2ObjectText(key) {
@@ -8609,6 +8826,109 @@ async function handleProtectedTrackDownload(request, response, pathname) {
   }
 }
 
+async function handleProtectedAlbumPdfDownload(request, response, pathname) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  const match = pathname.match(/^\/api\/store\/products\/([^/]+)\/pdf\/download$/);
+  if (!match) {
+    sendJson(response, 404, { error: "PDF nao encontrado." });
+    return;
+  }
+
+  const productId = decodeURIComponent(match[1]);
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+  const albumZipLinks = await getAlbumZipLinks();
+  const detail = product ? await buildAlbumDetailResponse(product, pricing, albumZipLinks) : null;
+
+  if (!product || !detail) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  try {
+    const accessState = await getUserAccessState(user.id);
+    if (!canAccessAlbumZip(accessState, product.id)) {
+      sendJson(response, 403, {
+        error: "Esse PDF so fica liberado para quem possui o album."
+      });
+      return;
+    }
+
+    const pdfBuffer = await buildAlbumPdfBuffer(detail);
+    const fileName = `${buildSafeDownloadBaseName(product.name, "Album")}.pdf`;
+    response.writeHead(200, {
+      "Content-Type": "application/pdf",
+      "Content-Length": pdfBuffer.length,
+      "Content-Disposition": buildContentDisposition(fileName)
+    });
+    response.end(pdfBuffer);
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel gerar o PDF do album."
+    });
+  }
+}
+
+async function handleProtectedAlbumBundleDownload(request, response, pathname) {
+  if (!await ensurePaymentsReady(response)) {
+    return;
+  }
+
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  const match = pathname.match(/^\/api\/store\/products\/([^/]+)\/bundle\/download$/);
+  if (!match) {
+    sendJson(response, 404, { error: "Pacote nao encontrado." });
+    return;
+  }
+
+  const productId = decodeURIComponent(match[1]);
+  const pricing = await getSitePricingSettings();
+  const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
+  const albumZipLinks = await getAlbumZipLinks();
+  const detail = product ? await buildAlbumDetailResponse(product, pricing, albumZipLinks) : null;
+
+  if (!product || !detail) {
+    sendJson(response, 404, { error: "Album nao encontrado." });
+    return;
+  }
+
+  try {
+    const accessState = await getUserAccessState(user.id);
+    if (!canAccessAlbumZip(accessState, product.id)) {
+      sendJson(response, 403, {
+        error: "Esse pacote so fica liberado para quem possui o album."
+      });
+      return;
+    }
+
+    const pdfBuffer = await buildAlbumPdfBuffer(detail);
+    const zipBuffer = await buildAlbumBundleZipBuffer(product, detail, pdfBuffer);
+    const fileName = `${buildSafeDownloadBaseName(product.name, "Album")}.zip`;
+    response.writeHead(200, {
+      "Content-Type": "application/zip",
+      "Content-Length": zipBuffer.length,
+      "Content-Disposition": buildContentDisposition(fileName)
+    });
+    response.end(zipBuffer);
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel montar o pacote do album."
+    });
+  }
+}
+
 async function serveStatic(response, filePath) {
   try {
     const extension = path.extname(filePath).toLowerCase();
@@ -9235,10 +9555,22 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname.startsWith("/api/store/products/")) {
     const albumZipDownloadMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/zip\/download$/);
+    const albumPdfDownloadMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/pdf\/download$/);
+    const albumBundleDownloadMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/bundle\/download$/);
     const trackDownloadMatch = pathname.match(/^\/api\/store\/products\/([^/]+)\/tracks\/(\d+)\/download$/);
 
     if (albumZipDownloadMatch) {
       await handleProtectedAlbumZipDownload(request, response, pathname);
+      return;
+    }
+
+    if (albumPdfDownloadMatch) {
+      await handleProtectedAlbumPdfDownload(request, response, pathname);
+      return;
+    }
+
+    if (albumBundleDownloadMatch) {
+      await handleProtectedAlbumBundleDownload(request, response, pathname);
       return;
     }
 
