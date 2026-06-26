@@ -6067,12 +6067,18 @@ async function loadStatsSummary() {
   try {
     const scope = getActiveStatsScope();
     statsScopeLabel.textContent = scope.label;
-    const [summaryPayload, goalsPayload, platformPayload, platformMonthPayload] = await Promise.all([
+    const requests = [
       apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`),
       apiRequest("/api/stats/goals"),
-      apiRequest("/api/finance/summary?period=total"),
       apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`)
-    ]);
+    ];
+    if (isProject200AdminUser()) {
+      requests.splice(2, 0, apiRequest("/api/finance/summary?period=total"));
+    }
+    const responses = await Promise.all(requests);
+    const [summaryPayload, goalsPayload] = responses;
+    const platformPayload = isProject200AdminUser() ? responses[2] : null;
+    const platformMonthPayload = isProject200AdminUser() ? responses[3] : responses[2];
 
     state.statsSummary = summaryPayload.summary || {};
     state.statsGoals = goalsPayload.goals || null;
