@@ -1689,6 +1689,9 @@ async function submitTrackCharacterModal() {
     })
     .filter((value) => value > 0);
   const targetLineNumbers = selectedLineNumbers.length ? selectedLineNumbers : [lineNumber];
+  const focusLineIndex = selectedLineNumbers.length
+    ? Math.max(0, Number(String(modal.dataset.selectedLineIndexes || "").split(",")[0] || 0))
+    : Math.max(0, lineNumber - 1);
 
   try {
     saveButton.disabled = true;
@@ -1741,11 +1744,11 @@ async function submitTrackCharacterModal() {
     if (updatedTrack && latestData) {
       updatedTrack.albumCharacters = Array.isArray(latestData.characters) ? latestData.characters : updatedTrack.albumCharacters;
       updatedTrack.lyricsSyncData = latestData.syncData || updatedTrack.lyricsSyncData;
+      await renderTracks(currentAlbum);
       openTrackTextsModal(updatedTrack);
+      resetTrackCharacterModalActionButtons();
+      openTrackCharacterModal(updatedTrack, focusLineIndex);
     }
-
-    modal.setAttribute("aria-hidden", "true");
-    modal.classList.remove("show");
     const batchUpdate = targetLineNumbers.length > 1;
     clearTrackCharacterSelection({ refresh: false });
     showFloatingNotice(
