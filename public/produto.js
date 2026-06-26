@@ -1501,13 +1501,19 @@ async function submitTrackCharacterModal() {
   const nameInput = modal.querySelector("#track-character-name");
   const groupSelect = modal.querySelector("#track-character-group");
   const colorInput = modal.querySelector("#track-character-color");
-  if (!albumId || !trackId || !trackNumber || !lineNumber || !select || !nameInput || !groupSelect || !colorInput) {
+  const saveButton = modal.querySelector("#track-character-save");
+  if (!albumId || !trackId || !trackNumber || !lineNumber || !select || !nameInput || !groupSelect || !colorInput || !saveButton) {
     return;
   }
 
   try {
+    saveButton.disabled = true;
+    saveButton.textContent = "Salvando...";
     let characterId = String(select.value || "").trim();
     if (characterId === "__new__" || (!characterId && nameInput.value.trim())) {
+      if (!nameInput.value.trim()) {
+        throw new Error("Informe o nome do personagem.");
+      }
       const createResponse = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/characters`), {
         method: "POST",
         headers: {
@@ -1553,8 +1559,12 @@ async function submitTrackCharacterModal() {
 
     modal.setAttribute("aria-hidden", "true");
     modal.classList.remove("show");
+    showFloatingNotice(characterId ? "Personagem salvo na linha." : "Personagem removido da linha.");
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar personagem.");
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = "Salvar";
   }
 }
 

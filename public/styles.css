@@ -2780,7 +2780,13 @@ body[data-page="produto"] .inline-link {
   padding: 10px 14px;
   font: inherit;
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(8, 48, 102, 0.9);
+}
+
+.track-character-field select option,
+.track-character-select option {
+  color: #ffffff;
+  background: #0d3d80;
 }
 
 .track-character-divider {
