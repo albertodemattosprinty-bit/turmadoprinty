@@ -84,7 +84,8 @@ function appendLiveTranscript(fragment) {
   liveText.textContent = liveTranscript || "Ouvindo...";
 }
 
-async function transcribeBlob(blob, fileName) {
+async function transcribeBlob(blob, fileName, options = {}) {
+  const suppressError = Boolean(options?.suppressError);
   const arrayBuffer = await blob.arrayBuffer();
   const uint8Array = new Uint8Array(arrayBuffer);
   let binary = "";
@@ -111,6 +112,9 @@ async function transcribeBlob(blob, fileName) {
   const data = await response.json();
 
   if (!response.ok) {
+    if (suppressError) {
+      return "";
+    }
     throw new Error(data?.error || "Falha ao transcrever audio.");
   }
 
@@ -130,11 +134,11 @@ async function flushLiveChunkQueue() {
   liveChunkInFlight = true;
 
   try {
-    const text = await transcribeBlob(nextItem.blob, nextItem.fileName);
+    const text = await transcribeBlob(nextItem.blob, nextItem.fileName, { suppressError: true });
     appendLiveTranscript(text);
-    liveStatus.textContent = liveTranscript ? "Falando..." : "Ouvindo...";
+    liveStatus.textContent = liveTranscript ? "Transcrevendo..." : "Ouvindo...";
   } catch (error) {
-    liveStatus.textContent = error instanceof Error ? error.message : "Falha ao ouvir.";
+    liveStatus.textContent = liveTranscript ? "Transcrevendo..." : "Ouvindo...";
   } finally {
     liveChunkInFlight = false;
     if (liveChunkQueue.length) {
@@ -419,7 +423,16 @@ async function stopRecording() {
       showToast("Nada para salvar.");
     }
   } catch (error) {
-    showToast(error instanceof Error ? error.message : "Falha ao salvar.");
+    if (liveTranscript) {
+      try {
+        await saveParagraph(liveTranscript);
+        showToast("Paragrafo salvo.");
+      } catch (saveError) {
+        showToast(saveError instanceof Error ? saveError.message : "Falha ao salvar.");
+      }
+    } else {
+      showToast(error instanceof Error ? error.message : "Falha ao salvar.");
+    }
   } finally {
     recordedChunks = [];
     liveChunkQueue = [];
@@ -449,7 +462,7 @@ async function startRecording() {
   liveChunkInFlight = false;
   liveTranscript = "";
   liveText.textContent = "Ouvindo...";
-  liveStatus.textContent = "Falando...";
+  liveStatus.textContent = "Transcrevendo...";
   recordingDot.hidden = true;
 
   mediaRecorder = new MediaRecorder(stream, {

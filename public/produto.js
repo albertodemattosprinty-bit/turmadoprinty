@@ -3112,7 +3112,9 @@ function bindAudioToCard(card, audio) {
 
   audio.addEventListener("loadedmetadata", updatePlayerButtons);
   audio.addEventListener("timeupdate", () => {
-    const previewLimit = Number(card.dataset.previewLimitSeconds || 0);
+    const previewLimit = canAccessAlbumByRehearsal(String(card?.dataset.albumId || ""))
+      ? 0
+      : Number(card.dataset.previewLimitSeconds || 0);
 
     if (previewLimit > 0) {
       const fadeStart = Math.max(0, previewLimit - freePreviewFadeSeconds);
@@ -3178,7 +3180,9 @@ async function playTrack(card, albumId, track) {
     audio.dataset.ready = "true";
   }
 
-  const previewLimit = Number(card.dataset.previewLimitSeconds || 0);
+  const previewLimit = canAccessAlbumByRehearsal(albumId)
+    ? 0
+    : Number(card.dataset.previewLimitSeconds || 0);
   if (previewLimit > 0 && audio.currentTime >= previewLimit) {
     audio.currentTime = 0;
   }
@@ -3677,6 +3681,7 @@ async function renderTracks(album) {
   for (const track of album.tracks) {
     const article = document.createElement("article");
     article.className = "track-card";
+    article.dataset.albumId = String(album.id || "");
     article.dataset.trackNumber = String(track.number);
     article.dataset.trackMode = getTrackModeLabel(track);
     article.dataset.previewLimitSeconds = shouldLimitFreePreview(album.id, album.name, track) ? String(freePreviewSeconds) : "0";
