@@ -1718,10 +1718,18 @@ async function submitTrackCharacterModal() {
         throw new Error(createData.error || "Nao foi possivel criar o personagem.");
       }
       characterId = String(createData.character?.id || "").trim();
-      const updatedTrack = getTrackByNumber(trackNumber);
-      if (updatedTrack) {
-        updatedTrack.albumCharacters = Array.isArray(createData.album?.characters) ? createData.album.characters : updatedTrack.albumCharacters;
+      applyAlbumCharactersToCurrentAlbum(Array.isArray(createData.album?.characters) ? createData.album.characters : []);
+      const refreshedTrack = getTrackByNumber(trackNumber);
+      if (refreshedTrack && characterId) {
+        resetTrackCharacterModalActionButtons();
+        openTrackCharacterModal(refreshedTrack, focusLineIndex);
+        const refreshedSelect = ensureTrackCharacterModal().querySelector("#track-character-select");
+        if (refreshedSelect) {
+          refreshedSelect.value = characterId;
+        }
       }
+      showFloatingNotice("Personagem criado.");
+      return;
     }
     let latestData = null;
     for (const targetLineNumber of targetLineNumbers) {
