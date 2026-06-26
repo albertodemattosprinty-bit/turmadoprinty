@@ -1508,6 +1508,10 @@ function buildLyricsTextFromSyncLines(lines) {
     .join("\n");
 }
 
+function startsWithUppercaseWord(word) {
+  return /^[A-ZÀ-Ý][\p{L}\p{M}'’-]*$/u.test(String(word || "").trim());
+}
+
 function splitTextIntoShortLyricsLines(text, maxChars = 30) {
   const safeMax = Math.max(8, Number(maxChars) || 30);
   const normalized = String(text || "")
@@ -1550,6 +1554,8 @@ function splitTextIntoShortLyricsLines(text, maxChars = 30) {
     .filter(Boolean);
 
   const output = [];
+  const preferredBreakLength = Math.max(16, safeMax - 10);
+  const targetLineLength = Math.max(preferredBreakLength, safeMax - 4);
 
   for (const part of rawParts) {
     if (part.length <= safeMax) {
@@ -1559,11 +1565,28 @@ function splitTextIntoShortLyricsLines(text, maxChars = 30) {
 
     const words = part.split(/\s+/).filter(Boolean);
     let buffer = "";
-
     for (const word of words) {
+      if (
+        buffer
+        && startsWithUppercaseWord(word)
+        && buffer.length >= preferredBreakLength
+        && !/[.!?:;,-]$/.test(buffer)
+      ) {
+        output.push(buffer.trim());
+        buffer = "";
+      }
+
       const candidate = buffer ? `${buffer} ${word}` : word;
       if (candidate.length <= safeMax) {
         buffer = candidate;
+        if (
+          startsWithUppercaseWord(word)
+          && buffer.length >= targetLineLength
+          && !/[.!?:;,-]$/.test(buffer)
+        ) {
+          output.push(buffer.trim());
+          buffer = "";
+        }
         continue;
       }
 
