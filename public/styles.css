@@ -3643,7 +3643,7 @@ body[data-page="eventos-pagamento"] {
 .rehearsal-field {
   display: grid;
   gap: 8px;
-  margin-top: auto;
+  margin-top: 18px;
   font-size: 0.94rem;
   font-weight: 700;
 }
