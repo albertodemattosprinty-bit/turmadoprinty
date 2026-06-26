@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css" />
+  <link rel="stylesheet" href="/200/project.css?v=20260626-conversations-chat" />
 </head>
 <body>
   <video class="app-background-video" autoplay muted loop playsinline webkit-playsinline preload="auto" aria-hidden="true">
@@ -81,9 +81,9 @@
         <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.8A3.2 3.2 0 1 0 12 15.2 3.2 3.2 0 0 0 12 8.8Zm9 3.2-.9-.5a8.8 8.8 0 0 0-.3-1.2l.7-.8a1 1 0 0 0-.1-1.4l-1-1a1 1 0 0 0-1.4-.1l-.8.7q-.57-.18-1.2-.3L15 3a1 1 0 0 0-1-.8h-2a1 1 0 0 0-1 .8l-.5.9q-.62.12-1.2.3l-.8-.7a1 1 0 0 0-1.4.1l-1 1a1 1 0 0 0-.1 1.4l.7.8q-.18.57-.3 1.2L3 11a1 1 0 0 0-.8 1v2a1 1 0 0 0 .8 1l.9.5q.12.62.3 1.2l-.7.8a1 1 0 0 0 .1 1.4l1 1a1 1 0 0 0 1.4.1l.8-.7q.57.18 1.2.3l.5.9a1 1 0 0 0 1 .8h2a1 1 0 0 0 1-.8l.5-.9q.62-.12 1.2-.3l.8.7a1 1 0 0 0 1.4-.1l1-1a1 1 0 0 0 .1-1.4l-.7-.8q.18-.57.3-1.2l.9-.5a1 1 0 0 0 .8-1v-2A1 1 0 0 0 21 12Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
         <span class="hub-label">Opções</span>
       </button>
-      <button class="hub-action hub-icon-only" type="button" data-open-modal="financeModal" aria-label="Plataforma">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="7" cy="8" r="1"/></svg>
-        <span class="hub-label">Plataforma</span>
+      <button class="hub-action hub-icon-only" type="button" data-open-modal="conversationsModal" aria-label="Conversas">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H11l-4.5 4v-4H7.5A2.5 2.5 0 0 1 5 12.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 8.5h8M8 11.5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span class="hub-label">Conversas</span>
       </button>
       <button class="hub-action hub-icon-only" type="button" data-open-modal="calendarModal" aria-label="Finanças">
         <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v10M8 10.5c0-1.2 1.8-2.2 4-2.2s4 1 4 2.2-1.8 2.2-4 2.2-4 1-4 2.2 1.8 2.2 4 2.2 4-1 4-2.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -635,6 +635,12 @@
         <strong>Background</strong>
         <span class="running-music-default-bottom" id="toggleBackgroundThemeHint">Modern</span>
       </button>
+      <button class="running-music-default-option" type="button" id="toggleChatToneOption">
+        <span class="running-music-default-top">Escolher a personalidade do chat das Conversas</span>
+        <strong>Tom do chat</strong>
+        <span class="running-music-default-bottom" id="toggleChatToneHint">Neutro</span>
+      </button>
+      <p class="options-note" id="chatToneDetailHint">Neutro: direto e equilibrado.</p>
       <button class="running-music-default-option" type="button" id="openProject200ExportModal">
         <span class="running-music-default-top">Duplicar todos os dados do /200</span>
         <strong>Exportar</strong>
@@ -702,6 +708,26 @@
       <p class="finance-status" id="project200ExportMessage" aria-live="polite"></p>
       <button class="primary-btn" type="button" id="project200ExportConfirm">Exportar</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
+    </div>
+  </section>
+
+  <section class="workspace-modal" id="conversationsModal" aria-hidden="true" aria-label="Conversas">
+    <div class="actions-app conversations-app">
+      <header class="actions-head conversations-head">
+        <button class="date-title" type="button" id="conversationsToneChip">Neutro</button>
+        <button class="circle-nav" type="button" data-close-modal aria-label="Fechar conversas">
+          <svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
+        </button>
+      </header>
+      <div class="conversations-subtitle">Chat de voz com contexto da sua rotina, ranking, estatísticas e histórico.</div>
+      <div class="conversations-list" id="conversationsMessages" aria-live="polite"></div>
+      <div class="conversations-transcript" id="conversationsTranscript">Toque no microfone e fale.</div>
+      <div class="history-voice-status conversations-status" id="conversationsStatus">Pronto para ouvir.</div>
+      <div class="conversations-actions">
+        <button class="history-icon-btn mic-idle conversations-mic-btn" type="button" id="conversationsMicButton" aria-label="Falar com o chat">
+          <svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m6-4a1 1 0 0 1 2 0 8 8 0 0 1-7 7.94V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.06A8 8 0 0 1 4 11a1 1 0 1 1 2 0 6 6 0 0 0 12 0"/></svg>
+        </button>
+      </div>
     </div>
   </section>
 
@@ -975,7 +1001,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260621-avatar-theme"></script>
+  <script type="module" src="/200/project.js?v=20260626-conversations-chat"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

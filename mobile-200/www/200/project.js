@@ -12,6 +12,33 @@ const taskBeepOptionLabels = new Map([
   [5, "Cinco vezes"],
   [10, "Dez vezes"]
 ]);
+const chatToneModes = [
+  {
+    key: "neutral",
+    label: "Neutro",
+    detail: "Neutro: direto e equilibrado."
+  },
+  {
+    key: "motivator",
+    label: "Motivador",
+    detail: "Motivador: reconhece avanços e puxa para a próxima tarefa."
+  },
+  {
+    key: "strict",
+    label: "Exigente",
+    detail: "Exigente: fica mais firme conforme sua semana cai, mas sem humilhação pessoal."
+  },
+  {
+    key: "playful",
+    label: "Descontraído",
+    detail: "Descontraído: brinca bastante, tom leve, mas segue cobrando execução."
+  },
+  {
+    key: "street",
+    label: "Descolado",
+    detail: "Descolado: gírias leves, respostas curtas e foco nas próximas e atrasadas."
+  }
+];
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const actionStatuses = {
   pending: "PENDING",
@@ -247,6 +274,9 @@ const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
 const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption");
 const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
+const toggleChatToneOptionButton = document.getElementById("toggleChatToneOption");
+const toggleChatToneHint = document.getElementById("toggleChatToneHint");
+const chatToneDetailHint = document.getElementById("chatToneDetailHint");
 const openProject200ExportModalButton = document.getElementById("openProject200ExportModal");
 const project200ExportModal = document.getElementById("project200ExportModal");
 const project200ExportUsernameInput = document.getElementById("project200ExportUsername");
@@ -296,6 +326,11 @@ const historyVoiceStatus = document.getElementById("historyVoiceStatus");
 const historyLiveText = document.getElementById("historyLiveText");
 const historyReadTitle = document.getElementById("historyReadTitle");
 const historyReadBody = document.getElementById("historyReadBody");
+const conversationsMessages = document.getElementById("conversationsMessages");
+const conversationsTranscript = document.getElementById("conversationsTranscript");
+const conversationsStatus = document.getElementById("conversationsStatus");
+const conversationsMicButton = document.getElementById("conversationsMicButton");
+const conversationsToneChip = document.getElementById("conversationsToneChip");
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
@@ -458,6 +493,13 @@ let historyAudioContext = null;
 let historyAudioAnalyser = null;
 let historySpeechMonitorTimer = null;
 let historyLastSpeechAt = 0;
+let conversationsMediaRecorder = null;
+let conversationsMediaStream = null;
+let conversationsAudioContext = null;
+let conversationsAudioAnalyser = null;
+let conversationsSpeechMonitorTimer = null;
+let conversationsLastSpeechAt = 0;
+let conversationsTypingTimer = null;
 let financeEntryConfirmResolve = null;
 let actionMediaRecorder = null;
 let actionMediaStream = null;
@@ -563,6 +605,7 @@ const state = {
   platformBaseIncomeCents: 0,
   statsSummary: null,
   statsGoals: null,
+  statsGlobalProfiles: [],
   statsRanking: [],
   statsGeneral: null,
   constitutionVersions: [],
@@ -571,6 +614,7 @@ const state = {
   actions: [],
   historySystem: [],
   historyTexts: [],
+  conversationChat: null,
   profiles: [],
   selectedProfile: defaultProjectProfileName,
   profileLock: "",
@@ -589,7 +633,8 @@ const state = {
   options: {
     showFreeTime: true,
     completionBeepCycles: 0,
-    backgroundTheme: "modern"
+    backgroundTheme: "modern",
+    chatTone: "neutral"
   },
   overlapResolver: null,
   overlapItems: [],
@@ -712,6 +757,16 @@ function getProfileById(profileId) {
   return getProfilesList().find((profile) => String(profile?.id || "") === input) || null;
 }
 
+function getStatsGlobalProfileByName(name) {
+  const input = String(name || "").trim();
+  if (!input) {
+    return null;
+  }
+  return (Array.isArray(state.statsGlobalProfiles) ? state.statsGlobalProfiles : []).find((profile) => (
+    String(profile?.name || "").localeCompare(input, "pt-BR", { sensitivity: "accent" }) === 0
+  )) || null;
+}
+
 function getProfileAvatarPath(profileOrName) {
   const profile = typeof profileOrName === "string" ? getProfileByName(profileOrName) : profileOrName;
   const customAvatar = String(profile?.avatarDataUrl || "").trim();
@@ -724,6 +779,11 @@ function getProfileAvatarPath(profileOrName) {
 
 function normalizeBackgroundTheme(value) {
   return String(value || "").trim().toLowerCase() === "light" ? "light" : "modern";
+}
+
+function getChatToneMode(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return chatToneModes.find((item) => item.key === normalized) || chatToneModes[0];
 }
 
 function applyBackgroundTheme() {
@@ -2892,6 +2952,14 @@ function getWizardAssigneeName() {
   return normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
 }
 
+function getStatsAvatarPath(assignee) {
+  const globalProfile = getStatsGlobalProfileByName(assignee);
+  if (globalProfile) {
+    return getProfileAvatarPath(globalProfile);
+  }
+  return getActionAvatarPath(assignee);
+}
+
 function getActionAvatarPath(assignee) {
   return getProfileAvatarPath(assignee);
 }
@@ -3150,6 +3218,17 @@ function openModal(id) {
     startFinancePresentation();
   }
 
+  if (id === "conversationsModal") {
+    renderOptionsModal();
+    void loadConversationChat();
+    if (conversationsTranscript) {
+      conversationsTranscript.textContent = "Toque no microfone e fale.";
+    }
+    if (conversationsStatus) {
+      conversationsStatus.textContent = "Pronto para ouvir.";
+    }
+  }
+
   if (id === "constitutionModal") {
     void loadConstitution();
   }
@@ -3226,6 +3305,14 @@ function closeModal(modal) {
 
   if (modal.id === "historyModal") {
     closeHistoryTextComposer();
+  }
+
+  if (modal.id === "conversationsModal") {
+    stopConversationMic();
+    if (conversationsTypingTimer) {
+      window.clearInterval(conversationsTypingTimer);
+      conversationsTypingTimer = null;
+    }
   }
   if (modal.id === "profileAvatarModal") {
     resetProfileAvatarModal();
@@ -5877,7 +5964,7 @@ function buildStatsRankingFromSummary() {
   const totals = state.statsSummary?.totals || {};
   const ranking = [];
   const orderedNames = [...new Set([
-    ...getProfilesList().map((profile) => profile.name),
+    ...(Array.isArray(state.statsGlobalProfiles) ? state.statsGlobalProfiles : []).map((profile) => profile.name),
     ...Object.keys(byAssignee || {})
   ])];
   state.statsGeneral = {
@@ -5939,7 +6026,7 @@ function renderStatsRanking() {
     row.className = "task-row stats-ranking-row";
     row.innerHTML = `
       <div class="stats-avatar-wrap">
-        <img class="task-avatar" src="${getActionAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
+        <img class="task-avatar" src="${getStatsAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
         <span class="stats-rank-badge">${index + 1}º</span>
       </div>
       <div class="task-main">
@@ -5968,6 +6055,7 @@ async function loadStatsSummary() {
 
     state.statsSummary = summaryPayload.summary || {};
     state.statsGoals = goalsPayload.goals || null;
+    state.statsGlobalProfiles = Array.isArray(summaryPayload.summary?.globalProfiles) ? summaryPayload.summary.globalProfiles : [];
     state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
     state.platformBalanceCents = Number(platformMonthPayload?.summary?.balanceCents || state.platformBalanceCents);
     buildStatsRankingFromSummary();
@@ -6160,6 +6248,228 @@ async function loadHistoryFromApi() {
   const payload = await apiRequest("/api/200/history");
   state.historySystem = Array.isArray(payload.systemEvents) ? payload.systemEvents : [];
   state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
+}
+
+function renderConversationMessages() {
+  if (!conversationsMessages) {
+    return;
+  }
+  const shouldStick = conversationsMessages.scrollHeight - conversationsMessages.scrollTop - conversationsMessages.clientHeight < 90;
+  const messages = Array.isArray(state.conversationChat?.messages) ? state.conversationChat.messages : [];
+  conversationsMessages.innerHTML = "";
+  if (!messages.length) {
+    conversationsMessages.innerHTML = '<div class="empty-state">Fale no microfone para começar.</div>';
+    return;
+  }
+  messages.forEach((entry) => {
+    const role = entry.role === "assistant" ? "assistant" : "user";
+    const bubble = document.createElement("article");
+    bubble.className = `conversation-bubble conversation-bubble-${role}`;
+    bubble.dataset.conversationRole = role;
+    bubble.innerHTML = `
+      <div class="conversation-bubble-label">${role === "assistant" ? "Conversas" : "Você"}</div>
+      <div class="conversation-bubble-text">${escapeHtml(String(entry.content || ""))}</div>
+    `;
+    conversationsMessages.appendChild(bubble);
+  });
+  if (shouldStick) {
+    conversationsMessages.scrollTop = conversationsMessages.scrollHeight;
+  }
+}
+
+function typeConversationAssistantReply(text) {
+  if (!conversationsMessages) {
+    return;
+  }
+  if (conversationsTypingTimer) {
+    window.clearInterval(conversationsTypingTimer);
+    conversationsTypingTimer = null;
+  }
+  renderConversationMessages();
+  const textNodes = conversationsMessages.querySelectorAll(".conversation-bubble-assistant .conversation-bubble-text");
+  const target = textNodes[textNodes.length - 1];
+  if (!target) {
+    return;
+  }
+  const fullText = String(text || "");
+  const shouldStick = conversationsMessages.scrollHeight - conversationsMessages.scrollTop - conversationsMessages.clientHeight < 90;
+  target.textContent = "";
+  let index = 0;
+  conversationsTypingTimer = window.setInterval(() => {
+    index += 1;
+    target.textContent = fullText.slice(0, index);
+    if (shouldStick) {
+      conversationsMessages.scrollTop = conversationsMessages.scrollHeight;
+    }
+    if (index >= fullText.length) {
+      window.clearInterval(conversationsTypingTimer);
+      conversationsTypingTimer = null;
+    }
+  }, 50);
+}
+
+async function loadConversationChat() {
+  if (!getToken()) {
+    state.conversationChat = { messages: [] };
+    renderConversationMessages();
+    return;
+  }
+  const payload = await apiRequest("/api/200/chat");
+  state.conversationChat = payload.chat || { messages: [] };
+  renderConversationMessages();
+}
+
+async function sendConversationMessage(text) {
+  const message = String(text || "").trim();
+  if (!message) {
+    if (conversationsStatus) {
+      conversationsStatus.textContent = "Não consegui entender sua fala.";
+    }
+    return;
+  }
+  if (!state.conversationChat) {
+    state.conversationChat = { messages: [] };
+  }
+  const optimisticUserEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
+  state.conversationChat.messages = [...(state.conversationChat.messages || []), optimisticUserEntry];
+  renderConversationMessages();
+  if (conversationsStatus) {
+    conversationsStatus.textContent = "Pensando rápido...";
+  }
+  try {
+    const payload = await apiRequest("/api/200/chat/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        tone: getChatToneMode(state.options.chatTone).key
+      })
+    });
+    state.conversationChat = payload.chat || state.conversationChat;
+    typeConversationAssistantReply(String(payload.replyText || ""));
+    if (conversationsStatus) {
+      conversationsStatus.textContent = "Resposta pronta.";
+    }
+  } catch (error) {
+    state.conversationChat.messages = (state.conversationChat.messages || []).slice(0, -1);
+    renderConversationMessages();
+    if (conversationsStatus) {
+      conversationsStatus.textContent = error instanceof Error ? error.message : "Falha ao conversar.";
+    }
+  }
+}
+
+function stopConversationMic() {
+  if (conversationsSpeechMonitorTimer) {
+    window.clearInterval(conversationsSpeechMonitorTimer);
+    conversationsSpeechMonitorTimer = null;
+  }
+  if (conversationsMediaRecorder && conversationsMediaRecorder.state !== "inactive") {
+    conversationsMediaRecorder.stop();
+  }
+  conversationsMediaRecorder = null;
+  conversationsAudioAnalyser = null;
+  if (conversationsAudioContext) {
+    conversationsAudioContext.close().catch(() => {});
+    conversationsAudioContext = null;
+  }
+  if (conversationsMediaStream) {
+    conversationsMediaStream.getTracks().forEach((track) => track.stop());
+    conversationsMediaStream = null;
+  }
+  conversationsMicButton?.classList.remove("mic-active");
+  conversationsMicButton?.classList.add("mic-idle");
+}
+
+async function startConversationMic() {
+  if (conversationsMediaRecorder && conversationsMediaRecorder.state !== "inactive") {
+    if (conversationsStatus) {
+      conversationsStatus.textContent = "Encerrando gravação...";
+    }
+    stopConversationMic();
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    conversationsMediaStream = stream;
+    conversationsAudioContext = new AudioContext();
+    const source = conversationsAudioContext.createMediaStreamSource(stream);
+    conversationsAudioAnalyser = conversationsAudioContext.createAnalyser();
+    conversationsAudioAnalyser.fftSize = 2048;
+    source.connect(conversationsAudioAnalyser);
+
+    const chunks = [];
+    conversationsMediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+    conversationsMediaRecorder.ondataavailable = (event) => {
+      if (event.data?.size) {
+        chunks.push(event.data);
+      }
+    };
+    conversationsMediaRecorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (!blob.size) {
+        if (conversationsStatus) {
+          conversationsStatus.textContent = "Sem áudio captado.";
+        }
+        return;
+      }
+      try {
+        if (conversationsStatus) {
+          conversationsStatus.textContent = "Transcrevendo...";
+        }
+        const base64 = await blob.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
+        const transcribed = await apiRequest("/api/audio/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm", fileName: "project200-chat.webm" })
+        });
+        const spoken = String(transcribed?.text || "").trim();
+        if (conversationsTranscript) {
+          conversationsTranscript.textContent = spoken || "Não entendi. Tenta falar de novo.";
+        }
+        await sendConversationMessage(spoken);
+      } catch (error) {
+        if (conversationsStatus) {
+          conversationsStatus.textContent = error instanceof Error ? error.message : "Falha no microfone.";
+        }
+      }
+    };
+    conversationsMediaRecorder.start();
+    conversationsMicButton?.classList.remove("mic-idle");
+    conversationsMicButton?.classList.add("mic-active");
+    if (conversationsStatus) {
+      conversationsStatus.textContent = "Microfone ouvindo...";
+    }
+    conversationsLastSpeechAt = Date.now();
+    conversationsSpeechMonitorTimer = window.setInterval(() => {
+      if (!conversationsAudioAnalyser) {
+        return;
+      }
+      const buffer = new Uint8Array(conversationsAudioAnalyser.fftSize);
+      conversationsAudioAnalyser.getByteTimeDomainData(buffer);
+      let sum = 0;
+      for (let i = 0; i < buffer.length; i += 1) {
+        const value = (buffer[i] - 128) / 128;
+        sum += value * value;
+      }
+      const rms = Math.sqrt(sum / buffer.length);
+      if (rms > 0.02) {
+        conversationsLastSpeechAt = Date.now();
+      }
+      if (Date.now() - conversationsLastSpeechAt >= 2000) {
+        if (conversationsStatus) {
+          conversationsStatus.textContent = "Silêncio detectado. Enviando...";
+        }
+        stopConversationMic();
+      }
+    }, 110);
+  } catch (error) {
+    if (conversationsStatus) {
+      conversationsStatus.textContent = error instanceof Error ? error.message : "Falha ao abrir microfone.";
+    }
+    stopConversationMic();
+  }
 }
 
 function historyIconSvg(type) {
@@ -6907,10 +7217,12 @@ function loadOptionsConfig() {
       ? Number(parsed.completionBeepCycles)
       : 0;
     state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
+    state.options.chatTone = getChatToneMode(parsed.chatTone).key;
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
     state.options.backgroundTheme = "modern";
+    state.options.chatTone = "neutral";
   }
   applyBackgroundTheme();
 }
@@ -6920,7 +7232,8 @@ function saveOptionsConfig() {
     window.localStorage.setItem(optionsConfigKey, JSON.stringify({
       showFreeTime: Boolean(state.options.showFreeTime),
       completionBeepCycles: Number(state.options.completionBeepCycles || 0),
-      backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme)
+      backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
+      chatTone: getChatToneMode(state.options.chatTone).key
     }));
   } catch {}
 }
@@ -6935,6 +7248,16 @@ function renderOptionsModal() {
   }
   if (toggleBackgroundThemeHint) {
     toggleBackgroundThemeHint.textContent = normalizeBackgroundTheme(state.options.backgroundTheme) === "light" ? "Light" : "Modern";
+  }
+  const toneMode = getChatToneMode(state.options.chatTone);
+  if (toggleChatToneHint) {
+    toggleChatToneHint.textContent = toneMode.label;
+  }
+  if (chatToneDetailHint) {
+    chatToneDetailHint.textContent = toneMode.detail;
+  }
+  if (conversationsToneChip) {
+    conversationsToneChip.textContent = toneMode.label;
   }
 }
 
@@ -7812,6 +8135,19 @@ toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
   applyBackgroundTheme();
   saveOptionsConfig();
   renderOptionsModal();
+});
+toggleChatToneOptionButton?.addEventListener("click", () => {
+  const currentIndex = Math.max(0, chatToneModes.findIndex((item) => item.key === getChatToneMode(state.options.chatTone).key));
+  const nextIndex = (currentIndex + 1) % chatToneModes.length;
+  state.options.chatTone = chatToneModes[nextIndex].key;
+  saveOptionsConfig();
+  renderOptionsModal();
+});
+conversationsMicButton?.addEventListener("click", () => {
+  void startConversationMic();
+});
+conversationsToneChip?.addEventListener("click", () => {
+  openModal("optionsModal");
 });
 logoutProject200Button?.addEventListener("click", () => {
   const shouldLogout = window.confirm("Deseja sair do login salvo neste aparelho?");

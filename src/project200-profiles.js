@@ -198,6 +198,32 @@ export async function listProject200Profiles(userId) {
   }
 }
 
+export async function listGlobalProject200Profiles() {
+  await ensureProject200ProfilesSchema();
+  const result = await query(
+    `
+      with ranked_profiles as (
+        select
+          *,
+          row_number() over (
+            partition by lower(trim(coalesce(name, '')))
+            order by
+              case when nullif(trim(coalesce(avatar_data_url, '')), '') is not null then 0 else 1 end,
+              updated_at desc,
+              created_at desc
+          ) as profile_rank
+        from project200_profiles
+        where deleted_at is null
+      )
+      select *
+      from ranked_profiles
+      where profile_rank = 1
+      order by lower(name), created_at asc
+    `
+  );
+  return result.rows.map(normalizeProfileRow);
+}
+
 export async function listProject200ProfileNames(userId) {
   const profiles = await listProject200Profiles(userId);
   return profiles.map((profile) => profile.name);

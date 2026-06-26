@@ -66,6 +66,98 @@ body[data-background-theme="light"] .app-background-video {
   opacity: 0;
 }
 
+.conversations-app {
+  min-height: min(82dvh, 760px);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+}
+
+.conversations-head {
+  align-items: center;
+}
+
+.conversations-subtitle {
+  color: rgba(255, 255, 255, 0.88);
+  text-align: center;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  padding: 0 12px;
+}
+
+.conversations-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 6px 10px;
+}
+
+.conversation-bubble {
+  max-width: 88%;
+  border-radius: 18px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.conversation-bubble-user {
+  align-self: flex-end;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0d3b78;
+}
+
+.conversation-bubble-assistant {
+  align-self: flex-start;
+  background: rgba(7, 31, 78, 0.74);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.conversation-bubble-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.conversation-bubble-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.conversations-transcript {
+  min-height: 46px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 12px 14px;
+  line-height: 1.4;
+}
+
+.conversations-status {
+  text-align: center;
+}
+
+.conversations-actions {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 8px;
+}
+
+.conversations-mic-btn {
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
 button,
 input {
   font: inherit;

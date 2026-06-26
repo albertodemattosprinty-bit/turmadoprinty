@@ -60,6 +60,7 @@ import { approveConstitutionVersion, createConstitutionVersion, ensureConstituti
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
+import { appendProject200ChatMessages, createProject200Chat, getProject200Chat } from "./src/project200-chats.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -3706,6 +3707,234 @@ function createMiniChatTitleFromMessage(message) {
   return cleaned.slice(0, 32).replace(/[.!?]+$/g, "") || "Novo chat";
 }
 
+function createProject200ChatTitleFromMessage(message) {
+  const cleaned = String(message || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return "Conversas";
+  }
+
+  return cleaned.slice(0, 36).replace(/[.!?]+$/g, "") || "Conversas";
+}
+
+function startOfProjectDay(date) {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function addProjectDays(date, amount) {
+  const value = new Date(date);
+  value.setDate(value.getDate() + amount);
+  return value;
+}
+
+function startOfProjectWeek(date) {
+  const value = startOfProjectDay(date);
+  const weekday = value.getDay();
+  const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
+  return addProjectDays(value, -daysSinceMonday);
+}
+
+function summarizeProject200OwnProgress(actions = []) {
+  const totalMinutes = actions.reduce((sum, action) => {
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    const endAt = action?.endAt ? new Date(action.endAt).getTime() : NaN;
+    if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      return sum;
+    }
+    return sum + Math.round((endAt - startAt) / 60000);
+  }, 0);
+  const completedMinutes = actions.reduce((sum, action) => {
+    if (String(action?.status || "").trim().toUpperCase() !== "COMPLETED") {
+      return sum;
+    }
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    const endAt = action?.endAt ? new Date(action.endAt).getTime() : NaN;
+    if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      return sum;
+    }
+    return sum + Math.round((endAt - startAt) / 60000);
+  }, 0);
+  const lateStartMinutes = actions.reduce((sum, action) => sum + Math.max(0, Number(action?.lateStartMinutes || 0)), 0);
+  return {
+    totalMinutes,
+    completedMinutes,
+    lateStartMinutes,
+    completionPercent: totalMinutes > 0 ? Math.round((completedMinutes / totalMinutes) * 100) : 0
+  };
+}
+
+function buildProject200ToneInstructions(toneKey, ownWeekProgress) {
+  const normalized = String(toneKey || "neutral").trim().toLowerCase();
+  const weekPercent = Number(ownWeekProgress?.completionPercent || 0);
+
+  if (normalized === "motivator") {
+    return "Tom motivador: incentive, reconheça progresso real e puxe para a próxima tarefa com energia e clareza.";
+  }
+  if (normalized === "strict") {
+    if (weekPercent < 20) {
+      return "Tom exigente máximo: seja duro e muito direto sobre disciplina, atraso e consequência prática, mas sem humilhar, xingar, desumanizar ou atacar o valor pessoal do usuário.";
+    }
+    if (weekPercent < 50) {
+      return "Tom exigente forte: cobre execução, confronte desculpas e fale com pressão clara, sem insultos pessoais.";
+    }
+    if (weekPercent < 70) {
+      return "Tom exigente moderado: cobre prazo, disciplina e sequência de tarefas com firmeza direta.";
+    }
+    return "Tom exigente disciplinado: reconheça que está andando, mas mantenha cobrança alta por consistência.";
+  }
+  if (normalized === "playful") {
+    return "Tom descontraído: leve, brincalhão, sempre de boa, mas ainda focado em cumprir tarefas.";
+  }
+  if (normalized === "street") {
+    return "Tom descolado: use gírias leves de São Paulo e internet, frases curtas, abreviações moderadas e foco em próxima tarefa, pendências e atrasos.";
+  }
+  return "Tom neutro: humano, claro, direto e útil, sem exagerar na emoção.";
+}
+
+function formatProject200ActionLine(action, now) {
+  const assignee = normalizeStoredProject200ProfileName(action?.assignee);
+  const title = String(action?.title || "Tarefa").trim();
+  const start = action?.startAt ? new Date(action.startAt) : null;
+  const end = action?.endAt ? new Date(action.endAt) : null;
+  const status = String(action?.status || "PENDING").trim().toUpperCase();
+  const startLabel = start && !Number.isNaN(start.getTime()) ? start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+  const endLabel = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+  let badge = "pendente";
+  if (status === "COMPLETED") {
+    badge = "concluída";
+  } else if (status === "IN_PROGRESS") {
+    badge = "em andamento";
+  } else if (start && start.getTime() < now.getTime()) {
+    badge = "atrasada";
+  }
+  return `${startLabel}-${endLabel} | ${assignee} | ${title} | ${badge}`;
+}
+
+function clipProject200Text(value, maxLength = 140) {
+  const cleaned = String(value || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) {
+    return "";
+  }
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1).trim()}…` : cleaned;
+}
+
+function normalizeProject200ChatReply(text) {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) {
+    return "Foca na próxima tarefa e me chama no microfone que eu te puxo pelo que está pendente.";
+  }
+  if (cleaned.length <= 500 && cleaned.length >= 60) {
+    return cleaned;
+  }
+  if (cleaned.length > 500) {
+    return `${cleaned.slice(0, 497).trim()}...`;
+  }
+  return `${cleaned} Me chama no microfone que eu cruzo isso com tua rotina e te passo o próximo passo.`;
+}
+
+async function buildProject200ChatContext(user) {
+  const now = new Date();
+  const todayStart = startOfProjectDay(now);
+  const tomorrow = addProjectDays(todayStart, 1);
+  const weekStart = startOfProjectWeek(now);
+  const nextWeek = addProjectDays(weekStart, 7);
+  const historyStart = addProjectDays(todayStart, -14);
+
+  const [todayActions, weekActions, history, runtimeState, globalWeekStats] = await Promise.all([
+    listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
+    listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
+    listProject200History(user.id, { from: historyStart.toISOString(), to: tomorrow.toISOString() }),
+    getProject200RuntimeState(user.id),
+    getStatsSummary(user.id, "week")
+  ]);
+
+  const ownWeekProgress = summarizeProject200OwnProgress(weekActions);
+  const runningLine = runtimeState?.actionTitle
+    ? `${runtimeState.actionTitle} (${runtimeState.eventType || "start"})`
+    : "nenhuma";
+
+  const pendingToday = todayActions
+    .filter((action) => String(action?.status || "").trim().toUpperCase() !== "COMPLETED")
+    .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
+  const overdueToday = pendingToday.filter((action) => {
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    return Number.isFinite(startAt) && startAt < now.getTime();
+  });
+  const upcomingToday = pendingToday.filter((action) => {
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    return Number.isFinite(startAt) && startAt >= now.getTime();
+  });
+
+  const ranking = Object.entries(globalWeekStats?.byAssignee || {})
+    .map(([name, item]) => {
+      const total = Number(item?.totalMinutes || 0);
+      const completed = Number(item?.completedMinutes || 0);
+      const late = Number(item?.lateStartMinutes || 0);
+      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+      return { name, percent, completed, total, late };
+    })
+    .sort((left, right) => {
+      if (right.percent !== left.percent) return right.percent - left.percent;
+      if (right.completed !== left.completed) return right.completed - left.completed;
+      return String(left.name).localeCompare(String(right.name), "pt-BR");
+    })
+    .slice(0, 6)
+    .map((entry, index) => `${index + 1}. ${entry.name}: ${entry.percent}% (${entry.completed}/${entry.total} min, atraso ${entry.late}m)`)
+    .join(" | ");
+
+  const systemHistory = (history?.systemEvents || [])
+    .slice(0, 8)
+    .map((entry) => `${entry.type} | ${normalizeStoredProject200ProfileName(entry.assignee)} | ${clipProject200Text(entry.taskTitle, 64)} | ${clipProject200Text(entry.occurredAt, 32)}`)
+    .join(" | ");
+  const textHistory = (history?.texts || [])
+    .slice(0, 6)
+    .map((entry) => `${normalizeStoredProject200ProfileName(entry.speaker)}: ${clipProject200Text(entry.title, 36)} - ${clipProject200Text(entry.text, 90)}`)
+    .join(" | ");
+
+  return {
+    ownWeekProgress,
+    contextText: [
+      `Usuario logado: ${user.username || user.email || "usuario"}.`,
+      `Agora: ${now.toISOString()}.`,
+      `Tarefa em andamento no runtime: ${runningLine}.`,
+      `Semana do usuario: ${ownWeekProgress.completionPercent}% | ${ownWeekProgress.completedMinutes}/${ownWeekProgress.totalMinutes} min | atraso ${ownWeekProgress.lateStartMinutes}m.`,
+      `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
+      `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
+      `Ranking global da semana: ${ranking || "sem dados"}.`,
+      `Historico recente do sistema: ${systemHistory || "sem eventos recentes"}.`,
+      `Textos recentes do historico: ${textHistory || "sem textos recentes"}.`
+    ].join("\n")
+  };
+}
+
+async function buildProject200ChatSystemPrompt({ user, chat, toneKey }) {
+  const recentMessages = Array.isArray(chat?.messages) ? chat.messages.slice(-16) : [];
+  const memory = recentMessages
+    .map((item) => `${item.role === "assistant" ? "IA" : "Usuario"}: ${clipProject200Text(item.content, 180)}`)
+    .join(" | ");
+  const sharedContext = await getContextPrompt();
+  const { ownWeekProgress, contextText } = await buildProject200ChatContext(user);
+  const toneInstruction = buildProject200ToneInstructions(toneKey, ownWeekProgress);
+
+  return [
+    DEFAULT_SYSTEM_PROMPT,
+    "Voce e o chat de Conversas do /200, com foco em rotina, disciplina, tarefas, atrasos, historico e ranking.",
+    "Responda sempre em pt-BR.",
+    toneInstruction,
+    "Regras obrigatorias: resposta entre 60 e 500 caracteres; sem markdown; texto corrido ou no maximo duas frases curtas; fale como mensageiro fluido e rapido.",
+    "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa ou disciplina semanal.",
+    "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
+    "No modo exigente, jamais humilhe, ameace, xingue, desumanize ou ataque o valor pessoal do usuario. Seja firme sem abuso.",
+    `Memoria recente da conversa: ${memory || "vazia"}.`,
+    `Contexto compartilhado do projeto: ${sharedContext || "sem contexto extra"}.`,
+    `Contexto vivo do /200:\n${contextText}`
+  ].join("\n\n");
+}
+
 async function buildMiniChatCompletionPrompt({ user, chat, modeKey, message, extraContext = "" }) {
   const recentMessages = Array.isArray(chat?.messages) ? chat.messages.slice(-12) : [];
   const chatMemory = recentMessages
@@ -7192,6 +7421,110 @@ async function handleMiniChatMessageRequest(request, response, chatId) {
   }
 }
 
+async function handleProject200ChatDetailRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    let chat = await getProject200Chat(user.id);
+    if (!chat) {
+      chat = await createProject200Chat(user.id, { title: "Conversas" });
+    }
+    sendJson(response, 200, { ok: true, chat });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar as conversas."
+    });
+  }
+}
+
+async function handleProject200ChatMessageRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, {
+      error: "OPENAI_API_KEY nao configurada.",
+      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const message = String(body?.message || "").trim();
+  if (!message) {
+    sendJson(response, 400, { error: "Mensagem ausente." });
+    return;
+  }
+
+  const toneKey = String(body?.tone || "neutral").trim().toLowerCase();
+
+  try {
+    let chat = await getProject200Chat(user.id);
+    if (!chat) {
+      chat = await createProject200Chat(user.id, { title: createProject200ChatTitleFromMessage(message) });
+    }
+
+    const userEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
+    const currentMessages = [...(chat.messages || [])].slice(-20);
+    const system = await buildProject200ChatSystemPrompt({
+      user,
+      chat: { ...chat, messages: currentMessages },
+      toneKey
+    });
+
+    const completion = await createChatCompletion(apiKey, {
+      model: OPENAI_INSTANT_MODEL || "gpt-4.1-nano",
+      temperature: toneKey === "street" ? 0.85 : 0.7,
+      max_completion_tokens: 260,
+      messages: [
+        { role: "system", content: system },
+        ...currentMessages
+          .filter((item) => item.role === "user" || item.role === "assistant")
+          .map((item) => ({
+            role: item.role,
+            content: String(item.content || "")
+          })),
+        { role: "user", content: message }
+      ]
+    }, {
+      timeoutMs: 30000,
+      timeoutMessage: "A resposta da OpenAI demorou demais para o chat do /200."
+    });
+
+    const replyText = normalizeProject200ChatReply(extractChatCompletionText(completion));
+    const assistantEntry = { role: "assistant", content: replyText, createdAt: new Date().toISOString() };
+    const nextChat = await appendProject200ChatMessages(user.id, [userEntry, assistantEntry], {
+      title: chat.title === "Conversas" ? createProject200ChatTitleFromMessage(message) : chat.title,
+      lastMessageAt: new Date().toISOString()
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      model: OPENAI_INSTANT_MODEL || "gpt-4.1-nano",
+      chat: nextChat,
+      replyText
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: "Falha ao gerar resposta das conversas do /200.",
+      details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -10451,6 +10784,16 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Não foi possível exportar os dados do /200."
       });
     }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/chat") {
+    await handleProject200ChatDetailRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/chat/messages") {
+    await handleProject200ChatMessageRequest(request, response);
     return;
   }
 

@@ -1,5 +1,5 @@
 import { query } from "./db.js";
-import { normalizeStoredProject200ProfileName } from "./project200-profiles.js";
+import { listGlobalProject200Profiles, normalizeStoredProject200ProfileName } from "./project200-profiles.js";
 const DEFAULT_SALDO_GOAL_CENTS = 1000000;
 
 function startOfDay(date) {
@@ -165,7 +165,7 @@ async function syncClosedDailyReports(userId) {
 }
 
 async function buildStatsSummary(userId, range) {
-  const [actionsResult, incomeResult, expenseResult, balanceResult] = await Promise.all([
+  const [actionsResult, incomeResult, expenseResult, balanceResult, globalProfiles] = await Promise.all([
     query(
       `
         with action_status as (
@@ -180,9 +180,8 @@ async function buildStatsSummary(userId, range) {
           left join action_status_overrides o
             on o.user_id = a.user_id
            and o.action_id = a.id
-          where a.user_id = $1
-            and ($2::timestamptz is null or a.start_at < $3::timestamptz)
-            and ($2::timestamptz is null or a.end_at > $2::timestamptz)
+          where ($1::timestamptz is null or a.start_at < $2::timestamptz)
+            and ($1::timestamptz is null or a.end_at > $1::timestamptz)
         )
         select
           assignee,
@@ -198,7 +197,7 @@ async function buildStatsSummary(userId, range) {
         from action_status
         group by assignee
       `,
-      [userId, range.from || null, range.to || null]
+      [range.from || null, range.to || null]
     ),
     query(
       `
@@ -231,7 +230,8 @@ async function buildStatsSummary(userId, range) {
         limit 1
       `,
       [userId]
-    )
+    ),
+    listGlobalProject200Profiles()
   ]);
 
   const byAssignee = {};
@@ -260,7 +260,16 @@ async function buildStatsSummary(userId, range) {
       expenseCents: Number(expenseResult.rows[0]?.expense_cents || 0),
       balanceCents: Number(balanceResult.rows[0]?.balance_cents || 0)
     },
-    byAssignee
+    byAssignee,
+    globalProfiles: Array.isArray(globalProfiles)
+      ? globalProfiles.map((profile) => ({
+          id: profile.id,
+          userId: profile.userId,
+          name: normalizeStoredProject200ProfileName(profile.name),
+          avatarPreset: profile.avatarPreset,
+          avatarDataUrl: profile.avatarDataUrl
+        }))
+      : []
   };
 }
 
