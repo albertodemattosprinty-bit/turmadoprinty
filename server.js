@@ -5117,21 +5117,13 @@ async function handleMiniMediaAlbumCharacterCreateRequest(request, response, alb
   }
 }
 
-async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, albumId, characterId) {
+async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, albumId, characterId = "__all__") {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
     return;
   }
 
-  let body = {};
-  try {
-    body = await readJsonBody(request);
-  } catch {
-    body = {};
-  }
-
   const safeCharacterId = String(characterId || "").trim();
-  const safeCharacterName = sanitizeMiniMediaTitle(body?.name || "", "").trim();
   if (!safeCharacterId) {
     sendJson(response, 400, { error: "Personagem invalido." });
     return;
@@ -5146,16 +5138,23 @@ async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, alb
     }
 
     const characters = normalizeMiniMediaAlbumCharacters(album.characters || album.metadata?.characters);
-    const targetCharacter = characters.find((item) => item.id === safeCharacterId)
-      || (safeCharacterName
-        ? characters.find((item) => String(item?.name || "").trim().toLocaleLowerCase("pt-BR") === safeCharacterName.toLocaleLowerCase("pt-BR"))
-        : null);
-    if (!targetCharacter) {
+    if (!characters.length) {
       sendJson(response, 404, { error: "Personagem nao encontrado." });
       return;
     }
 
-    const nextCharacters = characters.filter((item) => item.id !== targetCharacter.id);
+    const removeAllCharacters = safeCharacterId === "__all__";
+    const targetCharacter = removeAllCharacters
+      ? null
+      : characters.find((item) => item.id === safeCharacterId) || null;
+    if (!removeAllCharacters && !targetCharacter) {
+      sendJson(response, 404, { error: "Personagem nao encontrado." });
+      return;
+    }
+
+    const nextCharacters = removeAllCharacters
+      ? []
+      : characters.filter((item) => item.id !== targetCharacter.id);
 
     album.characters = nextCharacters;
     album.metadata = {
@@ -5173,7 +5172,11 @@ async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, alb
 
       let changed = false;
       const nextLines = lines.map((line) => {
-        if (String(line?.characterId || "").trim() !== targetCharacter.id) {
+        const currentCharacterId = String(line?.characterId || "").trim();
+        if (!currentCharacterId) {
+          return line;
+        }
+        if (!removeAllCharacters && currentCharacterId !== targetCharacter.id) {
           return line;
         }
         changed = true;
@@ -5222,12 +5225,12 @@ async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, alb
       user: sanitizeUser(adminUser),
       album: buildMiniMediaAlbumPayload(savedAlbum, { includeExtended: true }),
       characters: nextCharacters,
-      removedCharacterId: targetCharacter.id,
+      removedCharacterId: targetCharacter?.id || null,
       syncUpdates
     });
   } catch (error) {
     sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel excluir o personagem."
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir os personagens."
     });
   }
 }
@@ -9279,6 +9282,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && pathname.startsWith("/api/mini/media/albums/") && pathname.endsWith("/characters")) {
     const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", "").replace(/\/characters$/, ""));
     await handleMiniMediaAlbumCharacterCreateRequest(request, response, albumId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && pathname.endsWith("/characters")) {
+    const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", "").replace(/\/characters$/, ""));
+    await handleMiniMediaAlbumCharacterDeleteRequest(request, response, albumId, "__all__");
     return;
   }
 
