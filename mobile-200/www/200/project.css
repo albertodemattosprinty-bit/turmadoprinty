@@ -77,6 +77,18 @@ body[data-background-theme="light"] .app-background-video {
   align-items: center;
 }
 
+.conversations-head-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conversations-admin-btn {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+}
+
 .conversations-subtitle {
   color: rgba(255, 255, 255, 0.88);
   text-align: center;
@@ -156,6 +168,11 @@ body[data-background-theme="light"] .app-background-video {
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.24);
   color: #fff;
+}
+
+.conversations-prompt-field {
+  min-height: 220px;
+  resize: vertical;
 }
 
 button,

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260626-conversations-chat" />
+  <link rel="stylesheet" href="/200/project.css?v=20260626-conversations-chat-admin" />
 </head>
 <body>
   <video class="app-background-video" autoplay muted loop playsinline webkit-playsinline preload="auto" aria-hidden="true">
@@ -714,7 +714,12 @@
   <section class="workspace-modal" id="conversationsModal" aria-hidden="true" aria-label="Conversas">
     <div class="actions-app conversations-app">
       <header class="actions-head conversations-head">
-        <button class="date-title" type="button" id="conversationsToneChip">Neutro</button>
+        <div class="conversations-head-main">
+          <button class="icon-action-btn conversations-admin-btn" type="button" id="openConversationsPromptButton" aria-label="Editar prompt global" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
+          </button>
+          <button class="date-title" type="button" id="conversationsToneChip">Neutro</button>
+        </div>
         <button class="circle-nav" type="button" data-close-modal aria-label="Fechar conversas">
           <svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
         </button>
@@ -728,6 +733,20 @@
           <svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m6-4a1 1 0 0 1 2 0 8 8 0 0 1-7 7.94V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.06A8 8 0 0 1 4 11a1 1 0 1 1 2 0 6 6 0 0 0 12 0"/></svg>
         </button>
       </div>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal" id="conversationsPromptModal" aria-hidden="true" aria-label="Prompt global das conversas">
+    <div class="finance-content options-content">
+      <div class="running-music-default-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
+        <span>Prompt global</span>
+      </div>
+      <p class="options-note">Esse texto vale para todos os usuários do chat `Conversas`.</p>
+      <textarea class="text-field options-text-field conversations-prompt-field" id="conversationsPromptInput" maxlength="12000" placeholder="Escreva aqui as instruções globais da RoseMattos..."></textarea>
+      <p class="finance-status" id="conversationsPromptMessage" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="saveConversationsPromptButton">Salvar prompt</button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>
   </section>
 
@@ -1001,7 +1020,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260626-conversations-chat"></script>
+  <script type="module" src="/200/project.js?v=20260626-conversations-chat-admin"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

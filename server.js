@@ -50,7 +50,7 @@ import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema,
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getAlbumRehearsalCodeForOwner, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent, redeemAlbumRehearsalCode } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
-import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
+import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getProject200ChatPromptSettings, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveProject200ChatPromptSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createUserAction, deleteUserAction, ensureActionsSchema, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
@@ -3842,12 +3842,10 @@ async function buildProject200ChatContext(user) {
   const tomorrow = addProjectDays(todayStart, 1);
   const weekStart = startOfProjectWeek(now);
   const nextWeek = addProjectDays(weekStart, 7);
-  const historyStart = addProjectDays(todayStart, -14);
 
-  const [todayActions, weekActions, history, runtimeState, globalWeekStats] = await Promise.all([
+  const [todayActions, weekActions, runtimeState, globalWeekStats] = await Promise.all([
     listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
     listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
-    listProject200History(user.id, { from: historyStart.toISOString(), to: tomorrow.toISOString() }),
     getProject200RuntimeState(user.id),
     getStatsSummary(user.id, "week")
   ]);
@@ -3886,15 +3884,6 @@ async function buildProject200ChatContext(user) {
     .map((entry, index) => `${index + 1}. ${entry.name}: ${entry.percent}% (${entry.completed}/${entry.total} min, atraso ${entry.late}m)`)
     .join(" | ");
 
-  const systemHistory = (history?.systemEvents || [])
-    .slice(0, 8)
-    .map((entry) => `${entry.type} | ${normalizeStoredProject200ProfileName(entry.assignee)} | ${clipProject200Text(entry.taskTitle, 64)} | ${clipProject200Text(entry.occurredAt, 32)}`)
-    .join(" | ");
-  const textHistory = (history?.texts || [])
-    .slice(0, 6)
-    .map((entry) => `${normalizeStoredProject200ProfileName(entry.speaker)}: ${clipProject200Text(entry.title, 36)} - ${clipProject200Text(entry.text, 90)}`)
-    .join(" | ");
-
   return {
     ownWeekProgress,
     contextText: [
@@ -3904,9 +3893,7 @@ async function buildProject200ChatContext(user) {
       `Semana do usuario: ${ownWeekProgress.completionPercent}% | ${ownWeekProgress.completedMinutes}/${ownWeekProgress.totalMinutes} min | atraso ${ownWeekProgress.lateStartMinutes}m.`,
       `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
-      `Ranking global da semana: ${ranking || "sem dados"}.`,
-      `Historico recente do sistema: ${systemHistory || "sem eventos recentes"}.`,
-      `Textos recentes do historico: ${textHistory || "sem textos recentes"}.`
+      `Ranking global da semana: ${ranking || "sem dados"}.`
     ].join("\n")
   };
 }
@@ -3916,21 +3903,23 @@ async function buildProject200ChatSystemPrompt({ user, chat, toneKey }) {
   const memory = recentMessages
     .map((item) => `${item.role === "assistant" ? "IA" : "Usuario"}: ${clipProject200Text(item.content, 180)}`)
     .join(" | ");
-  const sharedContext = await getContextPrompt();
   const { ownWeekProgress, contextText } = await buildProject200ChatContext(user);
   const toneInstruction = buildProject200ToneInstructions(toneKey, ownWeekProgress);
+  const globalPromptSettings = await getProject200ChatPromptSettings();
+  const globalPrompt = String(globalPromptSettings?.prompt || "").trim();
 
   return [
-    DEFAULT_SYSTEM_PROMPT,
-    "Voce e o chat de Conversas do /200, com foco em rotina, disciplina, tarefas, atrasos, historico e ranking.",
-    "Responda sempre em pt-BR.",
+    "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto.",
+    "Voce e o chat de Conversas do /200, neutro por padrao e moldado apenas pelo contexto do /200.",
+    "Para comentar o usuario, foque somente nos dados de acoes e estatisticas.",
     toneInstruction,
     "Regras obrigatorias: resposta entre 60 e 500 caracteres; sem markdown; texto corrido ou no maximo duas frases curtas; fale como mensageiro fluido e rapido.",
     "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa ou disciplina semanal.",
     "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
     "No modo exigente, jamais humilhe, ameace, xingue, desumanize ou ataque o valor pessoal do usuario. Seja firme sem abuso.",
+    "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
+    globalPrompt ? `Instrucao global da RoseMattos: ${globalPrompt}` : "",
     `Memoria recente da conversa: ${memory || "vazia"}.`,
-    `Contexto compartilhado do projeto: ${sharedContext || "sem contexto extra"}.`,
     `Contexto vivo do /200:\n${contextText}`
   ].join("\n\n");
 }
@@ -7525,6 +7514,48 @@ async function handleProject200ChatMessageRequest(request, response) {
   }
 }
 
+async function handleProject200ChatPromptGetRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  try {
+    const settings = await getProject200ChatPromptSettings();
+    sendJson(response, 200, { ok: true, settings, user: sanitizeUser(adminUser) });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o prompt global do /200."
+    });
+  }
+}
+
+async function handleProject200ChatPromptSaveRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const settings = await saveProject200ChatPromptSettings({
+      prompt: String(body?.prompt || "")
+    });
+    sendJson(response, 200, { ok: true, settings, user: sanitizeUser(adminUser) });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar o prompt global do /200."
+    });
+  }
+}
+
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -10794,6 +10825,16 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/200/chat/messages") {
     await handleProject200ChatMessageRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/admin/project200/chat-prompt") {
+    await handleProject200ChatPromptGetRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/admin/project200/chat-prompt") {
+    await handleProject200ChatPromptSaveRequest(request, response);
     return;
   }
 

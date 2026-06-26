@@ -331,6 +331,10 @@ const conversationsTranscript = document.getElementById("conversationsTranscript
 const conversationsStatus = document.getElementById("conversationsStatus");
 const conversationsMicButton = document.getElementById("conversationsMicButton");
 const conversationsToneChip = document.getElementById("conversationsToneChip");
+const openConversationsPromptButton = document.getElementById("openConversationsPromptButton");
+const conversationsPromptInput = document.getElementById("conversationsPromptInput");
+const conversationsPromptMessage = document.getElementById("conversationsPromptMessage");
+const saveConversationsPromptButton = document.getElementById("saveConversationsPromptButton");
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
@@ -615,6 +619,7 @@ const state = {
   historySystem: [],
   historyTexts: [],
   conversationChat: null,
+  authUser: null,
   profiles: [],
   selectedProfile: defaultProjectProfileName,
   profileLock: "",
@@ -765,6 +770,10 @@ function getStatsGlobalProfileByName(name) {
   return (Array.isArray(state.statsGlobalProfiles) ? state.statsGlobalProfiles : []).find((profile) => (
     String(profile?.name || "").localeCompare(input, "pt-BR", { sensitivity: "accent" }) === 0
   )) || null;
+}
+
+function isProject200AdminUser() {
+  return Boolean(state.authUser?.isAdmin);
 }
 
 function getProfileAvatarPath(profileOrName) {
@@ -3229,6 +3238,14 @@ function openModal(id) {
     }
   }
 
+  if (id === "conversationsPromptModal") {
+    if (conversationsPromptMessage) {
+      conversationsPromptMessage.textContent = "";
+    }
+    void loadConversationsPromptEditor();
+    window.setTimeout(() => conversationsPromptInput?.focus(), 40);
+  }
+
   if (id === "constitutionModal") {
     void loadConstitution();
   }
@@ -4622,6 +4639,7 @@ async function markActionAsGivenUp(action) {
 async function ensureProject200Session() {
   const token = getToken();
   if (!token) {
+    state.authUser = null;
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
     return false;
@@ -4637,17 +4655,20 @@ async function ensureProject200Session() {
       if (response.status === 401) {
         setToken("");
         state.profileLock = "";
+        state.authUser = null;
         project200LoginOverlay?.classList.add("active");
         project200LoginOverlay?.setAttribute("aria-hidden", "false");
       }
       return false;
     }
+    state.authUser = payload?.user || null;
     refreshProfileLockFromAuth(payload?.user || null);
     project200LoginOverlay?.classList.remove("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
     return true;
   } catch {
     state.profileLock = "";
+    state.authUser = null;
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
     return false;
@@ -6319,6 +6340,63 @@ async function loadConversationChat() {
   renderConversationMessages();
 }
 
+async function loadConversationsPromptEditor() {
+  if (!isProject200AdminUser()) {
+    return;
+  }
+  if (conversationsPromptMessage) {
+    conversationsPromptMessage.textContent = "Carregando prompt...";
+  }
+  try {
+    const payload = await apiRequest("/api/admin/project200/chat-prompt");
+    if (conversationsPromptInput) {
+      conversationsPromptInput.value = String(payload?.settings?.prompt || "");
+    }
+    if (conversationsPromptMessage) {
+      conversationsPromptMessage.textContent = "";
+    }
+  } catch (error) {
+    if (conversationsPromptMessage) {
+      conversationsPromptMessage.textContent = error instanceof Error ? error.message : "Falha ao carregar prompt.";
+    }
+  }
+}
+
+async function saveConversationsPromptEditor() {
+  if (!isProject200AdminUser()) {
+    return;
+  }
+  if (conversationsPromptMessage) {
+    conversationsPromptMessage.textContent = "Salvando...";
+  }
+  if (saveConversationsPromptButton) {
+    saveConversationsPromptButton.disabled = true;
+  }
+  try {
+    const payload = await apiRequest("/api/admin/project200/chat-prompt", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: String(conversationsPromptInput?.value || "")
+      })
+    });
+    if (conversationsPromptInput) {
+      conversationsPromptInput.value = String(payload?.settings?.prompt || "");
+    }
+    if (conversationsPromptMessage) {
+      conversationsPromptMessage.textContent = "Prompt global salvo.";
+    }
+  } catch (error) {
+    if (conversationsPromptMessage) {
+      conversationsPromptMessage.textContent = error instanceof Error ? error.message : "Falha ao salvar prompt.";
+    }
+  } finally {
+    if (saveConversationsPromptButton) {
+      saveConversationsPromptButton.disabled = false;
+    }
+  }
+}
+
 async function sendConversationMessage(text) {
   const message = String(text || "").trim();
   if (!message) {
@@ -7259,6 +7337,9 @@ function renderOptionsModal() {
   if (conversationsToneChip) {
     conversationsToneChip.textContent = toneMode.label;
   }
+  if (openConversationsPromptButton) {
+    openConversationsPromptButton.hidden = !isProject200AdminUser();
+  }
 }
 
 function resetProject200ExportModal() {
@@ -8148,6 +8229,12 @@ conversationsMicButton?.addEventListener("click", () => {
 });
 conversationsToneChip?.addEventListener("click", () => {
   openModal("optionsModal");
+});
+openConversationsPromptButton?.addEventListener("click", () => {
+  openModal("conversationsPromptModal");
+});
+saveConversationsPromptButton?.addEventListener("click", () => {
+  void saveConversationsPromptEditor();
 });
 logoutProject200Button?.addEventListener("click", () => {
   const shouldLogout = window.confirm("Deseja sair do login salvo neste aparelho?");
