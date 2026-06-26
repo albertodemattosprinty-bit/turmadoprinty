@@ -9,7 +9,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-page="produto">
+<body data-page="produto" class="page-is-loading">
+  <div class="page-loading-overlay" id="page-loading-overlay" aria-live="polite">
+    <div class="page-loading-spinner" aria-hidden="true"></div>
+    <div class="page-loading-copy">
+      <strong>Carregando albuns</strong>
+      <span>Carregando Albuns</span>
+    </div>
+  </div>
   <header class="site-header">
     <a class="brand" href="/index.html"><span class="brand-mark">P</span><span class="brand-text">Turma do Printy</span></a>
   </header>
@@ -21,7 +28,7 @@
         <div class="product-hero">
           <img id="product-cover" class="product-cover" alt="Capa do album">
           <div class="product-summary">
-            <h1 id="product-title" class="section-title">Carregando album...</h1>
+            <h1 id="product-title" class="section-title"></h1>
             <div id="album-admin-panel" class="album-admin-panel" hidden>
               <label>Preco deste album (centavos)
                 <input id="album-price-input" type="number" min="0" step="1">
@@ -47,7 +54,7 @@
           <button id="track-prev-button" class="ghost-button track-nav-button" type="button" aria-label="Faixa anterior">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
           </button>
-          <div id="track-position-label" class="track-position-label">Faixa 1 de 1</div>
+          <div id="track-position-label" class="track-position-label"></div>
           <button id="track-next-button" class="ghost-button track-nav-button" type="button" aria-label="Proxima faixa">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.59 16.59 1.41 1.41 6-6-6-6-1.41 1.41L13.17 12z"/></svg>
           </button>

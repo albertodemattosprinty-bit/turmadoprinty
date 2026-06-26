@@ -9,7 +9,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-page="produtos">
+<body data-page="produtos" class="page-is-loading">
+  <div class="page-loading-overlay" id="page-loading-overlay" aria-live="polite">
+    <div class="page-loading-spinner" aria-hidden="true"></div>
+    <div class="page-loading-copy">
+      <strong>Carregando albuns</strong>
+      <span>Carregando Albuns</span>
+    </div>
+  </div>
   <header class="site-header">
     <a class="brand" href="/index.html"><span class="brand-mark">P</span><span class="brand-text">Turma do Printy</span></a>
   </header>

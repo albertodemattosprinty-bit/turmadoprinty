@@ -31,6 +31,14 @@ const bannerConfigByPage = {
   }
 };
 
+function setGridPageLoading(isLoading) {
+  document.body.classList.toggle("page-is-loading", isLoading);
+  const overlay = document.getElementById("page-loading-overlay");
+  if (overlay) {
+    overlay.setAttribute("aria-hidden", isLoading ? "false" : "true");
+  }
+}
+
 function markActiveNav() {
   document.querySelectorAll(".nav-link").forEach((link) => {
     const href = link.getAttribute("href");
@@ -696,6 +704,7 @@ async function loadAlbums(siteConfig, user) {
 
   const refreshAlbums = async () => {
     grid.innerHTML = "";
+    setGridPageLoading(true);
 
     try {
       const [productsResponse, nextAccessState] = await Promise.all([
@@ -717,6 +726,8 @@ async function loadAlbums(siteConfig, user) {
       if (storeStatus) {
         storeStatus.textContent = "Nao foi possivel carregar a lista de albuns agora.";
       }
+    } finally {
+      setGridPageLoading(false);
     }
   };
 

@@ -1371,6 +1371,14 @@ body[data-page="produto"] {
   background: linear-gradient(180deg, #47c8b7 0%, #35a8d9 46%, #197ec9 100%);
 }
 
+body[data-page="produtos"] .section-card,
+body[data-page="produtos"] .album-card,
+body[data-page="produto"] .section-card {
+  background: rgba(255, 255, 255, 0);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+
 .page-loading-overlay {
   position: fixed;
   inset: 0;
