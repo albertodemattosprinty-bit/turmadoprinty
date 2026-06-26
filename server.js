@@ -59,7 +59,7 @@ import { approveConstitutionVersion, createConstitutionVersion, ensureConstituti
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
-import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar } from "./src/project200-profiles.js";
+import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1785,7 +1785,7 @@ async function getProject200AssignedProfile(userId) {
     `select assigned_profile from project200_profile_links where user_id = $1 limit 1`,
     [userId]
   );
-  return normalizeProject200Profile(result.rows[0]?.assigned_profile || "");
+  return normalizeStoredProject200ProfileName(result.rows[0]?.assigned_profile || "");
 }
 
 async function findUserByUsernameOrNameInput(usernameInput) {
