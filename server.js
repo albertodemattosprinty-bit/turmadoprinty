@@ -9267,7 +9267,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && !pathname.includes("/tracks/") && !pathname.includes("/characters/") && !pathname.endsWith("/cover") && !pathname.endsWith("/cover/generate")) {
+  if (request.method === "DELETE" && pathname.startsWith("/api/mini/media/albums/") && !pathname.includes("/tracks/") && !pathname.includes("/characters/") && !pathname.endsWith("/characters") && !pathname.endsWith("/cover") && !pathname.endsWith("/cover/generate")) {
     const albumId = decodeURIComponent(pathname.replace("/api/mini/media/albums/", ""));
     await handleMiniMediaAlbumDeleteRequest(request, response, albumId);
     return;
