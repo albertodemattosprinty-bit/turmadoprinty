@@ -2401,8 +2401,8 @@ body[data-page="produto"] .inline-link {
   overflow: hidden;
   box-sizing: border-box;
   background:
-    radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(44, 44, 46, 0.98) 0%, rgba(22, 22, 24, 0.99) 52%, rgba(6, 6, 7, 0.995) 100%);
+    radial-gradient(circle at top center, rgba(88, 149, 255, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(9, 26, 58, 0.985) 0%, rgba(5, 14, 36, 0.992) 52%, rgba(1, 4, 14, 0.998) 100%);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 28px 54px rgba(0, 0, 0, 0.26);
 }
@@ -2421,12 +2421,23 @@ body[data-page="produto"] .inline-link {
   margin-bottom: 18px;
 }
 
+.track-texts-title-wrap {
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+.track-texts-title-wrap .section-title,
+.track-texts-title-wrap .track-texts-sync-status {
+  text-align: center;
+}
+
 .track-texts-head-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 10px;
+  min-width: fit-content;
 }
 
 .track-texts-sync-status {
@@ -2557,6 +2568,13 @@ body[data-page="produto"] .inline-link {
   overscroll-behavior: contain;
   -webkit-user-select: none;
   user-select: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.track-texts-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .track-texts-lines {
@@ -3157,6 +3175,11 @@ body[data-page="eventos-pagamento"] {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.download-album-button {
+  background: rgba(91, 170, 255, 0.12);
+  border-color: rgba(120, 186, 255, 0.32);
+}
+
 .album-admin-panel {
   display: grid;
   gap: 12px;
@@ -3663,13 +3686,19 @@ body[data-page="eventos-pagamento"] {
   color: rgba(255, 255, 255, 0.46);
 }
 
+.rehearsal-entry-actions {
+  margin-top: 15px;
+}
+
 .track-download-modal-panel {
-  inset: auto;
+  top: 50%;
+  left: 50%;
   width: min(520px, calc(100vw - 28px));
   height: auto;
   min-height: 0;
-  margin: 8vh auto 0;
+  margin: 0;
   padding: 24px;
+  transform: translate(-50%, -50%);
   border-radius: 30px;
   background:
     radial-gradient(circle at top center, rgba(255, 255, 255, 0.12), transparent 34%),
@@ -3685,8 +3714,17 @@ body[data-page="eventos-pagamento"] {
 }
 
 .track-download-choice {
+  position: relative;
+  overflow: hidden;
   min-height: 52px;
   width: 100%;
+}
+
+.track-download-choice.is-downloading {
+  background:
+    linear-gradient(90deg, rgba(93, 187, 255, 0.95) 0%, rgba(93, 187, 255, 0.95) var(--download-progress, 0%), rgba(255, 255, 255, 0.12) var(--download-progress, 0%), rgba(255, 255, 255, 0.12) 100%) !important;
+  color: #061529 !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
 }
 
 .plans-grid {

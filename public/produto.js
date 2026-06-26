@@ -8,6 +8,7 @@ const productTitle = document.getElementById("product-title");
 const productPrice = document.getElementById("product-price");
 const buyAlbumButton = document.getElementById("buy-album-button");
 const rehearseAlbumButton = document.getElementById("rehearse-album-button");
+const downloadAlbumButton = document.getElementById("download-album-button");
 const lyricsDownloadButton = document.getElementById("lyrics-download-button");
 const trackList = document.getElementById("track-list");
 const trackPrevButton = document.getElementById("track-prev-button");
@@ -54,7 +55,7 @@ let trackCharacterDesktopHoldState = null;
 let rehearsalRedeemInFlight = false;
 let rehearsalOwnerLoadInFlight = false;
 let downloadOptionInFlight = false;
-const freePreviewSeconds = 30;
+const freePreviewSeconds = 75;
 const freePreviewFadeSeconds = 4;
 const characterPalettes = {
   boys: ["#7FDBFF", "#9EE8FF", "#61D2FF", "#8CCBFF"],
@@ -408,6 +409,24 @@ function setRehearseButtonState({ label, onClick, disabled = false, ariaLabel = 
   rehearseAlbumButton.onclick = onClick || null;
 }
 
+function syncAlbumDownloadButton(albumId) {
+  if (!downloadAlbumButton) {
+    return;
+  }
+
+  const canDownloadAlbum = canUseDownloads(albumId);
+  downloadAlbumButton.hidden = !canDownloadAlbum;
+  downloadAlbumButton.disabled = !canDownloadAlbum;
+  downloadAlbumButton.onclick = canDownloadAlbum
+    ? () => {
+      const fallbackTrack = currentAlbum?.tracks?.[currentTrackIndex] || currentAlbum?.tracks?.[0] || null;
+      if (fallbackTrack) {
+        openTrackDownloadModal(fallbackTrack);
+      }
+    }
+    : null;
+}
+
 function hasPurchasedAlbum(albumId) {
   return accessState.purchasedAlbumIds.includes(albumId);
 }
@@ -457,9 +476,10 @@ function syncRehearseAlbumButton(albumId) {
     },
     ariaLabel: canAccessAlbumByRehearsal(albumId) ? "Abrir tela imersiva do album" : "Ensaiar album"
   });
+  syncAlbumDownloadButton(albumId);
 }
 
-async function downloadProtectedFile(url, fallbackName) {
+async function downloadProtectedFile(url, fallbackName, { onProgress } = {}) {
   const token = getToken();
   if (!token) {
     redirectToAuth(currentAlbum?.id || getAlbumId());
@@ -482,7 +502,46 @@ async function downloadProtectedFile(url, fallbackName) {
     throw new Error(data?.error || "Nao foi possivel baixar o arquivo.");
   }
 
-  const blob = await response.blob();
+  const totalBytes = Number(response.headers.get("content-length") || 0);
+  if (!response.body || typeof response.body.getReader !== "function") {
+    const blob = await response.blob();
+    if (typeof onProgress === "function") {
+      onProgress(totalBytes > 0 ? 100 : 0);
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = fallbackName || "download";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let receivedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    if (value) {
+      chunks.push(value);
+      receivedBytes += value.byteLength;
+      if (typeof onProgress === "function" && totalBytes > 0) {
+        onProgress(Math.min(100, (receivedBytes / totalBytes) * 100));
+      }
+    }
+  }
+
+  if (typeof onProgress === "function") {
+    onProgress(100);
+  }
+
+  const blob = new Blob(chunks);
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
@@ -1042,8 +1101,7 @@ function ensureTrackTextsModal() {
     <div class="track-texts-backdrop" data-role="close-texts"></div>
     <div class="track-texts-panel" role="dialog" aria-modal="true" aria-labelledby="track-texts-title">
       <div class="track-texts-head">
-        <div>
-          <p class="eyebrow">Textos da faixa</p>
+        <div class="track-texts-title-wrap">
           <h3 id="track-texts-title" class="section-title small">Carregando...</h3>
           <p id="track-texts-sync-status" class="track-texts-sync-status" hidden>Modo sync ativo</p>
         </div>
@@ -1281,7 +1339,7 @@ function ensureRehearsalOwnerModal() {
     <div class="track-texts-backdrop" data-role="close-rehearsal-owner"></div>
     <div class="track-texts-panel track-generation-panel rehearsal-modal-panel" role="dialog" aria-modal="true" aria-labelledby="album-rehearsal-title">
       <div class="track-texts-head">
-        <div>
+        <div class="track-texts-title-wrap">
           <p class="eyebrow">Codigo de ensaio</p>
           <h3 id="album-rehearsal-title" class="section-title small">Liberar ensaio para seus alunos</h3>
         </div>
@@ -1299,6 +1357,7 @@ function ensureRehearsalOwnerModal() {
       </div>
       <div class="bulk-track-title-actions">
         <button id="album-rehearsal-refresh" class="ghost-button" type="button">Atualizar</button>
+        <button id="album-rehearsal-open-texts" class="ghost-button" type="button">Ensaiar agora</button>
         <button class="primary-button" type="button" data-role="close-rehearsal-owner">Fechar</button>
       </div>
     </div>
@@ -1313,6 +1372,11 @@ function ensureRehearsalOwnerModal() {
   });
   modal.querySelector("#album-rehearsal-refresh")?.addEventListener("click", async () => {
     await openAlbumRehearsalOwnerModal({ forceReload: true });
+  });
+  modal.querySelector("#album-rehearsal-open-texts")?.addEventListener("click", () => {
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+    openAlbumRehearsalTexts();
   });
 
   return modal;
@@ -1332,7 +1396,7 @@ function ensureRehearsalEntryModal() {
     <div class="track-texts-backdrop" data-role="close-rehearsal-entry"></div>
     <div class="track-texts-panel track-generation-panel rehearsal-modal-panel" role="dialog" aria-modal="true" aria-labelledby="album-rehearsal-entry-title">
       <div class="track-texts-head">
-        <div>
+        <div class="track-texts-title-wrap">
           <p class="eyebrow">Ensaiar</p>
           <h3 id="album-rehearsal-entry-title" class="section-title small">Entrar com codigo de ensaio</h3>
         </div>
@@ -1346,7 +1410,7 @@ function ensureRehearsalEntryModal() {
       <label class="rehearsal-field">Codigo de ensaio
         <input id="album-rehearsal-entry-code" type="text" maxlength="12" placeholder="Digite o codigo">
       </label>
-      <div class="bulk-track-title-actions">
+      <div class="bulk-track-title-actions rehearsal-entry-actions">
         <button class="ghost-button" type="button" data-role="close-rehearsal-entry">Cancelar</button>
         <button id="album-rehearsal-entry-submit" class="primary-button" type="button">Liberar ensaio</button>
       </div>
@@ -1384,7 +1448,7 @@ function ensureTrackDownloadModal() {
     <div class="track-texts-backdrop" data-role="close-download-modal"></div>
     <div class="track-texts-panel track-generation-panel track-download-modal-panel" role="dialog" aria-modal="true" aria-labelledby="track-download-title">
       <div class="track-texts-head">
-        <div>
+        <div class="track-texts-title-wrap">
           <p class="eyebrow">Download</p>
           <h3 id="track-download-title" class="section-title small">Escolha o que baixar</h3>
         </div>
@@ -1396,7 +1460,7 @@ function ensureTrackDownloadModal() {
         <p id="track-download-copy">Baixar os arquivos deste album ou somente a faixa atual.</p>
       </div>
       <div class="track-download-choice-list">
-        <button id="track-download-album" class="primary-button track-download-choice" type="button">Baixar album</button>
+        <button id="track-download-album" class="primary-button track-download-choice track-download-progress-button" type="button">Baixar album</button>
         <button id="track-download-track" class="ghost-button track-download-choice" type="button">Baixar musica</button>
         <button id="track-download-pdf" class="ghost-button track-download-choice" type="button">Baixar PDF</button>
       </div>
@@ -1544,6 +1608,16 @@ function openTrackDownloadModal(track) {
   modal.classList.add("show");
 }
 
+function setTrackDownloadChoiceState(button, { baseLabel, active = false, progress = 0 } = {}) {
+  if (!button) {
+    return;
+  }
+  const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
+  button.style.setProperty("--download-progress", `${safeProgress}%`);
+  button.classList.toggle("is-downloading", active);
+  button.textContent = active ? `Baixando ${safeProgress}%` : baseLabel;
+}
+
 async function submitTrackDownloadOption(kind) {
   if (!currentAlbum?.id || downloadOptionInFlight) {
     return;
@@ -1566,26 +1640,31 @@ async function submitTrackDownloadOption(kind) {
       button.disabled = true;
     }
   });
+  setTrackDownloadChoiceState(albumButton, { baseLabel: "Baixar album", active: kind === "album", progress: 0 });
+  setTrackDownloadChoiceState(trackButton, { baseLabel: "Baixar musica", active: kind === "track", progress: 0 });
+  setTrackDownloadChoiceState(pdfButton, { baseLabel: "Baixar PDF", active: kind === "pdf", progress: 0 });
 
-  if (albumButton) {
-    albumButton.textContent = kind === "album" ? "Baixando..." : "Baixar album";
-  }
-  if (trackButton) {
-    trackButton.textContent = kind === "track" ? "Baixando..." : "Baixar musica";
-  }
-  if (pdfButton) {
-    pdfButton.textContent = kind === "pdf" ? "Baixando..." : "Baixar PDF";
-  }
+  const updateProgress = (percent) => {
+    if (kind === "album") {
+      setTrackDownloadChoiceState(albumButton, { baseLabel: "Baixar album", active: true, progress: percent });
+      return;
+    }
+    if (kind === "track") {
+      setTrackDownloadChoiceState(trackButton, { baseLabel: "Baixar musica", active: true, progress: percent });
+      return;
+    }
+    setTrackDownloadChoiceState(pdfButton, { baseLabel: "Baixar PDF", active: true, progress: percent });
+  };
 
   try {
     if (kind === "album") {
-      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/bundle/download`, `${currentAlbum.name}.zip`);
+      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/bundle/download`, `${currentAlbum.name}.zip`, { onProgress: updateProgress });
       showFloatingNotice("Pacote do album em download.");
     } else if (kind === "pdf") {
-      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/pdf/download`, `${currentAlbum.name}.pdf`);
+      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/pdf/download`, `${currentAlbum.name}.pdf`, { onProgress: updateProgress });
       showFloatingNotice("PDF do album em download.");
     } else {
-      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/tracks/${track.number}/download`, `${track.title || track.label || "faixa"}.mp3`);
+      await downloadProtectedFile(`/api/store/products/${encodeURIComponent(currentAlbum.id)}/tracks/${track.number}/download`, `${track.title || track.label || "faixa"}.mp3`, { onProgress: updateProgress });
       showFloatingNotice("Musica em download.");
     }
 
@@ -1600,15 +1679,9 @@ async function submitTrackDownloadOption(kind) {
         button.disabled = false;
       }
     });
-    if (albumButton) {
-      albumButton.textContent = "Baixar album";
-    }
-    if (trackButton) {
-      trackButton.textContent = "Baixar musica";
-    }
-    if (pdfButton) {
-      pdfButton.textContent = "Baixar PDF";
-    }
+    setTrackDownloadChoiceState(albumButton, { baseLabel: "Baixar album" });
+    setTrackDownloadChoiceState(trackButton, { baseLabel: "Baixar musica" });
+    setTrackDownloadChoiceState(pdfButton, { baseLabel: "Baixar PDF" });
   }
 }
 
@@ -2789,7 +2862,7 @@ function openTrackTextsModal(track) {
     return;
   }
 
-  title.textContent = track?.title || "Textos da faixa";
+  title.textContent = track?.title || track?.label || currentAlbum?.name || "Faixa";
   body.dataset.trackNumber = String(track?.number || "");
   const storedDraft = isAdmin() ? readTrackSyncDraft(track) : null;
   if (storedDraft) {
@@ -3304,7 +3377,7 @@ function bindAudioToCard(card, audio) {
       if (audio.currentTime >= previewLimit) {
         audio.volume = 1;
         audio.pause();
-        showFloatingNotice("No plano gratis a previa vai ate 30 segundos.");
+        showFloatingNotice("No plano gratis a previa vai ate 1 minuto e 15 segundos.");
       } else if (audio.currentTime >= fadeStart) {
         const remaining = Math.max(0, previewLimit - audio.currentTime);
         audio.volume = Math.min(1, remaining / Math.max(freePreviewFadeSeconds, 1));
