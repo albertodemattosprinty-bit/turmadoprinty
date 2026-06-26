@@ -1158,6 +1158,7 @@ function ensureTrackCharacterModal() {
       </label>
       <div class="bulk-track-title-actions">
         <button id="track-character-cancel" class="ghost-button" type="button">Cancelar</button>
+        <button id="track-character-add" class="primary-button track-character-add-button" type="button">Adicionar</button>
         <button id="track-character-save" class="primary-button" type="button">Salvar</button>
       </div>
     </div>
@@ -1183,6 +1184,9 @@ function ensureTrackCharacterModal() {
   });
   modal.querySelector("#track-character-delete-all-button")?.addEventListener("click", async () => {
     await deleteAllTrackCharacters();
+  });
+  modal.querySelector("#track-character-add")?.addEventListener("click", async () => {
+    await createTrackCharacterOption();
   });
 
   modal.querySelector("#track-character-save")?.addEventListener("click", async () => {
@@ -1347,8 +1351,13 @@ function syncCharacterPaletteOptions() {
 
 function resetTrackCharacterModalActionButtons() {
   const modal = ensureTrackCharacterModal();
+  const addButton = modal.querySelector("#track-character-add");
   const saveButton = modal.querySelector("#track-character-save");
   const deleteButton = modal.querySelector("#track-character-delete-all-button");
+  if (addButton) {
+    addButton.disabled = false;
+    addButton.textContent = "Adicionar";
+  }
   if (saveButton) {
     saveButton.disabled = false;
     saveButton.textContent = "Salvar";
@@ -1396,6 +1405,74 @@ function openTrackCharacterModal(track, lineIndex) {
 
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
+}
+
+async function createTrackCharacterOption() {
+  const modal = ensureTrackCharacterModal();
+  const albumId = String(modal.dataset.albumId || "");
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const selectedIndexes = String(modal.dataset.selectedLineIndexes || "")
+    .split(",")
+    .map((value) => Number(value || -1))
+    .filter((value) => value >= 0);
+  const focusLineIndex = selectedIndexes.length
+    ? Math.max(0, selectedIndexes[0])
+    : Math.max(0, Number(modal.dataset.lineNumber || 1) - 1);
+  const nameInput = modal.querySelector("#track-character-name");
+  const groupSelect = modal.querySelector("#track-character-group");
+  const colorInput = modal.querySelector("#track-character-color");
+  const addButton = modal.querySelector("#track-character-add");
+  if (!albumId || !trackNumber || !nameInput || !groupSelect || !colorInput || !addButton) {
+    return;
+  }
+
+  const characterName = nameInput.value.trim();
+  if (!characterName) {
+    showFloatingNotice("Informe o nome do personagem.");
+    return;
+  }
+
+  try {
+    addButton.disabled = true;
+    addButton.textContent = "Adicionando...";
+    const createResponse = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/characters`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        name: characterName,
+        group: groupSelect.value,
+        color: colorInput.value
+      })
+    });
+    const createData = await createResponse.json().catch(() => ({}));
+    if (!createResponse.ok) {
+      throw new Error(createData.error || "Nao foi possivel criar o personagem.");
+    }
+
+    const characterId = String(createData.character?.id || "").trim();
+    applyAlbumCharactersToCurrentAlbum(Array.isArray(createData.album?.characters) ? createData.album.characters : []);
+    const refreshedTrack = getTrackByNumber(trackNumber);
+    if (refreshedTrack && characterId) {
+      resetTrackCharacterModalActionButtons();
+      openTrackCharacterModal(refreshedTrack, focusLineIndex);
+      const refreshedSelect = ensureTrackCharacterModal().querySelector("#track-character-select");
+      const refreshedNameInput = ensureTrackCharacterModal().querySelector("#track-character-name");
+      if (refreshedSelect) {
+        refreshedSelect.value = characterId;
+      }
+      if (refreshedNameInput) {
+        refreshedNameInput.value = "";
+      }
+    }
+    showFloatingNotice("Personagem criado.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel criar o personagem.");
+  } finally {
+    resetTrackCharacterModalActionButtons();
+  }
 }
 
 async function deleteAllTrackCharacters() {
@@ -1698,38 +1775,7 @@ async function submitTrackCharacterModal() {
     saveButton.textContent = "Salvando...";
     let characterId = String(select.value || "").trim();
     if (characterId === "__new__" || (!characterId && nameInput.value.trim())) {
-      if (!nameInput.value.trim()) {
-        throw new Error("Informe o nome do personagem.");
-      }
-      const createResponse = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/characters`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({
-          name: nameInput.value.trim(),
-          group: groupSelect.value,
-          color: colorInput.value
-        })
-      });
-      const createData = await createResponse.json().catch(() => ({}));
-      if (!createResponse.ok) {
-        throw new Error(createData.error || "Nao foi possivel criar o personagem.");
-      }
-      characterId = String(createData.character?.id || "").trim();
-      applyAlbumCharactersToCurrentAlbum(Array.isArray(createData.album?.characters) ? createData.album.characters : []);
-      const refreshedTrack = getTrackByNumber(trackNumber);
-      if (refreshedTrack && characterId) {
-        resetTrackCharacterModalActionButtons();
-        openTrackCharacterModal(refreshedTrack, focusLineIndex);
-        const refreshedSelect = ensureTrackCharacterModal().querySelector("#track-character-select");
-        if (refreshedSelect) {
-          refreshedSelect.value = characterId;
-        }
-      }
-      showFloatingNotice("Personagem criado.");
-      return;
+      throw new Error("Use o botao Adicionar para criar um novo personagem.");
     }
     let latestData = null;
     for (const targetLineNumber of targetLineNumbers) {

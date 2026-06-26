@@ -2812,6 +2812,11 @@ body[data-page="produto"] .inline-link {
   padding: 0 14px;
 }
 
+.track-character-add-button {
+  background: linear-gradient(135deg, #1ba96b 0%, #29c17b 100%);
+  color: #ffffff;
+}
+
 .track-character-palette {
   display: flex;
   flex-wrap: wrap;
