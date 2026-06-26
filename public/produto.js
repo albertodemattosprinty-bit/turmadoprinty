@@ -2010,6 +2010,11 @@ function openTrackTextsModal(track) {
         openTrackTextEditModal(track, lineIndex);
       }
     };
+    const openCharacterEditor = () => {
+      if (isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
+        openTrackCharacterModal(track, lineIndex);
+      }
+    };
 
     node.addEventListener("click", async (event) => {
       if (trackTextsTouchState?.opened) {
@@ -2078,8 +2083,15 @@ function openTrackTextsModal(track) {
       modalManualLineIndex = lineIndex;
       syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
     });
+    node.addEventListener("contextmenu", (event) => {
+      if (!isAdmin() || !isDesktopPointer()) {
+        return;
+      }
+      event.preventDefault();
+      openCharacterEditor();
+    });
     node.addEventListener("pointerdown", (event) => {
-      if (!isAdmin()) {
+      if (!isAdmin() || isDesktopPointer() || event.pointerType === "mouse") {
         return;
       }
       trackTextsTouchState = {
