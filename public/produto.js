@@ -1166,12 +1166,14 @@ function ensureTrackCharacterModal() {
 
   modal.querySelectorAll("[data-role='close-character-modal']").forEach((node) => {
     node.addEventListener("click", () => {
+      resetTrackCharacterModalActionButtons();
       modal.setAttribute("aria-hidden", "true");
       modal.classList.remove("show");
     });
   });
 
   modal.querySelector("#track-character-cancel")?.addEventListener("click", () => {
+    resetTrackCharacterModalActionButtons();
     modal.setAttribute("aria-hidden", "true");
     modal.classList.remove("show");
   });
@@ -1343,6 +1345,20 @@ function syncCharacterPaletteOptions() {
   }
 }
 
+function resetTrackCharacterModalActionButtons() {
+  const modal = ensureTrackCharacterModal();
+  const saveButton = modal.querySelector("#track-character-save");
+  const deleteButton = modal.querySelector("#track-character-delete-all-button");
+  if (saveButton) {
+    saveButton.disabled = false;
+    saveButton.textContent = "Salvar";
+  }
+  if (deleteButton) {
+    deleteButton.disabled = false;
+    deleteButton.textContent = "Excluir todos";
+  }
+}
+
 function openTrackCharacterModal(track, lineIndex) {
   const modal = ensureTrackCharacterModal();
   const line = getTrackLyricsLines(track)[lineIndex] || null;
@@ -1357,6 +1373,7 @@ function openTrackCharacterModal(track, lineIndex) {
 
   const characters = getTrackCharacters(track);
   const currentCharacter = getCharacterById(track, line.characterId);
+  resetTrackCharacterModalActionButtons();
   preview.textContent = line.text;
   modal.dataset.albumId = String(track?.sourceAlbumId || "");
   modal.dataset.trackId = String(track?.sourceSongId || "");

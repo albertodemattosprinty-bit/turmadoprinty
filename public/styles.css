@@ -2401,8 +2401,8 @@ body[data-page="produto"] .inline-link {
   overflow: hidden;
   box-sizing: border-box;
   background:
-    radial-gradient(circle at top center, rgba(86, 184, 255, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(18, 88, 150, 0.98) 0%, rgba(11, 67, 122, 0.985) 48%, rgba(6, 42, 84, 0.995) 100%);
+    radial-gradient(circle at top center, rgba(255, 255, 255, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(44, 44, 46, 0.98) 0%, rgba(22, 22, 24, 0.99) 52%, rgba(6, 6, 7, 0.995) 100%);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 28px 54px rgba(0, 0, 0, 0.26);
 }
