@@ -415,6 +415,19 @@ function hasRehearsalAlbumAccess(albumId) {
   return accessState.rehearsalAlbumIds.includes(albumId);
 }
 
+function hasGuestRehearsalAlbumAccess(albumId) {
+  const key = getRehearsalStorageKey(albumId);
+  if (!key) {
+    return false;
+  }
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(key) || "null");
+    return Boolean(stored?.albumId && String(stored.albumId) === String(albumId) && stored?.grantedAt);
+  } catch {
+    return false;
+  }
+}
+
 function canUseDownloads(albumId) {
   return accessState.canDownloadAll || hasPurchasedAlbum(albumId);
 }
@@ -424,7 +437,21 @@ function canManageAlbumRehearsal(albumId) {
 }
 
 function canAccessAlbumByRehearsal(albumId) {
-  return hasRehearsalAlbumAccess(albumId);
+  return hasRehearsalAlbumAccess(albumId) || hasGuestRehearsalAlbumAccess(albumId);
+}
+
+function syncRehearseAlbumButton(albumId) {
+  setRehearseButtonState({
+    label: "Ensaiar",
+    onClick: () => {
+      if (canAccessAlbumByRehearsal(albumId)) {
+        openAlbumRehearsalTexts();
+        return;
+      }
+      openAlbumRehearsalEntryModal();
+    },
+    ariaLabel: canAccessAlbumByRehearsal(albumId) ? "Abrir tela imersiva do album" : "Ensaiar album"
+  });
 }
 
 function hasLyricsZip(album) {
@@ -1155,6 +1182,23 @@ function getRehearsalStorageKey(albumId) {
   return albumId ? `produto-rehearsal-access:${albumId}` : "";
 }
 
+function getRehearsalGuestKey() {
+  const storageKey = "produto-rehearsal-guest-key";
+  try {
+    let value = window.localStorage.getItem(storageKey);
+    if (value) {
+      return value;
+    }
+    value = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    window.localStorage.setItem(storageKey, value);
+    return value;
+  } catch {
+    return `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+}
+
 function rememberRehearsalAccess(albumId, payload = {}) {
   const key = getRehearsalStorageKey(albumId);
   if (!key) {
@@ -1163,13 +1207,25 @@ function rememberRehearsalAccess(albumId, payload = {}) {
   try {
     window.localStorage.setItem(key, JSON.stringify({
       albumId,
-      ownerLogin: String(payload.ownerLogin || ""),
       rehearsalCode: String(payload.rehearsalCode || ""),
+      guestKey: String(payload.guestKey || ""),
       grantedAt: new Date().toISOString()
     }));
   } catch {
     // noop
   }
+}
+
+function openAlbumRehearsalTexts() {
+  if (!currentAlbum || !Array.isArray(currentAlbum.tracks) || !currentAlbum.tracks.length) {
+    return;
+  }
+  currentTrackIndex = Math.max(0, Math.min(currentTrackIndex, currentAlbum.tracks.length - 1));
+  const track = currentAlbum.tracks[currentTrackIndex] || currentAlbum.tracks[0];
+  if (!track) {
+    return;
+  }
+  openTrackTextsModal(track);
 }
 
 function ensureRehearsalOwnerModal() {
@@ -1195,9 +1251,8 @@ function ensureRehearsalOwnerModal() {
         </button>
       </div>
       <div class="rehearsal-modal-copy">
-        <p>Peça aos seus alunos para entrarem no site, tocarem em <strong>Ensaiar</strong> e informarem o seu login junto com este codigo.</p>
+        <p>Peça aos seus alunos para entrarem no site, tocarem em <strong>Ensaiar</strong> e digitarem somente este codigo.</p>
         <div class="rehearsal-code-card">
-          <span id="album-rehearsal-owner-login" class="rehearsal-helper">Login: -</span>
           <strong id="album-rehearsal-code-value" class="rehearsal-code-value">--------</strong>
           <span id="album-rehearsal-remaining" class="rehearsal-remaining">Voce tem 20 acessos restantes.</span>
           <small id="album-rehearsal-helper" class="rehearsal-helper">20 pessoas ainda podem ensaiar com este album.</small>
@@ -1247,11 +1302,8 @@ function ensureRehearsalEntryModal() {
         </button>
       </div>
       <div class="rehearsal-modal-copy">
-        <p>Informe o login do usuario dono do album e o codigo de ensaio que ele compartilhou com a turma.</p>
+        <p>Informe somente o codigo de ensaio para abrir este album no modo imersivo.</p>
       </div>
-      <label class="rehearsal-field">Login do usuario
-        <input id="album-rehearsal-entry-login" type="text" placeholder="Ex.: rosemattos" autocomplete="username">
-      </label>
       <label class="rehearsal-field">Codigo de ensaio
         <input id="album-rehearsal-entry-code" type="text" maxlength="12" placeholder="Digite o codigo">
       </label>
@@ -1296,7 +1348,6 @@ async function openAlbumRehearsalOwnerModal({ forceReload = false } = {}) {
   }
 
   const modal = ensureRehearsalOwnerModal();
-  const loginNode = modal.querySelector("#album-rehearsal-owner-login");
   const codeNode = modal.querySelector("#album-rehearsal-code-value");
   const remainingNode = modal.querySelector("#album-rehearsal-remaining");
   const helperNode = modal.querySelector("#album-rehearsal-helper");
@@ -1306,9 +1357,6 @@ async function openAlbumRehearsalOwnerModal({ forceReload = false } = {}) {
   if (refreshButton) {
     refreshButton.disabled = true;
     refreshButton.textContent = "Atualizando...";
-  }
-  if (loginNode) {
-    loginNode.textContent = `Login: ${currentUser?.username || "-"}`;
   }
   if (codeNode) {
     codeNode.textContent = "Carregando...";
@@ -1331,9 +1379,6 @@ async function openAlbumRehearsalOwnerModal({ forceReload = false } = {}) {
 
     const remainingUses = Number(data.rehearsal?.remainingUses || 0);
     const totalUses = Number(data.rehearsal?.totalUses || 20);
-    if (loginNode) {
-      loginNode.textContent = `Login: ${data.owner?.username || currentUser?.username || "-"}`;
-    }
     if (codeNode) {
       codeNode.textContent = String(data.rehearsal?.rehearsalCode || "--------");
     }
@@ -1366,13 +1411,8 @@ function openAlbumRehearsalEntryModal() {
   if (!currentAlbum?.id) {
     return;
   }
-  if (!getToken()) {
-    redirectToAuth(currentAlbum.id);
-    return;
-  }
 
   const modal = ensureRehearsalEntryModal();
-  const loginInput = modal.querySelector("#album-rehearsal-entry-login");
   const codeInput = modal.querySelector("#album-rehearsal-entry-code");
   const remembered = (() => {
     try {
@@ -1382,9 +1422,6 @@ function openAlbumRehearsalEntryModal() {
     }
   })();
 
-  if (loginInput && !loginInput.value) {
-    loginInput.value = String(remembered?.ownerLogin || "");
-  }
   if (codeInput && !codeInput.value) {
     codeInput.value = String(remembered?.rehearsalCode || "");
   }
@@ -1399,14 +1436,13 @@ async function submitAlbumRehearsalEntry() {
   }
 
   const modal = ensureRehearsalEntryModal();
-  const loginInput = modal.querySelector("#album-rehearsal-entry-login");
   const codeInput = modal.querySelector("#album-rehearsal-entry-code");
   const submitButton = modal.querySelector("#album-rehearsal-entry-submit");
-  const ownerLogin = String(loginInput?.value || "").trim();
   const rehearsalCode = String(codeInput?.value || "").trim().toUpperCase();
+  const guestKey = getRehearsalGuestKey();
 
-  if (!ownerLogin || !rehearsalCode) {
-    showFloatingNotice("Informe o login e o codigo de ensaio.");
+  if (!rehearsalCode) {
+    showFloatingNotice("Informe o codigo de ensaio.");
     return;
   }
 
@@ -1421,11 +1457,11 @@ async function submitAlbumRehearsalEntry() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`
+        ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
       },
       body: JSON.stringify({
-        ownerLogin,
-        rehearsalCode
+        rehearsalCode,
+        guestKey
       })
     });
     const data = await response.json().catch(() => ({}));
@@ -1433,15 +1469,19 @@ async function submitAlbumRehearsalEntry() {
       throw new Error(data.error || "Nao foi possivel liberar o ensaio.");
     }
 
-    rememberRehearsalAccess(currentAlbum.id, { ownerLogin, rehearsalCode });
-    await loadAccessState();
+    rememberRehearsalAccess(currentAlbum.id, { rehearsalCode, guestKey });
+    if (getToken()) {
+      await loadAccessState();
+    }
     setPurchaseStatus(currentAlbum.id);
+    syncRehearseAlbumButton(currentAlbum.id);
     await renderTracks(currentAlbum);
     modal.setAttribute("aria-hidden", "true");
     modal.classList.remove("show");
     if (trackPositionLabel && Array.isArray(currentAlbum?.tracks) && currentAlbum.tracks[currentTrackIndex]) {
       trackPositionLabel.textContent = currentAlbum.tracks[currentTrackIndex].label || "";
     }
+    openAlbumRehearsalTexts();
     showFloatingNotice(data.redemption?.alreadyGranted
       ? "Esse ensaio ja estava liberado na sua conta."
       : "Ensaio liberado para este album.");
@@ -3914,13 +3954,7 @@ async function loadAlbumDetail() {
       });
     }
 
-    setRehearseButtonState({
-      label: "Ensaiar",
-      onClick: () => {
-        openAlbumRehearsalEntryModal();
-      },
-      ariaLabel: "Ensaiar album"
-    });
+    syncRehearseAlbumButton(album.id);
   } catch (error) {
     productTitle.textContent = "Nao foi possivel abrir o album";
     if (purchaseStatus) {

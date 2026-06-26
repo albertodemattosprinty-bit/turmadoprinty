@@ -8240,11 +8240,6 @@ async function handleAlbumRehearsalRedeemRequest(request, response, productId) {
     return;
   }
 
-  const user = await requireAuth(request, response);
-  if (!user) {
-    return;
-  }
-
   const pricing = await getSitePricingSettings();
   const product = findStoreProductById(productId, pricing.albumPriceCents, pricing.albumOverrides);
 
@@ -8261,59 +8256,49 @@ async function handleAlbumRehearsalRedeemRequest(request, response, productId) {
     return;
   }
 
-  const ownerLogin = String(body?.ownerLogin || "").trim();
   const rehearsalCode = String(body?.rehearsalCode || "").trim().toUpperCase();
+  const guestKey = String(body?.guestKey || "").trim();
+  const token = parseBearerToken(request.headers.authorization);
+  const user = token ? await findUserBySessionToken(token).catch(() => null) : null;
 
-  if (!ownerLogin || !rehearsalCode) {
+  if (!rehearsalCode) {
     sendJson(response, 400, {
-      error: "Informe o login do usuario e o codigo de ensaio."
+      error: "Informe o codigo de ensaio."
     });
     return;
   }
 
   try {
-    const ownerUser = await findUserByUsername(ownerLogin);
-    if (!ownerUser) {
-      sendJson(response, 404, { error: "Usuario do ensaio nao encontrado." });
-      return;
-    }
-
-    const currentAccessState = await getUserAccessState(user.id);
-    if (currentAccessState.canDownloadAll || currentAccessState.purchasedAlbumIds.includes(product.id) || currentAccessState.rehearsalAlbumIds?.includes(product.id)) {
-      sendJson(response, 200, {
-        ok: true,
-        access: currentAccessState,
-        redemption: {
-          alreadyGranted: true,
-          accessCreatedAt: null,
-          remainingUses: null,
-          totalUses: null,
-          rehearsalCode: rehearsalCode
-        },
-        owner: {
-          username: ownerUser.username || null,
-          name: ownerUser.name || null
-        }
-      });
-      return;
+    if (user) {
+      const currentAccessState = await getUserAccessState(user.id);
+      if (currentAccessState.canDownloadAll || currentAccessState.purchasedAlbumIds.includes(product.id) || currentAccessState.rehearsalAlbumIds?.includes(product.id)) {
+        sendJson(response, 200, {
+          ok: true,
+          access: currentAccessState,
+          redemption: {
+            alreadyGranted: true,
+            accessCreatedAt: null,
+            remainingUses: null,
+            totalUses: null,
+            rehearsalCode
+          }
+        });
+        return;
+      }
     }
 
     const redemption = await redeemAlbumRehearsalCode({
-      userId: user.id,
-      ownerUserId: ownerUser.id,
+      userId: user?.id || null,
+      guestKey,
       productId: product.id,
       rehearsalCode
     });
 
-    const accessState = await getUserAccessState(user.id);
+    const accessState = user ? await getUserAccessState(user.id) : null;
     sendJson(response, 200, {
       ok: true,
       access: accessState,
-      redemption,
-      owner: {
-        username: ownerUser.username || null,
-        name: ownerUser.name || null
-      }
+      redemption
     });
   } catch (error) {
     sendJson(response, 400, {

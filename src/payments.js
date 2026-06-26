@@ -126,15 +126,20 @@ export async function ensurePaymentSchema() {
           id uuid primary key default gen_random_uuid(),
           code_id uuid not null references user_album_rehearsal_codes(id) on delete cascade,
           owner_user_id uuid not null references users(id) on delete cascade,
-          user_id uuid not null references users(id) on delete cascade,
+          user_id uuid references users(id) on delete cascade,
+          guest_key text,
           product_id text not null,
           created_at timestamptz not null default now(),
           unique (user_id, product_id)
         );
       `);
+      await query("alter table user_album_rehearsal_access add column if not exists guest_key text;");
+      await query("alter table user_album_rehearsal_access alter column user_id drop not null;");
       await query("create index if not exists idx_user_album_rehearsal_access_user on user_album_rehearsal_access(user_id);");
       await query("create index if not exists idx_user_album_rehearsal_access_owner on user_album_rehearsal_access(owner_user_id);");
       await query("create index if not exists idx_user_album_rehearsal_access_product on user_album_rehearsal_access(product_id);");
+      await query("create index if not exists idx_user_album_rehearsal_access_guest on user_album_rehearsal_access(guest_key);");
+      await query("create unique index if not exists idx_user_album_rehearsal_access_guest_product_unique on user_album_rehearsal_access(guest_key, product_id) where guest_key is not null;");
     })().catch((error) => {
       paymentSchemaReadyPromise = null;
       throw error;
@@ -553,11 +558,16 @@ export async function getAlbumRehearsalCodeForOwner({ ownerUserId, productId, cr
   throw new Error("Nao foi possivel gerar o codigo de ensaio.");
 }
 
-export async function redeemAlbumRehearsalCode({ userId, ownerUserId, productId, rehearsalCode }) {
+export async function redeemAlbumRehearsalCode({ userId = null, guestKey = "", productId, rehearsalCode }) {
   await ensurePaymentSchema();
 
   if (!db) {
     throw new Error("DATABASE_URL nao configurada.");
+  }
+
+  const normalizedGuestKey = String(guestKey || "").trim();
+  if (!userId && !normalizedGuestKey) {
+    throw new Error("Identificador do visitante ausente.");
   }
 
   const client = await db.connect();
@@ -565,17 +575,29 @@ export async function redeemAlbumRehearsalCode({ userId, ownerUserId, productId,
   try {
     await client.query("BEGIN");
 
-    const existingAccess = await client.query(
-      `
-        select access.id, access.created_at, codes.remaining_uses, codes.total_uses, codes.rehearsal_code
-        from user_album_rehearsal_access access
-        join user_album_rehearsal_codes codes on codes.id = access.code_id
-        where access.user_id = $1
-          and access.product_id = $2
-        limit 1
-      `,
-      [userId, productId]
-    );
+    const existingAccess = userId
+      ? await client.query(
+        `
+          select access.id, access.created_at, codes.remaining_uses, codes.total_uses, codes.rehearsal_code
+          from user_album_rehearsal_access access
+          join user_album_rehearsal_codes codes on codes.id = access.code_id
+          where access.user_id = $1
+            and access.product_id = $2
+          limit 1
+        `,
+        [userId, productId]
+      )
+      : await client.query(
+        `
+          select access.id, access.created_at, codes.remaining_uses, codes.total_uses, codes.rehearsal_code
+          from user_album_rehearsal_access access
+          join user_album_rehearsal_codes codes on codes.id = access.code_id
+          where access.guest_key = $1
+            and access.product_id = $2
+          limit 1
+        `,
+        [normalizedGuestKey, productId]
+      );
 
     if (existingAccess.rows[0]) {
       await client.query("COMMIT");
@@ -592,14 +614,13 @@ export async function redeemAlbumRehearsalCode({ userId, ownerUserId, productId,
       `
         select *
         from user_album_rehearsal_codes
-        where owner_user_id = $1
-          and product_id = $2
-          and rehearsal_code = $3
+        where product_id = $1
+          and rehearsal_code = $2
           and active = true
         limit 1
         for update
       `,
-      [ownerUserId, productId, String(rehearsalCode || "").trim().toUpperCase()]
+      [productId, String(rehearsalCode || "").trim().toUpperCase()]
     );
 
     const codeRow = codeResult.rows[0] || null;
@@ -617,28 +638,46 @@ export async function redeemAlbumRehearsalCode({ userId, ownerUserId, productId,
           code_id,
           owner_user_id,
           user_id,
+          guest_key,
           product_id,
           created_at
         )
-        values ($1, $2, $3, $4, now())
-        on conflict (user_id, product_id) do nothing
+        values ($1, $2, $3, $4, $5, now())
         returning *
       `,
-      [codeRow.id, ownerUserId, userId, productId]
-    );
+      [codeRow.id, codeRow.owner_user_id, userId || null, normalizedGuestKey || null, productId]
+    ).catch(async (error) => {
+      const message = String(error?.message || "");
+      if (!message.includes("user_album_rehearsal_access")) {
+        throw error;
+      }
+      return { rows: [] };
+    });
 
     if (!insertAccess.rows[0]) {
-      const concurrentAccess = await client.query(
-        `
-          select access.created_at, codes.remaining_uses, codes.total_uses, codes.rehearsal_code
-          from user_album_rehearsal_access access
-          join user_album_rehearsal_codes codes on codes.id = access.code_id
-          where access.user_id = $1
-            and access.product_id = $2
-          limit 1
-        `,
-        [userId, productId]
-      );
+      const concurrentAccess = userId
+        ? await client.query(
+          `
+            select access.created_at, codes.remaining_uses, codes.total_uses, codes.rehearsal_code
+            from user_album_rehearsal_access access
+            join user_album_rehearsal_codes codes on codes.id = access.code_id
+            where access.user_id = $1
+              and access.product_id = $2
+            limit 1
+          `,
+          [userId, productId]
+        )
+        : await client.query(
+          `
+            select access.created_at, codes.remaining_uses, codes.total_uses, codes.rehearsal_code
+            from user_album_rehearsal_access access
+            join user_album_rehearsal_codes codes on codes.id = access.code_id
+            where access.guest_key = $1
+              and access.product_id = $2
+            limit 1
+          `,
+          [normalizedGuestKey, productId]
+        );
 
       await client.query("COMMIT");
       return {
