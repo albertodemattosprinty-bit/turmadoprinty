@@ -5123,7 +5123,15 @@ async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, alb
     return;
   }
 
+  let body = {};
+  try {
+    body = await readJsonBody(request);
+  } catch {
+    body = {};
+  }
+
   const safeCharacterId = String(characterId || "").trim();
+  const safeCharacterName = sanitizeMiniMediaTitle(body?.name || "", "").trim();
   if (!safeCharacterId) {
     sendJson(response, 400, { error: "Personagem invalido." });
     return;
@@ -5138,11 +5146,16 @@ async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, alb
     }
 
     const characters = normalizeMiniMediaAlbumCharacters(album.characters || album.metadata?.characters);
-    const nextCharacters = characters.filter((item) => item.id !== safeCharacterId);
-    if (nextCharacters.length === characters.length) {
+    const targetCharacter = characters.find((item) => item.id === safeCharacterId)
+      || (safeCharacterName
+        ? characters.find((item) => String(item?.name || "").trim().toLocaleLowerCase("pt-BR") === safeCharacterName.toLocaleLowerCase("pt-BR"))
+        : null);
+    if (!targetCharacter) {
       sendJson(response, 404, { error: "Personagem nao encontrado." });
       return;
     }
+
+    const nextCharacters = characters.filter((item) => item.id !== targetCharacter.id);
 
     album.characters = nextCharacters;
     album.metadata = {
@@ -5160,7 +5173,7 @@ async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, alb
 
       let changed = false;
       const nextLines = lines.map((line) => {
-        if (String(line?.characterId || "").trim() !== safeCharacterId) {
+        if (String(line?.characterId || "").trim() !== targetCharacter.id) {
           return line;
         }
         changed = true;
@@ -5209,7 +5222,7 @@ async function handleMiniMediaAlbumCharacterDeleteRequest(request, response, alb
       user: sanitizeUser(adminUser),
       album: buildMiniMediaAlbumPayload(savedAlbum, { includeExtended: true }),
       characters: nextCharacters,
-      removedCharacterId: safeCharacterId,
+      removedCharacterId: targetCharacter.id,
       syncUpdates
     });
   } catch (error) {

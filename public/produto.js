@@ -1348,7 +1348,7 @@ function renderTrackCharacterDeleteSheet(track) {
   }
 
   list.innerHTML = characters.map((character) => `
-    <button class="track-character-delete-item" type="button" data-character-id="${escapeHtml(character.id)}">
+    <button class="track-character-delete-item" type="button" data-character-id="${escapeHtml(character.id)}" data-character-name="${escapeHtml(character.name)}">
       <span class="track-character-delete-swatch" style="--character-delete-color:${escapeHtml(character.color || "#FFFFFF")}"></span>
       <span class="track-character-delete-name">${escapeHtml(character.name)}</span>
     </button>
@@ -1356,7 +1356,10 @@ function renderTrackCharacterDeleteSheet(track) {
 
   list.querySelectorAll("[data-character-id]").forEach((node) => {
     node.addEventListener("click", async () => {
-      await deleteTrackCharacter(String(node.dataset.characterId || "").trim());
+      await deleteTrackCharacter(
+        String(node.dataset.characterId || "").trim(),
+        String(node.dataset.characterName || "").trim()
+      );
     });
   });
 }
@@ -1374,7 +1377,7 @@ function openTrackCharacterDeleteSheet() {
   sheet.classList.add("show");
 }
 
-async function deleteTrackCharacter(characterId) {
+async function deleteTrackCharacter(characterId, characterName = "") {
   const modal = ensureTrackCharacterModal();
   const albumId = String(modal.dataset.albumId || "");
   const trackNumber = Number(modal.dataset.trackNumber || 0);
@@ -1388,8 +1391,12 @@ async function deleteTrackCharacter(characterId) {
     const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(albumId)}/characters/${encodeURIComponent(characterId)}`), {
       method: "DELETE",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${getToken()}`
-      }
+      },
+      body: JSON.stringify({
+        name: characterName
+      })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
