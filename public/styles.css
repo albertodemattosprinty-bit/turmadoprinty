@@ -3153,6 +3153,15 @@ body[data-page="eventos-pagamento"] {
   gap: 10px;
 }
 
+.track-action-icon-button {
+  color: #ffffff !important;
+}
+
+.track-action-danger {
+  color: #ffd0d0 !important;
+  border-color: rgba(255, 138, 138, 0.32) !important;
+}
+
 .track-texts-button {
   min-height: 42px;
   padding: 0 14px;

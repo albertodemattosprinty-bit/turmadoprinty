@@ -770,6 +770,10 @@ function hasTrackTexts(track) {
   return Boolean(getTrackLyricsLines(track).length || String(track?.lyrics || "").trim());
 }
 
+function hasTrackTimestamps(track) {
+  return getTrackLyricsLines(track).some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
+}
+
 function canGenerateTrackTexts(track) {
   return isAdmin() && String(track?.streamUrl || "").trim();
 }
@@ -2317,6 +2321,7 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
   const downloadButton = card.querySelector("[data-role='download']");
   const textsButton = card.querySelector("[data-role='texts']");
   const generateTextsButton = card.querySelector("[data-role='generate-texts']");
+  const clearTimestampsButton = card.querySelector("[data-role='clear-timestamps']");
 
   if (!actionLabel || !downloadButton) {
     return;
@@ -2331,6 +2336,9 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
     if (generateTextsButton) {
       generateTextsButton.disabled = true;
     }
+    if (clearTimestampsButton) {
+      clearTimestampsButton.disabled = true;
+    }
     return;
   }
 
@@ -2341,6 +2349,9 @@ function setDownloadUi(card, { downloading = false, progress = 0, downloaded = f
   }
   if (generateTextsButton) {
     generateTextsButton.disabled = false;
+  }
+  if (clearTimestampsButton) {
+    clearTimestampsButton.disabled = false;
   }
 }
 
@@ -2365,7 +2376,7 @@ async function createTrackTexts(card, album, track) {
     return;
   }
 
-  const hasExistingTimestamps = getTrackLyricsLines(track).some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
+  const hasExistingTimestamps = hasTrackTimestamps(track);
   if (hasExistingTimestamps) {
     const accepted = await confirmTrackTextsReset();
     if (!accepted) {
@@ -2392,7 +2403,9 @@ async function createTrackTexts(card, album, track) {
     stopTrackGenerationProgress();
     setTrackGenerationModalState({
       title: "Tudo pronto",
-      message: "Os textos e os timestamps foram gerados e ligados ao catalogo do MINI.",
+      message: hasExistingTimestamps
+        ? "Os timestamps antigos foram removidos e a faixa agora ficou com texto simples."
+        : "O texto simples foi criado e ligado ao catalogo do MINI.",
       progress: 100
     });
 
@@ -2401,10 +2414,13 @@ async function createTrackTexts(card, album, track) {
       lyrics: data.lyrics || "",
       lyricsSyncData: data.syncData || null
     };
+    clearTrackSyncDraft(track);
+    trackTextsSyncDraft = null;
+    trackTextsSyncMode = false;
     updateTrackInCurrentAlbum(updatedTrack);
     await renderTracks(currentAlbum);
     openTrackTextsModal(updatedTrack);
-    showFloatingNotice("Textos criados com sucesso.");
+    showFloatingNotice(hasExistingTimestamps ? "Timestamp removido e texto recriado." : "Textos criados com sucesso.");
     window.setTimeout(() => {
       setTrackGenerationModalState({ open: false });
     }, 900);
@@ -2412,6 +2428,58 @@ async function createTrackTexts(card, album, track) {
     stopTrackGenerationProgress();
     setTrackGenerationModalState({ open: false });
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel criar os textos.");
+  }
+}
+
+async function clearTrackTimestamps(card, track) {
+  if (!isAdmin() || !track?.sourceAlbumId || !track?.sourceSongId) {
+    return;
+  }
+
+  try {
+    const lines = cloneLyricsLines(getTrackLyricsLines(track)).map((line, index) => ({
+      ...line,
+      number: index + 1,
+      timestampMs: null
+    }));
+    const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(track.sourceAlbumId)}/tracks/${encodeURIComponent(track.sourceSongId)}/lyrics`), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`
+      },
+      body: JSON.stringify({
+        lyrics: lines.map((line) => line.text).join("\n"),
+        syncData: {
+          ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+          albumId: track.sourceAlbumId,
+          trackId: track.sourceSongId,
+          title: track.title,
+          lines
+        }
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "Nao foi possivel remover os timestamps.");
+    }
+
+    clearTrackSyncDraft(track);
+    trackTextsSyncDraft = null;
+    trackTextsSyncMode = false;
+    const updatedTrack = {
+      ...track,
+      lyrics: data.lyrics || lines.map((line) => line.text).join("\n"),
+      lyricsSyncData: data.syncData || {
+        ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+        lines
+      }
+    };
+    updateTrackInCurrentAlbum(updatedTrack);
+    await renderTracks(currentAlbum);
+    showFloatingNotice("Timestamps removidos da faixa.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel remover os timestamps.");
   }
 }
 
@@ -2775,8 +2843,11 @@ async function renderTracks(album) {
               : "Preview"
         }</span>
         <div class="track-download-actions">
-          <button class="ghost-button track-texts-button" type="button" data-role="texts" ${hasTrackTexts(track) ? "" : "hidden"}>Ver textos</button>
-          ${canGenerateTrackTexts(track) ? `<button class="ghost-button track-texts-button" type="button" data-role="generate-texts">Criar textos</button>` : ""}
+          <button class="ghost-button download-icon-button track-action-icon-button" type="button" data-role="texts" aria-label="Ver textos" ${hasTrackTexts(track) ? "" : "hidden"}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2h9A2.5 2.5 0 0 1 19 4.5v15a.5.5 0 0 1-.8.4L12 15.2 5.8 19.9a.5.5 0 0 1-.8-.4zm3 2a1 1 0 0 0 0 2h8a1 1 0 1 0 0-2zm0 4a1 1 0 0 0 0 2h8a1 1 0 1 0 0-2z"/></svg>
+          </button>
+          ${canGenerateTrackTexts(track) ? `<button class="ghost-button download-icon-button track-action-icon-button" type="button" data-role="generate-texts" aria-label="Criar textos com OpenAI"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a1 1 0 0 1 1 1v2.05a6.5 6.5 0 0 1 3.7 1.53l1.45-1.45a1 1 0 1 1 1.42 1.41l-1.46 1.46A6.47 6.47 0 0 1 18.95 11H21a1 1 0 1 1 0 2h-2.05a6.5 6.5 0 0 1-1.53 3.7l1.45 1.45a1 1 0 0 1-1.41 1.42l-1.46-1.46A6.47 6.47 0 0 1 13 18.95V21a1 1 0 1 1-2 0v-2.05a6.5 6.5 0 0 1-3.7-1.53l-1.45 1.45a1 1 0 1 1-1.42-1.41l1.46-1.46A6.47 6.47 0 0 1 5.05 13H3a1 1 0 1 1 0-2h2.05a6.5 6.5 0 0 1 1.53-3.7L5.13 5.85a1 1 0 0 1 1.41-1.42l1.46 1.46A6.47 6.47 0 0 1 11 5.05V3a1 1 0 0 1 1-1m0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10"/></svg></button>` : ""}
+          ${isAdmin() ? `<button class="ghost-button download-icon-button track-action-icon-button track-action-danger" type="button" data-role="clear-timestamps" aria-label="Remover timestamps" ${hasTrackTimestamps(track) ? "" : "hidden"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h.72l.95 11.36A2 2 0 0 0 8.66 20h6.68a2 2 0 0 0 1.99-1.64L18.28 7H19a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1zm1 2V5h4V5zm-.28 4a1 1 0 0 1 1 .92l.5 6a1 1 0 1 1-1.99.16l-.5-6a1 1 0 0 1 .91-1.08m4.56 0a1 1 0 0 1 .91 1.08l-.5 6a1 1 0 1 1-1.99-.16l.5-6a1 1 0 0 1 1.08-.92"/></svg></button>` : ""}
           <button class="ghost-button download-icon-button" type="button" data-role="download" aria-label="Baixar faixa">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1m-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1"/></svg>
           </button>
@@ -2848,6 +2919,10 @@ async function renderTracks(album) {
 
     article.querySelector("[data-role='generate-texts']")?.addEventListener("click", async () => {
       await createTrackTexts(article, album, track);
+    });
+
+    article.querySelector("[data-role='clear-timestamps']")?.addEventListener("click", async () => {
+      await clearTrackTimestamps(article, track);
     });
 
     setDownloadUi(article, {

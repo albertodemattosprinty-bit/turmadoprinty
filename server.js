@@ -4979,7 +4979,7 @@ async function handleStoreTrackTextsGenerateRequest(request, response, productId
         ? updatedSong.lyrics_sync_json
         : generated.syncData,
       updatedAt: updatedSong?.lyrics_updated_at || null,
-      feedback: "Textos e timestamps gerados com sucesso."
+      feedback: "Texto simples gerado com sucesso e timestamps antigos removidos."
     });
   } catch (error) {
     sendJson(response, 400, {
