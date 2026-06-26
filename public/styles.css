@@ -2266,9 +2266,7 @@ body[data-page="produtos"] .section-muted {
 
 body[data-page="produto"] {
   color: #ffffff;
-  background:
-    radial-gradient(140% 72% at 50% 0%, #4ccfbc 0%, #43c7b7 38%, rgba(67, 199, 183, 0) 39%),
-    linear-gradient(180deg, #3dbecc 0%, #2f9fe1 44%, #1f86cf 45%, #1f86cf 100%);
+  background: linear-gradient(180deg, #47c8b7 0%, #197ec9 100%);
 }
 
 body[data-page="produto"] .site-header {
@@ -2751,8 +2749,19 @@ body[data-page="produto"] .inline-link {
 }
 
 .track-character-panel {
+  position: absolute;
+  inset: 0;
   display: grid;
   gap: 14px;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 22px 22px 30px;
+  border-radius: 0;
+  overflow: auto;
 }
 
 .track-character-field {
