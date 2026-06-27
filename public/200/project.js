@@ -6067,22 +6067,30 @@ async function loadStatsSummary() {
   try {
     const scope = getActiveStatsScope();
     statsScopeLabel.textContent = scope.label;
-    const requests = [
-      apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`),
+    const summaryResult = await apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`);
+    const optionalRequests = [
       apiRequest("/api/stats/goals"),
       apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`)
     ];
     if (isProject200AdminUser()) {
-      requests.splice(2, 0, apiRequest("/api/finance/summary?period=total"));
+      optionalRequests.splice(1, 0, apiRequest("/api/finance/summary?period=total"));
     }
-    const responses = await Promise.all(requests);
-    const [summaryPayload, goalsPayload] = responses;
-    const platformPayload = isProject200AdminUser() ? responses[2] : null;
-    const platformMonthPayload = isProject200AdminUser() ? responses[3] : responses[2];
+    const optionalResponses = await Promise.allSettled(optionalRequests);
+    const goalsPayload = optionalResponses[0]?.status === "fulfilled" ? optionalResponses[0].value : null;
+    const platformPayload = isProject200AdminUser() && optionalResponses[1]?.status === "fulfilled"
+      ? optionalResponses[1].value
+      : null;
+    const platformMonthPayload = isProject200AdminUser()
+      ? optionalResponses[2]?.status === "fulfilled"
+        ? optionalResponses[2].value
+        : null
+      : optionalResponses[1]?.status === "fulfilled"
+        ? optionalResponses[1].value
+        : null;
 
-    state.statsSummary = summaryPayload.summary || {};
-    state.statsGoals = goalsPayload.goals || null;
-    state.statsGlobalProfiles = Array.isArray(summaryPayload.summary?.globalProfiles) ? summaryPayload.summary.globalProfiles : [];
+    state.statsSummary = summaryResult.summary || {};
+    state.statsGoals = goalsPayload?.goals || null;
+    state.statsGlobalProfiles = Array.isArray(summaryResult.summary?.globalProfiles) ? summaryResult.summary.globalProfiles : [];
     state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
     state.platformBalanceCents = Number(platformMonthPayload?.summary?.balanceCents || state.platformBalanceCents);
     buildStatsRankingFromSummary();
