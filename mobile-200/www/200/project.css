@@ -275,12 +275,12 @@ body.project-no-select textarea {
 }
 
 .home-top-logo {
-  width: min(128px, 34vw);
-  height: min(128px, 34vw);
-  object-fit: cover;
-  border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.12);
+  width: min(280px, 72vw);
+  height: auto;
+  object-fit: contain;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.32));
 }
 
@@ -310,11 +310,11 @@ body.project-no-select textarea {
   border-radius: 0;
   background: transparent;
   min-height: auto;
-  min-height: 84px;
+  min-height: 96px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 4px;
+  gap: 0;
   cursor: pointer;
   box-shadow: none;
   transition: transform 0.18s ease, opacity 0.18s ease;
@@ -328,8 +328,8 @@ body.project-no-select textarea {
 }
 
 .hub-icon-image {
-  width: min(58px, 9vw);
-  height: min(58px, 9vw);
+  width: min(84px, 18vw);
+  height: min(84px, 18vw);
   object-fit: contain;
   display: block;
 }
@@ -340,13 +340,6 @@ body.project-no-select textarea {
   color: #fff;
   fill: currentColor;
   display: block;
-}
-
-.hub-label {
-  font-size: 0.8rem;
-  color: #fff;
-  font-weight: 700;
-  line-height: 1;
 }
 
 .home-datetime {
@@ -466,16 +459,46 @@ body.start-decision-open .home-running-btn {
   background: rgba(8, 20, 52, 0.5);
   padding: 24px;
   color: #fff;
+  display: grid;
+  align-content: center;
+  justify-items: stretch;
 }
 
 .project-login-logo {
-  width: min(220px, 56vw);
+  width: min(280px, 74vw);
   display: block;
   margin: 0 auto 10px;
 }
 
 .project-login-card h2 { margin: 0 0 6px; }
 .project-login-card p { margin: 0 0 12px; color: rgba(255,255,255,0.9); }
+.project-login-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0 14px;
+}
+.project-login-tab {
+  width: 100%;
+  margin-top: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 800;
+  padding: 12px 14px;
+}
+.project-login-tab.active {
+  background: linear-gradient(135deg, #1aa7ff, #ff9b1f);
+  color: #081630;
+  border-color: transparent;
+}
+.project-login-panel {
+  display: none;
+}
+.project-login-panel.active {
+  display: block;
+}
 .project-login-card label { display: block; margin: 10px 0 6px; font-weight: 700; }
 .project-login-card input {
   width: 100%;

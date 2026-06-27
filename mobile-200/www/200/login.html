@@ -11,15 +11,36 @@
 </head>
 <body>
   <main class="login-shell">
-    <img class="login-logo" src="/200/avatars/familyplan.png" alt="Projeto 200" />
+    <img class="login-logo" src="/200/branding/mindset-trainer.png" alt="Mindset Trainer" />
     <section class="login-card" aria-label="Login da pagina 200">
-      <h1>Acesso da página 200</h1>
-      <p>Digite o nome autorizado para continuar.</p>
-      <form id="loginForm" novalidate>
-        <label for="usernameInput">Nome de acesso</label>
-        <input id="usernameInput" name="username" type="text" autocomplete="off" placeholder="RoseMattos" required />
-        <button type="submit">Entrar</button>
-      </form>
+      <h1>Mindset Trainer</h1>
+      <p>Entre com sua conta ou crie um cadastro.</p>
+      <div class="login-tabs" role="tablist" aria-label="Acesso da pagina 200">
+        <button class="login-tab active" type="button" data-login-tab="login" aria-selected="true">Entrar</button>
+        <button class="login-tab" type="button" data-login-tab="register" aria-selected="false">Cadastrar</button>
+      </div>
+      <div class="login-panel active" data-login-panel="login">
+        <form id="loginForm" novalidate>
+          <label for="usernameInput">Usuário</label>
+          <input id="usernameInput" name="username" type="text" autocomplete="username" required />
+          <label for="passwordInput">Senha</label>
+          <input id="passwordInput" name="password" type="password" autocomplete="current-password" required />
+          <button type="submit">Entrar</button>
+        </form>
+      </div>
+      <div class="login-panel" data-login-panel="register" hidden>
+        <form id="registerForm" novalidate>
+          <label for="registerNameInput">Nome</label>
+          <input id="registerNameInput" name="name" type="text" autocomplete="name" required />
+          <label for="registerUsernameInput">Usuário</label>
+          <input id="registerUsernameInput" name="username" type="text" autocomplete="username" required />
+          <label for="registerPasswordInput">Senha</label>
+          <input id="registerPasswordInput" name="password" type="password" autocomplete="new-password" required />
+          <label for="registerPasswordConfirmInput">Confirmar senha</label>
+          <input id="registerPasswordConfirmInput" name="password-confirm" type="password" autocomplete="new-password" required />
+          <button type="submit">Cadastrar</button>
+        </form>
+      </div>
       <p id="loginMessage" role="status" aria-live="polite"></p>
     </section>
   </main>

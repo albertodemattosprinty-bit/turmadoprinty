@@ -445,6 +445,15 @@ const project200LoginOverlay = document.getElementById("project200LoginOverlay")
 const project200LoginForm = document.getElementById("project200LoginForm");
 const project200Username = document.getElementById("project200Username");
 const project200Password = document.getElementById("project200Password");
+const project200RegisterForm = document.getElementById("project200RegisterForm");
+const project200RegisterName = document.getElementById("project200RegisterName");
+const project200RegisterUsername = document.getElementById("project200RegisterUsername");
+const project200RegisterPassword = document.getElementById("project200RegisterPassword");
+const project200RegisterPasswordConfirm = document.getElementById("project200RegisterPasswordConfirm");
+const project200LoginTabButton = document.getElementById("project200LoginTabButton");
+const project200RegisterTabButton = document.getElementById("project200RegisterTabButton");
+const project200LoginPanel = document.getElementById("project200LoginPanel");
+const project200RegisterPanel = document.getElementById("project200RegisterPanel");
 const project200LoginMessage = document.getElementById("project200LoginMessage");
 const profileManageOverlay = document.getElementById("profileManageOverlay");
 const profileManageTitle = document.getElementById("profileManageTitle");
@@ -943,11 +952,27 @@ function applySelectedProfile(profile) {
 function renderHomeProfileHero() {
   const profile = getProfileByName(state.selectedProfile) || getDefaultProfile();
   if (homeProfileAvatar) {
-    homeProfileAvatar.src = getProfileAvatarPath(profile);
-    homeProfileAvatar.alt = profile?.name ? `Avatar de ${profile.name}` : "Avatar";
+    homeProfileAvatar.src = "/200/branding/mindset-trainer.png";
+    homeProfileAvatar.alt = "Mindset Trainer";
   }
   if (homeProfileName) {
     homeProfileName.textContent = profile?.name || getDefaultProfileName();
+  }
+}
+
+function setProject200AuthTab(tab) {
+  const nextTab = String(tab || "login").trim().toLowerCase() === "register" ? "register" : "login";
+  project200LoginTabButton?.classList.toggle("active", nextTab === "login");
+  project200RegisterTabButton?.classList.toggle("active", nextTab === "register");
+  project200LoginTabButton?.setAttribute("aria-selected", nextTab === "login" ? "true" : "false");
+  project200RegisterTabButton?.setAttribute("aria-selected", nextTab === "register" ? "true" : "false");
+  project200LoginPanel?.classList.toggle("active", nextTab === "login");
+  project200RegisterPanel?.classList.toggle("active", nextTab === "register");
+  if (project200LoginPanel) {
+    project200LoginPanel.hidden = nextTab !== "login";
+  }
+  if (project200RegisterPanel) {
+    project200RegisterPanel.hidden = nextTab !== "register";
   }
 }
 
@@ -7308,6 +7333,7 @@ function openProject200LoginOverlay(message = "") {
   if (project200LoginMessage) {
     project200LoginMessage.textContent = message;
   }
+  setProject200AuthTab("login");
   project200LoginOverlay?.classList.add("active");
   project200LoginOverlay?.setAttribute("aria-hidden", "false");
 }
@@ -8871,6 +8897,73 @@ project200LoginForm?.addEventListener("submit", (event) => {
     } catch (error) {
       if (project200LoginMessage) {
         project200LoginMessage.textContent = error instanceof Error ? error.message : "Falha no login.";
+      }
+    }
+  })();
+});
+
+project200LoginTabButton?.addEventListener("click", () => {
+  if (project200LoginMessage) {
+    project200LoginMessage.textContent = "";
+  }
+  setProject200AuthTab("login");
+});
+
+project200RegisterTabButton?.addEventListener("click", () => {
+  if (project200LoginMessage) {
+    project200LoginMessage.textContent = "";
+  }
+  setProject200AuthTab("register");
+});
+
+project200RegisterForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = String(project200RegisterName?.value || "").trim();
+  const username = String(project200RegisterUsername?.value || "").trim();
+  const password = String(project200RegisterPassword?.value || "");
+  const confirmPassword = String(project200RegisterPasswordConfirm?.value || "");
+  if (!name || !username || !password || !confirmPassword) {
+    if (project200LoginMessage) project200LoginMessage.textContent = "Preencha todos os campos do cadastro.";
+    return;
+  }
+  if (password !== confirmPassword) {
+    if (project200LoginMessage) project200LoginMessage.textContent = "As senhas nao conferem.";
+    return;
+  }
+  if (project200LoginMessage) project200LoginMessage.textContent = "Criando conta...";
+  void (async () => {
+    try {
+      const registerResponse = await fetch(getApiUrl("/api/auth/register"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, username, password })
+      });
+      const registerData = await registerResponse.json();
+      if (!registerResponse.ok) {
+        throw new Error(registerData?.error || "Falha no cadastro.");
+      }
+
+      const loginResponse = await fetch(getApiUrl("/api/auth/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const loginData = await loginResponse.json();
+      if (!loginResponse.ok || !loginData?.token) {
+        throw new Error(loginData?.error || "Conta criada, mas o login automatico falhou.");
+      }
+
+      setToken(String(loginData.token));
+      refreshProfileLockFromAuth(loginData?.user || null);
+      if (project200LoginMessage) project200LoginMessage.textContent = "Conta criada e acesso liberado.";
+      project200LoginOverlay?.classList.remove("active");
+      project200LoginOverlay?.setAttribute("aria-hidden", "true");
+      setProject200AuthTab("login");
+      await loadProject200Profiles();
+      await loadActions();
+    } catch (error) {
+      if (project200LoginMessage) {
+        project200LoginMessage.textContent = error instanceof Error ? error.message : "Falha no cadastro.";
       }
     }
   })();

@@ -17,11 +17,13 @@ body {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  gap: 20px;
   padding: 24px;
 }
+.login-shell > * {
+  justify-self: center;
+}
 .login-logo {
-  width: min(240px, 62vw);
+  width: min(300px, 76vw);
   filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.3));
 }
 .login-card {
@@ -31,6 +33,8 @@ body {
   border-radius: 20px;
   padding: 22px;
   backdrop-filter: blur(10px);
+  display: grid;
+  gap: 0;
 }
 h1 { margin: 0 0 6px; font-size: 1.45rem; }
 p { margin: 0 0 14px; color: rgba(255, 255, 255, 0.88); }
@@ -50,5 +54,25 @@ button {
   font-weight: 800;
   padding: 12px 14px;
   cursor: pointer;
+}
+.login-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+.login-tab {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+.login-tab.active {
+  background: linear-gradient(135deg, #1aa7ff, #ff9b1f);
+  color: #071b39;
+}
+.login-panel {
+  display: none;
+}
+.login-panel.active {
+  display: block;
 }
 #loginMessage { min-height: 22px; margin-top: 10px; font-weight: 600; }

@@ -16,16 +16,35 @@
   <div class="app-background-light" aria-hidden="true"></div>
   <section class="project-login-overlay" id="project200LoginOverlay" aria-hidden="true">
     <div class="project-login-card">
-      <img class="project-login-logo" src="/200/avatars/familyplan.png" alt="Projeto 200" />
-      <h2>Entrar no Projeto 200</h2>
-      <p>Use seu usuário e senha do Turma do Printy.</p>
-      <form id="project200LoginForm">
-        <label for="project200Username">Usuário</label>
-        <input id="project200Username" type="text" autocomplete="username" required />
-        <label for="project200Password">Senha</label>
-        <input id="project200Password" type="password" autocomplete="current-password" required />
-        <button type="submit" class="primary-btn">Entrar</button>
-      </form>
+      <img class="project-login-logo" src="/200/branding/mindset-trainer.png" alt="Mindset Trainer" />
+      <h2>Mindset Trainer</h2>
+      <p>Acesse sua conta ou crie um cadastro novo.</p>
+      <div class="project-login-tabs" role="tablist" aria-label="Acesso do aplicativo">
+        <button class="project-login-tab active" type="button" id="project200LoginTabButton" data-project-login-tab="login" aria-selected="true">Entrar</button>
+        <button class="project-login-tab" type="button" id="project200RegisterTabButton" data-project-login-tab="register" aria-selected="false">Cadastrar</button>
+      </div>
+      <div class="project-login-panel active" id="project200LoginPanel">
+        <form id="project200LoginForm">
+          <label for="project200Username">Usuário</label>
+          <input id="project200Username" type="text" autocomplete="username" required />
+          <label for="project200Password">Senha</label>
+          <input id="project200Password" type="password" autocomplete="current-password" required />
+          <button type="submit" class="primary-btn">Entrar</button>
+        </form>
+      </div>
+      <div class="project-login-panel" id="project200RegisterPanel" hidden>
+        <form id="project200RegisterForm">
+          <label for="project200RegisterName">Nome</label>
+          <input id="project200RegisterName" type="text" autocomplete="name" required />
+          <label for="project200RegisterUsername">Usuário</label>
+          <input id="project200RegisterUsername" type="text" autocomplete="username" required />
+          <label for="project200RegisterPassword">Senha</label>
+          <input id="project200RegisterPassword" type="password" autocomplete="new-password" required />
+          <label for="project200RegisterPasswordConfirm">Confirmar senha</label>
+          <input id="project200RegisterPasswordConfirm" type="password" autocomplete="new-password" required />
+          <button type="submit" class="primary-btn">Cadastrar</button>
+        </form>
+      </div>
       <p id="project200LoginMessage" class="project-login-message"></p>
     </div>
   </section>
@@ -68,34 +87,28 @@
   <main class="project-shell">
     <section class="home-profile-hero">
       <button class="home-profile-button" id="homeProfileButton" type="button" aria-label="Usuário atual">
-        <img class="home-top-logo" id="homeProfileAvatar" src="/200/avatars/familyplan.png" alt="Usuário atual" />
+        <img class="home-top-logo" id="homeProfileAvatar" src="/200/branding/mindset-trainer.png" alt="Mindset Trainer" />
       </button>
       <span class="home-profile-name" id="homeProfileName">Usuario</span>
     </section>
     <section class="project-hub" aria-label="Projeto 200">
       <button class="hub-action hub-icon-only" type="button" data-open-modal="actionsModal" aria-label="Ações">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-        <span class="hub-label">Ações</span>
+        <img class="hub-icon-image" src="/200/branding/acoes.png" alt="" aria-hidden="true" />
       </button>
       <button class="hub-action hub-icon-only" type="button" data-open-modal="optionsModal" aria-label="Opções">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.8A3.2 3.2 0 1 0 12 15.2 3.2 3.2 0 0 0 12 8.8Zm9 3.2-.9-.5a8.8 8.8 0 0 0-.3-1.2l.7-.8a1 1 0 0 0-.1-1.4l-1-1a1 1 0 0 0-1.4-.1l-.8.7q-.57-.18-1.2-.3L15 3a1 1 0 0 0-1-.8h-2a1 1 0 0 0-1 .8l-.5.9q-.62.12-1.2.3l-.8-.7a1 1 0 0 0-1.4.1l-1 1a1 1 0 0 0-.1 1.4l.7.8q-.18.57-.3 1.2L3 11a1 1 0 0 0-.8 1v2a1 1 0 0 0 .8 1l.9.5q.12.62.3 1.2l-.7.8a1 1 0 0 0 .1 1.4l1 1a1 1 0 0 0 1.4.1l.8-.7q.57.18 1.2.3l.5.9a1 1 0 0 0 1 .8h2a1 1 0 0 0 1-.8l.5-.9q.62-.12 1.2-.3l.8.7a1 1 0 0 0 1.4-.1l1-1a1 1 0 0 0 .1-1.4l-.7-.8q.18-.57.3-1.2l.9-.5a1 1 0 0 0 .8-1v-2A1 1 0 0 0 21 12Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-        <span class="hub-label">Opções</span>
+        <img class="hub-icon-image" src="/200/branding/configuracoes.png" alt="" aria-hidden="true" />
       </button>
       <button class="hub-action hub-icon-only" type="button" data-open-modal="conversationsModal" aria-label="Conversas">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H11l-4.5 4v-4H7.5A2.5 2.5 0 0 1 5 12.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 8.5h8M8 11.5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span class="hub-label">Conversas</span>
+        <img class="hub-icon-image" src="/200/branding/mensagens.png" alt="" aria-hidden="true" />
       </button>
       <button class="hub-action hub-icon-only" type="button" data-open-modal="calendarModal" aria-label="Finanças">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v10M8 10.5c0-1.2 1.8-2.2 4-2.2s4 1 4 2.2-1.8 2.2-4 2.2-4 1-4 2.2 1.8 2.2 4 2.2 4-1 4-2.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-        <span class="hub-label">Financeiro</span>
+        <img class="hub-icon-image" src="/200/branding/financas.png" alt="" aria-hidden="true" />
       </button>
       <button class="hub-action hub-icon-only" type="button" data-open-modal="statsModal" aria-label="Estatísticas">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 9.5 8H5l3.5 3-1.5 5L12 13l5 3-1.5-5L19 8h-4.5z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 20h8" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-        <span class="hub-label">Estatísticas</span>
+        <img class="hub-icon-image" src="/200/branding/estatisticas.png" alt="" aria-hidden="true" />
       </button>
       <button class="hub-action hub-icon-only" type="button" data-open-modal="historyModal" aria-label="Histórico">
-        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-        <span class="hub-label">Histórico</span>
+        <img class="hub-icon-image" src="/200/branding/historico.png" alt="" aria-hidden="true" />
       </button>
     </section>
     <section class="home-datetime" aria-label="Data e horário atual">
