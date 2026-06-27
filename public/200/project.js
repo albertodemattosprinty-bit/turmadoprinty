@@ -3527,7 +3527,7 @@ async function loadConstitution() {
     return;
   }
 
-  constitutionMessage.textContent = "Carregando...";
+  showDbLoadingState(constitutionMessage, 84);
   try {
     const payload = await apiRequest("/api/constitution/versions");
     state.constitutionVersions = Array.isArray(payload?.versions) && payload.versions.length
@@ -3689,7 +3689,7 @@ async function loadFinanceSummary() {
   if (saveFinanceNotesButton) {
     saveFinanceNotesButton.disabled = true;
   }
-  financeStatus.textContent = "Carregando...";
+  showDbLoadingState(financeStatus, 84);
   setFinanceSalesTitle(selectedPeriod.label);
 
   try {
@@ -3943,6 +3943,18 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function buildDbLoadingMarkup(minHeight = 140) {
+  const safeMinHeight = Math.max(48, Number(minHeight || 140));
+  return `<div class="db-loading-shell" style="--db-loading-min-height:${safeMinHeight}px;"><span class="db-loading-loop" aria-hidden="true"></span></div>`;
+}
+
+function showDbLoadingState(target, minHeight = 140) {
+  if (!target) {
+    return;
+  }
+  target.innerHTML = buildDbLoadingMarkup(minHeight);
+}
+
 async function loadActions() {
   renderDateHeader();
 
@@ -3953,7 +3965,7 @@ async function loadActions() {
   }
 
   const date = dateFromOffset(state.activeOffset);
-  actionsList.innerHTML = '<div class="empty-state">Carregando...</div>';
+  showDbLoadingState(actionsList, 220);
 
   try {
     const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`);
@@ -6146,7 +6158,7 @@ async function loadPlatformFinance() {
   }
 
   const date = dateFromOffset(state.platformOffset);
-  platformEntriesList.innerHTML = '<div class="empty-state">Carregando...</div>';
+  showDbLoadingState(platformEntriesList, 220);
 
   try {
     const [entriesPayload, monthPayload, platformPayload] = await Promise.all([
@@ -6661,13 +6673,22 @@ async function loadStatsSummary() {
   try {
     const scope = getActiveStatsScope();
     statsScopeLabel.textContent = scope.label;
+    const loadingTarget = isPointsStatsScope(scope) ? statsMissionsList : statsRankingList;
+    const hiddenTarget = isPointsStatsScope(scope) ? statsRankingList : statsMissionsList;
+    if (hiddenTarget) {
+      hiddenTarget.hidden = true;
+    }
+    if (loadingTarget) {
+      loadingTarget.hidden = false;
+      showDbLoadingState(loadingTarget, 220);
+    }
     if (isPointsStatsScope(scope)) {
-      const [allTimeSummary, last7Summary, last30Summary] = await Promise.all([
-        apiRequest("/api/stats/summary?scope=general"),
+      const [todaySummary, last7Summary, last30Summary] = await Promise.all([
+        apiRequest("/api/stats/summary?scope=today"),
         apiRequest("/api/stats/summary?scope=last7"),
         apiRequest("/api/stats/summary?scope=last30")
       ]);
-      const summary = allTimeSummary?.summary || {};
+      const summary = todaySummary?.summary || {};
       const byCategory = summary?.byCategory || {};
       state.statsSummary = summary;
       state.statsPointsOverview = {
@@ -6709,9 +6730,6 @@ async function loadStatsSummary() {
     renderStatsRanking();
     if (statsMissionSummary) {
       statsMissionSummary.hidden = true;
-    }
-    if (statsMissionsList) {
-      statsMissionsList.hidden = true;
     }
     if (statsRankingList) {
       statsRankingList.hidden = false;
@@ -6858,6 +6876,7 @@ async function loadHistoryFromApi() {
     state.historyTexts = [];
     return;
   }
+  showDbLoadingState(historyTimelineList, 220);
   const payload = await apiRequest("/api/200/history");
   state.historySystem = Array.isArray(payload.systemEvents) ? payload.systemEvents : [];
   state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
@@ -6954,6 +6973,7 @@ async function loadConversationChat() {
     renderConversationMessages();
     return;
   }
+  showDbLoadingState(conversationsMessages, 220);
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
   const payload = await apiRequest(`/api/200/chat?profile=${encodeURIComponent(profile)}`);
   state.conversationChat = payload.chat || { messages: [] };
@@ -6965,7 +6985,7 @@ async function loadConversationsPromptEditor() {
     return;
   }
   if (conversationsPromptMessage) {
-    conversationsPromptMessage.textContent = "Carregando prompt...";
+    showDbLoadingState(conversationsPromptMessage, 84);
   }
   try {
     const payload = await apiRequest(`/api/admin/project200/chat-prompt?tone=${encodeURIComponent(conversationsPromptToneKey)}`);

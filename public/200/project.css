@@ -2259,6 +2259,32 @@ body.running-music-standalone #actionsModal .actions-list {
   padding: 42px 12px;
 }
 
+.db-loading-shell {
+  min-height: var(--db-loading-min-height, 140px);
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.db-loading-loop {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.16);
+  border-top-color: #ffffff;
+  border-right-color: rgba(255, 255, 255, 0.92);
+  animation: db-loading-spin 0.85s linear infinite;
+}
+
+@keyframes db-loading-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .task-row {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr) max-content;
