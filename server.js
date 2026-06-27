@@ -61,6 +61,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { appendProject200ChatMessages, createProject200Chat, getProject200Chat } from "./src/project200-chats.js";
+import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -3286,6 +3287,59 @@ async function handleProject200FinanceInterpret(request, response) {
     });
   }
 }
+
+async function handleProject200PersonalFinanceRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const requestUrl = new URL(request.url || "/api/200/finance/personal", `http://${request.headers.host || "localhost"}`);
+    const period = requestUrl.searchParams.get("period") || "total";
+    const [summary, notes] = await Promise.all([
+      summarizeProject200PersonalFinance(user.id, period),
+      getProject200FinanceNotes(user.id)
+    ]);
+    sendJson(response, 200, {
+      ok: true,
+      summary,
+      notes
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o financeiro."
+    });
+  }
+}
+
+async function handleProject200PersonalFinanceNotesUpdate(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const notes = await saveProject200FinanceNotes(user.id, body?.notes);
+    sendJson(response, 200, {
+      ok: true,
+      notes
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar as anotacoes."
+    });
+  }
+}
+
 async function handleProject200ActionInterpret(request, response) {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -3859,11 +3913,14 @@ async function buildProject200ChatContext(user, profileName) {
   const weekStart = startOfProjectWeek(now);
   const nextWeek = addProjectDays(weekStart, 7);
 
-  const [todayActions, weekActions, runtimeState, globalWeekStats] = await Promise.all([
+  const [todayActions, weekActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes] = await Promise.all([
     listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
     listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
     getProject200RuntimeState(user.id),
-    getStatsSummary(user.id, "week")
+    getStatsSummary(user.id, "week"),
+    summarizeProject200PersonalFinance(user.id, "month-".concat(String(now.getMonth() + 1).padStart(2, "0"))),
+    summarizeProject200PersonalFinance(user.id, "today"),
+    getProject200FinanceNotes(user.id)
   ]);
 
   const todayProfileActions = filterProject200ActionsByProfile(todayActions, selectedProfile);
@@ -3892,6 +3949,7 @@ async function buildProject200ChatContext(user, profileName) {
     lateStartMinutes: Number(selectedWeekStats?.lateStartMinutes || ownWeekProgress.lateStartMinutes || 0),
     completionPercent: ownWeekProgress.completionPercent
   };
+  const financeNotesText = clipProject200Text(financeNotes?.notes || "", 320);
 
   return {
     ownWeekProgress: selectedWeekSummary,
@@ -3903,6 +3961,9 @@ async function buildProject200ChatContext(user, profileName) {
       `Semana do perfil: ${selectedWeekSummary.completionPercent}% | ${selectedWeekSummary.completedMinutes}/${selectedWeekSummary.totalMinutes} min | atraso ${selectedWeekSummary.lateStartMinutes}m.`,
       `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
+      `Financeiro pessoal hoje: entradas ${Math.round(Number(financeTodaySummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeTodaySummary?.expenseCents || 0) / 100)} reais | pendencias ${Number(financeTodaySummary?.pendingCount || 0)}.`,
+      `Financeiro pessoal do mes: entradas ${Math.round(Number(financeMonthSummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeMonthSummary?.expenseCents || 0) / 100)} reais | saldo atual ${Math.round(Number(financeMonthSummary?.balanceCents || 0) / 100)} reais | lancamentos ${Number(financeMonthSummary?.totalEntries || 0)}.`,
+      `Notas financeiras pessoais: ${financeNotesText || "vazias"}.`,
       `Considere somente os dados deste perfil, sem misturar informacoes de outros perfis da conta.`
     ].join("\n")
   };
@@ -3921,11 +3982,12 @@ async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileNam
   return [
     "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto.",
     "Voce e o chat de Conversas do /200, neutro por padrao e moldado apenas pelo contexto do /200.",
-    "Para comentar o usuario, foque somente nos dados de acoes e estatisticas.",
+    "Para comentar o usuario, foque primeiro nos dados de acoes e estatisticas. Quando o assunto pedir, voce tambem pode usar o financeiro pessoal e as notas financeiras do usuario.",
     "Regras obrigatorias: resposta entre 60 e 500 caracteres; sem markdown; texto corrido ou no maximo duas frases curtas; fale como mensageiro fluido e rapido.",
     "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa ou disciplina semanal.",
     "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
     "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
+    "Cada nova resposta deve tratar o Contexto vivo do /200 como uma consulta fresca do backend. Se a memoria recente da conversa conflitar com o contexto vivo, o contexto vivo vence.",
     globalPrompt ? `Use exatamente este prompt global do estilo selecionado, escrito pela RoseMattos: ${globalPrompt}` : "",
     `Memoria recente da conversa: ${memory || "vazia"}.`,
     `Contexto vivo do /200:\n${contextText}`
@@ -10043,6 +10105,16 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleProject200FinanceInterpret(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/finance/personal") {
+    await handleProject200PersonalFinanceRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/200/finance/notes") {
+    await handleProject200PersonalFinanceNotesUpdate(request, response);
     return;
   }
 

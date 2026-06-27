@@ -258,9 +258,13 @@ const financePeriodLabel = document.getElementById("financePeriodLabel");
 const financeDashboard = document.getElementById("financeDashboard");
 const financeStatus = document.getElementById("financeStatus");
 const financeSalesLabel = document.getElementById("financeSalesLabel");
+const financeEntriesLabel = document.getElementById("financeEntriesLabel");
+const financeBalanceLabel = document.getElementById("financeBalanceLabel");
 const financeTotalSales = document.getElementById("financeTotalSales");
 const financeSubscribers = document.getElementById("financeSubscribers");
 const financeMonthlyRevenue = document.getElementById("financeMonthlyRevenue");
+const financeNotesInput = document.getElementById("financeNotesInput");
+const saveFinanceNotesButton = document.getElementById("saveFinanceNotesButton");
 const constitutionVersionLabel = document.getElementById("constitutionVersionLabel");
 const constitutionAuthAlert = document.getElementById("constitutionAuthAlert");
 const constitutionTextView = document.getElementById("constitutionTextView");
@@ -1727,10 +1731,7 @@ function startRunningCompletionTransition({ fromPercent, toPercent, nextAction, 
       return;
     }
     resetRunningCompletionState();
-    if (dayDonePercent) {
-      dayDonePercent.textContent = `${Math.round(Number(summary?.percent || 0))}%`;
-    }
-    openModal("dayDoneModal");
+    renderHomeRunningTask();
   }, RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS);
 }
 
@@ -3528,7 +3529,7 @@ function getActiveFinancePeriod() {
 }
 
 function setFinanceSalesTitle(periodLabel) {
-  financeSalesLabel.textContent = `Total de vendas (${periodLabel})`;
+  financeSalesLabel.textContent = `Entradas (${periodLabel})`;
 }
 
 function renderFinancePeriod() {
@@ -3573,28 +3574,84 @@ async function loadFinanceSummary() {
 
   if (!getToken()) {
     financeDashboard.hidden = true;
-    financeStatus.innerHTML = 'Entre como administrador para ver as finanças. <a href="/auth.html?next=/200">Entrar</a>';
+    if (financeNotesInput) {
+      financeNotesInput.value = "";
+      financeNotesInput.disabled = true;
+    }
+    if (saveFinanceNotesButton) {
+      saveFinanceNotesButton.disabled = true;
+    }
+    financeStatus.innerHTML = 'Entre para ver seu financeiro. <a href="/auth.html?next=/200">Entrar</a>';
     return;
   }
 
+  if (financeNotesInput) {
+    financeNotesInput.disabled = true;
+  }
+  if (saveFinanceNotesButton) {
+    saveFinanceNotesButton.disabled = true;
+  }
   financeStatus.textContent = "Carregando...";
   setFinanceSalesTitle(selectedPeriod.label);
 
   try {
-    const payload = await apiRequest(`/api/finance/summary?period=${encodeURIComponent(selectedPeriod.key)}`);
+    const payload = await apiRequest(`/api/200/finance/personal?period=${encodeURIComponent(selectedPeriod.key)}`);
     const summary = payload.summary || {};
     const periodLabel = String(summary.periodLabel || selectedPeriod.label || "").trim() || "Total";
 
     setFinanceSalesTitle(periodLabel);
     financePeriodLabel.textContent = periodLabel;
-    financeTotalSales.textContent = formatMoney(summary.totalSalesCents);
-    financeSubscribers.textContent = String(summary.activeSubscribers || 0);
-    financeMonthlyRevenue.textContent = formatMoney(summary.monthlyRevenueCents);
+    if (financeEntriesLabel) {
+      financeEntriesLabel.textContent = "Lancamentos";
+    }
+    if (financeBalanceLabel) {
+      financeBalanceLabel.textContent = "Saldo atual";
+    }
+    financeTotalSales.textContent = formatMoney(summary.incomeCents || 0);
+    financeSubscribers.textContent = String(summary.totalEntries || 0);
+    financeMonthlyRevenue.textContent = formatMoney(summary.balanceCents || 0);
     financeDashboard.hidden = false;
     financeStatus.textContent = "";
+    if (financeNotesInput) {
+      financeNotesInput.value = String(payload?.notes?.notes || "");
+      financeNotesInput.disabled = false;
+    }
+    if (saveFinanceNotesButton) {
+      saveFinanceNotesButton.disabled = false;
+    }
   } catch (error) {
     financeDashboard.hidden = true;
     financeStatus.textContent = error instanceof Error ? error.message : "Nao foi possivel carregar as financas.";
+  }
+}
+
+async function saveFinanceNotes() {
+  if (!getToken()) {
+    financeStatus.textContent = "Entre para salvar suas anotacoes.";
+    return;
+  }
+  if (saveFinanceNotesButton) {
+    saveFinanceNotesButton.disabled = true;
+  }
+  financeStatus.textContent = "Salvando anotacoes...";
+  try {
+    const payload = await apiRequest("/api/200/finance/notes", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        notes: String(financeNotesInput?.value || "")
+      })
+    });
+    if (financeNotesInput) {
+      financeNotesInput.value = String(payload?.notes?.notes || "");
+    }
+    financeStatus.textContent = "Anotacoes salvas.";
+  } catch (error) {
+    financeStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar anotacoes.";
+  } finally {
+    if (saveFinanceNotesButton) {
+      saveFinanceNotesButton.disabled = false;
+    }
   }
 }
 
@@ -7497,6 +7554,9 @@ document.querySelectorAll("[data-day-nav]").forEach((button) => {
 
 financePeriodPrev?.addEventListener("click", () => moveFinancePeriod(-1));
 financePeriodNext?.addEventListener("click", () => moveFinancePeriod(1));
+saveFinanceNotesButton?.addEventListener("click", () => {
+  void saveFinanceNotes();
+});
 document.querySelectorAll("[data-finance-day-nav]").forEach((button) => {
   button.addEventListener("click", () => movePlatformDate(Number(button.dataset.financeDayNav)));
 });

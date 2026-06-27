@@ -770,7 +770,7 @@
   <section class="workspace-modal simple-modal finance-modal" id="financeModal" aria-hidden="true" aria-label="Plataforma">
     <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
     <div class="finance-content">
-      <h1 id="financeIntroTitle">Plataforma</h1>
+      <h1 id="financeIntroTitle">Financeiro</h1>
       <div class="finance-period-picker" id="financePeriodPicker" hidden>
         <button class="circle-nav" type="button" id="financePeriodPrev" aria-label="Periodo anterior">‹</button>
         <span class="finance-period-label" id="financePeriodLabel">Total</span>
@@ -778,18 +778,20 @@
       </div>
       <div class="finance-dashboard" id="financeDashboard" hidden>
         <article class="finance-metric">
-          <span id="financeSalesLabel">Total de vendas</span>
+          <span id="financeSalesLabel">Entradas</span>
           <strong id="financeTotalSales">R$ 0,00</strong>
         </article>
         <article class="finance-metric">
-          <span>Assinantes atuais</span>
+          <span id="financeEntriesLabel">Lancamentos</span>
           <strong id="financeSubscribers">0</strong>
         </article>
         <article class="finance-metric">
-          <span>Renda mensal</span>
+          <span id="financeBalanceLabel">Saldo atual</span>
           <strong id="financeMonthlyRevenue">R$ 0,00</strong>
         </article>
       </div>
+      <textarea class="text-field options-text-field conversations-prompt-field" id="financeNotesInput" maxlength="12000" placeholder="Suas anotacoes financeiras pessoais..."></textarea>
+      <button class="primary-btn" type="button" id="saveFinanceNotesButton">Salvar anotacoes</button>
       <p class="finance-status" id="financeStatus" aria-live="polite"></p>
     </div>
   </section>
