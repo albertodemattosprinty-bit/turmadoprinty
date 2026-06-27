@@ -5762,12 +5762,12 @@ async function loadPlatformFinance() {
     const [entriesPayload, monthPayload, platformPayload] = await Promise.all([
       apiRequest(`/api/platform/entries?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`),
       apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`),
-      apiRequest("/api/finance/summary?period=total")
+      apiRequest("/api/200/finance/personal?period=total")
     ]);
 
     state.platformEntries = entriesPayload.entries || [];
     state.platformMonthly = monthPayload.summary || { incomeCents: 0, expenseCents: 0 };
-    state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
+    state.platformBaseIncomeCents = Number(platformPayload?.summary?.incomeCents || 0);
     state.platformBalanceCents = Number(monthPayload?.summary?.balanceCents || 0);
 
     platformMonthlyExpense.textContent = formatMoney(state.platformMonthly.expenseCents);
@@ -6196,26 +6196,20 @@ async function loadStatsSummary() {
       apiRequest("/api/stats/goals"),
       apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`)
     ];
-    if (isProject200AdminUser()) {
-      optionalRequests.splice(1, 0, apiRequest("/api/finance/summary?period=total"));
-    }
+    optionalRequests.splice(1, 0, apiRequest("/api/200/finance/personal?period=total"));
     const optionalResponses = await Promise.allSettled(optionalRequests);
     const goalsPayload = optionalResponses[0]?.status === "fulfilled" ? optionalResponses[0].value : null;
-    const platformPayload = isProject200AdminUser() && optionalResponses[1]?.status === "fulfilled"
+    const platformPayload = optionalResponses[1]?.status === "fulfilled"
       ? optionalResponses[1].value
       : null;
-    const platformMonthPayload = isProject200AdminUser()
-      ? optionalResponses[2]?.status === "fulfilled"
-        ? optionalResponses[2].value
-        : null
-      : optionalResponses[1]?.status === "fulfilled"
-        ? optionalResponses[1].value
-        : null;
+    const platformMonthPayload = optionalResponses[2]?.status === "fulfilled"
+      ? optionalResponses[2].value
+      : null;
 
     state.statsSummary = summaryResult.summary || {};
     state.statsGoals = goalsPayload?.goals || null;
     state.statsGlobalProfiles = Array.isArray(summaryResult.summary?.globalProfiles) ? summaryResult.summary.globalProfiles : [];
-    state.platformBaseIncomeCents = Number(platformPayload?.summary?.monthlyRevenueCents || 0);
+    state.platformBaseIncomeCents = Number(platformPayload?.summary?.incomeCents || 0);
     state.platformBalanceCents = Number(platformMonthPayload?.summary?.balanceCents || state.platformBalanceCents);
     buildStatsRankingFromSummary();
     renderStatsGoals();
