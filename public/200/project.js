@@ -6415,7 +6415,8 @@ async function loadConversationChat() {
     renderConversationMessages();
     return;
   }
-  const payload = await apiRequest("/api/200/chat");
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  const payload = await apiRequest(`/api/200/chat?profile=${encodeURIComponent(profile)}`);
   state.conversationChat = payload.chat || { messages: [] };
   renderConversationMessages();
 }
@@ -6506,7 +6507,8 @@ async function sendConversationMessage(text) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        tone: getChatToneMode(state.options.chatTone).key
+        tone: getChatToneMode(state.options.chatTone).key,
+        profile: String(state.selectedProfile || getDefaultProfileName()).trim()
       })
     });
     state.conversationChat = payload.chat || state.conversationChat;

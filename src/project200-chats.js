@@ -1,4 +1,5 @@
 import { query } from "./db.js";
+import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
 function toIso(value) {
   if (!value) {
@@ -28,6 +29,8 @@ function normalizeMessages(raw) {
 function normalizeChat(row) {
   return {
     id: row.id,
+    userId: row.user_id,
+    profileName: normalizeStoredProject200ProfileName(row.assigned_profile || PROJECT200_DEFAULT_PROFILE_NAME),
     title: row.title || "Conversas",
     summary: row.summary || "",
     messages: normalizeMessages(row.messages || []),
@@ -37,11 +40,16 @@ function normalizeChat(row) {
   };
 }
 
+function normalizeChatProfileName(value) {
+  return normalizeStoredProject200ProfileName(value || PROJECT200_DEFAULT_PROFILE_NAME);
+}
+
 export async function ensureProject200ChatsSchema() {
   await query(`
     create table if not exists project200_chats (
       id uuid primary key default gen_random_uuid(),
-      user_id uuid not null unique references users(id) on delete cascade,
+      user_id uuid not null references users(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
       title text not null default 'Conversas',
       summary text not null default '',
       messages jsonb not null default '[]'::jsonb,
@@ -50,48 +58,62 @@ export async function ensureProject200ChatsSchema() {
       last_message_at timestamptz
     );
   `);
+  await query("alter table project200_chats add column if not exists assigned_profile text not null default 'Usuario';");
+  await query("drop index if exists idx_project200_chats_updated_at;");
+  await query("drop index if exists idx_project200_chats_user_unique;");
+  await query("drop index if exists idx_project200_chats_user_profile_unique;");
+  await query(`
+    create unique index if not exists idx_project200_chats_user_profile_unique
+    on project200_chats (user_id, assigned_profile);
+  `);
   await query("create index if not exists idx_project200_chats_updated_at on project200_chats(updated_at desc);");
 }
 
-export async function getProject200Chat(userId) {
+export async function getProject200Chat(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200ChatsSchema();
+  const normalizedProfile = normalizeChatProfileName(profileName);
   const result = await query(
     `
-      select id, title, summary, created_at, updated_at, last_message_at, messages
+      select id, user_id, assigned_profile, title, summary, created_at, updated_at, last_message_at, messages
       from project200_chats
       where user_id = $1
+        and assigned_profile = $2
       limit 1
     `,
-    [userId]
+    [userId, normalizedProfile]
   );
   return result.rows[0] ? normalizeChat(result.rows[0]) : null;
 }
 
-export async function createProject200Chat(userId, payload = {}) {
+export async function createProject200Chat(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, payload = {}) {
   await ensureProject200ChatsSchema();
+  const normalizedProfile = normalizeChatProfileName(profileName);
   const title = String(payload.title || "Conversas").trim() || "Conversas";
   const summary = String(payload.summary || "").trim();
   const messages = normalizeMessages(payload.messages || []);
   const result = await query(
     `
-      insert into project200_chats (user_id, title, summary, messages, created_at, updated_at, last_message_at)
-      values ($1, $2, $3, $4::jsonb, now(), now(), null)
-      on conflict (user_id) do update
+      insert into project200_chats (
+        user_id, assigned_profile, title, summary, messages, created_at, updated_at, last_message_at
+      )
+      values ($1, $2, $3, $4, $5::jsonb, now(), now(), null)
+      on conflict (user_id, assigned_profile) do update
         set title = excluded.title,
             summary = excluded.summary,
             updated_at = now()
-      returning id, title, summary, created_at, updated_at, last_message_at, messages
+      returning id, user_id, assigned_profile, title, summary, created_at, updated_at, last_message_at, messages
     `,
-    [userId, title.slice(0, 120), summary.slice(0, 2000), JSON.stringify(messages)]
+    [userId, normalizedProfile, title.slice(0, 120), summary.slice(0, 2000), JSON.stringify(messages)]
   );
   return normalizeChat(result.rows[0]);
 }
 
-export async function updateProject200Chat(userId, patch = {}) {
+export async function updateProject200Chat(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, patch = {}) {
   await ensureProject200ChatsSchema();
-  const current = await getProject200Chat(userId);
+  const normalizedProfile = normalizeChatProfileName(profileName);
+  const current = await getProject200Chat(userId, normalizedProfile);
   if (!current) {
-    return createProject200Chat(userId, patch);
+    return createProject200Chat(userId, normalizedProfile, patch);
   }
 
   const nextTitle = typeof patch.title === "string" && patch.title.trim()
@@ -108,26 +130,28 @@ export async function updateProject200Chat(userId, patch = {}) {
   const result = await query(
     `
       update project200_chats
-      set title = $2,
-          summary = $3,
-          messages = $4::jsonb,
-          last_message_at = $5::timestamptz,
+      set title = $3,
+          summary = $4,
+          messages = $5::jsonb,
+          last_message_at = $6::timestamptz,
           updated_at = now()
       where user_id = $1
-      returning id, title, summary, created_at, updated_at, last_message_at, messages
+        and assigned_profile = $2
+      returning id, user_id, assigned_profile, title, summary, created_at, updated_at, last_message_at, messages
     `,
-    [userId, nextTitle, nextSummary, JSON.stringify(nextMessages), nextLastMessageAt]
+    [userId, normalizedProfile, nextTitle, nextSummary, JSON.stringify(nextMessages), nextLastMessageAt]
   );
 
   return result.rows[0] ? normalizeChat(result.rows[0]) : null;
 }
 
-export async function appendProject200ChatMessages(userId, entries = [], patch = {}) {
-  const current = await getProject200Chat(userId);
+export async function appendProject200ChatMessages(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, entries = [], patch = {}) {
+  const normalizedProfile = normalizeChatProfileName(profileName);
+  const current = await getProject200Chat(userId, normalizedProfile);
   const existingMessages = current?.messages || [];
   const nextMessages = [...existingMessages, ...normalizeMessages(entries)];
 
-  return updateProject200Chat(userId, {
+  return updateProject200Chat(userId, normalizedProfile, {
     title: patch.title,
     summary: patch.summary,
     messages: nextMessages,

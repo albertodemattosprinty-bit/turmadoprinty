@@ -3814,7 +3814,45 @@ function normalizeProject200ChatReply(text) {
   return `${cleaned} Me chama no microfone que eu cruzo isso com tua rotina e te passo o próximo passo.`;
 }
 
-async function buildProject200ChatContext(user) {
+function filterProject200ActionsByProfile(actions, profileName) {
+  const normalizedProfile = normalizeStoredProject200ProfileName(profileName);
+  return (Array.isArray(actions) ? actions : []).filter((action) => (
+    normalizeStoredProject200ProfileName(action?.assignee) === normalizedProfile
+  ));
+}
+
+function summarizeProject200ProfileProgress(actions) {
+  const list = Array.isArray(actions) ? actions : [];
+  let totalMinutes = 0;
+  let completedMinutes = 0;
+  let lateStartMinutes = 0;
+
+  for (const action of list) {
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    const endAt = action?.endAt ? new Date(action.endAt).getTime() : NaN;
+    const startedAt = action?.startedAt ? new Date(action.startedAt).getTime() : NaN;
+    const durationMinutes = Number.isFinite(startAt) && Number.isFinite(endAt) && endAt > startAt
+      ? Math.round((endAt - startAt) / (60 * 1000))
+      : 0;
+    totalMinutes += durationMinutes;
+    if (String(action?.status || "").trim().toUpperCase() === "COMPLETED") {
+      completedMinutes += durationMinutes;
+    }
+    if (Number.isFinite(startedAt) && Number.isFinite(startAt) && startedAt > startAt) {
+      lateStartMinutes += Math.round((startedAt - startAt) / (60 * 1000));
+    }
+  }
+
+  return {
+    totalMinutes,
+    completedMinutes,
+    lateStartMinutes,
+    completionPercent: totalMinutes > 0 ? Math.round((completedMinutes / totalMinutes) * 100) : 0
+  };
+}
+
+async function buildProject200ChatContext(user, profileName) {
+  const selectedProfile = normalizeStoredProject200ProfileName(profileName);
   const now = new Date();
   const todayStart = startOfProjectDay(now);
   const tomorrow = addProjectDays(todayStart, 1);
@@ -3828,12 +3866,14 @@ async function buildProject200ChatContext(user) {
     getStatsSummary(user.id, "week")
   ]);
 
-  const ownWeekProgress = summarizeProject200OwnProgress(weekActions);
-  const runningLine = runtimeState?.actionTitle
+  const todayProfileActions = filterProject200ActionsByProfile(todayActions, selectedProfile);
+  const weekProfileActions = filterProject200ActionsByProfile(weekActions, selectedProfile);
+  const ownWeekProgress = summarizeProject200ProfileProgress(weekProfileActions);
+  const runningLine = normalizeStoredProject200ProfileName(runtimeState?.assignee) === selectedProfile && runtimeState?.actionTitle
     ? `${runtimeState.actionTitle} (${runtimeState.eventType || "start"})`
     : "nenhuma";
 
-  const pendingToday = todayActions
+  const pendingToday = todayProfileActions
     .filter((action) => String(action?.status || "").trim().toUpperCase() !== "COMPLETED")
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
   const overdueToday = pendingToday.filter((action) => {
@@ -3845,43 +3885,35 @@ async function buildProject200ChatContext(user) {
     return Number.isFinite(startAt) && startAt >= now.getTime();
   });
 
-  const ranking = Object.entries(globalWeekStats?.byAssignee || {})
-    .map(([name, item]) => {
-      const total = Number(item?.totalMinutes || 0);
-      const completed = Number(item?.completedMinutes || 0);
-      const late = Number(item?.lateStartMinutes || 0);
-      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-      return { name, percent, completed, total, late };
-    })
-    .sort((left, right) => {
-      if (right.percent !== left.percent) return right.percent - left.percent;
-      if (right.completed !== left.completed) return right.completed - left.completed;
-      return String(left.name).localeCompare(String(right.name), "pt-BR");
-    })
-    .slice(0, 6)
-    .map((entry, index) => `${index + 1}. ${entry.name}: ${entry.percent}% (${entry.completed}/${entry.total} min, atraso ${entry.late}m)`)
-    .join(" | ");
+  const selectedWeekStats = globalWeekStats?.byAssignee?.[selectedProfile] || {};
+  const selectedWeekSummary = {
+    totalMinutes: Number(selectedWeekStats?.totalMinutes || ownWeekProgress.totalMinutes || 0),
+    completedMinutes: Number(selectedWeekStats?.completedMinutes || ownWeekProgress.completedMinutes || 0),
+    lateStartMinutes: Number(selectedWeekStats?.lateStartMinutes || ownWeekProgress.lateStartMinutes || 0),
+    completionPercent: ownWeekProgress.completionPercent
+  };
 
   return {
-    ownWeekProgress,
+    ownWeekProgress: selectedWeekSummary,
     contextText: [
       `Usuario logado: ${user.username || user.email || "usuario"}.`,
+      `Perfil ativo do /200: ${selectedProfile}.`,
       `Agora: ${now.toISOString()}.`,
-      `Tarefa em andamento no runtime: ${runningLine}.`,
-      `Semana do usuario: ${ownWeekProgress.completionPercent}% | ${ownWeekProgress.completedMinutes}/${ownWeekProgress.totalMinutes} min | atraso ${ownWeekProgress.lateStartMinutes}m.`,
+      `Tarefa em andamento do perfil: ${runningLine}.`,
+      `Semana do perfil: ${selectedWeekSummary.completionPercent}% | ${selectedWeekSummary.completedMinutes}/${selectedWeekSummary.totalMinutes} min | atraso ${selectedWeekSummary.lateStartMinutes}m.`,
       `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
-      `Ranking global da semana: ${ranking || "sem dados"}.`
+      `Considere somente os dados deste perfil, sem misturar informacoes de outros perfis da conta.`
     ].join("\n")
   };
 }
 
-async function buildProject200ChatSystemPrompt({ user, chat, toneKey }) {
+async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileName }) {
   const recentMessages = Array.isArray(chat?.messages) ? chat.messages.slice(-16) : [];
   const memory = recentMessages
     .map((item) => `${item.role === "assistant" ? "IA" : "Usuario"}: ${clipProject200Text(item.content, 180)}`)
     .join(" | ");
-  const { ownWeekProgress, contextText } = await buildProject200ChatContext(user);
+  const { ownWeekProgress, contextText } = await buildProject200ChatContext(user, profileName);
   const globalPromptSettings = await getProject200ChatPromptSettings();
   const tonePromptKey = String(toneKey || "neutral").trim().toLowerCase();
   const globalPrompt = String(globalPromptSettings?.prompts?.[tonePromptKey] || "").trim();
@@ -7393,11 +7425,13 @@ async function handleProject200ChatDetailRequest(request, response) {
   }
 
   try {
-    let chat = await getProject200Chat(user.id);
+    const requestUrl = new URL(request.url || "/api/200/chat", `http://${request.headers.host || "localhost"}`);
+    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    let chat = await getProject200Chat(user.id, selectedProfile);
     if (!chat) {
-      chat = await createProject200Chat(user.id, { title: "Conversas" });
+      chat = await createProject200Chat(user.id, selectedProfile, { title: "Conversas" });
     }
-    sendJson(response, 200, { ok: true, chat });
+    sendJson(response, 200, { ok: true, chat, profile: selectedProfile });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel carregar as conversas."
@@ -7435,11 +7469,12 @@ async function handleProject200ChatMessageRequest(request, response) {
   }
 
   const toneKey = String(body?.tone || "neutral").trim().toLowerCase();
+  const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
 
   try {
-    let chat = await getProject200Chat(user.id);
+    let chat = await getProject200Chat(user.id, selectedProfile);
     if (!chat) {
-      chat = await createProject200Chat(user.id, { title: createProject200ChatTitleFromMessage(message) });
+      chat = await createProject200Chat(user.id, selectedProfile, { title: createProject200ChatTitleFromMessage(message) });
     }
 
     const userEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
@@ -7447,7 +7482,8 @@ async function handleProject200ChatMessageRequest(request, response) {
     const system = await buildProject200ChatSystemPrompt({
       user,
       chat: { ...chat, messages: currentMessages },
-      toneKey
+      toneKey,
+      profileName: selectedProfile
     });
 
     const completion = await createChatCompletion(apiKey, {
@@ -7471,7 +7507,7 @@ async function handleProject200ChatMessageRequest(request, response) {
 
     const replyText = normalizeProject200ChatReply(extractChatCompletionText(completion));
     const assistantEntry = { role: "assistant", content: replyText, createdAt: new Date().toISOString() };
-    const nextChat = await appendProject200ChatMessages(user.id, [userEntry, assistantEntry], {
+    const nextChat = await appendProject200ChatMessages(user.id, selectedProfile, [userEntry, assistantEntry], {
       title: chat.title === "Conversas" ? createProject200ChatTitleFromMessage(message) : chat.title,
       lastMessageAt: new Date().toISOString()
     });
@@ -7479,6 +7515,7 @@ async function handleProject200ChatMessageRequest(request, response) {
     sendJson(response, 200, {
       ok: true,
       model: OPENAI_INSTANT_MODEL || "gpt-4.1-nano",
+      profile: selectedProfile,
       chat: nextChat,
       replyText
     });
