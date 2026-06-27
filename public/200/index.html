@@ -83,7 +83,7 @@
       <button class="home-profile-button" id="homeProfileButton" type="button" aria-label="Usuário atual">
         <img class="home-top-logo" id="homeProfileAvatar" src="/200/branding/mindset-trainer.png" alt="Mindset Trainer" />
       </button>
-      <span class="home-profile-name" id="homeProfileName">Usuario</span>
+      <span class="home-profile-name" id="homeProfileName" hidden>Usuario</span>
     </section>
     <section class="project-hub" aria-label="Projeto 200">
       <button class="hub-action hub-icon-only" type="button" data-open-modal="actionsModal" aria-label="Ações">
@@ -108,11 +108,20 @@
     <section class="home-datetime" aria-label="Data e horário atual">
       <span id="homeDateTimeLabel">--</span>
     </section>
-    <button class="home-running-btn" id="openRunningTaskModal" type="button" data-open-modal="runningTaskModal" aria-label="Tarefa em execução" hidden>
+    <button class="home-running-btn" id="openRunningTaskModal" type="button" data-open-modal="runningTaskModal" aria-label="Painel da rotina">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
     </button>
     <section class="profile-selector profile-footer" id="profileFooter" aria-label="Usuários"></section>
   </main>
+  <div class="screen-lock-overlay" id="screenLockOverlay" aria-hidden="true" hidden>
+    <div class="screen-lock-corner" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M8 10V7.5a4 4 0 1 1 8 0V10m-9 0h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="screen-lock-center" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M8 10V7.5a4 4 0 1 1 8 0V10m-9 0h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Deslize para cima para desbloquear</span>
+    </div>
+  </div>
 
   <section class="workspace-modal simple-modal" id="runningTaskModal" aria-hidden="true" aria-label="Tarefa em execução">
     <div class="finance-content running-task-content">
@@ -649,6 +658,11 @@
         <strong>Tom do chat</strong>
         <span class="running-music-default-bottom" id="toggleChatToneHint">Neutro</span>
       </button>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="toggleScreenLockOption">
+        <span class="running-music-default-top">Bloqueia a tela após 10 segundos sem toque</span>
+        <strong>Bloquear tela</strong>
+        <span class="running-music-default-bottom" id="toggleScreenLockHint">Desbloqueada</span>
+      </button>
       <button class="running-music-default-option" type="button" id="openProject200ExportModal">
         <span class="running-music-default-top">Duplicar todos os dados do /200</span>
         <strong>Exportar</strong>
@@ -732,7 +746,6 @@
           <svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
         </button>
       </header>
-      <div class="conversations-subtitle">Chat de voz com contexto da sua rotina.</div>
       <div class="conversations-list" id="conversationsMessages" aria-live="polite"></div>
       <div class="conversations-transcript" id="conversationsTranscript" hidden></div>
       <div class="history-voice-status conversations-status" id="conversationsStatus" hidden></div>

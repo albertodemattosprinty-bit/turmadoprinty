@@ -273,6 +273,8 @@ const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
 const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption");
 const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
+const toggleScreenLockOptionButton = document.getElementById("toggleScreenLockOption");
+const toggleScreenLockHint = document.getElementById("toggleScreenLockHint");
 const toggleChatToneOptionButton = document.getElementById("toggleChatToneOption");
 const toggleChatToneHint = document.getElementById("toggleChatToneHint");
 const chatToneDetailHint = document.getElementById("chatToneDetailHint");
@@ -400,6 +402,7 @@ const actionsModal = document.getElementById("actionsModal");
 const runtimeStateEndpoint = "/api/200/runtime-state";
 const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
+const screenLockOverlay = document.getElementById("screenLockOverlay");
 const startDecisionModal = document.getElementById("startDecisionModal");
 const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
 const startDecisionContent = document.getElementById("startDecisionContent");
@@ -659,7 +662,17 @@ const state = {
     showFreeTime: true,
     completionBeepCycles: 0,
     backgroundTheme: "modern",
-    chatTone: "neutral"
+    chatTone: "neutral",
+    screenLockEnabled: false
+  },
+  screenLock: {
+    locked: false,
+    inactivityTimerId: 0,
+    promptTimerId: 0,
+    promptVisible: false,
+    gestureActive: false,
+    touchStartY: 0,
+    touchCurrentY: 0
   },
   overlapResolver: null,
   overlapItems: [],
@@ -738,6 +751,7 @@ const state = {
   },
   runtimeState: null,
   runningCenterMode: "auto",
+  runningIdleTopMode: "hint",
   runningLocalStarts: {}
 };
 
@@ -958,13 +972,12 @@ function applySelectedProfile(profile) {
 }
 
 function renderHomeProfileHero() {
-  const profile = getProfileByName(state.selectedProfile) || getDefaultProfile();
   if (homeProfileAvatar) {
     homeProfileAvatar.src = "/200/branding/mindset-trainer.png";
     homeProfileAvatar.alt = "Mindset Trainer";
   }
   if (homeProfileName) {
-    homeProfileName.textContent = profile?.name || getDefaultProfileName();
+    homeProfileName.textContent = "";
   }
 }
 
@@ -1385,6 +1398,14 @@ function formatWholePercentMarkup(value) {
   return `${Math.round(safe)}<span class="running-task-unit">%</span>`;
 }
 
+function formatRunningPercentMarkup(value) {
+  const safe = clampPercent(value);
+  if (safe >= 50) {
+    return formatWholePercentMarkup(safe);
+  }
+  return formatPercentMarkup(safe, 1);
+}
+
 function getPunctualityPercentFromLateMinutes(lateMinutesValue) {
   const lateMinutes = Math.max(0, Number(lateMinutesValue || 0));
   return clampPercent(100 - (lateMinutes / 5));
@@ -1455,7 +1476,7 @@ function setRunningRingPercent(percent) {
 function formatRunningCenter(percent, percentPrecise, remainingMinutes, remainingSeconds, showPercent) {
   if (showPercent) {
     const safe = Number.isFinite(percentPrecise) ? clampPercent(percentPrecise) : Number(percent || 0);
-    return formatPercentMarkup(safe, 1);
+    return formatRunningPercentMarkup(safe);
   }
   const totalSec = Math.max(0, Math.round(Number(remainingSeconds || 0)));
   if (totalSec >= 3600) {
@@ -1468,6 +1489,19 @@ function formatRunningCenter(percent, percentPrecise, remainingMinutes, remainin
   return `${m}<span class="running-task-decimal">:${String(s).padStart(2, "0")}</span>`;
 }
 
+function formatRunningClockMarkup(date = new Date()) {
+  return `${String(date.getHours()).padStart(2, "0")}<span class="running-task-decimal">:${String(date.getMinutes()).padStart(2, "0")}</span>`;
+}
+
+function getDayElapsedPercent(date = new Date()) {
+  const totalMinutes = (date.getHours() * 60) + date.getMinutes();
+  return clampPercent((totalMinutes / (24 * 60)) * 100);
+}
+
+function formatRunningDateTitle(date = new Date()) {
+  return formatDateLabel(date);
+}
+
 function updateRunningCenterModeButtons(mode) {
   if (runningModePercentBtn) runningModePercentBtn.classList.toggle("active", mode === "percent");
   if (runningModeTimeBtn) runningModeTimeBtn.classList.toggle("active", mode === "time");
@@ -1478,15 +1512,6 @@ function setRunningCompletionVisualState(isCompletion) {
 }
 
 function setRunningIdleVisualState(isIdle) {
-  const toggle = (el, hide) => {
-    if (!el) return;
-    el.classList.add("running-fade");
-    el.classList.toggle("is-hidden", hide);
-  };
-  toggle(runningTaskMinutesLeft, isIdle);
-  toggle(runningCircleWrap, isIdle);
-  toggle(runningModePercentBtn, isIdle);
-  toggle(runningModeTimeBtn, isIdle);
   runningTaskContent?.classList.toggle("is-idle-layout", isIdle);
 }
 
@@ -1594,7 +1619,7 @@ function renderRunningCompletionCelebration() {
   updateRunningCenterModeButtons("percent");
   setRunningRingPercent(state.runningCompletion.displayPercent);
   if (runningTaskPercent) {
-    runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.displayPercent, 2);
+    runningTaskPercent.innerHTML = formatRunningPercentMarkup(state.runningCompletion.displayPercent);
   }
 }
 
@@ -1616,7 +1641,7 @@ function renderRunningCompletionNextView() {
   }
   setRunningRingPercent(state.runningCompletion.progressValue);
   if (runningTaskPercent) {
-    runningTaskPercent.innerHTML = formatPercentMarkup(state.runningCompletion.progressValue, 2);
+    runningTaskPercent.innerHTML = formatRunningPercentMarkup(state.runningCompletion.progressValue);
   }
   const nextOfNext = state.runningCompletion.nextOfNext;
   if (nextOfNext) {
@@ -1655,7 +1680,7 @@ function animateRunningCompletionProgress(fromPercent, toPercent, durationMs) {
     const current = safeFrom + ((safeTo - safeFrom) * ratio);
     state.runningCompletion.displayPercent = current;
     setRunningRingPercent(current);
-    runningTaskPercent.innerHTML = formatPercentMarkup(current, 2);
+    runningTaskPercent.innerHTML = formatRunningPercentMarkup(current);
     if (ratio < 1) {
       state.runningCompletion.rafId = window.requestAnimationFrame(step);
       return;
@@ -1898,7 +1923,7 @@ function anchorToCurrentAction() {
 function renderHomeRunningTask() {
   if (state.runningCompletion.active) {
     if (openRunningTaskModalButton) {
-      openRunningTaskModalButton.hidden = true;
+      openRunningTaskModalButton.hidden = false;
     }
     if (state.runningCompletion.phase === "celebration") {
       renderRunningCompletionCelebration();
@@ -1919,33 +1944,40 @@ function renderHomeRunningTask() {
   }
   const hasRunning = Boolean(action);
   if (openRunningTaskModalButton) {
-    openRunningTaskModalButton.hidden = !hasRunning;
+    openRunningTaskModalButton.hidden = false;
   }
   if (!runningTaskName || !runningTaskProgressRing || !runningTaskPercent || !runningTaskMinutesLeft || !runningTaskNextName) {
     return;
   }
   if (!hasRunning) {
     state.runningPlayer.defaultAppliedActionId = "";
-    runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Próxima tarefa");
+    const now = new Date();
+    const dayElapsedPercent = getDayElapsedPercent(now);
+    const showPercent = state.runningCenterMode === "percent";
+    runningTaskName.innerHTML = formatRunningTaskTitleMarkup(formatRunningDateTitle(now));
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
     }
-    setRunningRingPercent(0);
-    runningTaskPercent.textContent = "";
-    runningTaskMinutesLeft.textContent = "";
+    setRunningRingPercent(dayElapsedPercent);
+    runningTaskPercent.innerHTML = showPercent ? formatRunningPercentMarkup(dayElapsedPercent) : formatRunningClockMarkup(now);
+    runningTaskMinutesLeft.textContent = state.runningIdleTopMode === "percent"
+      ? `${Math.round(dayElapsedPercent)}% do dia já passou`
+      : "Toque aqui para ver % do dia";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     setRunningIdleVisualState(true);
+    updateRunningCenterModeButtons(showPercent ? "percent" : "time");
     if (runningTaskNextLabel) {
       runningTaskNextLabel.classList.add("running-fade");
-      runningTaskNextLabel.classList.add("is-hidden");
+      runningTaskNextLabel.classList.remove("is-hidden");
     }
     const nextPending = getEarliestPendingAction();
     setRunningNextDisplay(
       nextPending ? formatActionTitleForDisplay(nextPending.title) : "Descanso",
       nextPending ? getActionDurationMinutes(nextPending) : getSleepDurationMinutesForDay()
     );
-    if (runningTaskListButton) runningTaskListButton.hidden = false;
-    if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
+    if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
+    if (runningTaskListButton) runningTaskListButton.hidden = true;
+    if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
     if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
     if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
@@ -1989,6 +2021,7 @@ function renderHomeRunningTask() {
   }
   const punctualitySummary = getCompletionSummaryForSelectedProfile();
   renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes);
+  if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = false;
   if (nextAction) {
     const nextLabel = formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
@@ -4383,6 +4416,9 @@ function renderTaskComposerModal() {
   startDecisionTaskTitle.style.cursor = "pointer";
   startDecisionMicButton.hidden = false;
   startDecisionMicButton.classList.toggle("is-active", actionMediaRecorder && actionMediaRecorder.state !== "inactive");
+  if (closeStartDecisionModal) {
+    closeStartDecisionModal.hidden = mode === "edit";
+  }
 
   renderTaskComposerMeta(
     startDecisionStartAt,
@@ -4596,6 +4632,9 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     if (startDecisionMicButton) {
       startDecisionMicButton.hidden = true;
       startDecisionMicButton.classList.remove("is-active");
+    }
+    if (closeStartDecisionModal) {
+      closeStartDecisionModal.hidden = false;
     }
     if (startDecisionTaskTitle) {
       startDecisionTaskTitle.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
@@ -4974,6 +5013,8 @@ async function ensureProject200Session() {
     state.authUser = null;
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
+    unlockProject200Screen();
+    clearScreenLockInactivityTimer();
     return false;
   }
   try {
@@ -4990,6 +5031,8 @@ async function ensureProject200Session() {
         state.authUser = null;
         project200LoginOverlay?.classList.add("active");
         project200LoginOverlay?.setAttribute("aria-hidden", "false");
+        unlockProject200Screen();
+        clearScreenLockInactivityTimer();
       }
       return false;
     }
@@ -4997,12 +5040,15 @@ async function ensureProject200Session() {
     refreshProfileLockFromAuth(payload?.user || null);
     project200LoginOverlay?.classList.remove("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
+    scheduleScreenLockInactivity();
     return true;
   } catch {
     state.profileLock = "";
     state.authUser = null;
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
+    unlockProject200Screen();
+    clearScreenLockInactivityTimer();
     return false;
   }
 }
@@ -6810,26 +6856,7 @@ function typeConversationAssistantReply(text) {
     conversationsTypingTimer = null;
   }
   renderConversationMessages();
-  const textNodes = conversationsMessages.querySelectorAll(".conversation-bubble-assistant .conversation-bubble-text");
-  const target = textNodes[textNodes.length - 1];
-  if (!target) {
-    return;
-  }
-  const fullText = String(text || "");
-  const shouldStick = conversationsMessages.scrollHeight - conversationsMessages.scrollTop - conversationsMessages.clientHeight < 90;
-  target.textContent = "";
-  let index = 0;
-  conversationsTypingTimer = window.setInterval(() => {
-    index += 1;
-    target.textContent = fullText.slice(0, index);
-    if (shouldStick) {
-      conversationsMessages.scrollTop = conversationsMessages.scrollHeight;
-    }
-    if (index >= fullText.length) {
-      window.clearInterval(conversationsTypingTimer);
-      conversationsTypingTimer = null;
-    }
-  }, 50);
+  conversationsMessages.scrollTop = conversationsMessages.scrollHeight;
 }
 
 async function loadConversationChat() {
@@ -7683,15 +7710,20 @@ function openProject200LoginOverlay(message = "") {
   setProject200AuthTab("login");
   project200LoginOverlay?.classList.add("active");
   project200LoginOverlay?.setAttribute("aria-hidden", "false");
+  unlockProject200Screen();
+  clearScreenLockInactivityTimer();
 }
 
 function clearProject200SessionState() {
   setToken("");
   state.profileLock = "";
+  state.authUser = null;
   state.actions = [];
   state.profiles = [];
   state.historySystem = [];
   state.historyTexts = [];
+  unlockProject200Screen();
+  clearScreenLockInactivityTimer();
   renderProfileFooter();
   renderHistorySpeakerSelectionOptions();
   renderActions();
@@ -7808,11 +7840,13 @@ function loadOptionsConfig() {
       : 0;
     state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
     state.options.chatTone = getChatToneMode(parsed.chatTone).key;
+    state.options.screenLockEnabled = parsed.screenLockEnabled === true;
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
     state.options.backgroundTheme = "modern";
     state.options.chatTone = "neutral";
+    state.options.screenLockEnabled = false;
   }
   applyBackgroundTheme();
 }
@@ -7823,9 +7857,117 @@ function saveOptionsConfig() {
       showFreeTime: Boolean(state.options.showFreeTime),
       completionBeepCycles: Number(state.options.completionBeepCycles || 0),
       backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
-      chatTone: getChatToneMode(state.options.chatTone).key
+      chatTone: getChatToneMode(state.options.chatTone).key,
+      screenLockEnabled: Boolean(state.options.screenLockEnabled)
     }));
   } catch {}
+}
+
+function getInteractionClientY(event) {
+  if (typeof event?.clientY === "number") {
+    return event.clientY;
+  }
+  const touch = event?.touches?.[0] || event?.changedTouches?.[0] || null;
+  return typeof touch?.clientY === "number" ? touch.clientY : 0;
+}
+
+function clearScreenLockPromptTimer() {
+  if (state.screenLock.promptTimerId) {
+    window.clearTimeout(state.screenLock.promptTimerId);
+    state.screenLock.promptTimerId = 0;
+  }
+}
+
+function clearScreenLockInactivityTimer() {
+  if (state.screenLock.inactivityTimerId) {
+    window.clearTimeout(state.screenLock.inactivityTimerId);
+    state.screenLock.inactivityTimerId = 0;
+  }
+}
+
+function canAutoLockScreen() {
+  if (!state.options.screenLockEnabled) {
+    return false;
+  }
+  if (!getToken()) {
+    return false;
+  }
+  if (!state.authUser) {
+    return false;
+  }
+  if (project200LoginOverlay?.classList.contains("active")) {
+    return false;
+  }
+  return true;
+}
+
+function hideScreenLockPrompt() {
+  clearScreenLockPromptTimer();
+  state.screenLock.promptVisible = false;
+  document.body.classList.remove("screen-lock-prompt");
+}
+
+function showScreenLockPrompt() {
+  if (!state.screenLock.locked) {
+    return;
+  }
+  state.screenLock.promptVisible = true;
+  document.body.classList.add("screen-lock-prompt");
+  clearScreenLockPromptTimer();
+  state.screenLock.promptTimerId = window.setTimeout(() => {
+    if (!state.screenLock.locked) {
+      return;
+    }
+    hideScreenLockPrompt();
+  }, 1500);
+}
+
+function applyScreenLockUi() {
+  const locked = Boolean(state.screenLock.locked);
+  document.body.classList.toggle("screen-locked", locked);
+  if (!screenLockOverlay) {
+    return;
+  }
+  screenLockOverlay.hidden = !locked;
+  screenLockOverlay.classList.toggle("active", locked);
+  screenLockOverlay.setAttribute("aria-hidden", locked ? "false" : "true");
+}
+
+function scheduleScreenLockInactivity() {
+  clearScreenLockInactivityTimer();
+  if (!canAutoLockScreen() || state.screenLock.locked) {
+    return;
+  }
+  state.screenLock.inactivityTimerId = window.setTimeout(() => {
+    lockProject200Screen();
+  }, 10000);
+}
+
+function lockProject200Screen() {
+  clearScreenLockInactivityTimer();
+  state.screenLock.locked = true;
+  state.screenLock.gestureActive = false;
+  state.screenLock.touchStartY = 0;
+  state.screenLock.touchCurrentY = 0;
+  hideScreenLockPrompt();
+  applyScreenLockUi();
+}
+
+function unlockProject200Screen() {
+  state.screenLock.locked = false;
+  state.screenLock.gestureActive = false;
+  state.screenLock.touchStartY = 0;
+  state.screenLock.touchCurrentY = 0;
+  hideScreenLockPrompt();
+  applyScreenLockUi();
+  scheduleScreenLockInactivity();
+}
+
+function registerScreenLockActivity() {
+  if (state.screenLock.locked) {
+    return;
+  }
+  scheduleScreenLockInactivity();
 }
 
 function renderOptionsModal() {
@@ -7843,6 +7985,10 @@ function renderOptionsModal() {
   if (toggleChatToneHint) {
     toggleChatToneHint.textContent = toneMode.label;
   }
+  if (toggleScreenLockHint) {
+    toggleScreenLockHint.textContent = state.options.screenLockEnabled ? "Ativada" : "Desbloqueada";
+  }
+  toggleScreenLockOptionButton?.classList.toggle("is-off", !state.options.screenLockEnabled);
   if (chatToneDetailHint) {
     chatToneDetailHint.textContent = "";
   }
@@ -8757,6 +8903,61 @@ toggleChatToneOptionButton?.addEventListener("click", () => {
   saveOptionsConfig();
   renderOptionsModal();
 });
+toggleScreenLockOptionButton?.addEventListener("click", () => {
+  state.options.screenLockEnabled = !state.options.screenLockEnabled;
+  if (!state.options.screenLockEnabled) {
+    unlockProject200Screen();
+    clearScreenLockInactivityTimer();
+  } else {
+    scheduleScreenLockInactivity();
+  }
+  saveOptionsConfig();
+  renderOptionsModal();
+});
+screenLockOverlay?.addEventListener("pointerdown", (event) => {
+  if (!state.screenLock.locked) {
+    return;
+  }
+  state.screenLock.gestureActive = true;
+  state.screenLock.touchStartY = getInteractionClientY(event);
+  state.screenLock.touchCurrentY = state.screenLock.touchStartY;
+  showScreenLockPrompt();
+  event.preventDefault();
+});
+screenLockOverlay?.addEventListener("pointermove", (event) => {
+  if (!state.screenLock.locked || !state.screenLock.gestureActive) {
+    return;
+  }
+  state.screenLock.touchCurrentY = getInteractionClientY(event);
+  const deltaY = state.screenLock.touchCurrentY - state.screenLock.touchStartY;
+  if (deltaY <= -80) {
+    unlockProject200Screen();
+  }
+  event.preventDefault();
+});
+["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+  screenLockOverlay?.addEventListener(eventName, (event) => {
+    if (state.screenLock.locked) {
+      showScreenLockPrompt();
+    }
+    state.screenLock.gestureActive = false;
+    state.screenLock.touchStartY = 0;
+    state.screenLock.touchCurrentY = 0;
+    event.preventDefault();
+  });
+});
+document.addEventListener("pointerdown", (event) => {
+  if (state.screenLock.locked) {
+    return;
+  }
+  if (screenLockOverlay?.contains(event.target)) {
+    return;
+  }
+  registerScreenLockActivity();
+}, true);
+document.addEventListener("keydown", () => {
+  registerScreenLockActivity();
+}, true);
 conversationsMicButton?.addEventListener("click", () => {
   void startConversationMic();
 });
@@ -8918,6 +9119,13 @@ runningModePercentBtn?.addEventListener("click", () => {
 });
 runningModeTimeBtn?.addEventListener("click", () => {
   state.runningCenterMode = state.runningCenterMode === "time" ? "auto" : "time";
+  renderHomeRunningTask();
+});
+runningTaskMinutesLeft?.addEventListener("click", () => {
+  if (getRunningActionForSelectedProfile()) {
+    return;
+  }
+  state.runningIdleTopMode = state.runningIdleTopMode === "percent" ? "hint" : "percent";
   renderHomeRunningTask();
 });
 if (runningAudio) {
@@ -9308,12 +9516,14 @@ project200LoginForm?.addEventListener("submit", (event) => {
         throw new Error(data?.error || "Falha no login.");
       }
       setToken(String(data.token));
+      state.authUser = data?.user || null;
       refreshProfileLockFromAuth(data?.user || null);
       if (project200LoginMessage) project200LoginMessage.textContent = "Acesso liberado.";
       project200LoginOverlay?.classList.remove("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
       await loadProject200Profiles();
       await loadActions();
+      scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {
         project200LoginMessage.textContent = error instanceof Error ? error.message : "Falha no login.";
@@ -9374,6 +9584,7 @@ project200RegisterForm?.addEventListener("submit", (event) => {
       }
 
       setToken(String(loginData.token));
+      state.authUser = loginData?.user || null;
       refreshProfileLockFromAuth(loginData?.user || null);
       if (project200LoginMessage) project200LoginMessage.textContent = "Conta criada e acesso liberado.";
       project200LoginOverlay?.classList.remove("active");
@@ -9381,6 +9592,7 @@ project200RegisterForm?.addEventListener("submit", (event) => {
       setProject200AuthTab("login");
       await loadProject200Profiles();
       await loadActions();
+      scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {
         project200LoginMessage.textContent = error instanceof Error ? error.message : "Falha no cadastro.";
@@ -9458,6 +9670,8 @@ saveSleepConfigBtn?.addEventListener("click", () => {
 
 loadSleepConfig();
 loadOptionsConfig();
+applyScreenLockUi();
+scheduleScreenLockInactivity();
 
 document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));
@@ -9470,16 +9684,22 @@ registerNativeBackButtonHandler();
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     startRunningTaskTicker();
+    scheduleScreenLockInactivity();
+    return;
   }
+  clearScreenLockInactivityTimer();
 });
 window.addEventListener("focus", () => {
   startRunningTaskTicker();
+  scheduleScreenLockInactivity();
 });
 window.addEventListener("pageshow", () => {
   startRunningTaskTicker();
+  scheduleScreenLockInactivity();
 });
 document.addEventListener("resume", () => {
   startRunningTaskTicker();
+  scheduleScreenLockInactivity();
 });
 startHomeDateTimeTicker();
 startRunningTaskTicker();

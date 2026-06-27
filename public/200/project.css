@@ -262,8 +262,8 @@ body.project-no-select textarea {
 .home-profile-hero {
   display: grid;
   justify-items: center;
-  gap: 8px;
-  margin-top: calc(clamp(4px, 2vh, 16px) + 20px);
+  gap: 0;
+  margin-top: calc(clamp(8px, 2.5vh, 22px) + 18px);
 }
 
 .home-profile-button {
@@ -275,7 +275,7 @@ body.project-no-select textarea {
 }
 
 .home-top-logo {
-  width: min(280px, 72vw);
+  width: min(504px, 92vw);
   height: auto;
   object-fit: contain;
   border-radius: 0;
@@ -285,10 +285,7 @@ body.project-no-select textarea {
 }
 
 .home-profile-name {
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 800;
-  text-align: center;
+  display: none;
 }
 
 @keyframes projectBgDrift {
@@ -302,7 +299,7 @@ body.project-no-select textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin: auto 0;
+  margin: 10px auto 0;
 }
 
 .hub-action {
@@ -371,6 +368,10 @@ body.project-no-select textarea {
   width: 24px;
   height: 24px;
   fill: #fff;
+}
+
+.conversations-subtitle {
+  display: none;
 }
 
 body.running-task-active .project-shell > :not(.home-running-btn) {
@@ -995,6 +996,83 @@ body.start-decision-open .home-running-btn {
   opacity: 0.72;
 }
 
+.screen-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: none;
+  pointer-events: auto;
+  touch-action: none;
+  background: transparent;
+}
+
+.screen-lock-overlay.active {
+  display: block;
+}
+
+.screen-lock-corner {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 12, 25, 0.82);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+}
+
+.screen-lock-corner svg,
+.screen-lock-center svg {
+  width: 18px;
+  height: 18px;
+}
+
+.screen-lock-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.92);
+  min-width: min(74vw, 320px);
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: rgba(4, 10, 20, 0.84);
+  color: #fff;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 220ms ease, transform 220ms ease;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
+}
+
+.screen-lock-center span {
+  font-size: 0.88rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+body.screen-lock-prompt .screen-lock-center {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+body.screen-lock-prompt .project-shell,
+body.screen-lock-prompt .workspace-modal.active,
+body.screen-lock-prompt .project-login-overlay.active {
+  filter: blur(12px);
+  transition: filter 220ms ease;
+}
+
+body.screen-locked .project-shell,
+body.screen-locked .workspace-modal.active,
+body.screen-locked .project-login-overlay.active {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .options-note {
   margin: 0;
   color: rgba(255, 255, 255, 0.8);
@@ -1219,6 +1297,22 @@ body.start-decision-open .home-running-btn {
 #runningTaskModal .running-task-content.is-idle-layout .running-task-next {
   text-align: center;
   font-size: 1.08rem;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-title-row {
+  margin-bottom: 8px;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-name {
+  font-size: clamp(1.3rem, 4.2vw, 2rem);
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-minutes {
+  cursor: pointer;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-actions {
+  display: none;
 }
 
 #runningTaskModal .running-task-content.is-idle-layout .running-task-start-btn {
@@ -1627,8 +1721,8 @@ body.running-music-standalone #actionsModal .actions-list {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 14px;
-  padding-bottom: 6px;
+  gap: 18px;
+  padding-bottom: 12px;
 }
 
 .start-decision-task-title {
@@ -1650,7 +1744,7 @@ body.running-music-standalone #actionsModal .actions-list {
 .start-decision-task-meta {
   margin: 0;
   width: min(100%, 760px);
-  font-size: clamp(1.2rem, 2.9vw, 1.54rem);
+  font-size: clamp(1.5rem, 3.6vw, 1.95rem);
   line-height: 1.12;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
@@ -1662,19 +1756,20 @@ body.running-music-standalone #actionsModal .actions-list {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
+  padding: 10px 0;
 }
 
 .start-decision-meta-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
 }
 
 .start-decision-mic {
-  width: 58px;
-  height: 58px;
+  width: 76px;
+  height: 76px;
   border: 0;
   border-radius: 999px;
   display: inline-grid;
@@ -1685,8 +1780,8 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .start-decision-mic svg {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
 }
 
 .start-decision-mic.is-active {
@@ -1698,7 +1793,7 @@ body.running-music-standalone #actionsModal .actions-list {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 10px;
+  gap: 14px;
   padding: 8px 24px;
 }
 
@@ -3291,8 +3386,8 @@ body.running-music-standalone #actionsModal .actions-list {
   }
 
   .home-top-logo {
-    width: min(116px, 32vw);
-    height: min(116px, 32vw);
+    width: min(360px, 88vw);
+    height: auto;
   }
 
   .hub-icon-image {
