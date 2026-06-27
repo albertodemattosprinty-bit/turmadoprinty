@@ -930,42 +930,34 @@
         <button class="circle-nav" type="button" data-stats-scope-nav="-1" aria-label="Escopo anterior">
           <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
         </button>
-        <button class="date-title" type="button" id="statsScopeLabel">Geral</button>
+        <button class="date-title" type="button" id="statsScopeLabel">Missões</button>
         <button class="circle-nav" type="button" data-stats-scope-nav="1" aria-label="Próximo escopo">
           <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
         </button>
       </header>
 
-      <section class="finance-overview" id="statsGeneralGoals">
+      <section class="finance-overview" id="statsMissionSummary">
         <article class="finance-metric">
-          <span>Saldo</span>
-          <strong id="statsDailyGoalProgress">0%</strong>
+          <span>Missões</span>
+          <strong id="statsMissionTotal">0</strong>
         </article>
         <article class="finance-metric">
-          <span>Meta mensal</span>
-          <strong id="statsMonthlyGoalProgress">0%</strong>
+          <span>Concluídas</span>
+          <strong id="statsMissionCompleted">0</strong>
         </article>
         <article class="finance-metric">
-          <span>Meta recorrente</span>
-          <strong id="statsRecurringGoalProgress">0%</strong>
+          <span>Pendentes</span>
+          <strong id="statsMissionPending">0</strong>
         </article>
       </section>
 
       <div class="actions-list">
-        <article class="task-row stats-general-card" id="statsGeneralCard">
-      <div class="stats-avatar-wrap">
-        <img class="task-avatar" id="statsGeneralAvatar" src="/200/avatars/familyplan.png" alt="Avatar global" />
-      </div>
-      <div class="task-main">
-        <div class="task-title">Global</div>
-        <div class="task-assignee" id="statsGeneralDetail">0%</div>
-      </div>
-        </article>
+        <div id="statsMissionsList"></div>
         <div id="statsRankingList"></div>
       </div>
       <div class="actions-side-actions stats-side-actions">
-        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="editStatsGoals" aria-label="Editar metas">
-          <img src="/200/icons/star.svg" alt="" aria-hidden="true" />
+        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="editStatsGoals" aria-label="Adicionar missão">
+          <span class="stats-side-plus" aria-hidden="true">+</span>
         </button>
         <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar estatísticas">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>

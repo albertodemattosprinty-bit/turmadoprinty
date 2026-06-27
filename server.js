@@ -3343,6 +3343,98 @@ async function handleProject200PersonalFinanceNotesUpdate(request, response) {
   }
 }
 
+async function handleProject200MissionsListRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const requestUrl = new URL(request.url || "/api/200/missions", `http://${request.headers.host || "localhost"}`);
+    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    const [missions, summary] = await Promise.all([
+      listProject200DailyMissions(user.id, selectedProfile),
+      summarizeProject200DailyMissions(user.id, selectedProfile)
+    ]);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar as missoes."
+    });
+  }
+}
+
+async function handleProject200MissionCreateRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const missions = await createProject200DailyMission(user.id, selectedProfile, body);
+    const summary = await summarizeProject200DailyMissions(user.id, selectedProfile);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel criar a missao."
+    });
+  }
+}
+
+async function handleProject200MissionDeleteRequest(request, response, missionId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const requestUrl = new URL(request.url || "/api/200/missions", `http://${request.headers.host || "localhost"}`);
+    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    const missions = await deleteProject200DailyMission(user.id, selectedProfile, missionId);
+    const summary = await summarizeProject200DailyMissions(user.id, selectedProfile);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir a missao."
+    });
+  }
+}
+
+async function handleProject200MissionProgressRequest(request, response, missionId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const missions = await updateProject200DailyMissionProgress(user.id, selectedProfile, missionId, body?.delta);
+    const summary = await summarizeProject200DailyMissions(user.id, selectedProfile);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."
+    });
+  }
+}
+
 async function handleProject200ActionInterpret(request, response) {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -3984,14 +4076,15 @@ async function buildProject200ChatContext(user, profileName) {
   const weekStart = startOfProjectWeek(now);
   const nextWeek = addProjectDays(weekStart, 7);
 
-  const [todayActions, weekActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes] = await Promise.all([
+  const [todayActions, weekActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes, missionSummary] = await Promise.all([
     listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
     listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
     getProject200RuntimeState(user.id),
     getStatsSummary(user.id, "week"),
     summarizeProject200PersonalFinance(user.id, "month-".concat(String(now.getMonth() + 1).padStart(2, "0"))),
     summarizeProject200PersonalFinance(user.id, "today"),
-    getProject200FinanceNotes(user.id)
+    getProject200FinanceNotes(user.id),
+    summarizeProject200DailyMissions(user.id, selectedProfile, now)
   ]);
 
   const todayProfileActions = filterProject200ActionsByProfile(todayActions, selectedProfile);
@@ -4041,6 +4134,7 @@ async function buildProject200ChatContext(user, profileName) {
       `Atraso pendente agora: ${selectedWeekSummary.lateStartMinutes}m em ${overdueToday.length} tarefa(s) ainda nao concluidas.`,
       `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
+      `Missoes de hoje: ${Number(missionSummary?.completed || 0)}/${Number(missionSummary?.total || 0)} concluidas | pendentes ${Number(missionSummary?.pending || 0)} | detalhes ${Array.isArray(missionSummary?.lines) && missionSummary.lines.length ? missionSummary.lines.join(" | ") : "nenhuma"}.`,
       `Financeiro pessoal hoje: entradas ${Math.round(Number(financeTodaySummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeTodaySummary?.expenseCents || 0) / 100)} reais | pendencias ${Number(financeTodaySummary?.pendingCount || 0)}.`,
       `Financeiro pessoal do mes: entradas ${Math.round(Number(financeMonthSummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeMonthSummary?.expenseCents || 0) / 100)} reais | saldo atual ${Math.round(Number(financeMonthSummary?.balanceCents || 0) / 100)} reais | lancamentos ${Number(financeMonthSummary?.totalEntries || 0)}.`,
       `Notas financeiras pessoais: ${financeNotesText || "vazias"}.`,
@@ -10196,6 +10290,28 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "PUT" && pathname === "/api/200/finance/notes") {
     await handleProject200PersonalFinanceNotesUpdate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/missions") {
+    await handleProject200MissionsListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/missions") {
+    await handleProject200MissionCreateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/missions\/[^/]+\/progress$/)) {
+    const missionId = pathname.replace(/^\/api\/200\/missions\/([^/]+)\/progress$/, "$1");
+    await handleProject200MissionProgressRequest(request, response, missionId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/200\/missions\/[^/]+$/)) {
+    const missionId = pathname.replace(/^\/api\/200\/missions\/([^/]+)$/, "$1");
+    await handleProject200MissionDeleteRequest(request, response, missionId);
     return;
   }
 

@@ -42,7 +42,7 @@ const actionStatuses = {
 };
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
-  { key: "general", label: "Global" },
+  { key: "missions", label: "Missoes" },
   { key: "today", label: "Hoje" },
   { key: "week", label: "Esta semana" },
   { key: "last15", label: "Ultimos 15 dias" },
@@ -211,12 +211,11 @@ const platformValueInput = document.getElementById("platformValue");
 const platformCategoryRow = document.getElementById("platformCategoryRow");
 const platformRecurrenceDayLabel = document.getElementById("platformRecurrenceDayLabel");
 const statsScopeLabel = document.getElementById("statsScopeLabel");
-const statsGeneralGoals = document.getElementById("statsGeneralGoals");
-const statsDailyGoalProgress = document.getElementById("statsDailyGoalProgress");
-const statsMonthlyGoalProgress = document.getElementById("statsMonthlyGoalProgress");
-const statsRecurringGoalProgress = document.getElementById("statsRecurringGoalProgress");
-const statsGeneralAvatar = document.getElementById("statsGeneralAvatar");
-const statsGeneralDetail = document.getElementById("statsGeneralDetail");
+const statsMissionSummary = document.getElementById("statsMissionSummary");
+const statsMissionTotal = document.getElementById("statsMissionTotal");
+const statsMissionCompleted = document.getElementById("statsMissionCompleted");
+const statsMissionPending = document.getElementById("statsMissionPending");
+const statsMissionsList = document.getElementById("statsMissionsList");
 const statsRankingList = document.getElementById("statsRankingList");
 const editStatsGoalsButton = document.getElementById("editStatsGoals");
 const openActionWizardButton = document.getElementById("openActionWizard");
@@ -547,6 +546,8 @@ let timeButtonHoldTimer = null;
 let timeButtonHoldInterval = null;
 let periodicHoldTimer = null;
 let periodicHoldInterval = null;
+let statsMissionHoldTimer = null;
+let statsMissionHoldHandledId = "";
 let platformNameMediaRecorder = null;
 let platformNameMediaStream = null;
 let platformNameAudioContext = null;
@@ -634,7 +635,8 @@ const state = {
   statsGoals: null,
   statsGlobalProfiles: [],
   statsRanking: [],
-  statsGeneral: null,
+  statsMissions: [],
+  statsMissionSummary: null,
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -3027,6 +3029,10 @@ function normalizeAssigneeName(value) {
 }
 
 function getWizardAssigneeName() {
+  return normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
+}
+
+function getSelectedProfileName() {
   return normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
 }
 
@@ -6440,6 +6446,10 @@ function getActiveStatsScope() {
   return statsScopes[state.statsScopeIndex] || statsScopes[0];
 }
 
+function isMissionStatsScope(scope = getActiveStatsScope()) {
+  return String(scope?.key || "").trim() === "missions";
+}
+
 function moveStatsScope(amount) {
   const total = statsScopes.length;
   state.statsScopeIndex = (state.statsScopeIndex + amount + total) % total;
@@ -6447,49 +6457,26 @@ function moveStatsScope(amount) {
   void loadStatsSummary();
 }
 
-function safeGoalPercent(value, goal) {
-  if (!goal || goal <= 0) {
-    return 0;
+function renderMissionSummary() {
+  const summary = state.statsMissionSummary || { total: 0, completed: 0, pending: 0 };
+  if (statsMissionTotal) {
+    statsMissionTotal.textContent = String(Number(summary.total || 0));
   }
-  return Math.max(0, Math.min(999, Math.round((value / goal) * 100)));
-}
-
-function renderStatsGoals() {
-  const summary = state.statsSummary || {};
-  const goals = state.statsGoals || {
-    dailyIncomeGoalCents: defaultSaldoGoalCents,
-    monthlyBalanceGoalCents: 0,
-    recurringIncomeGoalCents: 0
-  };
-  const totals = summary.totals || {};
-  const recurringIncome = Number(state.platformBaseIncomeCents || 0);
-
-  const dailyValue = Number(state.platformBalanceCents || 0);
-  const saldoGoal = Number(goals.dailyIncomeGoalCents || defaultSaldoGoalCents);
-  const dailyPercent = safeGoalPercent(dailyValue, saldoGoal);
-  const monthlyPercent = safeGoalPercent(Number(totals.balanceCents || 0), Number(goals.monthlyBalanceGoalCents || 0));
-  const recurringPercent = safeGoalPercent(recurringIncome, Number(goals.recurringIncomeGoalCents || 0));
-
-  statsDailyGoalProgress.textContent = `${dailyPercent}%`;
-  statsMonthlyGoalProgress.textContent = `${monthlyPercent}%`;
-  statsRecurringGoalProgress.textContent = `${recurringPercent}%`;
+  if (statsMissionCompleted) {
+    statsMissionCompleted.textContent = String(Number(summary.completed || 0));
+  }
+  if (statsMissionPending) {
+    statsMissionPending.textContent = String(Number(summary.pending || 0));
+  }
 }
 
 function buildStatsRankingFromSummary() {
   const byAssignee = state.statsSummary?.byAssignee || {};
-  const totals = state.statsSummary?.totals || {};
   const ranking = [];
   const orderedNames = [...new Set([
     ...(Array.isArray(state.statsGlobalProfiles) ? state.statsGlobalProfiles : []).map((profile) => profile.name),
     ...Object.keys(byAssignee || {})
   ])];
-  state.statsGeneral = {
-    name: "Global",
-    total: Number(totals.totalMinutes || 0),
-    completed: Number(totals.completedMinutes || 0),
-    percent: Number(totals.completionPercent || 0),
-    lateStartMinutes: Number(totals.lateStartMinutes || 0)
-  };
   for (const name of orderedNames) {
     const item = byAssignee[name] || { totalMinutes: 0, completedMinutes: 0 };
     const total = Number(item.totalMinutes || 0);
@@ -6519,13 +6506,45 @@ function buildStatsRankingFromSummary() {
   state.statsRanking = ranking;
 }
 
-function renderStatsRanking() {
-  const general = state.statsGeneral || { percent: 0, completed: 0, total: 0, lateStartMinutes: 0 };
-  statsGeneralAvatar.src = getActionAvatarPath(getDefaultProfileName());
-  statsGeneralDetail.textContent = general.lateStartMinutes > 0
-    ? `${general.percent}% • atraso ${general.lateStartMinutes}m`
-    : `${general.percent}%`;
+function createStatsMissionRow(entry) {
+  const row = document.createElement("article");
+  const progressPercent = Math.max(0, Math.min(100, Number(entry.percent || 0)));
+  row.className = "task-row stats-mission-row";
+  row.dataset.missionId = String(entry.id || "");
+  row.innerHTML = `
+    <div class="task-main">
+      <div class="task-title">${escapeHtml(String(entry.title || "Missao"))}</div>
+      <div class="task-assignee">${escapeHtml(`${Number(entry.progressCount || 0)}/${Number(entry.targetCount || 0)} • ${progressPercent}%`)}</div>
+      <div class="stats-mission-progress" aria-hidden="true">
+        <div class="stats-mission-progress-fill" style="width:${progressPercent}%;"></div>
+      </div>
+    </div>
+    <div class="stats-mission-actions">
+      <button class="stats-mission-btn stats-mission-btn-delete" type="button" data-mission-delete="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(entry.title || "missao")}`)}">×</button>
+      <button class="stats-mission-btn stats-mission-btn-plus" type="button" data-mission-plus="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Adicionar progresso em ${String(entry.title || "missao")}`)}">+</button>
+    </div>
+  `;
+  return row;
+}
 
+function renderStatsMissions() {
+  if (!statsMissionsList) {
+    return;
+  }
+
+  statsMissionsList.innerHTML = "";
+  const missions = Array.isArray(state.statsMissions) ? state.statsMissions : [];
+  if (!missions.length) {
+    statsMissionsList.innerHTML = '<div class="empty-state">Nenhuma missão por aqui.</div>';
+    return;
+  }
+
+  missions.forEach((entry) => {
+    statsMissionsList.appendChild(createStatsMissionRow(entry));
+  });
+}
+
+function renderStatsRanking() {
   if (!statsRankingList) {
     return;
   }
@@ -6562,76 +6581,151 @@ async function loadStatsSummary() {
   try {
     const scope = getActiveStatsScope();
     statsScopeLabel.textContent = scope.label;
+    if (isMissionStatsScope(scope)) {
+      const missionsPayload = await apiRequest(`/api/200/missions?profile=${encodeURIComponent(getSelectedProfileName())}`);
+      state.statsMissions = Array.isArray(missionsPayload?.missions) ? missionsPayload.missions : [];
+      state.statsMissionSummary = missionsPayload?.summary || { total: 0, completed: 0, pending: 0 };
+      renderMissionSummary();
+      renderStatsMissions();
+      if (statsMissionSummary) {
+        statsMissionSummary.hidden = false;
+      }
+      if (statsMissionsList) {
+        statsMissionsList.hidden = false;
+      }
+      if (statsRankingList) {
+        statsRankingList.hidden = true;
+      }
+      if (editStatsGoalsButton) {
+        editStatsGoalsButton.hidden = false;
+        editStatsGoalsButton.setAttribute("aria-label", "Adicionar missão");
+      }
+      return;
+    }
+
     const summaryResult = await apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`);
-    const optionalRequests = [
-      apiRequest("/api/stats/goals"),
-      apiRequest(`/api/platform/summary?date=${encodeURIComponent(getPlatformMonthReferenceDate())}`)
-    ];
-    optionalRequests.splice(1, 0, apiRequest("/api/200/finance/personal?period=total"));
-    const optionalResponses = await Promise.allSettled(optionalRequests);
-    const goalsPayload = optionalResponses[0]?.status === "fulfilled" ? optionalResponses[0].value : null;
-    const platformPayload = optionalResponses[1]?.status === "fulfilled"
-      ? optionalResponses[1].value
-      : null;
-    const platformMonthPayload = optionalResponses[2]?.status === "fulfilled"
-      ? optionalResponses[2].value
-      : null;
-
     state.statsSummary = summaryResult.summary || {};
-    state.statsGoals = goalsPayload?.goals || null;
     state.statsGlobalProfiles = Array.isArray(summaryResult.summary?.globalProfiles) ? summaryResult.summary.globalProfiles : [];
-    state.platformBaseIncomeCents = Number(platformPayload?.summary?.incomeCents || 0);
-    state.platformBalanceCents = Number(platformMonthPayload?.summary?.balanceCents || state.platformBalanceCents);
+    state.statsMissions = [];
+    state.statsMissionSummary = null;
     buildStatsRankingFromSummary();
-    renderStatsGoals();
     renderStatsRanking();
-
-    const isGeneral = scope.key === "general";
-    statsGeneralGoals.hidden = !isGeneral;
-    editStatsGoalsButton.hidden = !isGeneral;
-  } catch (error) {
+    if (statsMissionSummary) {
+      statsMissionSummary.hidden = true;
+    }
+    if (statsMissionsList) {
+      statsMissionsList.hidden = true;
+    }
     if (statsRankingList) {
-      statsRankingList.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha")}</div>`;
+      statsRankingList.hidden = false;
+    }
+    if (editStatsGoalsButton) {
+      editStatsGoalsButton.hidden = true;
+    }
+  } catch (error) {
+    const target = isMissionStatsScope(getActiveStatsScope()) ? statsMissionsList : statsRankingList;
+    if (target) {
+      target.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha")}</div>`;
     }
   }
 }
 
-async function editStatsGoals() {
-  const current = state.statsGoals || {
-    dailyIncomeGoalCents: defaultSaldoGoalCents,
-    monthlyBalanceGoalCents: 0,
-    recurringIncomeGoalCents: 0
-  };
-  const saldoDefault = Number(current.dailyIncomeGoalCents || defaultSaldoGoalCents);
-  const dailyRaw = window.prompt("Meta de saldo (R$):", String(saldoDefault / 100).replace(".", ","));
-  if (dailyRaw == null) {
-    return;
-  }
-  const monthlyRaw = window.prompt("Meta mensal de saldo final (R$):", String((current.monthlyBalanceGoalCents || 0) / 100).replace(".", ","));
-  if (monthlyRaw == null) {
-    return;
-  }
-  const recurringRaw = window.prompt("Meta recorrente mensal (R$):", String((current.recurringIncomeGoalCents || 0) / 100).replace(".", ","));
-  if (recurringRaw == null) {
-    return;
-  }
+function parseMissionTargetCount(value, fallback = 1) {
+  const parsed = Math.trunc(Number(String(value || "").replace(/[^\d-]/g, "")) || 0);
+  return Math.max(1, parsed || fallback);
+}
 
-  const parseCurrency = (value) => Math.max(0, Math.round(Number(String(value).replace(/\./g, "").replace(",", ".")) * 100) || 0);
+function resolveMissionDeltaInput(mode = "add") {
+  const isRemove = mode === "remove";
+  const label = isRemove ? "Remover quantas unidades?" : "Adicionar quantas unidades?";
+  const raw = window.prompt(label, "1");
+  if (raw == null) {
+    return 0;
+  }
+  const amount = parseMissionTargetCount(raw, 1);
+  return isRemove ? -amount : amount;
+}
 
+async function openStatsMissionCreateFlow() {
+  const title = String(window.prompt("Nome da missão:", "") || "").trim();
+  if (!title) {
+    return;
+  }
+  const targetRaw = window.prompt("Meta numérica da missão:", "6");
+  if (targetRaw == null) {
+    return;
+  }
   try {
-    const payload = await apiRequest("/api/stats/goals", {
-      method: "PUT",
+    const payload = await apiRequest("/api/200/missions", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        dailyIncomeGoalCents: parseCurrency(dailyRaw),
-        monthlyBalanceGoalCents: parseCurrency(monthlyRaw),
-        recurringIncomeGoalCents: parseCurrency(recurringRaw)
+        profile: getSelectedProfileName(),
+        title,
+        targetCount: parseMissionTargetCount(targetRaw, 6)
       })
     });
-    state.statsGoals = payload.goals || state.statsGoals;
-    renderStatsGoals();
+    state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];
+    state.statsMissionSummary = payload?.summary || state.statsMissionSummary;
+    renderMissionSummary();
+    renderStatsMissions();
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : "Nao foi possivel salvar metas.");
+    showToast(error instanceof Error ? error.message : "Falha ao criar missão.");
+  }
+}
+
+async function updateStatsMissionProgress(missionId, delta) {
+  if (!missionId || !delta) {
+    return;
+  }
+  try {
+    const payload = await apiRequest(`/api/200/missions/${encodeURIComponent(missionId)}/progress`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profile: getSelectedProfileName(),
+        delta
+      })
+    });
+    state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];
+    state.statsMissionSummary = payload?.summary || state.statsMissionSummary;
+    renderMissionSummary();
+    renderStatsMissions();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Falha ao atualizar missão.");
+  }
+}
+
+async function deleteStatsMission(missionId) {
+  if (!missionId) {
+    return;
+  }
+  if (!window.confirm("Excluir esta missão?")) {
+    return;
+  }
+  try {
+    const payload = await apiRequest(`/api/200/missions/${encodeURIComponent(missionId)}?profile=${encodeURIComponent(getSelectedProfileName())}`, {
+      method: "DELETE"
+    });
+    state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];
+    state.statsMissionSummary = payload?.summary || state.statsMissionSummary;
+    renderMissionSummary();
+    renderStatsMissions();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Falha ao excluir missão.");
+  }
+}
+
+function handleStatsSideAction() {
+  if (isMissionStatsScope()) {
+    void openStatsMissionCreateFlow();
+  }
+}
+
+function clearStatsMissionHoldState() {
+  if (statsMissionHoldTimer) {
+    window.clearTimeout(statsMissionHoldTimer);
+    statsMissionHoldTimer = null;
   }
 }
 
@@ -8583,6 +8677,56 @@ actionsList.addEventListener("keydown", async (event) => {
   await toggleActionStatus(row.dataset.actionId);
 });
 
+statsMissionsList?.addEventListener("pointerdown", (event) => {
+  const button = event.target.closest("[data-mission-plus]");
+  const missionId = String(button?.dataset?.missionPlus || "").trim();
+  if (!missionId) {
+    return;
+  }
+  clearStatsMissionHoldState();
+  statsMissionHoldHandledId = "";
+  statsMissionHoldTimer = window.setTimeout(() => {
+    statsMissionHoldHandledId = missionId;
+    const delta = resolveMissionDeltaInput("remove");
+    if (delta) {
+      void updateStatsMissionProgress(missionId, delta);
+    }
+  }, 500);
+});
+
+["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+  statsMissionsList?.addEventListener(eventName, () => {
+    clearStatsMissionHoldState();
+  });
+});
+
+statsMissionsList?.addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-mission-delete]");
+  if (deleteButton) {
+    const missionId = String(deleteButton.dataset.missionDelete || "").trim();
+    void deleteStatsMission(missionId);
+    return;
+  }
+
+  const plusButton = event.target.closest("[data-mission-plus]");
+  if (!plusButton) {
+    return;
+  }
+  const missionId = String(plusButton.dataset.missionPlus || "").trim();
+  if (!missionId) {
+    return;
+  }
+  if (statsMissionHoldHandledId === missionId) {
+    statsMissionHoldHandledId = "";
+    return;
+  }
+  const delta = resolveMissionDeltaInput("add");
+  if (!delta) {
+    return;
+  }
+  void updateStatsMissionProgress(missionId, delta);
+});
+
 handleSwipe(activeDateLabel, moveActiveDate);
 handleSwipe(financePeriodLabel, moveFinancePeriod);
 handleSwipe(financePeriodPicker, moveFinancePeriod);
@@ -8615,7 +8759,7 @@ addPlatformBalanceButton?.addEventListener("click", () => {
 });
 
 editStatsGoalsButton?.addEventListener("click", () => {
-  void editStatsGoals();
+  handleStatsSideAction();
 });
 openConstitutionEditButton?.addEventListener("click", startConstitutionEdit);
 cancelConstitutionEditButton?.addEventListener("click", () => {
