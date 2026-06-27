@@ -60,8 +60,9 @@ import { approveConstitutionVersion, createConstitutionVersion, ensureConstituti
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
-import { appendProject200ChatMessages, createProject200Chat, getProject200Chat } from "./src/project200-chats.js";
+import { appendProject200ChatMessages, createProject200Chat, getProject200Chat, markProject200ChatRead, saveProject200ChatNotificationPermission } from "./src/project200-chats.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
+import { createProject200DailyMission, deleteProject200DailyMission, ensureProject200MissionsSchema, listProject200DailyMissions, summarizeProject200DailyMissions, updateProject200DailyMissionProgress } from "./src/project200-missions.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -2515,6 +2516,7 @@ async function ensurePaymentsReady(response) {
     await ensureStatsSchema();
     await ensureConstitutionSchema();
     await ensureProject200ProfileLinksSchema();
+    await ensureProject200MissionsSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
