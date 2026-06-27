@@ -216,6 +216,14 @@ const statsMissionTotal = document.getElementById("statsMissionTotal");
 const statsMissionCompleted = document.getElementById("statsMissionCompleted");
 const statsMissionPending = document.getElementById("statsMissionPending");
 const statsMissionsList = document.getElementById("statsMissionsList");
+const missionQuantityTitle = document.getElementById("missionQuantityTitle");
+const missionQuantitySubtitle = document.getElementById("missionQuantitySubtitle");
+const missionQuantityValue = document.getElementById("missionQuantityValue");
+const missionQuantityQuickGrid = document.getElementById("missionQuantityQuickGrid");
+const missionQuantityDecreaseButton = document.getElementById("missionQuantityDecreaseButton");
+const missionQuantityIncreaseButton = document.getElementById("missionQuantityIncreaseButton");
+const missionQuantityCancelButton = document.getElementById("missionQuantityCancelButton");
+const missionQuantityConfirmButton = document.getElementById("missionQuantityConfirmButton");
 const statsRankingList = document.getElementById("statsRankingList");
 const editStatsGoalsButton = document.getElementById("editStatsGoals");
 const openActionWizardButton = document.getElementById("openActionWizard");
@@ -548,6 +556,7 @@ let periodicHoldTimer = null;
 let periodicHoldInterval = null;
 let statsMissionHoldTimer = null;
 let statsMissionHoldHandledId = "";
+let missionQuantityResolver = null;
 let platformNameMediaRecorder = null;
 let platformNameMediaStream = null;
 let platformNameAudioContext = null;
@@ -637,6 +646,14 @@ const state = {
   statsRanking: [],
   statsMissions: [],
   statsMissionSummary: null,
+  missionQuantity: {
+    mode: "add",
+    amount: 1,
+    missionId: "",
+    missionTitle: "",
+    missionTargetCount: 0,
+    quickValues: [1, 5, 10]
+  },
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -6511,10 +6528,12 @@ function createStatsMissionRow(entry) {
   const progressPercent = Math.max(0, Math.min(100, Number(entry.percent || 0)));
   row.className = "task-row stats-mission-row";
   row.dataset.missionId = String(entry.id || "");
+  row.dataset.missionTitle = String(entry.title || "Missao");
+  row.dataset.missionTargetCount = String(Number(entry.targetCount || 0));
   row.innerHTML = `
     <div class="task-main">
       <div class="task-title">${escapeHtml(String(entry.title || "Missao"))}</div>
-      <div class="task-assignee">${escapeHtml(`${Number(entry.progressCount || 0)}/${Number(entry.targetCount || 0)} • ${progressPercent}%`)}</div>
+      <div class="task-assignee">${escapeHtml(`${Number(entry.progressCount || 0)} de ${Number(entry.targetCount || 0)} • ${progressPercent}%`)}</div>
       <div class="stats-mission-progress" aria-hidden="true">
         <div class="stats-mission-progress-fill" style="width:${progressPercent}%;"></div>
       </div>
@@ -6635,15 +6654,68 @@ function parseMissionTargetCount(value, fallback = 1) {
   return Math.max(1, parsed || fallback);
 }
 
-function resolveMissionDeltaInput(mode = "add") {
-  const isRemove = mode === "remove";
-  const label = isRemove ? "Remover quantas unidades?" : "Adicionar quantas unidades?";
-  const raw = window.prompt(label, "1");
-  if (raw == null) {
-    return 0;
+function resolveMissionQuickValues(targetCount) {
+  if (Number(targetCount || 0) > 100) {
+    return [1, 10, 50];
   }
-  const amount = parseMissionTargetCount(raw, 1);
-  return isRemove ? -amount : amount;
+  return [1, 5, 10];
+}
+
+function renderMissionQuantityModal() {
+  if (missionQuantityTitle) {
+    missionQuantityTitle.textContent = state.missionQuantity.mode === "remove" ? "Remover progresso" : "Adicionar progresso";
+  }
+  if (missionQuantitySubtitle) {
+    missionQuantitySubtitle.textContent = state.missionQuantity.missionTitle || "Missão";
+  }
+  if (missionQuantityValue) {
+    missionQuantityValue.textContent = String(Math.max(1, Number(state.missionQuantity.amount || 1)));
+  }
+  if (!missionQuantityQuickGrid) {
+    return;
+  }
+  missionQuantityQuickGrid.innerHTML = "";
+  state.missionQuantity.quickValues.forEach((value) => {
+    const button = document.createElement("button");
+    const signedLabel = state.missionQuantity.mode === "remove" ? `-${value}` : `+${value}`;
+    button.type = "button";
+    button.className = "mission-quantity-quick-btn";
+    if (Number(state.missionQuantity.amount || 1) === Number(value)) {
+      button.classList.add("is-active");
+    }
+    button.dataset.missionQuickValue = String(value);
+    button.textContent = signedLabel;
+    missionQuantityQuickGrid.appendChild(button);
+  });
+}
+
+function closeMissionQuantityModal(confirm = false) {
+  const resolver = missionQuantityResolver;
+  const amount = Math.max(1, Number(state.missionQuantity.amount || 1));
+  missionQuantityResolver = null;
+  closeModal("missionQuantityModal");
+  if (typeof resolver === "function") {
+    if (!confirm) {
+      resolver(0);
+      return;
+    }
+    resolver(state.missionQuantity.mode === "remove" ? -amount : amount);
+  }
+}
+
+function openMissionQuantityModal({ mode = "add", missionId = "", missionTitle = "", missionTargetCount = 0 } = {}) {
+  state.missionQuantity.mode = mode === "remove" ? "remove" : "add";
+  state.missionQuantity.amount = 1;
+  state.missionQuantity.missionId = String(missionId || "");
+  state.missionQuantity.missionTitle = String(missionTitle || "Missão");
+  state.missionQuantity.missionTargetCount = Number(missionTargetCount || 0);
+  state.missionQuantity.quickValues = resolveMissionQuickValues(missionTargetCount);
+  renderMissionQuantityModal();
+  openModal("missionQuantityModal");
+  window.setTimeout(() => missionQuantityConfirmButton?.focus(), 40);
+  return new Promise((resolve) => {
+    missionQuantityResolver = resolve;
+  });
 }
 
 async function openStatsMissionCreateFlow() {
@@ -6727,6 +6799,18 @@ function clearStatsMissionHoldState() {
     window.clearTimeout(statsMissionHoldTimer);
     statsMissionHoldTimer = null;
   }
+}
+
+function getMissionEntryFromEventTarget(target) {
+  const row = target?.closest?.("[data-mission-id]");
+  if (!row) {
+    return null;
+  }
+  return {
+    id: String(row.dataset.missionId || "").trim(),
+    title: String(row.dataset.missionTitle || "Missão").trim(),
+    targetCount: Number(row.dataset.missionTargetCount || 0)
+  };
 }
 
 function renderPlatformCategoryOptions() {
@@ -8155,6 +8239,33 @@ document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", () => closeModal(button.closest(".workspace-modal")));
 });
 
+missionQuantityDecreaseButton?.addEventListener("click", () => {
+  state.missionQuantity.amount = Math.max(1, Number(state.missionQuantity.amount || 1) - 1);
+  renderMissionQuantityModal();
+});
+
+missionQuantityIncreaseButton?.addEventListener("click", () => {
+  state.missionQuantity.amount = Math.max(1, Number(state.missionQuantity.amount || 1) + 1);
+  renderMissionQuantityModal();
+});
+
+missionQuantityQuickGrid?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-mission-quick-value]");
+  if (!button) {
+    return;
+  }
+  state.missionQuantity.amount = parseMissionTargetCount(button.dataset.missionQuickValue, 1);
+  renderMissionQuantityModal();
+});
+
+missionQuantityCancelButton?.addEventListener("click", () => {
+  closeMissionQuantityModal(false);
+});
+
+missionQuantityConfirmButton?.addEventListener("click", () => {
+  closeMissionQuantityModal(true);
+});
+
 document.querySelectorAll("[data-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveActiveDate(Number(button.dataset.dayNav)));
 });
@@ -8679,15 +8790,21 @@ actionsList.addEventListener("keydown", async (event) => {
 
 statsMissionsList?.addEventListener("pointerdown", (event) => {
   const button = event.target.closest("[data-mission-plus]");
-  const missionId = String(button?.dataset?.missionPlus || "").trim();
-  if (!missionId) {
+  const mission = getMissionEntryFromEventTarget(event.target);
+  if (!button || !mission?.id) {
     return;
   }
   clearStatsMissionHoldState();
   statsMissionHoldHandledId = "";
-  statsMissionHoldTimer = window.setTimeout(() => {
+  const missionId = mission.id;
+  statsMissionHoldTimer = window.setTimeout(async () => {
     statsMissionHoldHandledId = missionId;
-    const delta = resolveMissionDeltaInput("remove");
+    const delta = await openMissionQuantityModal({
+      mode: "remove",
+      missionId: mission.id,
+      missionTitle: mission.title,
+      missionTargetCount: mission.targetCount
+    });
     if (delta) {
       void updateStatsMissionProgress(missionId, delta);
     }
@@ -8700,7 +8817,7 @@ statsMissionsList?.addEventListener("pointerdown", (event) => {
   });
 });
 
-statsMissionsList?.addEventListener("click", (event) => {
+statsMissionsList?.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-mission-delete]");
   if (deleteButton) {
     const missionId = String(deleteButton.dataset.missionDelete || "").trim();
@@ -8720,7 +8837,13 @@ statsMissionsList?.addEventListener("click", (event) => {
     statsMissionHoldHandledId = "";
     return;
   }
-  const delta = resolveMissionDeltaInput("add");
+  const mission = getMissionEntryFromEventTarget(event.target);
+  const delta = await openMissionQuantityModal({
+    mode: "add",
+    missionId,
+    missionTitle: mission?.title,
+    missionTargetCount: mission?.targetCount
+  });
   if (!delta) {
     return;
   }

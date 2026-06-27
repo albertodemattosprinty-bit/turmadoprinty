@@ -986,6 +986,25 @@
     </div>
   </section>
 
+  <section class="workspace-modal simple-modal" id="missionQuantityModal" aria-hidden="true" aria-label="Ajustar quantidade da missão">
+    <div class="modal-card mission-quantity-card">
+      <div class="mission-quantity-head">
+        <strong id="missionQuantityTitle">Adicionar progresso</strong>
+        <span id="missionQuantitySubtitle">Missão</span>
+      </div>
+      <div class="mission-quantity-value-row">
+        <button class="ghost-btn mission-quantity-step-btn" type="button" id="missionQuantityDecreaseButton">-</button>
+        <div class="mission-quantity-value" id="missionQuantityValue">1</div>
+        <button class="ghost-btn mission-quantity-step-btn" type="button" id="missionQuantityIncreaseButton">+</button>
+      </div>
+      <div class="mission-quantity-quick-grid" id="missionQuantityQuickGrid"></div>
+      <div class="wizard-actions mission-quantity-actions">
+        <button class="ghost-btn" type="button" id="missionQuantityCancelButton">Cancelar</button>
+        <button class="primary-btn" type="button" id="missionQuantityConfirmButton">Confirmar</button>
+      </div>
+    </div>
+  </section>
+
   <section class="workspace-modal" id="historyModal" aria-hidden="true" aria-label="Histórico">
     <div class="actions-app history-app">
       <header class="actions-head">
