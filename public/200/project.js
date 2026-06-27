@@ -3053,6 +3053,20 @@ function getSelectedProfileName() {
   return normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
 }
 
+function getProjectTodayDateKey() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+  return `${year}-${month}-${day}`;
+}
+
 function getStatsAvatarPath(assignee) {
   const globalProfile = getStatsGlobalProfileByName(assignee);
   if (globalProfile) {
@@ -6601,7 +6615,7 @@ async function loadStatsSummary() {
     const scope = getActiveStatsScope();
     statsScopeLabel.textContent = scope.label;
     if (isMissionStatsScope(scope)) {
-      const missionsPayload = await apiRequest(`/api/200/missions?profile=${encodeURIComponent(getSelectedProfileName())}`);
+      const missionsPayload = await apiRequest(`/api/200/missions?profile=${encodeURIComponent(getSelectedProfileName())}&date=${encodeURIComponent(getProjectTodayDateKey())}`);
       state.statsMissions = Array.isArray(missionsPayload?.missions) ? missionsPayload.missions : [];
       state.statsMissionSummary = missionsPayload?.summary || { total: 0, completed: 0, pending: 0 };
       renderMissionSummary();
@@ -6753,7 +6767,8 @@ async function updateStatsMissionProgress(missionId, delta) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         profile: getSelectedProfileName(),
-        delta
+        delta,
+        date: getProjectTodayDateKey()
       })
     });
     state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];
