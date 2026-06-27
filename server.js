@@ -62,7 +62,7 @@ import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProj
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { appendProject200ChatMessages, createProject200Chat, getProject200Chat, markProject200ChatRead, saveProject200ChatNotificationPermission } from "./src/project200-chats.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createProject200DailyMission, deleteProject200DailyMission, ensureProject200MissionsSchema, listProject200DailyMissions, summarizeProject200DailyMissions, summarizeProject200MissionItems, updateProject200DailyMissionProgress } from "./src/project200-missions.js";
+import { createProject200DailyMission, deleteProject200DailyMission, ensureProject200MissionsSchema, listProject200DailyMissions, summarizeProject200MissionItems, updateProject200DailyMissionProgress } from "./src/project200-missions.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -4076,15 +4076,14 @@ async function buildProject200ChatContext(user, profileName) {
   const weekStart = startOfProjectWeek(now);
   const nextWeek = addProjectDays(weekStart, 7);
 
-  const [todayActions, weekActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes, missionSummary] = await Promise.all([
+  const [todayActions, weekActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes] = await Promise.all([
     listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
     listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
     getProject200RuntimeState(user.id),
     getStatsSummary(user.id, "week"),
     summarizeProject200PersonalFinance(user.id, "month-".concat(String(now.getMonth() + 1).padStart(2, "0"))),
     summarizeProject200PersonalFinance(user.id, "today"),
-    getProject200FinanceNotes(user.id),
-    summarizeProject200DailyMissions(user.id, selectedProfile, now)
+    getProject200FinanceNotes(user.id)
   ]);
 
   const todayProfileActions = filterProject200ActionsByProfile(todayActions, selectedProfile);
@@ -4115,6 +4114,17 @@ async function buildProject200ChatContext(user, profileName) {
   }, 0);
 
   const selectedWeekStats = globalWeekStats?.byAssignee?.[selectedProfile] || {};
+  const todayCompletedPoints = todayProfileActions.reduce((sum, action) => {
+    if (String(action?.status || "").trim().toUpperCase() !== "COMPLETED") {
+      return sum;
+    }
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    const endAt = action?.endAt ? new Date(action.endAt).getTime() : NaN;
+    if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      return sum;
+    }
+    return sum + Math.max(0, Math.round((endAt - startAt) / 60000));
+  }, 0);
   const selectedWeekSummary = {
     totalMinutes: Number(selectedWeekStats?.totalMinutes || ownWeekProgress.totalMinutes || 0),
     completedMinutes: Number(selectedWeekStats?.completedMinutes || ownWeekProgress.completedMinutes || 0),
@@ -4131,10 +4141,11 @@ async function buildProject200ChatContext(user, profileName) {
       `Agora no Brasil (${PROJECT200_TIME_ZONE}): ${formatProjectNowLabel(now)}.`,
       `Tarefa em andamento do perfil: ${runningLine}.`,
       `Semana do perfil: ${selectedWeekSummary.completionPercent}% | ${selectedWeekSummary.completedMinutes}/${selectedWeekSummary.totalMinutes} min concluidos.`,
+      `Pontos do perfil hoje: ${todayCompletedPoints}.`,
+      `Pontos do perfil na semana: ${selectedWeekSummary.completedMinutes}.`,
       `Atraso pendente agora: ${selectedWeekSummary.lateStartMinutes}m em ${overdueToday.length} tarefa(s) ainda nao concluidas.`,
       `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
-      `Missoes de hoje: ${Number(missionSummary?.completed || 0)}/${Number(missionSummary?.total || 0)} concluidas | pendentes ${Number(missionSummary?.pending || 0)} | detalhes ${Array.isArray(missionSummary?.lines) && missionSummary.lines.length ? missionSummary.lines.join(" | ") : "nenhuma"}.`,
       `Financeiro pessoal hoje: entradas ${Math.round(Number(financeTodaySummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeTodaySummary?.expenseCents || 0) / 100)} reais | pendencias ${Number(financeTodaySummary?.pendingCount || 0)}.`,
       `Financeiro pessoal do mes: entradas ${Math.round(Number(financeMonthSummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeMonthSummary?.expenseCents || 0) / 100)} reais | saldo atual ${Math.round(Number(financeMonthSummary?.balanceCents || 0) / 100)} reais | lancamentos ${Number(financeMonthSummary?.totalEntries || 0)}.`,
       `Notas financeiras pessoais: ${financeNotesText || "vazias"}.`,

@@ -930,7 +930,7 @@
         <button class="circle-nav" type="button" data-stats-scope-nav="-1" aria-label="Escopo anterior">
           <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
         </button>
-        <button class="date-title" type="button" id="statsScopeLabel">Missões</button>
+        <button class="date-title" type="button" id="statsScopeLabel">Pontos</button>
         <button class="circle-nav" type="button" data-stats-scope-nav="1" aria-label="Próximo escopo">
           <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
         </button>
@@ -938,15 +938,15 @@
 
       <section class="finance-overview" id="statsMissionSummary">
         <article class="finance-metric">
-          <span>Missões</span>
+          <span>Pontos</span>
           <strong id="statsMissionTotal">0</strong>
         </article>
         <article class="finance-metric">
-          <span>Concluídas</span>
+          <span>Ultimos 7 dias</span>
           <strong id="statsMissionCompleted">0</strong>
         </article>
         <article class="finance-metric">
-          <span>Pendentes</span>
+          <span>Ultimos 30 dias</span>
           <strong id="statsMissionPending">0</strong>
         </article>
       </section>
@@ -956,9 +956,6 @@
         <div id="statsRankingList"></div>
       </div>
       <div class="actions-side-actions stats-side-actions">
-        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="editStatsGoals" aria-label="Adicionar missão">
-          <span class="stats-side-plus" aria-hidden="true">+</span>
-        </button>
         <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar estatísticas">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
         </button>
@@ -982,25 +979,6 @@
           <button class="ghost-btn" type="button" id="financeEntryConfirmCancel">Cancelar</button>
           <button class="primary-btn" type="button" id="financeEntryConfirmApply">Confirmar</button>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="workspace-modal simple-modal" id="missionQuantityModal" aria-hidden="true" aria-label="Ajustar quantidade da missão">
-    <div class="modal-card mission-quantity-card">
-      <div class="mission-quantity-head">
-        <strong id="missionQuantityTitle">Adicionar progresso</strong>
-        <span id="missionQuantitySubtitle">Missão</span>
-      </div>
-      <div class="mission-quantity-value-row">
-        <button class="ghost-btn mission-quantity-step-btn" type="button" id="missionQuantityDecreaseButton">-</button>
-        <div class="mission-quantity-value" id="missionQuantityValue">1</div>
-        <button class="ghost-btn mission-quantity-step-btn" type="button" id="missionQuantityIncreaseButton">+</button>
-      </div>
-      <div class="mission-quantity-quick-grid" id="missionQuantityQuickGrid"></div>
-      <div class="wizard-actions mission-quantity-actions">
-        <button class="ghost-btn" type="button" id="missionQuantityCancelButton">Cancelar</button>
-        <button class="primary-btn" type="button" id="missionQuantityConfirmButton">Confirmar</button>
       </div>
     </div>
   </section>

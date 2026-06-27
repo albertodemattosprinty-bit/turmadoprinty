@@ -35,6 +35,9 @@ function resolveStatsRange(scope = "general") {
   if (normalized === "last15") {
     return { key: "last15", label: "Ultimos 15 dias", from: addDays(today, -14), to: addDays(today, 1) };
   }
+  if (normalized === "last7") {
+    return { key: "last7", label: "Ultimos 7 dias", from: addDays(today, -6), to: addDays(today, 1) };
+  }
   if (normalized === "last30") {
     return { key: "last30", label: "Ultimos 30 dias", from: addDays(today, -29), to: addDays(today, 1) };
   }
@@ -165,7 +168,7 @@ async function syncClosedDailyReports(userId) {
 }
 
 async function buildStatsSummary(userId, range) {
-  const [actionsResult, incomeResult, expenseResult, balanceResult, globalProfiles] = await Promise.all([
+  const [actionsResult, categoryResult, incomeResult, expenseResult, balanceResult, globalProfiles] = await Promise.all([
     query(
       `
         with action_status as (
@@ -196,6 +199,29 @@ async function buildStatsSummary(userId, range) {
           ), 0)::bigint as late_start_minutes
         from action_status
         group by assignee
+      `,
+      [range.from || null, range.to || null]
+    ),
+    query(
+      `
+        with action_status as (
+          select
+            a.id,
+            a.category_id,
+            extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
+            coalesce(o.status, 'PENDING') as status
+          from actions a
+          left join action_status_overrides o
+            on o.user_id = a.user_id
+           and o.action_id = a.id
+          where ($1::timestamptz is null or a.start_at < $2::timestamptz)
+            and ($1::timestamptz is null or a.end_at > $1::timestamptz)
+        )
+        select
+          coalesce(nullif(trim(category_id), ''), 'sem_categoria') as category_id,
+          coalesce(sum(case when upper(status) = 'COMPLETED' then minutes else 0 end), 0)::bigint as completed_minutes
+        from action_status
+        group by coalesce(nullif(trim(category_id), ''), 'sem_categoria')
       `,
       [range.from || null, range.to || null]
     ),
@@ -247,6 +273,11 @@ async function buildStatsSummary(userId, range) {
   const totalMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.totalMinutes || 0), 0);
   const completedMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.completedMinutes || 0), 0);
   const lateStartMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.lateStartMinutes || 0), 0);
+  const byCategory = {};
+  for (const row of categoryResult.rows) {
+    const categoryId = String(row.category_id || "").trim().toLowerCase() || "sem_categoria";
+    byCategory[categoryId] = Number(row.completed_minutes || 0);
+  }
 
   return {
     rangeKey: range.key,
@@ -261,6 +292,7 @@ async function buildStatsSummary(userId, range) {
       balanceCents: Number(balanceResult.rows[0]?.balance_cents || 0)
     },
     byAssignee,
+    byCategory,
     globalProfiles: Array.isArray(globalProfiles)
       ? globalProfiles.map((profile) => ({
           id: profile.id,

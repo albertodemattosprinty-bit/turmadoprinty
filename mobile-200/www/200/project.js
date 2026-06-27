@@ -42,7 +42,7 @@ const actionStatuses = {
 };
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
-  { key: "missions", label: "Missoes" },
+  { key: "points", label: "Pontos" },
   { key: "today", label: "Hoje" },
   { key: "week", label: "Esta semana" },
   { key: "last15", label: "Ultimos 15 dias" },
@@ -59,6 +59,20 @@ const statsScopes = [
   { key: "month-10", label: "Outubro" },
   { key: "month-11", label: "Novembro" },
   { key: "month-12", label: "Dezembro" }
+];
+const statsPointCategories = [
+  { id: "sono", name: "Sono", targetPoints: 360 },
+  { id: "alimentacao", name: "Alimentação", targetPoints: 30 },
+  { id: "hidratacao", name: "Hidratação", targetPoints: 15 },
+  { id: "estudo", name: "Estudo", targetPoints: 30 },
+  { id: "financeiro", name: "Financeiro", targetPoints: 30 },
+  { id: "trabalho", name: "Trabalho", targetPoints: 360 },
+  { id: "casa", name: "Casa", targetPoints: 120 },
+  { id: "exercicios", name: "Exercícios", targetPoints: 30 },
+  { id: "social", name: "Social", targetPoints: 30 },
+  { id: "familia", name: "Familia", targetPoints: 30 },
+  { id: "higiene", name: "Higiene", targetPoints: 15 },
+  { id: "lazer", name: "Lazer", targetPoints: 90 }
 ];
 const avatarPresetToPath = {
   rose: "/200/avatars/rose.png",
@@ -216,16 +230,7 @@ const statsMissionTotal = document.getElementById("statsMissionTotal");
 const statsMissionCompleted = document.getElementById("statsMissionCompleted");
 const statsMissionPending = document.getElementById("statsMissionPending");
 const statsMissionsList = document.getElementById("statsMissionsList");
-const missionQuantityTitle = document.getElementById("missionQuantityTitle");
-const missionQuantitySubtitle = document.getElementById("missionQuantitySubtitle");
-const missionQuantityValue = document.getElementById("missionQuantityValue");
-const missionQuantityQuickGrid = document.getElementById("missionQuantityQuickGrid");
-const missionQuantityDecreaseButton = document.getElementById("missionQuantityDecreaseButton");
-const missionQuantityIncreaseButton = document.getElementById("missionQuantityIncreaseButton");
-const missionQuantityCancelButton = document.getElementById("missionQuantityCancelButton");
-const missionQuantityConfirmButton = document.getElementById("missionQuantityConfirmButton");
 const statsRankingList = document.getElementById("statsRankingList");
-const editStatsGoalsButton = document.getElementById("editStatsGoals");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
@@ -554,9 +559,6 @@ let timeButtonHoldTimer = null;
 let timeButtonHoldInterval = null;
 let periodicHoldTimer = null;
 let periodicHoldInterval = null;
-let statsMissionHoldTimer = null;
-let statsMissionHoldHandledId = "";
-let missionQuantityResolver = null;
 let platformNameMediaRecorder = null;
 let platformNameMediaStream = null;
 let platformNameAudioContext = null;
@@ -644,16 +646,8 @@ const state = {
   statsGoals: null,
   statsGlobalProfiles: [],
   statsRanking: [],
+  statsPointsOverview: null,
   statsMissions: [],
-  statsMissionSummary: null,
-  missionQuantity: {
-    mode: "add",
-    amount: 1,
-    missionId: "",
-    missionTitle: "",
-    missionTargetCount: 0,
-    quickValues: [1, 5, 10]
-  },
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -6477,8 +6471,8 @@ function getActiveStatsScope() {
   return statsScopes[state.statsScopeIndex] || statsScopes[0];
 }
 
-function isMissionStatsScope(scope = getActiveStatsScope()) {
-  return String(scope?.key || "").trim() === "missions";
+function isPointsStatsScope(scope = getActiveStatsScope()) {
+  return String(scope?.key || "").trim() === "points";
 }
 
 function moveStatsScope(amount) {
@@ -6489,15 +6483,15 @@ function moveStatsScope(amount) {
 }
 
 function renderMissionSummary() {
-  const summary = state.statsMissionSummary || { total: 0, completed: 0, pending: 0 };
+  const summary = state.statsPointsOverview || { total: 0, last7: 0, last30: 0 };
   if (statsMissionTotal) {
     statsMissionTotal.textContent = String(Number(summary.total || 0));
   }
   if (statsMissionCompleted) {
-    statsMissionCompleted.textContent = String(Number(summary.completed || 0));
+    statsMissionCompleted.textContent = String(Number(summary.last7 || 0));
   }
   if (statsMissionPending) {
-    statsMissionPending.textContent = String(Number(summary.pending || 0));
+    statsMissionPending.textContent = String(Number(summary.last30 || 0));
   }
 }
 
@@ -6510,31 +6504,84 @@ function buildStatsRankingFromSummary() {
   ])];
   for (const name of orderedNames) {
     const item = byAssignee[name] || { totalMinutes: 0, completedMinutes: 0 };
-    const total = Number(item.totalMinutes || 0);
     const completed = Number(item.completedMinutes || 0);
     const lateStartMinutes = Number(item.lateStartMinutes || 0);
-    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     const payload = {
       name,
-      total,
       completed,
-      percent,
       lateStartMinutes
     };
     ranking.push(payload);
   }
 
   ranking.sort((left, right) => {
-    if (right.percent !== left.percent) {
-      return right.percent - left.percent;
-    }
     if (right.completed !== left.completed) {
       return right.completed - left.completed;
+    }
+    if (left.lateStartMinutes !== right.lateStartMinutes) {
+      return left.lateStartMinutes - right.lateStartMinutes;
     }
     return left.name.localeCompare(right.name, "pt-BR");
   });
 
   state.statsRanking = ranking;
+}
+
+function mixPointColor(start, end, ratio) {
+  const safeRatio = Math.max(0, Math.min(1, Number(ratio || 0)));
+  const left = start.replace("#", "");
+  const right = end.replace("#", "");
+  const lr = parseInt(left.slice(0, 2), 16);
+  const lg = parseInt(left.slice(2, 4), 16);
+  const lb = parseInt(left.slice(4, 6), 16);
+  const rr = parseInt(right.slice(0, 2), 16);
+  const rg = parseInt(right.slice(2, 4), 16);
+  const rb = parseInt(right.slice(4, 6), 16);
+  const red = Math.round(lr + (rr - lr) * safeRatio);
+  const green = Math.round(lg + (rg - lg) * safeRatio);
+  const blue = Math.round(lb + (rb - lb) * safeRatio);
+  return `rgb(${red}, ${green}, ${blue})`;
+}
+
+function getPointProgressColor(percent) {
+  const safePercent = Math.max(0, Math.min(100, Number(percent || 0)));
+  const stops = [
+    { percent: 0, color: "#dc2626" },
+    { percent: 25, color: "#f97316" },
+    { percent: 45, color: "#facc15" },
+    { percent: 60, color: "#f59e0b" },
+    { percent: 80, color: "#2dd4bf" },
+    { percent: 100, color: "#16a34a" }
+  ];
+  for (let index = 1; index < stops.length; index += 1) {
+    const previous = stops[index - 1];
+    const current = stops[index];
+    if (safePercent <= current.percent) {
+      const ratio = (safePercent - previous.percent) / Math.max(1, current.percent - previous.percent);
+      return mixPointColor(previous.color, current.color, ratio);
+    }
+  }
+  return stops[stops.length - 1].color;
+}
+
+function createStatsPointRow(entry) {
+  const row = document.createElement("article");
+  const progressPercent = Math.max(0, Math.min(100, Number(entry.percent || 0)));
+  const progressColor = getPointProgressColor(progressPercent);
+  const iconPath = getTaskCategoryIconPath(entry.id) || "/200/icons/agenda.svg";
+  row.className = "task-row stats-point-row";
+  row.innerHTML = `
+    <div class="stats-point-head">
+      <img class="stats-point-icon" src="${iconPath}" alt="${escapeHtml(entry.name)}" loading="lazy" />
+      <div class="task-main">
+        <div class="task-title">${escapeHtml(entry.name)}</div>
+      </div>
+    </div>
+    <div class="stats-point-progress" aria-hidden="true">
+      <div class="stats-point-progress-fill" style="width:${progressPercent}%; background:linear-gradient(90deg, rgba(255,255,255,0.16) 0%, ${progressColor} 100%);"></div>
+    </div>
+  `;
+  return row;
 }
 
 function createStatsMissionRow(entry) {
@@ -6566,14 +6613,14 @@ function renderStatsMissions() {
   }
 
   statsMissionsList.innerHTML = "";
-  const missions = Array.isArray(state.statsMissions) ? state.statsMissions : [];
-  if (!missions.length) {
-    statsMissionsList.innerHTML = '<div class="empty-state">Nenhuma missão por aqui.</div>';
+  const entries = Array.isArray(state.statsMissions) ? state.statsMissions : [];
+  if (!entries.length) {
+    statsMissionsList.innerHTML = '<div class="empty-state">Sem pontos por categoria ainda.</div>';
     return;
   }
 
-  missions.forEach((entry) => {
-    statsMissionsList.appendChild(createStatsMissionRow(entry));
+  entries.forEach((entry) => {
+    statsMissionsList.appendChild(createStatsPointRow(entry));
   });
 }
 
@@ -6599,7 +6646,7 @@ function renderStatsRanking() {
       </div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${entry.lateStartMinutes > 0 ? `${entry.percent}% • atraso ${entry.lateStartMinutes}m` : `${entry.percent}%`}</div>
+        <div class="task-assignee">${entry.lateStartMinutes > 0 ? `${entry.completed} pontos • atraso ${entry.lateStartMinutes}m` : `${entry.completed} pontos`}</div>
       </div>
     `;
     statsRankingList.appendChild(row);
@@ -6614,10 +6661,31 @@ async function loadStatsSummary() {
   try {
     const scope = getActiveStatsScope();
     statsScopeLabel.textContent = scope.label;
-    if (isMissionStatsScope(scope)) {
-      const missionsPayload = await apiRequest(`/api/200/missions?profile=${encodeURIComponent(getSelectedProfileName())}&date=${encodeURIComponent(getProjectTodayDateKey())}`);
-      state.statsMissions = Array.isArray(missionsPayload?.missions) ? missionsPayload.missions : [];
-      state.statsMissionSummary = missionsPayload?.summary || { total: 0, completed: 0, pending: 0 };
+    if (isPointsStatsScope(scope)) {
+      const [allTimeSummary, last7Summary, last30Summary] = await Promise.all([
+        apiRequest("/api/stats/summary?scope=general"),
+        apiRequest("/api/stats/summary?scope=last7"),
+        apiRequest("/api/stats/summary?scope=last30")
+      ]);
+      const summary = allTimeSummary?.summary || {};
+      const byCategory = summary?.byCategory || {};
+      state.statsSummary = summary;
+      state.statsPointsOverview = {
+        total: Number(summary?.totals?.completedMinutes || 0),
+        last7: Number(last7Summary?.summary?.totals?.completedMinutes || 0),
+        last30: Number(last30Summary?.summary?.totals?.completedMinutes || 0)
+      };
+      state.statsMissions = statsPointCategories.map((category) => {
+        const points = Number(byCategory?.[category.id] || 0);
+        const percent = Math.max(0, Math.min(100, Math.round((points / category.targetPoints) * 100)));
+        return {
+          id: category.id,
+          name: category.name,
+          points,
+          targetPoints: category.targetPoints,
+          percent
+        };
+      });
       renderMissionSummary();
       renderStatsMissions();
       if (statsMissionSummary) {
@@ -6629,10 +6697,6 @@ async function loadStatsSummary() {
       if (statsRankingList) {
         statsRankingList.hidden = true;
       }
-      if (editStatsGoalsButton) {
-        editStatsGoalsButton.hidden = false;
-        editStatsGoalsButton.setAttribute("aria-label", "Adicionar missão");
-      }
       return;
     }
 
@@ -6640,7 +6704,7 @@ async function loadStatsSummary() {
     state.statsSummary = summaryResult.summary || {};
     state.statsGlobalProfiles = Array.isArray(summaryResult.summary?.globalProfiles) ? summaryResult.summary.globalProfiles : [];
     state.statsMissions = [];
-    state.statsMissionSummary = null;
+    state.statsPointsOverview = null;
     buildStatsRankingFromSummary();
     renderStatsRanking();
     if (statsMissionSummary) {
@@ -6652,181 +6716,12 @@ async function loadStatsSummary() {
     if (statsRankingList) {
       statsRankingList.hidden = false;
     }
-    if (editStatsGoalsButton) {
-      editStatsGoalsButton.hidden = true;
-    }
   } catch (error) {
-    const target = isMissionStatsScope(getActiveStatsScope()) ? statsMissionsList : statsRankingList;
+    const target = isPointsStatsScope(getActiveStatsScope()) ? statsMissionsList : statsRankingList;
     if (target) {
       target.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha")}</div>`;
     }
   }
-}
-
-function parseMissionTargetCount(value, fallback = 1) {
-  const parsed = Math.trunc(Number(String(value || "").replace(/[^\d-]/g, "")) || 0);
-  return Math.max(1, parsed || fallback);
-}
-
-function resolveMissionQuickValues(targetCount) {
-  if (Number(targetCount || 0) > 100) {
-    return [1, 10, 50];
-  }
-  return [1, 5, 10];
-}
-
-function renderMissionQuantityModal() {
-  if (missionQuantityTitle) {
-    missionQuantityTitle.textContent = state.missionQuantity.mode === "remove" ? "Remover progresso" : "Adicionar progresso";
-  }
-  if (missionQuantitySubtitle) {
-    missionQuantitySubtitle.textContent = state.missionQuantity.missionTitle || "Missão";
-  }
-  if (missionQuantityValue) {
-    missionQuantityValue.textContent = String(Math.max(1, Number(state.missionQuantity.amount || 1)));
-  }
-  if (!missionQuantityQuickGrid) {
-    return;
-  }
-  missionQuantityQuickGrid.innerHTML = "";
-  state.missionQuantity.quickValues.forEach((value) => {
-    const button = document.createElement("button");
-    const signedLabel = state.missionQuantity.mode === "remove" ? `-${value}` : `+${value}`;
-    button.type = "button";
-    button.className = "mission-quantity-quick-btn";
-    button.dataset.missionQuickValue = String(value);
-    button.textContent = signedLabel;
-    missionQuantityQuickGrid.appendChild(button);
-  });
-}
-
-function closeMissionQuantityModal(confirm = false) {
-  const resolver = missionQuantityResolver;
-  const amount = Math.max(1, Number(state.missionQuantity.amount || 1));
-  missionQuantityResolver = null;
-  closeModal("missionQuantityModal");
-  if (typeof resolver === "function") {
-    if (!confirm) {
-      resolver(0);
-      return;
-    }
-    resolver(state.missionQuantity.mode === "remove" ? -amount : amount);
-  }
-}
-
-function openMissionQuantityModal({ mode = "add", missionId = "", missionTitle = "", missionTargetCount = 0 } = {}) {
-  state.missionQuantity.mode = mode === "remove" ? "remove" : "add";
-  state.missionQuantity.amount = 1;
-  state.missionQuantity.missionId = String(missionId || "");
-  state.missionQuantity.missionTitle = String(missionTitle || "Missão");
-  state.missionQuantity.missionTargetCount = Number(missionTargetCount || 0);
-  state.missionQuantity.quickValues = resolveMissionQuickValues(missionTargetCount);
-  renderMissionQuantityModal();
-  openModal("missionQuantityModal");
-  window.setTimeout(() => missionQuantityConfirmButton?.focus(), 40);
-  return new Promise((resolve) => {
-    missionQuantityResolver = resolve;
-  });
-}
-
-async function openStatsMissionCreateFlow() {
-  const title = String(window.prompt("Nome da missão:", "") || "").trim();
-  if (!title) {
-    return;
-  }
-  const targetRaw = window.prompt("Meta numérica da missão:", "6");
-  if (targetRaw == null) {
-    return;
-  }
-  try {
-    const payload = await apiRequest("/api/200/missions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        profile: getSelectedProfileName(),
-        title,
-        targetCount: parseMissionTargetCount(targetRaw, 6),
-        date: getProjectTodayDateKey()
-      })
-    });
-    state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];
-    state.statsMissionSummary = payload?.summary || state.statsMissionSummary;
-    renderMissionSummary();
-    renderStatsMissions();
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : "Falha ao criar missão.");
-  }
-}
-
-async function updateStatsMissionProgress(missionId, delta) {
-  if (!missionId || !delta) {
-    return;
-  }
-  try {
-    const payload = await apiRequest(`/api/200/missions/${encodeURIComponent(missionId)}/progress`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        profile: getSelectedProfileName(),
-        delta,
-        date: getProjectTodayDateKey()
-      })
-    });
-    state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];
-    state.statsMissionSummary = payload?.summary || state.statsMissionSummary;
-    renderMissionSummary();
-    renderStatsMissions();
-    if (isMissionStatsScope()) {
-      await loadStatsSummary();
-    }
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : "Falha ao atualizar missão.");
-  }
-}
-
-async function deleteStatsMission(missionId) {
-  if (!missionId) {
-    return;
-  }
-  if (!window.confirm("Excluir esta missão?")) {
-    return;
-  }
-  try {
-    const payload = await apiRequest(`/api/200/missions/${encodeURIComponent(missionId)}?profile=${encodeURIComponent(getSelectedProfileName())}`, {
-      method: "DELETE"
-    });
-    state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];
-    state.statsMissionSummary = payload?.summary || state.statsMissionSummary;
-    renderMissionSummary();
-    renderStatsMissions();
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : "Falha ao excluir missão.");
-  }
-}
-
-function handleStatsSideAction() {
-  if (isMissionStatsScope()) {
-    void openStatsMissionCreateFlow();
-  }
-}
-
-function clearStatsMissionHoldState() {
-  if (statsMissionHoldTimer) {
-    window.clearTimeout(statsMissionHoldTimer);
-    statsMissionHoldTimer = null;
-  }
-}
-
-function getMissionEntryFromEventTarget(target) {
-  const row = target?.closest?.("[data-mission-id]");
-  if (!row) {
-    return null;
-  }
-  return {
-    id: String(row.dataset.missionId || "").trim(),
-    title: String(row.dataset.missionTitle || "Missão").trim(),
-    targetCount: Number(row.dataset.missionTargetCount || 0)
-  };
 }
 
 function renderPlatformCategoryOptions() {
@@ -8255,36 +8150,6 @@ document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", () => closeModal(button.closest(".workspace-modal")));
 });
 
-missionQuantityDecreaseButton?.addEventListener("click", () => {
-  state.missionQuantity.amount = Math.max(1, Number(state.missionQuantity.amount || 1) - 1);
-  renderMissionQuantityModal();
-});
-
-missionQuantityIncreaseButton?.addEventListener("click", () => {
-  state.missionQuantity.amount = Math.max(1, Number(state.missionQuantity.amount || 1) + 1);
-  renderMissionQuantityModal();
-});
-
-missionQuantityQuickGrid?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-mission-quick-value]");
-  if (!button) {
-    return;
-  }
-  state.missionQuantity.amount = Math.max(
-    1,
-    Number(state.missionQuantity.amount || 1) + parseMissionTargetCount(button.dataset.missionQuickValue, 1)
-  );
-  renderMissionQuantityModal();
-});
-
-missionQuantityCancelButton?.addEventListener("click", () => {
-  closeMissionQuantityModal(false);
-});
-
-missionQuantityConfirmButton?.addEventListener("click", () => {
-  closeMissionQuantityModal(true);
-});
-
 document.querySelectorAll("[data-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveActiveDate(Number(button.dataset.dayNav)));
 });
@@ -8807,68 +8672,6 @@ actionsList.addEventListener("keydown", async (event) => {
   await toggleActionStatus(row.dataset.actionId);
 });
 
-statsMissionsList?.addEventListener("pointerdown", (event) => {
-  const button = event.target.closest("[data-mission-plus]");
-  const mission = getMissionEntryFromEventTarget(event.target);
-  if (!button || !mission?.id) {
-    return;
-  }
-  clearStatsMissionHoldState();
-  statsMissionHoldHandledId = "";
-  const missionId = mission.id;
-  statsMissionHoldTimer = window.setTimeout(async () => {
-    statsMissionHoldHandledId = missionId;
-    const delta = await openMissionQuantityModal({
-      mode: "remove",
-      missionId: mission.id,
-      missionTitle: mission.title,
-      missionTargetCount: mission.targetCount
-    });
-    if (delta) {
-      void updateStatsMissionProgress(missionId, delta);
-    }
-  }, 500);
-});
-
-["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
-  statsMissionsList?.addEventListener(eventName, () => {
-    clearStatsMissionHoldState();
-  });
-});
-
-statsMissionsList?.addEventListener("click", async (event) => {
-  const deleteButton = event.target.closest("[data-mission-delete]");
-  if (deleteButton) {
-    const missionId = String(deleteButton.dataset.missionDelete || "").trim();
-    void deleteStatsMission(missionId);
-    return;
-  }
-
-  const plusButton = event.target.closest("[data-mission-plus]");
-  if (!plusButton) {
-    return;
-  }
-  const missionId = String(plusButton.dataset.missionPlus || "").trim();
-  if (!missionId) {
-    return;
-  }
-  if (statsMissionHoldHandledId === missionId) {
-    statsMissionHoldHandledId = "";
-    return;
-  }
-  const mission = getMissionEntryFromEventTarget(event.target);
-  const delta = await openMissionQuantityModal({
-    mode: "add",
-    missionId,
-    missionTitle: mission?.title,
-    missionTargetCount: mission?.targetCount
-  });
-  if (!delta) {
-    return;
-  }
-  void updateStatsMissionProgress(missionId, delta);
-});
-
 handleSwipe(activeDateLabel, moveActiveDate);
 handleSwipe(financePeriodLabel, moveFinancePeriod);
 handleSwipe(financePeriodPicker, moveFinancePeriod);
@@ -8900,9 +8703,6 @@ addPlatformBalanceButton?.addEventListener("click", () => {
   void addPlatformBalanceNow();
 });
 
-editStatsGoalsButton?.addEventListener("click", () => {
-  handleStatsSideAction();
-});
 openConstitutionEditButton?.addEventListener("click", startConstitutionEdit);
 cancelConstitutionEditButton?.addEventListener("click", () => {
   state.constitutionEditing = false;
