@@ -92,6 +92,11 @@ async function seedDefaultProfiles(client, userId) {
   );
   const existingNames = new Set(existingResult.rows.map((row) => String(row.normalized_name || "").trim()).filter(Boolean));
 
+  if (existingNames.size > 0) {
+    await migrateLegacyGeneralToUsuario(client, userId);
+    return;
+  }
+
   for (const profile of LEGACY_SEED_PROFILES) {
     const normalized = profile.name.toLocaleLowerCase("pt-BR");
     if (existingNames.has(normalized)) {
@@ -253,7 +258,7 @@ export async function resolveProject200ProfileName(userId, profileName, options 
     if (fallbackToDefault) {
       return PROJECT200_DEFAULT_PROFILE_NAME;
     }
-    throw new Error("Usuário inválido.");
+    throw new Error("Usuario invalido.");
   }
 
   const matchedProfile = await getProject200ProfileByName(userId, normalized);
@@ -265,19 +270,19 @@ export async function resolveProject200ProfileName(userId, profileName, options 
     return PROJECT200_DEFAULT_PROFILE_NAME;
   }
 
-  throw new Error("Usuário inválido.");
+  throw new Error("Usuario invalido.");
 }
 
 export async function createProject200Profile(userId, payload = {}) {
   await ensureProject200ProfilesSchema();
   const name = normalizeProfileName(payload?.name);
   if (name.length < 2 || name.length > 40) {
-    throw new Error("Digite um nome de usuário entre 2 e 40 caracteres.");
+    throw new Error("Digite um nome de usuario entre 2 e 40 caracteres.");
   }
 
   const profiles = await listProject200Profiles(userId);
   if (profiles.some((profile) => profile.name.localeCompare(name, "pt-BR", { sensitivity: "accent" }) === 0)) {
-    throw new Error("Já existe um usuário com esse nome.");
+    throw new Error("Ja existe um usuario com esse nome.");
   }
 
   const result = await query(
@@ -294,6 +299,74 @@ export async function createProject200Profile(userId, payload = {}) {
   return normalizeProfileRow(result.rows[0]);
 }
 
+export async function updateProject200ProfileName(userId, profileId, payload = {}) {
+  await ensureProject200ProfilesSchema();
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    await seedDefaultProfiles(client, userId);
+
+    const profile = await getProfileByIdWithClient(client, userId, profileId);
+    if (!profile) {
+      throw new Error("Usuario nao encontrado.");
+    }
+    if (profile.isImmutable) {
+      throw new Error("O usuario padrao precisa continuar com esse nome.");
+    }
+
+    const name = normalizeProfileName(payload?.name);
+    if (name.length < 2 || name.length > 40) {
+      throw new Error("Digite um nome de usuario entre 2 e 40 caracteres.");
+    }
+    if (profile.name.localeCompare(name, "pt-BR", { sensitivity: "accent" }) === 0) {
+      await client.query("commit");
+      return profile;
+    }
+
+    const duplicate = await client.query(
+      `
+        select id
+        from project200_profiles
+        where user_id = $1
+          and deleted_at is null
+          and lower(name) = lower($2)
+          and id <> $3
+        limit 1
+      `,
+      [userId, name, profile.id]
+    );
+    if (duplicate.rows[0]?.id) {
+      throw new Error("Ja existe um usuario com esse nome.");
+    }
+
+    await client.query(`update actions set assignee = $2 where user_id = $1 and assignee = $3`, [userId, name, profile.name]);
+    await client.query(`update project_200_history_entries set assignee = $2 where user_id = $1 and assignee = $3`, [userId, name, profile.name]);
+    await client.query(`update project_200_history_entries set speaker = $2 where user_id = $1 and speaker = $3`, [userId, name, profile.name]);
+    await client.query(`update project200_profile_links set assigned_profile = $2, updated_at = now() where user_id = $1 and assigned_profile = $3`, [userId, name, profile.name]);
+
+    const result = await client.query(
+      `
+        update project200_profiles
+        set name = $3,
+            updated_at = now()
+        where user_id = $1
+          and id = $2
+          and deleted_at is null
+        returning *
+      `,
+      [userId, profile.id, name]
+    );
+
+    await client.query("commit");
+    return normalizeProfileRow(result.rows[0]);
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function deleteProject200Profile(userId, profileId) {
   await ensureProject200ProfilesSchema();
   const client = await db.connect();
@@ -303,20 +376,37 @@ export async function deleteProject200Profile(userId, profileId) {
 
     const profile = await getProfileByIdWithClient(client, userId, profileId);
     if (!profile) {
-      throw new Error("Usuário não encontrado.");
-    }
-    if (profile.isImmutable) {
-      throw new Error("O usuário padrão não pode ser excluído.");
+      throw new Error("Usuario nao encontrado.");
     }
 
-    await client.query(`update actions set assignee = $2 where user_id = $1 and assignee = $3`, [userId, PROJECT200_DEFAULT_PROFILE_NAME, profile.name]);
-    await client.query(`update project_200_history_entries set assignee = $2 where user_id = $1 and assignee = $3`, [userId, PROJECT200_DEFAULT_PROFILE_NAME, profile.name]);
-    await client.query(`update project_200_history_entries set speaker = $2 where user_id = $1 and speaker = $3`, [userId, PROJECT200_DEFAULT_PROFILE_NAME, profile.name]);
-    await client.query(`update project200_profile_links set assigned_profile = $2, updated_at = now() where user_id = $1 and assigned_profile = $3`, [userId, PROJECT200_DEFAULT_PROFILE_NAME, profile.name]);
+    const profilesResult = await client.query(
+      `
+        select *
+        from project200_profiles
+        where user_id = $1
+          and deleted_at is null
+        order by sort_order asc, created_at asc
+      `,
+      [userId]
+    );
+    const activeProfiles = profilesResult.rows.map(normalizeProfileRow);
+    if (activeProfiles.length <= 1) {
+      throw new Error("Voce precisa manter pelo menos um usuario.");
+    }
+
+    const fallbackProfile = activeProfiles.find((item) => item.id !== profile.id) || null;
+    if (!fallbackProfile) {
+      throw new Error("Escolha outro usuario antes de excluir este perfil.");
+    }
+
+    await client.query(`update actions set assignee = $2 where user_id = $1 and assignee = $3`, [userId, fallbackProfile.name, profile.name]);
+    await client.query(`update project_200_history_entries set assignee = $2 where user_id = $1 and assignee = $3`, [userId, fallbackProfile.name, profile.name]);
+    await client.query(`update project_200_history_entries set speaker = $2 where user_id = $1 and speaker = $3`, [userId, fallbackProfile.name, profile.name]);
+    await client.query(`update project200_profile_links set assigned_profile = $2, updated_at = now() where user_id = $1 and assigned_profile = $3`, [userId, fallbackProfile.name, profile.name]);
     await client.query(`update project200_profiles set deleted_at = now(), updated_at = now() where user_id = $1 and id = $2`, [userId, profile.id]);
 
     await client.query("commit");
-    return { deleted: true, fallbackProfileName: PROJECT200_DEFAULT_PROFILE_NAME };
+    return { deleted: true, fallbackProfileName: fallbackProfile.name };
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -329,10 +419,10 @@ export async function updateProject200ProfileAvatar(userId, profileId, payload =
   await ensureProject200ProfilesSchema();
   const avatarDataUrl = String(payload?.avatarDataUrl || "").trim();
   if (!avatarDataUrl.startsWith("data:image/")) {
-    throw new Error("A imagem do usuário é inválida.");
+    throw new Error("A imagem do usuario e invalida.");
   }
   if (avatarDataUrl.length > 14 * 1024 * 1024) {
-    throw new Error("A imagem do usuário ficou grande demais.");
+    throw new Error("A imagem do usuario ficou grande demais.");
   }
 
   const client = await db.connect();
@@ -342,7 +432,7 @@ export async function updateProject200ProfileAvatar(userId, profileId, payload =
 
     const profile = await getProfileByIdWithClient(client, userId, profileId);
     if (!profile) {
-      throw new Error("Usuário não encontrado.");
+      throw new Error("Usuario nao encontrado.");
     }
 
     const result = await client.query(
@@ -378,10 +468,10 @@ export async function reassignProject200ProfileTasks(userId, payload = {}) {
     const source = await getProfileByIdWithClient(client, userId, payload?.sourceProfileId);
     const target = await getProfileByIdWithClient(client, userId, payload?.targetProfileId);
     if (!source || !target) {
-      throw new Error("Selecione usuários válidos para copiar.");
+      throw new Error("Selecione usuarios validos para copiar.");
     }
     if (source.id === target.id) {
-      throw new Error("Escolha um usuário diferente para receber as tarefas.");
+      throw new Error("Escolha um usuario diferente para receber as tarefas.");
     }
 
     const result = await client.query(

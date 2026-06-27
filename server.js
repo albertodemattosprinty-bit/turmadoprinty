@@ -61,7 +61,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { appendProject200ChatMessages, createProject200Chat, getProject200Chat } from "./src/project200-chats.js";
-import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar } from "./src/project200-profiles.js";
+import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3768,31 +3768,9 @@ function summarizeProject200OwnProgress(actions = []) {
 }
 
 function buildProject200ToneInstructions(toneKey, ownWeekProgress) {
-  const normalized = String(toneKey || "neutral").trim().toLowerCase();
-  const weekPercent = Number(ownWeekProgress?.completionPercent || 0);
-
-  if (normalized === "motivator") {
-    return "Tom motivador: incentive, reconheça progresso real e puxe para a próxima tarefa com energia e clareza.";
-  }
-  if (normalized === "strict") {
-    if (weekPercent < 20) {
-      return "Tom exigente máximo: seja duro e muito direto sobre disciplina, atraso e consequência prática, mas sem humilhar, xingar, desumanizar ou atacar o valor pessoal do usuário.";
-    }
-    if (weekPercent < 50) {
-      return "Tom exigente forte: cobre execução, confronte desculpas e fale com pressão clara, sem insultos pessoais.";
-    }
-    if (weekPercent < 70) {
-      return "Tom exigente moderado: cobre prazo, disciplina e sequência de tarefas com firmeza direta.";
-    }
-    return "Tom exigente disciplinado: reconheça que está andando, mas mantenha cobrança alta por consistência.";
-  }
-  if (normalized === "playful") {
-    return "Tom descontraído: leve, brincalhão, sempre de boa, mas ainda focado em cumprir tarefas.";
-  }
-  if (normalized === "street") {
-    return "Tom descolado: use gírias leves de São Paulo e internet, frases curtas, abreviações moderadas e foco em próxima tarefa, pendências e atrasos.";
-  }
-  return "Tom neutro: humano, claro, direto e útil, sem exagerar na emoção.";
+  void toneKey;
+  void ownWeekProgress;
+  return "";
 }
 
 function formatProject200ActionLine(action, now) {
@@ -3904,24 +3882,22 @@ async function buildProject200ChatSystemPrompt({ user, chat, toneKey }) {
     .map((item) => `${item.role === "assistant" ? "IA" : "Usuario"}: ${clipProject200Text(item.content, 180)}`)
     .join(" | ");
   const { ownWeekProgress, contextText } = await buildProject200ChatContext(user);
-  const toneInstruction = buildProject200ToneInstructions(toneKey, ownWeekProgress);
   const globalPromptSettings = await getProject200ChatPromptSettings();
-  const globalPrompt = String(globalPromptSettings?.prompt || "").trim();
+  const tonePromptKey = String(toneKey || "neutral").trim().toLowerCase();
+  const globalPrompt = String(globalPromptSettings?.prompts?.[tonePromptKey] || "").trim();
 
   return [
     "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto.",
     "Voce e o chat de Conversas do /200, neutro por padrao e moldado apenas pelo contexto do /200.",
     "Para comentar o usuario, foque somente nos dados de acoes e estatisticas.",
-    toneInstruction,
     "Regras obrigatorias: resposta entre 60 e 500 caracteres; sem markdown; texto corrido ou no maximo duas frases curtas; fale como mensageiro fluido e rapido.",
     "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa ou disciplina semanal.",
     "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
-    "No modo exigente, jamais humilhe, ameace, xingue, desumanize ou ataque o valor pessoal do usuario. Seja firme sem abuso.",
     "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
-    globalPrompt ? `Instrucao global da RoseMattos: ${globalPrompt}` : "",
+    globalPrompt ? `Use exatamente este prompt global do estilo selecionado, escrito pela RoseMattos: ${globalPrompt}` : "",
     `Memoria recente da conversa: ${memory || "vazia"}.`,
     `Contexto vivo do /200:\n${contextText}`
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 async function buildMiniChatCompletionPrompt({ user, chat, modeKey, message, extraContext = "" }) {
@@ -7476,7 +7452,7 @@ async function handleProject200ChatMessageRequest(request, response) {
 
     const completion = await createChatCompletion(apiKey, {
       model: OPENAI_INSTANT_MODEL || "gpt-4.1-nano",
-      temperature: toneKey === "street" ? 0.85 : 0.7,
+      temperature: 0.7,
       max_completion_tokens: 260,
       messages: [
         { role: "system", content: system },
@@ -7545,8 +7521,13 @@ async function handleProject200ChatPromptSaveRequest(request, response) {
   }
 
   try {
+    const current = await getProject200ChatPromptSettings();
+    const toneKey = String(body?.tone || "neutral").trim().toLowerCase();
     const settings = await saveProject200ChatPromptSettings({
-      prompt: String(body?.prompt || "")
+      prompts: {
+        ...(current?.prompts || {}),
+        [toneKey]: String(body?.prompt || "")
+      }
     });
     sendJson(response, 200, { ok: true, settings, user: sanitizeUser(adminUser) });
   } catch (error) {
@@ -10722,6 +10703,25 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Erro ao criar usuário."
+      });
+    }
+    return;
+  }
+
+  if ((request.method === "PUT" || request.method === "PATCH") && pathname.startsWith("/api/200/profiles/")) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+
+      const profileId = decodeURIComponent(pathname.slice("/api/200/profiles/".length));
+      const body = await readJsonBody(request);
+      const profile = await updateProject200ProfileName(authUser.id, profileId, body);
+      sendJson(response, 200, { ok: true, profile });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Erro ao atualizar usuario."
       });
     }
     return;

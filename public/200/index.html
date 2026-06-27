@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260626-conversations-chat-admin" />
+  <link rel="stylesheet" href="/200/project.css?v=20260626-conversations-chat-prompts" />
 </head>
 <body>
   <video class="app-background-video" autoplay muted loop playsinline webkit-playsinline preload="auto" aria-hidden="true">
@@ -636,11 +636,10 @@
         <span class="running-music-default-bottom" id="toggleBackgroundThemeHint">Modern</span>
       </button>
       <button class="running-music-default-option" type="button" id="toggleChatToneOption">
-        <span class="running-music-default-top">Escolher a personalidade do chat das Conversas</span>
+        <span class="running-music-default-top">Estilo atual das Conversas</span>
         <strong>Tom do chat</strong>
         <span class="running-music-default-bottom" id="toggleChatToneHint">Neutro</span>
       </button>
-      <p class="options-note" id="chatToneDetailHint">Neutro: direto e equilibrado.</p>
       <button class="running-music-default-option" type="button" id="openProject200ExportModal">
         <span class="running-music-default-top">Duplicar todos os dados do /200</span>
         <strong>Exportar</strong>
@@ -724,10 +723,10 @@
           <svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
         </button>
       </header>
-      <div class="conversations-subtitle">Chat de voz com contexto da sua rotina, ranking, estatísticas e histórico.</div>
+      <div class="conversations-subtitle">Chat de voz com contexto da sua rotina.</div>
       <div class="conversations-list" id="conversationsMessages" aria-live="polite"></div>
-      <div class="conversations-transcript" id="conversationsTranscript">Toque no microfone e fale.</div>
-      <div class="history-voice-status conversations-status" id="conversationsStatus">Pronto para ouvir.</div>
+      <div class="conversations-transcript" id="conversationsTranscript" hidden></div>
+      <div class="history-voice-status conversations-status" id="conversationsStatus" hidden></div>
       <div class="conversations-actions">
         <button class="history-icon-btn mic-idle conversations-mic-btn" type="button" id="conversationsMicButton" aria-label="Falar com o chat">
           <svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m6-4a1 1 0 0 1 2 0 8 8 0 0 1-7 7.94V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.06A8 8 0 0 1 4 11a1 1 0 1 1 2 0 6 6 0 0 0 12 0"/></svg>
@@ -742,10 +741,28 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
         <span>Prompt global</span>
       </div>
-      <p class="options-note">Esse texto vale para todos os usuários do chat `Conversas`.</p>
-      <textarea class="text-field options-text-field conversations-prompt-field" id="conversationsPromptInput" maxlength="12000" placeholder="Escreva aqui as instruções globais da RoseMattos..."></textarea>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="conversationsPromptToneChip">
+        <span class="running-music-default-top">Estilo que está sendo editado</span>
+        <strong id="conversationsPromptToneLabel">Neutro</strong>
+        <span class="running-music-default-bottom">Toque para alternar</span>
+      </button>
+      <textarea class="text-field options-text-field conversations-prompt-field" id="conversationsPromptInput" maxlength="12000" placeholder="Escreva aqui exatamente o prompt global deste estilo..."></textarea>
       <p class="finance-status" id="conversationsPromptMessage" aria-live="polite"></p>
       <button class="primary-btn" type="button" id="saveConversationsPromptButton">Salvar prompt</button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal" id="profileRenameModal" aria-hidden="true" aria-label="Renomear usuario do Projeto 200">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
+    <div class="finance-content options-content">
+      <div class="running-music-default-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
+        <span>Renomear usuario</span>
+      </div>
+      <input class="text-field options-text-field" type="text" id="profileRenameInput" maxlength="40" autocomplete="off" placeholder="Novo nome do usuario" />
+      <p class="finance-status" id="profileRenameMessage" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="profileRenameConfirmButton">Salvar nome</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>
   </section>
@@ -1020,7 +1037,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260626-conversations-chat-admin"></script>
+  <script type="module" src="/200/project.js?v=20260626-conversations-chat-prompts"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

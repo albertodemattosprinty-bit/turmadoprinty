@@ -15,28 +15,23 @@ const taskBeepOptionLabels = new Map([
 const chatToneModes = [
   {
     key: "neutral",
-    label: "Neutro",
-    detail: "Neutro: direto e equilibrado."
+    label: "Neutro"
   },
   {
     key: "motivator",
-    label: "Motivador",
-    detail: "Motivador: reconhece avanços e puxa para a próxima tarefa."
+    label: "Motivador"
   },
   {
     key: "strict",
-    label: "Exigente",
-    detail: "Exigente: fica mais firme conforme sua semana cai, mas sem humilhação pessoal."
+    label: "Exigente"
   },
   {
     key: "playful",
-    label: "Descontraído",
-    detail: "Descontraído: brinca bastante, tom leve, mas segue cobrando execução."
+    label: "Descontraído"
   },
   {
     key: "street",
-    label: "Descolado",
-    detail: "Descolado: gírias leves, respostas curtas e foco nas próximas e atrasadas."
+    label: "Descolado"
   }
 ];
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -335,6 +330,8 @@ const openConversationsPromptButton = document.getElementById("openConversations
 const conversationsPromptInput = document.getElementById("conversationsPromptInput");
 const conversationsPromptMessage = document.getElementById("conversationsPromptMessage");
 const saveConversationsPromptButton = document.getElementById("saveConversationsPromptButton");
+const conversationsPromptToneChip = document.getElementById("conversationsPromptToneChip");
+const conversationsPromptToneLabel = document.getElementById("conversationsPromptToneLabel");
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
@@ -463,6 +460,9 @@ const project200CreateProfileConfirmButton = document.getElementById("project200
 const homeProfileButton = document.getElementById("homeProfileButton");
 const homeProfileAvatar = document.getElementById("homeProfileAvatar");
 const homeProfileName = document.getElementById("homeProfileName");
+const profileRenameInput = document.getElementById("profileRenameInput");
+const profileRenameMessage = document.getElementById("profileRenameMessage");
+const profileRenameConfirmButton = document.getElementById("profileRenameConfirmButton");
 const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption");
 const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
 const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
@@ -504,6 +504,7 @@ let conversationsAudioAnalyser = null;
 let conversationsSpeechMonitorTimer = null;
 let conversationsLastSpeechAt = 0;
 let conversationsTypingTimer = null;
+let conversationsPromptToneKey = "neutral";
 let financeEntryConfirmResolve = null;
 let actionMediaRecorder = null;
 let actionMediaStream = null;
@@ -535,6 +536,7 @@ let overlapCarouselTimer = null;
 let profileHoldTimer = null;
 let profileLongPressHandledProfile = "";
 let profileManageTargetId = "";
+let profileRenameTargetId = "";
 let profilePressStartedAt = 0;
 let profilePressProfile = "";
 let profileAvatarTargetId = "";
@@ -3230,20 +3232,22 @@ function openModal(id) {
   if (id === "conversationsModal") {
     renderOptionsModal();
     void loadConversationChat();
-    if (conversationsTranscript) {
-      conversationsTranscript.textContent = "Toque no microfone e fale.";
-    }
-    if (conversationsStatus) {
-      conversationsStatus.textContent = "Pronto para ouvir.";
-    }
   }
 
   if (id === "conversationsPromptModal") {
     if (conversationsPromptMessage) {
       conversationsPromptMessage.textContent = "";
     }
+    conversationsPromptToneKey = getChatToneMode(state.options.chatTone).key;
     void loadConversationsPromptEditor();
     window.setTimeout(() => conversationsPromptInput?.focus(), 40);
+  }
+
+  if (id === "profileRenameModal") {
+    if (profileRenameMessage) {
+      profileRenameMessage.textContent = "";
+    }
+    window.setTimeout(() => profileRenameInput?.focus(), 40);
   }
 
   if (id === "constitutionModal") {
@@ -4878,20 +4882,83 @@ async function deleteManagedProfile() {
   if (!profile) {
     return;
   }
-  await apiRequest(`/api/200/profiles/${encodeURIComponent(profile.id)}`, {
+  const payload = await apiRequest(`/api/200/profiles/${encodeURIComponent(profile.id)}`, {
     method: "DELETE"
   });
   state.profiles = getProfilesList().filter((item) => item.id !== profile.id);
+  const fallbackProfileName = String(payload?.fallbackProfileName || getDefaultProfileName()).trim() || getDefaultProfileName();
   if (state.selectedProfile === profile.name) {
-    applySelectedProfile(getDefaultProfileName());
+    applySelectedProfile(fallbackProfileName);
   }
   if (state.historyTextComposer.speaker === profile.name) {
-    state.historyTextComposer.speaker = getDefaultProfileName();
+    state.historyTextComposer.speaker = fallbackProfileName;
   }
   renderProfileFooter();
   renderHistorySpeakerSelectionOptions();
   closeProfileManageOverlay();
   await loadActions();
+}
+
+function openProfileRenameModal() {
+  const profile = getProfileByName(state.selectedProfile) || getDefaultProfile();
+  if (!profile) {
+    return;
+  }
+  profileRenameTargetId = String(profile.id || "").trim();
+  if (profileRenameInput) {
+    profileRenameInput.value = String(profile.name || "");
+  }
+  if (profileRenameMessage) {
+    profileRenameMessage.textContent = "";
+  }
+  openModal("profileRenameModal");
+}
+
+async function saveProfileRename() {
+  const profile = getProfileById(profileRenameTargetId) || getProfileByName(state.selectedProfile);
+  if (!profile) {
+    return;
+  }
+  if (profileRenameMessage) {
+    profileRenameMessage.textContent = "Salvando...";
+  }
+  if (profileRenameConfirmButton) {
+    profileRenameConfirmButton.disabled = true;
+  }
+  try {
+    const payload = await apiRequest(`/api/200/profiles/${encodeURIComponent(profile.id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: String(profileRenameInput?.value || "")
+      })
+    });
+    const renamed = payload?.profile || null;
+    if (renamed) {
+      state.profiles = getProfilesList().map((item) => item.id === renamed.id ? renamed : item);
+      if (state.selectedProfile === profile.name) {
+        applySelectedProfile(renamed.name);
+      }
+      if (state.historyTextComposer.speaker === profile.name) {
+        state.historyTextComposer.speaker = renamed.name;
+      }
+      renderProfileFooter();
+      renderHistorySpeakerSelectionOptions();
+    }
+    if (profileRenameMessage) {
+      profileRenameMessage.textContent = "Nome salvo.";
+    }
+    await loadActions();
+    window.setTimeout(() => closeModal("profileRenameModal"), 250);
+  } catch (error) {
+    if (profileRenameMessage) {
+      profileRenameMessage.textContent = error instanceof Error ? error.message : "Falha ao salvar nome.";
+    }
+  } finally {
+    if (profileRenameConfirmButton) {
+      profileRenameConfirmButton.disabled = false;
+    }
+  }
 }
 
 async function reassignManagedProfileTasks() {
@@ -6293,7 +6360,6 @@ function renderConversationMessages() {
   const messages = Array.isArray(state.conversationChat?.messages) ? state.conversationChat.messages : [];
   conversationsMessages.innerHTML = "";
   if (!messages.length) {
-    conversationsMessages.innerHTML = '<div class="empty-state">Fale no microfone para começar.</div>';
     return;
   }
   messages.forEach((entry) => {
@@ -6362,9 +6428,13 @@ async function loadConversationsPromptEditor() {
     conversationsPromptMessage.textContent = "Carregando prompt...";
   }
   try {
-    const payload = await apiRequest("/api/admin/project200/chat-prompt");
+    const payload = await apiRequest(`/api/admin/project200/chat-prompt?tone=${encodeURIComponent(conversationsPromptToneKey)}`);
+    const prompt = String(payload?.settings?.prompts?.[conversationsPromptToneKey] || "");
     if (conversationsPromptInput) {
-      conversationsPromptInput.value = String(payload?.settings?.prompt || "");
+      conversationsPromptInput.value = prompt;
+    }
+    if (conversationsPromptToneLabel) {
+      conversationsPromptToneLabel.textContent = getChatToneMode(conversationsPromptToneKey).label;
     }
     if (conversationsPromptMessage) {
       conversationsPromptMessage.textContent = "";
@@ -6391,11 +6461,13 @@ async function saveConversationsPromptEditor() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        tone: conversationsPromptToneKey,
         prompt: String(conversationsPromptInput?.value || "")
       })
     });
+    const prompt = String(payload?.settings?.prompts?.[conversationsPromptToneKey] || "");
     if (conversationsPromptInput) {
-      conversationsPromptInput.value = String(payload?.settings?.prompt || "");
+      conversationsPromptInput.value = prompt;
     }
     if (conversationsPromptMessage) {
       conversationsPromptMessage.textContent = "Prompt global salvo.";
@@ -7346,7 +7418,7 @@ function renderOptionsModal() {
     toggleChatToneHint.textContent = toneMode.label;
   }
   if (chatToneDetailHint) {
-    chatToneDetailHint.textContent = toneMode.detail;
+    chatToneDetailHint.textContent = "";
   }
   if (conversationsToneChip) {
     conversationsToneChip.textContent = toneMode.label;
@@ -8247,8 +8319,17 @@ conversationsToneChip?.addEventListener("click", () => {
 openConversationsPromptButton?.addEventListener("click", () => {
   openModal("conversationsPromptModal");
 });
+conversationsPromptToneChip?.addEventListener("click", () => {
+  const currentIndex = Math.max(0, chatToneModes.findIndex((item) => item.key === getChatToneMode(conversationsPromptToneKey).key));
+  const nextIndex = (currentIndex + 1) % chatToneModes.length;
+  conversationsPromptToneKey = chatToneModes[nextIndex].key;
+  void loadConversationsPromptEditor();
+});
 saveConversationsPromptButton?.addEventListener("click", () => {
   void saveConversationsPromptEditor();
+});
+profileRenameConfirmButton?.addEventListener("click", () => {
+  void saveProfileRename();
 });
 logoutProject200Button?.addEventListener("click", () => {
   const shouldLogout = window.confirm("Deseja sair do login salvo neste aparelho?");
@@ -8427,6 +8508,38 @@ homeProfileButton?.addEventListener("click", () => {
     return;
   }
   openProfileAvatarModal(profile);
+});
+homeProfileName?.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+homeProfileName?.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  profilePressStartedAt = Date.now();
+  profilePressProfile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  if (profileHoldTimer) {
+    window.clearTimeout(profileHoldTimer);
+    profileHoldTimer = null;
+  }
+  if (profilePressProfile) {
+    profileHoldTimer = window.setTimeout(() => {
+      profileHoldTimer = null;
+      if (!profilePressProfile) {
+        return;
+      }
+      profileLongPressHandledProfile = profilePressProfile;
+      openProfileRenameModal();
+    }, 500);
+  }
+});
+["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
+  homeProfileName?.addEventListener(evt, () => {
+    if (profileHoldTimer) {
+      window.clearTimeout(profileHoldTimer);
+      profileHoldTimer = null;
+    }
+    profilePressStartedAt = 0;
+    profilePressProfile = "";
+  });
 });
 homeProfileButton?.addEventListener("pointerdown", (event) => {
   event.preventDefault();

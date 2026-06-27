@@ -68,8 +68,9 @@ body[data-background-theme="light"] .app-background-video {
 
 .conversations-app {
   min-height: min(82dvh, 760px);
+  position: relative;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 10px;
 }
 
@@ -142,32 +143,29 @@ body[data-background-theme="light"] .app-background-video {
   line-height: 1.45;
 }
 
-.conversations-transcript {
-  min-height: 46px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  padding: 12px 14px;
-  line-height: 1.4;
-}
-
-.conversations-status {
-  text-align: center;
-}
-
 .conversations-actions {
   display: flex;
-  justify-content: center;
-  padding-bottom: 8px;
+  justify-content: flex-end;
+  position: sticky;
+  bottom: 0;
+  padding: 4px 4px 10px;
+  pointer-events: none;
 }
 
 .conversations-mic-btn {
-  width: 76px;
-  height: 76px;
+  width: 72px;
+  height: 72px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  color: #fff;
+  background: #04070f;
+  border: 1px solid rgba(74, 130, 255, 0.4);
+  color: #2f8cff;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.36);
+  pointer-events: auto;
+}
+
+.conversations-mic-btn.mic-active {
+  color: #2fe06d;
+  border-color: rgba(47, 224, 109, 0.48);
 }
 
 .conversations-prompt-field {
@@ -921,6 +919,10 @@ body.start-decision-open .home-running-btn {
   width: min(540px, 92vw);
   display: grid;
   gap: 14px;
+  max-height: min(82dvh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .options-toggle-btn.is-off {
