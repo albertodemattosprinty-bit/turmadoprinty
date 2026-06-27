@@ -2650,7 +2650,7 @@ body.running-music-standalone #actionsModal .actions-list {
   gap: 10px;
 }
 
-.stats-mission-row {
+.task-row.stats-mission-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px;
@@ -2699,19 +2699,19 @@ body.running-music-standalone #actionsModal .actions-list {
   background: linear-gradient(90deg, #22c55e 0%, #38bdf8 100%);
 }
 
-.stats-mission-row .task-main {
+.task-row.stats-mission-row .task-main {
   gap: 2px;
   min-width: 0;
 }
 
-.stats-mission-row .task-title,
-.stats-mission-row .task-assignee {
+.task-row.stats-mission-row .task-title,
+.task-row.stats-mission-row .task-assignee {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.stats-mission-row .task-title {
+.task-row.stats-mission-row .task-title {
   display: block;
   width: 100%;
 }
@@ -3549,6 +3549,12 @@ body.running-music-standalone #actionsModal .actions-list {
     padding: 14px 12px;
   }
 
+  .task-row.stats-mission-row {
+    grid-template-columns: minmax(0, 1fr) 32px;
+    gap: 10px;
+    align-items: start;
+  }
+
   .task-avatar {
     width: 40px;
     height: 40px;
@@ -3565,6 +3571,26 @@ body.running-music-standalone #actionsModal .actions-list {
     overflow: visible;
     text-overflow: clip;
     line-height: 1.12;
+  }
+
+  .task-row.stats-mission-row .task-title,
+  .task-row.stats-mission-row .task-assignee {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .task-row.stats-mission-row .task-title {
+    font-size: 1rem;
+    line-height: 1.05;
+  }
+
+  .task-row.stats-mission-row .task-assignee {
+    font-size: 0.9rem;
+  }
+
+  .task-row.stats-mission-row .stats-mission-progress {
+    width: 90%;
   }
 
   .task-assignee.task-duration {

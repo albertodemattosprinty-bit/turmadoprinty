@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
+const PROJECT200_TIME_ZONE = "America/Sao_Paulo";
+
 const DEFAULT_DAILY_MISSIONS = [
   { title: "Beber um copo de água", targetCount: 6 },
   { title: "Respirar profundamente", targetCount: 6 },
@@ -25,11 +27,18 @@ function normalizeMissionProfile(value) {
 
 function toDateKey(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  }
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const target = Number.isNaN(date.getTime()) ? new Date() : date;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: PROJECT200_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(target);
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeMissionRow(row) {
