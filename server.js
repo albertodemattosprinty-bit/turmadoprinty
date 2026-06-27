@@ -75,6 +75,7 @@ const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-m
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
 const OPENAI_TTS_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || "").trim();
 const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || "").trim();
@@ -3773,21 +3774,83 @@ function createProject200ChatTitleFromMessage(message) {
   return cleaned.slice(0, 36).replace(/[.!?]+$/g, "") || "Conversas";
 }
 
+function getProjectTimeZoneOffsetMinutes(date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: PROJECT200_TIME_ZONE,
+    timeZoneName: "shortOffset",
+    hour: "2-digit"
+  });
+  const value = formatter.formatToParts(date).find((part) => part.type === "timeZoneName")?.value || "GMT-3";
+  const match = value.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/i);
+  if (!match) {
+    return -180;
+  }
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2] || 0);
+  const minutes = Number(match[3] || 0);
+  return sign * ((hours * 60) + minutes);
+}
+
+function getProjectCalendarParts(date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: PROJECT200_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(date);
+  const read = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return {
+    year: read("year"),
+    month: read("month"),
+    day: read("day")
+  };
+}
+
+function makeProjectZonedDate(year, month, day, hour = 0, minute = 0, second = 0) {
+  const guessUtcMs = Date.UTC(year, month - 1, day, hour, minute, second, 0);
+  const offsetMinutes = getProjectTimeZoneOffsetMinutes(new Date(guessUtcMs));
+  return new Date(guessUtcMs - (offsetMinutes * 60000));
+}
+
+function formatProjectNowLabel(date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: PROJECT200_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).format(date);
+}
+
 function startOfProjectDay(date) {
-  const value = new Date(date);
-  value.setHours(0, 0, 0, 0);
-  return value;
+  const { year, month, day } = getProjectCalendarParts(date);
+  return makeProjectZonedDate(year, month, day, 0, 0, 0);
 }
 
 function addProjectDays(date, amount) {
-  const value = new Date(date);
-  value.setDate(value.getDate() + amount);
-  return value;
+  return new Date(date.getTime() + (amount * 86400000));
 }
 
 function startOfProjectWeek(date) {
   const value = startOfProjectDay(date);
-  const weekday = value.getDay();
+  const weekdayLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: PROJECT200_TIME_ZONE,
+    weekday: "short"
+  }).format(value);
+  const weekdayMap = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+  };
+  const weekday = weekdayMap[weekdayLabel] ?? 0;
   const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
   return addProjectDays(value, -daysSinceMonday);
 }
@@ -3833,8 +3896,14 @@ function formatProject200ActionLine(action, now) {
   const start = action?.startAt ? new Date(action.startAt) : null;
   const end = action?.endAt ? new Date(action.endAt) : null;
   const status = String(action?.status || "PENDING").trim().toUpperCase();
-  const startLabel = start && !Number.isNaN(start.getTime()) ? start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
-  const endLabel = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+  const timeFormat = {
+    timeZone: PROJECT200_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  };
+  const startLabel = start && !Number.isNaN(start.getTime()) ? start.toLocaleTimeString("pt-BR", timeFormat) : "--:--";
+  const endLabel = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString("pt-BR", timeFormat) : "--:--";
   let badge = "pendente";
   if (status === "COMPLETED") {
     badge = "concluída";
@@ -3929,24 +3998,32 @@ async function buildProject200ChatContext(user, profileName) {
   const runningLine = normalizeStoredProject200ProfileName(runtimeState?.assignee) === selectedProfile && runtimeState?.actionTitle
     ? `${runtimeState.actionTitle} (${runtimeState.eventType || "start"})`
     : "nenhuma";
+  const nowMs = now.getTime();
 
   const pendingToday = todayProfileActions
     .filter((action) => String(action?.status || "").trim().toUpperCase() !== "COMPLETED")
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
   const overdueToday = pendingToday.filter((action) => {
     const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
-    return Number.isFinite(startAt) && startAt < now.getTime();
+    return Number.isFinite(startAt) && startAt < nowMs;
   });
   const upcomingToday = pendingToday.filter((action) => {
     const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
-    return Number.isFinite(startAt) && startAt >= now.getTime();
+    return Number.isFinite(startAt) && startAt >= nowMs;
   });
+  const overduePendingMinutes = overdueToday.reduce((sum, action) => {
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    if (!Number.isFinite(startAt) || startAt >= nowMs) {
+      return sum;
+    }
+    return sum + Math.max(0, Math.round((nowMs - startAt) / 60000));
+  }, 0);
 
   const selectedWeekStats = globalWeekStats?.byAssignee?.[selectedProfile] || {};
   const selectedWeekSummary = {
     totalMinutes: Number(selectedWeekStats?.totalMinutes || ownWeekProgress.totalMinutes || 0),
     completedMinutes: Number(selectedWeekStats?.completedMinutes || ownWeekProgress.completedMinutes || 0),
-    lateStartMinutes: Number(selectedWeekStats?.lateStartMinutes || ownWeekProgress.lateStartMinutes || 0),
+    lateStartMinutes: overduePendingMinutes,
     completionPercent: ownWeekProgress.completionPercent
   };
   const financeNotesText = clipProject200Text(financeNotes?.notes || "", 320);
@@ -3956,9 +4033,10 @@ async function buildProject200ChatContext(user, profileName) {
     contextText: [
       `Usuario logado: ${user.username || user.email || "usuario"}.`,
       `Perfil ativo do /200: ${selectedProfile}.`,
-      `Agora: ${now.toISOString()}.`,
+      `Agora no Brasil (${PROJECT200_TIME_ZONE}): ${formatProjectNowLabel(now)}.`,
       `Tarefa em andamento do perfil: ${runningLine}.`,
-      `Semana do perfil: ${selectedWeekSummary.completionPercent}% | ${selectedWeekSummary.completedMinutes}/${selectedWeekSummary.totalMinutes} min | atraso ${selectedWeekSummary.lateStartMinutes}m.`,
+      `Semana do perfil: ${selectedWeekSummary.completionPercent}% | ${selectedWeekSummary.completedMinutes}/${selectedWeekSummary.totalMinutes} min concluidos.`,
+      `Atraso pendente agora: ${selectedWeekSummary.lateStartMinutes}m em ${overdueToday.length} tarefa(s) ainda nao concluidas.`,
       `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Financeiro pessoal hoje: entradas ${Math.round(Number(financeTodaySummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeTodaySummary?.expenseCents || 0) / 100)} reais | pendencias ${Number(financeTodaySummary?.pendingCount || 0)}.`,
@@ -3985,6 +4063,7 @@ async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileNam
     "Para comentar o usuario, foque primeiro nos dados de acoes e estatisticas. Quando o assunto pedir, voce tambem pode usar o financeiro pessoal e as notas financeiras do usuario.",
     "Regras obrigatorias: resposta entre 60 e 500 caracteres; sem markdown; texto corrido ou no maximo duas frases curtas; fale como mensageiro fluido e rapido.",
     "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa ou disciplina semanal.",
+    "Nunca cobre como atrasada uma tarefa que ja esteja concluida, mesmo que ela tenha sido concluida depois do horario.",
     "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
     "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
     "Cada nova resposta deve tratar o Contexto vivo do /200 como uma consulta fresca do backend. Se a memoria recente da conversa conflitar com o contexto vivo, o contexto vivo vence.",
