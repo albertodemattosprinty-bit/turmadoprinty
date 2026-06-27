@@ -6680,9 +6680,6 @@ function renderMissionQuantityModal() {
     const signedLabel = state.missionQuantity.mode === "remove" ? `-${value}` : `+${value}`;
     button.type = "button";
     button.className = "mission-quantity-quick-btn";
-    if (Number(state.missionQuantity.amount || 1) === Number(value)) {
-      button.classList.add("is-active");
-    }
     button.dataset.missionQuickValue = String(value);
     button.textContent = signedLabel;
     missionQuantityQuickGrid.appendChild(button);
@@ -6763,6 +6760,9 @@ async function updateStatsMissionProgress(missionId, delta) {
     state.statsMissionSummary = payload?.summary || state.statsMissionSummary;
     renderMissionSummary();
     renderStatsMissions();
+    if (isMissionStatsScope()) {
+      await loadStatsSummary();
+    }
   } catch (error) {
     showToast(error instanceof Error ? error.message : "Falha ao atualizar missão.");
   }
@@ -8254,7 +8254,10 @@ missionQuantityQuickGrid?.addEventListener("click", (event) => {
   if (!button) {
     return;
   }
-  state.missionQuantity.amount = parseMissionTargetCount(button.dataset.missionQuickValue, 1);
+  state.missionQuantity.amount = Math.max(
+    1,
+    Number(state.missionQuantity.amount || 1) + parseMissionTargetCount(button.dataset.missionQuickValue, 1)
+  );
   renderMissionQuantityModal();
 });
 

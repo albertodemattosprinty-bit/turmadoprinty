@@ -2721,6 +2721,10 @@ body.running-music-standalone #actionsModal .actions-list {
   display: grid;
   gap: 18px;
   text-align: center;
+  padding: 22px 18px 18px;
+  background: #0b1120;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
 }
 
 .mission-quantity-head {
@@ -2756,8 +2760,8 @@ body.running-music-standalone #actionsModal .actions-list {
 .mission-quantity-value {
   min-height: 64px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   display: grid;
   place-items: center;
   font-size: 2rem;
@@ -2774,8 +2778,8 @@ body.running-music-standalone #actionsModal .actions-list {
 .mission-quantity-quick-btn {
   min-height: 46px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.96);
   color: #fff;
   font-size: 1rem;
   font-weight: 700;
