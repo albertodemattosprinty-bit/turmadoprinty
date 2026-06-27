@@ -402,12 +402,17 @@ const dayDonePercent = document.getElementById("dayDonePercent");
 const dayDoneDelay = document.getElementById("dayDoneDelay");
 const startDecisionModal = document.getElementById("startDecisionModal");
 const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
+const startDecisionContent = document.getElementById("startDecisionContent");
 const startDecisionTaskTitle = document.getElementById("startDecisionTaskTitle");
+const startDecisionMicButton = document.getElementById("startDecisionMicButton");
 const startDecisionStartAt = document.getElementById("startDecisionStartAt");
 const startDecisionEndAt = document.getElementById("startDecisionEndAt");
 const startDecisionRepeatLabel = document.getElementById("startDecisionRepeatLabel");
 const startDecisionMusicLabel = document.getElementById("startDecisionMusicLabel");
 const startDecisionActions = document.getElementById("startDecisionActions");
+const startDecisionStartInput = document.getElementById("startDecisionStartInput");
+const startDecisionEndInput = document.getElementById("startDecisionEndInput");
+const startDecisionDateInput = document.getElementById("startDecisionDateInput");
 const startConflictModal = document.getElementById("startConflictModal");
 const startConflictCurrentTitle = document.getElementById("startConflictCurrentTitle");
 const startConflictNextTitle = document.getElementById("startConflictNextTitle");
@@ -722,7 +727,10 @@ const state = {
     nextActionId: ""
   },
   startDecisionContext: {
-    actionId: ""
+    actionId: "",
+    mode: "view",
+    fieldToFocus: "",
+    dirty: false
   },
   uiAnchors: {
     actionsCurrentCentered: false,
@@ -4273,6 +4281,16 @@ function getCurrentTimelineEntry(nowMs, exceptId = "") {
 function closeStartDecisionModalWith(value) {
   startDecisionModal?.classList.remove("active");
   startDecisionModal?.setAttribute("aria-hidden", "true");
+  if (startDecisionContent) {
+    startDecisionContent.id = "startDecisionContent";
+  }
+  if (startDecisionMicButton) {
+    startDecisionMicButton.hidden = true;
+    startDecisionMicButton.classList.remove("is-active");
+  }
+  state.startDecisionContext.mode = "view";
+  state.startDecisionContext.fieldToFocus = "";
+  state.startDecisionContext.dirty = false;
   document.body.classList.remove("start-decision-open");
   if (["start", "start_chosen", "do_current"].includes(String(value || ""))) {
     document.body.classList.add("task-starting");
@@ -4308,6 +4326,200 @@ function buildPendingStartActionButtons(targetAction) {
     { label: "Iniciar", value: "start", primary: true },
     { label: "Excluir", value: "remove" }
   ];
+}
+
+function isTaskComposerMode() {
+  return state.startDecisionContext.mode === "create" || state.startDecisionContext.mode === "edit";
+}
+
+function markTaskComposerDirty() {
+  if (isTaskComposerMode()) {
+    state.startDecisionContext.dirty = true;
+  }
+}
+
+function formatTaskComposerDateLabel() {
+  if (state.wizard.repeatOpen && normalizeRepeatMode(state.wizard.repeatMode) === "daily") {
+    return "Diariamente";
+  }
+  return formatDateLabel(dateFromOffset(state.wizard.dateOffset)) || "Inserir uma data";
+}
+
+function renderTaskComposerMeta(button, iconMarkup, label, placeholder = false) {
+  if (!button) return;
+  button.innerHTML = `${iconMarkup}<span>${escapeHtml(label)}</span>`;
+  button.classList.toggle("is-placeholder", Boolean(placeholder));
+}
+
+function renderTaskComposerModal() {
+  if (!startDecisionContent || !startDecisionTaskTitle || !startDecisionMicButton) {
+    return;
+  }
+  const mode = state.startDecisionContext.mode;
+  const untouchedCreate = mode === "create" && !state.startDecisionContext.dirty;
+  startDecisionContent.id = mode === "create" ? "create-task" : "edit-task";
+  const titleValue = String(taskTitle?.value || "").trim();
+  startDecisionTaskTitle.textContent = titleValue || "Inserir nome da tarefa";
+  startDecisionTaskTitle.classList.toggle("is-placeholder", !titleValue);
+  startDecisionTaskTitle.style.cursor = "pointer";
+  startDecisionMicButton.hidden = false;
+  startDecisionMicButton.classList.toggle("is-active", actionMediaRecorder && actionMediaRecorder.state !== "inactive");
+
+  renderTaskComposerMeta(
+    startDecisionStartAt,
+    startDecisionStartAt?.querySelector("svg")?.outerHTML || "",
+    untouchedCreate ? "Inserir horário inicial" : `${String(state.wizard.startHour).padStart(2, "0")}:${String(state.wizard.startMinute).padStart(2, "0")}`,
+    untouchedCreate
+  );
+  renderTaskComposerMeta(
+    startDecisionEndAt,
+    startDecisionEndAt?.querySelector("svg")?.outerHTML || "",
+    untouchedCreate ? "Inserir horário final" : `${String(state.wizard.endHour).padStart(2, "0")}:${String(state.wizard.endMinute).padStart(2, "0")}`,
+    untouchedCreate
+  );
+  const repeatLabel = untouchedCreate ? "Inserir uma data" : formatTaskComposerDateLabel();
+  renderTaskComposerMeta(
+    startDecisionRepeatLabel,
+    startDecisionRepeatLabel?.querySelector("svg")?.outerHTML || "",
+    repeatLabel || "Inserir uma data",
+    untouchedCreate || !repeatLabel
+  );
+  renderTaskComposerMeta(
+    startDecisionMusicLabel,
+    startDecisionMusicLabel?.querySelector("svg")?.outerHTML || "",
+    formatActionMusicInlineLabel(findActionById(state.startDecisionContext.actionId)) || "Definir música",
+    false
+  );
+
+  if (startDecisionActions) {
+    startDecisionActions.innerHTML = "";
+    const primary = document.createElement("button");
+    primary.type = "button";
+    primary.className = "decision-btn decision-btn-start";
+    primary.innerHTML = `<span>${mode === "create" ? "Criar tarefa" : "Salvar edição"}</span>`;
+    primary.addEventListener("click", () => {
+      void saveTaskComposer();
+    });
+    startDecisionActions.appendChild(primary);
+
+    const secondary = document.createElement("button");
+    secondary.type = "button";
+    secondary.className = `decision-btn ${mode === "create" ? "decision-btn-edit" : "decision-btn-remove"}`;
+    secondary.innerHTML = `<span>${mode === "create" ? "Voltar" : "Excluir"}</span>`;
+    secondary.addEventListener("click", async () => {
+      if (mode === "create") {
+        closeStartDecisionModalWith("cancel");
+        return;
+      }
+      const action = findActionById(state.startDecisionContext.actionId);
+      if (!action) {
+        closeStartDecisionModalWith("cancel");
+        return;
+      }
+      if (!window.confirm("Excluir essa tarefa? Se for repetida, toda a rede sera removida.")) {
+        return;
+      }
+      await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, { method: "DELETE" });
+      closeStartDecisionModalWith("remove");
+      await loadActions();
+    });
+    startDecisionActions.appendChild(secondary);
+  }
+}
+
+function openTaskComposer(action = null, options = {}) {
+  state.wizard = buildInitialWizardState();
+  state.startDecisionContext.mode = action ? "edit" : "create";
+  state.startDecisionContext.actionId = String(action?.id || "");
+  state.startDecisionContext.fieldToFocus = String(options.fieldToFocus || "");
+  state.startDecisionContext.dirty = false;
+  if (action) {
+    const startAt = new Date(action.startAt);
+    const endAt = new Date(action.endAt);
+    const today = todayStart();
+    const actionDay = new Date(startAt);
+    actionDay.setHours(0, 0, 0, 0);
+    state.wizard.dateOffset = Math.round((actionDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    state.wizard.startHour = startAt.getHours();
+    state.wizard.startMinute = startAt.getMinutes();
+    state.wizard.endHour = endAt.getHours();
+    state.wizard.endMinute = endAt.getMinutes();
+    state.wizard.categoryId = String(action.categoryId || "").trim().toLowerCase();
+    state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
+    state.wizard.editingActionId = action.id;
+    state.wizard.repeatOpen = String(action.repeatRule || "none") !== "none";
+    state.wizard.repeatMode = normalizeRepeatMode(String(action.repeatRule || "none"));
+    state.wizard.repeatDays = Array.isArray(action.repeatDays) ? action.repeatDays.map((day) => Number(day)).filter((day) => day >= 0 && day <= 6) : [];
+    if (taskTitle) {
+      taskTitle.value = String(action.title || "");
+    }
+  } else if (taskTitle) {
+    taskTitle.value = "";
+  }
+  renderTaskComposerModal();
+  startDecisionModal?.classList.add("active");
+  startDecisionModal?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("start-decision-open", "modal-open");
+  if (state.startDecisionContext.fieldToFocus) {
+    window.setTimeout(() => openTaskComposerFieldEditor(state.startDecisionContext.fieldToFocus), 40);
+  }
+}
+
+function openTaskComposerFieldEditor(field) {
+  if (!isTaskComposerMode()) {
+    return;
+  }
+  if (field === "title") {
+    const nextTitle = window.prompt("Nome da tarefa:", String(taskTitle?.value || "").trim());
+    if (nextTitle == null) return;
+    if (taskTitle) {
+      taskTitle.value = String(nextTitle).trim().slice(0, 80);
+    }
+    markTaskComposerDirty();
+    renderTaskComposerModal();
+    return;
+  }
+  if (field === "start" || field === "end") {
+    const input = field === "start" ? startDecisionStartInput : startDecisionEndInput;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    input.value = `${String(field === "start" ? state.wizard.startHour : state.wizard.endHour).padStart(2, "0")}:${String(field === "start" ? state.wizard.startMinute : state.wizard.endMinute).padStart(2, "0")}`;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    } else {
+      input.click();
+      input.focus();
+    }
+    return;
+  }
+  if (field === "repeat") {
+    const choice = window.prompt("1 - Data única\n2 - Diariamente", state.wizard.repeatOpen ? "2" : "1");
+    if (choice == null) return;
+    if (String(choice).trim() === "2") {
+      state.wizard.repeatOpen = true;
+      state.wizard.repeatMode = "daily";
+      state.wizard.repeatDays = [...recurrenceDays.daily];
+      markTaskComposerDirty();
+      renderTaskComposerModal();
+      return;
+    }
+    state.wizard.repeatOpen = false;
+    state.wizard.repeatMode = "none";
+    state.wizard.repeatDays = [];
+    markTaskComposerDirty();
+    renderTaskComposerModal();
+    if (startDecisionDateInput instanceof HTMLInputElement) {
+      const date = dateFromOffset(state.wizard.dateOffset);
+      startDecisionDateInput.value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      if (typeof startDecisionDateInput.showPicker === "function") {
+        startDecisionDateInput.showPicker();
+      } else {
+        startDecisionDateInput.click();
+        startDecisionDateInput.focus();
+      }
+    }
+  }
 }
 
 function findActionById(actionId) {
@@ -4352,8 +4564,19 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
   return new Promise((resolve) => {
     startDecisionResolver = resolve;
     state.startDecisionContext.actionId = String(targetAction?.id || "");
+    state.startDecisionContext.mode = "view";
+    state.startDecisionContext.fieldToFocus = "";
+    state.startDecisionContext.dirty = false;
+    if (startDecisionContent) {
+      startDecisionContent.id = "startDecisionContent";
+    }
+    if (startDecisionMicButton) {
+      startDecisionMicButton.hidden = true;
+      startDecisionMicButton.classList.remove("is-active");
+    }
     if (startDecisionTaskTitle) {
       startDecisionTaskTitle.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
+      startDecisionTaskTitle.classList.remove("is-placeholder");
     }
     if (startDecisionStartAt) {
       startDecisionStartAt.innerHTML = `${startDecisionStartAt.querySelector("svg")?.outerHTML || ""}<span>${escapeHtml(formatTime(targetAction?.startAt || 0))}</span>`;
@@ -5918,6 +6141,7 @@ function stopActionMic() {
   }
   actionMicButton?.classList.remove("mic-active");
   actionMicButton?.classList.add("mic-idle");
+  startDecisionMicButton?.classList.remove("is-active");
 }
 
 function formatRepeatLabel(repeatRule, repeatDays) {
@@ -5991,6 +6215,11 @@ function applyInterpretedAction(entry) {
   state.wizard.repeatDays = Array.isArray(entry?.repeatDays) ? entry.repeatDays.map((day) => Number(day)).filter((day) => day >= 0 && day <= 6) : [];
   renderActionCategoryPicker();
   void interpretActionCategoryFromTitle(taskTitle.value);
+  if (isTaskComposerMode()) {
+    markTaskComposerDirty();
+    renderTaskComposerModal();
+    return;
+  }
   renderWizard();
 }
 
@@ -6053,8 +6282,13 @@ async function startActionMic() {
           body: JSON.stringify({ text: speechText })
         });
         actionPendingAiPayload = interpreted?.action || null;
-        renderActionAiConfirmation(actionPendingAiPayload || {});
-        actionVoiceStatus.textContent = "Tarefa pronta. Confirme abaixo.";
+        if (isTaskComposerMode()) {
+          applyInterpretedAction(actionPendingAiPayload || {});
+          actionVoiceStatus.textContent = "Campos preenchidos.";
+        } else {
+          renderActionAiConfirmation(actionPendingAiPayload || {});
+          actionVoiceStatus.textContent = "Tarefa pronta. Confirme abaixo.";
+        }
       } catch (error) {
         actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretação.";
       }
@@ -6062,6 +6296,7 @@ async function startActionMic() {
     actionMediaRecorder.start();
     actionMicButton?.classList.remove("mic-idle");
     actionMicButton?.classList.add("mic-active");
+    startDecisionMicButton?.classList.add("is-active");
     actionVoiceStatus.textContent = "Gravando...";
     actionLastSpeechAt = Date.now();
     actionSpeechMonitorTimer = window.setInterval(() => {
@@ -6426,6 +6661,53 @@ async function loadHistoryFromApi() {
   const payload = await apiRequest("/api/200/history");
   state.historySystem = Array.isArray(payload.systemEvents) ? payload.systemEvents : [];
   state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
+}
+
+async function saveTaskComposer() {
+  try {
+    const title = String(taskTitle?.value || "").trim();
+    if (title.length < 2) {
+      window.alert("Escreva o titulo da tarefa.");
+      return;
+    }
+    const repeatRule = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
+    const repeatDays = repeatRule === "weekly"
+      ? state.wizard.repeatDays
+      : recurrenceDays[repeatRule] || [];
+    const occurrences = buildOccurrences();
+    let applyTo = "single";
+    const editingAction = findActionById(state.startDecisionContext.actionId);
+    if (editingAction && editingAction.repeatGroupId && state.startDecisionContext.dirty) {
+      const choice = window.prompt("1 - Editar uma tarefa\n2 - Editar todas as tarefas", "2");
+      if (choice == null) {
+        return;
+      }
+      applyTo = String(choice).trim() === "1" ? "single" : "series";
+    } else if (!editingAction && (repeatRule !== "none" || occurrences.length > 1)) {
+      applyTo = "series";
+    }
+    const requestPath = editingAction
+      ? `/api/actions/${encodeURIComponent(editingAction.id)}`
+      : "/api/actions";
+    const requestMethod = editingAction ? "PATCH" : "POST";
+    await apiRequest(requestPath, {
+      method: requestMethod,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        assignee: getWizardAssigneeName(),
+        categoryId: String(state.wizard.categoryId || "").trim().toLowerCase(),
+        repeatRule,
+        repeatDays,
+        occurrences,
+        applyTo
+      })
+    });
+    closeStartDecisionModalWith(editingAction ? "edit" : "create");
+    await loadActions();
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : "Erro ao salvar.");
+  }
 }
 
 function renderConversationMessages() {
@@ -7593,7 +7875,7 @@ openActionWizardButton.addEventListener("click", () => {
     return;
   }
 
-  openWizard();
+  openTaskComposer();
 });
 
 closeActionWizardButton.addEventListener("click", closeWizard);
@@ -8440,45 +8722,100 @@ project200ExportUsernameInput?.addEventListener("keydown", (event) => {
   void submitProject200Export();
 });
 startDecisionTaskTitle?.addEventListener("click", () => {
+  if (isTaskComposerMode()) {
+    openTaskComposerFieldEditor("title");
+    return;
+  }
   const action = findActionById(state.startDecisionContext.actionId);
   if (!action) {
     return;
   }
   closeStartDecisionModalWith("cancel");
-  openWizard(action, { step: 1, inlineEditStep: 1, returnToStartDecision: true });
+  openTaskComposer(action, { fieldToFocus: "title" });
 });
 startDecisionStartAt?.addEventListener("click", () => {
+  if (isTaskComposerMode()) {
+    openTaskComposerFieldEditor("start");
+    return;
+  }
   const action = findActionById(state.startDecisionContext.actionId);
   if (!action) {
     return;
   }
   closeStartDecisionModalWith("cancel");
-  openWizard(action, { step: 3, inlineEditStep: 3, returnToStartDecision: true });
+  openTaskComposer(action, { fieldToFocus: "start" });
 });
 startDecisionEndAt?.addEventListener("click", () => {
+  if (isTaskComposerMode()) {
+    openTaskComposerFieldEditor("end");
+    return;
+  }
   const action = findActionById(state.startDecisionContext.actionId);
   if (!action) {
     return;
   }
   closeStartDecisionModalWith("cancel");
-  openWizard(action, { step: 4, inlineEditStep: 4, returnToStartDecision: true });
+  openTaskComposer(action, { fieldToFocus: "end" });
 });
 startDecisionRepeatLabel?.addEventListener("click", () => {
+  if (isTaskComposerMode()) {
+    openTaskComposerFieldEditor("repeat");
+    return;
+  }
   const action = findActionById(state.startDecisionContext.actionId);
   if (!action) {
     return;
   }
   closeStartDecisionModalWith("cancel");
-  openWizard(action, { step: 2, inlineEditStep: 2, returnToStartDecision: true });
+  openTaskComposer(action, { fieldToFocus: "repeat" });
 });
 startDecisionMusicLabel?.addEventListener("click", () => {
   const action = findActionById(state.startDecisionContext.actionId);
   if (!action) {
+    if (isTaskComposerMode()) {
+      window.alert("Defina a música depois de criar a tarefa.");
+    }
     return;
   }
   state.runningPlayer.currentTaskTitle = String(action.title || "").trim();
   closeStartDecisionModalWith("cancel");
   openRunningMusicListModal();
+});
+startDecisionMicButton?.addEventListener("click", () => {
+  if (actionMediaRecorder && actionMediaRecorder.state !== "inactive") {
+    stopActionMic();
+    return;
+  }
+  void startActionMic();
+});
+startDecisionStartInput?.addEventListener("change", () => {
+  const value = String(startDecisionStartInput.value || "").trim();
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return;
+  state.wizard.startHour = Number(match[1]);
+  state.wizard.startMinute = Number(match[2]);
+  markTaskComposerDirty();
+  renderTaskComposerModal();
+});
+startDecisionEndInput?.addEventListener("change", () => {
+  const value = String(startDecisionEndInput.value || "").trim();
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return;
+  state.wizard.endHour = Number(match[1]);
+  state.wizard.endMinute = Number(match[2]);
+  markTaskComposerDirty();
+  renderTaskComposerModal();
+});
+startDecisionDateInput?.addEventListener("change", () => {
+  const value = String(startDecisionDateInput.value || "").trim();
+  if (!value) return;
+  const picked = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(picked.getTime())) return;
+  const today = todayStart();
+  picked.setHours(0, 0, 0, 0);
+  state.wizard.dateOffset = Math.round((picked.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  markTaskComposerDirty();
+  renderTaskComposerModal();
 });
 startConflictFinalizeButton?.addEventListener("click", () => closeStartConflictModal("finalize_and_start"));
 startConflictAbortButton?.addEventListener("click", () => closeStartConflictModal("abort_and_start"));

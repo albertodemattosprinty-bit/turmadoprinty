@@ -264,11 +264,14 @@
   </section>
   <section class="workspace-modal simple-modal" id="startDecisionModal" aria-hidden="true" aria-label="Decisão de início">
     <button class="modal-close" type="button" id="closeStartDecisionModal" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
-    <div class="finance-content running-task-content start-decision-content">
+    <div class="finance-content running-task-content start-decision-content" id="startDecisionContent">
       <div class="start-decision-top">
         <div class="start-decision-top-spacer" aria-hidden="true"></div>
         <div class="start-decision-title-wrap">
           <h1 class="start-decision-task-title" id="startDecisionTaskTitle">Tarefa X</h1>
+          <button class="start-decision-mic" type="button" id="startDecisionMicButton" aria-label="Falar tarefa" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-3.07A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0z"/></svg>
+          </button>
         </div>
       </div>
       <div class="start-decision-middle">
@@ -292,6 +295,9 @@
       <div class="start-decision-bottom">
         <div class="start-decision-actions" id="startDecisionActions"></div>
       </div>
+      <input type="time" id="startDecisionStartInput" hidden />
+      <input type="time" id="startDecisionEndInput" hidden />
+      <input type="date" id="startDecisionDateInput" hidden />
     </div>
   </section>
   <section class="workspace-modal simple-modal" id="startConflictModal" aria-hidden="true" aria-label="Conflito de tarefa em andamento">
@@ -452,10 +458,6 @@
               <div class="weekday-row" id="weekdayRow" aria-label="Dias da semana"></div>
             </div>
 
-            <button class="repeat-toggle" type="button" id="repeatToggle" aria-label="Editar repetição">
-              <svg viewBox="0 0 24 24"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5zm14.1-9.1 1.2-1.2a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1.2 1.2z"/></svg>
-              <span>Personalizar</span>
-            </button>
           </section>
 
           <section class="wizard-step" data-step="3">

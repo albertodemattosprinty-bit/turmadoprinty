@@ -1627,6 +1627,7 @@ body.running-music-standalone #actionsModal .actions-list {
   display: grid;
   align-content: center;
   justify-items: center;
+  gap: 14px;
   padding-bottom: 6px;
 }
 
@@ -1639,6 +1640,11 @@ body.running-music-standalone #actionsModal .actions-list {
   color: #fff;
   text-wrap: balance;
   cursor: pointer;
+}
+
+.start-decision-task-title.is-placeholder,
+.start-decision-task-meta.is-placeholder {
+  opacity: 0.84;
 }
 
 .start-decision-task-meta {
@@ -1664,6 +1670,28 @@ body.running-music-standalone #actionsModal .actions-list {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
+}
+
+.start-decision-mic {
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+
+.start-decision-mic svg {
+  width: 28px;
+  height: 28px;
+}
+
+.start-decision-mic.is-active {
+  background: #16a34a;
+  color: #fff;
 }
 
 .start-decision-middle {
@@ -1799,6 +1827,32 @@ body.running-music-standalone #actionsModal .actions-list {
 
 .decision-btn-remove span {
   display: none;
+}
+
+#create-task .start-decision-actions,
+#edit-task .start-decision-actions {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  width: min(76vw, 560px);
+}
+
+#create-task .decision-btn,
+#edit-task .decision-btn {
+  min-height: 60px;
+  border-radius: 18px;
+}
+
+#create-task .decision-btn-remove,
+#edit-task .decision-btn-remove {
+  width: 100%;
+  min-width: 0;
+  min-height: 60px;
+  border-radius: 18px;
+  padding: 0 18px;
+}
+
+#create-task .decision-btn-remove span,
+#edit-task .decision-btn-remove span {
+  display: inline;
 }
 .start-conflict-content {
   width: min(520px, 92vw);

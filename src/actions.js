@@ -403,6 +403,52 @@ export async function createUserAction(userId, payload) {
   return result.rows.map(normalizeAction);
 }
 
+async function assertActionOverlaps(userId, assignee, occurrences, excludeIds = []) {
+  const safeExcludeIds = Array.isArray(excludeIds)
+    ? excludeIds.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+  for (const occurrence of occurrences) {
+    const overlap = await query(
+      `
+        select id, title, start_at, end_at
+        from actions
+        where user_id = $1
+          and assignee = $2
+          and start_at < $4
+          and end_at > $3
+          and not (id = any($5::uuid[]))
+        limit 1
+      `,
+      [userId, assignee, occurrence.startAt.toISOString(), occurrence.endAt.toISOString(), safeExcludeIds]
+    );
+
+    if (overlap.rows[0]) {
+      const busy = normalizeAction(overlap.rows[0]);
+      throw new Error(`Horario indisponivel por sobrepor "${busy.title}".`);
+    }
+  }
+}
+
+function parseActionOccurrences(payload) {
+  const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
+    ? payload.occurrences
+    : [{ startAt: payload?.startAt, endAt: payload?.endAt }];
+  if (rawOccurrences.length > MAX_OCCURRENCES) {
+    throw new Error("Limite de recorrencias excedido.");
+  }
+  return rawOccurrences.map((occurrence) => {
+    const startAt = parseDate(occurrence?.startAt, "Horario inicial");
+    const endAt = parseDate(occurrence?.endAt, "Horario final");
+    if (endAt <= startAt) {
+      throw new Error("O horario final precisa ser depois do horario inicial.");
+    }
+    if (endAt.getTime() - startAt.getTime() > 24 * 60 * 60 * 1000) {
+      throw new Error("A tarefa nao pode passar de 24 horas.");
+    }
+    return { startAt, endAt };
+  });
+}
+
 export async function setActionMusicDefaultByTitle(userId, title, payload = {}) {
   await ensureActionsSchema();
 
@@ -443,39 +489,45 @@ export async function updateUserAction(userId, actionId, payload) {
   const title = String(payload?.title || "").trim();
   const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
   const categoryId = normalizeCategoryId(payload?.categoryId || action?.categoryId);
-  const occurrence = Array.isArray(payload?.occurrences) && payload.occurrences.length
-    ? payload.occurrences[0]
-    : { startAt: payload?.startAt, endAt: payload?.endAt };
-  const startAt = parseDate(occurrence?.startAt, "Horario inicial");
-  const endAt = parseDate(occurrence?.endAt, "Horario final");
+  const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
+  const repeatDays = normalizeRepeatDays(payload?.repeatDays);
+  const applyTo = String(payload?.applyTo || "").trim().toLowerCase() === "series" ? "series" : "single";
+  const occurrences = parseActionOccurrences(payload);
 
   if (title.length < 2) {
     throw new Error("Titulo da tarefa invalido.");
   }
-  if (endAt <= startAt) {
-    throw new Error("O horario final precisa ser depois do horario inicial.");
-  }
-  if (endAt.getTime() - startAt.getTime() > 24 * 60 * 60 * 1000) {
-    throw new Error("A tarefa nao pode passar de 24 horas.");
+  const isSeriesUpdate = applyTo === "series" && (action.repeatGroupId || repeatRule !== "none" || occurrences.length > 1);
+
+  if (isSeriesUpdate) {
+    const seriesRows = action.repeatGroupId
+      ? await query("select id from actions where user_id = $1 and repeat_group_id = $2", [userId, action.repeatGroupId])
+      : await query("select id from actions where user_id = $1 and id = $2", [userId, action.id]);
+    const existingIds = seriesRows.rows.map((row) => String(row.id || "").trim()).filter(Boolean);
+    await assertActionOverlaps(userId, assignee, occurrences, existingIds);
+    if (existingIds.length) {
+      await query("delete from action_status_overrides where user_id = $1 and action_id = any($2::uuid[])", [userId, existingIds]);
+      await query("delete from actions where user_id = $1 and id = any($2::uuid[])", [userId, existingIds]);
+    }
+    const created = await createUserAction(userId, {
+      title,
+      assignee,
+      categoryId,
+      repeatRule,
+      repeatDays,
+      occurrences
+    });
+    const preferred = created.find((item) => item.startAt === action.startAt) || created[0] || null;
+    return preferred;
   }
 
-  const overlap = await query(
-    `
-      select id
-      from actions
-      where user_id = $1
-        and assignee = $2
-        and id <> $3
-        and start_at < $5
-        and end_at > $4
-      limit 1
-    `,
-    [userId, assignee, action.id, startAt.toISOString(), endAt.toISOString()]
-  );
+  const occurrence = occurrences[0];
+  await assertActionOverlaps(userId, assignee, [occurrence], [action.id]);
 
-  if (overlap.rows[0]) {
-    throw new Error("Horario indisponivel para essa pessoa.");
-  }
+  const detachFromSeries = Boolean(action.repeatGroupId);
+  const nextRepeatGroupId = detachFromSeries ? null : action.repeatGroupId;
+  const nextRepeatRule = detachFromSeries ? "none" : repeatRule;
+  const nextRepeatDays = detachFromSeries ? [] : repeatDays;
 
   const result = await query(
     `
@@ -484,16 +536,43 @@ export async function updateUserAction(userId, actionId, payload) {
           assignee = $4,
           category_id = $5,
           start_at = $6::timestamptz,
-          end_at = $7::timestamptz
+          end_at = $7::timestamptz,
+          repeat_group_id = $8,
+          repeat_rule = $9,
+          repeat_days = $10::jsonb
       where user_id = $1
         and id = $2
       returning id
     `,
-    [userId, action.id, title, assignee, categoryId, startAt.toISOString(), endAt.toISOString()]
+    [
+      userId,
+      action.id,
+      title,
+      assignee,
+      categoryId,
+      occurrence.startAt.toISOString(),
+      occurrence.endAt.toISOString(),
+      nextRepeatGroupId,
+      nextRepeatRule,
+      JSON.stringify(nextRepeatDays)
+    ]
   );
 
   if (!result.rows[0]) {
     throw new Error("Tarefa nao encontrada.");
+  }
+
+  if (detachFromSeries) {
+    await query(
+      `
+        update action_status_overrides
+           set repeat_group_id = null,
+               updated_at = now()
+         where user_id = $1
+           and action_id = $2
+      `,
+      [userId, action.id]
+    );
   }
 
   return getUserActionById(userId, action.id);
@@ -699,6 +778,10 @@ export async function deleteUserAction(userId, actionId) {
   }
 
   if (action.repeat_group_id) {
+    await query(
+      "delete from action_status_overrides where user_id = $1 and repeat_group_id = $2",
+      [userId, action.repeat_group_id]
+    );
     const deletedGroup = await query(
       "delete from actions where user_id = $1 and repeat_group_id = $2",
       [userId, action.repeat_group_id]
@@ -707,6 +790,7 @@ export async function deleteUserAction(userId, actionId) {
     return { deleted: deletedGroup.rowCount || 0 };
   }
 
+  await query("delete from action_status_overrides where user_id = $1 and action_id = $2", [userId, action.id]);
   const deletedSingle = await query(
     "delete from actions where user_id = $1 and id = $2",
     [userId, action.id]
