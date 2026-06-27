@@ -3081,6 +3081,7 @@ function buildInitialWizardState() {
     step: 1,
     inlineEditStep: 0,
     returnToStartDecision: false,
+    returnMode: "none",
     dateOffset: 0,
     repeatOpen: false,
     repeatMode: "none",
@@ -4043,6 +4044,7 @@ function openWizard(action = null, options = {}) {
   state.wizard.step = Math.max(1, Math.min(4, Number(options.step || state.wizard.step || 1)));
   state.wizard.inlineEditStep = Number(options.inlineEditStep || 0) || 0;
   state.wizard.returnToStartDecision = Boolean(options.returnToStartDecision);
+  state.wizard.returnMode = String(options.returnMode || "none");
   wizardMessage.textContent = "";
   hideActionAiConfirmation();
   actionWizard.classList.add("active");
@@ -4051,6 +4053,23 @@ function openWizard(action = null, options = {}) {
   if (state.wizard.step === 1) {
     setTimeout(() => taskTitle.focus(), 60);
   }
+}
+
+function openRepeatEditorFromTaskComposer() {
+  if (!isTaskComposerMode()) {
+    return;
+  }
+  startDecisionModal?.classList.remove("active");
+  startDecisionModal?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("start-decision-open");
+  state.wizard.step = 2;
+  state.wizard.inlineEditStep = 2;
+  state.wizard.returnMode = "task-composer";
+  wizardMessage.textContent = "";
+  hideActionAiConfirmation();
+  actionWizard.classList.add("active");
+  actionWizard.setAttribute("aria-hidden", "false");
+  renderWizard();
 }
 
 function closeWizard() {
@@ -4494,6 +4513,10 @@ function openTaskComposerFieldEditor(field) {
     return;
   }
   if (field === "repeat") {
+    if (state.startDecisionContext.mode === "edit") {
+      openRepeatEditorFromTaskComposer();
+      return;
+    }
     const choice = window.prompt("1 - Data única\n2 - Diariamente", state.wizard.repeatOpen ? "2" : "1");
     if (choice == null) return;
     if (String(choice).trim() === "2") {
@@ -5401,6 +5424,9 @@ function setRepeatMode(mode) {
     state.wizard.repeatDays = [...(recurrenceDays[normalizedMode] || [])];
   }
   state.wizard.repeatMode = normalizedMode;
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
 
   renderRepeatControls();
 }
@@ -5416,11 +5442,17 @@ function toggleWeekday(day) {
 
   state.wizard.repeatDays = [...days].sort((a, b) => a - b);
   state.wizard.repeatMode = state.wizard.repeatDays.length ? "weekly" : "none";
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
   renderRepeatControls();
 }
 
 function moveWizardDate(amount) {
   state.wizard.dateOffset += amount;
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
 }
 
@@ -5472,6 +5504,9 @@ function moveTimeHoldFive(type, unit, direction) {
 function shiftPeriodicEveryDays(direction) {
   const next = Math.max(1, Math.min(180, Number(state.wizard.periodicEveryDays || 1) + direction));
   state.wizard.periodicEveryDays = next;
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
   renderRepeatControls();
 }
 
@@ -5493,11 +5528,17 @@ function shiftPeriodicHoldTen(direction) {
 
 function shiftMonthlyOrdinal(direction) {
   state.wizard.monthlyOrdinalIndex = (state.wizard.monthlyOrdinalIndex + direction + monthlyOrdinalLabels.length) % monthlyOrdinalLabels.length;
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
   renderRepeatControls();
 }
 
 function shiftMonthlyWeekday(direction) {
   state.wizard.monthlyWeekdayIndex = (state.wizard.monthlyWeekdayIndex + direction + monthlyWeekdayLabels.length) % monthlyWeekdayLabels.length;
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
   renderRepeatControls();
 }
 
@@ -5572,14 +5613,16 @@ function buildOccurrences() {
   return occurrences;
 }
 
-function computeOverlapsForOccurrences(occurrences) {
+function computeOverlapsForOccurrences(occurrences, options = {}) {
   const existing = getVisibleActions();
+  const excludeGroupId = String(options.excludeGroupId || "").trim();
   const collisions = [];
   for (const item of occurrences) {
     const startMs = new Date(item.startAt).getTime();
     const endMs = new Date(item.endAt).getTime();
     const hit = existing.filter((action) => {
       if (state.wizard.editingActionId && action.id === state.wizard.editingActionId) return false;
+      if (excludeGroupId && String(action.repeatGroupId || "") === excludeGroupId) return false;
       const aStart = new Date(action.startAt).getTime();
       const aEnd = new Date(action.endAt).getTime();
       return aEnd > startMs && aStart < endMs;
@@ -5658,6 +5701,8 @@ async function saveAction() {
     const reopenStartDecisionActionId = state.wizard.returnToStartDecision
       ? String(state.wizard.editingActionId || "")
       : "";
+    const reopenTaskComposer = state.wizard.returnMode === "task-composer";
+    const editingAction = state.wizard.editingActionId ? findActionById(state.wizard.editingActionId) : null;
     const repeatRule = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
     const repeatDays = repeatRule === "weekly"
       ? state.wizard.repeatDays
@@ -5667,9 +5712,22 @@ async function saveAction() {
       ? `/api/actions/${encodeURIComponent(state.wizard.editingActionId)}`
       : "/api/actions";
     const requestMethod = state.wizard.editingActionId ? "PATCH" : "POST";
+    let applyTo = "single";
 
     let occurrences = buildOccurrences();
-    const overlaps = computeOverlapsForOccurrences(occurrences);
+    if (editingAction && editingAction.repeatGroupId) {
+      const choice = window.prompt("1 - Editar uma tarefa\n2 - Editar todas as tarefas", "2");
+      if (choice == null) {
+        wizardMessage.textContent = "";
+        return;
+      }
+      applyTo = String(choice).trim() === "1" ? "single" : "series";
+    } else if (!editingAction && (repeatRule !== "none" || occurrences.length > 1)) {
+      applyTo = "series";
+    }
+    const overlaps = computeOverlapsForOccurrences(occurrences, {
+      excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
+    });
     if (overlaps.length) {
       const decision = await openOverlapWizard(overlaps, occurrences);
       if (!decision || decision.type === "cancel") {
@@ -5701,7 +5759,7 @@ async function saveAction() {
       }
     }
 
-    await apiRequest(requestPath, {
+    const payload = await apiRequest(requestPath, {
       method: requestMethod,
       headers: {
         "Content-Type": "application/json"
@@ -5712,13 +5770,20 @@ async function saveAction() {
         categoryId: String(state.wizard.categoryId || "").trim().toLowerCase(),
         repeatRule,
         repeatDays,
+        applyTo,
         occurrences: occurrences
       })
     });
+    const updatedActionId = String(payload?.action?.id || payload?.actions?.[0]?.id || state.wizard.editingActionId || "").trim();
 
     state.activeOffset = state.wizard.dateOffset;
     closeWizard();
     await loadActions();
+    if (reopenTaskComposer) {
+      const action = findActionById(updatedActionId);
+      openTaskComposer(action || null);
+      return;
+    }
     if (reopenStartDecisionActionId) {
       reopenStartDecisionForAction(reopenStartDecisionActionId);
     }
@@ -7927,7 +7992,13 @@ function stepWizardBack() {
   if (state.wizard.inlineEditStep) {
     const actionId = String(state.wizard.editingActionId || "");
     const shouldReturn = Boolean(state.wizard.returnToStartDecision);
+    const shouldReturnToTaskComposer = state.wizard.returnMode === "task-composer";
     closeWizard();
+    if (shouldReturnToTaskComposer) {
+      const action = findActionById(actionId);
+      openTaskComposer(action || null);
+      return;
+    }
     if (shouldReturn && actionId) {
       reopenStartDecisionForAction(actionId);
     }
@@ -8024,12 +8095,18 @@ repeatTypeTabs?.querySelectorAll("[data-repeat-open]").forEach((button) => {
       state.wizard.repeatMode = "none";
       state.wizard.repeatDays = [];
     }
+    if (state.wizard.returnMode === "task-composer") {
+      state.startDecisionContext.dirty = true;
+    }
     renderRepeatControls();
   });
 });
 repeatModeBackButton?.addEventListener("click", () => {
   state.wizard.repeatMode = "none";
   state.wizard.repeatDays = [];
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
   renderRepeatControls();
 });
 
@@ -8078,10 +8155,16 @@ document.querySelectorAll("[data-monthly-weekday-nav]").forEach((button) => {
 
 avoidSaturdayInput?.addEventListener("change", () => {
   state.wizard.avoidSaturday = Boolean(avoidSaturdayInput.checked);
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
 });
 
 avoidSundayInput?.addEventListener("change", () => {
   state.wizard.avoidSunday = Boolean(avoidSundayInput.checked);
+  if (state.wizard.returnMode === "task-composer") {
+    state.startDecisionContext.dirty = true;
+  }
 });
 
 document.querySelectorAll("[data-repeat-mode]").forEach((button) => {

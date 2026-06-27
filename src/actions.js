@@ -493,6 +493,8 @@ export async function updateUserAction(userId, actionId, payload) {
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const applyTo = String(payload?.applyTo || "").trim().toLowerCase() === "series" ? "series" : "single";
   const occurrences = parseActionOccurrences(payload);
+  const sameRepeatDefinition = repeatRule === String(action.repeatRule || "none")
+    && JSON.stringify(repeatDays) === JSON.stringify(normalizeRepeatDays(action.repeatDays));
 
   if (title.length < 2) {
     throw new Error("Titulo da tarefa invalido.");
@@ -501,9 +503,74 @@ export async function updateUserAction(userId, actionId, payload) {
 
   if (isSeriesUpdate) {
     const seriesRows = action.repeatGroupId
-      ? await query("select id from actions where user_id = $1 and repeat_group_id = $2", [userId, action.repeatGroupId])
-      : await query("select id from actions where user_id = $1 and id = $2", [userId, action.id]);
+      ? await query(
+        `
+          select id, start_at, end_at
+          from actions
+          where user_id = $1
+            and repeat_group_id = $2
+          order by start_at asc
+        `,
+        [userId, action.repeatGroupId]
+      )
+      : await query("select id, start_at, end_at from actions where user_id = $1 and id = $2", [userId, action.id]);
     const existingIds = seriesRows.rows.map((row) => String(row.id || "").trim()).filter(Boolean);
+
+    if (action.repeatGroupId && sameRepeatDefinition) {
+      const referenceStart = occurrences[0]?.startAt || parseDate(action.startAt, "Horario inicial");
+      const referenceEnd = occurrences[0]?.endAt || parseDate(action.endAt, "Horario final");
+      const nextOccurrences = seriesRows.rows.map((row) => {
+        const rowStart = parseDate(row.start_at, "Horario inicial");
+        const rowEnd = parseDate(row.end_at, "Horario final");
+        const nextStart = new Date(rowStart);
+        nextStart.setHours(referenceStart.getHours(), referenceStart.getMinutes(), 0, 0);
+        const nextEnd = new Date(rowEnd);
+        nextEnd.setHours(referenceEnd.getHours(), referenceEnd.getMinutes(), 0, 0);
+        if (nextEnd <= nextStart) {
+          nextEnd.setDate(nextEnd.getDate() + 1);
+        }
+        return {
+          id: String(row.id || "").trim(),
+          startAt: nextStart,
+          endAt: nextEnd
+        };
+      });
+      await assertActionOverlaps(
+        userId,
+        assignee,
+        nextOccurrences.map((item) => ({ startAt: item.startAt, endAt: item.endAt })),
+        existingIds
+      );
+      for (const item of nextOccurrences) {
+        await query(
+          `
+            update actions
+               set title = $3,
+                   assignee = $4,
+                   category_id = $5,
+                   start_at = $6::timestamptz,
+                   end_at = $7::timestamptz,
+                   repeat_rule = $8,
+                   repeat_days = $9::jsonb
+             where user_id = $1
+               and id = $2
+          `,
+          [
+            userId,
+            item.id,
+            title,
+            assignee,
+            categoryId,
+            item.startAt.toISOString(),
+            item.endAt.toISOString(),
+            repeatRule,
+            JSON.stringify(repeatDays)
+          ]
+        );
+      }
+      return getUserActionById(userId, action.id);
+    }
+
     await assertActionOverlaps(userId, assignee, occurrences, existingIds);
     if (existingIds.length) {
       await query("delete from action_status_overrides where user_id = $1 and action_id = any($2::uuid[])", [userId, existingIds]);
