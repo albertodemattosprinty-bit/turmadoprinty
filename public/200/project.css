@@ -452,6 +452,11 @@ body.start-decision-open .home-running-btn {
   display: grid;
 }
 
+#project200LoginOverlay {
+  padding: 0;
+  background: #000;
+}
+
 .project-login-card {
   width: min(430px, 94vw);
   border-radius: 20px;
@@ -464,37 +469,59 @@ body.start-decision-open .home-running-btn {
   justify-items: stretch;
 }
 
+#project200LoginOverlay .project-login-card {
+  width: 100vw;
+  min-height: 100dvh;
+  border-radius: 0;
+  border: 0;
+  background: #000;
+  padding: 32px 24px;
+}
+
 .project-login-logo {
   width: min(280px, 74vw);
   display: block;
   margin: 0 auto 10px;
 }
 
-.project-login-card h2 { margin: 0 0 6px; }
-.project-login-card p { margin: 0 0 12px; color: rgba(255,255,255,0.9); }
+#project200LoginOverlay .project-login-logo {
+  margin: 0 auto 20px;
+}
+
 .project-login-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin: 8px 0 14px;
 }
+
+#project200LoginOverlay .project-login-tabs {
+  margin: 0 0 18px;
+  width: min(460px, 100%);
+  justify-self: center;
+}
 .project-login-tab {
   width: 100%;
   margin-top: 0;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.86);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #071327;
+  color: rgba(255, 255, 255, 0.92);
   font-weight: 800;
-  padding: 12px 14px;
+  padding: 15px 16px;
 }
 .project-login-tab.active {
-  background: linear-gradient(135deg, #1aa7ff, #ff9b1f);
-  color: #081630;
+  background: linear-gradient(135deg, #0f8fff, #ff8a1e);
+  color: #03101f;
   border-color: transparent;
 }
 .project-login-panel {
   display: none;
+}
+
+#project200LoginOverlay .project-login-panel {
+  width: min(460px, 100%);
+  justify-self: center;
 }
 .project-login-panel.active {
   display: block;
@@ -502,14 +529,30 @@ body.start-decision-open .home-running-btn {
 .project-login-card label { display: block; margin: 10px 0 6px; font-weight: 700; }
 .project-login-card input {
   width: 100%;
-  border: 1px solid rgba(255,255,255,0.35);
-  border-radius: 12px;
-  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  background: #050505;
   color: #fff;
-  padding: 11px 12px;
+  padding: 14px 15px;
 }
-.project-login-card button { width: 100%; margin-top: 14px; }
-.project-login-message { min-height: 22px; font-weight: 700; }
+.project-login-card button { width: 100%; margin-top: 16px; }
+.project-login-card .primary-btn {
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f8fff, #ff8a1e);
+  color: #03101f;
+  font-weight: 800;
+  padding: 15px 16px;
+}
+.project-login-message {
+  min-height: 22px;
+  font-weight: 700;
+}
+
+#project200LoginOverlay .project-login-message {
+  width: min(460px, 100%);
+  justify-self: center;
+}
 .profile-manage-section {
   display: grid;
   gap: 8px;
