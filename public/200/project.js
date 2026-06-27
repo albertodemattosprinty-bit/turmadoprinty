@@ -6745,7 +6745,8 @@ async function openStatsMissionCreateFlow() {
       body: JSON.stringify({
         profile: getSelectedProfileName(),
         title,
-        targetCount: parseMissionTargetCount(targetRaw, 6)
+        targetCount: parseMissionTargetCount(targetRaw, 6),
+        date: getProjectTodayDateKey()
       })
     });
     state.statsMissions = Array.isArray(payload?.missions) ? payload.missions : [];

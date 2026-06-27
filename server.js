@@ -62,7 +62,7 @@ import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProj
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { appendProject200ChatMessages, createProject200Chat, getProject200Chat, markProject200ChatRead, saveProject200ChatNotificationPermission } from "./src/project200-chats.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createProject200DailyMission, deleteProject200DailyMission, ensureProject200MissionsSchema, listProject200DailyMissions, summarizeProject200DailyMissions, updateProject200DailyMissionProgress } from "./src/project200-missions.js";
+import { createProject200DailyMission, deleteProject200DailyMission, ensureProject200MissionsSchema, listProject200DailyMissions, summarizeProject200DailyMissions, summarizeProject200MissionItems, updateProject200DailyMissionProgress } from "./src/project200-missions.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -3353,10 +3353,8 @@ async function handleProject200MissionsListRequest(request, response) {
     const requestUrl = new URL(request.url || "/api/200/missions", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
     const missionDate = String(requestUrl.searchParams.get("date") || "").trim() || undefined;
-    const [missions, summary] = await Promise.all([
-      listProject200DailyMissions(user.id, selectedProfile, missionDate),
-      summarizeProject200DailyMissions(user.id, selectedProfile, missionDate)
-    ]);
+    const missions = await listProject200DailyMissions(user.id, selectedProfile, missionDate);
+    const summary = summarizeProject200MissionItems(missions);
     sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
   } catch (error) {
     sendJson(response, 400, {
@@ -3382,7 +3380,7 @@ async function handleProject200MissionCreateRequest(request, response) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const missions = await createProject200DailyMission(user.id, selectedProfile, body);
-    const summary = await summarizeProject200DailyMissions(user.id, selectedProfile);
+    const summary = summarizeProject200MissionItems(missions);
     sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
   } catch (error) {
     sendJson(response, 400, {
@@ -3401,7 +3399,7 @@ async function handleProject200MissionDeleteRequest(request, response, missionId
     const requestUrl = new URL(request.url || "/api/200/missions", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
     const missions = await deleteProject200DailyMission(user.id, selectedProfile, missionId);
-    const summary = await summarizeProject200DailyMissions(user.id, selectedProfile);
+    const summary = summarizeProject200MissionItems(missions);
     sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
   } catch (error) {
     sendJson(response, 400, {
@@ -3428,7 +3426,7 @@ async function handleProject200MissionProgressRequest(request, response, mission
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const missionDate = String(body?.date || "").trim() || undefined;
     const missions = await updateProject200DailyMissionProgress(user.id, selectedProfile, missionId, body?.delta, missionDate);
-    const summary = await summarizeProject200DailyMissions(user.id, selectedProfile, missionDate);
+    const summary = summarizeProject200MissionItems(missions);
     sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
   } catch (error) {
     sendJson(response, 400, {

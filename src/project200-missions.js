@@ -26,6 +26,10 @@ function normalizeMissionProfile(value) {
 }
 
 function toDateKey(value = new Date()) {
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
   const date = value instanceof Date ? value : new Date(value);
   const target = Number.isNaN(date.getTime()) ? new Date() : date;
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -58,6 +62,16 @@ function normalizeMissionRow(row) {
     sortOrder: Number(row.sort_order || 0),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null
+  };
+}
+
+function summarizeMissionItems(missions = []) {
+  const completed = missions.filter((item) => item.progressCount >= item.targetCount);
+  return {
+    total: missions.length,
+    completed: completed.length,
+    pending: Math.max(0, missions.length - completed.length),
+    lines: missions.slice(0, 8).map((item) => `${item.title}: ${item.progressCount}/${item.targetCount} (${item.percent}%)`)
   };
 }
 
@@ -100,6 +114,7 @@ async function seedDefaultDailyMissions(userId, profileName = PROJECT200_DEFAULT
       from project200_daily_mission_templates
       where user_id = $1
         and assigned_profile = $2
+        and deleted_at is null
     `,
     [userId, normalizedProfile]
   );
@@ -120,8 +135,80 @@ async function seedDefaultDailyMissions(userId, profileName = PROJECT200_DEFAULT
   }
 }
 
+async function dedupeProject200DailyMissions(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
+  const normalizedProfile = normalizeMissionProfile(profileName);
+  const result = await query(
+    `
+      select id, title, target_count, created_at, sort_order
+      from project200_daily_mission_templates
+      where user_id = $1
+        and assigned_profile = $2
+        and deleted_at is null
+      order by sort_order asc, created_at asc, id asc
+    `,
+    [userId, normalizedProfile]
+  );
+
+  const groups = new Map();
+  for (const row of result.rows) {
+    const key = normalizeMissionTitle(row.title).toLocaleLowerCase("pt-BR");
+    const list = groups.get(key) || [];
+    list.push(row);
+    groups.set(key, list);
+  }
+
+  for (const entries of groups.values()) {
+    if (entries.length <= 1) {
+      continue;
+    }
+    const keeper = entries[0];
+    const targetCount = Math.max(1, Math.trunc(Number(keeper.target_count || 0) || 1));
+    for (const duplicate of entries.slice(1)) {
+      const progressRows = await query(
+        `
+          select progress_date, progress_count
+          from project200_daily_mission_progress
+          where template_id = $1
+          order by progress_date asc
+        `,
+        [duplicate.id]
+      );
+      for (const progressRow of progressRows.rows) {
+        const progressDate = toDateKey(progressRow.progress_date);
+        const progressCount = Math.max(0, Math.trunc(Number(progressRow.progress_count || 0) || 0));
+        if (!progressCount) {
+          continue;
+        }
+        await query(
+          `
+            insert into project200_daily_mission_progress (
+              id, template_id, progress_date, progress_count, created_at, updated_at
+            )
+            values ($1, $2, $3::date, $4, now(), now())
+            on conflict (template_id, progress_date) do update
+              set progress_count = greatest(0, least($5, project200_daily_mission_progress.progress_count + excluded.progress_count)),
+                  updated_at = now()
+          `,
+          [crypto.randomUUID(), keeper.id, progressDate, progressCount, targetCount]
+        );
+      }
+      await query(`delete from project200_daily_mission_progress where template_id = $1`, [duplicate.id]);
+      await query(
+        `
+          update project200_daily_mission_templates
+          set deleted_at = now(),
+              updated_at = now()
+          where id = $1
+        `,
+        [duplicate.id]
+      );
+    }
+  }
+}
+
 export async function listProject200DailyMissions(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, date = new Date()) {
   await seedDefaultDailyMissions(userId, profileName);
+  await dedupeProject200DailyMissions(userId, profileName);
   const normalizedProfile = normalizeMissionProfile(profileName);
   const dateKey = toDateKey(date);
   const result = await query(
@@ -156,6 +243,7 @@ export async function createProject200DailyMission(userId, profileName = PROJECT
   const normalizedProfile = normalizeMissionProfile(profileName);
   const title = normalizeMissionTitle(payload?.title);
   const targetCount = Math.max(1, Math.trunc(Number(payload?.targetCount) || 1));
+  const dateKey = toDateKey(payload?.date);
   if (!title) {
     throw new Error("Informe o nome da missão.");
   }
@@ -165,10 +253,12 @@ export async function createProject200DailyMission(userId, profileName = PROJECT
       from project200_daily_mission_templates
       where user_id = $1
         and assigned_profile = $2
+        and deleted_at is null
     `,
     [userId, normalizedProfile]
   );
   const nextSort = Number(sortResult.rows[0]?.next_sort || 0);
+  const templateId = crypto.randomUUID();
   await query(
     `
       insert into project200_daily_mission_templates (
@@ -176,9 +266,19 @@ export async function createProject200DailyMission(userId, profileName = PROJECT
       )
       values ($1, $2, $3, $4, $5, $6, false, now(), now())
     `,
-    [crypto.randomUUID(), userId, normalizedProfile, title, targetCount, nextSort]
+    [templateId, userId, normalizedProfile, title, targetCount, nextSort]
   );
-  const items = await listProject200DailyMissions(userId, normalizedProfile);
+  await query(
+    `
+      insert into project200_daily_mission_progress (
+        id, template_id, progress_date, progress_count, created_at, updated_at
+      )
+      values ($1, $2, $3::date, 0, now(), now())
+      on conflict (template_id, progress_date) do nothing
+    `,
+    [crypto.randomUUID(), templateId, dateKey]
+  );
+  const items = await listProject200DailyMissions(userId, normalizedProfile, dateKey);
   return items;
 }
 
@@ -250,11 +350,9 @@ export async function updateProject200DailyMissionProgress(userId, profileName =
 
 export async function summarizeProject200DailyMissions(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, date = new Date()) {
   const missions = await listProject200DailyMissions(userId, profileName, date);
-  const completed = missions.filter((item) => item.progressCount >= item.targetCount);
-  return {
-    total: missions.length,
-    completed: completed.length,
-    pending: Math.max(0, missions.length - completed.length),
-    lines: missions.slice(0, 8).map((item) => `${item.title}: ${item.progressCount}/${item.targetCount} (${item.percent}%)`)
-  };
+  return summarizeMissionItems(missions);
+}
+
+export function summarizeProject200MissionItems(missions = []) {
+  return summarizeMissionItems(missions);
 }
