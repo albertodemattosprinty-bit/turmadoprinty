@@ -38,7 +38,7 @@ function toDateKey(value = new Date()) {
 function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
   const targetValue = Math.max(1, Math.trunc(Number(row.target_value || 0) || 1));
   const rawProgress = Math.max(0, Math.trunc(Number(row.progress_value || 0) || 0));
-  const progressValue = String(row.progress_date || "") === dateKey ? rawProgress : 0;
+  const progressValue = toDateKey(row.progress_date) === dateKey ? rawProgress : 0;
   return {
     id: row.id,
     userId: row.user_id,
@@ -156,7 +156,7 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   if (!current) {
     throw new Error("Missao nao encontrada.");
   }
-  const currentProgress = String(current.progress_date || "") === dateKey
+  const currentProgress = toDateKey(current.progress_date) === dateKey
     ? Math.max(0, Math.trunc(Number(current.progress_value || 0) || 0))
     : 0;
   const nextProgress = Math.max(0, currentProgress + safeDelta);
