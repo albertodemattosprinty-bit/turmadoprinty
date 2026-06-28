@@ -105,6 +105,13 @@ body[data-background-theme="light"] .app-background-video {
   flex-direction: column;
   gap: 10px;
   padding: 4px 6px 10px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.conversations-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .conversation-bubble {
@@ -148,7 +155,7 @@ body[data-background-theme="light"] .app-background-video {
   justify-content: flex-end;
   position: sticky;
   bottom: 0;
-  padding: 4px 4px 10px;
+  padding: 4px 4px 35px;
   pointer-events: none;
 }
 
@@ -1203,10 +1210,20 @@ body.screen-locked .project-login-overlay.active {
 }
 
 .running-task-list-btn,
+.running-task-home-btn,
+.running-task-quick-btn,
 .running-task-restore-btn,
 .running-task-giveup-btn,
 .running-task-music-btn {
   transform: scale(0.9);
+}
+
+.running-task-home-btn {
+  background: linear-gradient(145deg, #6fd1ff, #2b8dff);
+}
+
+.running-task-quick-btn {
+  background: linear-gradient(145deg, #1b2a55, #0c1328);
 }
 
 .running-task-restore-btn {
@@ -1311,10 +1328,6 @@ body.screen-locked .project-login-overlay.active {
   cursor: pointer;
 }
 
-#runningTaskModal .running-task-content.is-idle-layout .running-task-actions {
-  display: none;
-}
-
 #runningTaskModal .running-task-content.is-idle-layout .running-task-start-btn {
   align-self: center;
   margin-top: 4px;
@@ -1322,6 +1335,19 @@ body.screen-locked .project-login-overlay.active {
 
 #runningTaskModal .running-task-content.is-idle-layout .running-player {
   margin-top: 0;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-actions {
+  display: flex;
+}
+
+.running-quick-task-content {
+  width: min(460px, calc(100% - 28px));
+  gap: 14px;
+}
+
+.quick-task-input {
+  width: 100%;
 }
 
 body.running-music-list-open #runningTaskModal .running-task-content {

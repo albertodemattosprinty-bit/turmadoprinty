@@ -53,7 +53,7 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getProject200ChatPromptSettings, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveProject200ChatPromptSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { createUserAction, deleteUserAction, ensureActionsSchema, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
+import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
@@ -4003,13 +4003,13 @@ function buildProject200ToneInstructions(toneKey, ownWeekProgress) {
   if (normalizedToneKey === "motivator") {
     return `${baseInstruction} No estilo motivador, reconheca qualquer progresso real, mas deixe claro quando a agenda ainda esta curta e proponha subir o volume com firmeza positiva.`;
   }
-  if (normalizedToneKey === "demanding") {
+  if (normalizedToneKey === "strict") {
     if (plannedMinutes10d < 1000 || completionPercent < 50) {
       return `${baseInstruction} No estilo exigente, seja duro e incisivo. Se estiver muito abaixo da media ou com disciplina baixa, exponha sem enfeite que a agenda esta fraca e que ele precisa reagir agora.`;
     }
     return `${baseInstruction} No estilo exigente, seja firme, direto e cobrador. Se estiver abaixo de 4000, trate como agenda insuficiente e pressione por mais compromisso.`;
   }
-  if (normalizedToneKey === "relaxed") {
+  if (normalizedToneKey === "playful") {
     return `${baseInstruction} No estilo descontraido, mantenha leveza e humor, mas ainda lembre com clareza quando a agenda dos proximos 10 dias estiver fraca.`;
   }
   if (normalizedToneKey === "street") {
@@ -4229,7 +4229,8 @@ async function buildProject200ChatContext(user, profileName) {
 async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileName }) {
   const recentMessages = Array.isArray(chat?.messages) ? chat.messages.slice(-16) : [];
   const memory = recentMessages
-    .map((item) => `${item.role === "assistant" ? "IA" : "Usuario"}: ${clipProject200Text(item.content, 180)}`)
+    .filter((item) => item.role === "user")
+    .map((item) => `Usuario: ${clipProject200Text(item.content, 180)}`)
     .join(" | ");
   const { ownWeekProgress, contextText } = await buildProject200ChatContext(user, profileName);
   const globalPromptSettings = await getProject200ChatPromptSettings();
@@ -4246,6 +4247,7 @@ async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileNam
     "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
     "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
     "Cada nova resposta deve tratar o Contexto vivo do /200 como uma consulta fresca do backend. Se a memoria recente da conversa conflitar com o contexto vivo, o contexto vivo vence.",
+    "Use a memoria recente apenas para entender o assunto e a forma de responder. Nunca use a memoria recente para afirmar status, atraso, conclusao ou inexistencia de tarefas; esses fatos devem vir somente do Contexto vivo do /200.",
     buildProject200ToneInstructions(tonePromptKey, ownWeekProgress),
     globalPrompt ? `Use exatamente este prompt global do estilo selecionado, escrito pela RoseMattos: ${globalPrompt}` : "",
     `Memoria recente da conversa: ${memory || "vazia"}.`,
@@ -11723,6 +11725,26 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/actions/quick-start") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const action = await createQuickUserAction(user.id, body);
+
+      sendJson(response, 201, { ok: true, action });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel iniciar a tarefa rapida."
+      });
+    }
+    return;
+  }
+
   if (request.method === "DELETE" && pathname.match(/^\/api\/actions\/[^/]+$/)) {
     try {
       const user = await requireAuth(request, response);
@@ -11812,6 +11834,30 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel atualizar manualmente a tarefa."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/actions\/[^/]+\/quick-extend$/)) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)\/quick-extend$/, "$1"));
+      const body = await readJsonBody(request);
+      const action = await extendQuickUserAction(user.id, actionId, body);
+
+      sendJson(response, 200, {
+        ok: true,
+        action
+      });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel estender a tarefa rapida."
       });
     }
     return;

@@ -353,6 +353,10 @@ const conversationsPromptToneLabel = document.getElementById("conversationsPromp
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
 const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
+const quickTaskTitleInput = document.getElementById("quickTaskTitleInput");
+const quickTaskMinutesInput = document.getElementById("quickTaskMinutesInput");
+const quickTaskStartButton = document.getElementById("quickTaskStartButton");
+const quickTaskStatus = document.getElementById("quickTaskStatus");
 const runningTaskContent = runningTaskModalElement?.querySelector(".running-task-content");
 const runningTaskName = document.getElementById("runningTaskName");
 const runningTaskCategoryIcon = document.getElementById("runningTaskCategoryIcon");
@@ -367,6 +371,8 @@ const runningTaskNextLabel = runningTaskModalElement?.querySelector(".running-ta
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskNextTime = document.getElementById("runningTaskNextTime");
 const runningNextPanel = document.getElementById("runningNextPanel");
+const runningTaskHomeButton = document.getElementById("runningTaskHomeButton");
+const runningTaskQuickButton = document.getElementById("runningTaskQuickButton");
 const runningTaskListButton = document.getElementById("runningTaskListButton");
 const runningTaskFinalizeButton = document.getElementById("runningTaskFinalizeButton");
 const runningTaskRestoreButton = document.getElementById("runningTaskRestoreButton");
@@ -537,6 +543,7 @@ let conversationsAudioAnalyser = null;
 let conversationsSpeechMonitorTimer = null;
 let conversationsLastSpeechAt = 0;
 let conversationsTypingTimer = null;
+let conversationsIsRecording = false;
 let conversationsPromptToneKey = "neutral";
 let financeEntryConfirmResolve = null;
 let actionMediaRecorder = null;
@@ -548,6 +555,7 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
+let quickTaskExtendPending = false;
 let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
@@ -1092,6 +1100,10 @@ function getServerNowMs() {
 function getRunningActionForSelectedProfile() {
   const list = getVisibleActions();
   return list.find((action) => normalizeActionStatus(action?.status) === actionStatuses.inProgress) || null;
+}
+
+function isQuickTaskAction(action) {
+  return String(action?.categoryId || "").trim().toLowerCase() === "quick_task";
 }
 
 function buildActionTimelineEntries() {
@@ -1988,7 +2000,9 @@ function renderHomeRunningTask() {
       nextPending ? formatActionTitleForDisplay(nextPending.title) : "Descanso",
       nextPending ? getActionDurationMinutes(nextPending) : getSleepDurationMinutesForDay()
     );
-    if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
+    if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = false;
+    if (runningTaskHomeButton) runningTaskHomeButton.hidden = false;
+    if (runningTaskQuickButton) runningTaskQuickButton.hidden = false;
     if (runningTaskListButton) runningTaskListButton.hidden = true;
     if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
@@ -2042,6 +2056,8 @@ function renderHomeRunningTask() {
     setRunningNextDisplay("Descanso", getSleepDurationMinutesForDay());
   }
   if (runningTaskListButton) runningTaskListButton.hidden = false;
+  if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
+  if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
   if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
   if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = false;
   if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = false;
@@ -2049,6 +2065,36 @@ function renderHomeRunningTask() {
     runningTaskStartNextButton.hidden = true;
   }
   renderRunningMusicPlayer();
+}
+
+async function ensureQuickTaskWindowProgress() {
+  if (quickTaskExtendPending) {
+    return;
+  }
+  const runningAction = getRunningActionForSelectedProfile();
+  if (!isQuickTaskAction(runningAction)) {
+    return;
+  }
+  const endAtMs = new Date(runningAction?.endAt || "").getTime();
+  if (!Number.isFinite(endAtMs) || getServerNowMs() <= endAtMs) {
+    return;
+  }
+  quickTaskExtendPending = true;
+  try {
+    const payload = await apiRequest(`/api/actions/${encodeURIComponent(runningAction.id)}/quick-extend`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endAt: new Date(getServerNowMs()).toISOString() })
+    });
+    const updated = payload?.action || null;
+    if (updated?.id) {
+      state.actions = state.actions.map((item) => item.id === updated.id ? updated : item);
+      renderActions();
+    }
+  } catch {
+  } finally {
+    quickTaskExtendPending = false;
+  }
 }
 
 async function loadRunningMusicStations() {
@@ -3004,6 +3050,7 @@ function startRunningTaskTicker() {
   }
   runningTaskTicker = window.setTimeout(function tickRunningTask() {
     renderHomeRunningTask();
+    void ensureQuickTaskWindowProgress();
     runningTaskTicker = window.setTimeout(tickRunningTask, 250);
   }, 250);
 }
@@ -6967,6 +7014,18 @@ function typeConversationAssistantReply(text) {
   conversationsMessages.scrollTop = conversationsMessages.scrollHeight;
 }
 
+function updateConversationMicButtonVisual() {
+  if (!conversationsMicButton) {
+    return;
+  }
+  conversationsMicButton.classList.toggle("mic-active", conversationsIsRecording);
+  conversationsMicButton.classList.toggle("mic-idle", !conversationsIsRecording);
+  conversationsMicButton.setAttribute("aria-label", conversationsIsRecording ? "Enviar gravação" : "Falar com o chat");
+  conversationsMicButton.innerHTML = conversationsIsRecording
+    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z" fill="currentColor"/></svg>'
+    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m6-4a1 1 0 0 1 2 0 8 8 0 0 1-7 7.94V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.06A8 8 0 0 1 4 11a1 1 0 1 1 2 0 6 6 0 0 0 12 0"/></svg>';
+}
+
 async function loadConversationChat() {
   if (!getToken()) {
     state.conversationChat = { messages: [] };
@@ -7103,14 +7162,14 @@ function stopConversationMic() {
     conversationsMediaStream.getTracks().forEach((track) => track.stop());
     conversationsMediaStream = null;
   }
-  conversationsMicButton?.classList.remove("mic-active");
-  conversationsMicButton?.classList.add("mic-idle");
+  conversationsIsRecording = false;
+  updateConversationMicButtonVisual();
 }
 
 async function startConversationMic() {
   if (conversationsMediaRecorder && conversationsMediaRecorder.state !== "inactive") {
     if (conversationsStatus) {
-      conversationsStatus.textContent = "Encerrando gravação...";
+      conversationsStatus.textContent = "Enviando gravação...";
     }
     stopConversationMic();
     return;
@@ -7162,8 +7221,8 @@ async function startConversationMic() {
       }
     };
     conversationsMediaRecorder.start();
-    conversationsMicButton?.classList.remove("mic-idle");
-    conversationsMicButton?.classList.add("mic-active");
+    conversationsIsRecording = true;
+    updateConversationMicButtonVisual();
     if (conversationsStatus) {
       conversationsStatus.textContent = "Microfone ouvindo...";
     }
@@ -7195,6 +7254,62 @@ async function startConversationMic() {
       conversationsStatus.textContent = error instanceof Error ? error.message : "Falha ao abrir microfone.";
     }
     stopConversationMic();
+  }
+}
+
+function openQuickTaskModal() {
+  if (quickTaskTitleInput) {
+    quickTaskTitleInput.value = "";
+  }
+  if (quickTaskMinutesInput) {
+    quickTaskMinutesInput.value = "15";
+  }
+  if (quickTaskStatus) {
+    quickTaskStatus.textContent = "";
+  }
+  openModal("quickTaskModal");
+  window.setTimeout(() => quickTaskTitleInput?.focus(), 60);
+}
+
+async function submitQuickTaskStart(conflictMode = "") {
+  const title = String(quickTaskTitleInput?.value || "").trim();
+  const plannedMinutes = Math.max(1, Math.round(Number(quickTaskMinutesInput?.value || 15) || 15));
+  if (!title) {
+    if (quickTaskStatus) {
+      quickTaskStatus.textContent = "Digite o nome da tarefa.";
+    }
+    return;
+  }
+  if (quickTaskStatus) {
+    quickTaskStatus.textContent = "Iniciando tarefa rápida...";
+  }
+  if (quickTaskStartButton) {
+    quickTaskStartButton.disabled = true;
+  }
+  try {
+    const payload = await apiRequest("/api/actions/quick-start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        plannedMinutes,
+        assignee: getSelectedProfileName(),
+        conflictMode
+      })
+    });
+    closeModal("quickTaskModal");
+    await loadActions();
+    if (payload?.action?.id) {
+      openModal("runningTaskModal");
+    }
+  } catch (error) {
+    if (quickTaskStatus) {
+      quickTaskStatus.textContent = error instanceof Error ? error.message : "Falha ao iniciar a tarefa rápida.";
+    }
+  } finally {
+    if (quickTaskStartButton) {
+      quickTaskStartButton.disabled = false;
+    }
   }
 }
 
@@ -8856,6 +8971,21 @@ document.querySelectorAll("[data-ai-time-nav]").forEach((button) => {
 });
 
 async function performRunningFinalize(runningAction) {
+  if (isQuickTaskAction(runningAction)) {
+    try {
+      const extendPayload = await apiRequest(`/api/actions/${encodeURIComponent(runningAction.id)}/quick-extend`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endAt: new Date(getServerNowMs()).toISOString() })
+      });
+      const extended = extendPayload?.action || null;
+      if (extended?.id) {
+        state.actions = state.actions.map((item) => item.id === extended.id ? extended : item);
+        runningAction = extended;
+      }
+    } catch {
+    }
+  }
   const beforeSummary = getCompletionSummaryForSelectedProfile();
   const duration = getActionDurationMinutes(runningAction);
   const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
@@ -8935,6 +9065,12 @@ runningTaskRestoreButton?.addEventListener("click", () => {
 runningTaskListButton?.addEventListener("click", () => {
   closeRunningTaskModalWithFade();
   window.setTimeout(() => openModal("actionsModal"), 500);
+});
+runningTaskHomeButton?.addEventListener("click", () => {
+  closeRunningTaskModalWithFade();
+});
+runningTaskQuickButton?.addEventListener("click", () => {
+  openQuickTaskModal();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
 runningPlayerList?.addEventListener("click", () => {
@@ -9068,6 +9204,32 @@ document.addEventListener("keydown", () => {
 }, true);
 conversationsMicButton?.addEventListener("click", () => {
   void startConversationMic();
+});
+quickTaskStartButton?.addEventListener("click", () => {
+  void (async () => {
+    const runningAction = getRunningActionForSelectedProfile();
+    if (!runningAction) {
+      await submitQuickTaskStart();
+      return;
+    }
+    if (startConflictCurrentTitle) {
+      startConflictCurrentTitle.textContent = formatActionTitleForDisplay(runningAction.title);
+    }
+    if (startConflictNextTitle) {
+      startConflictNextTitle.textContent = `Iniciar ${String(quickTaskTitleInput?.value || "Tarefa Rápida").trim() || "Tarefa Rápida"}`;
+    }
+    if (startConflictModal) {
+      startConflictModal.classList.add("active");
+      startConflictModal.setAttribute("aria-hidden", "false");
+    }
+    const choice = await new Promise((resolve) => {
+      state.startConflict.resolve = resolve;
+    });
+    if (!choice || choice === "cancel") {
+      return;
+    }
+    await submitQuickTaskStart(choice === "finalize_and_start" ? "finalize" : "abort");
+  })();
 });
 conversationsToneChip?.addEventListener("click", () => {
   openModal("optionsModal");
@@ -9247,6 +9409,7 @@ if (runningAudio) {
 handleSwipe(runningPlayerTrack, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
 handleSwipe(runningTaskModalElement, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
 
+updateConversationMicButtonVisual();
 document.body.classList.add("project-no-select");
 const isEditableTarget = (target) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
 document.addEventListener("copy", (event) => {

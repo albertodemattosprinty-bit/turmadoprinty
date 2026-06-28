@@ -9,6 +9,7 @@ const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
 const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
 const DEFAULT_CATEGORY_ID = "";
+const QUICK_TASK_CATEGORY_ID = "quick_task";
 
 function toIso(value) {
   if (!value) {
@@ -93,6 +94,28 @@ function normalizeAction(row) {
     createdAt: toIso(row.created_at),
     lateStartMinutes
   };
+}
+
+function getActionDurationMinutesFromRange(startAt, endAt) {
+  const startMs = startAt instanceof Date ? startAt.getTime() : new Date(startAt).getTime();
+  const endMs = endAt instanceof Date ? endAt.getTime() : new Date(endAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    return 0;
+  }
+  return Math.max(0, Math.round((endMs - startMs) / 60000));
+}
+
+function ceilDateToNextMinute(value) {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Data invalida.");
+  }
+  const next = new Date(date);
+  if (next.getSeconds() > 0 || next.getMilliseconds() > 0) {
+    next.setMinutes(next.getMinutes() + 1);
+  }
+  next.setSeconds(0, 0);
+  return next;
 }
 
 function parseDate(value, label) {
@@ -270,6 +293,155 @@ async function getUserActionById(userId, actionId) {
   );
 
   return result.rows[0] ? normalizeAction(result.rows[0]) : null;
+}
+
+async function setActionCompletedAt(userId, action, completedAt) {
+  const completedIso = completedAt instanceof Date ? completedAt.toISOString() : new Date(completedAt).toISOString();
+  const startedIso = action?.startedAt || action?.startAt || completedIso;
+  await query(
+    `
+      insert into action_status_overrides (
+        user_id,
+        action_id,
+        repeat_group_id,
+        status,
+        started_at,
+        completed_at
+      )
+      values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+      on conflict (user_id, action_id) do update
+        set status = excluded.status,
+            started_at = excluded.started_at,
+            completed_at = excluded.completed_at,
+            updated_at = now()
+    `,
+    [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedIso, completedIso]
+  );
+  await upsertProject200RuntimeState(userId, {
+    actionId: action.id,
+    actionTitle: action.title,
+    eventType: "complete",
+    startedAt: startedIso,
+    occurredAt: completedIso
+  });
+}
+
+async function cloneActionOccurrence(userId, action, startAt, endAt) {
+  if (!action?.id) {
+    return;
+  }
+  await query(
+    `
+      insert into actions (
+        user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url,
+        assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::timestamptz, $11, $12, $13::jsonb)
+    `,
+    [
+      userId,
+      action.title,
+      action.musicDefaultMode || "track",
+      action.musicStationName || null,
+      action.musicTrackName || null,
+      action.musicTrackUrl || null,
+      action.assignee,
+      action.categoryId || "",
+      startAt.toISOString(),
+      endAt.toISOString(),
+      action.repeatGroupId || null,
+      action.repeatRule || "none",
+      JSON.stringify(Array.isArray(action.repeatDays) ? action.repeatDays : [])
+    ]
+  );
+}
+
+async function resizeActionWindow(userId, action, startAt, endAt) {
+  await query(
+    `
+      update actions
+         set start_at = $3::timestamptz,
+             end_at = $4::timestamptz
+       where user_id = $1
+         and id = $2
+    `,
+    [userId, action.id, startAt.toISOString(), endAt.toISOString()]
+  );
+}
+
+async function deleteActionOccurrence(userId, actionId) {
+  await query("delete from action_status_overrides where user_id = $1 and action_id = $2", [userId, actionId]);
+  await query("delete from actions where user_id = $1 and id = $2", [userId, actionId]);
+}
+
+async function reshapeActionsForQuickTask(userId, assignee, rangeStartAt, rangeEndAt, excludeActionId = "") {
+  const result = await query(
+    `
+      select
+        a.id,
+        a.user_id,
+        a.title,
+        a.music_default_mode,
+        a.music_station_name,
+        a.music_track_name,
+        a.music_track_url,
+        a.assignee,
+        a.category_id,
+        a.start_at,
+        a.end_at,
+        a.repeat_group_id,
+        a.repeat_rule,
+        a.repeat_days,
+        a.created_at,
+        o.status as status_override,
+        o.started_at as status_started_at,
+        o.completed_at as status_completed_at,
+        o.updated_at as status_updated_at
+      from actions a
+      left join action_status_overrides o
+        on o.user_id = a.user_id
+       and o.action_id = a.id
+      where a.user_id = $1
+        and a.assignee = $2
+        and a.start_at < $4
+        and a.end_at > $3
+        and ($5 = '' or a.id <> $5::uuid)
+      order by a.start_at asc, a.created_at asc
+    `,
+    [userId, assignee, rangeStartAt.toISOString(), rangeEndAt.toISOString(), String(excludeActionId || "").trim()]
+  );
+
+  for (const row of result.rows) {
+    const action = normalizeAction(row);
+    const actionStartAt = parseDate(action.startAt, "Horario inicial");
+    const actionEndAt = parseDate(action.endAt, "Horario final");
+    const overlapStartsBefore = actionStartAt.getTime() < rangeStartAt.getTime();
+    const overlapEndsAfter = actionEndAt.getTime() > rangeEndAt.getTime();
+
+    if (overlapStartsBefore && overlapEndsAfter) {
+      await cloneActionOccurrence(userId, action, rangeEndAt, actionEndAt);
+      await resizeActionWindow(userId, action, actionStartAt, rangeStartAt);
+      if (normalizeActionStatus(action.status) === ACTION_STATUS_IN_PROGRESS) {
+        await setActionCompletedAt(userId, action, rangeStartAt);
+      }
+      continue;
+    }
+
+    if (overlapStartsBefore) {
+      await resizeActionWindow(userId, action, actionStartAt, rangeStartAt);
+      if (normalizeActionStatus(action.status) === ACTION_STATUS_IN_PROGRESS) {
+        await setActionCompletedAt(userId, action, rangeStartAt);
+      }
+      continue;
+    }
+
+    if (overlapEndsAfter) {
+      await resizeActionWindow(userId, action, rangeEndAt, actionEndAt);
+      continue;
+    }
+
+    await deleteActionOccurrence(userId, action.id);
+  }
 }
 
 export async function listUserActions(userId, { from, to }) {
@@ -828,6 +1000,54 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
   }
 
   throw new Error("Modo manual invalido.");
+}
+
+export async function createQuickUserAction(userId, payload = {}) {
+  await ensureActionsSchema();
+  const title = String(payload?.title || "").trim();
+  if (title.length < 2) {
+    throw new Error("Titulo da tarefa invalido.");
+  }
+  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
+  const plannedMinutesRaw = Math.max(1, Math.round(Number(payload?.plannedMinutes || 1) || 1));
+  const plannedMinutes = Math.min(24 * 60, plannedMinutesRaw);
+  const startAt = new Date();
+  const endAt = new Date(startAt.getTime() + (plannedMinutes * 60000));
+
+  await reshapeActionsForQuickTask(userId, assignee, startAt, endAt);
+  const created = await createUserAction(userId, {
+    title,
+    assignee,
+    categoryId: QUICK_TASK_CATEGORY_ID,
+    repeatRule: "none",
+    repeatDays: [],
+    startAt: startAt.toISOString(),
+    endAt: endAt.toISOString()
+  });
+  const action = created[0];
+  if (!action?.id) {
+    throw new Error("Nao foi possivel criar a tarefa rapida.");
+  }
+  return updateUserActionStatus(userId, action.id);
+}
+
+export async function extendQuickUserAction(userId, actionId, payload = {}) {
+  await ensureActionsSchema();
+  const action = await getUserActionById(userId, actionId);
+  if (!action) {
+    throw new Error("Tarefa nao encontrada.");
+  }
+  if (String(action.categoryId || "").trim() !== QUICK_TASK_CATEGORY_ID) {
+    return action;
+  }
+  const currentEndAt = parseDate(action.endAt, "Horario final");
+  const desiredEndAt = ceilDateToNextMinute(payload?.endAt || new Date());
+  if (desiredEndAt.getTime() <= currentEndAt.getTime()) {
+    return action;
+  }
+  await reshapeActionsForQuickTask(userId, action.assignee, currentEndAt, desiredEndAt, action.id);
+  await resizeActionWindow(userId, action, parseDate(action.startAt, "Horario inicial"), desiredEndAt);
+  return getUserActionById(userId, action.id);
 }
 
 export async function deleteUserAction(userId, actionId) {
