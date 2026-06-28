@@ -998,74 +998,65 @@
     </div>
   </section>
 
-  <section class="workspace-modal" id="historyModal" aria-hidden="true" aria-label="Histórico">
-    <div class="actions-app history-app">
-      <header class="actions-head">
-        <button class="circle-nav" type="button" data-history-day-nav="-1" aria-label="Dia anterior">
-          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
-        </button>
-        <button class="date-title" type="button" id="historyDateLabel">Hoje</button>
-        <button class="circle-nav" type="button" data-history-day-nav="1" aria-label="Próximo dia">
-          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
-        </button>
-      </header>
-      <div class="history-panels" id="historyTimelineList"></div>
-      <div class="actions-side-actions history-footer-actions">
-        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openHistoryTextComposer" aria-label="Novo texto">
-          <img src="/200/icons/add.svg" alt="" aria-hidden="true" />
-        </button>
-        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar histórico">
+  <section class="workspace-modal" id="historyModal" aria-hidden="true" aria-label="Missões">
+    <div class="actions-app history-app missions-app">
+      <header class="actions-head missions-head">
+        <div class="date-title missions-title-static">Missões</div>
+        <button class="circle-nav" type="button" data-close-modal aria-label="Fechar missões">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
         </button>
-      </div>
-      <section class="action-wizard" id="historyTextComposer" aria-hidden="true">
-        <div class="wizard-panel">
-          <header class="wizard-head">
-            <span id="historyTextStepLabel">1 de 2</span>
-            <button class="wizard-close" type="button" id="closeHistoryTextComposer" aria-label="Fechar">
-              <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
-            </button>
-          </header>
-          <form id="historyTextForm">
-            <section class="wizard-step active" data-history-text-step="1">
-              <label class="step-label">Quem está falando?</label>
-              <div class="history-avatar-grid" id="historyTextAvatarGrid"></div>
-            </section>
-            <section class="wizard-step" data-history-text-step="2">
-              <label class="step-label">Fale com o microfone</label>
-              <div class="history-voice-actions">
-                <button type="button" class="history-icon-btn mic-idle" id="historyMicButton" aria-label="Microfone">
-                  <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 1 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11z"/></svg>
-                </button>
-                <button type="button" class="history-icon-btn" id="historyDeleteWordButton" aria-label="Apagar palavra">
-                  <svg viewBox="0 0 24 24"><path d="M22 3H7L2 12l5 9h15V3zM9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59 17.59 17 14 13.41 10.41 17z"/></svg>
-                </button>
-                <button type="button" class="history-icon-btn history-icon-danger" id="historyClearTextButton" aria-label="Apagar tudo">
-                  <svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h5v2H3V5h5l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h10l-1 11H8L7 9z"/></svg>
-                </button>
-              </div>
-              <div class="history-voice-status" id="historyVoiceStatus">Aguardando gravação...</div>
-              <div class="history-live-text" id="historyLiveText"></div>
-            </section>
-            <footer class="wizard-actions">
-              <button class="ghost-btn" type="button" id="historyTextBack">Voltar</button>
-              <button class="primary-btn" type="submit" id="historyTextNext">Continuar</button>
-            </footer>
-          </form>
-        </div>
+      </header>
+      <p class="finance-status history-mission-status" id="historyMissionStatus" aria-live="polite"></p>
+      <section class="history-missions-empty" id="historyMissionsEmpty" hidden>
+        <div class="empty-state">Você não tem missões</div>
+        <button class="history-mission-add-large" type="button" id="openHistoryMissionCreateHero" aria-label="Adicionar missão">
+          <span>+</span>
+        </button>
       </section>
+      <div class="history-missions-list" id="historyMissionList" hidden></div>
+      <div class="actions-side-actions history-footer-actions history-missions-footer" id="historyMissionsFooter" hidden>
+        <button class="history-mission-add-small" type="button" id="openHistoryMissionCreateButton" aria-label="Adicionar missão">
+          <span>+</span>
+        </button>
+      </div>
     </div>
   </section>
 
-  <section class="workspace-modal simple-modal" id="historyReadModal" aria-hidden="true" aria-label="Leitura do histórico">
-    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
-    <div class="finance-content history-read-content">
-      <h2 id="historyReadTitle">Título</h2>
-      <div id="historyReadBody" class="history-read-body"></div>
+  <section class="workspace-modal simple-modal" id="historyMissionCreateModal" aria-hidden="true" aria-label="Nova missão">
+    <div class="finance-content history-mission-modal-content">
+      <div class="running-task-name">Nova missão</div>
+      <input class="text-field options-text-field" type="text" id="historyMissionTitleInput" maxlength="120" autocomplete="off" placeholder="Nome da missão" />
+      <input class="text-field options-text-field" type="text" id="historyMissionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Unidade diária" />
+      <p class="finance-status" id="historyMissionCreateStatus" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="historyMissionCreateConfirm">Criar missão</button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Voltar</button>
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260626-conversations-chat-prompts"></script>
+  <section class="workspace-modal simple-modal" id="historyMissionAdjustModal" aria-hidden="true" aria-label="Atualizar missão">
+    <div class="finance-content history-mission-modal-content">
+      <div class="running-task-name" id="historyMissionAdjustTitle">Missão</div>
+      <div class="history-mission-adjust-stage">
+        <button class="history-mission-sign-btn" type="button" id="historyMissionAdjustMinus">-</button>
+        <div class="history-mission-adjust-value" id="historyMissionAdjustValue">1</div>
+        <button class="history-mission-sign-btn active" type="button" id="historyMissionAdjustPlus">+</button>
+      </div>
+      <div class="history-mission-adjust-presets">
+        <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="1">+1</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="3">+3</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="5">+5</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="10">+10</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="50">+50</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="100">+100</button>
+      </div>
+      <p class="finance-status" id="historyMissionAdjustHint" aria-live="polite">Somar 1</p>
+      <p class="finance-status" id="historyMissionAdjustStatus" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="historyMissionAdjustConfirm">Aplicar</button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Voltar</button>
+    </div>
+  </section>
+
+  <script type="module" src="/200/project.js?v=20260628-extra-goals"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

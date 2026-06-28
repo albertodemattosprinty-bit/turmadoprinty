@@ -3966,29 +3966,207 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 #historyModal .history-app .actions-head {
-  padding: 0 64px;
+  padding: 0;
   min-height: 44px;
   gap: 10px;
   margin: 0;
 }
 
-#historyModal .history-footer-actions {
+.missions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.missions-title-static {
+  pointer-events: none;
+}
+
+.history-mission-status {
+  min-height: 24px;
+  margin: 0;
+}
+
+.history-missions-empty {
+  min-height: 56vh;
+  display: grid;
+  place-items: center;
+  justify-items: center;
+  gap: 18px;
+}
+
+.history-missions-list {
+  width: 100%;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.history-missions-footer {
   position: static;
   inset: auto;
   pointer-events: auto;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   width: 100%;
-  padding-top: 6px;
+  padding-top: 8px;
 }
 
-#historyModal .history-footer-actions .actions-side-btn {
-  position: static;
-  top: auto;
-  left: auto;
-  right: auto;
-  pointer-events: auto;
+.history-mission-add-large,
+.history-mission-add-small,
+.history-mission-sign-btn,
+.history-mission-preset-btn,
+.history-mission-card-add,
+.history-mission-card-delete {
+  border: 0;
+  cursor: pointer;
+  color: #fff;
+}
+
+.history-mission-add-large {
+  width: 108px;
+  height: 108px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1ec85e, #119a45);
+  box-shadow: 0 22px 44px rgba(17, 154, 69, 0.32);
+  font-size: 3.5rem;
+  font-weight: 900;
+}
+
+.history-mission-add-small {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1ec85e, #119a45);
+  box-shadow: 0 12px 24px rgba(17, 154, 69, 0.32);
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.history-mission-card {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 16px 16px 14px;
+  background: linear-gradient(135deg, rgba(20, 25, 38, 0.96), rgba(9, 13, 24, 0.96));
+  box-shadow: 0 20px 36px rgba(0, 0, 0, 0.22);
+  display: grid;
+  gap: 12px;
+}
+
+.history-mission-card-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.history-mission-card-title {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 900;
+  line-height: 1.16;
+}
+
+.history-mission-card-progress {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.history-mission-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-mission-card-add,
+.history-mission-card-delete {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.history-mission-card-add {
+  background: linear-gradient(135deg, #1ec85e, #119a45);
+}
+
+.history-mission-card-delete {
+  background: linear-gradient(135deg, #d25555, #a82d2d);
+}
+
+.history-mission-progress-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.history-mission-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #19bf5d 0%, #7df06e 100%);
+  transition: width 180ms ease;
+}
+
+.history-mission-modal-content {
+  width: min(460px, calc(100% - 28px));
+  min-height: 0;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.history-mission-adjust-stage {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 68px;
+  gap: 12px;
+  align-items: center;
+}
+
+.history-mission-sign-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.history-mission-sign-btn.active {
+  background: linear-gradient(135deg, #2a7bff, #1545bf);
+}
+
+.history-mission-adjust-value {
+  min-height: 68px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.history-mission-adjust-presets {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-mission-preset-btn {
+  min-height: 56px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .history-item {

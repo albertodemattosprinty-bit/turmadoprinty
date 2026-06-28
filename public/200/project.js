@@ -339,6 +339,23 @@ const historyVoiceStatus = document.getElementById("historyVoiceStatus");
 const historyLiveText = document.getElementById("historyLiveText");
 const historyReadTitle = document.getElementById("historyReadTitle");
 const historyReadBody = document.getElementById("historyReadBody");
+const historyMissionStatus = document.getElementById("historyMissionStatus");
+const historyMissionsEmpty = document.getElementById("historyMissionsEmpty");
+const historyMissionList = document.getElementById("historyMissionList");
+const historyMissionsFooter = document.getElementById("historyMissionsFooter");
+const openHistoryMissionCreateHeroButton = document.getElementById("openHistoryMissionCreateHero");
+const openHistoryMissionCreateButton = document.getElementById("openHistoryMissionCreateButton");
+const historyMissionTitleInput = document.getElementById("historyMissionTitleInput");
+const historyMissionTargetInput = document.getElementById("historyMissionTargetInput");
+const historyMissionCreateStatus = document.getElementById("historyMissionCreateStatus");
+const historyMissionCreateConfirmButton = document.getElementById("historyMissionCreateConfirm");
+const historyMissionAdjustTitle = document.getElementById("historyMissionAdjustTitle");
+const historyMissionAdjustMinusButton = document.getElementById("historyMissionAdjustMinus");
+const historyMissionAdjustPlusButton = document.getElementById("historyMissionAdjustPlus");
+const historyMissionAdjustValue = document.getElementById("historyMissionAdjustValue");
+const historyMissionAdjustHint = document.getElementById("historyMissionAdjustHint");
+const historyMissionAdjustStatus = document.getElementById("historyMissionAdjustStatus");
+const historyMissionAdjustConfirmButton = document.getElementById("historyMissionAdjustConfirm");
 const conversationsMessages = document.getElementById("conversationsMessages");
 const conversationsTranscript = document.getElementById("conversationsTranscript");
 const conversationsStatus = document.getElementById("conversationsStatus");
@@ -655,6 +672,7 @@ const state = {
   statsRanking: [],
   statsPointsOverview: null,
   statsMissions: [],
+  extraGoals: [],
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -667,6 +685,11 @@ const state = {
   selectedProfile: defaultProjectProfileName,
   profileLock: "",
   historyOffset: 0,
+  extraGoalAdjust: {
+    goalId: "",
+    amount: 1,
+    sign: 1
+  },
   historyTextComposer: {
     step: 1,
     speaker: defaultProjectProfileName,
@@ -3384,7 +3407,7 @@ function openModal(id) {
 
   if (id === "historyModal") {
     void (async () => {
-      await loadHistoryFromApi();
+      await loadExtraGoals();
       renderHistory();
     })();
   }
@@ -6905,6 +6928,27 @@ async function loadHistoryFromApi() {
   state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
 }
 
+async function loadExtraGoals() {
+  if (!getToken()) {
+    state.extraGoals = [];
+    return;
+  }
+  showDbLoadingState(historyMissionList || historyMissionsEmpty || historyMissionStatus, 220);
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  try {
+    const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}`);
+    state.extraGoals = Array.isArray(payload?.goals) ? payload.goals : [];
+    if (historyMissionStatus) {
+      historyMissionStatus.textContent = "";
+    }
+  } catch (error) {
+    state.extraGoals = [];
+    if (historyMissionStatus) {
+      historyMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar missões.";
+    }
+  }
+}
+
 async function saveTaskComposer() {
   try {
     const title = String(taskTitle?.value || "").trim();
@@ -7441,8 +7485,98 @@ function renderHistoryTimeline() {
   });
 }
 
+function renderHistoryMissionAdjustState() {
+  const sign = Number(state.extraGoalAdjust?.sign || 1) >= 0 ? 1 : -1;
+  const amount = Math.max(1, Math.trunc(Number(state.extraGoalAdjust?.amount || 1) || 1));
+  state.extraGoalAdjust.sign = sign;
+  state.extraGoalAdjust.amount = amount;
+  if (historyMissionAdjustValue) {
+    historyMissionAdjustValue.textContent = String(amount);
+  }
+  if (historyMissionAdjustHint) {
+    historyMissionAdjustHint.textContent = `${sign > 0 ? "Somar" : "Subtrair"} ${amount}`;
+  }
+  historyMissionAdjustMinusButton?.classList.toggle("active", sign < 0);
+  historyMissionAdjustPlusButton?.classList.toggle("active", sign > 0);
+}
+
+function openHistoryMissionCreateModal() {
+  if (historyMissionTitleInput) {
+    historyMissionTitleInput.value = "";
+  }
+  if (historyMissionTargetInput) {
+    historyMissionTargetInput.value = "";
+  }
+  if (historyMissionCreateStatus) {
+    historyMissionCreateStatus.textContent = "";
+  }
+  openModal("historyMissionCreateModal");
+  window.setTimeout(() => historyMissionTitleInput?.focus(), 60);
+}
+
+function openHistoryMissionAdjustModal(goalId) {
+  const goal = (Array.isArray(state.extraGoals) ? state.extraGoals : []).find((item) => String(item.id) === String(goalId));
+  if (!goal) {
+    return;
+  }
+  state.extraGoalAdjust = {
+    goalId: String(goal.id),
+    amount: 1,
+    sign: 1
+  };
+  if (historyMissionAdjustTitle) {
+    historyMissionAdjustTitle.textContent = String(goal.title || "Missão");
+  }
+  if (historyMissionAdjustStatus) {
+    historyMissionAdjustStatus.textContent = "";
+  }
+  renderHistoryMissionAdjustState();
+  openModal("historyMissionAdjustModal");
+}
+
+function createHistoryMissionCard(goal) {
+  const progress = Math.max(0, Number(goal.progressValue || 0));
+  const target = Math.max(1, Number(goal.targetValue || 1));
+  const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+  const card = document.createElement("article");
+  card.className = "history-mission-card";
+  card.dataset.goalId = String(goal.id || "");
+  card.innerHTML = `
+    <div class="history-mission-card-top">
+      <div>
+        <h3 class="history-mission-card-title">${escapeHtml(String(goal.title || "Missão"))}</h3>
+        <div class="history-mission-card-progress">${escapeHtml(`${progress} de ${target}`)}</div>
+      </div>
+      <div class="history-mission-card-actions">
+        <button class="history-mission-card-delete" type="button" data-history-goal-delete="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(goal.title || "missão")}`)}">×</button>
+        <button class="history-mission-card-add" type="button" data-history-goal-adjust="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Atualizar ${String(goal.title || "missão")}`)}">+</button>
+      </div>
+    </div>
+    <div class="history-mission-progress-track" aria-hidden="true">
+      <div class="history-mission-progress-fill" style="width:${percent}%;"></div>
+    </div>
+  `;
+  return card;
+}
+
 function renderHistory() {
-  renderHistoryTimeline();
+  const goals = Array.isArray(state.extraGoals) ? state.extraGoals : [];
+  if (historyMissionsEmpty) {
+    historyMissionsEmpty.hidden = goals.length > 0;
+  }
+  if (historyMissionList) {
+    historyMissionList.hidden = goals.length === 0;
+    historyMissionList.innerHTML = "";
+  }
+  if (historyMissionsFooter) {
+    historyMissionsFooter.hidden = goals.length === 0;
+  }
+  if (!historyMissionList || !goals.length) {
+    return;
+  }
+  goals.forEach((goal) => {
+    historyMissionList.appendChild(createHistoryMissionCard(goal));
+  });
 }
 
 function moveHistoryDate(amount) {
@@ -7569,6 +7703,9 @@ function openHistoryTextComposer() {
 
 function closeHistoryTextComposer() {
   stopHistoryMic();
+  if (!historyTextComposer) {
+    return;
+  }
   historyTextComposer.classList.remove("active");
   historyTextComposer.setAttribute("aria-hidden", "true");
 }
@@ -8847,18 +8984,126 @@ constitutionAvatars?.addEventListener("click", (event) => {
   void approveConstitution(button.dataset.constitutionApprover || "");
 });
 
-historyTimelineList?.addEventListener("click", (event) => {
-  const card = event.target.closest("[data-history-text-id]");
-  if (!card) {
+historyMissionList?.addEventListener("click", (event) => {
+  const adjustButton = event.target.closest("[data-history-goal-adjust]");
+  if (adjustButton) {
+    openHistoryMissionAdjustModal(adjustButton.dataset.historyGoalAdjust || "");
     return;
   }
-  if (historyReadTitle) {
-    historyReadTitle.textContent = card.dataset.historyTextTitle || "Texto";
+  const deleteButton = event.target.closest("[data-history-goal-delete]");
+  if (!deleteButton) {
+    return;
   }
-  if (historyReadBody) {
-    historyReadBody.textContent = card.dataset.historyTextBody || "";
+  const goalId = String(deleteButton.dataset.historyGoalDelete || "").trim();
+  if (!goalId) {
+    return;
   }
-  openModal("historyReadModal");
+  void (async () => {
+    try {
+      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
+        method: "DELETE"
+      });
+      await loadExtraGoals();
+      renderHistory();
+    } catch (error) {
+      if (historyMissionStatus) {
+        historyMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+      }
+    }
+  })();
+});
+
+openHistoryMissionCreateHeroButton?.addEventListener("click", openHistoryMissionCreateModal);
+openHistoryMissionCreateButton?.addEventListener("click", openHistoryMissionCreateModal);
+historyMissionCreateConfirmButton?.addEventListener("click", () => {
+  void (async () => {
+    const title = String(historyMissionTitleInput?.value || "").trim();
+    const targetValue = Math.max(1, Math.trunc(Number(historyMissionTargetInput?.value || 0) || 0));
+    if (!title) {
+      if (historyMissionCreateStatus) {
+        historyMissionCreateStatus.textContent = "Digite o nome da missão.";
+      }
+      return;
+    }
+    if (!targetValue) {
+      if (historyMissionCreateStatus) {
+        historyMissionCreateStatus.textContent = "Digite a unidade diária.";
+      }
+      return;
+    }
+    if (historyMissionCreateStatus) {
+      historyMissionCreateStatus.textContent = "Criando missão...";
+    }
+    try {
+      await apiRequest("/api/200/extra-goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          targetValue,
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim()
+        })
+      });
+      closeModal("historyMissionCreateModal");
+      await loadExtraGoals();
+      renderHistory();
+    } catch (error) {
+      if (historyMissionCreateStatus) {
+        historyMissionCreateStatus.textContent = error instanceof Error ? error.message : "Falha ao criar missão.";
+      }
+    }
+  })();
+});
+
+historyMissionAdjustMinusButton?.addEventListener("click", () => {
+  state.extraGoalAdjust.sign = -1;
+  renderHistoryMissionAdjustState();
+});
+
+historyMissionAdjustPlusButton?.addEventListener("click", () => {
+  state.extraGoalAdjust.sign = 1;
+  renderHistoryMissionAdjustState();
+});
+
+document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.extraGoalAdjust.amount = Math.max(
+      1,
+      Math.trunc(Number(state.extraGoalAdjust.amount || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionAdjustAdd || 0) || 0))
+    );
+    renderHistoryMissionAdjustState();
+  });
+});
+
+historyMissionAdjustConfirmButton?.addEventListener("click", () => {
+  void (async () => {
+    const goalId = String(state.extraGoalAdjust?.goalId || "").trim();
+    const amount = Math.max(1, Math.trunc(Number(state.extraGoalAdjust?.amount || 1) || 1));
+    const sign = Number(state.extraGoalAdjust?.sign || 1) >= 0 ? 1 : -1;
+    if (!goalId) {
+      return;
+    }
+    if (historyMissionAdjustStatus) {
+      historyMissionAdjustStatus.textContent = "Aplicando...";
+    }
+    try {
+      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+          delta: amount * sign
+        })
+      });
+      closeModal("historyMissionAdjustModal");
+      await loadExtraGoals();
+      renderHistory();
+    } catch (error) {
+      if (historyMissionAdjustStatus) {
+        historyMissionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
+      }
+    }
+  })();
 });
 
 openHistoryTextComposerButton?.addEventListener("click", openHistoryTextComposer);

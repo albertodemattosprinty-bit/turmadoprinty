@@ -63,6 +63,7 @@ import { exportProject200DataToUser } from "./src/project200-export.js";
 import { appendProject200ChatMessages, createProject200Chat, getProject200Chat, markProject200ChatRead, saveProject200ChatNotificationPermission } from "./src/project200-chats.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
 import { createProject200DailyMission, deleteProject200DailyMission, ensureProject200MissionsSchema, listProject200DailyMissions, summarizeProject200MissionItems, updateProject200DailyMissionProgress } from "./src/project200-missions.js";
+import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoalProgress } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -2557,6 +2558,7 @@ async function ensurePaymentsReady(response) {
     await ensureConstitutionSchema();
     await ensureProject200ProfileLinksSchema();
     await ensureProject200MissionsSchema();
+    await ensureExtraGoalsSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -3475,6 +3477,96 @@ async function handleProject200MissionProgressRequest(request, response, mission
   }
 }
 
+async function handleExtraGoalsListRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
+    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    const goals = await listExtraGoals(user.id, selectedProfile);
+    const summary = summarizeExtraGoals(goals);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar as missoes."
+    });
+  }
+}
+
+async function handleExtraGoalCreateRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const goals = await createExtraGoal(user.id, selectedProfile, body);
+    const summary = summarizeExtraGoals(goals);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel criar a missao."
+    });
+  }
+}
+
+async function handleExtraGoalProgressRequest(request, response, goalId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const goals = await updateExtraGoalProgress(user.id, selectedProfile, goalId, body?.delta);
+    const summary = summarizeExtraGoals(goals);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."
+    });
+  }
+}
+
+async function handleExtraGoalDeleteRequest(request, response, goalId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  try {
+    const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
+    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    const goals = await deleteExtraGoal(user.id, selectedProfile, goalId);
+    const summary = summarizeExtraGoals(goals);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel excluir a missao."
+    });
+  }
+}
+
 async function handleProject200ActionInterpret(request, response) {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -4198,7 +4290,7 @@ async function buildProject200ChatContext(user, profileName) {
   const nextWeek = addProjectDays(weekStart, 7);
   const next10Days = addProjectDays(todayStart, 10);
 
-  const [todayActions, weekActions, next10DayActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes] = await Promise.all([
+  const [todayActions, weekActions, next10DayActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes, extraGoals] = await Promise.all([
     listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
     listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
     listUserActions(user.id, { from: todayStart.toISOString(), to: next10Days.toISOString() }),
@@ -4206,7 +4298,8 @@ async function buildProject200ChatContext(user, profileName) {
     getStatsSummary(user.id, "week"),
     summarizeProject200PersonalFinance(user.id, "month-".concat(String(now.getMonth() + 1).padStart(2, "0"))),
     summarizeProject200PersonalFinance(user.id, "today"),
-    getProject200FinanceNotes(user.id)
+    getProject200FinanceNotes(user.id),
+    listExtraGoals(user.id, selectedProfile, now)
   ]);
 
   const todayProfileActions = filterProject200ActionsByProfile(todayActions, selectedProfile);
@@ -4273,6 +4366,7 @@ async function buildProject200ChatContext(user, profileName) {
     plannedMinutesNext10Days
   };
   const financeNotesText = clipProject200Text(financeNotes?.notes || "", 320);
+  const extraGoalsSummary = summarizeExtraGoals(extraGoals);
 
   return {
     ownWeekProgress: selectedWeekSummary,
@@ -4293,6 +4387,8 @@ async function buildProject200ChatContext(user, profileName) {
       `Financeiro pessoal hoje: entradas ${Math.round(Number(financeTodaySummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeTodaySummary?.expenseCents || 0) / 100)} reais | pendencias ${Number(financeTodaySummary?.pendingCount || 0)}.`,
       `Financeiro pessoal do mes: entradas ${Math.round(Number(financeMonthSummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeMonthSummary?.expenseCents || 0) / 100)} reais | saldo atual ${Math.round(Number(financeMonthSummary?.balanceCents || 0) / 100)} reais | lancamentos ${Number(financeMonthSummary?.totalEntries || 0)}.`,
       `Notas financeiras pessoais: ${financeNotesText || "vazias"}.`,
+      `Missoes extras do perfil hoje: ${extraGoalsSummary.total ? extraGoalsSummary.lines.join(" | ") : "nenhuma"}.`,
+      `Faltas nas missoes extras de hoje: ${extraGoalsSummary.missingLines.length ? extraGoalsSummary.missingLines.join(" | ") : "nenhuma"}.`,
       `Considere somente os dados deste perfil, sem misturar informacoes de outros perfis da conta.`
     ].join("\n")
   };
@@ -4312,9 +4408,9 @@ async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileNam
   return [
     "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto.",
     "Voce e o chat de Conversas do /200, neutro por padrao e moldado apenas pelo contexto do /200.",
-    "Para comentar o usuario, foque primeiro nos dados de acoes e estatisticas. Quando o assunto pedir, voce tambem pode usar o financeiro pessoal e as notas financeiras do usuario.",
+    "Para comentar o usuario, foque primeiro nos dados de acoes e estatisticas. Quando o assunto pedir, voce tambem pode usar o financeiro pessoal, as notas financeiras e as missoes extras do usuario.",
     "Regras obrigatorias: resposta entre 60 e 500 caracteres; sem markdown; texto corrido ou no maximo duas frases curtas; fale como mensageiro fluido e rapido.",
-    "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa ou disciplina semanal.",
+    "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa, disciplina semanal ou missao extra faltando no dia.",
     "Nunca cobre como atrasada uma tarefa que ja esteja concluida, mesmo que ela tenha sido concluida depois do horario.",
     "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
     "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
@@ -10499,6 +10595,28 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "DELETE" && pathname.match(/^\/api\/200\/missions\/[^/]+$/)) {
     const missionId = pathname.replace(/^\/api\/200\/missions\/([^/]+)$/, "$1");
     await handleProject200MissionDeleteRequest(request, response, missionId);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/extra-goals") {
+    await handleExtraGoalsListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/extra-goals") {
+    await handleExtraGoalCreateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/progress$/)) {
+    const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)\/progress$/, "$1");
+    await handleExtraGoalProgressRequest(request, response, goalId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/200\/extra-goals\/[^/]+$/)) {
+    const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)$/, "$1");
+    await handleExtraGoalDeleteRequest(request, response, goalId);
     return;
   }
 
