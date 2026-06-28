@@ -555,7 +555,6 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
-let quickTaskExtendPending = false;
 let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
@@ -773,7 +772,8 @@ const state = {
   runtimeState: null,
   runningCenterMode: "auto",
   runningIdleTopMode: "hint",
-  runningLocalStarts: {}
+  runningLocalStarts: {},
+  quickTaskAutoFinalizing: false
 };
 
 function buildDefaultProfileAvatarDataUrl() {
@@ -2045,6 +2045,10 @@ function renderHomeRunningTask() {
   void tryPlayRunningMinuteCue(String(action.id || ""), estimatedRemaining);
   if (remainingSeconds <= 0) {
     void playRunningEndBellCue(runningActionId);
+    if (isQuickTaskAction(action) && !state.quickTaskAutoFinalizing) {
+      state.quickTaskAutoFinalizing = true;
+      void performRunningFinalize(action);
+    }
   }
   const punctualitySummary = getCompletionSummaryForSelectedProfile();
   renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes);
@@ -2065,36 +2069,6 @@ function renderHomeRunningTask() {
     runningTaskStartNextButton.hidden = true;
   }
   renderRunningMusicPlayer();
-}
-
-async function ensureQuickTaskWindowProgress() {
-  if (quickTaskExtendPending) {
-    return;
-  }
-  const runningAction = getRunningActionForSelectedProfile();
-  if (!isQuickTaskAction(runningAction)) {
-    return;
-  }
-  const endAtMs = new Date(runningAction?.endAt || "").getTime();
-  if (!Number.isFinite(endAtMs) || getServerNowMs() <= endAtMs) {
-    return;
-  }
-  quickTaskExtendPending = true;
-  try {
-    const payload = await apiRequest(`/api/actions/${encodeURIComponent(runningAction.id)}/quick-extend`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endAt: new Date(getServerNowMs()).toISOString() })
-    });
-    const updated = payload?.action || null;
-    if (updated?.id) {
-      state.actions = state.actions.map((item) => item.id === updated.id ? updated : item);
-      renderActions();
-    }
-  } catch {
-  } finally {
-    quickTaskExtendPending = false;
-  }
 }
 
 async function loadRunningMusicStations() {
@@ -3050,7 +3024,6 @@ function startRunningTaskTicker() {
   }
   runningTaskTicker = window.setTimeout(function tickRunningTask() {
     renderHomeRunningTask();
-    void ensureQuickTaskWindowProgress();
     runningTaskTicker = window.setTimeout(tickRunningTask, 250);
   }, 250);
 }
@@ -8972,21 +8945,6 @@ document.querySelectorAll("[data-ai-time-nav]").forEach((button) => {
 });
 
 async function performRunningFinalize(runningAction) {
-  if (isQuickTaskAction(runningAction)) {
-    try {
-      const extendPayload = await apiRequest(`/api/actions/${encodeURIComponent(runningAction.id)}/quick-extend`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endAt: new Date(getServerNowMs()).toISOString() })
-      });
-      const extended = extendPayload?.action || null;
-      if (extended?.id) {
-        state.actions = state.actions.map((item) => item.id === extended.id ? extended : item);
-        runningAction = extended;
-      }
-    } catch {
-    }
-  }
   const beforeSummary = getCompletionSummaryForSelectedProfile();
   const duration = getActionDurationMinutes(runningAction);
   const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
@@ -9022,9 +8980,11 @@ async function performRunningFinalize(runningAction) {
         punctualityAfter: summary.punctualityPrecise
       }
     });
+    state.quickTaskAutoFinalizing = false;
     return;
   }
   resetRunningCompletionState();
+  state.quickTaskAutoFinalizing = false;
   renderHomeRunningTask();
 }
 

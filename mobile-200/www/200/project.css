@@ -1344,6 +1344,9 @@ body.screen-locked .project-login-overlay.active {
 .running-quick-task-content {
   width: min(460px, calc(100% - 28px));
   gap: 14px;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
 
 .quick-task-input {
