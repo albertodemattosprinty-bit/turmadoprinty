@@ -62,7 +62,6 @@ import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProj
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { appendProject200ChatMessages, createProject200Chat, getProject200Chat, markProject200ChatRead, saveProject200ChatNotificationPermission } from "./src/project200-chats.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createProject200DailyMission, deleteProject200DailyMission, ensureProject200MissionsSchema, listProject200DailyMissions, summarizeProject200MissionItems, updateProject200DailyMissionProgress } from "./src/project200-missions.js";
 import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoalProgress } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
@@ -2557,7 +2556,6 @@ async function ensurePaymentsReady(response) {
     await ensureStatsSchema();
     await ensureConstitutionSchema();
     await ensureProject200ProfileLinksSchema();
-    await ensureProject200MissionsSchema();
     await ensureExtraGoalsSchema();
   } catch (error) {
     sendJson(response, 503, {
@@ -3381,98 +3379,6 @@ async function handleProject200PersonalFinanceNotesUpdate(request, response) {
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel salvar as anotacoes."
-    });
-  }
-}
-
-async function handleProject200MissionsListRequest(request, response) {
-  const user = await requireAuth(request, response);
-  if (!user) {
-    return;
-  }
-
-  try {
-    const requestUrl = new URL(request.url || "/api/200/missions", `http://${request.headers.host || "localhost"}`);
-    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
-    const missionDate = String(requestUrl.searchParams.get("date") || "").trim() || undefined;
-    const missions = await listProject200DailyMissions(user.id, selectedProfile, missionDate);
-    const summary = summarizeProject200MissionItems(missions);
-    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel carregar as missoes."
-    });
-  }
-}
-
-async function handleProject200MissionCreateRequest(request, response) {
-  const user = await requireAuth(request, response);
-  if (!user) {
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, { error: error.message });
-    return;
-  }
-
-  try {
-    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
-    const missions = await createProject200DailyMission(user.id, selectedProfile, body);
-    const summary = summarizeProject200MissionItems(missions);
-    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel criar a missao."
-    });
-  }
-}
-
-async function handleProject200MissionDeleteRequest(request, response, missionId) {
-  const user = await requireAuth(request, response);
-  if (!user) {
-    return;
-  }
-
-  try {
-    const requestUrl = new URL(request.url || "/api/200/missions", `http://${request.headers.host || "localhost"}`);
-    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
-    const missions = await deleteProject200DailyMission(user.id, selectedProfile, missionId);
-    const summary = summarizeProject200MissionItems(missions);
-    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel excluir a missao."
-    });
-  }
-}
-
-async function handleProject200MissionProgressRequest(request, response, missionId) {
-  const user = await requireAuth(request, response);
-  if (!user) {
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, { error: error.message });
-    return;
-  }
-
-  try {
-    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
-    const missionDate = String(body?.date || "").trim() || undefined;
-    const missions = await updateProject200DailyMissionProgress(user.id, selectedProfile, missionId, body?.delta, missionDate);
-    const summary = summarizeProject200MissionItems(missions);
-    sendJson(response, 200, { ok: true, profile: selectedProfile, missions, summary });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."
     });
   }
 }
@@ -10573,28 +10479,6 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "PUT" && pathname === "/api/200/finance/notes") {
     await handleProject200PersonalFinanceNotesUpdate(request, response);
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/200/missions") {
-    await handleProject200MissionsListRequest(request, response);
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/missions") {
-    await handleProject200MissionCreateRequest(request, response);
-    return;
-  }
-
-  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/missions\/[^/]+\/progress$/)) {
-    const missionId = pathname.replace(/^\/api\/200\/missions\/([^/]+)\/progress$/, "$1");
-    await handleProject200MissionProgressRequest(request, response, missionId);
-    return;
-  }
-
-  if (request.method === "DELETE" && pathname.match(/^\/api\/200\/missions\/[^/]+$/)) {
-    const missionId = pathname.replace(/^\/api\/200\/missions\/([^/]+)$/, "$1");
-    await handleProject200MissionDeleteRequest(request, response, missionId);
     return;
   }
 

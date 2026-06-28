@@ -1006,40 +1006,40 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
         </button>
       </header>
-      <p class="finance-status history-mission-status" id="historyMissionStatus" aria-live="polite"></p>
-      <section class="history-missions-empty" id="historyMissionsEmpty" hidden>
+      <p class="finance-status history-mission-status" id="missionStatus" aria-live="polite"></p>
+      <section class="history-missions-empty" id="missionsEmpty" hidden>
         <div class="empty-state">Você não tem missões</div>
-        <button class="history-mission-add-large" type="button" id="openHistoryMissionCreateHero" aria-label="Adicionar missão">
+        <button class="history-mission-add-large" type="button" id="openMissionCreateHero" aria-label="Adicionar missão">
           <span>+</span>
         </button>
       </section>
-      <div class="history-missions-list" id="historyMissionList" hidden></div>
-      <div class="actions-side-actions history-footer-actions history-missions-footer" id="historyMissionsFooter" hidden>
-        <button class="history-mission-add-small" type="button" id="openHistoryMissionCreateButton" aria-label="Adicionar missão">
+      <div class="history-missions-list" id="missionList" hidden></div>
+      <div class="actions-side-actions history-footer-actions history-missions-footer" id="missionsFooter" hidden>
+        <button class="history-mission-add-small" type="button" id="openMissionCreateButton" aria-label="Adicionar missão">
           <span>+</span>
         </button>
       </div>
     </div>
   </section>
 
-  <section class="workspace-modal simple-modal" id="historyMissionCreateModal" aria-hidden="true" aria-label="Nova missão">
+  <section class="workspace-modal simple-modal" id="missionCreateModal" aria-hidden="true" aria-label="Nova missão">
     <div class="finance-content history-mission-modal-content">
       <div class="running-task-name">Nova missão</div>
-      <input class="text-field options-text-field" type="text" id="historyMissionTitleInput" maxlength="120" autocomplete="off" placeholder="Nome da missão" />
-      <input class="text-field options-text-field" type="text" id="historyMissionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Unidade diária" />
-      <p class="finance-status" id="historyMissionCreateStatus" aria-live="polite"></p>
-      <button class="primary-btn" type="button" id="historyMissionCreateConfirm">Criar missão</button>
+      <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" placeholder="Nome da missão" />
+      <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Unidade diária" />
+      <p class="finance-status" id="missionCreateStatus" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="missionCreateConfirm">Criar missão</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Voltar</button>
     </div>
   </section>
 
-  <section class="workspace-modal simple-modal" id="historyMissionAdjustModal" aria-hidden="true" aria-label="Atualizar missão">
+  <section class="workspace-modal simple-modal" id="missionAdjustModal" aria-hidden="true" aria-label="Atualizar missão">
     <div class="finance-content history-mission-modal-content">
-      <div class="running-task-name" id="historyMissionAdjustTitle">Missão</div>
+      <div class="running-task-name" id="missionAdjustTitle">Missão</div>
       <div class="history-mission-adjust-stage">
-        <button class="history-mission-sign-btn" type="button" id="historyMissionAdjustMinus">-</button>
-        <div class="history-mission-adjust-value" id="historyMissionAdjustValue">1</div>
-        <button class="history-mission-sign-btn active" type="button" id="historyMissionAdjustPlus">+</button>
+        <button class="history-mission-sign-btn" type="button" id="missionAdjustMinus">-</button>
+        <div class="history-mission-adjust-value" id="missionAdjustValue">1</div>
+        <button class="history-mission-sign-btn active" type="button" id="missionAdjustPlus">+</button>
       </div>
       <div class="history-mission-adjust-presets">
         <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="1">+1</button>
@@ -1049,14 +1049,14 @@
         <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="50">+50</button>
         <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="100">+100</button>
       </div>
-      <p class="finance-status" id="historyMissionAdjustHint" aria-live="polite">Somar 1</p>
-      <p class="finance-status" id="historyMissionAdjustStatus" aria-live="polite"></p>
-      <button class="primary-btn" type="button" id="historyMissionAdjustConfirm">Aplicar</button>
+      <p class="finance-status" id="missionAdjustHint" aria-live="polite">Somar 1</p>
+      <p class="finance-status" id="missionAdjustStatus" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="missionAdjustConfirm">Aplicar</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Voltar</button>
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260628-extra-goals"></script>
+  <script type="module" src="/200/project.js?v=20260628-missions-clean"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

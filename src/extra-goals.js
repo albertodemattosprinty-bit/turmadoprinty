@@ -35,10 +35,19 @@ function toDateKey(value = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function getStoredDateKey(value) {
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+  return "";
+}
+
 function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
   const targetValue = Math.max(1, Math.trunc(Number(row.target_value || 0) || 1));
   const rawProgress = Math.max(0, Math.trunc(Number(row.progress_value || 0) || 0));
-  const progressValue = toDateKey(row.progress_date) === dateKey ? rawProgress : 0;
+  const storedDateKey = getStoredDateKey(row.progress_date_key) || getStoredDateKey(row.progress_date);
+  const progressValue = storedDateKey === dateKey ? rawProgress : 0;
   return {
     id: row.id,
     userId: row.user_id,
@@ -95,7 +104,17 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
   const dateKey = toDateKey(date);
   const result = await query(
     `
-      select id, user_id, assigned_profile, title, target_value, progress_value, progress_date, created_at, updated_at
+      select
+        id,
+        user_id,
+        assigned_profile,
+        title,
+        target_value,
+        progress_value,
+        progress_date,
+        to_char(progress_date, 'YYYY-MM-DD') as progress_date_key,
+        created_at,
+        updated_at
       from extra_goals
       where user_id = $1
         and assigned_profile = $2
@@ -143,7 +162,11 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   const dateKey = toDateKey(date);
   const currentResult = await query(
     `
-      select id, progress_value, progress_date
+      select
+        id,
+        progress_value,
+        progress_date,
+        to_char(progress_date, 'YYYY-MM-DD') as progress_date_key
       from extra_goals
       where id = $1
         and user_id = $2
@@ -156,7 +179,7 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   if (!current) {
     throw new Error("Missao nao encontrada.");
   }
-  const currentProgress = toDateKey(current.progress_date) === dateKey
+  const currentProgress = (getStoredDateKey(current.progress_date_key) || getStoredDateKey(current.progress_date)) === dateKey
     ? Math.max(0, Math.trunc(Number(current.progress_value || 0) || 0))
     : 0;
   const nextProgress = Math.max(0, currentProgress + safeDelta);

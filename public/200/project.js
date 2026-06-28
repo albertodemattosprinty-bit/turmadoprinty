@@ -339,23 +339,23 @@ const historyVoiceStatus = document.getElementById("historyVoiceStatus");
 const historyLiveText = document.getElementById("historyLiveText");
 const historyReadTitle = document.getElementById("historyReadTitle");
 const historyReadBody = document.getElementById("historyReadBody");
-const historyMissionStatus = document.getElementById("historyMissionStatus");
-const historyMissionsEmpty = document.getElementById("historyMissionsEmpty");
-const historyMissionList = document.getElementById("historyMissionList");
-const historyMissionsFooter = document.getElementById("historyMissionsFooter");
-const openHistoryMissionCreateHeroButton = document.getElementById("openHistoryMissionCreateHero");
-const openHistoryMissionCreateButton = document.getElementById("openHistoryMissionCreateButton");
-const historyMissionTitleInput = document.getElementById("historyMissionTitleInput");
-const historyMissionTargetInput = document.getElementById("historyMissionTargetInput");
-const historyMissionCreateStatus = document.getElementById("historyMissionCreateStatus");
-const historyMissionCreateConfirmButton = document.getElementById("historyMissionCreateConfirm");
-const historyMissionAdjustTitle = document.getElementById("historyMissionAdjustTitle");
-const historyMissionAdjustMinusButton = document.getElementById("historyMissionAdjustMinus");
-const historyMissionAdjustPlusButton = document.getElementById("historyMissionAdjustPlus");
-const historyMissionAdjustValue = document.getElementById("historyMissionAdjustValue");
-const historyMissionAdjustHint = document.getElementById("historyMissionAdjustHint");
-const historyMissionAdjustStatus = document.getElementById("historyMissionAdjustStatus");
-const historyMissionAdjustConfirmButton = document.getElementById("historyMissionAdjustConfirm");
+const missionStatus = document.getElementById("missionStatus");
+const missionsEmpty = document.getElementById("missionsEmpty");
+const missionList = document.getElementById("missionList");
+const missionsFooter = document.getElementById("missionsFooter");
+const openMissionCreateHeroButton = document.getElementById("openMissionCreateHero");
+const openMissionCreateButton = document.getElementById("openMissionCreateButton");
+const missionTitleInput = document.getElementById("missionTitleInput");
+const missionTargetInput = document.getElementById("missionTargetInput");
+const missionCreateStatus = document.getElementById("missionCreateStatus");
+const missionCreateConfirmButton = document.getElementById("missionCreateConfirm");
+const missionAdjustTitle = document.getElementById("missionAdjustTitle");
+const missionAdjustMinusButton = document.getElementById("missionAdjustMinus");
+const missionAdjustPlusButton = document.getElementById("missionAdjustPlus");
+const missionAdjustValue = document.getElementById("missionAdjustValue");
+const missionAdjustHint = document.getElementById("missionAdjustHint");
+const missionAdjustStatus = document.getElementById("missionAdjustStatus");
+const missionAdjustConfirmButton = document.getElementById("missionAdjustConfirm");
 const conversationsMessages = document.getElementById("conversationsMessages");
 const conversationsTranscript = document.getElementById("conversationsTranscript");
 const conversationsStatus = document.getElementById("conversationsStatus");
@@ -672,7 +672,7 @@ const state = {
   statsRanking: [],
   statsPointsOverview: null,
   statsMissions: [],
-  extraGoals: [],
+  missions: [],
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -685,7 +685,7 @@ const state = {
   selectedProfile: defaultProjectProfileName,
   profileLock: "",
   historyOffset: 0,
-  extraGoalAdjust: {
+  missionAdjust: {
     goalId: "",
     amount: 1,
     sign: 1
@@ -3407,8 +3407,8 @@ function openModal(id) {
 
   if (id === "historyModal") {
     void (async () => {
-      await loadExtraGoals();
-      renderHistory();
+      await loadMissions();
+      renderMissions();
     })();
   }
 
@@ -5318,7 +5318,7 @@ async function submitProfileAvatarGeneration() {
       renderProfileFooter();
       renderHistorySpeakerSelectionOptions();
       renderActions();
-      renderHistory();
+      renderMissions();
       renderHomeRunningTask();
     }
     profileAvatarReferenceFile = null;
@@ -6002,7 +6002,7 @@ async function restoreActionToPending(actionId) {
     state.historySystem = state.historySystem.filter((item) => item.id !== target.id);
   }
   renderActions();
-  renderHistory();
+  renderMissions();
 }
 
 async function manualFinishAction(actionId) {
@@ -6928,23 +6928,23 @@ async function loadHistoryFromApi() {
   state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
 }
 
-async function loadExtraGoals() {
+async function loadMissions() {
   if (!getToken()) {
-    state.extraGoals = [];
+    state.missions = [];
     return;
   }
-  showDbLoadingState(historyMissionList || historyMissionsEmpty || historyMissionStatus, 220);
+  showDbLoadingState(missionList || missionsEmpty || missionStatus, 220);
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
   try {
     const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}`);
-    state.extraGoals = Array.isArray(payload?.goals) ? payload.goals : [];
-    if (historyMissionStatus) {
-      historyMissionStatus.textContent = "";
+    state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
+    if (missionStatus) {
+      missionStatus.textContent = "";
     }
   } catch (error) {
-    state.extraGoals = [];
-    if (historyMissionStatus) {
-      historyMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar missões.";
+    state.missions = [];
+    if (missionStatus) {
+      missionStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar missões.";
     }
   }
 }
@@ -7485,56 +7485,56 @@ function renderHistoryTimeline() {
   });
 }
 
-function renderHistoryMissionAdjustState() {
-  const sign = Number(state.extraGoalAdjust?.sign || 1) >= 0 ? 1 : -1;
-  const amount = Math.max(1, Math.trunc(Number(state.extraGoalAdjust?.amount || 1) || 1));
-  state.extraGoalAdjust.sign = sign;
-  state.extraGoalAdjust.amount = amount;
-  if (historyMissionAdjustValue) {
-    historyMissionAdjustValue.textContent = String(amount);
+function renderMissionAdjustState() {
+  const sign = Number(state.missionAdjust?.sign || 1) >= 0 ? 1 : -1;
+  const amount = Math.max(1, Math.trunc(Number(state.missionAdjust?.amount || 1) || 1));
+  state.missionAdjust.sign = sign;
+  state.missionAdjust.amount = amount;
+  if (missionAdjustValue) {
+    missionAdjustValue.textContent = String(amount);
   }
-  if (historyMissionAdjustHint) {
-    historyMissionAdjustHint.textContent = `${sign > 0 ? "Somar" : "Subtrair"} ${amount}`;
+  if (missionAdjustHint) {
+    missionAdjustHint.textContent = `${sign > 0 ? "Somar" : "Subtrair"} ${amount}`;
   }
-  historyMissionAdjustMinusButton?.classList.toggle("active", sign < 0);
-  historyMissionAdjustPlusButton?.classList.toggle("active", sign > 0);
+  missionAdjustMinusButton?.classList.toggle("active", sign < 0);
+  missionAdjustPlusButton?.classList.toggle("active", sign > 0);
 }
 
-function openHistoryMissionCreateModal() {
-  if (historyMissionTitleInput) {
-    historyMissionTitleInput.value = "";
+function openMissionCreateModal() {
+  if (missionTitleInput) {
+    missionTitleInput.value = "";
   }
-  if (historyMissionTargetInput) {
-    historyMissionTargetInput.value = "";
+  if (missionTargetInput) {
+    missionTargetInput.value = "";
   }
-  if (historyMissionCreateStatus) {
-    historyMissionCreateStatus.textContent = "";
+  if (missionCreateStatus) {
+    missionCreateStatus.textContent = "";
   }
-  openModal("historyMissionCreateModal");
-  window.setTimeout(() => historyMissionTitleInput?.focus(), 60);
+  openModal("missionCreateModal");
+  window.setTimeout(() => missionTitleInput?.focus(), 60);
 }
 
-function openHistoryMissionAdjustModal(goalId) {
-  const goal = (Array.isArray(state.extraGoals) ? state.extraGoals : []).find((item) => String(item.id) === String(goalId));
+function openMissionAdjustModal(goalId) {
+  const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id) === String(goalId));
   if (!goal) {
     return;
   }
-  state.extraGoalAdjust = {
+  state.missionAdjust = {
     goalId: String(goal.id),
     amount: 1,
     sign: 1
   };
-  if (historyMissionAdjustTitle) {
-    historyMissionAdjustTitle.textContent = String(goal.title || "Missão");
+  if (missionAdjustTitle) {
+    missionAdjustTitle.textContent = String(goal.title || "Missão");
   }
-  if (historyMissionAdjustStatus) {
-    historyMissionAdjustStatus.textContent = "";
+  if (missionAdjustStatus) {
+    missionAdjustStatus.textContent = "";
   }
-  renderHistoryMissionAdjustState();
-  openModal("historyMissionAdjustModal");
+  renderMissionAdjustState();
+  openModal("missionAdjustModal");
 }
 
-function createHistoryMissionCard(goal) {
+function createMissionCard(goal) {
   const progress = Math.max(0, Number(goal.progressValue || 0));
   const target = Math.max(1, Number(goal.targetValue || 1));
   const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
@@ -7548,8 +7548,8 @@ function createHistoryMissionCard(goal) {
         <div class="history-mission-card-progress">${escapeHtml(`${progress} de ${target}`)}</div>
       </div>
       <div class="history-mission-card-actions">
-        <button class="history-mission-card-delete" type="button" data-history-goal-delete="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(goal.title || "missão")}`)}">×</button>
-        <button class="history-mission-card-add" type="button" data-history-goal-adjust="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Atualizar ${String(goal.title || "missão")}`)}">+</button>
+        <button class="history-mission-card-delete" type="button" data-mission-goal-delete="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(goal.title || "missão")}`)}">×</button>
+        <button class="history-mission-card-add" type="button" data-mission-goal-adjust="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Atualizar ${String(goal.title || "missão")}`)}">+</button>
       </div>
     </div>
     <div class="history-mission-progress-track" aria-hidden="true">
@@ -7559,29 +7559,29 @@ function createHistoryMissionCard(goal) {
   return card;
 }
 
-function renderHistory() {
-  const goals = Array.isArray(state.extraGoals) ? state.extraGoals : [];
-  if (historyMissionsEmpty) {
-    historyMissionsEmpty.hidden = goals.length > 0;
+function renderMissions() {
+  const goals = Array.isArray(state.missions) ? state.missions : [];
+  if (missionsEmpty) {
+    missionsEmpty.hidden = goals.length > 0;
   }
-  if (historyMissionList) {
-    historyMissionList.hidden = goals.length === 0;
-    historyMissionList.innerHTML = "";
+  if (missionList) {
+    missionList.hidden = goals.length === 0;
+    missionList.innerHTML = "";
   }
-  if (historyMissionsFooter) {
-    historyMissionsFooter.hidden = goals.length === 0;
+  if (missionsFooter) {
+    missionsFooter.hidden = goals.length === 0;
   }
-  if (!historyMissionList || !goals.length) {
+  if (!missionList || !goals.length) {
     return;
   }
   goals.forEach((goal) => {
-    historyMissionList.appendChild(createHistoryMissionCard(goal));
+    missionList.appendChild(createMissionCard(goal));
   });
 }
 
 function moveHistoryDate(amount) {
   state.historyOffset += amount;
-  renderHistory();
+  renderMissions();
 }
 
 function registerDailyMissionEvents() {
@@ -8080,7 +8080,7 @@ function clearProject200SessionState() {
   renderProfileFooter();
   renderHistorySpeakerSelectionOptions();
   renderActions();
-  renderHistory();
+  renderMissions();
   renderHomeRunningTask();
 }
 
@@ -8984,17 +8984,17 @@ constitutionAvatars?.addEventListener("click", (event) => {
   void approveConstitution(button.dataset.constitutionApprover || "");
 });
 
-historyMissionList?.addEventListener("click", (event) => {
-  const adjustButton = event.target.closest("[data-history-goal-adjust]");
+missionList?.addEventListener("click", (event) => {
+  const adjustButton = event.target.closest("[data-mission-goal-adjust]");
   if (adjustButton) {
-    openHistoryMissionAdjustModal(adjustButton.dataset.historyGoalAdjust || "");
+    openMissionAdjustModal(adjustButton.dataset.missionGoalAdjust || "");
     return;
   }
-  const deleteButton = event.target.closest("[data-history-goal-delete]");
+  const deleteButton = event.target.closest("[data-mission-goal-delete]");
   if (!deleteButton) {
     return;
   }
-  const goalId = String(deleteButton.dataset.historyGoalDelete || "").trim();
+  const goalId = String(deleteButton.dataset.missionGoalDelete || "").trim();
   if (!goalId) {
     return;
   }
@@ -9003,36 +9003,36 @@ historyMissionList?.addEventListener("click", (event) => {
       await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
         method: "DELETE"
       });
-      await loadExtraGoals();
-      renderHistory();
+      await loadMissions();
+      renderMissions();
     } catch (error) {
-      if (historyMissionStatus) {
-        historyMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+      if (missionStatus) {
+        missionStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
       }
     }
   })();
 });
 
-openHistoryMissionCreateHeroButton?.addEventListener("click", openHistoryMissionCreateModal);
-openHistoryMissionCreateButton?.addEventListener("click", openHistoryMissionCreateModal);
-historyMissionCreateConfirmButton?.addEventListener("click", () => {
+openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
+openMissionCreateButton?.addEventListener("click", openMissionCreateModal);
+missionCreateConfirmButton?.addEventListener("click", () => {
   void (async () => {
-    const title = String(historyMissionTitleInput?.value || "").trim();
-    const targetValue = Math.max(1, Math.trunc(Number(historyMissionTargetInput?.value || 0) || 0));
+    const title = String(missionTitleInput?.value || "").trim();
+    const targetValue = Math.max(1, Math.trunc(Number(missionTargetInput?.value || 0) || 0));
     if (!title) {
-      if (historyMissionCreateStatus) {
-        historyMissionCreateStatus.textContent = "Digite o nome da missão.";
+      if (missionCreateStatus) {
+        missionCreateStatus.textContent = "Digite o nome da missão.";
       }
       return;
     }
     if (!targetValue) {
-      if (historyMissionCreateStatus) {
-        historyMissionCreateStatus.textContent = "Digite a unidade diária.";
+      if (missionCreateStatus) {
+        missionCreateStatus.textContent = "Digite a unidade diária.";
       }
       return;
     }
-    if (historyMissionCreateStatus) {
-      historyMissionCreateStatus.textContent = "Criando missão...";
+    if (missionCreateStatus) {
+      missionCreateStatus.textContent = "Criando missão...";
     }
     try {
       await apiRequest("/api/200/extra-goals", {
@@ -9044,47 +9044,47 @@ historyMissionCreateConfirmButton?.addEventListener("click", () => {
           profile: String(state.selectedProfile || getDefaultProfileName()).trim()
         })
       });
-      closeModal("historyMissionCreateModal");
-      await loadExtraGoals();
-      renderHistory();
+      closeModal("missionCreateModal");
+      await loadMissions();
+      renderMissions();
     } catch (error) {
-      if (historyMissionCreateStatus) {
-        historyMissionCreateStatus.textContent = error instanceof Error ? error.message : "Falha ao criar missão.";
+      if (missionCreateStatus) {
+        missionCreateStatus.textContent = error instanceof Error ? error.message : "Falha ao criar missão.";
       }
     }
   })();
 });
 
-historyMissionAdjustMinusButton?.addEventListener("click", () => {
-  state.extraGoalAdjust.sign = -1;
-  renderHistoryMissionAdjustState();
+missionAdjustMinusButton?.addEventListener("click", () => {
+  state.missionAdjust.sign = -1;
+  renderMissionAdjustState();
 });
 
-historyMissionAdjustPlusButton?.addEventListener("click", () => {
-  state.extraGoalAdjust.sign = 1;
-  renderHistoryMissionAdjustState();
+missionAdjustPlusButton?.addEventListener("click", () => {
+  state.missionAdjust.sign = 1;
+  renderMissionAdjustState();
 });
 
 document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
   button.addEventListener("click", () => {
-    state.extraGoalAdjust.amount = Math.max(
+    state.missionAdjust.amount = Math.max(
       1,
-      Math.trunc(Number(state.extraGoalAdjust.amount || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionAdjustAdd || 0) || 0))
+      Math.trunc(Number(state.missionAdjust.amount || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionAdjustAdd || 0) || 0))
     );
-    renderHistoryMissionAdjustState();
+    renderMissionAdjustState();
   });
 });
 
-historyMissionAdjustConfirmButton?.addEventListener("click", () => {
+missionAdjustConfirmButton?.addEventListener("click", () => {
   void (async () => {
-    const goalId = String(state.extraGoalAdjust?.goalId || "").trim();
-    const amount = Math.max(1, Math.trunc(Number(state.extraGoalAdjust?.amount || 1) || 1));
-    const sign = Number(state.extraGoalAdjust?.sign || 1) >= 0 ? 1 : -1;
+    const goalId = String(state.missionAdjust?.goalId || "").trim();
+    const amount = Math.max(1, Math.trunc(Number(state.missionAdjust?.amount || 1) || 1));
+    const sign = Number(state.missionAdjust?.sign || 1) >= 0 ? 1 : -1;
     if (!goalId) {
       return;
     }
-    if (historyMissionAdjustStatus) {
-      historyMissionAdjustStatus.textContent = "Aplicando...";
+    if (missionAdjustStatus) {
+      missionAdjustStatus.textContent = "Aplicando...";
     }
     try {
       await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
@@ -9095,12 +9095,12 @@ historyMissionAdjustConfirmButton?.addEventListener("click", () => {
           delta: amount * sign
         })
       });
-      closeModal("historyMissionAdjustModal");
-      await loadExtraGoals();
-      renderHistory();
+      closeModal("missionAdjustModal");
+      await loadMissions();
+      renderMissions();
     } catch (error) {
-      if (historyMissionAdjustStatus) {
-        historyMissionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
+      if (missionAdjustStatus) {
+        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
       }
     }
   })();
@@ -9682,7 +9682,7 @@ historyTextForm?.addEventListener("submit", (event) => {
       if (payload?.entry) {
         state.historyTexts = [payload.entry, ...state.historyTexts.filter((item) => item.id !== payload.entry.id)];
       }
-      renderHistory();
+      renderMissions();
       closeHistoryTextComposer();
     } catch (error) {
       historyVoiceStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar texto.";
