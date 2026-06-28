@@ -6984,6 +6984,7 @@ function renderConversationMessages() {
   const messages = Array.isArray(state.conversationChat?.messages) ? state.conversationChat.messages : [];
   conversationsMessages.innerHTML = "";
   if (!messages.length) {
+    conversationsMessages.innerHTML = '<div class="empty-state">Sem mensagens</div>';
     return;
   }
   messages.forEach((entry) => {

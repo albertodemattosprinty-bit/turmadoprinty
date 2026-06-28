@@ -4122,6 +4122,22 @@ function clipProject200Text(value, maxLength = 140) {
   return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1).trim()}…` : cleaned;
 }
 
+function formatProject200CompletedActionLine(action) {
+  const assignee = normalizeStoredProject200ProfileName(action?.assignee);
+  const title = String(action?.title || "Tarefa").trim();
+  const completedAt = action?.completedAt ? new Date(action.completedAt) : null;
+  const timeFormat = {
+    timeZone: PROJECT200_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  };
+  const completedLabel = completedAt && !Number.isNaN(completedAt.getTime())
+    ? completedAt.toLocaleTimeString("pt-BR", timeFormat)
+    : "--:--";
+  return `${completedLabel} | ${assignee} | ${title} | concluida`;
+}
+
 function normalizeProject200ChatReply(text) {
   const cleaned = String(text || "").replace(/\s+/g, " ").trim();
   if (!cleaned) {
@@ -4207,6 +4223,20 @@ async function buildProject200ChatContext(user, profileName) {
   const pendingToday = todayProfileActions
     .filter((action) => String(action?.status || "").trim().toUpperCase() !== "COMPLETED")
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
+  const completedToday = todayProfileActions
+    .filter((action) => String(action?.status || "").trim().toUpperCase() === "COMPLETED")
+    .sort((left, right) => {
+      const leftTs = new Date(left.completedAt || left.statusUpdatedAt || left.endAt || 0).getTime();
+      const rightTs = new Date(right.completedAt || right.statusUpdatedAt || right.endAt || 0).getTime();
+      return rightTs - leftTs;
+    });
+  const completedWeek = weekProfileActions
+    .filter((action) => String(action?.status || "").trim().toUpperCase() === "COMPLETED")
+    .sort((left, right) => {
+      const leftTs = new Date(left.completedAt || left.statusUpdatedAt || left.endAt || 0).getTime();
+      const rightTs = new Date(right.completedAt || right.statusUpdatedAt || right.endAt || 0).getTime();
+      return rightTs - leftTs;
+    });
   const overdueToday = pendingToday.filter((action) => {
     const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
     return Number.isFinite(startAt) && startAt < nowMs;
@@ -4255,6 +4285,8 @@ async function buildProject200ChatContext(user, profileName) {
       `Minutos agendados nos proximos 10 dias: ${plannedMinutesNext10Days}. Faixa: ${plannedMinutesBand}. Referencia: 500 muito baixo, 1000 fraco, 2000 pouco mas bom para comecar, 4000 media minima, acima de 6000 ideal.`,
       `Pontos do perfil hoje: ${todayCompletedPoints}.`,
       `Pontos do perfil na semana: ${selectedWeekSummary.completedMinutes}.`,
+      `Tarefas concluidas hoje: ${completedToday.length ? completedToday.slice(0, 8).map((item) => formatProject200CompletedActionLine(item)).join(" | ") : "nenhuma"}.`,
+      `Ultimas tarefas concluidas na semana: ${completedWeek.length ? completedWeek.slice(0, 8).map((item) => formatProject200CompletedActionLine(item)).join(" | ") : "nenhuma"}.`,
       `Atraso pendente agora: ${selectedWeekSummary.lateStartMinutes}m em ${overdueToday.length} tarefa(s) ainda nao concluidas.`,
       `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
       `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
