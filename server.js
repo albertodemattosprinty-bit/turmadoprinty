@@ -3979,9 +3979,74 @@ function summarizeProject200OwnProgress(actions = []) {
 }
 
 function buildProject200ToneInstructions(toneKey, ownWeekProgress) {
-  void toneKey;
-  void ownWeekProgress;
-  return "";
+  const normalizedToneKey = String(toneKey || "neutral").trim().toLowerCase();
+  const completionPercent = Math.max(0, Math.round(Number(ownWeekProgress?.completionPercent || 0)));
+  const plannedMinutes10d = Math.max(0, Math.round(Number(ownWeekProgress?.plannedMinutesNext10Days || 0)));
+
+  let plannedBand = "abaixo do ideal";
+  if (plannedMinutes10d >= 6000) {
+    plannedBand = "ideal";
+  } else if (plannedMinutes10d >= 4000) {
+    plannedBand = "media minima";
+  } else if (plannedMinutes10d >= 2000) {
+    plannedBand = "pouco, mas bom pra comecar";
+  } else if (plannedMinutes10d >= 1000) {
+    plannedBand = "fraco";
+  } else if (plannedMinutes10d >= 500) {
+    plannedBand = "muito baixo";
+  } else {
+    plannedBand = "criticamente baixo";
+  }
+
+  const baseInstruction = `Minutos agendados nos proximos 10 dias: ${plannedMinutes10d}. Classificacao: ${plannedBand}. Abaixo de 4000, cobre o usuario de acordo com o tom selecionado e empurre para aumentar a agenda.`;
+
+  if (normalizedToneKey === "motivator") {
+    return `${baseInstruction} No estilo motivador, reconheca qualquer progresso real, mas deixe claro quando a agenda ainda esta curta e proponha subir o volume com firmeza positiva.`;
+  }
+  if (normalizedToneKey === "demanding") {
+    if (plannedMinutes10d < 1000 || completionPercent < 50) {
+      return `${baseInstruction} No estilo exigente, seja duro e incisivo. Se estiver muito abaixo da media ou com disciplina baixa, exponha sem enfeite que a agenda esta fraca e que ele precisa reagir agora.`;
+    }
+    return `${baseInstruction} No estilo exigente, seja firme, direto e cobrador. Se estiver abaixo de 4000, trate como agenda insuficiente e pressione por mais compromisso.`;
+  }
+  if (normalizedToneKey === "relaxed") {
+    return `${baseInstruction} No estilo descontraido, mantenha leveza e humor, mas ainda lembre com clareza quando a agenda dos proximos 10 dias estiver fraca.`;
+  }
+  if (normalizedToneKey === "street") {
+    return `${baseInstruction} No estilo descolado, use texto curto, girias leves e foco em cumprir tarefa. Se estiver abaixo de 4000, deixa claro que a agenda ta curta e precisa subir.`;
+  }
+  return `${baseInstruction} No estilo neutro, fale de forma objetiva e sem drama, deixando explicito quando a agenda estiver abaixo da media minima de 4000.`;
+}
+
+function summarizeProject200ScheduledMinutes(actions) {
+  return (Array.isArray(actions) ? actions : []).reduce((sum, action) => {
+    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
+    const endAt = action?.endAt ? new Date(action.endAt).getTime() : NaN;
+    if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+      return sum;
+    }
+    return sum + Math.max(0, Math.round((endAt - startAt) / (60 * 1000)));
+  }, 0);
+}
+
+function describeProject200PlannedMinutesBand(plannedMinutes) {
+  const total = Math.max(0, Math.round(Number(plannedMinutes || 0)));
+  if (total >= 6000) {
+    return "ideal";
+  }
+  if (total >= 4000) {
+    return "media minima";
+  }
+  if (total >= 2000) {
+    return "pouco, mas bom pra comecar";
+  }
+  if (total >= 1000) {
+    return "fraco ainda";
+  }
+  if (total >= 500) {
+    return "muito baixo";
+  }
+  return "criticamente baixo";
 }
 
 function formatProject200ActionLine(action, now) {
@@ -4075,10 +4140,12 @@ async function buildProject200ChatContext(user, profileName) {
   const tomorrow = addProjectDays(todayStart, 1);
   const weekStart = startOfProjectWeek(now);
   const nextWeek = addProjectDays(weekStart, 7);
+  const next10Days = addProjectDays(todayStart, 10);
 
-  const [todayActions, weekActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes] = await Promise.all([
+  const [todayActions, weekActions, next10DayActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes] = await Promise.all([
     listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
     listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
+    listUserActions(user.id, { from: todayStart.toISOString(), to: next10Days.toISOString() }),
     getProject200RuntimeState(user.id),
     getStatsSummary(user.id, "week"),
     summarizeProject200PersonalFinance(user.id, "month-".concat(String(now.getMonth() + 1).padStart(2, "0"))),
@@ -4088,7 +4155,10 @@ async function buildProject200ChatContext(user, profileName) {
 
   const todayProfileActions = filterProject200ActionsByProfile(todayActions, selectedProfile);
   const weekProfileActions = filterProject200ActionsByProfile(weekActions, selectedProfile);
+  const next10DayProfileActions = filterProject200ActionsByProfile(next10DayActions, selectedProfile);
   const ownWeekProgress = summarizeProject200ProfileProgress(weekProfileActions);
+  const plannedMinutesNext10Days = summarizeProject200ScheduledMinutes(next10DayProfileActions);
+  const plannedMinutesBand = describeProject200PlannedMinutesBand(plannedMinutesNext10Days);
   const runningLine = normalizeStoredProject200ProfileName(runtimeState?.assignee) === selectedProfile && runtimeState?.actionTitle
     ? `${runtimeState.actionTitle} (${runtimeState.eventType || "start"})`
     : "nenhuma";
@@ -4129,7 +4199,8 @@ async function buildProject200ChatContext(user, profileName) {
     totalMinutes: Number(selectedWeekStats?.totalMinutes || ownWeekProgress.totalMinutes || 0),
     completedMinutes: Number(selectedWeekStats?.completedMinutes || ownWeekProgress.completedMinutes || 0),
     lateStartMinutes: overduePendingMinutes,
-    completionPercent: ownWeekProgress.completionPercent
+    completionPercent: ownWeekProgress.completionPercent,
+    plannedMinutesNext10Days
   };
   const financeNotesText = clipProject200Text(financeNotes?.notes || "", 320);
 
@@ -4141,6 +4212,7 @@ async function buildProject200ChatContext(user, profileName) {
       `Agora no Brasil (${PROJECT200_TIME_ZONE}): ${formatProjectNowLabel(now)}.`,
       `Tarefa em andamento do perfil: ${runningLine}.`,
       `Semana do perfil: ${selectedWeekSummary.completionPercent}% | ${selectedWeekSummary.completedMinutes}/${selectedWeekSummary.totalMinutes} min concluidos.`,
+      `Minutos agendados nos proximos 10 dias: ${plannedMinutesNext10Days}. Faixa: ${plannedMinutesBand}. Referencia: 500 muito baixo, 1000 fraco, 2000 pouco mas bom para comecar, 4000 media minima, acima de 6000 ideal.`,
       `Pontos do perfil hoje: ${todayCompletedPoints}.`,
       `Pontos do perfil na semana: ${selectedWeekSummary.completedMinutes}.`,
       `Atraso pendente agora: ${selectedWeekSummary.lateStartMinutes}m em ${overdueToday.length} tarefa(s) ainda nao concluidas.`,
@@ -4174,6 +4246,7 @@ async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileNam
     "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
     "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
     "Cada nova resposta deve tratar o Contexto vivo do /200 como uma consulta fresca do backend. Se a memoria recente da conversa conflitar com o contexto vivo, o contexto vivo vence.",
+    buildProject200ToneInstructions(tonePromptKey, ownWeekProgress),
     globalPrompt ? `Use exatamente este prompt global do estilo selecionado, escrito pela RoseMattos: ${globalPrompt}` : "",
     `Memoria recente da conversa: ${memory || "vazia"}.`,
     `Contexto vivo do /200:\n${contextText}`
@@ -7675,11 +7748,12 @@ async function handleProject200ChatDetailRequest(request, response) {
   try {
     const requestUrl = new URL(request.url || "/api/200/chat", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
-    let chat = await getProject200Chat(user.id, selectedProfile);
+    const toneKey = String(requestUrl.searchParams.get("tone") || "neutral").trim().toLowerCase();
+    let chat = await getProject200Chat(user.id, selectedProfile, toneKey);
     if (!chat) {
-      chat = await createProject200Chat(user.id, selectedProfile, { title: "Conversas" });
+      chat = await createProject200Chat(user.id, selectedProfile, toneKey, { title: "Conversas" });
     }
-    sendJson(response, 200, { ok: true, chat, profile: selectedProfile });
+    sendJson(response, 200, { ok: true, chat, profile: selectedProfile, tone: toneKey });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel carregar as conversas."
@@ -7720,9 +7794,9 @@ async function handleProject200ChatMessageRequest(request, response) {
   const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
 
   try {
-    let chat = await getProject200Chat(user.id, selectedProfile);
+    let chat = await getProject200Chat(user.id, selectedProfile, toneKey);
     if (!chat) {
-      chat = await createProject200Chat(user.id, selectedProfile, { title: createProject200ChatTitleFromMessage(message) });
+      chat = await createProject200Chat(user.id, selectedProfile, toneKey, { title: createProject200ChatTitleFromMessage(message) });
     }
 
     const userEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
@@ -7755,7 +7829,7 @@ async function handleProject200ChatMessageRequest(request, response) {
 
     const replyText = normalizeProject200ChatReply(extractChatCompletionText(completion));
     const assistantEntry = { role: "assistant", content: replyText, createdAt: new Date().toISOString() };
-    const nextChat = await appendProject200ChatMessages(user.id, selectedProfile, [userEntry, assistantEntry], {
+    const nextChat = await appendProject200ChatMessages(user.id, selectedProfile, toneKey, [userEntry, assistantEntry], {
       title: chat.title === "Conversas" ? createProject200ChatTitleFromMessage(message) : chat.title,
       lastMessageAt: new Date().toISOString()
     });

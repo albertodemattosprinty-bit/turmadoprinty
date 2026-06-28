@@ -6975,7 +6975,8 @@ async function loadConversationChat() {
   }
   showDbLoadingState(conversationsMessages, 220);
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
-  const payload = await apiRequest(`/api/200/chat?profile=${encodeURIComponent(profile)}`);
+  const toneKey = getChatToneMode(state.options.chatTone).key;
+  const payload = await apiRequest(`/api/200/chat?profile=${encodeURIComponent(profile)}&tone=${encodeURIComponent(toneKey)}`);
   state.conversationChat = payload.chat || { messages: [] };
   renderConversationMessages();
 }
@@ -9008,6 +9009,7 @@ toggleChatToneOptionButton?.addEventListener("click", () => {
   state.options.chatTone = chatToneModes[nextIndex].key;
   saveOptionsConfig();
   renderOptionsModal();
+  void loadConversationChat();
 });
 toggleScreenLockOptionButton?.addEventListener("click", () => {
   state.options.screenLockEnabled = !state.options.screenLockEnabled;
