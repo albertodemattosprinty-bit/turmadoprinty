@@ -117,7 +117,7 @@
     h1 {
       margin-top: 18px;
       font-family: var(--font-display);
-      font-size: 58px;
+      font-size: 46px;
       letter-spacing: -0.035em;
     }
 
@@ -207,13 +207,7 @@
 
     .video-copy h2 {
       color: #fff;
-      font-size: 38px;
-    }
-
-    .video-copy p {
-      margin: 14px 0 0;
-      color: rgba(255, 255, 255, 0.87);
-      max-width: 560px;
+      font-size: 30px;
     }
 
     .video-stage {
@@ -309,7 +303,7 @@
 
     h2 {
       font-family: var(--font-display);
-      font-size: 36px;
+      font-size: 29px;
       color: #20344f;
     }
 
@@ -474,8 +468,73 @@
     }
 
     .theme-card {
+      position: relative;
+      overflow: hidden;
       background: #fff;
-      box-shadow: 0 12px 28px rgba(29, 36, 48, 0.05);
+      box-shadow: 0 12px 28px rgba(29, 36, 48, 0.08);
+      color: #fff;
+    }
+
+    .theme-card h3,
+    .theme-card p {
+      color: #fff;
+    }
+
+    .theme-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.12));
+      pointer-events: none;
+    }
+
+    .theme-card > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .theme-card--naama {
+      background: linear-gradient(135deg, #6fc7ff 0%, #3f90e8 100%);
+    }
+
+    .theme-card--jonas {
+      background: linear-gradient(135deg, #0d3f8c 0%, #13255d 100%);
+    }
+
+    .theme-card--samuel {
+      background: linear-gradient(135deg, #8b5d3b 0%, #5b341d 100%);
+    }
+
+    .theme-card--davi {
+      background: linear-gradient(135deg, #1f60c4 0%, #2e9e8f 100%);
+    }
+
+    .theme-card--criacao {
+      background: linear-gradient(135deg, #30aa6c 0%, #187a50 100%);
+    }
+
+    .theme-card--heroes {
+      background: linear-gradient(135deg, #2f72ff 0%, #ff5fa2 52%, #ffd35a 100%);
+      background-size: 200% 200%;
+      animation: heroesGlow 8s ease-in-out infinite;
+    }
+
+    .theme-badge {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .theme-meta {
@@ -491,12 +550,25 @@
       min-height: 34px;
       padding: 0 12px;
       border-radius: 999px;
-      background: var(--brand-soft);
-      color: var(--brand);
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.22);
       font-size: 12px;
       font-weight: 800;
       letter-spacing: 0.04em;
       text-transform: uppercase;
+    }
+
+    @keyframes heroesGlow {
+      0% {
+        background-position: 0% 50%;
+      }
+      50% {
+        background-position: 100% 50%;
+      }
+      100% {
+        background-position: 0% 50%;
+      }
     }
 
     .media-grid {
@@ -655,7 +727,7 @@
       }
 
       h1 {
-        font-size: 42px;
+        font-size: 34px;
       }
 
       .sheet-inner {
@@ -715,7 +787,6 @@
             </p>
             <div class="hero-cta">
               <a class="button button-primary" href="https://wa.me/551233515318" target="_blank" rel="noreferrer">Solicitar data no WhatsApp</a>
-              <a class="button button-secondary" href="#investimento">Ver investimento</a>
             </div>
           </div>
           <div class="hero-side">
@@ -741,11 +812,7 @@
         <div class="video-shell">
           <div class="video-copy">
             <div class="eyebrow">Primeira impressão</div>
-            <h2>Antes da proposta, sinta a atmosfera do que a igreja vai viver.</h2>
-            <p>
-              Este vídeo ajuda a comunicar aquilo que o papel sozinho não consegue: a alegria das crianças,
-              a força da música, os personagens em cena e o cuidado artístico que sustenta cada apresentação.
-            </p>
+            <h2>Turma do Printy e Alberto de Mattos</h2>
           </div>
           <div class="video-stage">
             <video id="releaseVideo" playsinline muted controls preload="metadata"></video>
@@ -875,7 +942,7 @@
         </div>
 
         <div class="theme-grid">
-          <article class="theme-card">
+          <article class="theme-card theme-card--naama">
             <h3>Fé em Deus | Naamã</h3>
             <p>Uma história sobre confiança, obediência e o agir de Deus mesmo quando a solução parece improvável.</p>
             <div class="theme-meta">
@@ -883,7 +950,7 @@
               <span class="tag">Fé</span>
             </div>
           </article>
-          <article class="theme-card">
+          <article class="theme-card theme-card--jonas">
             <h3>Obediência e missões | Jonas</h3>
             <p>Uma narrativa forte sobre ouvir o chamado de Deus, vencer resistências e obedecer ao propósito.</p>
             <div class="theme-meta">
@@ -891,7 +958,7 @@
               <span class="tag">Missões</span>
             </div>
           </article>
-          <article class="theme-card">
+          <article class="theme-card theme-card--samuel">
             <h3>Ouvir a voz de Deus | Samuel</h3>
             <p>Espetáculo sensível sobre escuta, prontidão e resposta à voz do Senhor.</p>
             <div class="theme-meta">
@@ -899,7 +966,7 @@
               <span class="tag">Chamado</span>
             </div>
           </article>
-          <article class="theme-card">
+          <article class="theme-card theme-card--davi">
             <h3>Desafios e fé | Davi e Golias</h3>
             <p>Uma apresentação que mostra coragem, dependência de Deus e vitória em meio aos gigantes da vida.</p>
             <div class="theme-meta">
@@ -907,7 +974,7 @@
               <span class="tag">Coragem</span>
             </div>
           </article>
-          <article class="theme-card">
+          <article class="theme-card theme-card--criacao">
             <h3>Amor de Deus | Criação</h3>
             <p>Uma história cheia de encanto para falar da origem de tudo e do cuidado amoroso do Criador.</p>
             <div class="theme-meta">
@@ -915,7 +982,8 @@
               <span class="tag">Criação</span>
             </div>
           </article>
-          <article class="theme-card">
+          <article class="theme-card theme-card--heroes">
+            <span class="theme-badge">Novo</span>
             <h3>Fábrica de Heróis</h3>
             <p>Espetáculo autoral com humor, ação e identidade forte, ideal para grandes encontros infantis.</p>
             <div class="theme-meta">
