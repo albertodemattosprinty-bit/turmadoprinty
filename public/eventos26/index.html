@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Eventos 2026</title>
+  <style>
+    :root {
+      --ink: #1d2430;
+      --muted: #5f6b7c;
+      --line: rgba(30, 45, 69, 0.12);
+      --panel: #ffffff;
+      --panel-soft: #f7f5ef;
+      --hero-deep: #23406a;
+      --hero-mid: #36639a;
+      --hero-warm: #c8852f;
+      --brand: #ba4d2e;
+      --brand-soft: #fde9d7;
+      --sage: #58725f;
+      --gold: #f1c86c;
+      --shadow: 0 20px 56px rgba(26, 41, 64, 0.14);
+      --radius: 26px;
+      --page-width: 1160px;
+      --font-body: "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+      --font-display: "Georgia", "Cambria", serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background:
+        radial-gradient(circle at top left, rgba(241, 200, 108, 0.22), transparent 28%),
+        linear-gradient(180deg, #fffdf8 0%, #f7f6f1 45%, #edf2f8 100%);
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px 18px 72px;
+    }
+
+    .document {
+      max-width: var(--page-width);
+      margin: 0 auto;
+      display: grid;
+      gap: 22px;
+    }
+
+    .sheet {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .sheet-inner {
+      padding: 40px;
+    }
+
+    .hero {
+      position: relative;
+      color: #fff;
+      background:
+        radial-gradient(circle at top right, rgba(241, 200, 108, 0.24), transparent 24%),
+        linear-gradient(135deg, rgba(20, 42, 71, 0.96), rgba(54, 99, 154, 0.93) 55%, rgba(186, 77, 46, 0.92) 100%);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -8% -20% auto;
+      width: 360px;
+      height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 64%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-grid,
+    .video-shell,
+    .closing-grid {
+      display: grid;
+      gap: 28px;
+    }
+
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      grid-template-columns: 1.25fr 0.75fr;
+      align-items: end;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      line-height: 1.08;
+    }
+
+    h1 {
+      margin-top: 18px;
+      font-family: var(--font-display);
+      font-size: 58px;
+      letter-spacing: -0.035em;
+    }
+
+    .lead {
+      margin: 18px 0 0;
+      max-width: 720px;
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.93);
+    }
+
+    .hero-cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 26px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 22px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 800;
+      transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button-primary {
+      background: linear-gradient(135deg, #f3cf7d, #f0b85d);
+      color: #2b2f38;
+      box-shadow: 0 14px 28px rgba(241, 200, 108, 0.28);
+    }
+
+    .button-secondary {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .hero-side {
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero-card,
+    .quote-card {
+      padding: 20px 22px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(8px);
+    }
+
+    .hero-card strong,
+    .quote-card strong {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 14px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .hero-card span,
+    .quote-card span {
+      display: block;
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .video-hero {
+      background:
+        radial-gradient(circle at top right, rgba(241, 200, 108, 0.18), transparent 24%),
+        linear-gradient(135deg, #1f3556 0%, #2b4e7c 55%, #345e93 100%);
+      color: #fff;
+    }
+
+    .video-shell {
+      grid-template-columns: 1.1fr 0.9fr;
+      align-items: center;
+    }
+
+    .video-copy h2 {
+      color: #fff;
+      font-size: 38px;
+    }
+
+    .video-copy p {
+      margin: 14px 0 0;
+      color: rgba(255, 255, 255, 0.87);
+      max-width: 560px;
+    }
+
+    .video-stage {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      border-radius: 26px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(8, 24, 47, 0.14), rgba(8, 24, 47, 0.46)),
+        linear-gradient(135deg, #173963 0%, #255993 100%);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .video-stage video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      background: #163e6b;
+    }
+
+    .video-loading {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        linear-gradient(180deg, rgba(10, 28, 51, 0.36), rgba(10, 28, 51, 0.86)),
+        linear-gradient(135deg, #163c69 0%, #102d50 100%);
+      transition: opacity 300ms ease, visibility 300ms ease;
+    }
+
+    .video-loading.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .video-loading-card {
+      width: min(320px, 100%);
+      padding: 28px 24px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.11);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      text-align: center;
+    }
+
+    .video-loading-card strong {
+      display: block;
+      font-size: 38px;
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .video-loading-card span {
+      display: block;
+      margin-top: 10px;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 14px;
+    }
+
+    .video-progress {
+      width: 100%;
+      height: 10px;
+      margin-top: 18px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      overflow: hidden;
+    }
+
+    .video-progress-bar {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #f1c86c 0%, #ffe8b1 100%);
+      transition: width 120ms linear;
+    }
+
+    .section-header {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .section-kicker {
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      color: #20344f;
+    }
+
+    .section-copy {
+      max-width: 920px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .stats,
+    .pillars,
+    .experience-grid,
+    .theme-grid,
+    .timeline,
+    .logistics-grid,
+    .closing-grid,
+    .media-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .stat,
+    .card,
+    .theme-card,
+    .logistics-card,
+    .media-card,
+    .price-card,
+    .fit-list {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+    }
+
+    .stat {
+      padding: 24px;
+      background: linear-gradient(180deg, #ffffff 0%, #f7f8fb 100%);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 34px;
+      color: var(--brand);
+      line-height: 1;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .pillars {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .card,
+    .theme-card,
+    .logistics-card,
+    .media-card,
+    .price-card,
+    .fit-list {
+      padding: 24px;
+      background: var(--panel-soft);
+    }
+
+    .card h3,
+    .theme-card h3,
+    .logistics-card h3,
+    .media-card h3,
+    .price-card h3,
+    .fit-list h3 {
+      font-size: 21px;
+      color: #24364f;
+      margin-bottom: 10px;
+    }
+
+    .card p,
+    .theme-card p,
+    .logistics-card p,
+    .media-card p,
+    .price-card p,
+    .fit-list li {
+      color: var(--muted);
+      font-size: 15px;
+      margin: 0;
+    }
+
+    .experience-grid {
+      grid-template-columns: 0.95fr 1.05fr;
+      align-items: start;
+    }
+
+    .experience-flow {
+      display: grid;
+      gap: 14px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 16px;
+      align-items: start;
+      padding: 18px 20px;
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .flow-step strong {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 48px;
+      border-radius: 16px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 18px;
+    }
+
+    .flow-step h4 {
+      font-size: 18px;
+      color: #21344e;
+      margin-bottom: 6px;
+    }
+
+    .flow-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .quote-band {
+      padding: 28px;
+      border-radius: 28px;
+      background:
+        linear-gradient(135deg, rgba(186, 77, 46, 0.08), rgba(88, 114, 95, 0.08)),
+        #fff;
+      border: 1px solid rgba(186, 77, 46, 0.14);
+    }
+
+    .quote-band p {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 30px;
+      color: #23406a;
+      line-height: 1.2;
+    }
+
+    .quote-band span {
+      display: block;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .theme-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .theme-card {
+      background: #fff;
+      box-shadow: 0 12px 28px rgba(29, 36, 48, 0.05);
+    }
+
+    .theme-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .media-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .media-card {
+      padding: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .media-card img {
+      width: 100%;
+      height: 220px;
+      display: block;
+      object-fit: cover;
+      background: #e6ebf2;
+    }
+
+    .media-copy {
+      padding: 20px;
+    }
+
+    .timeline {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .timeline-item {
+      border-radius: 24px;
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid var(--line);
+      display: grid;
+      grid-template-rows: 220px auto;
+    }
+
+    .timeline-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #e7edf5;
+    }
+
+    .timeline-copy {
+      padding: 18px 20px 22px;
+    }
+
+    .timeline-year {
+      display: inline-block;
+      padding: 6px 11px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .timeline-copy h3 {
+      font-size: 21px;
+      color: #24364f;
+      margin-bottom: 10px;
+    }
+
+    .timeline-copy p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .logistics-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .logistics-card {
+      background: #fff;
+    }
+
+    .logistics-card ul,
+    .fit-list ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .price-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .price-card {
+      background: #fff;
+    }
+
+    .price-highlight {
+      font-family: var(--font-display);
+      font-size: 46px;
+      color: #23406a;
+      line-height: 1;
+      margin: 18px 0 8px;
+    }
+
+    .closing-grid {
+      grid-template-columns: 1.15fr 0.85fr;
+      align-items: start;
+    }
+
+    .closing-note {
+      padding: 30px;
+      border-radius: 28px;
+      background:
+        linear-gradient(180deg, #21344f 0%, #31537a 100%);
+      color: #fff;
+    }
+
+    .closing-note h3 {
+      font-size: 30px;
+      margin-bottom: 12px;
+    }
+
+    .closing-note p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .closing-note .hero-cta {
+      margin-top: 22px;
+    }
+
+    .footer-note {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.16);
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 13px;
+    }
+
+    @media (max-width: 960px) {
+      .hero-grid,
+      .video-shell,
+      .stats,
+      .pillars,
+      .experience-grid,
+      .theme-grid,
+      .timeline,
+      .logistics-grid,
+      .price-layout,
+      .closing-grid,
+      .media-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 42px;
+      }
+
+      .sheet-inner {
+        padding: 28px;
+      }
+    }
+
+    @media print {
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+
+      html,
+      body {
+        background: #fff;
+      }
+
+      body {
+        padding: 0;
+      }
+
+      .document {
+        max-width: none;
+        gap: 12px;
+      }
+
+      .sheet {
+        box-shadow: none;
+        border: 1px solid #d5dbe5;
+        break-inside: avoid;
+      }
+
+      .sheet-inner {
+        padding: 22px;
+      }
+
+      .timeline-item,
+      .media-card,
+      .theme-card {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="document">
+    <section class="sheet hero">
+      <div class="sheet-inner">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Eventos 2026 | Turma do Printy</div>
+            <h1>Uma apresentação pode durar 75 minutos. Uma lembrança com o Evangelho pode durar a vida inteira.</h1>
+            <p class="lead">
+              Teatro, música, personagens, fantoches e mensagem bíblica em uma experiência infantil pensada
+              para igrejas que desejam um evento marcante, organizado e cheio da presença de Deus.
+            </p>
+            <div class="hero-cta">
+              <a class="button button-primary" href="https://wa.me/5511979870528" target="_blank" rel="noreferrer">Solicitar data no WhatsApp</a>
+              <a class="button button-secondary" href="#investimento">Ver investimento</a>
+            </div>
+          </div>
+          <div class="hero-side">
+            <div class="hero-card">
+              <strong>Missão</strong>
+              <span>Imprimir o Evangelho no coração da criança com linguagem lúdica, bíblica e profundamente memorável.</span>
+            </div>
+            <div class="hero-card">
+              <strong>Formato</strong>
+              <span>Apresentação de cerca de 1h15 com abertura musical, oração, humor, personagens e ministração da Palavra.</span>
+            </div>
+            <div class="hero-card">
+              <strong>Contratação</strong>
+              <span>Ideal para congressos infantis, cultos especiais, escolas bíblicas, retiros, celebrações e eventos temáticos em 2026.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet video-hero">
+      <div class="sheet-inner">
+        <div class="video-shell">
+          <div class="video-copy">
+            <div class="eyebrow">Primeira impressão</div>
+            <h2>Antes da proposta, sinta a atmosfera do que a igreja vai viver.</h2>
+            <p>
+              Este vídeo ajuda a comunicar aquilo que o papel sozinho não consegue: a alegria das crianças,
+              a força da música, os personagens em cena e o cuidado artístico que sustenta cada apresentação.
+            </p>
+          </div>
+          <div class="video-stage">
+            <video id="releaseVideo" playsinline muted controls preload="metadata"></video>
+            <div class="video-loading" id="videoLoading">
+              <div class="video-loading-card">
+                <strong id="videoPercent">0%</strong>
+                <span id="videoStatus">Preparando vídeo de apresentação</span>
+                <div class="video-progress">
+                  <div class="video-progress-bar" id="videoProgressBar"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Nossa missão</div>
+          <h2>Mais de quatro décadas usando arte, fé e criatividade para alcançar crianças.</h2>
+          <div class="section-copy">
+            Somos gratos ao Senhor por cada porta aberta. A Turma do Printy existe para servir a igreja com
+            apresentações que unem excelência, leveza, humor, beleza visual e uma mensagem cristã clara,
+            conduzindo as crianças da atenção para a escuta, e da escuta para a Palavra.
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <strong>1h15</strong>
+            <span>Duração média com ritmo pensado para prender a atenção da criança do início ao fim.</span>
+          </div>
+          <div class="stat">
+            <strong>1989+</strong>
+            <span>Trajetória construída ao longo de décadas em projetos, espetáculos e ações com crianças.</span>
+          </div>
+          <div class="stat">
+            <strong>6 temas</strong>
+            <span>Histórias bíblicas e espetáculos prontos para diferentes contextos da programação infantil.</span>
+          </div>
+          <div class="stat">
+            <strong>3 a 6</strong>
+            <span>Equipe em cena conforme o espetáculo, a estrutura disponível e a proposta contratada.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Como acontece</div>
+          <h2>Uma experiência em capítulos, não apenas uma peça infantil.</h2>
+          <div class="section-copy">
+            A proposta foi pensada para ajudar a igreja a enxergar o valor do evento inteiro: o impacto
+            espiritual, a preparação, a atmosfera e a forma como a mensagem é construída diante das crianças.
+          </div>
+        </div>
+
+        <div class="experience-grid">
+          <div class="experience-flow">
+            <article class="flow-step">
+              <strong>01</strong>
+              <div>
+                <h4>Música de abertura</h4>
+                <p>Começamos com energia e encanto para captar a atenção logo nos primeiros minutos.</p>
+              </div>
+            </article>
+            <article class="flow-step">
+              <strong>02</strong>
+              <div>
+                <h4>Momento de oração</h4>
+                <p>Criamos um início sensível, alinhado ao propósito espiritual da programação infantil.</p>
+              </div>
+            </article>
+            <article class="flow-step">
+              <strong>03</strong>
+              <div>
+                <h4>Bonecos e fantoches</h4>
+                <p>Entramos com humor, descontração e identificação para preparar o coração da criança.</p>
+              </div>
+            </article>
+            <article class="flow-step">
+              <strong>04</strong>
+              <div>
+                <h4>Pregação da Palavra</h4>
+                <p>A história bíblica chega com clareza, emoção, beleza visual e aplicação prática.</p>
+              </div>
+            </article>
+          </div>
+
+          <div>
+            <div class="quote-band">
+              <p>"A criança ri primeiro, participa depois e então guarda a verdade bíblica com mais profundidade."</p>
+              <span>Esse é o coração da proposta: criar abertura emocional para que o Evangelho seja recebido com alegria e atenção.</span>
+            </div>
+            <div class="pillars" style="margin-top: 18px;">
+              <article class="card">
+                <h3>Teatro com propósito</h3>
+                <p>Personagens, figurinos e encenação a serviço de uma mensagem cristã viva e compreensível.</p>
+              </article>
+              <article class="card">
+                <h3>Música e participação</h3>
+                <p>A trilha da apresentação ajuda a envolver as crianças e sustentar a memória do que foi vivido.</p>
+              </article>
+              <article class="card">
+                <h3>Equipe coesa</h3>
+                <p>Revezamento entre atores e fantoches para manter dinamismo, ritmo e variedade em cena.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Espetáculos</div>
+          <h2>Temas bíblicos que podem ser escolhidos para o seu evento.</h2>
+          <div class="section-copy">
+            Cada tema foi pensado para comunicar verdades eternas com a linguagem da infância. A depender da
+            estrutura e da proposta da igreja, ajudamos na escolha do espetáculo mais adequado.
+          </div>
+        </div>
+
+        <div class="theme-grid">
+          <article class="theme-card">
+            <h3>Fé em Deus | Naamã</h3>
+            <p>Uma história sobre confiança, obediência e o agir de Deus mesmo quando a solução parece improvável.</p>
+            <div class="theme-meta">
+              <span class="tag">5 pessoas</span>
+              <span class="tag">Fé</span>
+            </div>
+          </article>
+          <article class="theme-card">
+            <h3>Obediência e missões | Jonas</h3>
+            <p>Uma narrativa forte sobre ouvir o chamado de Deus, vencer resistências e obedecer ao propósito.</p>
+            <div class="theme-meta">
+              <span class="tag">4 pessoas</span>
+              <span class="tag">Missões</span>
+            </div>
+          </article>
+          <article class="theme-card">
+            <h3>Ouvir a voz de Deus | Samuel</h3>
+            <p>Espetáculo sensível sobre escuta, prontidão e resposta à voz do Senhor.</p>
+            <div class="theme-meta">
+              <span class="tag">3 pessoas</span>
+              <span class="tag">Chamado</span>
+            </div>
+          </article>
+          <article class="theme-card">
+            <h3>Desafios e fé | Davi e Golias</h3>
+            <p>Uma apresentação que mostra coragem, dependência de Deus e vitória em meio aos gigantes da vida.</p>
+            <div class="theme-meta">
+              <span class="tag">3 ou 4 pessoas</span>
+              <span class="tag">Coragem</span>
+            </div>
+          </article>
+          <article class="theme-card">
+            <h3>Amor de Deus | Criação</h3>
+            <p>Uma história cheia de encanto para falar da origem de tudo e do cuidado amoroso do Criador.</p>
+            <div class="theme-meta">
+              <span class="tag">5 pessoas</span>
+              <span class="tag">Criação</span>
+            </div>
+          </article>
+          <article class="theme-card">
+            <h3>Fábrica de Heróis</h3>
+            <p>Espetáculo autoral com humor, ação e identidade forte, ideal para grandes encontros infantis.</p>
+            <div class="theme-meta">
+              <span class="tag">4 a 6 pessoas</span>
+              <span class="tag">Especial 2026</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Confiança</div>
+          <h2>Bastidores, estrada e história para a igreja contratar com tranquilidade.</h2>
+          <div class="section-copy">
+            A proposta original já deixava clara a logística. Aqui, ela aparece no lugar certo: depois que a
+            igreja entende o valor espiritual e artístico do que será entregue.
+          </div>
+        </div>
+
+        <div class="media-grid">
+          <article class="media-card">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/14.png" alt="Lançamento do teatro Fábrica de Heróis">
+            <div class="media-copy">
+              <h3>Palco que ganha vida</h3>
+              <p>Figurinos, personagens e dinâmica visual para transformar o ambiente da programação infantil.</p>
+            </div>
+          </article>
+          <article class="media-card">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/16.png" alt="Crianças em projeto Fábrica de Heróis">
+            <div class="media-copy">
+              <h3>Crianças realmente envolvidas</h3>
+              <p>A apresentação não fica distante do público: ela convida, aproxima e cria memória afetiva.</p>
+            </div>
+          </article>
+          <article class="media-card">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/20.png" alt="Simpósio de musicalização infantil">
+            <div class="media-copy">
+              <h3>Experiência acumulada</h3>
+              <p>Décadas de atuação fortalecem o preparo, a sensibilidade e a consistência do trabalho entregue.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Trajetória</div>
+          <h2>Marcos que mostram constância, repertório e credibilidade.</h2>
+          <div class="section-copy">
+            A linha do tempo reforça algo muito importante para 2026: não se trata de uma iniciativa improvisada,
+            mas de um ministério artístico com caminhada, produção e presença contínua junto à infância.
+          </div>
+        </div>
+
+        <div class="timeline">
+          <article class="timeline-item">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/01.png" alt="Projeto Educativo com Escola Shallon">
+            <div class="timeline-copy">
+              <div class="timeline-year">1989</div>
+              <h3>Início documentado da trajetória</h3>
+              <p>Projetos com crianças em ambiente escolar e comunitário já registravam a essência do trabalho: arte, participação e formação.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/07.png" alt="Gravação de DVD infantil educativo">
+            <div class="timeline-copy">
+              <div class="timeline-year">2005</div>
+              <h3>Produção audiovisual infantil</h3>
+              <p>Música e vídeo ampliaram o alcance da mensagem e mostraram capacidade de comunicar além do palco.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/11.png" alt="Simpósio da família">
+            <div class="timeline-copy">
+              <div class="timeline-year">2019</div>
+              <h3>Atuação em eventos e encontros</h3>
+              <p>Programações com famílias e infância reforçaram a adaptabilidade da Turma do Printy para diferentes contextos cristãos.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/14.png" alt="Fábrica de Heróis">
+            <div class="timeline-copy">
+              <div class="timeline-year">2023</div>
+              <h3>Lançamento de espetáculo marcante</h3>
+              <p>Fábrica de Heróis consolidou a força de um formato moderno, visualmente rico e com alto potencial para grandes programações.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/16.png" alt="Projeto com crianças da comunidade">
+            <div class="timeline-copy">
+              <div class="timeline-year">2025</div>
+              <h3>Continuidade com crianças e comunidade</h3>
+              <p>A caminhada segue viva, atual e conectada com a realidade das igrejas, famílias e territórios onde as crianças estão.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/20.png" alt="Simpósio de musicalização infantil em 2026">
+            <div class="timeline-copy">
+              <div class="timeline-year">2026</div>
+              <h3>Preparação para a agenda do ano</h3>
+              <p>Eventos, treinamentos e apresentações seguem fortalecendo a agenda 2026 com base em experiência real e entrega consistente.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Estrutura do evento</div>
+          <h2>O que a igreja precisa disponibilizar para receber a equipe.</h2>
+          <div class="section-copy">
+            Organizamos esta parte com clareza para facilitar a conversa com a liderança, equipe técnica e responsáveis pela programação.
+          </div>
+        </div>
+
+        <div class="logistics-grid">
+          <article class="logistics-card">
+            <h3>Som e apoio técnico</h3>
+            <ul>
+              <li>O mesmo equipamento usado nos cultos normalmente já atende a apresentação.</li>
+              <li>Precisamos de 1 microfone, de preferência sem fio, já carregado.</li>
+              <li>Pedimos o técnico da igreja conosco pelo menos 40 minutos antes para a passagem de som.</li>
+            </ul>
+          </article>
+          <article class="logistics-card">
+            <h3>Camarim ou sala de apoio</h3>
+            <ul>
+              <li>Sala próxima ao púlpito ou palco, com cadeiras e pelo menos duas mesas ou aparadores.</li>
+              <li>Uso exclusivo da Turma do Printy durante o evento para figurinos, acessórios e pertences da equipe.</li>
+              <li>Sugestão prática: sinalizar a porta para evitar entrada durante a preparação.</li>
+            </ul>
+          </article>
+          <article class="logistics-card">
+            <h3>Alimentação e estacionamento</h3>
+            <ul>
+              <li>Muitas vezes a equipe sai muito cedo ou vem de outro compromisso, então a alimentação ajuda bastante.</li>
+              <li>Se não houver estacionamento, uma vaga próxima facilita a descarga de cenário, iluminação e materiais.</li>
+            </ul>
+          </article>
+          <article class="logistics-card">
+            <h3>Chegada, hospedagem e logística</h3>
+            <ul>
+              <li>Costumamos chegar com 1h30 de antecedência para montagem, som e organização.</li>
+              <li>Hospedagem é isenta em São Paulo.</li>
+              <li>Quando a distância ultrapassa 200 km ida e volta e o evento é à noite, a hospedagem passa a ser necessária.</li>
+              <li>Em cidades mais distantes, a equipe pode chegar no dia anterior para preservar a pontualidade do compromisso.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet" id="investimento">
+      <div class="sheet-inner">
+        <div class="section-header">
+          <div class="section-kicker">Investimento</div>
+          <h2>Contexto, valor e condições para fechamento da data.</h2>
+          <div class="section-copy">
+            Em vez de mostrar apenas um número, esta seção ajuda a liderança a enxergar o que está sendo contratado:
+            equipe, cenário, personagens, teatro, música, logística e uma apresentação cristã com identidade própria.
+          </div>
+        </div>
+
+        <div class="price-layout">
+          <article class="price-card">
+            <h3>Valor da apresentação</h3>
+            <div class="price-highlight">R$ 3.400,00</div>
+            <p>
+              Investimento por apresentação, não incluindo transporte. Para cidade de São Paulo e região,
+              o transporte é fixado em R$ 350,00, considerando a sede da equipe em Jacareí - SP.
+            </p>
+          </article>
+          <article class="price-card">
+            <h3>Fechamento da data</h3>
+            <p>
+              A reserva acontece com depósito de 50% do cachê, no valor de R$ 1.700,00. O restante do valor,
+              junto com o transporte, deve ser depositado na semana que antecede o evento.
+            </p>
+            <p style="margin-top: 14px;">
+              Para outras cidades e estados, o transporte é informado após a prévia de custo e pode ser
+              confirmado mais próximo da viagem.
+            </p>
+          </article>
+        </div>
+
+        <div class="pillars" style="margin-top: 18px;">
+          <article class="card">
+            <h3>Remarcações</h3>
+            <p>Em casos extremos, como impedimentos graves ou choques de agenda, a proposta prevê remarcação conforme disponibilidade.</p>
+          </article>
+          <article class="card">
+            <h3>Desistência após reserva</h3>
+            <p>Após a aprovação e o pagamento dos 50%, o valor não é ressarcido em caso de cancelamento por parte da igreja.</p>
+          </article>
+          <article class="card">
+            <h3>Formalização</h3>
+            <p>Depois do fechamento da data, a equipe envia o termo de compromisso consolidando todos os pontos tratados.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet">
+      <div class="sheet-inner">
+        <div class="closing-grid">
+          <div class="closing-note">
+            <h3>Vamos viver esse dia juntos?</h3>
+            <p>
+              Se a sua igreja está buscando um evento infantil cristão com beleza, organização, mensagem bíblica
+              e impacto real nas crianças, a Turma do Printy está pronta para servir em 2026.
+            </p>
+            <div class="hero-cta">
+              <a class="button button-primary" href="https://wa.me/551233515318" target="_blank" rel="noreferrer">Ligar para assessoria</a>
+              <a class="button button-secondary" href="https://wa.me/5511979870528" target="_blank" rel="noreferrer">Falar no WhatsApp</a>
+            </div>
+            <div class="footer-note">
+              Contatos informados na proposta: WhatsApp 12 3351-5318 | Ligações 11 9 7987-0528.
+              Proposta válida de janeiro a dezembro de 2026.
+            </div>
+          </div>
+          <div class="fit-list">
+            <h3>Ideal para contratação em</h3>
+            <ul>
+              <li>Congressos e conferências infantis</li>
+              <li>Cultos especiais com crianças</li>
+              <li>Escola bíblica de férias e retiros</li>
+              <li>Programações evangelísticas em igrejas</li>
+              <li>Datas comemorativas com foco cristão</li>
+              <li>Grandes encontros com famílias e ministério infantil</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const videoUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Capas/Release%20Alberto%20de%20Mattos.mp4";
+      const bufferTargetBytes = 1024 * 1024;
+      const video = document.getElementById("releaseVideo");
+      const loading = document.getElementById("videoLoading");
+      const percent = document.getElementById("videoPercent");
+      const status = document.getElementById("videoStatus");
+      const bar = document.getElementById("videoProgressBar");
+
+      function setProgress(value, label) {
+        const clamped = Math.max(0, Math.min(100, Math.round(value)));
+        percent.textContent = clamped + "%";
+        bar.style.width = clamped + "%";
+        if (label) {
+          status.textContent = label;
+        }
+      }
+
+      function releaseVideo() {
+        if (video.dataset.released === "1") return;
+        video.dataset.released = "1";
+        setProgress(100, "Vídeo pronto para iniciar");
+        video.src = videoUrl;
+        video.load();
+      }
+
+      function hideLoader() {
+        loading.classList.add("is-hidden");
+      }
+
+      async function warmupVideo() {
+        if (!window.fetch || !window.ReadableStream) {
+          setProgress(100, "Iniciando vídeo");
+          releaseVideo();
+          return;
+        }
+
+        try {
+          const response = await fetch(videoUrl, {
+            headers: { Range: "bytes=0-1048575" }
+          });
+
+          if (!response.ok || !response.body) {
+            setProgress(100, "Iniciando vídeo");
+            releaseVideo();
+            return;
+          }
+
+          const reader = response.body.getReader();
+          let loaded = 0;
+
+          setProgress(0, "Carregando buffer inicial");
+
+          while (loaded < bufferTargetBytes) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            loaded += value ? value.byteLength : 0;
+            setProgress((loaded / bufferTargetBytes) * 100, "Carregando buffer inicial");
+          }
+
+          releaseVideo();
+        } catch (error) {
+          setProgress(100, "Iniciando vídeo");
+          releaseVideo();
+        }
+      }
+
+      video.addEventListener("loadeddata", function () {
+        setProgress(100, "Vídeo liberado");
+      });
+
+      video.addEventListener("canplay", function () {
+        hideLoader();
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.catch === "function") {
+          playAttempt.catch(function () {});
+        }
+      });
+
+      video.addEventListener("error", function () {
+        setProgress(100, "Clique em play para carregar o vídeo");
+        hideLoader();
+      });
+
+      warmupVideo();
+    })();
+  </script>
+</body>
+</html>
