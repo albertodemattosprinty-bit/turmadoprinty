@@ -226,6 +226,46 @@ function buildAlbumZipPublicUrlFromKey(key) {
     .join("/")}`;
 }
 
+async function listPublicR2AssetsByPrefix(prefix) {
+  const normalizedPrefix = String(prefix || "").trim().replace(/^\/+/, "");
+  if (!normalizedPrefix) {
+    return [];
+  }
+
+  const client = getR2Client();
+  const assets = [];
+  let continuationToken;
+
+  do {
+    const result = await client.send(new ListObjectsV2Command({
+      Bucket: R2_BUCKET_NAME,
+      Prefix: normalizedPrefix,
+      ContinuationToken: continuationToken
+    }));
+    const objects = Array.isArray(result?.Contents) ? result.Contents : [];
+
+    for (const item of objects) {
+      const key = String(item?.Key || "").trim();
+      if (!key || key.endsWith("/")) {
+        continue;
+      }
+
+      const extension = path.posix.extname(key).toLowerCase();
+      const fileName = path.posix.basename(key);
+      assets.push({
+        key,
+        fileName,
+        extension,
+        url: buildAlbumZipPublicUrlFromKey(key)
+      });
+    }
+
+    continuationToken = result?.IsTruncated ? result?.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return assets.sort((first, second) => first.key.localeCompare(second.key, "pt-BR"));
+}
+
 function buildSafeDownloadBaseName(value, fallback = "arquivo") {
   const normalized = String(value || "")
     .normalize("NFD")
@@ -10215,6 +10255,34 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/site/config") {
     await handleSiteConfigRequest(response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/proposta2026/assets") {
+    try {
+      const assets = await listPublicR2AssetsByPrefix("Proposta/");
+      const imageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif"]);
+      const videoExtensions = new Set([".mp4", ".webm", ".mov", ".m4v"]);
+      const images = assets.filter((asset) => imageExtensions.has(asset.extension));
+      const videos = assets.filter((asset) => videoExtensions.has(asset.extension));
+
+      sendJson(response, 200, {
+        ok: true,
+        prefix: "Proposta/",
+        images,
+        videos,
+        total: assets.length
+      });
+    } catch (error) {
+      sendJson(response, 200, {
+        ok: false,
+        prefix: "Proposta/",
+        images: [],
+        videos: [],
+        total: 0,
+        error: error instanceof Error ? error.message : "Nao foi possivel listar os arquivos da proposta."
+      });
+    }
     return;
   }
 
