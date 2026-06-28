@@ -77,6 +77,24 @@ export async function ensureProject200ChatsSchema() {
   await query("alter table project200_chats add column if not exists unread_count integer not null default 0;");
   await query("alter table project200_chats add column if not exists notification_permission text not null default 'default';");
   await query("alter table project200_chats add column if not exists auto_meta jsonb not null default '{}'::jsonb;");
+  await query("update project200_chats set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
+  await query("update project200_chats set tone_key = 'neutral' where tone_key is null or btrim(tone_key) = '';");
+  await query(`
+    with ranked as (
+      select ctid,
+             row_number() over (
+               partition by user_id, assigned_profile, tone_key
+               order by coalesce(updated_at, last_message_at, created_at) desc, created_at desc, ctid desc
+             ) as duplicate_rank
+        from project200_chats
+    )
+    delete from project200_chats
+    where ctid in (
+      select ctid
+      from ranked
+      where duplicate_rank > 1
+    );
+  `);
   await query("drop index if exists idx_project200_chats_updated_at;");
   await query("drop index if exists idx_project200_chats_user_unique;");
   await query("drop index if exists idx_project200_chats_user_profile_unique;");

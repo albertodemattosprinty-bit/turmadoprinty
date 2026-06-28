@@ -3472,6 +3472,9 @@ function closeModal(modal) {
     state.runningConfirm.action = null;
     document.body.classList.remove("running-confirm-open");
   }
+  if (modal.id === "quickTaskModal") {
+    document.body.classList.remove("quick-task-open");
+  }
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
   }
@@ -7009,9 +7012,22 @@ async function loadConversationChat() {
   showDbLoadingState(conversationsMessages, 220);
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
   const toneKey = getChatToneMode(state.options.chatTone).key;
-  const payload = await apiRequest(`/api/200/chat?profile=${encodeURIComponent(profile)}&tone=${encodeURIComponent(toneKey)}`);
-  state.conversationChat = payload.chat || { messages: [] };
-  renderConversationMessages();
+  try {
+    const payload = await apiRequest(`/api/200/chat?profile=${encodeURIComponent(profile)}&tone=${encodeURIComponent(toneKey)}`);
+    state.conversationChat = payload.chat || { messages: [] };
+    renderConversationMessages();
+    if (conversationsStatus) {
+      conversationsStatus.hidden = true;
+      conversationsStatus.textContent = "";
+    }
+  } catch (error) {
+    state.conversationChat = { messages: [] };
+    renderConversationMessages();
+    if (conversationsStatus) {
+      conversationsStatus.hidden = false;
+      conversationsStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar esta conversa.";
+    }
+  }
 }
 
 async function loadConversationsPromptEditor() {
@@ -7241,6 +7257,7 @@ function openQuickTaskModal() {
   if (quickTaskStatus) {
     quickTaskStatus.textContent = "";
   }
+  document.body.classList.add("quick-task-open");
   openModal("quickTaskModal");
   window.setTimeout(() => quickTaskTitleInput?.focus(), 60);
 }

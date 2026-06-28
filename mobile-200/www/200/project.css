@@ -1349,6 +1349,11 @@ body.screen-locked .project-login-overlay.active {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
 
+body.quick-task-open #runningTaskModal.active {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .quick-task-input {
   width: 100%;
 }
@@ -2068,6 +2073,12 @@ body.running-music-standalone #actionsModal .actions-list {
 
 .simple-modal.active {
   display: grid;
+}
+
+#quickTaskModal.workspace-modal {
+  z-index: 36;
+  background: rgba(0, 0, 0, 0.94);
+  backdrop-filter: blur(8px);
 }
 
 .simple-modal h1 {
