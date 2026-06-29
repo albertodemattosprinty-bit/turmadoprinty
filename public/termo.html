@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Termo - Formul·rio</title>
+  <title>Termo - Formul√°rio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;600&display=swap" rel="stylesheet" />
@@ -277,7 +278,7 @@
 <body>
   <section class="screen active" data-screen="intro">
     <div class="card">
-      <h1>Formul·rio do Evento</h1>
+      <h1>Formul√°rio do Evento</h1>
       <p class="intro-copy">Leva cerca de 5 minutos. Preencha com calma e avance no seu ritmo.</p>
       <div class="actions">
         <button class="btn-primary" id="startBtn" type="button">Iniciar</button>
@@ -292,7 +293,7 @@
         <h1>Assinatura</h1>
       </div>
       <h2 class="agreement-copy">Eu <u id="signatureName">contratante</u> concordo com os termos desse documento.</h2>
-      <input id="signatureCpf" class="input" type="text" inputmode="numeric" maxlength="11" placeholder="Digite o CPF (11 dÌgitos)" />
+      <input id="signatureCpf" class="input" type="text" inputmode="numeric" maxlength="11" placeholder="Digite o CPF (11 d√≠gitos)" />
       <div class="error" id="signatureError"></div>
       <div class="actions">
         <button class="btn-approve" id="signAgreeBtn" type="button">
@@ -335,7 +336,7 @@
 
       <div class="actions">
         <button class="btn-secondary" id="prevBtn" type="button">Voltar</button>
-        <button class="btn-primary" id="nextBtn" type="button">PrÛximo</button>
+        <button class="btn-primary" id="nextBtn" type="button">Pr√≥ximo</button>
       </div>
     </div>
   </section>
@@ -361,7 +362,7 @@
   <section class="screen" data-screen="success">
     <div class="card">
       <h1>Tudo certo!</h1>
-      <p class="success-copy" id="successCopy">Seu formul·rio foi preenchido com sucesso.</p>
+      <p class="success-copy" id="successCopy">Seu formul√°rio foi preenchido com sucesso.</p>
       <div class="actions">
         <button class="btn-secondary" id="downloadPdfBtn" type="button" style="display:none;">Baixar PDF</button>
         <button class="btn-primary" id="restartBtn" type="button">Preencher novamente</button>
@@ -374,27 +375,27 @@
 
   <script>
     const historyOptions = [
-      "F·brica de herÛis",
-      "HistÛria de Samuel",
+      "F√°brica de her√≥is",
+      "Hist√≥ria de Samuel",
       "Davi e Golias",
-      "HistÛria de Jonas",
-      "HistÛria de Naam„",
-      "HistÛria da criaÁ„o",
-      "ApresentaÁ„o Mista",
-      "HistÛria de NoÈ"
+      "Hist√≥ria de Jonas",
+      "Hist√≥ria de Naam√£",
+      "Hist√≥ria da cria√ß√£o",
+      "Apresenta√ß√£o Mista",
+      "Hist√≥ria de No√©"
     ];
 
     const months = [
-      "Janeiro", "Fevereiro", "MarÁo", "Abril", "Maio", "Junho",
+      "Janeiro", "Fevereiro", "Mar√ßo", "Abril", "Maio", "Junho",
       "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
     ];
 
     const years = ["2026", "2027", "2028", "2029", "2030"];
 
     const countries = [
-      "Brasil", "Estados Unidos", "China", "Jap„o", "Alemanha", "Õndia", "Reino Unido", "FranÁa", "It·lia",
-      "Canad·", "Coreia do Sul", "Austr·lia", "Espanha", "PaÌses Baixos", "SuÌÁa", "Ar·bia Saudita",
-      "Argentina", "Chile", "ColÙmbia", "Peru", "Uruguai", "Paraguai"
+      "Brasil", "Estados Unidos", "China", "Jap√£o", "Alemanha", "√çndia", "Reino Unido", "Fran√ßa", "It√°lia",
+      "Canad√°", "Coreia do Sul", "Austr√°lia", "Espanha", "Pa√≠ses Baixos", "Su√≠√ßa", "Ar√°bia Saudita",
+      "Argentina", "Chile", "Col√¥mbia", "Peru", "Uruguai", "Paraguai"
     ];
 
     const timeSlots = [];
@@ -409,18 +410,18 @@
     }
 
     const steps = [
-      { key: "igreja", title: "Qual È o nome da igreja?", type: "text", placeholder: "Digite o nome da igreja" },
-      { key: "contratante", title: "Qual È o nome do contratante?", type: "text", placeholder: "Digite o nome do contratante" },
-      { key: "whatsapp", title: "Qual È o WhatsApp do contratante?", type: "text", placeholder: "Somente n˙meros", maxLength: 15, numeric: true },
-      { key: "historia", title: "Qual histÛria foi escolhida?", type: "picker", options: historyOptions },
-      { key: "dia", title: "Em que dia ser· o evento?", type: "picker", options: Array.from({ length: 31 }, (_, i) => String(i + 1)) },
-      { key: "mes", title: "Em qual mÍs ser· o evento?", type: "picker", options: months },
-      { key: "ano", title: "Em qual ano ser· o evento?", type: "picker", options: years },
-      { key: "horario", title: "Qual ser· o hor·rio do evento?", type: "picker", options: timeSlots },
-      { key: "pais", title: "Em qual paÌs ou regi„o ser· o evento?", type: "picker", options: countries },
-      { key: "endereco", title: "Qual È o endereÁo do evento?", type: "text", placeholder: "Digite o endereÁo" },
-      { key: "cidade", title: "Em qual cidade ser· o evento?", type: "text", placeholder: "Digite a cidade" },
-      { key: "cep", title: "Qual È o cÛdigo postal (CEP)?", type: "text", placeholder: "8 dÌgitos", maxLength: 8, numeric: true }
+      { key: "igreja", title: "Qual √© o nome da igreja?", type: "text", placeholder: "Digite o nome da igreja" },
+      { key: "contratante", title: "Qual √© o nome do contratante?", type: "text", placeholder: "Digite o nome do contratante" },
+      { key: "whatsapp", title: "Qual √© o WhatsApp do contratante?", type: "text", placeholder: "Somente n√∫meros", maxLength: 15, numeric: true },
+      { key: "historia", title: "Qual hist√≥ria foi escolhida?", type: "picker", options: historyOptions },
+      { key: "dia", title: "Em que dia ser√° o evento?", type: "picker", options: Array.from({ length: 31 }, (_, i) => String(i + 1)) },
+      { key: "mes", title: "Em qual m√™s ser√° o evento?", type: "picker", options: months },
+      { key: "ano", title: "Em qual ano ser√° o evento?", type: "picker", options: years },
+      { key: "horario", title: "Qual ser√° o hor√°rio do evento?", type: "picker", options: timeSlots },
+      { key: "pais", title: "Em qual pa√≠s ou regi√£o ser√° o evento?", type: "picker", options: countries },
+      { key: "endereco", title: "Qual √© o endere√ßo do evento?", type: "text", placeholder: "Digite o endere√ßo" },
+      { key: "cidade", title: "Em qual cidade ser√° o evento?", type: "text", placeholder: "Digite a cidade" },
+      { key: "cep", title: "Qual √© o c√≥digo postal (CEP)?", type: "text", placeholder: "8 d√≠gitos", maxLength: 8, numeric: true }
     ];
 
     const answers = {};
@@ -476,24 +477,24 @@
       {
         icon: `<path d="M4 20h16" stroke="white" stroke-width="1.8"/><path d="M7 17V5a2 2 0 0 1 2-2h8v14" stroke="white" stroke-width="1.8"/><path d="M10 8h5M10 11h5" stroke="white" stroke-width="1.8"/>`,
         h1: "Termo de Compromisso",
-        h2: "Agradecemos pela contrataÁ„o da Turma do Printy. Gentilmente pedimos que atentem ‡ import‚ncia do correto e imediato preenchimento deste documento, pois ele ser· utilizado como registro oficial das informaÁıes do evento, bem como para a gravaÁ„o do vÌdeo de divulgaÁ„o e para a inclus„o da agenda no site e nas mÌdias sociais."
+        h2: "Agradecemos pela contrata√ß√£o da Turma do Printy. Gentilmente pedimos que atentem √† import√¢ncia do correto e imediato preenchimento deste documento, pois ele ser√° utilizado como registro oficial das informa√ß√µes do evento, bem como para a grava√ß√£o do v√≠deo de divulga√ß√£o e para a inclus√£o da agenda no site e nas m√≠dias sociais."
       },
       { icon: `<path d="M3 11L12 4L21 11" stroke="white" stroke-width="1.8"/><path d="M6 10v10h12V10" stroke="white" stroke-width="1.8"/>`, h1: "Compromisso da igreja", h2: "" },
-      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M9 9c1-1 5-1 6 1s-1 3-3 3-4 1-3 3 4 2 6 0" stroke="white" stroke-width="1.8"/>`, h1: "Financeiro/LogÌstico", h2: "O valor de uma (1) apresentaÁ„o: R$ 3.400,00\nO valor de duas (2) apresentaÁıes: R$ 5.100,00\n\nO transporte para a cidade de S„o Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor ser· definido mediante orÁamento prÈvio." },
-      { icon: `<path d="M12 4c4 3 5 6 5 8a5 5 0 1 1-10 0c0-2 1-5 5-8z" stroke="white" stroke-width="1.8"/><path d="M12 14c1 0 2-.8 2-2" stroke="white" stroke-width="1.8"/>`, h1: "ALIMENTA«√O", h2: "A equipe È composta pelo mÌnimo de 3 pessoas e m·ximo de 6, a depender da histÛria escolhida. A alimentaÁ„o pode ser na igreja, hotel ou restaurante.\n\nCafÈ da manh„ - AlmoÁo - Jantar, a depender do hor·rio do evento ou solicitaÁ„o prÈvia da equipe." },
-      { icon: `<path d="M4 14h16l-1.5 4H5.5L4 14z" stroke="white" stroke-width="1.8"/><circle cx="8" cy="18.5" r="1.5" fill="white"/><circle cx="16" cy="18.5" r="1.5" fill="white"/>`, h1: "ESTACIONAMENTO", h2: "Solicitamos liberaÁ„o de vaga na porta da igreja para 2 carros para descarga de equipamento, ou acesso a estacionamento prÛprio." },
-      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.8"/>`, h1: "SALA / CAMARIM", h2: "Precisamos de uma sala exclusiva para a Turma do Printy, prÛxima ao palco/p˙lpito. Sempre lembrando que iremos nos adequar ao espaÁo fÌsico da igreja. TambÈm solicitamos:\nCadeiras e mesas para figurinos e acessÛrios\n\n¡gua mineral ou ·gua de coco (norte e nordeste) disponÌvel no palco durante a apresentaÁ„o." },
-      { icon: `<path d="M5 14V8l6-3 6 3v6" stroke="white" stroke-width="1.8"/><path d="M9 18h6" stroke="white" stroke-width="1.8"/>`, h1: "EQUIPAMENTO DE SOM", h2: "Usamos o equipamento disponÌvel da igreja e 1 microfone sem fio carregado.\n\nUm tÈcnico apto para exercer a funÁ„o de operar a sonoplastia da igreja, a fim de garantir a qualidade sonora do evento." },
-      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M10 10l5 2-5 2v-4z" fill="white"/>`, h1: "VÕDEOS DA PROGRAMA«√O", h2: "Est„o liberadas a gravaÁ„o de imagens da performance da Turma do Printy, desde que as mesmas sejam repassadas ‡ equipe, para a liberaÁ„o de veiculaÁ„o das imagens em plataforma digital. As gravaÁıes de lives est„o liberadas, desde que seja repassado o respectivo link ‡ Turma do Printy antecipadamente, para a divulgaÁ„o do mesmo." },
+      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M9 9c1-1 5-1 6 1s-1 3-3 3-4 1-3 3 4 2 6 0" stroke="white" stroke-width="1.8"/>`, h1: "Financeiro/Log√≠stico", h2: "O valor de uma (1) apresenta√ß√£o: R$ 3.400,00\nO valor de duas (2) apresenta√ß√µes: R$ 5.100,00\n\nO transporte para a cidade de S√£o Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor ser√° definido mediante or√ßamento pr√©vio." },
+      { icon: `<path d="M12 4c4 3 5 6 5 8a5 5 0 1 1-10 0c0-2 1-5 5-8z" stroke="white" stroke-width="1.8"/><path d="M12 14c1 0 2-.8 2-2" stroke="white" stroke-width="1.8"/>`, h1: "ALIMENTA√á√ÉO", h2: "A equipe √© composta pelo m√≠nimo de 3 pessoas e m√°ximo de 6, a depender da hist√≥ria escolhida. A alimenta√ß√£o pode ser na igreja, hotel ou restaurante.\n\nCaf√© da manh√£ - Almo√ßo - Jantar, a depender do hor√°rio do evento ou solicita√ß√£o pr√©via da equipe." },
+      { icon: `<path d="M4 14h16l-1.5 4H5.5L4 14z" stroke="white" stroke-width="1.8"/><circle cx="8" cy="18.5" r="1.5" fill="white"/><circle cx="16" cy="18.5" r="1.5" fill="white"/>`, h1: "ESTACIONAMENTO", h2: "Solicitamos libera√ß√£o de vaga na porta da igreja para 2 carros para descarga de equipamento, ou acesso a estacionamento pr√≥prio." },
+      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.8"/>`, h1: "SALA / CAMARIM", h2: "Precisamos de uma sala exclusiva para a Turma do Printy, pr√≥xima ao palco/p√∫lpito. Sempre lembrando que iremos nos adequar ao espa√ßo f√≠sico da igreja. Tamb√©m solicitamos:\nCadeiras e mesas para figurinos e acess√≥rios\n\n√Ågua mineral ou √°gua de coco (norte e nordeste) dispon√≠vel no palco durante a apresenta√ß√£o." },
+      { icon: `<path d="M5 14V8l6-3 6 3v6" stroke="white" stroke-width="1.8"/><path d="M9 18h6" stroke="white" stroke-width="1.8"/>`, h1: "EQUIPAMENTO DE SOM", h2: "Usamos o equipamento dispon√≠vel da igreja e 1 microfone sem fio carregado.\n\nUm t√©cnico apto para exercer a fun√ß√£o de operar a sonoplastia da igreja, a fim de garantir a qualidade sonora do evento." },
+      { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M10 10l5 2-5 2v-4z" fill="white"/>`, h1: "V√çDEOS DA PROGRAMA√á√ÉO", h2: "Est√£o liberadas a grava√ß√£o de imagens da performance da Turma do Printy, desde que as mesmas sejam repassadas √† equipe, para a libera√ß√£o de veicula√ß√£o das imagens em plataforma digital. As grava√ß√µes de lives est√£o liberadas, desde que seja repassado o respectivo link √† Turma do Printy antecipadamente, para a divulga√ß√£o do mesmo." },
       { icon: `<path d="M5 16l3-7 4 5 3-3 4 5" stroke="white" stroke-width="1.8"/><circle cx="6" cy="7" r="1.2" fill="white"/>`, h1: "COMPROMISSOS DA TURMA DO PRINTY", h2: "" },
-      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="white" stroke-width="1.8"/>`, h1: "CHEGADA E MONTAGEM", h2: "Chegar com 2h00 de antecedÍncia para reconhecimento do espaÁo, passagem de som, montagem de cen·rio e luz, alimentaÁ„o e estruturaÁ„o do evento junto ao respons·vel pelo mesmo." },
-      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M10 9l5 3-5 3V9z" fill="white"/>`, h1: "VÌdeo DivulgaÁ„o", h2: "GravaÁ„o de 1 vÌdeo chamada para WhatsApp e rede social, e divulgar chamada do evento em nossos stories ou feed.\n\n*Enviar imagens e logomarca para a confecÁ„o de flyers e banners, caso a igreja deseje divulgar." },
-      { icon: `<rect x="6" y="4" width="12" height="16" rx="2" stroke="white" stroke-width="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="white" stroke-width="1.8"/>`, h1: "ConsideraÁıes finais", h2: "As informaÁıes utilizadas ser„o exatamente as informadas no termo de compromisso pelo contratante. Se houver alguma variaÁ„o necess·ria, como nome de congresso/evento, escrita/pron˙ncia de nomes prÛprios, igreja/end, dever· ser informada no campo \"Notas adicionais\" deste formul·rio. O material È enviado 8 dias apÛs o preenchimento do contrato." }
+      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="white" stroke-width="1.8"/>`, h1: "CHEGADA E MONTAGEM", h2: "Chegar com 2h00 de anteced√™ncia para reconhecimento do espa√ßo, passagem de som, montagem de cen√°rio e luz, alimenta√ß√£o e estrutura√ß√£o do evento junto ao respons√°vel pelo mesmo." },
+      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M10 9l5 3-5 3V9z" fill="white"/>`, h1: "V√≠deo Divulga√ß√£o", h2: "Grava√ß√£o de 1 v√≠deo chamada para WhatsApp e rede social, e divulgar chamada do evento em nossos stories ou feed.\n\n*Enviar imagens e logomarca para a confec√ß√£o de flyers e banners, caso a igreja deseje divulgar." },
+      { icon: `<rect x="6" y="4" width="12" height="16" rx="2" stroke="white" stroke-width="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="white" stroke-width="1.8"/>`, h1: "Considera√ß√µes finais", h2: "As informa√ß√µes utilizadas ser√£o exatamente as informadas no termo de compromisso pelo contratante. Se houver alguma varia√ß√£o necess√°ria, como nome de congresso/evento, escrita/pron√∫ncia de nomes pr√≥prios, igreja/end, dever√° ser informada no campo \"Notas adicionais\" deste formul√°rio. O material √© enviado 8 dias ap√≥s o preenchimento do contrato." }
     ];
 
     const paymentOptions = [
-      { key: "one", label: "Uma (1) apresentaÁ„o", priceLabel: "R$ 3.400,00", stripeProductId: "prod_UXGPN4quiGCV2S" },
-      { key: "two", label: "Duas (2) apresentaÁıes", priceLabel: "R$ 5.100,00", stripeProductId: "prod_UXFnHWguWzdbst" }
+      { key: "one", label: "Uma (1) apresenta√ß√£o", priceLabel: "R$ 3.400,00", stripeProductId: "prod_UXGPN4quiGCV2S" },
+      { key: "two", label: "Duas (2) apresenta√ß√µes", priceLabel: "R$ 5.100,00", stripeProductId: "prod_UXFnHWguWzdbst" }
     ];
 
     const totalStages = 1 + steps.length + (agreementSteps.length - 1) + 3 + 1 + 1;
@@ -536,7 +537,7 @@
     }
 
     function getWeekdayPt(date) {
-      const days = ["Domingo", "Segunda-feira", "TerÁa-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "S·bado"];
+      const days = ["Domingo", "Segunda-feira", "Ter√ßa-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "S√°bado"];
       return days[date.getDay()] || "";
     }
 
@@ -577,7 +578,7 @@
 
       if (paymentStage === 0) {
         paymentIcon.innerHTML = `<path d="M3 8h18v8H3z" stroke="white" stroke-width="1.8"/><path d="M3 12h18" stroke="white" stroke-width="1.8"/>`;
-        paymentH1.textContent = "Escolha da apresentaÁ„o";
+        paymentH1.textContent = "Escolha da apresenta√ß√£o";
         paymentH2.textContent = "";
         paymentBody.innerHTML = `
           ${paymentOptions.map((opt) => `<button type="button" class="payment-choice ${answers.pagamentoOpcao === opt.key ? "active" : ""}" data-option="${opt.key}">${opt.label} - ${opt.priceLabel}</button>`).join("")}
@@ -601,7 +602,7 @@
         paymentH2.textContent = "Escolha um dia";
         paymentBody.innerHTML = dueDates.map((d, idx) => {
           const dateLabel = formatDateBr(d);
-          const dayLabel = idx === 0 ? "Amanh„" : `<strong>${getWeekdayPt(d)}</strong>`;
+          const dayLabel = idx === 0 ? "Amanh√£" : `<strong>${getWeekdayPt(d)}</strong>`;
           return `<button type="button" class="payment-choice ${answers.pagamentoVencimento === dateLabel ? "active" : ""}" data-due="${idx}">${dayLabel}<br>${dateLabel}</button>`;
         }).join("");
 
@@ -618,7 +619,7 @@
       } else {
         paymentIcon.innerHTML = `<rect x="4" y="5" width="16" height="15" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 3v4M16 3v4" stroke="white" stroke-width="1.8"/>`;
         paymentH1.textContent = "Sua data foi reservada";
-        paymentH2.textContent = "Pague atÈ o vencimento em atÈ 12x";
+        paymentH2.textContent = "Pague at√© o vencimento em at√© 12x";
         paymentBody.style.textAlign = "center";
         paymentBody.innerHTML = `
           <div class="countdown" id="countdownBox">00d : 00h : 00min</div>
@@ -701,7 +702,7 @@
           <div class="picker">
             <button class="picker-btn" id="pickPrev" type="button" aria-label="anterior">${arrowLeft}</button>
             <div class="picker-value" id="pickValue"></div>
-            <button class="picker-btn" id="pickNext" type="button" aria-label="prÛximo">${arrowRight}</button>
+            <button class="picker-btn" id="pickNext" type="button" aria-label="pr√≥ximo">${arrowRight}</button>
           </div>`;
 
         const pickValue = document.getElementById("pickValue");
@@ -728,7 +729,7 @@
       }
 
       prevBtn.style.visibility = currentStep === 0 ? "hidden" : "visible";
-      nextBtn.textContent = currentStep === steps.length - 1 ? "Finalizar" : "PrÛximo";
+      nextBtn.textContent = currentStep === steps.length - 1 ? "Finalizar" : "Pr√≥ximo";
       updateProgress();
     }
 
@@ -746,17 +747,17 @@
         }
 
         if (step.numeric && !/^\d+$/.test(value)) {
-          errorBox.textContent = "Use somente n˙meros nesse campo.";
+          errorBox.textContent = "Use somente n√∫meros nesse campo.";
           return false;
         }
 
         if (step.key === "cep" && value.length !== 8) {
-          errorBox.textContent = "O CEP precisa ter exatamente 8 dÌgitos.";
+          errorBox.textContent = "O CEP precisa ter exatamente 8 d√≠gitos.";
           return false;
         }
 
         if (step.key === "whatsapp" && value.length > 15) {
-          errorBox.textContent = "O WhatsApp pode ter no m·ximo 15 dÌgitos.";
+          errorBox.textContent = "O WhatsApp pode ter no m√°ximo 15 d√≠gitos.";
           return false;
         }
 
@@ -801,18 +802,18 @@
         const data = await response.json();
 
         if (!response.ok || !data?.ok) {
-          throw new Error(data?.error || "Falha ao enviar formul·rio.");
+          throw new Error(data?.error || "Falha ao enviar formul√°rio.");
         }
 
         currentPdfUrl = data.pdfUrl || "";
-        successCopy.textContent = "Seu formul·rio foi preenchido com sucesso e j· foi salvo no sistema.";
+        successCopy.textContent = "Seu formul√°rio foi preenchido com sucesso e j√° foi salvo no sistema.";
         downloadPdfBtn.style.display = currentPdfUrl ? "inline-block" : "none";
 
         showScreen("success");
         currentStep = steps.length + 1;
         updateProgress();
       } catch (error) {
-        errorBox.textContent = error instanceof Error ? error.message : "Falha ao enviar formul·rio.";
+        errorBox.textContent = error instanceof Error ? error.message : "Falha ao enviar formul√°rio.";
       } finally {
         nextBtn.disabled = false;
         nextBtn.textContent = "Finalizar";
@@ -845,7 +846,7 @@
       clearCountdown();
       signatureCpf.value = "";
       signatureError.textContent = "";
-      successCopy.textContent = "Seu formul·rio foi preenchido com sucesso.";
+      successCopy.textContent = "Seu formul√°rio foi preenchido com sucesso.";
       downloadPdfBtn.style.display = "none";
       showScreen("intro");
       updateProgress();
@@ -877,7 +878,7 @@
       paymentError.textContent = "";
       if (paymentStage === 0) {
         if (!answers.pagamentoOpcao) {
-          paymentError.textContent = "Escolha uma opÁ„o de apresentaÁ„o.";
+          paymentError.textContent = "Escolha uma op√ß√£o de apresenta√ß√£o.";
           return;
         }
         paymentStage = 1;
@@ -910,7 +911,7 @@
     signAgreeBtn.addEventListener("click", () => {
       const cpf = String(signatureCpf.value || "").trim();
       if (!/^\d{11}$/.test(cpf)) {
-        signatureError.textContent = "Informe um CPF v·lido com 11 dÌgitos.";
+        signatureError.textContent = "Informe um CPF v√°lido com 11 d√≠gitos.";
         return;
       }
       answers.assinatura = `Eu ${answers.contratante || "contratante"} concordo com os termos desse documento.`;
