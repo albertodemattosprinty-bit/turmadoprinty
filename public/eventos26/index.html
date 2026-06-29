@@ -41,26 +41,31 @@
 
     body {
       margin: 0;
-      padding: 32px 18px 72px;
+      padding: 0 0 72px;
     }
 
     .document {
-      max-width: var(--page-width);
-      margin: 0 auto;
+      max-width: none;
+      margin: 0;
       display: grid;
-      gap: 22px;
+      gap: 0;
     }
 
     .sheet {
       background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 30px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      border-left: 0;
+      border-right: 0;
+      border-radius: 0;
       overflow: hidden;
-      box-shadow: var(--shadow);
+      box-shadow: none;
     }
 
     .sheet-inner {
-      padding: 40px;
+      max-width: var(--page-width);
+      margin: 0 auto;
+      padding: 40px 28px;
     }
 
     .hero {
@@ -80,19 +85,6 @@
       border-radius: 50%;
       background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 64%);
       pointer-events: none;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 14px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.14);
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
     }
 
     .hero-grid,
@@ -291,14 +283,6 @@
       display: grid;
       gap: 10px;
       margin-bottom: 22px;
-    }
-
-    .section-kicker {
-      color: var(--brand);
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
     }
 
     h2 {
@@ -731,7 +715,7 @@
       }
 
       .sheet-inner {
-        padding: 28px;
+        padding: 28px 20px;
       }
     }
 
@@ -752,7 +736,7 @@
 
       .document {
         max-width: none;
-        gap: 12px;
+        gap: 0;
       }
 
       .sheet {
@@ -779,7 +763,6 @@
       <div class="sheet-inner">
         <div class="hero-grid">
           <div>
-            <div class="eyebrow">Eventos 2026 | Turma do Printy</div>
             <h1>Proposta de Evento 2026</h1>
             <p class="lead">
               Teatro, música, personagens, fantoches e mensagem bíblica em uma experiência infantil pensada
@@ -811,7 +794,6 @@
       <div class="sheet-inner">
         <div class="video-shell">
           <div class="video-copy">
-            <div class="eyebrow">Primeira impressão</div>
             <h2>Turma do Printy e Alberto de Mattos</h2>
           </div>
           <div class="video-stage">
@@ -833,7 +815,6 @@
     <section class="sheet">
       <div class="sheet-inner">
         <div class="section-header">
-          <div class="section-kicker">Nossa missão</div>
           <h2>Mais de quatro décadas usando arte, fé e criatividade para alcançar crianças.</h2>
           <div class="section-copy">
             Somos gratos ao Senhor por cada porta aberta. A Turma do Printy existe para servir a igreja com
@@ -866,7 +847,6 @@
     <section class="sheet">
       <div class="sheet-inner">
         <div class="section-header">
-          <div class="section-kicker">Como acontece</div>
           <h2>Uma experiência em capítulos, não apenas uma peça infantil.</h2>
           <div class="section-copy">
             A proposta foi pensada para ajudar a igreja a enxergar o valor do evento inteiro: o impacto
@@ -880,7 +860,7 @@
               <strong>01</strong>
               <div>
                 <h4>Música de abertura</h4>
-                <p>Começamos com energia e encanto para captar a atenção logo nos primeiros minutos.</p>
+                <p>Começamos com uma música interativa e animada, com personagens de palco, iluminação e movimento, criando o ambiente ideal para a programação.</p>
               </div>
             </article>
             <article class="flow-step">
@@ -933,7 +913,6 @@
     <section class="sheet">
       <div class="sheet-inner">
         <div class="section-header">
-          <div class="section-kicker">Espetáculos</div>
           <h2>Temas bíblicos que podem ser escolhidos para o seu evento.</h2>
           <div class="section-copy">
             Cada tema foi pensado para comunicar verdades eternas com a linguagem da infância. A depender da
@@ -998,7 +977,6 @@
     <section class="sheet">
       <div class="sheet-inner">
         <div class="section-header">
-          <div class="section-kicker">Confiança</div>
           <h2>Bastidores, estrada e história para a igreja contratar com tranquilidade.</h2>
           <div class="section-copy">
             A proposta original já deixava clara a logística. Aqui, ela aparece no lugar certo: depois que a
@@ -1035,7 +1013,6 @@
     <section class="sheet">
       <div class="sheet-inner">
         <div class="section-header">
-          <div class="section-kicker">Trajetória</div>
           <h2>Marcos que mostram constância, repertório e credibilidade.</h2>
           <div class="section-copy">
             A linha do tempo reforça algo muito importante para 2026: não se trata de uma iniciativa improvisada,
@@ -1099,7 +1076,6 @@
     <section class="sheet">
       <div class="sheet-inner">
         <div class="section-header">
-          <div class="section-kicker">Estrutura do evento</div>
           <h2>O que a igreja precisa disponibilizar para receber a equipe.</h2>
           <div class="section-copy">
             Organizamos esta parte com clareza para facilitar a conversa com a liderança, equipe técnica e responsáveis pela programação.
@@ -1146,7 +1122,6 @@
     <section class="sheet" id="investimento">
       <div class="sheet-inner">
         <div class="section-header">
-          <div class="section-kicker">Investimento</div>
           <h2>Contexto, valor e condições para fechamento da data.</h2>
           <div class="section-copy">
             Em vez de mostrar apenas um número, esta seção ajuda a liderança a enxergar o que está sendo contratado:
