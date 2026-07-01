@@ -1,6 +1,8 @@
 import { query } from "./db.js";
-import { listGlobalProject200Profiles, normalizeStoredProject200ProfileName } from "./project200-profiles.js";
+import { PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 const DEFAULT_SALDO_GOAL_CENTS = 1000000;
+const CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE = 3;
+const closedDailyReportSyncByUser = new Map();
 
 function startOfDay(date) {
   const value = new Date(date);
@@ -124,8 +126,9 @@ export async function updateStatsGoals(userId, payload) {
   return getStatsGoals(userId);
 }
 
-async function syncClosedDailyReports(userId) {
+async function syncClosedDailyReports(userId, options = {}) {
   await ensureStatsSchema();
+  const maxDays = Math.max(1, Math.trunc(Number(options?.maxDays) || 0)) || CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE;
 
   const yesterday = startOfDay(new Date());
   if (!yesterday) {
@@ -145,8 +148,9 @@ async function syncClosedDailyReports(userId) {
 
   let cursor = last.rows[0]?.report_date ? addDays(new Date(last.rows[0].report_date), 1) : addDays(yesterday, -30);
   const end = addDays(yesterday, -1);
+  let syncedDays = 0;
 
-  while (cursor <= end) {
+  while (cursor <= end && syncedDays < maxDays) {
     const from = startOfDay(cursor);
     const to = addDays(from, 1);
     const stats = await buildStatsSummary(userId, {
@@ -164,11 +168,27 @@ async function syncClosedDailyReports(userId) {
       [userId, from.toISOString().slice(0, 10), JSON.stringify(stats)]
     );
     cursor = addDays(cursor, 1);
+    syncedDays += 1;
   }
 }
 
+function scheduleClosedDailyReportsSync(userId) {
+  const safeUserId = String(userId || "").trim();
+  if (!safeUserId || closedDailyReportSyncByUser.has(safeUserId)) {
+    return;
+  }
+
+  const task = syncClosedDailyReports(safeUserId, { maxDays: CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE })
+    .catch(() => {})
+    .finally(() => {
+      closedDailyReportSyncByUser.delete(safeUserId);
+    });
+
+  closedDailyReportSyncByUser.set(safeUserId, task);
+}
+
 async function buildStatsSummary(userId, range) {
-  const [actionsResult, categoryResult, incomeResult, expenseResult, balanceResult, globalProfiles] = await Promise.all([
+  const [actionsResult, categoryResult, incomeResult, expenseResult, balanceResult] = await Promise.all([
     query(
       `
         with action_status as (
@@ -183,8 +203,9 @@ async function buildStatsSummary(userId, range) {
           left join action_status_overrides o
             on o.user_id = a.user_id
            and o.action_id = a.id
-          where ($1::timestamptz is null or a.start_at < $2::timestamptz)
-            and ($1::timestamptz is null or a.end_at > $1::timestamptz)
+          where a.user_id = $1
+            and ($2::timestamptz is null or a.start_at < $3::timestamptz)
+            and ($2::timestamptz is null or a.end_at > $2::timestamptz)
         )
         select
           assignee,
@@ -200,7 +221,7 @@ async function buildStatsSummary(userId, range) {
         from action_status
         group by assignee
       `,
-      [range.from || null, range.to || null]
+      [userId, range.from || null, range.to || null]
     ),
     query(
       `
@@ -214,8 +235,9 @@ async function buildStatsSummary(userId, range) {
           left join action_status_overrides o
             on o.user_id = a.user_id
            and o.action_id = a.id
-          where ($1::timestamptz is null or a.start_at < $2::timestamptz)
-            and ($1::timestamptz is null or a.end_at > $1::timestamptz)
+          where a.user_id = $1
+            and ($2::timestamptz is null or a.start_at < $3::timestamptz)
+            and ($2::timestamptz is null or a.end_at > $2::timestamptz)
         )
         select
           coalesce(nullif(trim(category_id), ''), 'sem_categoria') as category_id,
@@ -223,7 +245,7 @@ async function buildStatsSummary(userId, range) {
         from action_status
         group by coalesce(nullif(trim(category_id), ''), 'sem_categoria')
       `,
-      [range.from || null, range.to || null]
+      [userId, range.from || null, range.to || null]
     ),
     query(
       `
@@ -256,23 +278,19 @@ async function buildStatsSummary(userId, range) {
         limit 1
       `,
       [userId]
-    ),
-    listGlobalProject200Profiles()
+    )
   ]);
 
-  const byAssignee = {};
-  for (const row of actionsResult.rows) {
-    const assignee = normalizeStoredProject200ProfileName(row.assignee);
-    byAssignee[assignee] = {
-      totalMinutes: Number(row.total_minutes || 0),
-      completedMinutes: Number(row.completed_minutes || 0),
-      lateStartMinutes: Number(row.late_start_minutes || 0)
-    };
-  }
-
-  const totalMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.totalMinutes || 0), 0);
-  const completedMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.completedMinutes || 0), 0);
-  const lateStartMinutes = Object.values(byAssignee).reduce((sum, item) => sum + Number(item.lateStartMinutes || 0), 0);
+  const totalMinutes = actionsResult.rows.reduce((sum, row) => sum + Number(row.total_minutes || 0), 0);
+  const completedMinutes = actionsResult.rows.reduce((sum, row) => sum + Number(row.completed_minutes || 0), 0);
+  const lateStartMinutes = actionsResult.rows.reduce((sum, row) => sum + Number(row.late_start_minutes || 0), 0);
+  const byAssignee = {
+    [PROJECT200_DEFAULT_PROFILE_NAME]: {
+      totalMinutes,
+      completedMinutes,
+      lateStartMinutes
+    }
+  };
   const byCategory = {};
   for (const row of categoryResult.rows) {
     const categoryId = String(row.category_id || "").trim().toLowerCase() || "sem_categoria";
@@ -293,20 +311,12 @@ async function buildStatsSummary(userId, range) {
     },
     byAssignee,
     byCategory,
-    globalProfiles: Array.isArray(globalProfiles)
-      ? globalProfiles.map((profile) => ({
-          id: profile.id,
-          userId: profile.userId,
-          name: normalizeStoredProject200ProfileName(profile.name),
-          avatarPreset: profile.avatarPreset,
-          avatarDataUrl: profile.avatarDataUrl
-        }))
-      : []
+    globalProfiles: []
   };
 }
 
 export async function getStatsSummary(userId, scope) {
-  await syncClosedDailyReports(userId);
+  scheduleClosedDailyReportsSync(userId);
   const range = resolveStatsRange(scope);
   return buildStatsSummary(userId, {
     key: range.key,
