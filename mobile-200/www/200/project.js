@@ -448,6 +448,7 @@ const startDecisionEndAt = document.getElementById("startDecisionEndAt");
 const startDecisionRepeatLabel = document.getElementById("startDecisionRepeatLabel");
 const startDecisionMusicLabel = document.getElementById("startDecisionMusicLabel");
 const startDecisionActions = document.getElementById("startDecisionActions");
+const startDecisionMessage = document.getElementById("startDecisionMessage");
 const startDecisionStartInput = document.getElementById("startDecisionStartInput");
 const startDecisionEndInput = document.getElementById("startDecisionEndInput");
 const startDecisionDateInput = document.getElementById("startDecisionDateInput");
@@ -4438,6 +4439,9 @@ function closeStartDecisionModalWith(value) {
   state.startDecisionContext.mode = "view";
   state.startDecisionContext.fieldToFocus = "";
   state.startDecisionContext.dirty = false;
+  if (startDecisionMessage) {
+    startDecisionMessage.textContent = "";
+  }
   document.body.classList.remove("start-decision-open");
   if (["start", "start_chosen", "do_current"].includes(String(value || ""))) {
     document.body.classList.add("task-starting");
@@ -4583,6 +4587,9 @@ function openTaskComposer(action = null, options = {}) {
   state.startDecisionContext.actionId = String(action?.id || "");
   state.startDecisionContext.fieldToFocus = String(options.fieldToFocus || "");
   state.startDecisionContext.dirty = false;
+  if (startDecisionMessage) {
+    startDecisionMessage.textContent = "";
+  }
   if (action) {
     const startAt = new Date(action.startAt);
     const endAt = new Date(action.endAt);
@@ -6965,24 +6972,73 @@ async function saveTaskComposer() {
   try {
     const title = String(taskTitle?.value || "").trim();
     if (title.length < 2) {
-      window.alert("Escreva o titulo da tarefa.");
+      if (startDecisionMessage) {
+        startDecisionMessage.textContent = "Escreva o titulo da tarefa.";
+      }
       return;
+    }
+    if (startDecisionMessage) {
+      startDecisionMessage.textContent = "Salvando...";
     }
     const repeatRule = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
     const repeatDays = repeatRule === "weekly"
       ? state.wizard.repeatDays
       : recurrenceDays[repeatRule] || [];
-    const occurrences = buildOccurrences();
+    let occurrences = buildOccurrences();
     let applyTo = "single";
     const editingAction = findActionById(state.startDecisionContext.actionId);
     if (editingAction && editingAction.repeatGroupId && state.startDecisionContext.dirty) {
       const choice = window.prompt("1 - Editar uma tarefa\n2 - Editar todas as tarefas", "2");
       if (choice == null) {
+        if (startDecisionMessage) {
+          startDecisionMessage.textContent = "";
+        }
         return;
       }
       applyTo = String(choice).trim() === "1" ? "single" : "series";
     } else if (!editingAction && (repeatRule !== "none" || occurrences.length > 1)) {
       applyTo = "series";
+    }
+    const overlaps = computeOverlapsForOccurrences(occurrences, {
+      excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
+    });
+    if (overlaps.length) {
+      let replaceOverlaps = false;
+      const decision = await openOverlapWizard(overlaps, occurrences);
+      if (!decision || decision.type === "cancel") {
+        if (startDecisionMessage) {
+          startDecisionMessage.textContent = "Ajuste o horário para continuar.";
+        }
+        return;
+      }
+      if (decision.type === "change_time") {
+        if (startDecisionMessage) {
+          startDecisionMessage.textContent = "Escolha outro horário.";
+        }
+        return;
+      }
+      if (decision.type === "use_free" && decision.startAt) {
+        const start = new Date(decision.startAt);
+        const firstOccurrence = occurrences[0];
+        const originalDurationMs = firstOccurrence
+          ? Math.max(60 * 1000, new Date(firstOccurrence.endAt).getTime() - new Date(firstOccurrence.startAt).getTime())
+          : 15 * 60 * 1000;
+        state.wizard.startHour = start.getHours();
+        state.wizard.startMinute = start.getMinutes();
+        const end = new Date(start.getTime() + originalDurationMs);
+        state.wizard.endHour = end.getHours();
+        state.wizard.endMinute = end.getMinutes();
+        occurrences = buildOccurrences();
+      }
+      if (decision.type === "replace") {
+        replaceOverlaps = true;
+        for (const item of overlaps) {
+          await apiRequest(`/api/actions/${encodeURIComponent(item.id)}`, { method: "DELETE" });
+        }
+      }
+      state.wizard.replaceOverlaps = replaceOverlaps;
+    } else {
+      state.wizard.replaceOverlaps = false;
     }
     const requestPath = editingAction
       ? `/api/actions/${encodeURIComponent(editingAction.id)}`
@@ -6998,13 +7054,16 @@ async function saveTaskComposer() {
         repeatRule,
         repeatDays,
         occurrences,
-        applyTo
+        applyTo,
+        replaceOverlaps: Boolean(state.wizard.replaceOverlaps)
       })
     });
     closeStartDecisionModalWith(editingAction ? "edit" : "create");
     await loadActions();
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : "Erro ao salvar.");
+    if (startDecisionMessage) {
+      startDecisionMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar.";
+    }
   }
 }
 
