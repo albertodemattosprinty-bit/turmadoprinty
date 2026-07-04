@@ -601,6 +601,41 @@ async function assertActionOverlaps(userId, assignee, occurrences, excludeIds = 
   }
 }
 
+async function deleteOverlappingActions(userId, assignee, occurrences, excludeIds = []) {
+  const safeExcludeIds = Array.isArray(excludeIds)
+    ? excludeIds.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+  const deleteIds = new Set();
+
+  for (const occurrence of occurrences) {
+    const overlap = await query(
+      `
+        select id
+        from actions
+        where user_id = $1
+          and assignee = $2
+          and start_at < $4
+          and end_at > $3
+          and not (id = any($5::uuid[]))
+      `,
+      [userId, assignee, occurrence.startAt.toISOString(), occurrence.endAt.toISOString(), safeExcludeIds]
+    );
+    overlap.rows.forEach((row) => {
+      if (row?.id) {
+        deleteIds.add(String(row.id));
+      }
+    });
+  }
+
+  const ids = Array.from(deleteIds);
+  if (!ids.length) {
+    return;
+  }
+
+  await query("delete from action_status_overrides where user_id = $1 and action_id = any($2::uuid[])", [userId, ids]);
+  await query("delete from actions where user_id = $1 and id = any($2::uuid[])", [userId, ids]);
+}
+
 function parseActionOccurrences(payload) {
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
     ? payload.occurrences
@@ -664,6 +699,7 @@ export async function updateUserAction(userId, actionId, payload) {
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const applyTo = String(payload?.applyTo || "").trim().toLowerCase() === "series" ? "series" : "single";
+  const replaceOverlaps = Boolean(payload?.replaceOverlaps);
   const occurrences = parseActionOccurrences(payload);
   const sameRepeatDefinition = repeatRule === String(action.repeatRule || "none")
     && JSON.stringify(repeatDays) === JSON.stringify(normalizeRepeatDays(action.repeatDays));
@@ -707,12 +743,11 @@ export async function updateUserAction(userId, actionId, payload) {
           endAt: nextEnd
         };
       });
-      await assertActionOverlaps(
-        userId,
-        assignee,
-        nextOccurrences.map((item) => ({ startAt: item.startAt, endAt: item.endAt })),
-        existingIds
-      );
+      const overlapOccurrences = nextOccurrences.map((item) => ({ startAt: item.startAt, endAt: item.endAt }));
+      if (replaceOverlaps) {
+        await deleteOverlappingActions(userId, assignee, overlapOccurrences, existingIds);
+      }
+      await assertActionOverlaps(userId, assignee, overlapOccurrences, existingIds);
       for (const item of nextOccurrences) {
         await query(
           `
@@ -743,6 +778,9 @@ export async function updateUserAction(userId, actionId, payload) {
       return getUserActionById(userId, action.id);
     }
 
+    if (replaceOverlaps) {
+      await deleteOverlappingActions(userId, assignee, occurrences, existingIds);
+    }
     await assertActionOverlaps(userId, assignee, occurrences, existingIds);
     if (existingIds.length) {
       await query("delete from action_status_overrides where user_id = $1 and action_id = any($2::uuid[])", [userId, existingIds]);
@@ -761,6 +799,9 @@ export async function updateUserAction(userId, actionId, payload) {
   }
 
   const occurrence = occurrences[0];
+  if (replaceOverlaps) {
+    await deleteOverlappingActions(userId, assignee, [occurrence], [action.id]);
+  }
   await assertActionOverlaps(userId, assignee, [occurrence], [action.id]);
 
   const detachFromSeries = Boolean(action.repeatGroupId);

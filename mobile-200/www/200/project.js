@@ -479,6 +479,7 @@ const closeOverlapWizard = document.getElementById("closeOverlapWizard");
 const overlapTaskTitle = document.getElementById("overlapTaskTitle");
 const overlapTaskRange = document.getElementById("overlapTaskRange");
 const overlapReplaceButton = document.getElementById("overlapReplaceButton");
+const overlapCancelButton = document.getElementById("overlapCancelButton");
 const overlapFreePrev = document.getElementById("overlapFreePrev");
 const overlapFreeNext = document.getElementById("overlapFreeNext");
 const overlapFreeStartLabel = document.getElementById("overlapFreeStartLabel");
@@ -1086,7 +1087,7 @@ function renderProfileManageOverlay() {
   if (profileReassignTargetHint) {
     profileReassignTargetHint.textContent = `Destino: ${selectedProfile?.name || state.selectedProfile || "usuário selecionado"}`;
   }
-  const canDelete = !profile.isImmutable && String(profileDeleteConfirmInput?.value || "").trim() === "Excluir";
+  const canDelete = String(profileDeleteConfirmInput?.value || "").trim() === "Excluir";
   profileDeleteConfirmButton?.classList.toggle("is-disabled", !canDelete);
   if (profileDeleteConfirmButton) {
     profileDeleteConfirmButton.disabled = !canDelete;
@@ -2050,7 +2051,7 @@ function renderHomeRunningTask() {
     runningTaskNextLabel.classList.add("running-fade");
     runningTaskNextLabel.classList.remove("is-hidden");
   }
-  const nextAction = getNextRelatedActionForRunning(action);
+  const nextAction = getNextTimelineEntryForRunning(action);
   runningTaskName.innerHTML = formatRunningTaskTitleMarkup(action.title);
   if (runningTaskCategoryIcon) {
     runningTaskCategoryIcon.hidden = true;
@@ -2077,7 +2078,11 @@ function renderHomeRunningTask() {
   renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes);
   if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = false;
   if (nextAction) {
-    const nextLabel = formatActionTitleForDisplay(nextAction.title);
+    const nextLabel = nextAction.kind === "free"
+      ? "Tempo livre"
+      : nextAction.kind === "sleep"
+        ? "Sono"
+        : formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
   } else {
     setRunningNextDisplay("Descanso", getSleepDurationMinutesForDay());
@@ -3204,7 +3209,8 @@ function buildInitialWizardState() {
     endMinute: end.getMinutes(),
     categoryId: "",
     categoryName: "",
-    editingActionId: null
+    editingActionId: null,
+    replaceOverlaps: false
   };
 }
 
@@ -5864,6 +5870,7 @@ async function saveAction() {
       excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
     });
     if (overlaps.length) {
+      let replaceOverlaps = false;
       const decision = await openOverlapWizard(overlaps, occurrences);
       if (!decision || decision.type === "cancel") {
         wizardMessage.textContent = "Ajuste o horário para continuar.";
@@ -5888,10 +5895,14 @@ async function saveAction() {
         occurrences = buildOccurrences();
       }
       if (decision.type === "replace") {
+        replaceOverlaps = true;
         for (const item of overlaps) {
           await apiRequest(`/api/actions/${encodeURIComponent(item.id)}`, { method: "DELETE" });
         }
       }
+      state.wizard.replaceOverlaps = replaceOverlaps;
+    } else {
+      state.wizard.replaceOverlaps = false;
     }
 
     const payload = await apiRequest(requestPath, {
@@ -5906,6 +5917,7 @@ async function saveAction() {
         repeatRule,
         repeatDays,
         applyTo,
+        replaceOverlaps: Boolean(state.wizard.replaceOverlaps),
         occurrences: occurrences
       })
     });
@@ -8672,6 +8684,7 @@ document.querySelectorAll("[data-repeat-mode]").forEach((button) => {
 
 closeOverlapWizard?.addEventListener("click", () => closeOverlapWizardWith({ type: "cancel" }));
 overlapReplaceButton?.addEventListener("click", () => closeOverlapWizardWith({ type: "replace" }));
+overlapCancelButton?.addEventListener("click", () => closeOverlapWizardWith({ type: "cancel" }));
 overlapChangeTimeButton?.addEventListener("click", () => closeOverlapWizardWith({ type: "change_time" }));
 overlapApplyFreeButton?.addEventListener("click", () => {
   if (!state.overlapCandidateStarts.length) {
@@ -9226,8 +9239,8 @@ async function performRunningFinalize(runningAction) {
   await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
   const after = state.actions.find((item) => item.id === runningAction.id);
   if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
-    const nextAction = getNextRelatedActionForRunning(runningAction);
-    const nextOfNext = nextAction ? getNextRelatedActionForRunning(nextAction) : null;
+    const nextAction = getNextTimelineEntryForRunning(runningAction);
+    const nextOfNext = nextAction ? getNextTimelineEntryForRunning(nextAction) : null;
     const summary = getCompletionSummaryForSelectedProfile();
     runningCarryOverMinutes = savedMinutes;
     startRunningCompletionTransition({
