@@ -99,6 +99,8 @@ export async function ensureProject200ChatsSchema() {
   await query("drop index if exists idx_project200_chats_user_unique;");
   await query("drop index if exists idx_project200_chats_user_profile_unique;");
   await query("drop index if exists idx_project200_chats_user_profile_tone_unique;");
+  await query("drop index if exists project200_chats_user_id_key;");
+  await query("alter table project200_chats drop constraint if exists project200_chats_user_id_key;");
   await query(`
     create unique index if not exists idx_project200_chats_user_profile_tone_unique
     on project200_chats (user_id, assigned_profile, tone_key);

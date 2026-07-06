@@ -1212,6 +1212,7 @@ body.screen-locked .project-login-overlay.active {
 .running-task-list-btn,
 .running-task-home-btn,
 .running-task-quick-btn,
+.running-task-mission-btn,
 .running-task-restore-btn,
 .running-task-giveup-btn,
 .running-task-music-btn {
@@ -1232,6 +1233,10 @@ body.screen-locked .project-login-overlay.active {
 
 .running-task-list-btn {
   background: linear-gradient(145deg, #6fd1ff, #2b8dff);
+}
+
+.running-task-mission-btn {
+  background: linear-gradient(145deg, #1d274d, #0b1020);
 }
 
 .running-task-finalize-btn {
@@ -1297,6 +1302,88 @@ body.screen-locked .project-login-overlay.active {
 
 .running-task-music-btn {
   background: linear-gradient(145deg, #ffb14f, #ef6b24);
+}
+
+.running-mission-quick-shell {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding: 24px;
+  background: radial-gradient(circle at top, rgba(34, 92, 214, 0.18), transparent 38%), #020611;
+}
+
+.running-mission-quick-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.running-mission-quick-close svg {
+  width: 24px;
+  height: 24px;
+}
+
+.running-mission-quick-grid {
+  width: min(560px, 100%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.running-mission-quick-btn {
+  min-height: min(32vh, 220px);
+  border: 0;
+  border-radius: 28px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.28);
+}
+
+.running-mission-quick-btn svg {
+  width: min(24vw, 86px);
+  height: min(24vw, 86px);
+}
+
+.running-mission-quick-btn:disabled,
+.running-mission-quick-btn.is-disabled {
+  opacity: 0.34;
+}
+
+.running-mission-quick-btn-water {
+  background: linear-gradient(145deg, #2d95ff, #0d4cd1);
+}
+
+.running-mission-quick-btn-shoe {
+  background: linear-gradient(145deg, #2f3646, #111722);
+}
+
+.running-mission-quick-btn-book {
+  background: linear-gradient(145deg, #d28b21, #8f4f0a);
+}
+
+.running-mission-quick-btn-tooth {
+  background: linear-gradient(145deg, #49beff, #1572e6);
+}
+
+.running-mission-quick-feedback {
+  min-height: 34px;
+  color: #fff;
+  font-size: clamp(1.2rem, 4vw, 1.9rem);
+  font-weight: 800;
+  text-align: center;
 }
 
 .running-fade {
@@ -2286,7 +2373,7 @@ body.running-music-standalone #actionsModal .actions-list {
   display: grid;
   align-content: start;
   gap: 10px;
-  padding: 17px 0 10px;
+  padding: 8px 0 calc(8dvh + 30px);
 }
 
 #calendarModal .actions-list {
@@ -2330,9 +2417,10 @@ body.running-music-standalone #actionsModal .actions-list {
   grid-template-columns: 52px minmax(0, 1fr) max-content;
   align-items: center;
   gap: 12px;
-  padding: 14px 10px 14px 12px;
+  width: 100%;
+  padding: 14px 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.00) 100%);
   cursor: pointer;
   transition: background 180ms ease, border-color 180ms ease, transform 120ms ease;
@@ -2517,25 +2605,9 @@ body.running-music-standalone #actionsModal .actions-list {
   transition: opacity 220ms ease;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-}
-.task-time::before {
-  content: "";
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  background-repeat: no-repeat;
-  background-size: contain;
-  opacity: 0.74;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8' fill='none' stroke='white' stroke-width='1.8'/%3E%3Cpath d='M12 12V7.3' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M12 12l3.2 2' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .task-time.is-fading {
   opacity: 0.18;
-}
-
-.task-row.task-in-progress .task-time::before {
-  animation: taskClockSpin 6s linear infinite;
-  transform-origin: center;
 }
 
 .task-main {
@@ -2563,11 +2635,6 @@ body.running-music-standalone #actionsModal .actions-list {
 .task-duration {
   display: inline-flex;
   align-items: center;
-}
-
-@keyframes taskClockSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 @keyframes runningTaskGradientDrift {
@@ -3418,26 +3485,15 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .wizard-actions {
-  display: flex;
+  display: grid;
   justify-content: center;
   gap: 12px;
 }
 
-.wizard-step[data-step="2"] ~ .wizard-actions {
-  display: grid;
-  justify-content: center;
-  gap: 10px;
-}
-
-.wizard-step[data-step="2"].active ~ .wizard-actions .ghost-btn,
-.wizard-step[data-step="2"].active ~ .wizard-actions .primary-btn {
-  width: min(70vw, 420px);
+.wizard-actions .ghost-btn,
+.wizard-actions .primary-btn {
+  width: min(84vw, 504px);
   margin: 0 auto;
-}
-
-.wizard-step[data-step="2"].active ~ .wizard-actions .primary-btn {
-  background: #22c55e;
-  color: #fff;
 }
 
 .ghost-btn,
@@ -3461,7 +3517,7 @@ body.running-music-standalone #actionsModal .actions-list {
 
 #wizardNext {
   min-height: 60px;
-  min-width: min(88vw, 360px);
+  min-width: min(84vw, 504px);
   font-size: 1.25rem;
 }
 
@@ -3664,7 +3720,7 @@ body.running-music-standalone #actionsModal .actions-list {
   .task-row {
     grid-template-columns: 40px minmax(0, 1fr) max-content;
     gap: 10px;
-    padding: 14px 12px;
+    padding: 14px 0;
   }
 
   .task-row.stats-mission-row {
@@ -3725,11 +3781,11 @@ body.running-music-standalone #actionsModal .actions-list {
   }
 
   .actions-app {
-    padding-top: 54px;
+    padding-top: 18px;
   }
 
   #calendarModal .actions-app {
-    padding-top: 54px;
+    padding-top: 18px;
   }
 
   .actions-progress {
@@ -3739,6 +3795,21 @@ body.running-music-standalone #actionsModal .actions-list {
   .finance-bottom-actions {
     width: calc(100% - 24px);
     bottom: 16px;
+  }
+
+  #actionsModal .actions-side-actions {
+    grid-template-columns: 62px minmax(0, 1fr) 62px;
+    min-height: 68px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  #actionsModal .actions-footer-date {
+    gap: 8px;
+  }
+
+  #actionsModal .actions-footer-date .date-title {
+    font-size: clamp(0.96rem, 4.2vw, 1.35rem);
   }
 
   .finance-dashboard {
@@ -3772,6 +3843,19 @@ body.running-music-standalone #actionsModal .actions-list {
     width: 52px;
     height: 52px;
   }
+
+  .running-task-actions {
+    gap: 10px;
+  }
+
+  .running-mission-quick-grid {
+    gap: 14px;
+  }
+
+  .running-mission-quick-btn {
+    min-height: min(26vh, 170px);
+    border-radius: 22px;
+  }
 }
 
 .actions-side-actions {
@@ -3796,21 +3880,65 @@ body.running-music-standalone #actionsModal .actions-list {
   right: 12px;
 }
 
+#actionsModal .actions-side-actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8dvh;
+  min-height: 72px;
+  max-height: 92px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 6px);
+  pointer-events: auto;
+  z-index: 26;
+  background: linear-gradient(180deg, rgba(4, 13, 38, 0) 0%, rgba(4, 13, 38, 0.88) 18%, rgba(2, 11, 34, 0.98) 100%);
+}
+
+.actions-footer-date {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+#actionsModal .actions-side-btn {
+  position: static;
+  transform: none;
+}
+
+#actionsModal .actions-side-btn-left,
 #actionsModal .actions-side-btn-right {
-  border: 0;
-  background: transparent;
+  justify-self: center;
+}
+
+#actionsModal .actions-side-btn-right {
+  border: 1px solid rgba(116, 182, 255, 0.92);
+  background: rgba(17, 87, 204, 0.1);
 }
 
 #actionsModal .actions-side-btn-right svg {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   color: #ffffff;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+  filter: none;
 }
 
-.stats-side-actions .actions-side-btn-left,
-.stats-side-actions .actions-side-btn-right {
-  top: 6px;
+#actionsModal .actions-footer-date .circle-nav {
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+}
+
+#actionsModal .actions-footer-date .date-title {
+  min-width: 0;
+  font-size: clamp(1rem, 4vw, 1.55rem);
+  color: #fff;
+  white-space: nowrap;
 }
 
 .action-voice-tools {

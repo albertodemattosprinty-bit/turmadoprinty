@@ -40,6 +40,12 @@ const actionStatuses = {
   inProgress: "IN_PROGRESS",
   completed: "COMPLETED"
 };
+const missionQuickDefinitions = [
+  { key: "water", title: "Beber água", targetValue: 8 },
+  { key: "store", title: "Guardar 6 itens", targetValue: 6 },
+  { key: "read", title: "Ler uma página", targetValue: 6 },
+  { key: "brush", title: "Escovar os dentes", targetValue: 3 }
+];
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
   { key: "points", label: "Pontos" },
@@ -356,6 +362,11 @@ const missionAdjustValue = document.getElementById("missionAdjustValue");
 const missionAdjustHint = document.getElementById("missionAdjustHint");
 const missionAdjustStatus = document.getElementById("missionAdjustStatus");
 const missionAdjustConfirmButton = document.getElementById("missionAdjustConfirm");
+const runningTaskMissionButton = document.getElementById("runningTaskMissionButton");
+const runningMissionQuickModal = document.getElementById("runningMissionQuickModal");
+const closeRunningMissionQuickModalButton = document.getElementById("closeRunningMissionQuickModal");
+const runningMissionQuickGrid = document.getElementById("runningMissionQuickGrid");
+const runningMissionQuickFeedback = document.getElementById("runningMissionQuickFeedback");
 const conversationsMessages = document.getElementById("conversationsMessages");
 const conversationsTranscript = document.getElementById("conversationsTranscript");
 const conversationsStatus = document.getElementById("conversationsStatus");
@@ -654,6 +665,8 @@ let postponeNavHoldTimer = null;
 let postponeNavHoldInterval = null;
 let postponeNavLongPressHandled = false;
 let postponeFeedbackCarouselTimer = null;
+let runningMissionQuickFeedbackTimer = null;
+let runningMissionQuickRequestChain = Promise.resolve();
 
 const state = {
   activeOffset: 0,
@@ -692,6 +705,10 @@ const state = {
     goalId: "",
     amount: 1,
     sign: 1
+  },
+  runningMissionQuick: {
+    feedbackGoalKey: "",
+    lastRenderedText: ""
   },
   historyTextComposer: {
     step: 1,
@@ -2030,6 +2047,7 @@ function renderHomeRunningTask() {
     if (runningTaskHomeButton) runningTaskHomeButton.hidden = false;
     if (runningTaskQuickButton) runningTaskQuickButton.hidden = false;
     if (runningTaskListButton) runningTaskListButton.hidden = true;
+    if (runningTaskMissionButton) runningTaskMissionButton.hidden = false;
     if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
     if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
@@ -2090,6 +2108,7 @@ function renderHomeRunningTask() {
     setRunningNextDisplay("Descanso", getSleepDurationMinutesForDay());
   }
   if (runningTaskListButton) runningTaskListButton.hidden = false;
+  if (runningTaskMissionButton) runningTaskMissionButton.hidden = false;
   if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
   if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
   if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
@@ -3022,9 +3041,9 @@ function formatMinutesHuman(totalMinutesValue) {
   const total = Math.max(0, Math.round(Number(totalMinutesValue) || 0));
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  if (hours <= 0) return `${total} minutos`;
-  if (minutes <= 0) return hours === 1 ? "1 hora" : `${hours} horas`;
-  return `${hours === 1 ? "1 hora" : `${hours} horas`} e ${minutes} minutos`;
+  if (hours <= 0) return `${total} min`;
+  if (minutes <= 0) return `${hours}h`;
+  return `${hours}h ${minutes}min`;
 }
 
 function formatHomeDateTime(now = new Date()) {
@@ -3422,6 +3441,7 @@ function openModal(id) {
 
   if (id === "runningTaskModal") {
     setRunningHomeVisibility(false);
+    void loadMissions();
     startRunningTaskTicker();
     renderHomeRunningTask();
   }
@@ -3496,8 +3516,15 @@ function closeModal(modal) {
     closeFinanceEntryConfirm(false);
   }
   if (modal.id === "runningTaskModal") {
+    closeModal("runningMissionQuickModal");
     closeRunningMusicListModal();
     setRunningHomeVisibility(true);
+  }
+  if (modal.id === "runningMissionQuickModal") {
+    clearRunningMissionQuickFeedbackTimer();
+    if (runningMissionQuickFeedback) {
+      runningMissionQuickFeedback.textContent = "";
+    }
   }
   if (modal.id === "runningConfirmModal") {
     state.runningConfirm.action = null;
@@ -4316,11 +4343,11 @@ function renderWizard() {
     wizardHeaderBackButton.hidden = step === 1;
   }
   if (wizardBackButton) {
-    wizardBackButton.style.visibility = step === 1 ? "hidden" : "visible";
+    wizardBackButton.textContent = "Cancelar";
   }
   wizardNextButton.textContent = state.wizard.inlineEditStep
     ? "Atualizar"
-    : step === 4 ? "Salvar" : "Continuar";
+    : step === 4 ? "Criar tarefa" : "Continuar";
   wizardDateLabel.textContent = formatDateLabel(dateFromOffset(state.wizard.dateOffset));
   renderActionCategoryPicker();
   renderRepeatControls();
@@ -4652,35 +4679,7 @@ function openTaskComposerFieldEditor(field) {
     return;
   }
   if (field === "repeat") {
-    if (state.startDecisionContext.mode === "edit") {
-      openRepeatEditorFromTaskComposer();
-      return;
-    }
-    const choice = window.prompt("1 - Data única\n2 - Diariamente", state.wizard.repeatOpen ? "2" : "1");
-    if (choice == null) return;
-    if (String(choice).trim() === "2") {
-      state.wizard.repeatOpen = true;
-      state.wizard.repeatMode = "daily";
-      state.wizard.repeatDays = [...recurrenceDays.daily];
-      markTaskComposerDirty();
-      renderTaskComposerModal();
-      return;
-    }
-    state.wizard.repeatOpen = false;
-    state.wizard.repeatMode = "none";
-    state.wizard.repeatDays = [];
-    markTaskComposerDirty();
-    renderTaskComposerModal();
-    if (startDecisionDateInput instanceof HTMLInputElement) {
-      const date = dateFromOffset(state.wizard.dateOffset);
-      startDecisionDateInput.value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      if (typeof startDecisionDateInput.showPicker === "function") {
-        startDecisionDateInput.showPicker();
-      } else {
-        startDecisionDateInput.click();
-        startDecisionDateInput.focus();
-      }
-    }
+    openRepeatEditorFromTaskComposer();
   }
 }
 
@@ -7038,6 +7037,158 @@ async function loadMissions() {
   }
 }
 
+function normalizeMissionTitle(value) {
+  return String(value || "")
+    .normalize("NFC")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
+function getMissionQuickDefinitionByKey(key) {
+  return missionQuickDefinitions.find((item) => item.key === key) || null;
+}
+
+function getMissionQuickGoalByKey(key) {
+  const definition = getMissionQuickDefinitionByKey(key);
+  if (!definition) {
+    return null;
+  }
+  const normalizedTitle = normalizeMissionTitle(definition.title);
+  return (Array.isArray(state.missions) ? state.missions : []).find((goal) => normalizeMissionTitle(goal.title) === normalizedTitle) || null;
+}
+
+function clearRunningMissionQuickFeedbackTimer() {
+  if (runningMissionQuickFeedbackTimer) {
+    window.clearTimeout(runningMissionQuickFeedbackTimer);
+    runningMissionQuickFeedbackTimer = null;
+  }
+}
+
+function renderRunningMissionQuickFeedback(goal, mode = "count") {
+  if (!runningMissionQuickFeedback) {
+    return;
+  }
+  if (!goal) {
+    runningMissionQuickFeedback.textContent = "";
+    return;
+  }
+  const progress = Math.max(0, Number(goal.progressValue || 0));
+  const target = Math.max(1, Number(goal.targetValue || 1));
+  const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+  const countText = `${goal.title} ${progress}x`;
+  runningMissionQuickFeedback.textContent = mode === "percent" ? `${percent}%` : countText;
+  state.runningMissionQuick.feedbackGoalKey = String(goal.id || goal.title || "");
+  state.runningMissionQuick.lastRenderedText = runningMissionQuickFeedback.textContent;
+}
+
+function showRunningMissionQuickFeedback(goal) {
+  clearRunningMissionQuickFeedbackTimer();
+  renderRunningMissionQuickFeedback(goal, "count");
+  runningMissionQuickFeedbackTimer = window.setTimeout(() => {
+    renderRunningMissionQuickFeedback(goal, "percent");
+  }, 1000);
+}
+
+function renderRunningMissionQuickButtons() {
+  if (!runningMissionQuickGrid) {
+    return;
+  }
+  runningMissionQuickGrid.querySelectorAll("[data-mission-quick-key]").forEach((button) => {
+    const goal = getMissionQuickGoalByKey(button.dataset.missionQuickKey || "");
+    button.disabled = !goal;
+    button.classList.toggle("is-disabled", !goal);
+    button.setAttribute("aria-pressed", "false");
+    if (goal) {
+      button.title = `${goal.title}: ${goal.progressValue} de ${goal.targetValue}`;
+    } else {
+      button.title = "Missão indisponível";
+    }
+  });
+}
+
+async function openRunningMissionQuickModal() {
+  if (!getToken()) {
+    window.location.href = "/auth.html?next=/200";
+    return;
+  }
+  await loadMissions();
+  renderMissions();
+  renderRunningMissionQuickButtons();
+  if (runningMissionQuickFeedback) {
+    runningMissionQuickFeedback.textContent = "";
+  }
+  openModal("runningMissionQuickModal");
+}
+
+function applyMissionProgressLocally(goalId, delta) {
+  state.missions = (Array.isArray(state.missions) ? state.missions : []).map((goal) => {
+    if (String(goal.id || "") !== String(goalId || "")) {
+      return goal;
+    }
+    const targetValue = Math.max(1, Number(goal.targetValue || 1));
+    const progressValue = Math.max(0, Number(goal.progressValue || 0) + Number(delta || 0));
+    return {
+      ...goal,
+      progressValue,
+      remainingValue: Math.max(0, targetValue - progressValue),
+      percent: Math.max(0, Math.min(100, Math.round((progressValue / targetValue) * 100)))
+    };
+  });
+}
+
+function queueRunningMissionQuickIncrement(goal) {
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  runningMissionQuickRequestChain = runningMissionQuickRequestChain
+    .catch(() => {})
+    .then(async () => {
+      try {
+        const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(String(goal.id || ""))}/progress`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            profile,
+            delta: 1
+          })
+        });
+        if (Array.isArray(payload?.goals)) {
+          state.missions = payload.goals;
+          renderMissions();
+          renderRunningMissionQuickButtons();
+          const updatedGoal = getMissionQuickGoalByKey(
+            missionQuickDefinitions.find((item) => normalizeMissionTitle(item.title) === normalizeMissionTitle(goal.title))?.key || ""
+          );
+          if (updatedGoal && runningMissionQuickFeedback?.textContent) {
+            showRunningMissionQuickFeedback(updatedGoal);
+          }
+        }
+      } catch (error) {
+        await loadMissions();
+        renderMissions();
+        renderRunningMissionQuickButtons();
+        if (runningMissionQuickFeedback) {
+          runningMissionQuickFeedback.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
+        }
+      }
+    });
+}
+
+function handleRunningMissionQuickTap(key) {
+  const goal = getMissionQuickGoalByKey(key);
+  if (!goal) {
+    if (runningMissionQuickFeedback) {
+      runningMissionQuickFeedback.textContent = "Missão não encontrada.";
+    }
+    return;
+  }
+  applyMissionProgressLocally(goal.id, 1);
+  const updatedGoal = getMissionQuickGoalByKey(key);
+  renderMissions();
+  renderRunningMissionQuickButtons();
+  showRunningMissionQuickFeedback(updatedGoal || goal);
+  queueRunningMissionQuickIncrement(goal);
+}
+
 async function saveTaskComposer() {
   try {
     const title = String(taskTitle?.value || "").trim();
@@ -8649,7 +8800,7 @@ function stepWizardBack() {
 }
 
 wizardHeaderBackButton?.addEventListener("click", stepWizardBack);
-wizardBackButton?.addEventListener("click", stepWizardBack);
+wizardBackButton?.addEventListener("click", closeWizard);
 
 wizardNextButton.addEventListener("click", () => {
   if (!validateStep()) {
@@ -9248,6 +9399,18 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
   })();
 });
 
+runningMissionQuickGrid?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-mission-quick-key]");
+  if (!button) {
+    return;
+  }
+  handleRunningMissionQuickTap(String(button.dataset.missionQuickKey || ""));
+});
+
+closeRunningMissionQuickModalButton?.addEventListener("click", () => {
+  closeModal("runningMissionQuickModal");
+});
+
 openHistoryTextComposerButton?.addEventListener("click", openHistoryTextComposer);
 closeHistoryTextComposerButton?.addEventListener("click", closeHistoryTextComposer);
 
@@ -9436,6 +9599,9 @@ runningTaskHomeButton?.addEventListener("click", () => {
 });
 runningTaskQuickButton?.addEventListener("click", () => {
   openQuickTaskModal();
+});
+runningTaskMissionButton?.addEventListener("click", () => {
+  void openRunningMissionQuickModal();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
 runningPlayerList?.addEventListener("click", () => {

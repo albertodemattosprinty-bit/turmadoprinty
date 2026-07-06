@@ -2,6 +2,12 @@ import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
+const DEFAULT_EXTRA_GOALS = [
+  { title: "Beber água", targetValue: 8 },
+  { title: "Guardar 6 itens", targetValue: 6 },
+  { title: "Ler uma página", targetValue: 6 },
+  { title: "Escovar os dentes", targetValue: 3 }
+];
 
 function normalizeExtraGoalTitle(value) {
   return String(value || "")
@@ -62,6 +68,45 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
   };
 }
 
+function getDefaultExtraGoalOrder(title) {
+  const normalizedTitle = normalizeExtraGoalTitle(title).toLocaleLowerCase("pt-BR");
+  const index = DEFAULT_EXTRA_GOALS.findIndex((goal) => normalizeExtraGoalTitle(goal.title).toLocaleLowerCase("pt-BR") === normalizedTitle);
+  return index >= 0 ? index : Number.POSITIVE_INFINITY;
+}
+
+async function ensureDefaultExtraGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const existingResult = await query(
+    `
+      select title
+      from extra_goals
+      where user_id = $1
+        and assigned_profile = $2
+    `,
+    [userId, normalizedProfile]
+  );
+  const existingTitles = new Set(
+    existingResult.rows.map((row) => normalizeExtraGoalTitle(row.title).toLocaleLowerCase("pt-BR")).filter(Boolean)
+  );
+  for (const goal of DEFAULT_EXTRA_GOALS) {
+    const normalizedTitle = normalizeExtraGoalTitle(goal.title).toLocaleLowerCase("pt-BR");
+    if (existingTitles.has(normalizedTitle)) {
+      continue;
+    }
+    await query(
+      `
+        insert into extra_goals (
+          user_id, assigned_profile, title, target_value, progress_value, progress_date, created_at, updated_at
+        )
+        values ($1, $2, $3, $4, 0, null, now(), now())
+      `,
+      [userId, normalizedProfile, normalizeExtraGoalTitle(goal.title), Math.max(1, Math.trunc(Number(goal.targetValue) || 1))]
+    );
+    existingTitles.add(normalizedTitle);
+  }
+}
+
 export function summarizeExtraGoals(goals = []) {
   const list = Array.isArray(goals) ? goals : [];
   const completed = list.filter((goal) => Number(goal.progressValue || 0) >= Number(goal.targetValue || 0));
@@ -101,6 +146,7 @@ export async function ensureExtraGoalsSchema() {
 export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, date = new Date()) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  await ensureDefaultExtraGoals(userId, normalizedProfile);
   const dateKey = toDateKey(date);
   const result = await query(
     `
@@ -122,7 +168,16 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     `,
     [userId, normalizedProfile]
   );
-  return result.rows.map((row) => normalizeExtraGoalRow(row, dateKey));
+  return result.rows
+    .map((row) => normalizeExtraGoalRow(row, dateKey))
+    .sort((left, right) => {
+      const leftOrder = getDefaultExtraGoalOrder(left.title);
+      const rightOrder = getDefaultExtraGoalOrder(right.title);
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      return String(left.title || "").localeCompare(String(right.title || ""), "pt-BR");
+    });
 }
 
 export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, payload = {}) {
