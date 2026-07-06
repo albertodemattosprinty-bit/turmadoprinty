@@ -2426,7 +2426,7 @@ function ensureTrackTextEditModal() {
   modal.setAttribute("aria-hidden", "true");
   modal.innerHTML = `
     <div class="track-texts-backdrop" data-role="close-text-edit"></div>
-    <div class="track-texts-panel track-generation-panel track-text-edit-panel" role="dialog" aria-modal="true" aria-labelledby="track-text-edit-title">
+    <div class="track-texts-panel track-text-edit-panel track-text-edit-panel--immersive" role="dialog" aria-modal="true" aria-labelledby="track-text-edit-title">
       <div class="track-texts-head">
         <div>
           <p class="eyebrow">Editar texto</p>
@@ -2439,7 +2439,6 @@ function ensureTrackTextEditModal() {
       <label class="track-character-field">Texto da linha
         <textarea id="track-text-edit-input" class="track-text-edit-input" rows="5" placeholder="Edite somente o texto desta linha"></textarea>
       </label>
-      <p class="track-generation-message">O timestamp atual sera mantido.</p>
       <div class="bulk-track-title-actions">
         <button id="track-text-edit-cancel" class="ghost-button" type="button">Cancelar</button>
         <button id="track-text-edit-save" class="primary-button" type="button">Salvar texto</button>
@@ -2477,7 +2476,7 @@ function ensureTrackFullTextEditModal() {
   modal.setAttribute("aria-hidden", "true");
   modal.innerHTML = `
     <div class="track-texts-backdrop" data-role="close-full-text-edit"></div>
-    <div class="track-texts-panel track-generation-panel track-full-text-edit-panel track-full-text-edit-panel--immersive" role="dialog" aria-modal="true" aria-labelledby="track-full-text-edit-title">
+    <div class="track-texts-panel track-full-text-edit-panel track-full-text-edit-panel--immersive" role="dialog" aria-modal="true" aria-labelledby="track-full-text-edit-title">
       <div class="track-texts-head">
         <div>
           <p class="eyebrow">Editar texto completo</p>
@@ -2490,7 +2489,6 @@ function ensureTrackFullTextEditModal() {
       <label class="track-character-field">Texto completo
         <textarea id="track-full-text-edit-input" class="track-text-edit-input track-full-text-edit-input" rows="14" placeholder="Edite livremente o texto da musica"></textarea>
       </label>
-      <p class="track-generation-message">Cada quebra de linha vira uma linha da musica. Timestamps existentes serao mantidos somente por indice correspondente.</p>
       <div class="bulk-track-title-actions">
         <button id="track-full-text-edit-join" class="track-text-join-button" type="button">Juntar tudo</button>
         <button id="track-full-text-edit-cancel" class="ghost-button" type="button">Cancelar</button>

@@ -2678,13 +2678,26 @@ body[data-page="produto"] .inline-link {
   gap: 14px;
 }
 
+.track-text-edit-panel--immersive,
 .track-full-text-edit-panel--immersive {
-  width: min(1120px, calc(100vw - 24px));
-  max-width: none;
-  min-height: calc(100dvh - 24px);
-  max-height: calc(100dvh - 24px);
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  max-width: 100vw;
+  margin: 0;
   padding: 20px 20px 24px;
-  border-radius: 24px;
+  border-radius: 0;
+  box-sizing: border-box;
+}
+
+.track-text-edit-panel--immersive {
+  background:
+    linear-gradient(180deg, rgba(10, 18, 38, 0.98) 0%, rgba(6, 10, 24, 0.99) 100%);
+}
+
+.track-full-text-edit-panel--immersive {
   background:
     linear-gradient(180deg, rgba(10, 18, 38, 0.98) 0%, rgba(6, 10, 24, 0.99) 100%);
 }
@@ -2709,12 +2722,14 @@ body[data-page="produto"] .inline-link {
   min-height: 320px;
 }
 
+.track-text-edit-panel--immersive .track-character-field,
 .track-full-text-edit-panel--immersive .track-character-field {
   display: grid;
   min-height: 0;
   flex: 1 1 auto;
 }
 
+.track-text-edit-panel--immersive .track-text-edit-input,
 .track-full-text-edit-panel--immersive .track-full-text-edit-input {
   min-height: 100%;
   height: 100%;
@@ -2746,14 +2761,15 @@ body[data-page="produto"] .inline-link {
 }
 
 @media (max-width: 720px) {
+  .track-text-edit-panel--immersive,
   .track-full-text-edit-panel--immersive {
-    width: 100vw;
     min-height: 100dvh;
     max-height: 100dvh;
     padding: 18px 16px 22px;
     border-radius: 0;
   }
 
+  .track-text-edit-panel--immersive .track-text-edit-input,
   .track-full-text-edit-panel--immersive .track-full-text-edit-input {
     padding: 18px 18px 22px;
     font-size: 1.18rem;
