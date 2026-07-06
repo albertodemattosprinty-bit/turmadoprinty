@@ -1814,7 +1814,13 @@ function confirmTrackTextsReset() {
 }
 
 function hasPendingTrackTextsSyncChanges(track) {
-  if (!trackTextsSyncMode || !trackTextsSyncDraft || !track) {
+  if (!trackTextsSyncDraft || !track) {
+    return false;
+  }
+  if (String(trackTextsSyncDraft.trackNumber || "") !== String(track?.number || "")) {
+    return false;
+  }
+  if (String(trackTextsSyncDraft.trackId || "") !== String(track?.sourceSongId || "")) {
     return false;
   }
   const currentLines = JSON.stringify(cloneLyricsLines(getTrackLyricsLines(track)));
@@ -3288,7 +3294,13 @@ async function mergeImmersiveTrackLine(track, lineIndex) {
   if (!track || lineIndex <= 0 || !isAdmin() || !String(track?.sourceAlbumId || "") || !String(track?.sourceSongId || "")) {
     return false;
   }
-  const lines = cloneLyricsLines(getTrackLyricsLines(track));
+  if (!trackTextsSyncDraft || String(trackTextsSyncDraft.trackNumber || "") !== String(track?.number || "") || String(trackTextsSyncDraft.trackId || "") !== String(track?.sourceSongId || "")) {
+    trackTextsSyncDraft = buildTrackSyncDraft(track, {
+      lines: getTrackLyricsLines(track),
+      syncMode: false
+    });
+  }
+  const lines = cloneLyricsLines(trackTextsSyncDraft.lines);
   const previousLine = lines[lineIndex - 1];
   const currentLine = lines[lineIndex];
   if (!previousLine || !currentLine) {
@@ -3303,11 +3315,12 @@ async function mergeImmersiveTrackLine(track, lineIndex) {
     ...line,
     number: index + 1
   }));
-  const updatedTrack = await persistExternalLyricsTrackLines(track, normalizedLines);
-  updateTrackInCurrentAlbum(updatedTrack);
+  trackTextsSyncDraft.lines = normalizedLines;
+  trackTextsSyncDraft.lyrics = normalizedLines.map((line) => line.text).join("\n");
+  trackTextsSyncDraft.syncMode = false;
+  persistTrackTextsSyncDraft(track);
   modalManualLineIndex = Math.max(0, lineIndex - 1);
-  await renderTracks(currentAlbum);
-  reopenTrackTextsModal(updatedTrack, { preserveScroll: shouldAllowFreeAdminTrackTextsScroll(track) });
+  reopenTrackTextsModal(track, { preserveScroll: shouldAllowFreeAdminTrackTextsScroll(track) });
   showFloatingNotice("Linha unida com a linha de cima.");
   return true;
 }
