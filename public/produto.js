@@ -62,7 +62,6 @@ const freePreviewSeconds = 75;
 const freePreviewFadeSeconds = 4;
 const externalLyricsInlineStateByTrackNumber = new Map();
 const EXTERNAL_LYRICS_DOUBLE_TAP_MS = 360;
-const EXTERNAL_LYRICS_CANCEL_SWIPE_PX = 46;
 const characterPalettes = {
   boys: ["#7FDBFF", "#9EE8FF", "#61D2FF", "#8CCBFF"],
   girls: ["#FF79C6", "#FF9BE0", "#D38BFF", "#F09CFF"],
@@ -277,6 +276,7 @@ function syncExternalTrackLyricsPanel(trackNumber) {
     node.classList.toggle("is-voice-pending", Boolean(state && state.pendingLineIndex === index));
     node.classList.toggle("is-voice-saved", Boolean(state && state.savedLineIndex === index));
   });
+  syncExternalLyricsVoiceActionButton();
 }
 
 function resetExternalLyricsInlineState(trackNumber) {
@@ -286,6 +286,7 @@ function resetExternalLyricsInlineState(trackNumber) {
   }
   clearExternalLyricsSavedTimer(state);
   externalLyricsInlineStateByTrackNumber.delete(String(trackNumber || ""));
+  syncExternalLyricsVoiceActionButton();
 }
 
 function markExternalLyricsSaved(trackNumber, lineIndex) {
@@ -304,6 +305,81 @@ function markExternalLyricsSaved(trackNumber, lineIndex) {
     liveState.savedTimerId = 0;
     syncExternalTrackLyricsPanel(trackNumber);
   }, 1400);
+}
+
+function getExternalLyricsPendingSessionTarget() {
+  for (const [trackNumber, state] of externalLyricsInlineStateByTrackNumber.entries()) {
+    if (state?.pendingLineIndex >= 0) {
+      return {
+        trackNumber: Number(trackNumber),
+        lineIndex: state.pendingLineIndex
+      };
+    }
+  }
+  return null;
+}
+
+function ensureExternalLyricsVoiceActionButton() {
+  let button = document.getElementById("external-lyrics-voice-action");
+  if (button) {
+    return button;
+  }
+  button = document.createElement("button");
+  button.id = "external-lyrics-voice-action";
+  button.type = "button";
+  button.className = "external-lyrics-voice-action";
+  button.hidden = true;
+  button.setAttribute("aria-label", "Finalizar gravacao da letra");
+  button.innerHTML = `
+    <svg viewBox="0 0 24 24" aria-hidden="true" data-role="voice-action-icon">
+      <path d="M12 3a3 3 0 0 1 3 3v4a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3m-5 7a1 1 0 1 1 2 0 3 3 0 1 0 6 0 1 1 0 1 1 2 0 5 5 0 0 1-4 4.9V18h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-3.1A5 5 0 0 1 7 10"/>
+    </svg>
+  `;
+  button.addEventListener("click", async () => {
+    if (externalLyricsVoiceSession) {
+      await commitExternalLyricsVoiceSession(externalLyricsVoiceSession);
+      return;
+    }
+    const pendingTarget = getExternalLyricsPendingSessionTarget();
+    if (!pendingTarget) {
+      return;
+    }
+    const track = getTrackByNumber(pendingTarget.trackNumber);
+    if (!track) {
+      return;
+    }
+    await startExternalLyricsVoiceSession(track, pendingTarget.lineIndex);
+  });
+  document.body.appendChild(button);
+  return button;
+}
+
+function syncExternalLyricsVoiceActionButton() {
+  const button = ensureExternalLyricsVoiceActionButton();
+  const icon = button.querySelector("[data-role='voice-action-icon']");
+  const pendingTarget = getExternalLyricsPendingSessionTarget();
+  const isRecording = Boolean(externalLyricsVoiceSession);
+  const isPending = Boolean(!isRecording && pendingTarget);
+  button.hidden = !(isRecording || isPending);
+  button.classList.toggle("is-recording", isRecording);
+  button.classList.toggle("is-pending", isPending);
+  if (isRecording) {
+    button.setAttribute("aria-label", "Finalizar gravacao da letra");
+    button.title = "Finalizar gravacao";
+    if (icon) {
+      icon.innerHTML = '<path d="M7 7h4v10H7zm6 0h4v10h-4z"/>';
+    }
+    return;
+  }
+  if (isPending) {
+    button.setAttribute("aria-label", "Gravar novamente esta linha");
+    button.title = "Gravar novamente";
+    if (icon) {
+      icon.innerHTML = '<path d="M12 3a3 3 0 0 1 3 3v4a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3m-5 7a1 1 0 1 1 2 0 3 3 0 1 0 6 0 1 1 0 1 1 2 0 5 5 0 0 1-4 4.9V18h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-3.1A5 5 0 0 1 7 10"/>';
+    }
+    return;
+  }
+  button.removeAttribute("title");
 }
 
 function normalizeExternalLyricsTranscript(text) {
@@ -390,6 +466,7 @@ function teardownExternalLyricsVoiceSession(session) {
   if (externalLyricsVoiceSession === session) {
     externalLyricsVoiceSession = null;
   }
+  syncExternalLyricsVoiceActionButton();
 }
 
 function stopExternalLyricsRecorder(session) {
@@ -470,7 +547,7 @@ async function commitExternalLyricsVoiceSession(session) {
     state.lines = nextLines;
     state.pendingLineIndex = session.lineIndex;
     syncExternalTrackLyricsPanel(session.trackNumber);
-    showFloatingNotice("Texto ouvido. Toque na linha rosa para salvar.");
+    showFloatingNotice("Texto ouvido. Toque na linha rosa para salvar ou use o botao para gravar de novo.");
   } catch (error) {
     const state = getExternalLyricsInlineState(session.trackNumber);
     if (state) {
@@ -485,7 +562,7 @@ async function commitExternalLyricsVoiceSession(session) {
   }
 }
 
-async function startExternalLyricsVoiceSession(track, lineIndex, triggerEvent) {
+async function startExternalLyricsVoiceSession(track, lineIndex) {
   if (!isAdmin() || !track || lineIndex < 0) {
     return;
   }
@@ -521,9 +598,6 @@ async function startExternalLyricsVoiceSession(track, lineIndex, triggerEvent) {
       cancelled: false,
       committing: false,
       stopPromise: null,
-      anchorX: Number(triggerEvent?.clientX || 0),
-      anchorY: Number(triggerEvent?.clientY || 0),
-      gesturePointerId: null,
       cleanup: null
     };
 
@@ -533,55 +607,10 @@ async function startExternalLyricsVoiceSession(track, lineIndex, triggerEvent) {
       }
     });
 
-    const onPointerDown = (event) => {
-      session.gesturePointerId = event.pointerId;
-      session.anchorX = Number(event.clientX || 0);
-      session.anchorY = Number(event.clientY || 0);
-    };
-
-    const onPointerMove = (event) => {
-      if (session.cancelled || session.committing || session.gesturePointerId !== event.pointerId) {
-        return;
-      }
-      const deltaX = Number(event.clientX || 0) - session.anchorX;
-      const deltaY = Number(event.clientY || 0) - session.anchorY;
-      if (deltaY <= -EXTERNAL_LYRICS_CANCEL_SWIPE_PX && Math.abs(deltaY) > Math.abs(deltaX)) {
-        event.preventDefault();
-        event.stopImmediatePropagation?.();
-        cancelExternalLyricsVoiceSession(session);
-        showFloatingNotice("Gravacao cancelada.");
-      }
-    };
-
-    const onPointerUp = (event) => {
-      if (session.cancelled || session.committing) {
-        return;
-      }
-      const deltaX = Number(event.clientX || 0) - session.anchorX;
-      const deltaY = Number(event.clientY || 0) - session.anchorY;
-      const target = event.target instanceof Element ? event.target : null;
-      const touchedLine = target?.closest?.(".track-lyrics-line");
-      const isTap = Math.abs(deltaX) < 14 && Math.abs(deltaY) < 14;
-      if (isTap && !touchedLine) {
-        event.preventDefault();
-        event.stopImmediatePropagation?.();
-        commitExternalLyricsVoiceSession(session);
-      }
-      session.gesturePointerId = null;
-    };
-
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("pointermove", onPointerMove, true);
-    document.addEventListener("pointerup", onPointerUp, true);
-    session.cleanup = () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("pointermove", onPointerMove, true);
-      document.removeEventListener("pointerup", onPointerUp, true);
-    };
-
     externalLyricsVoiceSession = session;
     mediaRecorder.start();
-    showFloatingNotice("Fale agora. Toque fora da letra para aplicar ou deslize para cima para cancelar.");
+    syncExternalLyricsVoiceActionButton();
+    showFloatingNotice("Fale agora. Use o botao no topo direito para finalizar.");
   } catch (error) {
     state.recordingLineIndex = -1;
     state.pendingLineIndex = -1;
@@ -641,7 +670,7 @@ function bindExternalLyricsVoiceInteractions(card, track) {
       event.preventDefault();
       state.lastTapAt = 0;
       state.lastTapIndex = -1;
-      await startExternalLyricsVoiceSession(track, lineIndex, event);
+      await startExternalLyricsVoiceSession(track, lineIndex);
     });
   });
 }
