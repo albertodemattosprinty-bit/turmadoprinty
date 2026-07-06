@@ -3457,6 +3457,11 @@ body[data-page="eventos-pagamento"] {
   transition: color 0.18s ease, transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
+.track-lyrics-panel.is-admin .track-lyrics-line {
+  font-size: 1.3rem;
+  line-height: 1.82;
+}
+
 .track-lyrics-line.is-spacer {
   min-height: 1.8em;
   opacity: 0.28;

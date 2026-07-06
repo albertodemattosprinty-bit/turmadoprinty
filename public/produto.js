@@ -63,6 +63,7 @@ let rehearsalRedeemInFlight = false;
 let rehearsalOwnerLoadInFlight = false;
 let downloadOptionInFlight = false;
 let externalLyricsVoiceSession = null;
+let externalLyricsPressState = null;
 const freePreviewSeconds = 75;
 const freePreviewFadeSeconds = 4;
 const externalLyricsInlineStateByTrackNumber = new Map();
@@ -659,9 +660,40 @@ function bindExternalLyricsVoiceInteractions(card, track) {
   }
 
   panel.querySelectorAll(".track-lyrics-line").forEach((node) => {
+    node.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+      const lineIndex = Number(node.dataset.lyricsIndex || -1);
+      if (lineIndex < 0) {
+        return;
+      }
+      if (externalLyricsPressState?.timer) {
+        window.clearTimeout(externalLyricsPressState.timer);
+      }
+      externalLyricsPressState = {
+        lineIndex,
+        opened: false,
+        timer: window.setTimeout(() => {
+          if (externalLyricsPressState) {
+            externalLyricsPressState.opened = true;
+          }
+          openTrackTextEditModal(track, lineIndex, { scope: "external-lyrics" });
+        }, 500)
+      };
+    });
     node.addEventListener("pointerup", async (event) => {
       const lineIndex = Number(node.dataset.lyricsIndex || -1);
       if (lineIndex < 0) {
+        return;
+      }
+      const pressState = externalLyricsPressState;
+      if (pressState?.timer) {
+        window.clearTimeout(pressState.timer);
+      }
+      externalLyricsPressState = null;
+      if (pressState?.opened) {
+        event.preventDefault();
         return;
       }
 
@@ -684,6 +716,12 @@ function bindExternalLyricsVoiceInteractions(card, track) {
       state.lastTapAt = 0;
       state.lastTapIndex = -1;
       await startExternalLyricsVoiceSession(track, lineIndex);
+    });
+    node.addEventListener("pointercancel", () => {
+      if (externalLyricsPressState?.timer) {
+        window.clearTimeout(externalLyricsPressState.timer);
+      }
+      externalLyricsPressState = null;
     });
   });
 }
@@ -2739,9 +2777,11 @@ async function deleteAllTrackCharacters() {
   }
 }
 
-function openTrackTextEditModal(track, lineIndex) {
+function openTrackTextEditModal(track, lineIndex, options = {}) {
   const modal = ensureTrackTextEditModal();
-  const line = getTrackModalWorkingLines(track)[lineIndex] || null;
+  const isExternalScope = options?.scope === "external-lyrics";
+  const sourceLines = isExternalScope ? getTrackExternalLyricsLines(track) : getTrackModalWorkingLines(track);
+  const line = sourceLines[lineIndex] || null;
   const input = modal.querySelector("#track-text-edit-input");
   if (!line || !input) {
     return;
@@ -2751,6 +2791,7 @@ function openTrackTextEditModal(track, lineIndex) {
   modal.dataset.trackId = String(track?.sourceSongId || "");
   modal.dataset.trackNumber = String(track?.number || "");
   modal.dataset.lineIndex = String(lineIndex);
+  modal.dataset.editScope = isExternalScope ? "external-lyrics" : "track-texts";
   input.value = line.text || "";
   modal.setAttribute("aria-hidden", "false");
   modal.classList.add("show");
@@ -2820,6 +2861,7 @@ async function submitTrackTextEditModal() {
   const trackId = String(modal.dataset.trackId || "");
   const trackNumber = Number(modal.dataset.trackNumber || 0);
   const lineIndex = Number(modal.dataset.lineIndex || -1);
+  const editScope = String(modal.dataset.editScope || "track-texts");
   const input = modal.querySelector("#track-text-edit-input");
   const track = getTrackByNumber(trackNumber);
   if (!albumId || !trackId || !track || lineIndex < 0 || !input) {
@@ -2832,7 +2874,7 @@ async function submitTrackTextEditModal() {
     return;
   }
 
-  const lines = cloneLyricsLines(getTrackModalWorkingLines(track));
+  const lines = cloneLyricsLines(editScope === "external-lyrics" ? getTrackExternalLyricsLines(track) : getTrackModalWorkingLines(track));
   const originalLine = lines[lineIndex];
   if (!originalLine) {
     return;
@@ -2849,6 +2891,21 @@ async function submitTrackTextEditModal() {
     ...line,
     number: index + 1
   }));
+
+  if (editScope === "external-lyrics") {
+    try {
+      const updatedTrack = await persistExternalLyricsTrackLines(track, normalizedLines);
+      resetExternalLyricsInlineState(track.number);
+      updateTrackInCurrentAlbum(updatedTrack);
+      await renderTracks(currentAlbum);
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+      showFloatingNotice("Texto da linha atualizado.");
+    } catch (error) {
+      showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel atualizar o texto.");
+    }
+    return;
+  }
 
   if (trackTextsSyncMode || isAdmin()) {
     updateTrackTextsLocalDraft(track, normalizedLines, {
@@ -3866,7 +3923,7 @@ function renderTrackLyrics(track) {
   }
 
   return `
-    <div class="track-lyrics-panel" data-role="lyrics-panel">
+    <div class="track-lyrics-panel${isAdmin() ? " is-admin" : ""}" data-role="lyrics-panel">
       ${lines.map((line, index) => `
         <div class="track-lyrics-line${isSpacerLyricsLine(line) ? " is-spacer" : ""}${state?.recordingLineIndex === index ? " is-voice-recording" : ""}${state?.pendingLineIndex === index ? " is-voice-pending" : ""}${state?.savedLineIndex === index ? " is-voice-saved" : ""}" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
           ${isSpacerLyricsLine(line) ? "&nbsp;" : escapeHtml(line.text)}
@@ -4122,7 +4179,7 @@ function bindAudioToCard(card, audio) {
 
   audio.addEventListener("loadedmetadata", updatePlayerButtons);
   audio.addEventListener("timeupdate", () => {
-    const previewLimit = canAccessAlbumByRehearsal(String(card?.dataset.albumId || ""))
+    const previewLimit = isAdmin() || canAccessAlbumByRehearsal(String(card?.dataset.albumId || ""))
       ? 0
       : Number(card.dataset.previewLimitSeconds || 0);
 
@@ -4190,7 +4247,7 @@ async function playTrack(card, albumId, track) {
     audio.dataset.ready = "true";
   }
 
-  const previewLimit = canAccessAlbumByRehearsal(albumId)
+  const previewLimit = isAdmin() || canAccessAlbumByRehearsal(albumId)
     ? 0
     : Number(card.dataset.previewLimitSeconds || 0);
   if (previewLimit > 0 && audio.currentTime >= previewLimit) {
