@@ -213,15 +213,21 @@ function getLineDisplayColor(track, line) {
   return character?.color || "";
 }
 
+function isSpacerLyricsLine(line) {
+  return !String(line?.text || "").trim();
+}
+
 function cloneLyricsLines(lines) {
-  return Array.isArray(lines)
-    ? lines.map((line, index) => ({
+  if (!Array.isArray(lines)) {
+    return [];
+  }
+  const normalizedLines = lines.map((line, index) => ({
       number: Number(line?.number || index + 1) || (index + 1),
-      text: String(line?.text || "").trim(),
+      text: String(line?.text || "").replace(/\s+/g, " ").trim(),
       timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
       characterId: String(line?.characterId || "").trim()
-    })).filter((line) => line.text)
-    : [];
+    }));
+  return normalizedLines.some((line) => !isSpacerLyricsLine(line)) ? normalizedLines : [];
 }
 
 function getExternalLyricsInlineState(trackNumber, create = false) {
@@ -275,9 +281,10 @@ function syncExternalTrackLyricsPanel(trackNumber) {
     if (!node) {
       return;
     }
-    node.textContent = line.text;
+    node.textContent = line.text || "\u00A0";
     node.dataset.lyricsIndex = String(index);
     node.dataset.timestampMs = line.timestampMs === null || line.timestampMs === undefined ? "" : String(line.timestampMs);
+    node.classList.toggle("is-spacer", isSpacerLyricsLine(line));
     node.classList.toggle("is-voice-recording", Boolean(state && state.recordingLineIndex === index));
     node.classList.toggle("is-voice-pending", Boolean(state && state.pendingLineIndex === index));
     node.classList.toggle("is-voice-saved", Boolean(state && state.savedLineIndex === index));
@@ -2770,12 +2777,18 @@ function joinTrackTextEditInput() {
 }
 
 function splitEditedTrackText(value) {
-  return String(value || "")
+  const normalizedLines = String(value || "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")
-    .map((line) => String(line || "").replace(/\s+/g, " ").trim())
-    .filter(Boolean);
+    .map((line) => String(line || "").replace(/\s+/g, " ").trim());
+  while (normalizedLines.length && !normalizedLines[0]) {
+    normalizedLines.shift();
+  }
+  while (normalizedLines.length && !normalizedLines[normalizedLines.length - 1]) {
+    normalizedLines.pop();
+  }
+  return normalizedLines;
 }
 
 function buildTrackLinesFromMultilineText(sourceLines, value) {
@@ -2814,7 +2827,7 @@ async function submitTrackTextEditModal() {
   }
 
   const nextLinesText = splitEditedTrackText(input.value);
-  if (!nextLinesText.length) {
+  if (!nextLinesText.some((text) => text)) {
     showFloatingNotice("Digite algum texto para a linha.");
     return;
   }
@@ -2948,7 +2961,7 @@ async function submitTrackFullTextEditModal() {
 
   const sourceLines = cloneLyricsLines(getTrackModalWorkingLines(track));
   const lines = buildTrackLinesFromMultilineText(sourceLines, input.value);
-  if (!lines.length) {
+  if (!lines.some((line) => String(line?.text || "").trim())) {
     showFloatingNotice("Digite algum texto para a musica.");
     return;
   }
@@ -3131,8 +3144,8 @@ function renderLyricsLinesHtml(track, lines) {
   return `
     <div class="track-texts-lines" data-role="track-texts-lines">
       ${lines.map((line, index) => `
-        <button class="track-texts-line ${line.timestampMs !== null && line.timestampMs !== undefined ? "is-synced" : ""}" type="button" data-lyrics-index="${index}" data-line-number="${line.number}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}" data-character-id="${escapeHtml(line.characterId || "")}" style="${getLineDisplayColor(track, line) ? `--line-character-color:${getLineDisplayColor(track, line)};` : ""}">
-          ${escapeHtml(line.text)}
+        <button class="track-texts-line ${line.timestampMs !== null && line.timestampMs !== undefined ? "is-synced" : ""}${isSpacerLyricsLine(line) ? " is-spacer" : ""}" type="button" data-lyrics-index="${index}" data-line-number="${line.number}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}" data-character-id="${escapeHtml(line.characterId || "")}" style="${getLineDisplayColor(track, line) ? `--line-character-color:${getLineDisplayColor(track, line)};` : ""}">
+          ${isSpacerLyricsLine(line) ? "&nbsp;" : escapeHtml(line.text)}
         </button>
       `).join("")}
     </div>
@@ -3727,12 +3740,11 @@ function openTrackTextsModal(track) {
         trackCharacterDesktopHoldState = null;
         return;
       }
-      if (trackCharacterSelectionActive && trackCharacterSelectionTrackId === getTrackCharacterSelectionKey(track)) {
-        toggleTrackCharacterSelection(track, lineIndex);
-        refreshTrackCharacterSelectionUi();
-        return;
+      if (trackCharacterDesktopHoldState?.timer) {
+        window.clearTimeout(trackCharacterDesktopHoldState.timer);
+        trackCharacterDesktopHoldState = null;
       }
-      openCharacterEditor();
+      openTextEditor();
     });
     node.addEventListener("pointerdown", (event) => {
       if (isAdmin() && isDesktopPointer() && event.pointerType === "mouse" && event.button === 2) {
@@ -3825,15 +3837,16 @@ function openTrackTextsModal(track) {
 function getTrackLyricsLines(track) {
   const syncLines = Array.isArray(track?.lyricsSyncData?.lines) ? track.lyricsSyncData.lines : [];
   if (syncLines.length) {
-    return syncLines.map((line, index) => ({
+    const normalizedLines = syncLines.map((line, index) => ({
       number: Number(line?.number || index + 1) || (index + 1),
-      text: String(line?.text || "").trim(),
+      text: String(line?.text || "").replace(/\s+/g, " ").trim(),
       timestampMs: line?.timestampMs === null || line?.timestampMs === undefined ? null : Math.max(0, Number(line.timestampMs) || 0),
       characterId: String(line?.characterId || "").trim()
-    })).filter((line) => line.text);
+    }));
+    return normalizedLines.some((line) => !isSpacerLyricsLine(line)) ? normalizedLines : [];
   }
 
-  return String(track?.lyrics || "")
+  const fallbackLines = String(track?.lyrics || "")
     .split(/\r?\n/)
     .map((text, index) => ({
       number: index + 1,
@@ -3841,7 +3854,8 @@ function getTrackLyricsLines(track) {
       timestampMs: null,
       characterId: ""
     }))
-    .filter((line) => line.text);
+    ;
+  return fallbackLines.some((line) => !isSpacerLyricsLine(line)) ? fallbackLines : [];
 }
 
 function renderTrackLyrics(track) {
@@ -3854,8 +3868,8 @@ function renderTrackLyrics(track) {
   return `
     <div class="track-lyrics-panel" data-role="lyrics-panel">
       ${lines.map((line, index) => `
-        <div class="track-lyrics-line${state?.recordingLineIndex === index ? " is-voice-recording" : ""}${state?.pendingLineIndex === index ? " is-voice-pending" : ""}${state?.savedLineIndex === index ? " is-voice-saved" : ""}" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
-          ${escapeHtml(line.text)}
+        <div class="track-lyrics-line${isSpacerLyricsLine(line) ? " is-spacer" : ""}${state?.recordingLineIndex === index ? " is-voice-recording" : ""}${state?.pendingLineIndex === index ? " is-voice-pending" : ""}${state?.savedLineIndex === index ? " is-voice-saved" : ""}" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
+          ${isSpacerLyricsLine(line) ? "&nbsp;" : escapeHtml(line.text)}
         </div>
       `).join("")}
     </div>
