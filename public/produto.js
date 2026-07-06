@@ -53,6 +53,8 @@ let trackTextsLastPointerTap = { index: -1, time: 0 };
 let trackTextsSuppressedClick = { index: -1, time: 0 };
 let trackTextsSaveInFlight = false;
 let trackTextsPlaybackRate = 1;
+let trackTextsPreservedScrollTop = null;
+let trackTextsSkipAutoCenter = false;
 let trackCharacterSelectionActive = false;
 let trackCharacterSelectionTrackId = "";
 let trackCharacterSelectedLineIndexes = new Set();
@@ -3200,6 +3202,21 @@ function mergeTrackSyncDraftLine(lineIndex) {
   return true;
 }
 
+function shouldAllowFreeAdminTrackTextsScroll(track) {
+  return isAdmin() && (!currentAudio || currentAudio.paused || currentTrackNumber !== Number(track?.number || 0));
+}
+
+function reopenTrackTextsModal(track, { preserveScroll = false } = {}) {
+  const currentBody = document.getElementById("track-texts-body");
+  if (preserveScroll) {
+    trackTextsPreservedScrollTop = Number(currentBody?.scrollTop || 0);
+    trackTextsSkipAutoCenter = true;
+  } else {
+    trackTextsPreservedScrollTop = null;
+  }
+  openTrackTextsModal(track);
+}
+
 async function mergeImmersiveTrackLine(track, lineIndex) {
   if (!track || lineIndex <= 0 || !isAdmin() || !String(track?.sourceAlbumId || "") || !String(track?.sourceSongId || "")) {
     return false;
@@ -3223,7 +3240,7 @@ async function mergeImmersiveTrackLine(track, lineIndex) {
   updateTrackInCurrentAlbum(updatedTrack);
   modalManualLineIndex = Math.max(0, lineIndex - 1);
   await renderTracks(currentAlbum);
-  openTrackTextsModal(updatedTrack);
+  reopenTrackTextsModal(updatedTrack, { preserveScroll: shouldAllowFreeAdminTrackTextsScroll(track) });
   showFloatingNotice("Linha unida com a linha de cima.");
   return true;
 }
@@ -3254,7 +3271,7 @@ async function handleTrackTextsLineTap(track, node, lineIndex, event, { fromPoin
     if (mergeTrackSyncDraftLine(lineIndex)) {
       persistTrackTextsSyncDraft(track);
       modalManualLineIndex = Math.max(0, lineIndex - 1);
-      openTrackTextsModal(track);
+      reopenTrackTextsModal(track, { preserveScroll: shouldAllowFreeAdminTrackTextsScroll(track) });
       showFloatingNotice("Linha unida com a linha de cima.");
     }
     return;
@@ -3283,7 +3300,7 @@ async function handleTrackTextsLineTap(track, node, lineIndex, event, { fromPoin
       if (!isAdmin()) {
         await seekTrackAudio(track, anchorTimestampMs / 1000, { autoplay: false });
       }
-      openTrackTextsModal(track);
+      reopenTrackTextsModal(track, { preserveScroll: shouldAllowFreeAdminTrackTextsScroll(track) });
       return;
     }
     const nowMs = Math.max(0, Math.round((currentAudio?.currentTime || 0) * 1000));
@@ -3667,6 +3684,10 @@ function openTrackTextsModal(track) {
   modal.classList.add("show");
   refreshTrackCharacterSelectionUi();
   syncTrackTextsModalUi(track);
+  if (trackTextsPreservedScrollTop !== null) {
+    body.scrollTop = trackTextsPreservedScrollTop;
+    trackTextsPreservedScrollTop = null;
+  }
 }
 
 function getTrackLyricsLines(track) {
@@ -3753,7 +3774,8 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
     }
   });
 
-  if (activeNode && activeIndex !== trackTextsLastActiveIndex) {
+  const shouldAutoCenter = !trackTextsSkipAutoCenter && !shouldAllowFreeAdminTrackTextsScroll(track);
+  if (activeNode && activeIndex !== trackTextsLastActiveIndex && shouldAutoCenter) {
     const bodyRect = body.getBoundingClientRect();
     const nodeRect = activeNode.getBoundingClientRect();
     const currentScrollTop = body.scrollTop;
@@ -3767,6 +3789,7 @@ function syncTrackTextsModalHighlight(track, currentTimeSeconds) {
       behavior: "smooth"
     });
   }
+  trackTextsSkipAutoCenter = false;
   trackTextsLastActiveIndex = activeIndex;
 }
 
