@@ -730,6 +730,20 @@ function clearTrackSyncDraft(track) {
   }
 }
 
+function closeTrackTextsModal() {
+  const modal = document.getElementById("track-texts-modal");
+  if (trackTextsTitleHoldTimer) {
+    window.clearTimeout(trackTextsTitleHoldTimer);
+    trackTextsTitleHoldTimer = null;
+  }
+  closeTrackTextsTrackPicker();
+  clearTrackCharacterSelection({ refresh: false });
+  if (modal) {
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.remove("show");
+  }
+}
+
 function buildTrackSyncDraft(track, draft = null) {
   const baseLines = cloneLyricsLines(draft?.lines?.length ? draft.lines : getTrackLyricsLines(track));
   return {
@@ -1620,15 +1634,8 @@ function ensureTrackTextsModal() {
   `;
   document.body.appendChild(modal);
   modal.querySelectorAll("[data-role='close-texts']").forEach((node) => {
-    node.addEventListener("click", () => {
-      if (trackTextsTitleHoldTimer) {
-        window.clearTimeout(trackTextsTitleHoldTimer);
-        trackTextsTitleHoldTimer = null;
-      }
-      closeTrackTextsTrackPicker();
-      clearTrackCharacterSelection({ refresh: false });
-      modal.setAttribute("aria-hidden", "true");
-      modal.classList.remove("show");
+    node.addEventListener("click", async () => {
+      await requestCloseTrackTextsModal();
     });
   });
   modal.querySelectorAll("[data-role='close-track-picker']").forEach((node) => {
@@ -1758,6 +1765,31 @@ function ensureTrackTextsConfirmModal() {
 
 let trackTextsConfirmResolver = null;
 
+function openTrackTextsConfirm({
+  eyebrow = "Confirmar",
+  title = "Deseja continuar?",
+  message = "",
+  acceptLabel = "Continuar",
+  cancelLabel = "Cancelar"
+} = {}) {
+  const modal = ensureTrackTextsConfirmModal();
+  const eyebrowNode = modal.querySelector(".eyebrow");
+  const titleNode = modal.querySelector("#track-text-confirm-title");
+  const messageNode = modal.querySelector("#track-text-confirm-message");
+  const cancelButton = modal.querySelector("#track-text-confirm-cancel");
+  const acceptButton = modal.querySelector("#track-text-confirm-accept");
+  if (eyebrowNode) eyebrowNode.textContent = eyebrow;
+  if (titleNode) titleNode.textContent = title;
+  if (messageNode) messageNode.textContent = message;
+  if (cancelButton) cancelButton.textContent = cancelLabel;
+  if (acceptButton) acceptButton.textContent = acceptLabel;
+  modal.setAttribute("aria-hidden", "false");
+  modal.classList.add("show");
+  return new Promise((resolve) => {
+    trackTextsConfirmResolver = resolve;
+  });
+}
+
 function resolveTrackTextsConfirm(accepted) {
   const modal = document.getElementById("track-texts-confirm-modal");
   if (modal) {
@@ -1772,12 +1804,47 @@ function resolveTrackTextsConfirm(accepted) {
 }
 
 function confirmTrackTextsReset() {
-  const modal = ensureTrackTextsConfirmModal();
-  modal.setAttribute("aria-hidden", "false");
-  modal.classList.add("show");
-  return new Promise((resolve) => {
-    trackTextsConfirmResolver = resolve;
+  return openTrackTextsConfirm({
+    eyebrow: "Recriar textos",
+    title: "Deseja excluir o timestamp atual?",
+    message: "Os textos serao recriados pela OpenAI e a faixa ficara somente com texto simples, sem a syncagem atual.",
+    acceptLabel: "Continuar",
+    cancelLabel: "Cancelar"
   });
+}
+
+function hasPendingTrackTextsSyncChanges(track) {
+  if (!trackTextsSyncMode || !trackTextsSyncDraft || !track) {
+    return false;
+  }
+  const currentLines = JSON.stringify(cloneLyricsLines(getTrackLyricsLines(track)));
+  const draftLines = JSON.stringify(cloneLyricsLines(trackTextsSyncDraft.lines));
+  return currentLines !== draftLines;
+}
+
+async function requestCloseTrackTextsModal() {
+  const track = getModalTrack();
+  if (!hasPendingTrackTextsSyncChanges(track)) {
+    closeTrackTextsModal();
+    return;
+  }
+  const shouldSave = await openTrackTextsConfirm({
+    eyebrow: "Salvar mudancas",
+    title: "Salvar mudancas",
+    message: "Deseja salvar antes de voltar?",
+    acceptLabel: "Sim",
+    cancelLabel: "Nao"
+  });
+  if (shouldSave) {
+    await saveTrackTextsSyncDraft({ closeAfterSave: true });
+    return;
+  }
+  if (track) {
+    clearTrackSyncDraft(track);
+  }
+  trackTextsSyncDraft = null;
+  trackTextsSyncMode = false;
+  closeTrackTextsModal();
 }
 
 function getRehearsalStorageKey(albumId) {
@@ -3334,11 +3401,12 @@ async function handleTrackTextsLineTap(track, node, lineIndex, event, { fromPoin
   syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
 }
 
-async function saveTrackTextsSyncDraft() {
+async function saveTrackTextsSyncDraft(options = {}) {
   const track = getModalTrack();
   if (!track || !trackTextsSyncDraft || !isAdmin() || trackTextsSaveInFlight) {
     return;
   }
+  const closeAfterSave = Boolean(options?.closeAfterSave);
 
   trackTextsSaveInFlight = true;
   syncTrackTextsModeUi(track);
@@ -3380,8 +3448,12 @@ async function saveTrackTextsSyncDraft() {
     trackTextsSyncDraft = null;
     await renderTracks(currentAlbum);
     trackTextsSyncMode = false;
-    openTrackTextsModal(updatedTrack);
-    syncTrackTextsModeUi(updatedTrack);
+    if (closeAfterSave) {
+      closeTrackTextsModal();
+    } else {
+      openTrackTextsModal(updatedTrack);
+      syncTrackTextsModeUi(updatedTrack);
+    }
     showFloatingNotice("Sync salva no Postgres com sucesso.");
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar a syncagem.");
