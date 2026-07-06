@@ -2774,6 +2774,19 @@ function buildTrackLinesFromMultilineText(sourceLines, value) {
   }));
 }
 
+function updateTrackTextsLocalDraft(track, lines, { syncMode = trackTextsSyncMode } = {}) {
+  if (!track) {
+    return null;
+  }
+  trackTextsSyncDraft = buildTrackSyncDraft(track, {
+    lines,
+    syncMode
+  });
+  trackTextsSyncDraft.syncMode = Boolean(syncMode);
+  persistTrackTextsSyncDraft(track);
+  return trackTextsSyncDraft;
+}
+
 async function submitTrackTextEditModal() {
   const modal = ensureTrackTextEditModal();
   const albumId = String(modal.dataset.albumId || "");
@@ -2810,17 +2823,15 @@ async function submitTrackTextEditModal() {
     number: index + 1
   }));
 
-  if (trackTextsSyncMode) {
-    trackTextsSyncDraft = buildTrackSyncDraft(track, {
-      lines: normalizedLines,
-      syncMode: true
+  if (trackTextsSyncMode || isAdmin()) {
+    updateTrackTextsLocalDraft(track, normalizedLines, {
+      syncMode: trackTextsSyncMode
     });
-    persistTrackTextsSyncDraft(track);
     modal.setAttribute("aria-hidden", "true");
     modal.classList.remove("show");
     modalManualLineIndex = lineIndex;
     openTrackTextsModal(track);
-    showFloatingNotice("Texto atualizado no modo sync.");
+    showFloatingNotice(trackTextsSyncMode ? "Texto atualizado no modo sync." : "Texto da linha atualizado.");
     return;
   }
 
@@ -2904,16 +2915,14 @@ async function submitTrackFullTextEditModal() {
     return;
   }
 
-  if (trackTextsSyncMode) {
-    trackTextsSyncDraft = buildTrackSyncDraft(track, {
-      lines,
-      syncMode: true
+  if (trackTextsSyncMode || isAdmin()) {
+    updateTrackTextsLocalDraft(track, lines, {
+      syncMode: trackTextsSyncMode
     });
-    persistTrackTextsSyncDraft(track);
     modal.setAttribute("aria-hidden", "true");
     modal.classList.remove("show");
     openTrackTextsModal(track);
-    showFloatingNotice("Texto completo atualizado no modo sync.");
+    showFloatingNotice(trackTextsSyncMode ? "Texto completo atualizado no modo sync." : "Texto completo atualizado.");
     return;
   }
 
