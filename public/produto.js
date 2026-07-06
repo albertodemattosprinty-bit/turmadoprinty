@@ -52,6 +52,7 @@ let trackTextsLastTap = { index: -1, time: 0 };
 let trackTextsLastPointerTap = { index: -1, time: 0 };
 let trackTextsSuppressedClick = { index: -1, time: 0 };
 let trackTextsSaveInFlight = false;
+let trackTextsPlaybackRate = 1;
 let trackCharacterSelectionActive = false;
 let trackCharacterSelectionTrackId = "";
 let trackCharacterSelectedLineIndexes = new Set();
@@ -64,6 +65,7 @@ const freePreviewSeconds = 75;
 const freePreviewFadeSeconds = 4;
 const externalLyricsInlineStateByTrackNumber = new Map();
 const EXTERNAL_LYRICS_DOUBLE_TAP_MS = 360;
+const TRACK_TEXTS_SYNC_PLAYBACK_RATES = [1, 1.5, 2];
 const characterPalettes = {
   boys: ["#7FDBFF", "#9EE8FF", "#61D2FF", "#8CCBFF"],
   girls: ["#FF79C6", "#FF9BE0", "#D38BFF", "#F09CFF"],
@@ -1572,10 +1574,16 @@ function ensureTrackTextsModal() {
           <p id="track-texts-sync-status" class="track-texts-sync-status" hidden>Modo sync ativo</p>
         </div>
         <div class="track-texts-head-actions">
-          <button id="track-texts-save-sync" class="ghost-button track-texts-save-sync" type="button" hidden>Salvar sync</button>
-        <button class="ghost-button track-texts-close" type="button" data-role="close-texts" aria-label="Voltar aos detalhes">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
-        </button>
+          <button id="track-texts-speed-sync" class="ghost-button track-texts-speed-sync" type="button" hidden aria-label="Mudar velocidade da musica" title="Velocidade">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a9 9 0 1 0 9 9 1 1 0 1 0-2 0 7 7 0 1 1-2.05-4.95 1 1 0 0 0 1.42-1.41A8.94 8.94 0 0 0 12 4m-.53 4.15a1 1 0 0 1 1.3.55l1.1 2.79 2.98.64a1 1 0 0 1-.42 1.96l-3.52-.76a1 1 0 0 1-.72-.61L10.92 9.45a1 1 0 0 1 .55-1.3"/></svg>
+            <span data-role="sync-speed-label">1.0</span>
+          </button>
+          <button id="track-texts-save-sync" class="ghost-button track-texts-save-sync" type="button" hidden aria-label="Aprovar e salvar sync" title="Salvar sync">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.55 16.18 5.37 12a1 1 0 1 1 1.41-1.41l2.77 2.76 7.67-7.66A1 1 0 1 1 18.63 7.1z"/></svg>
+          </button>
+          <button class="ghost-button track-texts-close" type="button" data-role="close-texts" aria-label="Voltar aos detalhes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
+          </button>
         </div>
       </div>
       <div class="track-texts-player" data-role="modal-player">
@@ -1635,6 +1643,9 @@ function ensureTrackTextsModal() {
   modal.querySelector("#track-texts-save-sync")?.addEventListener("click", async () => {
     await saveTrackTextsSyncDraft();
   });
+  modal.querySelector("#track-texts-speed-sync")?.addEventListener("click", () => {
+    cycleTrackTextsSyncPlaybackRate();
+  });
   modal.querySelector("[data-role='modal-progress']")?.addEventListener("input", async (event) => {
     const currentTrack = getModalTrack();
     if (!currentTrack) {
@@ -1674,6 +1685,32 @@ function ensureTrackGenerationModal() {
   `;
   document.body.appendChild(modal);
   return modal;
+}
+
+function formatTrackTextsPlaybackRateLabel(rate) {
+  return Number(rate || 1).toFixed(1);
+}
+
+function getTrackTextsEffectivePlaybackRate() {
+  return trackTextsSyncMode ? trackTextsPlaybackRate : 1;
+}
+
+function applyTrackTextsPlaybackRate(audio) {
+  if (!audio) {
+    return;
+  }
+  audio.playbackRate = getTrackTextsEffectivePlaybackRate();
+}
+
+function cycleTrackTextsSyncPlaybackRate() {
+  const currentIndex = TRACK_TEXTS_SYNC_PLAYBACK_RATES.findIndex((value) => Math.abs(value - trackTextsPlaybackRate) < 0.001);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % TRACK_TEXTS_SYNC_PLAYBACK_RATES.length : 0;
+  trackTextsPlaybackRate = TRACK_TEXTS_SYNC_PLAYBACK_RATES[nextIndex];
+  if (currentAudio) {
+    applyTrackTextsPlaybackRate(currentAudio);
+  }
+  syncTrackTextsModeUi(getModalTrack());
+  syncTrackTextsModalUi(getModalTrack());
 }
 
 function ensureTrackTextsConfirmModal() {
@@ -3054,21 +3091,39 @@ function openTrackTextsTrackPicker() {
 function syncTrackTextsModeUi(track) {
   const modal = document.getElementById("track-texts-modal");
   const panel = modal?.querySelector(".track-texts-panel");
+  const title = modal?.querySelector("#track-texts-title");
   const status = modal?.querySelector("#track-texts-sync-status");
   const saveButton = modal?.querySelector("#track-texts-save-sync");
+  const speedButton = modal?.querySelector("#track-texts-speed-sync");
+  const speedLabel = speedButton?.querySelector("[data-role='sync-speed-label']");
   if (!modal || !panel) {
     return;
   }
 
   panel.classList.toggle("is-sync-mode", trackTextsSyncMode);
+  if (title) {
+    title.textContent = trackTextsSyncMode
+      ? "MODO SYNCA ATIVO"
+      : (track?.title || track?.label || currentAlbum?.name || "Faixa");
+  }
   if (status) {
-    status.hidden = !trackTextsSyncMode;
-    status.textContent = trackTextsSyncMode ? "Modo sync ativo" : "";
+    status.hidden = true;
+    status.textContent = "";
+  }
+  if (speedButton) {
+    speedButton.hidden = !trackTextsSyncMode;
+    speedButton.disabled = !trackTextsSyncMode;
+    speedButton.setAttribute("aria-label", `Velocidade ${formatTrackTextsPlaybackRateLabel(trackTextsPlaybackRate)}`);
+  }
+  if (speedLabel) {
+    speedLabel.textContent = formatTrackTextsPlaybackRateLabel(trackTextsPlaybackRate);
   }
   if (saveButton) {
     saveButton.hidden = !(trackTextsSyncMode && isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || ""));
     saveButton.disabled = trackTextsSaveInFlight;
-    saveButton.textContent = trackTextsSaveInFlight ? "Salvando..." : "Salvar sync";
+    saveButton.classList.toggle("is-saving", trackTextsSaveInFlight);
+    saveButton.setAttribute("aria-label", trackTextsSaveInFlight ? "Salvando sync" : "Aprovar e salvar sync");
+    saveButton.setAttribute("title", trackTextsSaveInFlight ? "Salvando..." : "Salvar sync");
   }
 }
 
@@ -3088,11 +3143,15 @@ async function enterTrackTextsSyncMode(track) {
 
 function exitTrackTextsSyncMode(track, { keepDraft = true } = {}) {
   trackTextsSyncMode = false;
+  trackTextsPlaybackRate = 1;
   if (trackTextsSyncDraft && track) {
     trackTextsSyncDraft.syncMode = false;
     if (keepDraft) {
       writeTrackSyncDraft(track, trackTextsSyncDraft);
     }
+  }
+  if (currentAudio) {
+    applyTrackTextsPlaybackRate(currentAudio);
   }
   syncTrackTextsModeUi(track);
 }
@@ -3141,6 +3200,34 @@ function mergeTrackSyncDraftLine(lineIndex) {
   return true;
 }
 
+async function mergeImmersiveTrackLine(track, lineIndex) {
+  if (!track || lineIndex <= 0 || !isAdmin() || !String(track?.sourceAlbumId || "") || !String(track?.sourceSongId || "")) {
+    return false;
+  }
+  const lines = cloneLyricsLines(getTrackLyricsLines(track));
+  const previousLine = lines[lineIndex - 1];
+  const currentLine = lines[lineIndex];
+  if (!previousLine || !currentLine) {
+    return false;
+  }
+  previousLine.text = `${previousLine.text}${previousLine.text && currentLine.text ? " " : ""}${currentLine.text}`.trim();
+  if (!previousLine.characterId && currentLine.characterId) {
+    previousLine.characterId = currentLine.characterId;
+  }
+  lines.splice(lineIndex, 1);
+  const normalizedLines = lines.map((line, index) => ({
+    ...line,
+    number: index + 1
+  }));
+  const updatedTrack = await persistExternalLyricsTrackLines(track, normalizedLines);
+  updateTrackInCurrentAlbum(updatedTrack);
+  modalManualLineIndex = Math.max(0, lineIndex - 1);
+  await renderTracks(currentAlbum);
+  openTrackTextsModal(updatedTrack);
+  showFloatingNotice("Linha unida com a linha de cima.");
+  return true;
+}
+
 async function handleTrackTextsLineTap(track, node, lineIndex, event, { fromPointer = false } = {}) {
   if (trackTextsTouchState?.opened) {
     trackTextsTouchState = null;
@@ -3168,9 +3255,16 @@ async function handleTrackTextsLineTap(track, node, lineIndex, event, { fromPoin
       persistTrackTextsSyncDraft(track);
       modalManualLineIndex = Math.max(0, lineIndex - 1);
       openTrackTextsModal(track);
-      showFloatingNotice("Linha unida com a de cima.");
+      showFloatingNotice("Linha unida com a linha de cima.");
     }
     return;
+  }
+
+  if (!trackTextsSyncMode && isDoubleTap && isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
+    event.preventDefault();
+    if (await mergeImmersiveTrackLine(track, lineIndex)) {
+      return;
+    }
   }
 
   if (trackTextsSyncMode) {
