@@ -49,6 +49,8 @@ let trackTextsSyncMode = false;
 let trackTextsSyncDraft = null;
 let trackTextsTitleHoldTimer = null;
 let trackTextsLastTap = { index: -1, time: 0 };
+let trackTextsLastPointerTap = { index: -1, time: 0 };
+let trackTextsSuppressedClick = { index: -1, time: 0 };
 let trackTextsSaveInFlight = false;
 let trackCharacterSelectionActive = false;
 let trackCharacterSelectionTrackId = "";
@@ -3139,6 +3141,86 @@ function mergeTrackSyncDraftLine(lineIndex) {
   return true;
 }
 
+async function handleTrackTextsLineTap(track, node, lineIndex, event, { fromPointer = false } = {}) {
+  if (trackTextsTouchState?.opened) {
+    trackTextsTouchState = null;
+    return;
+  }
+
+  const now = Date.now();
+  if (!fromPointer && trackTextsSuppressedClick.index === lineIndex && (now - trackTextsSuppressedClick.time) < 520) {
+    trackTextsSuppressedClick = { index: -1, time: 0 };
+    return;
+  }
+
+  const tapState = fromPointer ? trackTextsLastPointerTap : trackTextsLastTap;
+  const isDoubleTap = tapState.index === lineIndex && (now - tapState.time) < 360;
+  if (fromPointer) {
+    trackTextsLastPointerTap = { index: lineIndex, time: now };
+    trackTextsSuppressedClick = { index: lineIndex, time: now };
+  } else {
+    trackTextsLastTap = { index: lineIndex, time: now };
+  }
+
+  if (trackTextsSyncMode && isDoubleTap) {
+    event.preventDefault();
+    if (mergeTrackSyncDraftLine(lineIndex)) {
+      persistTrackTextsSyncDraft(track);
+      modalManualLineIndex = Math.max(0, lineIndex - 1);
+      openTrackTextsModal(track);
+      showFloatingNotice("Linha unida com a de cima.");
+    }
+    return;
+  }
+
+  if (trackTextsSyncMode) {
+    event.preventDefault();
+    if (!trackTextsSyncDraft) {
+      trackTextsSyncDraft = buildTrackSyncDraft(track);
+    }
+    const isPaused = !currentAudio || currentAudio.paused || currentTrackNumber !== track.number;
+    if (isPaused) {
+      const anchorTimestampMs = lineIndex <= 0
+        ? 0
+        : Math.max(0, Number(trackTextsSyncDraft.lines[lineIndex]?.timestampMs || 0));
+      resetTrackSyncDraftFromLine(lineIndex);
+      persistTrackTextsSyncDraft(track);
+      modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
+      await seekTrackAudio(track, anchorTimestampMs / 1000, { autoplay: false });
+      openTrackTextsModal(track);
+      return;
+    }
+    const nowMs = Math.max(0, Math.round((currentAudio?.currentTime || 0) * 1000));
+    if (trackTextsSyncDraft.lines[lineIndex]) {
+      trackTextsSyncDraft.lines[lineIndex].timestampMs = nowMs;
+    }
+    persistTrackTextsSyncDraft(track);
+    modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
+    openTrackTextsModal(track);
+    return;
+  }
+
+  if (isAdmin() && isDesktopPointer()) {
+    const timestampValue = String(node.dataset.timestampMs || "").trim();
+    if (timestampValue) {
+      const timestampMs = Number(timestampValue || 0);
+      await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
+      return;
+    }
+    modalManualLineIndex = lineIndex;
+    syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
+    return;
+  }
+  const timestampValue = String(node.dataset.timestampMs || "").trim();
+  if (timestampValue) {
+    const timestampMs = Number(timestampValue || 0);
+    await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
+    return;
+  }
+  modalManualLineIndex = lineIndex;
+  syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
+}
+
 async function saveTrackTextsSyncDraft() {
   const track = getModalTrack();
   if (!track || !trackTextsSyncDraft || !isAdmin() || trackTextsSaveInFlight) {
@@ -3382,72 +3464,14 @@ function openTrackTextsModal(track) {
       }
     };
 
+    node.addEventListener("pointerup", async (event) => {
+      if (isDesktopPointer() || !trackTextsSyncMode) {
+        return;
+      }
+      await handleTrackTextsLineTap(track, node, lineIndex, event, { fromPointer: true });
+    });
     node.addEventListener("click", async (event) => {
-      if (trackTextsTouchState?.opened) {
-        trackTextsTouchState = null;
-        return;
-      }
-      const now = Date.now();
-      const isDoubleTap = trackTextsLastTap.index === lineIndex && (now - trackTextsLastTap.time) < 360;
-      trackTextsLastTap = { index: lineIndex, time: now };
-
-      if (trackTextsSyncMode && isDoubleTap) {
-        event.preventDefault();
-        if (mergeTrackSyncDraftLine(lineIndex)) {
-          persistTrackTextsSyncDraft(track);
-          modalManualLineIndex = Math.max(0, lineIndex - 1);
-          openTrackTextsModal(track);
-          showFloatingNotice("Linha unida com a de cima.");
-        }
-        return;
-      }
-
-      if (trackTextsSyncMode) {
-        event.preventDefault();
-        if (!trackTextsSyncDraft) {
-          trackTextsSyncDraft = buildTrackSyncDraft(track);
-        }
-        const isPaused = !currentAudio || currentAudio.paused || currentTrackNumber !== track.number;
-        if (isPaused) {
-          const anchorTimestampMs = lineIndex <= 0
-            ? 0
-            : Math.max(0, Number(trackTextsSyncDraft.lines[lineIndex]?.timestampMs || 0));
-          resetTrackSyncDraftFromLine(lineIndex);
-          persistTrackTextsSyncDraft(track);
-          modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
-          await seekTrackAudio(track, anchorTimestampMs / 1000, { autoplay: false });
-          openTrackTextsModal(track);
-          return;
-        }
-        const nowMs = Math.max(0, Math.round((currentAudio?.currentTime || 0) * 1000));
-        if (trackTextsSyncDraft.lines[lineIndex]) {
-          trackTextsSyncDraft.lines[lineIndex].timestampMs = nowMs;
-        }
-        persistTrackTextsSyncDraft(track);
-        modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
-        openTrackTextsModal(track);
-        return;
-      }
-
-      if (isAdmin() && isDesktopPointer()) {
-        const timestampValue = String(node.dataset.timestampMs || "").trim();
-        if (timestampValue) {
-          const timestampMs = Number(timestampValue || 0);
-          await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
-          return;
-        }
-        modalManualLineIndex = lineIndex;
-        syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
-        return;
-      }
-      const timestampValue = String(node.dataset.timestampMs || "").trim();
-      if (timestampValue) {
-        const timestampMs = Number(timestampValue || 0);
-        await seekTrackAudio(track, Math.max(0, timestampMs) / 1000, { autoplay: true });
-        return;
-      }
-      modalManualLineIndex = lineIndex;
-      syncTrackTextsModalHighlight(track, currentAudio?.currentTime || 0);
+      await handleTrackTextsLineTap(track, node, lineIndex, event);
     });
     node.addEventListener("contextmenu", (event) => {
       if (!isAdmin() || !isDesktopPointer()) {
