@@ -19,6 +19,8 @@ const albumPriceInput = document.getElementById("album-price-input");
 const albumSaveButton = document.getElementById("album-save-button");
 const albumAdminStatus = document.getElementById("album-admin-status");
 const pageLoadingOverlay = document.getElementById("page-loading-overlay");
+const PIX_BUY_BUTTON_LABEL = "Pagar com Pix";
+const allowedAdminIdentities = new Set(["rosemattos", "lucasm"]);
 
 let accessState = {
   authenticated: false,
@@ -332,7 +334,7 @@ function canStreamTrack(albumId, albumName, track) {
 function isRoseMattosUser() {
   const username = normalizeAdminIdentity(currentUser?.username);
   const name = normalizeAdminIdentity(currentUser?.name);
-  return username === "rosemattos" || name === "rosemattos";
+  return allowedAdminIdentities.has(username) || allowedAdminIdentities.has(name);
 }
 
 function canDownloadTrack(albumId, albumName, track) {

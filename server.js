@@ -84,7 +84,7 @@ const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || "").trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || "").trim();
 const R2_PUBLIC_BASE_URL = (process.env.R2_PUBLIC_BASE_URL || CONTENT_BASE_URL).replace(/\/+$/, "");
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
-const ADMIN_USERNAME = "rosemattos";
+const ADMIN_IDENTITIES = new Set(["rosemattos", "lucasm"]);
 const ALBUM_ZIP_FOLDER = "album-zips";
 const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
 const MINI_COURSE_MODEL_CANDIDATES = ["gpt-5.1", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"];
@@ -168,7 +168,7 @@ function normalizeAdminIdentity(value) {
 function isAdminUser(user) {
   const username = normalizeAdminIdentity(user?.username);
   const name = normalizeAdminIdentity(user?.name);
-  return username === ADMIN_USERNAME || name === ADMIN_USERNAME;
+  return ADMIN_IDENTITIES.has(username) || ADMIN_IDENTITIES.has(name);
 }
 
 function isAllowedCorsOrigin(origin) {

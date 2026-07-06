@@ -118,7 +118,7 @@ function renderProductsAdminPanel(user, siteConfig, refreshAlbums) {
 
   panel.innerHTML = `
     <div class="admin-panel-head">
-      <strong>Admin RoseMattos</strong>
+      <strong>Painel Admin</strong>
       <span>Produtos</span>
     </div>
     <form id="admin-product-form" class="admin-form-inline">
@@ -164,6 +164,8 @@ function normalizeAdminIdentity(value) {
     .toLowerCase();
 }
 
+const allowedAdminIdentities = new Set(["rosemattos", "lucasm"]);
+
 async function registerProductsOfflineShell() {
   if (page !== "produtos") {
     return;
@@ -187,7 +189,7 @@ function isRoseMattosUser(user) {
 
   const username = normalizeAdminIdentity(user?.username);
   const name = normalizeAdminIdentity(user?.name);
-  return username === "rosemattos" || name === "rosemattos";
+  return allowedAdminIdentities.has(username) || allowedAdminIdentities.has(name);
 }
 
 function buildProductsAuthRedirect(filter) {
@@ -940,7 +942,7 @@ function renderAgendaAdminPanel(user, siteConfig, refreshSchedule) {
 
   panel.innerHTML = `
     <div class="admin-panel-head">
-      <strong>Admin RoseMattos</strong>
+      <strong>Painel Admin</strong>
       <span>Eventos</span>
     </div>
     <form id="admin-schedule-form" class="admin-form-grid">

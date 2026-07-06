@@ -5217,8 +5217,12 @@
     function buildMediaTrackKey(scopeId, songId) {
       return `${String(scopeId || "songs")}::${String(songId || "track")}`;
     }
+    const miniAdminUsernames = new Set(["rosemattos", "lucasm"]);
+    function isMiniAdminUser(user) {
+      return miniAdminUsernames.has(String(user?.username || "").trim().toLowerCase());
+    }
     function isMiniMediaAdmin() {
-      return String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
+      return isMiniAdminUser(miniCourseUser);
     }
     function getMediaAlbumsLibrary() {
       return mediaLibraryAlbums;
@@ -7933,7 +7937,7 @@
         renderMediaImageAlbumOptions();
         if (Object.prototype.hasOwnProperty.call(payload || {}, "user")) {
           miniCourseUser = payload.user || null;
-          isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
+          isMiniCourseAdmin = isMiniAdminUser(miniCourseUser);
         }
       } catch (error) {
         mediaLibraryError = error instanceof Error ? error.message : "Nao foi possivel carregar a midia.";
@@ -11655,7 +11659,7 @@
       miniCourses = Array.isArray(payload?.courses) ? payload.courses : miniCourses;
       miniCourseUser = Object.prototype.hasOwnProperty.call(payload || {}, "user") ? (payload?.user || null) : miniCourseUser;
       miniCourseSummary = payload?.summary || (miniCourseUser ? miniCourseSummary : { completedCourses: 0, startedCourses: 0, totalPoints: 0 });
-      isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
+      isMiniCourseAdmin = isMiniAdminUser(miniCourseUser);
       if (!isMiniCourseAdmin) {
         setMiniCourseAdminPanelVisible(false);
       }
@@ -11901,7 +11905,7 @@
         if (payload?.summary) {
           miniCourseSummary = payload.summary;
         }
-        isMiniCourseAdmin = String(miniCourseUser?.username || "").trim().toLowerCase() === "rosemattos";
+        isMiniCourseAdmin = isMiniAdminUser(miniCourseUser);
         updateMiniCourseAdminButton();
         updateMiniCoursesUserCard();
         currentMiniCourse = payload.course || null;

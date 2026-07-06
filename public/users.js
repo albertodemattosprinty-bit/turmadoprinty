@@ -492,10 +492,11 @@ async function deleteSelectedUser() {
 
 await initSiteHeader().catch(() => null);
 const currentUser = await loadCurrentUser().catch(() => null);
+const allowedAdminUsernames = new Set(["rosemattos", "lucasm"]);
 
 if (!currentUser) {
   redirectToAuth();
-} else if (String(currentUser.username || "").trim().toLowerCase() !== "rosemattos") {
+} else if (!currentUser.isAdmin || !allowedAdminUsernames.has(String(currentUser.username || "").trim().toLowerCase())) {
   window.location.href = "/index.html";
 } else {
   userContractorSelect.addEventListener("change", syncContractorEventVisibility);

@@ -179,7 +179,7 @@ function renderAdminPanel(user, siteConfig, refreshPage) {
 
   panel.innerHTML = `
     <div class="admin-panel-head">
-      <strong>Admin RoseMattos</strong>
+      <strong>Painel Admin</strong>
       <span>Planos</span>
     </div>
     <form id="admin-plan-form" class="admin-form-grid">
