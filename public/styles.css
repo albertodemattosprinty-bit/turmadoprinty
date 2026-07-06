@@ -2678,6 +2678,11 @@ body[data-page="produto"] .inline-link {
   gap: 14px;
 }
 
+.track-text-edit-head-minimal {
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
 .track-text-edit-panel--immersive,
 .track-full-text-edit-panel--immersive {
   inset: 0;
@@ -2695,6 +2700,11 @@ body[data-page="produto"] .inline-link {
 .track-text-edit-panel--immersive {
   background:
     linear-gradient(180deg, rgba(10, 18, 38, 0.98) 0%, rgba(6, 10, 24, 0.99) 100%);
+}
+
+.track-text-edit-panel--immersive .bulk-track-title-actions {
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .track-full-text-edit-panel--immersive {
@@ -2740,6 +2750,10 @@ body[data-page="produto"] .inline-link {
   line-height: 1.7;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.track-text-edit-panel--immersive .track-text-edit-input {
+  min-height: calc(100dvh - 164px);
 }
 
 .track-text-join-button {

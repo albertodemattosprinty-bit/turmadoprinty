@@ -2426,21 +2426,18 @@ function ensureTrackTextEditModal() {
   modal.setAttribute("aria-hidden", "true");
   modal.innerHTML = `
     <div class="track-texts-backdrop" data-role="close-text-edit"></div>
-    <div class="track-texts-panel track-text-edit-panel track-text-edit-panel--immersive" role="dialog" aria-modal="true" aria-labelledby="track-text-edit-title">
-      <div class="track-texts-head">
-        <div>
-          <p class="eyebrow">Editar texto</p>
-          <h3 id="track-text-edit-title" class="section-title small">Linha da faixa</h3>
-        </div>
+    <div class="track-texts-panel track-text-edit-panel track-text-edit-panel--immersive" role="dialog" aria-modal="true" aria-label="Editar texto da faixa">
+      <h3 id="track-text-edit-title" hidden>Editar texto da faixa</h3>
+      <div class="track-texts-head track-text-edit-head-minimal">
         <button class="ghost-button track-texts-close" type="button" data-role="close-text-edit" aria-label="Fechar modal">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.7 6.3a1 1 0 0 1 0 1.4L11.41 12l4.29 4.3a1 1 0 0 1-1.41 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.41 0"/></svg>
         </button>
       </div>
-      <label class="track-character-field">Texto da linha
-        <textarea id="track-text-edit-input" class="track-text-edit-input" rows="5" placeholder="Edite somente o texto desta linha"></textarea>
+      <label class="track-character-field" aria-label="Texto da faixa">
+        <textarea id="track-text-edit-input" class="track-text-edit-input" rows="5" placeholder=""></textarea>
       </label>
       <div class="bulk-track-title-actions">
-        <button id="track-text-edit-cancel" class="ghost-button" type="button">Cancelar</button>
+        <button id="track-text-edit-join" class="track-text-join-button" type="button">Unir texto</button>
         <button id="track-text-edit-save" class="primary-button" type="button">Salvar texto</button>
       </div>
     </div>
@@ -2453,9 +2450,8 @@ function ensureTrackTextEditModal() {
       modal.classList.remove("show");
     });
   });
-  modal.querySelector("#track-text-edit-cancel")?.addEventListener("click", () => {
-    modal.setAttribute("aria-hidden", "true");
-    modal.classList.remove("show");
+  modal.querySelector("#track-text-edit-join")?.addEventListener("click", () => {
+    joinTrackTextEditInput();
   });
   modal.querySelector("#track-text-edit-save")?.addEventListener("click", async () => {
     await submitTrackTextEditModal();
@@ -2755,6 +2751,22 @@ function openTrackTextEditModal(track, lineIndex) {
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
   }, 20);
+}
+
+function joinTrackTextEditInput() {
+  const modal = ensureTrackTextEditModal();
+  const trackNumber = Number(modal.dataset.trackNumber || 0);
+  const track = getTrackByNumber(trackNumber);
+  const input = modal.querySelector("#track-text-edit-input");
+  if (!track || !input) {
+    return;
+  }
+  input.value = getTrackModalWorkingLines(track)
+    .map((line) => String(line?.text || "").trim())
+    .filter(Boolean)
+    .join(" ");
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
 }
 
 function splitEditedTrackText(value) {
