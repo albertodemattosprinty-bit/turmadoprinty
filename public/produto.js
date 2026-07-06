@@ -3280,7 +3280,9 @@ async function handleTrackTextsLineTap(track, node, lineIndex, event, { fromPoin
       resetTrackSyncDraftFromLine(lineIndex);
       persistTrackTextsSyncDraft(track);
       modalManualLineIndex = Math.min(lineIndex + 1, Math.max(trackTextsSyncDraft.lines.length - 1, 0));
-      await seekTrackAudio(track, anchorTimestampMs / 1000, { autoplay: false });
+      if (!isAdmin()) {
+        await seekTrackAudio(track, anchorTimestampMs / 1000, { autoplay: false });
+      }
       openTrackTextsModal(track);
       return;
     }
