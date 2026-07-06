@@ -1385,6 +1385,7 @@ async function getContextPrompt() {
 }
 
 let stripeClient = null;
+const STRIPE_PIX_PAYMENT_METHOD_TYPES = ["pix"];
 
 function getStripeClient() {
   if (!STRIPE_SECRET_KEY) {
@@ -7978,6 +7979,7 @@ async function createStripeCheckout({ request, user, product }) {
   const referenceId = `printy-${product.id}-${crypto.randomUUID()}`;
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    payment_method_types: STRIPE_PIX_PAYMENT_METHOD_TYPES,
     success_url: buildStripeSuccessUrl(baseUrl, "/produto.html", "album", product.id),
     cancel_url: `${baseUrl}/produto.html?album=${encodeURIComponent(product.id)}`,
     locale: "pt-BR",
@@ -8436,6 +8438,49 @@ async function handleProject200ProfileAvatarGenerateRequest(request, response, p
       model: "gpt-image-1",
       profile,
       feedback: `Avatar atualizado com gpt-image-1 para ${profile.name}.`
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a foto do usuario."
+    });
+  }
+}
+
+async function handleProject200ProfileAvatarUploadRequest(request, response, profileId) {
+  const authUser = await requireAuth(request, response);
+  if (!authUser) {
+    return;
+  }
+
+  const contentTypeHeader = String(request.headers["content-type"] || "").trim().toLowerCase();
+  const contentType = contentTypeHeader.split(";")[0] || "image/png";
+  if (!contentType.startsWith("image/")) {
+    sendJson(response, 400, { error: "Envie uma imagem valida para salvar no perfil." });
+    return;
+  }
+
+  let uploadedReferenceBuffer = null;
+  try {
+    uploadedReferenceBuffer = await readBinaryBody(request, MAX_MINI_COURSE_COVER_BYTES);
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Falha ao ler a imagem enviada." });
+    return;
+  }
+
+  if (!uploadedReferenceBuffer?.length) {
+    sendJson(response, 400, { error: "Imagem enviada vazia." });
+    return;
+  }
+
+  try {
+    const profile = await updateProject200ProfileAvatar(authUser.id, profileId, {
+      avatarDataUrl: `data:${contentType};base64,${uploadedReferenceBuffer.toString("base64")}`
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      profile,
+      feedback: `Foto atualizada para ${profile.name}.`
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -11245,6 +11290,14 @@ const server = http.createServer(async (request, response) => {
       pathname.slice("/api/200/profiles/".length, pathname.length - "/avatar/generate".length)
     );
     await handleProject200ProfileAvatarGenerateRequest(request, response, profileId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.startsWith("/api/200/profiles/") && pathname.endsWith("/avatar/upload")) {
+    const profileId = decodeURIComponent(
+      pathname.slice("/api/200/profiles/".length, pathname.length - "/avatar/upload".length)
+    );
+    await handleProject200ProfileAvatarUploadRequest(request, response, profileId);
     return;
   }
 

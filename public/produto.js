@@ -57,8 +57,12 @@ let trackCharacterDesktopHoldState = null;
 let rehearsalRedeemInFlight = false;
 let rehearsalOwnerLoadInFlight = false;
 let downloadOptionInFlight = false;
+let externalLyricsVoiceSession = null;
 const freePreviewSeconds = 75;
 const freePreviewFadeSeconds = 4;
+const externalLyricsInlineStateByTrackNumber = new Map();
+const EXTERNAL_LYRICS_DOUBLE_TAP_MS = 360;
+const EXTERNAL_LYRICS_CANCEL_SWIPE_PX = 46;
 const characterPalettes = {
   boys: ["#7FDBFF", "#9EE8FF", "#61D2FF", "#8CCBFF"],
   girls: ["#FF79C6", "#FF9BE0", "#D38BFF", "#F09CFF"],
@@ -213,6 +217,433 @@ function cloneLyricsLines(lines) {
       characterId: String(line?.characterId || "").trim()
     })).filter((line) => line.text)
     : [];
+}
+
+function getExternalLyricsInlineState(trackNumber, create = false) {
+  const key = String(trackNumber || "");
+  if (!key) {
+    return null;
+  }
+  if (!externalLyricsInlineStateByTrackNumber.has(key) && create) {
+    externalLyricsInlineStateByTrackNumber.set(key, {
+      lines: null,
+      pendingLineIndex: -1,
+      recordingLineIndex: -1,
+      savedLineIndex: -1,
+      lastTapAt: 0,
+      lastTapIndex: -1,
+      savedTimerId: 0
+    });
+  }
+  return externalLyricsInlineStateByTrackNumber.get(key) || null;
+}
+
+function clearExternalLyricsSavedTimer(state) {
+  if (state?.savedTimerId) {
+    window.clearTimeout(state.savedTimerId);
+    state.savedTimerId = 0;
+  }
+}
+
+function getTrackExternalLyricsLines(track) {
+  const state = getExternalLyricsInlineState(track?.number);
+  if (state?.lines?.length) {
+    return cloneLyricsLines(state.lines);
+  }
+  return cloneLyricsLines(getTrackLyricsLines(track));
+}
+
+function syncExternalTrackLyricsPanel(trackNumber) {
+  const card = trackList?.querySelector(`.track-card[data-track-number="${String(trackNumber || "")}"]`);
+  const track = getTrackByNumber(trackNumber);
+  const panel = card?.querySelector("[data-role='lyrics-panel']");
+  if (!card || !track || !panel) {
+    return;
+  }
+
+  const state = getExternalLyricsInlineState(track.number);
+  const lines = getTrackExternalLyricsLines(track);
+  const nodes = Array.from(panel.querySelectorAll(".track-lyrics-line"));
+
+  lines.forEach((line, index) => {
+    const node = nodes[index];
+    if (!node) {
+      return;
+    }
+    node.textContent = line.text;
+    node.dataset.lyricsIndex = String(index);
+    node.dataset.timestampMs = line.timestampMs === null || line.timestampMs === undefined ? "" : String(line.timestampMs);
+    node.classList.toggle("is-voice-recording", Boolean(state && state.recordingLineIndex === index));
+    node.classList.toggle("is-voice-pending", Boolean(state && state.pendingLineIndex === index));
+    node.classList.toggle("is-voice-saved", Boolean(state && state.savedLineIndex === index));
+  });
+}
+
+function resetExternalLyricsInlineState(trackNumber) {
+  const state = getExternalLyricsInlineState(trackNumber);
+  if (!state) {
+    return;
+  }
+  clearExternalLyricsSavedTimer(state);
+  externalLyricsInlineStateByTrackNumber.delete(String(trackNumber || ""));
+}
+
+function markExternalLyricsSaved(trackNumber, lineIndex) {
+  const state = getExternalLyricsInlineState(trackNumber, true);
+  if (!state) {
+    return;
+  }
+  clearExternalLyricsSavedTimer(state);
+  state.savedLineIndex = lineIndex;
+  state.savedTimerId = window.setTimeout(() => {
+    const liveState = getExternalLyricsInlineState(trackNumber);
+    if (!liveState) {
+      return;
+    }
+    liveState.savedLineIndex = -1;
+    liveState.savedTimerId = 0;
+    syncExternalTrackLyricsPanel(trackNumber);
+  }, 1400);
+}
+
+function normalizeExternalLyricsTranscript(text) {
+  return String(text || "").replace(/\s+/g, " ").trim();
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const slice = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...slice);
+  }
+  return window.btoa(binary);
+}
+
+async function transcribeProdutoAudioBlob(blob, fileName) {
+  const response = await fetch(getApiUrl("/api/audio/transcribe"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({
+      audioBase64: arrayBufferToBase64(await blob.arrayBuffer()),
+      mimeType: blob.type || "audio/webm",
+      fileName
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Nao foi possivel transcrever o audio.");
+  }
+  return normalizeExternalLyricsTranscript(data.text || "");
+}
+
+async function persistExternalLyricsTrackLines(track, lines) {
+  const normalizedLines = cloneLyricsLines(lines).map((line, index) => ({
+    ...line,
+    number: index + 1
+  }));
+  const response = await fetch(getApiUrl(`/api/mini/media/albums/${encodeURIComponent(track.sourceAlbumId)}/tracks/${encodeURIComponent(track.sourceSongId)}/lyrics`), {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({
+      lyrics: normalizedLines.map((line) => line.text).join("\n"),
+      syncData: {
+        ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+        albumId: track.sourceAlbumId,
+        trackId: track.sourceSongId,
+        title: track.title,
+        lines: normalizedLines
+      }
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Nao foi possivel salvar a letra.");
+  }
+  return {
+    ...track,
+    lyrics: data.lyrics || normalizedLines.map((line) => line.text).join("\n"),
+    lyricsSyncData: data.syncData || {
+      ...(track.lyricsSyncData && typeof track.lyricsSyncData === "object" ? track.lyricsSyncData : {}),
+      lines: normalizedLines
+    }
+  };
+}
+
+function teardownExternalLyricsVoiceSession(session) {
+  if (!session) {
+    return;
+  }
+  if (session.cleanup) {
+    session.cleanup();
+  }
+  if (session.stream) {
+    session.stream.getTracks().forEach((track) => track.stop());
+  }
+  if (externalLyricsVoiceSession === session) {
+    externalLyricsVoiceSession = null;
+  }
+}
+
+function stopExternalLyricsRecorder(session) {
+  if (!session || session.stopPromise) {
+    return session?.stopPromise || Promise.resolve(null);
+  }
+  session.stopPromise = new Promise((resolve, reject) => {
+    const finalize = async () => {
+      try {
+        const blob = new Blob(session.chunks, { type: session.mediaRecorder.mimeType || "audio/webm" });
+        const text = await transcribeProdutoAudioBlob(blob, `produto-track-${session.trackNumber}.webm`);
+        resolve(text);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    session.mediaRecorder.addEventListener("stop", finalize, { once: true });
+    session.mediaRecorder.addEventListener("error", () => {
+      reject(new Error("Nao foi possivel capturar o audio."));
+    }, { once: true });
+    session.mediaRecorder.stop();
+  });
+  return session.stopPromise;
+}
+
+function cancelExternalLyricsVoiceSession(session) {
+  if (!session) {
+    return;
+  }
+  session.cancelled = true;
+  try {
+    if (session.mediaRecorder?.state !== "inactive") {
+      session.mediaRecorder.stop();
+    }
+  } catch (error) {
+    // Ignore recorder stop races during cancel.
+  }
+  const state = getExternalLyricsInlineState(session.trackNumber);
+  if (state) {
+    state.recordingLineIndex = -1;
+    state.pendingLineIndex = -1;
+    state.lines = session.originalLines;
+  }
+  teardownExternalLyricsVoiceSession(session);
+  syncExternalTrackLyricsPanel(session.trackNumber);
+}
+
+async function commitExternalLyricsVoiceSession(session) {
+  if (!session || session.committing) {
+    return;
+  }
+  session.committing = true;
+  try {
+    const transcript = await stopExternalLyricsRecorder(session);
+    if (session.cancelled) {
+      return;
+    }
+    const state = getExternalLyricsInlineState(session.trackNumber, true);
+    if (!state) {
+      return;
+    }
+    state.recordingLineIndex = -1;
+    if (!transcript) {
+      state.lines = session.originalLines;
+      state.pendingLineIndex = -1;
+      syncExternalTrackLyricsPanel(session.trackNumber);
+      showFloatingNotice("Nao entendi a fala. A linha voltou ao texto anterior.");
+      return;
+    }
+    const nextLines = cloneLyricsLines(session.originalLines);
+    if (!nextLines[session.lineIndex]) {
+      return;
+    }
+    nextLines[session.lineIndex] = {
+      ...nextLines[session.lineIndex],
+      text: transcript
+    };
+    state.lines = nextLines;
+    state.pendingLineIndex = session.lineIndex;
+    syncExternalTrackLyricsPanel(session.trackNumber);
+    showFloatingNotice("Texto ouvido. Toque na linha rosa para salvar.");
+  } catch (error) {
+    const state = getExternalLyricsInlineState(session.trackNumber);
+    if (state) {
+      state.recordingLineIndex = -1;
+      state.pendingLineIndex = -1;
+      state.lines = session.originalLines;
+      syncExternalTrackLyricsPanel(session.trackNumber);
+    }
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel transcrever o audio.");
+  } finally {
+    teardownExternalLyricsVoiceSession(session);
+  }
+}
+
+async function startExternalLyricsVoiceSession(track, lineIndex, triggerEvent) {
+  if (!isAdmin() || !track || lineIndex < 0) {
+    return;
+  }
+  if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
+    showFloatingNotice("Esse aparelho nao liberou gravacao por voz aqui.");
+    return;
+  }
+  if (externalLyricsVoiceSession) {
+    cancelExternalLyricsVoiceSession(externalLyricsVoiceSession);
+  }
+
+  const originalLines = getTrackExternalLyricsLines(track);
+  if (!originalLines[lineIndex]) {
+    return;
+  }
+
+  const state = getExternalLyricsInlineState(track.number, true);
+  state.lines = originalLines;
+  state.recordingLineIndex = lineIndex;
+  state.pendingLineIndex = -1;
+  syncExternalTrackLyricsPanel(track.number);
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    const session = {
+      trackNumber: track.number,
+      lineIndex,
+      originalLines,
+      stream,
+      mediaRecorder,
+      chunks: [],
+      cancelled: false,
+      committing: false,
+      stopPromise: null,
+      anchorX: Number(triggerEvent?.clientX || 0),
+      anchorY: Number(triggerEvent?.clientY || 0),
+      gesturePointerId: null,
+      cleanup: null
+    };
+
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) {
+        session.chunks.push(event.data);
+      }
+    });
+
+    const onPointerDown = (event) => {
+      session.gesturePointerId = event.pointerId;
+      session.anchorX = Number(event.clientX || 0);
+      session.anchorY = Number(event.clientY || 0);
+    };
+
+    const onPointerMove = (event) => {
+      if (session.cancelled || session.committing || session.gesturePointerId !== event.pointerId) {
+        return;
+      }
+      const deltaX = Number(event.clientX || 0) - session.anchorX;
+      const deltaY = Number(event.clientY || 0) - session.anchorY;
+      if (deltaY <= -EXTERNAL_LYRICS_CANCEL_SWIPE_PX && Math.abs(deltaY) > Math.abs(deltaX)) {
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        cancelExternalLyricsVoiceSession(session);
+        showFloatingNotice("Gravacao cancelada.");
+      }
+    };
+
+    const onPointerUp = (event) => {
+      if (session.cancelled || session.committing) {
+        return;
+      }
+      const deltaX = Number(event.clientX || 0) - session.anchorX;
+      const deltaY = Number(event.clientY || 0) - session.anchorY;
+      const target = event.target instanceof Element ? event.target : null;
+      const touchedLine = target?.closest?.(".track-lyrics-line");
+      const isTap = Math.abs(deltaX) < 14 && Math.abs(deltaY) < 14;
+      if (isTap && !touchedLine) {
+        event.preventDefault();
+        event.stopImmediatePropagation?.();
+        commitExternalLyricsVoiceSession(session);
+      }
+      session.gesturePointerId = null;
+    };
+
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("pointermove", onPointerMove, true);
+    document.addEventListener("pointerup", onPointerUp, true);
+    session.cleanup = () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("pointermove", onPointerMove, true);
+      document.removeEventListener("pointerup", onPointerUp, true);
+    };
+
+    externalLyricsVoiceSession = session;
+    mediaRecorder.start();
+    showFloatingNotice("Fale agora. Toque fora da letra para aplicar ou deslize para cima para cancelar.");
+  } catch (error) {
+    state.recordingLineIndex = -1;
+    state.pendingLineIndex = -1;
+    state.lines = originalLines;
+    syncExternalTrackLyricsPanel(track.number);
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel abrir o microfone.");
+  }
+}
+
+async function confirmExternalLyricsPendingLine(trackNumber, lineIndex) {
+  const track = getTrackByNumber(trackNumber);
+  const state = getExternalLyricsInlineState(trackNumber);
+  if (!track || !state?.lines?.length || state.pendingLineIndex !== lineIndex) {
+    return;
+  }
+  try {
+    const updatedTrack = await persistExternalLyricsTrackLines(track, state.lines);
+    resetExternalLyricsInlineState(trackNumber);
+    updateTrackInCurrentAlbum(updatedTrack);
+    await renderTracks(currentAlbum);
+    markExternalLyricsSaved(trackNumber, lineIndex);
+    syncExternalTrackLyricsPanel(trackNumber);
+    showFloatingNotice("Linha salva na letra.");
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar a letra.");
+  }
+}
+
+function bindExternalLyricsVoiceInteractions(card, track) {
+  const panel = card?.querySelector("[data-role='lyrics-panel']");
+  if (!panel || !isAdmin() || !track?.sourceAlbumId || !track?.sourceSongId) {
+    return;
+  }
+
+  panel.querySelectorAll(".track-lyrics-line").forEach((node) => {
+    node.addEventListener("pointerup", async (event) => {
+      const lineIndex = Number(node.dataset.lyricsIndex || -1);
+      if (lineIndex < 0) {
+        return;
+      }
+
+      const state = getExternalLyricsInlineState(track.number, true);
+      if (state.pendingLineIndex === lineIndex && !externalLyricsVoiceSession) {
+        event.preventDefault();
+        await confirmExternalLyricsPendingLine(track.number, lineIndex);
+        return;
+      }
+
+      const now = Date.now();
+      const isDoubleTap = state.lastTapIndex === lineIndex && (now - state.lastTapAt) <= EXTERNAL_LYRICS_DOUBLE_TAP_MS;
+      state.lastTapAt = now;
+      state.lastTapIndex = lineIndex;
+      if (!isDoubleTap) {
+        return;
+      }
+
+      event.preventDefault();
+      state.lastTapAt = 0;
+      state.lastTapIndex = -1;
+      await startExternalLyricsVoiceSession(track, lineIndex, event);
+    });
+  });
 }
 
 function getTrackSyncDraftStorageKey(track) {
@@ -386,7 +817,7 @@ function setBuyButtonState({ label, onClick, disabled = false, ariaLabel = "" })
     return;
   }
 
-  const nextLabel = String(label || "").trim() || "Comprar";
+  const nextLabel = String(label || "").trim() || PIX_BUY_BUTTON_LABEL;
   buyAlbumButton.disabled = disabled;
   buyAlbumButton.setAttribute("aria-label", ariaLabel || nextLabel);
   buyAlbumButton.innerHTML = `
@@ -928,7 +1359,7 @@ async function confirmReturnedCheckoutIfNeeded(albumId) {
 
   try {
     if (purchaseStatus) {
-      purchaseStatus.textContent = "Confirmando pagamento do album...";
+      purchaseStatus.textContent = "Confirmando pagamento Pix do album...";
     }
 
     const response = await fetch(getApiUrl("/api/payments/stripe/checkout/confirm"), {
@@ -950,7 +1381,9 @@ async function confirmReturnedCheckoutIfNeeded(albumId) {
     }
 
     if (purchaseStatus && payload.paymentStatus === "PAID") {
-      purchaseStatus.textContent = "Pagamento confirmado. Seu album ja foi liberado.";
+      purchaseStatus.textContent = "Pix confirmado. Seu album ja foi liberado.";
+    } else if (purchaseStatus && payload.paymentStatus) {
+      purchaseStatus.textContent = "Checkout Pix recebido. Assim que o Stripe confirmar o pagamento, o album sera liberado.";
     }
   } catch (error) {
     if (purchaseStatus) {
@@ -981,7 +1414,7 @@ function setPurchaseStatus(albumId) {
   }
 
   if (params.get("payment") === "return") {
-    purchaseStatus.textContent = "Pagamento enviado ao Stripe. Aguarde a confirmacao para liberar seus downloads.";
+    purchaseStatus.textContent = "Pix iniciado no Stripe. Aguarde a confirmacao para liberar seus downloads.";
     return;
   }
 
@@ -1002,9 +1435,9 @@ async function startCheckout(albumId) {
   }
 
   setBuyButtonState({
-    label: "Abrindo checkout...",
+    label: "Abrindo Pix...",
     disabled: true,
-    ariaLabel: "Abrindo checkout"
+    ariaLabel: "Abrindo checkout Pix"
   });
 
   try {
@@ -1040,11 +1473,11 @@ async function startCheckout(albumId) {
       purchaseStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar pagamento.";
     }
     setBuyButtonState({
-      label: "Comprar",
+      label: PIX_BUY_BUTTON_LABEL,
       onClick: async () => {
         await startCheckout(albumId);
       },
-      ariaLabel: "Comprar album"
+      ariaLabel: "Pagar album com Pix"
     });
   }
 }
@@ -3110,7 +3543,8 @@ function getTrackLyricsLines(track) {
 }
 
 function renderTrackLyrics(track) {
-  const lines = getTrackLyricsLines(track);
+  const lines = getTrackExternalLyricsLines(track);
+  const state = getExternalLyricsInlineState(track?.number);
   if (!lines.length) {
     return "";
   }
@@ -3118,7 +3552,7 @@ function renderTrackLyrics(track) {
   return `
     <div class="track-lyrics-panel" data-role="lyrics-panel">
       ${lines.map((line, index) => `
-        <div class="track-lyrics-line" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
+        <div class="track-lyrics-line${state?.recordingLineIndex === index ? " is-voice-recording" : ""}${state?.pendingLineIndex === index ? " is-voice-pending" : ""}${state?.savedLineIndex === index ? " is-voice-saved" : ""}" data-lyrics-index="${index}" data-timestamp-ms="${line.timestampMs === null ? "" : line.timestampMs}">
           ${escapeHtml(line.text)}
         </div>
       `).join("")}
@@ -3256,7 +3690,7 @@ function syncTrackLyricsHighlight(card, track, currentTimeSeconds) {
     return;
   }
 
-  const lines = getTrackModalWorkingLines(track);
+  const lines = getTrackExternalLyricsLines(track);
   const hasTimedLines = lines.some((line) => line.timestampMs !== null && line.timestampMs !== undefined);
   const currentMs = Math.max(0, Number(currentTimeSeconds || 0) * 1000);
   let activeIndex = -1;
@@ -3273,6 +3707,7 @@ function syncTrackLyricsHighlight(card, track, currentTimeSeconds) {
   panel.querySelectorAll(".track-lyrics-line").forEach((node, index) => {
     node.classList.toggle("is-active", hasTimedLines && index === activeIndex);
   });
+  syncExternalTrackLyricsPanel(track?.number);
   syncTrackTextsModalHighlight(track, currentTimeSeconds);
 }
 
@@ -4084,6 +4519,7 @@ async function renderTracks(album) {
     if (canEditTracksHere) {
       bindAdminTrackEditor(article, album, track);
     }
+    bindExternalLyricsVoiceInteractions(article, track);
     trackList.appendChild(article);
   }
 
@@ -4154,9 +4590,9 @@ async function loadAlbumDetail() {
       purchaseStatus.textContent = "Escolha um album pela pagina de produtos.";
     }
     setBuyButtonState({
-      label: "Comprar",
+      label: PIX_BUY_BUTTON_LABEL,
       disabled: true,
-      ariaLabel: "Comprar album"
+      ariaLabel: "Pagar album com Pix"
     });
     setRehearseButtonState({
       label: "Ensaiar",
@@ -4214,11 +4650,11 @@ async function loadAlbumDetail() {
         buyAlbumButton.hidden = false;
       }
       setBuyButtonState({
-        label: "Comprar",
+        label: PIX_BUY_BUTTON_LABEL,
         onClick: async () => {
           await startCheckout(album.id);
         },
-        ariaLabel: "Comprar album"
+        ariaLabel: "Pagar album com Pix"
       });
     }
 
@@ -4236,9 +4672,9 @@ async function loadAlbumDetail() {
       purchaseStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido.";
     }
     setBuyButtonState({
-      label: "Comprar",
+      label: PIX_BUY_BUTTON_LABEL,
       disabled: true,
-      ariaLabel: "Comprar album"
+      ariaLabel: "Pagar album com Pix"
     });
     setRehearseButtonState({
       label: "Ensaiar",

@@ -534,6 +534,7 @@ const profileAvatarFileInput = document.getElementById("profileAvatarFileInput")
 const profileAvatarChooseButton = document.getElementById("profileAvatarChooseButton");
 const profileAvatarFileName = document.getElementById("profileAvatarFileName");
 const profileAvatarMessage = document.getElementById("profileAvatarMessage");
+const profileAvatarUploadButton = document.getElementById("profileAvatarUploadButton");
 const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -5253,7 +5254,7 @@ function renderProfileAvatarModal() {
     profileAvatarModalTitle.textContent = `Foto de ${profile.name}`;
   }
   if (profileAvatarModalHint) {
-    profileAvatarModalHint.textContent = `Envie uma foto de ${profile.name} para gerar uma versao estilo Disney Pixar com o gpt-image-1.`;
+    profileAvatarModalHint.textContent = `Envie uma foto de ${profile.name} para usar direto no perfil ou gerar uma versao estilo Disney Pixar com o gpt-image-1.`;
   }
   if (profileAvatarPreview) {
     profileAvatarPreview.src = profileAvatarReferenceDataUrl || getProfileAvatarPath(profile);
@@ -5265,6 +5266,10 @@ function renderProfileAvatarModal() {
   if (profileAvatarGenerateButton) {
     profileAvatarGenerateButton.disabled = profileAvatarBusy || !profileAvatarReferenceFile;
     profileAvatarGenerateButton.textContent = profileAvatarBusy ? "Gerando..." : "Gerar foto Pixar";
+  }
+  if (profileAvatarUploadButton) {
+    profileAvatarUploadButton.disabled = profileAvatarBusy || !profileAvatarReferenceFile;
+    profileAvatarUploadButton.textContent = profileAvatarBusy ? "Salvando..." : "Usar foto enviada";
   }
 }
 
@@ -5346,6 +5351,71 @@ async function submitProfileAvatarGeneration() {
   } catch (error) {
     if (profileAvatarMessage) {
       profileAvatarMessage.textContent = error instanceof Error ? error.message : "Falha ao gerar a foto.";
+    }
+  } finally {
+    profileAvatarBusy = false;
+    renderProfileAvatarModal();
+  }
+}
+
+async function submitProfileAvatarUpload() {
+  const profile = getProfileById(profileAvatarTargetId) || getProfileByName(state.selectedProfile);
+  if (!profile) {
+    return;
+  }
+  if (!profileAvatarReferenceFile) {
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = "Escolha uma foto antes de salvar.";
+    }
+    renderProfileAvatarModal();
+    return;
+  }
+
+  const token = getToken();
+  if (!token) {
+    window.location.href = "/auth.html?next=/200";
+    return;
+  }
+
+  profileAvatarBusy = true;
+  if (profileAvatarMessage) {
+    profileAvatarMessage.textContent = "Salvando foto do perfil...";
+  }
+  renderProfileAvatarModal();
+
+  try {
+    const response = await fetch(getApiUrl(`/api/200/profiles/${encodeURIComponent(profile.id)}/avatar/upload`), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": profileAvatarReferenceFile.type || "application/octet-stream"
+      },
+      body: profileAvatarReferenceFile
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || "Nao foi possivel salvar a foto do usuario.");
+    }
+    if (payload?.profile) {
+      updateProfileInState(payload.profile);
+      renderProfileFooter();
+      renderHistorySpeakerSelectionOptions();
+      renderActions();
+      renderMissions();
+      renderHomeRunningTask();
+    }
+    profileAvatarReferenceFile = null;
+    profileAvatarReferenceDataUrl = "";
+    if (profileAvatarFileInput) {
+      profileAvatarFileInput.value = "";
+    }
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = "Foto atualizada com sucesso.";
+    }
+    renderProfileAvatarModal();
+  } catch (error) {
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = error instanceof Error ? error.message : "Falha ao salvar a foto.";
     }
   } finally {
     profileAvatarBusy = false;
@@ -9874,6 +9944,9 @@ profileAvatarFileInput?.addEventListener("change", () => {
 });
 profileAvatarGenerateButton?.addEventListener("click", () => {
   void submitProfileAvatarGeneration();
+});
+profileAvatarUploadButton?.addEventListener("click", () => {
+  void submitProfileAvatarUpload();
 });
 profileFooter?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-profile]");
