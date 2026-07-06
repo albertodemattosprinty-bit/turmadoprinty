@@ -2437,7 +2437,7 @@ function ensureTrackTextEditModal() {
         </button>
       </div>
       <label class="track-character-field">Texto da linha
-        <textarea id="track-text-edit-input" class="track-text-edit-input" rows="5" maxlength="240" placeholder="Edite somente o texto desta linha"></textarea>
+        <textarea id="track-text-edit-input" class="track-text-edit-input" rows="5" placeholder="Edite somente o texto desta linha"></textarea>
       </label>
       <p class="track-generation-message">O timestamp atual sera mantido.</p>
       <div class="bulk-track-title-actions">
@@ -2477,7 +2477,7 @@ function ensureTrackFullTextEditModal() {
   modal.setAttribute("aria-hidden", "true");
   modal.innerHTML = `
     <div class="track-texts-backdrop" data-role="close-full-text-edit"></div>
-    <div class="track-texts-panel track-generation-panel track-full-text-edit-panel" role="dialog" aria-modal="true" aria-labelledby="track-full-text-edit-title">
+    <div class="track-texts-panel track-generation-panel track-full-text-edit-panel track-full-text-edit-panel--immersive" role="dialog" aria-modal="true" aria-labelledby="track-full-text-edit-title">
       <div class="track-texts-head">
         <div>
           <p class="eyebrow">Editar texto completo</p>
@@ -2492,6 +2492,7 @@ function ensureTrackFullTextEditModal() {
       </label>
       <p class="track-generation-message">Cada quebra de linha vira uma linha da musica. Timestamps existentes serao mantidos somente por indice correspondente.</p>
       <div class="bulk-track-title-actions">
+        <button id="track-full-text-edit-join" class="track-text-join-button" type="button">Juntar tudo</button>
         <button id="track-full-text-edit-cancel" class="ghost-button" type="button">Cancelar</button>
         <button id="track-full-text-edit-save" class="primary-button" type="button">Salvar texto</button>
       </div>
@@ -2508,6 +2509,9 @@ function ensureTrackFullTextEditModal() {
   modal.querySelector("#track-full-text-edit-cancel")?.addEventListener("click", () => {
     modal.setAttribute("aria-hidden", "true");
     modal.classList.remove("show");
+  });
+  modal.querySelector("#track-full-text-edit-join")?.addEventListener("click", () => {
+    joinTrackFullTextEditInput();
   });
   modal.querySelector("#track-full-text-edit-save")?.addEventListener("click", async () => {
     await submitTrackFullTextEditModal();
@@ -2877,7 +2881,7 @@ async function submitTrackTextEditModal() {
   }
 }
 
-function openTrackFullTextEditModal(track) {
+function openTrackFullTextEditModal(track, options = {}) {
   const modal = ensureTrackFullTextEditModal();
   const input = modal.querySelector("#track-full-text-edit-input");
   const lines = getTrackModalWorkingLines(track);
@@ -2893,8 +2897,32 @@ function openTrackFullTextEditModal(track) {
   modal.classList.add("show");
   window.setTimeout(() => {
     input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
+    const focusLineIndex = Math.max(0, Number(options?.focusLineIndex || 0));
+    const safeLineIndex = Math.min(focusLineIndex, Math.max(lines.length - 1, 0));
+    const caretPosition = safeLineIndex <= 0
+      ? 0
+      : lines
+        .slice(0, safeLineIndex)
+        .reduce((total, line) => total + String(line?.text || "").length + 1, 0);
+    input.setSelectionRange(caretPosition, caretPosition);
   }, 20);
+}
+
+function joinTrackFullTextEditInput() {
+  const modal = ensureTrackFullTextEditModal();
+  const input = modal.querySelector("#track-full-text-edit-input");
+  if (!input) {
+    return;
+  }
+  input.value = String(input.value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => String(line || "").trim())
+    .filter(Boolean)
+    .join(" ");
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
 }
 
 async function submitTrackFullTextEditModal() {
@@ -3662,7 +3690,7 @@ function openTrackTextsModal(track) {
     const lineIndex = Number(node.dataset.lyricsIndex || 0);
     const openTextEditor = () => {
       if (isAdmin() && String(track?.sourceAlbumId || "") && String(track?.sourceSongId || "")) {
-        openTrackTextEditModal(track, lineIndex);
+        openTrackFullTextEditModal(track, { focusLineIndex: lineIndex });
       }
     };
     const openCharacterEditor = () => {

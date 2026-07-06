@@ -2678,6 +2678,17 @@ body[data-page="produto"] .inline-link {
   gap: 14px;
 }
 
+.track-full-text-edit-panel--immersive {
+  width: min(1120px, calc(100vw - 24px));
+  max-width: none;
+  min-height: calc(100dvh - 24px);
+  max-height: calc(100dvh - 24px);
+  padding: 20px 20px 24px;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(10, 18, 38, 0.98) 0%, rgba(6, 10, 24, 0.99) 100%);
+}
+
 .track-text-confirm-panel {
   gap: 14px;
 }
@@ -2696,6 +2707,57 @@ body[data-page="produto"] .inline-link {
 
 .track-full-text-edit-input {
   min-height: 320px;
+}
+
+.track-full-text-edit-panel--immersive .track-character-field {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.track-full-text-edit-panel--immersive .track-full-text-edit-input {
+  min-height: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  resize: none;
+  padding: 22px 24px;
+  font-size: 1.25rem;
+  line-height: 1.7;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.track-text-join-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font: 700 0.98rem/1 "Open Sans", sans-serif;
+  color: #ffffff;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  box-shadow: 0 12px 24px rgba(124, 58, 237, 0.24);
+}
+
+.track-text-join-button:hover {
+  filter: brightness(1.06);
+}
+
+.track-text-join-button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 720px) {
+  .track-full-text-edit-panel--immersive {
+    width: 100vw;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    padding: 18px 16px 22px;
+    border-radius: 0;
+  }
+
+  .track-full-text-edit-panel--immersive .track-full-text-edit-input {
+    padding: 18px 18px 22px;
+    font-size: 1.18rem;
+  }
 }
 
 .track-texts-track-picker-list {
