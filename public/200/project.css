@@ -1236,18 +1236,19 @@ body.screen-locked .project-login-overlay.active {
 }
 
 .running-task-mission-btn {
-  background: linear-gradient(145deg, #1d274d, #0b1020);
+  background: linear-gradient(145deg, #d73b3b, #7f1212);
 }
 
 .running-task-finalize-btn {
   background: linear-gradient(135deg, #22c55e, #16a34a);
-  width: 46px;
-  height: 46px;
+  width: 58px;
+  height: 58px;
+  order: 4;
 }
 
 .running-task-finalize-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
 
 .running-confirm-content {
@@ -1352,9 +1353,11 @@ body.screen-locked .project-login-overlay.active {
   box-shadow: 0 24px 50px rgba(0, 0, 0, 0.28);
 }
 
-.running-mission-quick-btn svg {
+.running-mission-quick-btn svg,
+.running-mission-quick-btn img {
   width: min(24vw, 86px);
   height: min(24vw, 86px);
+  object-fit: contain;
 }
 
 .running-mission-quick-btn:disabled,
@@ -4128,6 +4131,17 @@ body.running-music-standalone #actionsModal .actions-list {
   display: grid;
   gap: 14px;
   align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding-right: 4px;
+  padding-bottom: 10px;
+}
+
+.missions-app {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .history-missions-footer {
@@ -4145,7 +4159,8 @@ body.running-music-standalone #actionsModal .actions-list {
 .history-mission-sign-btn,
 .history-mission-preset-btn,
 .history-mission-card-add,
-.history-mission-card-delete {
+.history-mission-card-edit,
+.history-mission-quick-slot {
   border: 0;
   cursor: pointer;
   color: #fff;
@@ -4209,22 +4224,25 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .history-mission-card-add,
-.history-mission-card-delete {
+.history-mission-card-edit {
   width: 42px;
   height: 42px;
   border-radius: 14px;
   display: grid;
   place-items: center;
-  font-size: 1.5rem;
-  font-weight: 900;
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
 .history-mission-card-add {
   background: linear-gradient(135deg, #1ec85e, #119a45);
 }
 
-.history-mission-card-delete {
-  background: linear-gradient(135deg, #d25555, #a82d2d);
+.history-mission-card-edit {
+  min-width: 70px;
+  width: auto;
+  padding: 0 12px;
+  background: linear-gradient(135deg, #3067e7, #1f3ea8);
 }
 
 .history-mission-progress-track {
@@ -4248,6 +4266,14 @@ body.running-music-standalone #actionsModal .actions-list {
   background: #000;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.history-mission-adjust-caption {
+  margin: -8px 0 4px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .history-mission-adjust-stage {
@@ -4280,6 +4306,48 @@ body.running-music-standalone #actionsModal .actions-list {
   place-items: center;
   font-size: 2rem;
   font-weight: 900;
+}
+
+.history-mission-quick-access {
+  display: grid;
+  gap: 10px;
+}
+
+.history-mission-quick-access-title {
+  text-align: center;
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.history-mission-quick-access-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-mission-quick-slot {
+  min-height: 48px;
+  border-radius: 16px;
+  padding: 10px 12px;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.history-mission-quick-slot-water {
+  background: linear-gradient(145deg, #2d95ff, #0d4cd1);
+}
+
+.history-mission-quick-slot-store {
+  background: linear-gradient(145deg, #2f3646, #111722);
+}
+
+.history-mission-quick-slot-read {
+  background: linear-gradient(145deg, #d28b21, #8f4f0a);
+}
+
+.history-mission-quick-slot-brush {
+  background: linear-gradient(145deg, #49beff, #1572e6);
 }
 
 .history-mission-adjust-presets {

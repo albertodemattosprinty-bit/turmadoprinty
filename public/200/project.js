@@ -4,6 +4,7 @@ const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
 const sleepConfigKey = "project_200_sleep_v1";
 const optionsConfigKey = "project_200_options_v1";
+const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
 const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
 const taskBeepOptionLabels = new Map([
@@ -41,10 +42,10 @@ const actionStatuses = {
   completed: "COMPLETED"
 };
 const missionQuickDefinitions = [
-  { key: "water", title: "Beber água", targetValue: 8 },
-  { key: "store", title: "Guardar 6 itens", targetValue: 6 },
-  { key: "read", title: "Ler uma página", targetValue: 6 },
-  { key: "brush", title: "Escovar os dentes", targetValue: 3 }
+  { key: "water", label: "Água", defaultTitle: "Beber água", targetValue: 8 },
+  { key: "store", label: "Objeto", defaultTitle: "Guardar 6 itens", targetValue: 6 },
+  { key: "read", label: "Livro", defaultTitle: "Ler uma página", targetValue: 6 },
+  { key: "brush", label: "Dente", defaultTitle: "Escovar os dentes", targetValue: 3 }
 ];
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
@@ -362,6 +363,8 @@ const missionAdjustValue = document.getElementById("missionAdjustValue");
 const missionAdjustHint = document.getElementById("missionAdjustHint");
 const missionAdjustStatus = document.getElementById("missionAdjustStatus");
 const missionAdjustConfirmButton = document.getElementById("missionAdjustConfirm");
+const missionAdjustDeleteButton = document.getElementById("missionAdjustDelete");
+const missionQuickAssignGrid = document.getElementById("missionQuickAssignGrid");
 const runningTaskMissionButton = document.getElementById("runningTaskMissionButton");
 const runningMissionQuickModal = document.getElementById("runningMissionQuickModal");
 const closeRunningMissionQuickModalButton = document.getElementById("closeRunningMissionQuickModal");
@@ -703,9 +706,9 @@ const state = {
   historyOffset: 0,
   missionAdjust: {
     goalId: "",
-    amount: 1,
-    sign: 1
+    targetValue: 1
   },
+  missionQuickSlots: [],
   runningMissionQuick: {
     feedbackGoalKey: "",
     lastRenderedText: ""
@@ -1025,6 +1028,7 @@ function applySelectedProfile(profile) {
   const matched = getProfileByName(profile);
   const next = matched?.name || getDefaultProfileName();
   state.selectedProfile = next;
+  loadMissionQuickSlots(next);
   document.body.dataset.profile = next;
   window.localStorage.setItem(projectProfileKey, next);
   profileFooter?.querySelectorAll("[data-profile]").forEach((button) => {
@@ -1033,6 +1037,7 @@ function applySelectedProfile(profile) {
   renderHomeProfileHero();
   renderProfileFooterVisibility();
   renderHomeRunningTask();
+  renderRunningMissionQuickButtons();
 }
 
 function renderHomeProfileHero() {
@@ -7037,6 +7042,57 @@ async function loadMissions() {
   }
 }
 
+function buildDefaultMissionQuickSlots() {
+  return missionQuickDefinitions.map((definition) => ({
+    key: definition.key,
+    title: definition.defaultTitle,
+    goalId: ""
+  }));
+}
+
+function getMissionQuickStorageKey(profileName = state.selectedProfile || getDefaultProfileName()) {
+  const userId = String(state.authUser?.id || "guest").trim() || "guest";
+  const profile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
+  return `${missionQuickSlotsKey}:${userId}:${profile}`;
+}
+
+function readMissionQuickSlots(profileName = state.selectedProfile || getDefaultProfileName()) {
+  const fallback = buildDefaultMissionQuickSlots();
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(getMissionQuickStorageKey(profileName)) || "[]");
+    if (!Array.isArray(parsed) || !parsed.length) {
+      return fallback;
+    }
+    return missionQuickDefinitions.map((definition) => {
+      const matched = parsed.find((item) => String(item?.key || "") === definition.key) || {};
+      return {
+        key: definition.key,
+        title: String(matched.title || definition.defaultTitle || "").trim() || definition.defaultTitle,
+        goalId: String(matched.goalId || "").trim()
+      };
+    });
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function persistMissionQuickSlots(profileName = state.selectedProfile || getDefaultProfileName()) {
+  const sanitized = missionQuickDefinitions.map((definition) => {
+    const matched = (Array.isArray(state.missionQuickSlots) ? state.missionQuickSlots : []).find((item) => item.key === definition.key) || {};
+    return {
+      key: definition.key,
+      title: String(matched.title || definition.defaultTitle || "").trim() || definition.defaultTitle,
+      goalId: String(matched.goalId || "").trim()
+    };
+  });
+  state.missionQuickSlots = sanitized;
+  window.localStorage.setItem(getMissionQuickStorageKey(profileName), JSON.stringify(sanitized));
+}
+
+function loadMissionQuickSlots(profileName = state.selectedProfile || getDefaultProfileName()) {
+  state.missionQuickSlots = readMissionQuickSlots(profileName);
+}
+
 function normalizeMissionTitle(value) {
   return String(value || "")
     .normalize("NFC")
@@ -7049,13 +7105,25 @@ function getMissionQuickDefinitionByKey(key) {
   return missionQuickDefinitions.find((item) => item.key === key) || null;
 }
 
+function getMissionQuickSlotByKey(key) {
+  return (Array.isArray(state.missionQuickSlots) ? state.missionQuickSlots : []).find((item) => item.key === key) || null;
+}
+
 function getMissionQuickGoalByKey(key) {
   const definition = getMissionQuickDefinitionByKey(key);
   if (!definition) {
     return null;
   }
-  const normalizedTitle = normalizeMissionTitle(definition.title);
-  return (Array.isArray(state.missions) ? state.missions : []).find((goal) => normalizeMissionTitle(goal.title) === normalizedTitle) || null;
+  const slot = getMissionQuickSlotByKey(key);
+  const goals = Array.isArray(state.missions) ? state.missions : [];
+  if (slot?.goalId) {
+    const matchedById = goals.find((goal) => String(goal.id || "") === String(slot.goalId || ""));
+    if (matchedById) {
+      return matchedById;
+    }
+  }
+  const normalizedTitle = normalizeMissionTitle(slot?.title || definition.defaultTitle);
+  return goals.find((goal) => normalizeMissionTitle(goal.title) === normalizedTitle) || null;
 }
 
 function clearRunningMissionQuickFeedbackTimer() {
@@ -7095,14 +7163,18 @@ function renderRunningMissionQuickButtons() {
     return;
   }
   runningMissionQuickGrid.querySelectorAll("[data-mission-quick-key]").forEach((button) => {
-    const goal = getMissionQuickGoalByKey(button.dataset.missionQuickKey || "");
+    const key = String(button.dataset.missionQuickKey || "");
+    const definition = getMissionQuickDefinitionByKey(key);
+    const goal = getMissionQuickGoalByKey(key);
     button.disabled = !goal;
     button.classList.toggle("is-disabled", !goal);
     button.setAttribute("aria-pressed", "false");
     if (goal) {
       button.title = `${goal.title}: ${goal.progressValue} de ${goal.targetValue}`;
+      button.setAttribute("aria-label", goal.title);
     } else {
-      button.title = "Missão indisponível";
+      button.title = `Missão indisponível para ${definition?.label || "atalho"}`;
+      button.setAttribute("aria-label", definition?.label || "Missão rápida");
     }
   });
 }
@@ -7187,6 +7259,34 @@ function handleRunningMissionQuickTap(key) {
   renderRunningMissionQuickButtons();
   showRunningMissionQuickFeedback(updatedGoal || goal);
   queueRunningMissionQuickIncrement(goal);
+}
+
+function assignMissionQuickSlot(slotKey) {
+  const goalId = String(state.missionAdjust?.goalId || "").trim();
+  const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId);
+  const definition = getMissionQuickDefinitionByKey(slotKey);
+  if (!goal || !definition) {
+    return;
+  }
+  state.missionQuickSlots = missionQuickDefinitions.map((item) => {
+    if (item.key !== slotKey) {
+      return getMissionQuickSlotByKey(item.key) || {
+        key: item.key,
+        title: item.defaultTitle,
+        goalId: ""
+      };
+    }
+    return {
+      key: item.key,
+      title: String(goal.title || item.defaultTitle),
+      goalId: String(goal.id || "")
+    };
+  });
+  persistMissionQuickSlots();
+  renderRunningMissionQuickButtons();
+  if (missionAdjustStatus) {
+    missionAdjustStatus.textContent = `${goal.title} agora está no acesso rápido ${definition.label}.`;
+  }
 }
 
 async function saveTaskComposer() {
@@ -7778,18 +7878,16 @@ function renderHistoryTimeline() {
 }
 
 function renderMissionAdjustState() {
-  const sign = Number(state.missionAdjust?.sign || 1) >= 0 ? 1 : -1;
-  const amount = Math.max(1, Math.trunc(Number(state.missionAdjust?.amount || 1) || 1));
-  state.missionAdjust.sign = sign;
-  state.missionAdjust.amount = amount;
+  const targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust?.targetValue || 1) || 1));
+  state.missionAdjust.targetValue = targetValue;
   if (missionAdjustValue) {
-    missionAdjustValue.textContent = String(amount);
+    missionAdjustValue.textContent = String(targetValue);
   }
   if (missionAdjustHint) {
-    missionAdjustHint.textContent = `${sign > 0 ? "Somar" : "Subtrair"} ${amount}`;
+    missionAdjustHint.textContent = `Meta diária ${targetValue}x`;
   }
-  missionAdjustMinusButton?.classList.toggle("active", sign < 0);
-  missionAdjustPlusButton?.classList.toggle("active", sign > 0);
+  missionAdjustMinusButton?.classList.remove("active");
+  missionAdjustPlusButton?.classList.add("active");
 }
 
 function openMissionCreateModal() {
@@ -7813,8 +7911,7 @@ function openMissionAdjustModal(goalId) {
   }
   state.missionAdjust = {
     goalId: String(goal.id),
-    amount: 1,
-    sign: 1
+    targetValue: Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1))
   };
   if (missionAdjustTitle) {
     missionAdjustTitle.textContent = String(goal.title || "Missão");
@@ -7840,7 +7937,7 @@ function createMissionCard(goal) {
         <div class="history-mission-card-progress">${escapeHtml(`${progress} de ${target}`)}</div>
       </div>
       <div class="history-mission-card-actions">
-        <button class="history-mission-card-delete" type="button" data-mission-goal-delete="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(goal.title || "missão")}`)}">×</button>
+        <button class="history-mission-card-edit" type="button" data-mission-goal-edit="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Editar ${String(goal.title || "missão")}`)}">Editar</button>
         <button class="history-mission-card-add" type="button" data-mission-goal-adjust="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Atualizar ${String(goal.title || "missão")}`)}">+</button>
       </div>
     </div>
@@ -9280,30 +9377,38 @@ constitutionAvatars?.addEventListener("click", (event) => {
 missionList?.addEventListener("click", (event) => {
   const adjustButton = event.target.closest("[data-mission-goal-adjust]");
   if (adjustButton) {
-    openMissionAdjustModal(adjustButton.dataset.missionGoalAdjust || "");
-    return;
-  }
-  const deleteButton = event.target.closest("[data-mission-goal-delete]");
-  if (!deleteButton) {
-    return;
-  }
-  const goalId = String(deleteButton.dataset.missionGoalDelete || "").trim();
-  if (!goalId) {
-    return;
-  }
-  void (async () => {
-    try {
-      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
-        method: "DELETE"
-      });
-      await loadMissions();
-      renderMissions();
-    } catch (error) {
-      if (missionStatus) {
-        missionStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
-      }
+    const goalId = String(adjustButton.dataset.missionGoalAdjust || "").trim();
+    if (!goalId) {
+      return;
     }
-  })();
+    void (async () => {
+      try {
+        if (missionStatus) {
+          missionStatus.textContent = "";
+        }
+        await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+            delta: 1
+          })
+        });
+        await loadMissions();
+        renderMissions();
+      } catch (error) {
+        if (missionStatus) {
+          missionStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
+        }
+      }
+    })();
+    return;
+  }
+  const editButton = event.target.closest("[data-mission-goal-edit]");
+  if (!editButton) {
+    return;
+  }
+  openMissionAdjustModal(editButton.dataset.missionGoalEdit || "");
 });
 
 openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
@@ -9349,20 +9454,20 @@ missionCreateConfirmButton?.addEventListener("click", () => {
 });
 
 missionAdjustMinusButton?.addEventListener("click", () => {
-  state.missionAdjust.sign = -1;
+  state.missionAdjust.targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) - 1);
   renderMissionAdjustState();
 });
 
 missionAdjustPlusButton?.addEventListener("click", () => {
-  state.missionAdjust.sign = 1;
+  state.missionAdjust.targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) + 1);
   renderMissionAdjustState();
 });
 
 document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
   button.addEventListener("click", () => {
-    state.missionAdjust.amount = Math.max(
+    state.missionAdjust.targetValue = Math.max(
       1,
-      Math.trunc(Number(state.missionAdjust.amount || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionAdjustAdd || 0) || 0))
+      Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionAdjustAdd || 0) || 0))
     );
     renderMissionAdjustState();
   });
@@ -9371,21 +9476,20 @@ document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
 missionAdjustConfirmButton?.addEventListener("click", () => {
   void (async () => {
     const goalId = String(state.missionAdjust?.goalId || "").trim();
-    const amount = Math.max(1, Math.trunc(Number(state.missionAdjust?.amount || 1) || 1));
-    const sign = Number(state.missionAdjust?.sign || 1) >= 0 ? 1 : -1;
+    const targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust?.targetValue || 1) || 1));
     if (!goalId) {
       return;
     }
     if (missionAdjustStatus) {
-      missionAdjustStatus.textContent = "Aplicando...";
+      missionAdjustStatus.textContent = "Salvando...";
     }
     try {
-      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
+      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          delta: amount * sign
+          targetValue
         })
       });
       closeModal("missionAdjustModal");
@@ -9397,6 +9501,46 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
       }
     }
   })();
+});
+
+missionAdjustDeleteButton?.addEventListener("click", () => {
+  void (async () => {
+    const goalId = String(state.missionAdjust?.goalId || "").trim();
+    if (!goalId) {
+      return;
+    }
+    if (missionAdjustStatus) {
+      missionAdjustStatus.textContent = "Excluindo...";
+    }
+    try {
+      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
+        method: "DELETE"
+      });
+      state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
+        const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
+        return String(slot.goalId || "") === goalId
+          ? { key: definition.key, title: definition.defaultTitle, goalId: "" }
+          : slot;
+      });
+      persistMissionQuickSlots();
+      closeModal("missionAdjustModal");
+      await loadMissions();
+      renderMissions();
+      renderRunningMissionQuickButtons();
+    } catch (error) {
+      if (missionAdjustStatus) {
+        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+      }
+    }
+  })();
+});
+
+missionQuickAssignGrid?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-mission-quick-slot-assign]");
+  if (!button) {
+    return;
+  }
+  assignMissionQuickSlot(String(button.dataset.missionQuickSlotAssign || ""));
 });
 
 runningMissionQuickGrid?.addEventListener("click", (event) => {

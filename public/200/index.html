@@ -1040,6 +1040,7 @@
   <section class="workspace-modal simple-modal" id="missionAdjustModal" aria-hidden="true" aria-label="Atualizar missão">
     <div class="finance-content history-mission-modal-content">
       <div class="running-task-name" id="missionAdjustTitle">Missão</div>
+      <p class="history-mission-adjust-caption">Editar meta diária</p>
       <div class="history-mission-adjust-stage">
         <button class="history-mission-sign-btn" type="button" id="missionAdjustMinus">-</button>
         <div class="history-mission-adjust-value" id="missionAdjustValue">1</div>
@@ -1053,9 +1054,19 @@
         <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="50">+50</button>
         <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="100">+100</button>
       </div>
-      <p class="finance-status" id="missionAdjustHint" aria-live="polite">Somar 1</p>
+      <div class="history-mission-quick-access">
+        <div class="history-mission-quick-access-title">Definir acesso rápido</div>
+        <div class="history-mission-quick-access-grid" id="missionQuickAssignGrid">
+          <button class="history-mission-quick-slot history-mission-quick-slot-water" type="button" data-mission-quick-slot-assign="water">Trocar água</button>
+          <button class="history-mission-quick-slot history-mission-quick-slot-store" type="button" data-mission-quick-slot-assign="store">Trocar objeto</button>
+          <button class="history-mission-quick-slot history-mission-quick-slot-read" type="button" data-mission-quick-slot-assign="read">Trocar livro</button>
+          <button class="history-mission-quick-slot history-mission-quick-slot-brush" type="button" data-mission-quick-slot-assign="brush">Trocar dente</button>
+        </div>
+      </div>
+      <p class="finance-status" id="missionAdjustHint" aria-live="polite">Meta diária 1x</p>
       <p class="finance-status" id="missionAdjustStatus" aria-live="polite"></p>
-      <button class="primary-btn" type="button" id="missionAdjustConfirm">Aplicar</button>
+      <button class="primary-btn" type="button" id="missionAdjustConfirm">Salvar número</button>
+      <button class="danger-btn" type="button" id="missionAdjustDelete">Excluir missão</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Voltar</button>
     </div>
   </section>
@@ -1067,23 +1078,23 @@
       </button>
       <div class="running-mission-quick-grid" id="runningMissionQuickGrid">
         <button class="running-mission-quick-btn running-mission-quick-btn-water" type="button" data-mission-quick-key="water" aria-label="Beber água">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c-1.6 3-5.8 6.9-5.8 11.1A5.8 5.8 0 0 0 12 18.9a5.8 5.8 0 0 0 5.8-5.8C17.8 8.9 13.6 5 12 2Z" fill="currentColor"/></svg>
+          <img src="/200/icons/mission-water.svg" alt="" aria-hidden="true" />
         </button>
         <button class="running-mission-quick-btn running-mission-quick-btn-shoe" type="button" data-mission-quick-key="store" aria-label="Guardar 6 itens">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.5V14l4.1-1.2 3.4-4.3 2.6 1.8-1.2 3.4 2.8 1.1c1.5.6 3.1.9 4.7.9H22v3H4Z" fill="currentColor"/></svg>
+          <img src="/200/icons/mission-store.svg" alt="" aria-hidden="true" />
         </button>
         <button class="running-mission-quick-btn running-mission-quick-btn-book" type="button" data-mission-quick-key="read" aria-label="Ler uma página">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v17.5A2.5 2.5 0 0 0 17.5 17H5V4.5Zm2 0v10.5h10.5c.5 0 1 .1 1.5.2V4H7Z" fill="currentColor"/></svg>
+          <img src="/200/icons/mission-book.svg" alt="" aria-hidden="true" />
         </button>
         <button class="running-mission-quick-btn running-mission-quick-btn-tooth" type="button" data-mission-quick-key="brush" aria-label="Escovar os dentes">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 4.4c1.1 0 1.9.7 2.6 1.4.7-.7 1.5-1.4 2.6-1.4 1.3 0 2.3 1 2.6 2.5.4 1.9-.2 4-.9 5.7-.6 1.5-.7 3-.8 4.2-.1 1.6-.6 3.2-2 3.2s-1.9-1.5-2.3-2.8c-.4 1.3-1 2.8-2.3 2.8-1.4 0-1.9-1.6-2-3.2-.1-1.2-.2-2.7-.8-4.2-.7-1.7-1.3-3.8-.9-5.7.3-1.5 1.3-2.5 2.6-2.5Z" fill="currentColor"/></svg>
+          <img src="/200/icons/mission-brush.svg" alt="" aria-hidden="true" />
         </button>
       </div>
       <div class="running-mission-quick-feedback" id="runningMissionQuickFeedback" aria-live="polite"></div>
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260706-missions-quick"></script>
+  <script type="module" src="/200/project.js?v=20260706-missions-editor"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

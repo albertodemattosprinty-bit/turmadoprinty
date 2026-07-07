@@ -253,6 +253,31 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   return listExtraGoals(userId, normalizedProfile, dateKey);
 }
 
+export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, payload = {}) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeGoalId = String(goalId || "").trim();
+  if (!safeGoalId) {
+    throw new Error("Missao invalida.");
+  }
+  const nextTargetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
+  if (!nextTargetValue) {
+    throw new Error("Informe a unidade diaria da missao.");
+  }
+  await query(
+    `
+      update extra_goals
+      set target_value = $4,
+          updated_at = now()
+      where id = $1
+        and user_id = $2
+        and assigned_profile = $3
+    `,
+    [safeGoalId, userId, normalizedProfile, nextTargetValue]
+  );
+  return listExtraGoals(userId, normalizedProfile);
+}
+
 export async function deleteExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);

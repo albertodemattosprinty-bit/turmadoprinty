@@ -62,7 +62,7 @@ import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProj
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { appendProject200ChatMessages, createProject200Chat, getProject200Chat, markProject200ChatRead, saveProject200ChatNotificationPermission } from "./src/project200-chats.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoalProgress } from "./src/extra-goals.js";
+import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -3451,6 +3451,32 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."
+    });
+  }
+}
+
+async function handleExtraGoalUpdateRequest(request, response, goalId) {
+  const user = await requireAuth(request, response);
+  if (!user) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  try {
+    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const goals = await updateExtraGoal(user.id, selectedProfile, goalId, body);
+    const summary = summarizeExtraGoals(goals);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel editar a missao."
     });
   }
 }
@@ -10540,6 +10566,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PATCH" && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/progress$/)) {
     const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)\/progress$/, "$1");
     await handleExtraGoalProgressRequest(request, response, goalId);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/extra-goals\/[^/]+$/)) {
+    const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)$/, "$1");
+    await handleExtraGoalUpdateRequest(request, response, goalId);
     return;
   }
 
