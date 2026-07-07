@@ -10,6 +10,10 @@ const ACTION_STATUS_COMPLETED = "COMPLETED";
 const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
 const DEFAULT_CATEGORY_ID = "";
 const QUICK_TASK_CATEGORY_ID = "quick_task";
+const SLEEP_ACTION_CATEGORY_ID = "sono";
+const SLEEP_ACTION_TITLE = "Sono";
+const ACTIONS_TIME_ZONE = "America/Sao_Paulo";
+const SLEEP_PLACEHOLDER_DURATION_MINUTES = 20 * 60;
 
 function toIso(value) {
   if (!value) {
@@ -51,6 +55,30 @@ function normalizeCategoryId(value) {
   return raw.replace(/[^a-z0-9_]/g, "");
 }
 
+function toDateKey(value = new Date()) {
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ACTIONS_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(safeDate);
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+  return `${year}-${month}-${day}`;
+}
+
+function buildSleepPlaceholderEnd(startAt) {
+  return new Date(startAt.getTime() + (SLEEP_PLACEHOLDER_DURATION_MINUTES * 60000));
+}
+
 function getNextActionStatus(currentStatus) {
   const normalized = normalizeActionStatus(currentStatus);
 
@@ -87,6 +115,7 @@ function normalizeAction(row) {
     repeatGroupId: row.repeat_group_id || null,
     repeatRule: row.repeat_rule || "none",
     repeatDays: Array.isArray(row.repeat_days) ? row.repeat_days : [],
+    sleepSessionDate: row.sleep_session_date ? toDateKey(row.sleep_session_date) : "",
     status: normalizeActionStatus(row.status_override),
     startedAt: toIso(row.status_started_at),
     completedAt: toIso(row.status_completed_at),
@@ -163,10 +192,12 @@ export async function ensureActionsSchema() {
   await query("alter table actions add column if not exists music_default_mode text not null default 'track';");
   await query(`alter table actions add column if not exists assignee text not null default '${DEFAULT_ASSIGNEE}';`);
   await query("alter table actions add column if not exists category_id text not null default '';");
+  await query("alter table actions add column if not exists sleep_session_date date;");
 
   await query("create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);");
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");
   await query("create index if not exists idx_actions_user_assignee on actions(user_id, assignee);");
+  await query("create index if not exists idx_actions_sleep_session on actions(user_id, assignee, sleep_session_date);");
 
   await query(`
     create table if not exists action_status_overrides (
@@ -276,6 +307,7 @@ async function getUserActionById(userId, actionId) {
         a.repeat_group_id,
         a.repeat_rule,
         a.repeat_days,
+        a.sleep_session_date,
         a.created_at,
         o.status as status_override,
         o.started_at as status_started_at,
@@ -392,6 +424,7 @@ async function reshapeActionsForQuickTask(userId, assignee, rangeStartAt, rangeE
         a.repeat_group_id,
         a.repeat_rule,
         a.repeat_days,
+        a.sleep_session_date,
         a.created_at,
         o.status as status_override,
         o.started_at as status_started_at,
@@ -567,7 +600,7 @@ export async function createUserAction(userId, payload) {
     `
       insert into actions (user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
       values ${placeholders.join(", ")}
-      returning id, user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
+      returning id, user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, sleep_session_date, created_at
     `,
     values
   );
@@ -1070,6 +1103,225 @@ export async function createQuickUserAction(userId, payload = {}) {
     throw new Error("Nao foi possivel criar a tarefa rapida.");
   }
   return updateUserActionStatus(userId, action.id);
+}
+
+async function getSleepSessionActionRow(userId, assignee, sessionDateKey) {
+  const result = await query(
+    `
+      select
+        a.id,
+        a.user_id,
+        a.title,
+        a.music_default_mode,
+        a.music_station_name,
+        a.music_track_name,
+        a.music_track_url,
+        a.assignee,
+        a.category_id,
+        a.start_at,
+        a.end_at,
+        a.repeat_group_id,
+        a.repeat_rule,
+        a.repeat_days,
+        a.sleep_session_date,
+        a.created_at,
+        o.status as status_override,
+        o.started_at as status_started_at,
+        o.completed_at as status_completed_at,
+        o.updated_at as status_updated_at
+      from actions a
+      left join action_status_overrides o
+        on o.user_id = a.user_id
+       and o.action_id = a.id
+      where a.user_id = $1
+        and a.assignee = $2
+        and a.sleep_session_date = $3::date
+        and a.category_id = $4
+      order by a.created_at desc
+      limit 1
+    `,
+    [userId, assignee, sessionDateKey, SLEEP_ACTION_CATEGORY_ID]
+  );
+  return result.rows[0] ? normalizeAction(result.rows[0]) : null;
+}
+
+export async function getSleepSessionAction(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, sessionDate = new Date()) {
+  await ensureActionsSchema();
+  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(profileName), { fallbackToDefault: true });
+  const sessionDateKey = toDateKey(sessionDate);
+  return getSleepSessionActionRow(userId, assignee, sessionDateKey);
+}
+
+export async function upsertSleepSessionAction(userId, payload = {}) {
+  await ensureActionsSchema();
+  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.profileName), { fallbackToDefault: true });
+  const sessionDateKey = toDateKey(payload?.sessionDate || new Date());
+  const plannedStartAt = parseDate(payload?.plannedStartAt, "Horario inicial do sono");
+  const plannedEndAt = buildSleepPlaceholderEnd(plannedStartAt);
+  const existing = await getSleepSessionActionRow(userId, assignee, sessionDateKey);
+
+  if (existing?.id) {
+    await query(
+      `
+        update actions
+           set title = $3,
+               assignee = $4,
+               category_id = $5,
+               music_default_mode = 'station',
+               music_station_name = 'Frequency',
+               music_track_name = null,
+               music_track_url = null,
+               start_at = $6::timestamptz,
+               end_at = $7::timestamptz,
+               repeat_group_id = null,
+               repeat_rule = 'none',
+               repeat_days = '[]'::jsonb,
+               sleep_session_date = $8::date
+         where user_id = $1
+           and id = $2
+      `,
+      [userId, existing.id, SLEEP_ACTION_TITLE, assignee, SLEEP_ACTION_CATEGORY_ID, plannedStartAt.toISOString(), plannedEndAt.toISOString(), sessionDateKey]
+    );
+    await query(
+      `
+        insert into action_status_overrides (
+          user_id, action_id, repeat_group_id, status, started_at, completed_at
+        )
+        values ($1, $2, null, $3, null, null)
+        on conflict (user_id, action_id) do update
+          set repeat_group_id = null,
+              status = excluded.status,
+              started_at = null,
+              completed_at = null,
+              updated_at = now()
+      `,
+      [userId, existing.id, ACTION_STATUS_PENDING]
+    );
+    return getUserActionById(userId, existing.id);
+  }
+
+  const result = await query(
+    `
+      insert into actions (
+        user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url,
+        assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, sleep_session_date
+      )
+      values ($1, $2, 'station', $3, null, null, $4, $5, $6::timestamptz, $7::timestamptz, null, 'none', '[]'::jsonb, $8::date)
+      returning id
+    `,
+    [userId, SLEEP_ACTION_TITLE, "Frequency", assignee, SLEEP_ACTION_CATEGORY_ID, plannedStartAt.toISOString(), plannedEndAt.toISOString(), sessionDateKey]
+  );
+  return getUserActionById(userId, result.rows[0]?.id);
+}
+
+export async function activateSleepSessionAction(userId, payload = {}) {
+  await ensureActionsSchema();
+  const action = await getUserActionById(userId, payload?.actionId);
+  if (!action || action.categoryId !== SLEEP_ACTION_CATEGORY_ID || !action.sleepSessionDate) {
+    throw new Error("Sessao de sono nao encontrada.");
+  }
+  const actualStartAt = parseDate(payload?.actualStartAt, "Inicio real do sono");
+  const placeholderEndAt = buildSleepPlaceholderEnd(actualStartAt);
+  await query(
+    `
+      update actions
+         set start_at = $3::timestamptz,
+             end_at = $4::timestamptz,
+             music_default_mode = 'station',
+             music_station_name = 'Frequency',
+             music_track_name = null,
+             music_track_url = null
+       where user_id = $1
+         and id = $2
+    `,
+    [userId, action.id, actualStartAt.toISOString(), placeholderEndAt.toISOString()]
+  );
+  await query(
+    `
+      insert into action_status_overrides (
+        user_id, action_id, repeat_group_id, status, started_at, completed_at
+      )
+      values ($1, $2, null, $3, $4::timestamptz, null)
+      on conflict (user_id, action_id) do update
+        set repeat_group_id = null,
+            status = excluded.status,
+            started_at = excluded.started_at,
+            completed_at = null,
+            updated_at = now()
+    `,
+    [userId, action.id, ACTION_STATUS_IN_PROGRESS, actualStartAt.toISOString()]
+  );
+  await upsertProject200RuntimeState(userId, {
+    actionId: action.id,
+    actionTitle: SLEEP_ACTION_TITLE,
+    eventType: "start",
+    startedAt: actualStartAt.toISOString(),
+    occurredAt: actualStartAt.toISOString()
+  });
+  return getUserActionById(userId, action.id);
+}
+
+export async function finishSleepSessionAction(userId, payload = {}) {
+  await ensureActionsSchema();
+  const action = await getUserActionById(userId, payload?.actionId);
+  if (!action || action.categoryId !== SLEEP_ACTION_CATEGORY_ID || !action.sleepSessionDate) {
+    throw new Error("Sessao de sono nao encontrada.");
+  }
+  const completedAt = parseDate(payload?.completedAt, "Fim do sono");
+  const startedAt = parseDate(action.startedAt || action.startAt, "Inicio do sono");
+  if (completedAt <= startedAt) {
+    throw new Error("O fim do sono precisa ser depois do inicio.");
+  }
+  await query(
+    `
+      update actions
+         set end_at = $3::timestamptz
+       where user_id = $1
+         and id = $2
+    `,
+    [userId, action.id, completedAt.toISOString()]
+  );
+  await query(
+    `
+      insert into action_status_overrides (
+        user_id, action_id, repeat_group_id, status, started_at, completed_at
+      )
+      values ($1, $2, null, $3, $4::timestamptz, $5::timestamptz)
+      on conflict (user_id, action_id) do update
+        set repeat_group_id = null,
+            status = excluded.status,
+            started_at = excluded.started_at,
+            completed_at = excluded.completed_at,
+            updated_at = now()
+    `,
+    [userId, action.id, ACTION_STATUS_COMPLETED, startedAt.toISOString(), completedAt.toISOString()]
+  );
+  await upsertProject200RuntimeState(userId, {
+    actionId: action.id,
+    actionTitle: SLEEP_ACTION_TITLE,
+    eventType: "complete",
+    startedAt: startedAt.toISOString(),
+    occurredAt: completedAt.toISOString()
+  });
+  return getUserActionById(userId, action.id);
+}
+
+export async function abortSleepSessionAction(userId, payload = {}) {
+  await ensureActionsSchema();
+  const action = await getUserActionById(userId, payload?.actionId);
+  if (!action || action.categoryId !== SLEEP_ACTION_CATEGORY_ID || !action.sleepSessionDate) {
+    throw new Error("Sessao de sono nao encontrada.");
+  }
+  await query("delete from action_status_overrides where user_id = $1 and action_id = $2", [userId, action.id]);
+  await query("delete from actions where user_id = $1 and id = $2", [userId, action.id]);
+  await upsertProject200RuntimeState(userId, {
+    actionId: action.id,
+    actionTitle: SLEEP_ACTION_TITLE,
+    eventType: "abort",
+    startedAt: null,
+    occurredAt: new Date().toISOString()
+  });
+  return { ok: true };
 }
 
 export async function extendQuickUserAction(userId, actionId, payload = {}) {

@@ -53,7 +53,7 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getProject200ChatPromptSettings, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveProject200ChatPromptSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
+import { abortSleepSessionAction, activateSleepSessionAction, createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, finishSleepSessionAction, getProject200RuntimeState, getSleepSessionAction, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual, upsertSleepSessionAction } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
@@ -11927,6 +11927,114 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel iniciar a tarefa rapida."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/sleep-session") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const sessionDate = searchParams.get("date") || new Date().toISOString();
+      const profileName = searchParams.get("profile") || undefined;
+      const action = await getSleepSessionAction(user.id, profileName, sessionDate);
+      sendJson(response, 200, { ok: true, action });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar o sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/start") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const action = await upsertSleepSessionAction(user.id, {
+        profileName: body?.profile,
+        sessionDate: body?.date,
+        plannedStartAt: body?.plannedStartAt
+      });
+      sendJson(response, 201, { ok: true, action });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel iniciar o sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/activate") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const action = await activateSleepSessionAction(user.id, {
+        actionId: body?.actionId,
+        actualStartAt: body?.actualStartAt
+      });
+      sendJson(response, 200, { ok: true, action });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel ativar o sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/finish") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const action = await finishSleepSessionAction(user.id, {
+        actionId: body?.actionId,
+        completedAt: body?.completedAt
+      });
+      sendJson(response, 200, { ok: true, action });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel finalizar o sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/abort") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const result = await abortSleepSessionAction(user.id, {
+        actionId: body?.actionId
+      });
+      sendJson(response, 200, { ok: true, result });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel abortar o sono."
       });
     }
     return;

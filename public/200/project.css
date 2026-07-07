@@ -2487,8 +2487,9 @@ body.running-music-standalone #actionsModal .actions-list {
   grid-template-columns: 52px minmax(0, 1fr) max-content;
   align-items: center;
   gap: 12px;
-  width: 100%;
-  padding: 14px 0;
+  width: calc(100% + 15px);
+  margin-left: -15px;
+  padding: 14px 0 14px 15px;
   border: 0;
   border-radius: 0;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.00) 100%);
@@ -2654,14 +2655,113 @@ body.running-music-standalone #actionsModal .actions-list {
   color: rgba(255, 255, 255, 0.82);
 }
 
-.task-row.task-sleep-slot {
-  background: linear-gradient(90deg, rgba(5, 8, 16, 0.98) 0%, rgba(5, 8, 16, 0.98) 50%, rgba(5, 8, 16, 0.00) 100%);
-}
-
 .task-row.task-sleep-slot .task-title,
 .task-row.task-sleep-slot .task-assignee,
 .task-row.task-sleep-slot .task-time {
   color: #dbe8ff;
+}
+
+.sleep-config-content {
+  gap: 18px;
+}
+
+.sleep-config-moon {
+  display: grid;
+  place-items: center;
+  color: #cdd7ea;
+}
+
+.sleep-config-moon svg {
+  width: 72px;
+  height: 72px;
+}
+
+.sleep-start-btn {
+  width: min(280px, 100%);
+  min-height: 54px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #18b35d, #0f7f42);
+}
+
+#sleepSessionModal.workspace-modal {
+  display: none;
+  background: #000;
+}
+
+#sleepSessionModal.workspace-modal.active {
+  display: grid;
+  place-items: center;
+}
+
+.sleep-session-shell {
+  width: 100vw;
+  height: 100dvh;
+  background: #000;
+  color: #8b93a7;
+  position: relative;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 28px;
+}
+
+.sleep-session-main {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.sleep-session-status {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6f778b;
+}
+
+.sleep-session-time {
+  font-size: clamp(2.4rem, 10vw, 5.6rem);
+  font-weight: 800;
+  color: #c5ccda;
+  line-height: 0.96;
+}
+
+.sleep-session-subtitle {
+  font-size: 0.95rem;
+  color: #737c91;
+}
+
+.sleep-session-music-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #8a93a8;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-session-music-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sleep-session-controls {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  width: min(320px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+}
+
+.sleep-session-control-btn {
+  min-height: 52px;
 }
 
 .task-time {

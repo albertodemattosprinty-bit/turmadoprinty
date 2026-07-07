@@ -5,6 +5,8 @@ const projectProfileKey = "project_200_profile_v1";
 const sleepConfigKey = "project_200_sleep_v1";
 const optionsConfigKey = "project_200_options_v1";
 const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
+const sleepDelayOptions = [0, 5, 15, 30, 60];
+const sleepPlaceholderTitle = "Sono";
 const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
 const taskBeepOptionLabels = new Map([
@@ -493,8 +495,17 @@ const closePostponeReplaceModal = document.getElementById("closePostponeReplaceM
 const postponeReplaceList = document.getElementById("postponeReplaceList");
 const confirmPostponeReplace = document.getElementById("confirmPostponeReplace");
 const sleepConfigModal = document.getElementById("sleepConfigModal");
-const sleepStartLabel = document.getElementById("sleepStartLabel");
-const sleepEndLabel = document.getElementById("sleepEndLabel");
+const sleepDelayLabel = document.getElementById("sleepDelayLabel");
+const sleepSessionModal = document.getElementById("sleepSessionModal");
+const sleepSessionShell = document.getElementById("sleepSessionShell");
+const sleepSessionMusicButton = document.getElementById("sleepSessionMusicButton");
+const sleepSessionStatusLabel = document.getElementById("sleepSessionStatusLabel");
+const sleepSessionTimeLabel = document.getElementById("sleepSessionTimeLabel");
+const sleepSessionSubtitle = document.getElementById("sleepSessionSubtitle");
+const sleepSessionControls = document.getElementById("sleepSessionControls");
+const sleepSessionFinishButton = document.getElementById("sleepSessionFinishButton");
+const sleepSessionAbortButton = document.getElementById("sleepSessionAbortButton");
+const sleepSessionContinueButton = document.getElementById("sleepSessionContinueButton");
 const saveSleepConfigBtn = document.getElementById("saveSleepConfigBtn");
 const overlapWizard = document.getElementById("overlapWizard");
 const closeOverlapWizard = document.getElementById("closeOverlapWizard");
@@ -735,6 +746,14 @@ const state = {
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState(),
   sleepConfig: { startHour: 23, startMinute: 0, endHour: 8, endMinute: 0 },
+  sleepFlow: {
+    delayIndex: 0,
+    activationRequestInFlight: false,
+    controlsVisible: false,
+    controlsTimerId: 0,
+    audioFadeTimerId: 0,
+    audioStopTimerId: 0
+  },
   options: {
     showFreeTime: true,
     completionBeepCycles: 0,
@@ -1165,8 +1184,22 @@ function isQuickTaskAction(action) {
   return String(action?.categoryId || "").trim().toLowerCase() === "quick_task";
 }
 
+function isSleepAction(action) {
+  return String(action?.categoryId || "").trim().toLowerCase() === "sono" && Boolean(String(action?.sleepSessionDate || "").trim());
+}
+
+function getSelectedSleepAction() {
+  const selectedDateKey = toLocalDateKey(dateFromOffset(state.activeOffset));
+  return state.actions.find((action) =>
+    isSleepAction(action)
+    && normalizeAssigneeName(action.assignee) === state.selectedProfile
+    && String(action.sleepSessionDate || "").trim() === selectedDateKey
+  ) || null;
+}
+
 function buildActionTimelineEntries() {
   const visibleActions = getVisibleActions()
+    .filter((action) => !isSleepAction(action))
     .slice()
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   const entries = [];
@@ -1177,17 +1210,6 @@ function buildActionTimelineEntries() {
   dayEnd.setDate(dayEnd.getDate() + 1);
   dayEnd.setHours(7, 59, 59, 999);
   let cursor = dayStart.getTime();
-
-  const sleepStart = new Date(baseDate);
-  if (state.sleepConfig.startHour < 8) {
-    sleepStart.setDate(sleepStart.getDate() + 1);
-  }
-  sleepStart.setHours(state.sleepConfig.startHour, state.sleepConfig.startMinute, 0, 0);
-  const sleepEnd = new Date(sleepStart);
-  sleepEnd.setHours(state.sleepConfig.endHour, state.sleepConfig.endMinute, 0, 0);
-  if (sleepEnd.getTime() <= sleepStart.getTime()) {
-    sleepEnd.setDate(sleepEnd.getDate() + 1);
-  }
 
   for (const action of visibleActions) {
     const startMs = new Date(action.startAt).getTime();
@@ -1217,48 +1239,7 @@ function buildActionTimelineEntries() {
     });
   }
 
-  const sleepStartClamped = Math.max(dayStart.getTime(), sleepStart.getTime());
-  const sleepEndClamped = Math.min(dayEnd.getTime(), sleepEnd.getTime());
-  if (sleepEndClamped > sleepStartClamped) {
-    entries.push({
-      kind: "sleep",
-      id: "sleep-fixed",
-      startAt: new Date(sleepStartClamped).toISOString(),
-      endAt: new Date(sleepEndClamped).toISOString(),
-      title: "Descanso"
-    });
-  }
-  const normalized = [];
-  const sleepEntry = entries.find((entry) => entry.kind === "sleep");
-  for (const entry of entries) {
-    if (entry.kind !== "free" || !sleepEntry) {
-      normalized.push(entry);
-      continue;
-    }
-    const freeStart = new Date(entry.startAt).getTime();
-    const freeEnd = new Date(entry.endAt).getTime();
-    const sleepStartMs = new Date(sleepEntry.startAt).getTime();
-    const sleepEndMs = new Date(sleepEntry.endAt).getTime();
-    if (freeEnd <= sleepStartMs || freeStart >= sleepEndMs) {
-      normalized.push(entry);
-      continue;
-    }
-    if (freeStart < sleepStartMs) {
-      normalized.push({ ...entry, id: `${entry.id}-a`, endAt: new Date(sleepStartMs).toISOString() });
-    }
-    if (freeEnd > sleepEndMs) {
-      normalized.push({ ...entry, id: `${entry.id}-b`, startAt: new Date(sleepEndMs).toISOString() });
-    }
-  }
-
-  const withoutFreeAfterSleep = normalized.filter((entry) => {
-    if (entry.kind !== "free" || !sleepEntry) return true;
-    const freeStart = new Date(entry.startAt).getTime();
-    const sleepStartMs = new Date(sleepEntry.startAt).getTime();
-    return Number.isFinite(freeStart) && Number.isFinite(sleepStartMs) && freeStart < sleepStartMs;
-  });
-
-  return withoutFreeAfterSleep
+  return entries
     .filter((entry) => state.options.showFreeTime || entry.kind !== "free")
     .filter((entry) => getActionDurationMinutes(entry) > 0)
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
@@ -1945,12 +1926,14 @@ function getSleepDurationMinutesForDay() {
 
 function getEarliestPendingAction() {
   return getVisibleActions()
+    .filter((item) => !isSleepAction(item))
     .filter((item) => normalizeActionStatus(item.status) === actionStatuses.pending)
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0] || null;
 }
 
 function getLatestCompletedActionForSelectedProfile() {
   return getVisibleActions()
+    .filter((item) => !isSleepAction(item))
     .filter((item) => normalizeActionStatus(item.status) === actionStatuses.completed)
     .sort((a, b) => {
       const aTs = new Date(a.completedAt || a.statusUpdatedAt || a.endAt || 0).getTime();
@@ -2073,6 +2056,29 @@ function renderHomeRunningTask() {
       runningTaskStartNextButton.dataset.actionId = String(nextPending?.id || "");
       runningTaskStartNextButton.dataset.kind = "action";
     }
+    renderRunningMusicPlayer();
+    return;
+  }
+  if (isSleepAction(action)) {
+    const sleepMinutes = getSleepTrackedMinutes(action);
+    runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Sono");
+    if (runningTaskCategoryIcon) {
+      runningTaskCategoryIcon.hidden = true;
+    }
+    runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
+    runningTaskMinutesLeft.textContent = sleepMinutes > 0 ? formatMinutesHuman(sleepMinutes) : "Preparando";
+    setRunningRingPercent(100);
+    runningTaskPercent.innerHTML = formatRunningClockMarkup(new Date());
+    setRunningNextDisplay("Toque para abrir", 0);
+    if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = false;
+    if (runningTaskListButton) runningTaskListButton.hidden = false;
+    if (runningTaskMissionButton) runningTaskMissionButton.hidden = false;
+    if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
+    if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
+    if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
+    if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
+    if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
+    if (runningTaskStartNextButton) runningTaskStartNextButton.hidden = true;
     renderRunningMusicPlayer();
     return;
   }
@@ -3084,11 +3090,17 @@ function startHomeDateTimeTicker() {
 
 function startRunningTaskTicker() {
   renderHomeRunningTask();
+  if (sleepSessionModal?.classList.contains("active")) {
+    renderSleepSessionModal();
+  }
   if (runningTaskTicker) {
     window.clearTimeout(runningTaskTicker);
   }
   runningTaskTicker = window.setTimeout(function tickRunningTask() {
     renderHomeRunningTask();
+    if (sleepSessionModal?.classList.contains("active")) {
+      renderSleepSessionModal();
+    }
     runningTaskTicker = window.setTimeout(tickRunningTask, 250);
   }, 250);
 }
@@ -3462,6 +3474,11 @@ function openModal(id) {
     renderHomeRunningTask();
   }
 
+  if (id === "sleepSessionModal") {
+    renderSleepSessionModal();
+    startRunningTaskTicker();
+  }
+
   updateRunningPlayerOverlayState();
 }
 
@@ -3541,6 +3558,10 @@ function closeModal(modal) {
     if (runningMissionQuickFeedback) {
       runningMissionQuickFeedback.textContent = "";
     }
+  }
+  if (modal.id === "sleepSessionModal") {
+    clearSleepControlsTimer();
+    hideSleepControls();
   }
   if (modal.id === "runningConfirmModal") {
     state.runningConfirm.action = null;
@@ -3868,8 +3889,6 @@ function renderActions() {
 
   if (!timelineEntries.length) {
     actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse dia.</div>';
-    renderActionsProgress();
-    return;
   }
 
   timelineEntries.forEach((action) => {
@@ -3939,6 +3958,32 @@ function renderActions() {
     actionsList.appendChild(row);
   });
 
+  const selectedSleepAction = getSelectedSleepAction();
+  const sleepStatus = normalizeActionStatus(selectedSleepAction?.status || actionStatuses.completed);
+  const sleepStateClass = sleepStatus === actionStatuses.inProgress
+    ? " task-in-progress"
+    : (sleepStatus === actionStatuses.completed ? " task-completed" : " task-pending-clean");
+  const sleepAvatar = getActionAvatarPath(state.selectedProfile);
+  const sleepDurationText = selectedSleepAction
+    ? (getSleepTrackedMinutes(selectedSleepAction) > 0 ? formatMinutesHuman(getSleepTrackedMinutes(selectedSleepAction)) : "Sem tempo definido")
+    : "Sem tempo definido";
+  const sleepTimeLabel = selectedSleepAction?.startAt ? formatHourChip(selectedSleepAction.startAt) : "--";
+  const sleepRow = document.createElement("article");
+  sleepRow.className = `task-row task-sleep-slot${sleepStateClass}`;
+  sleepRow.dataset.sleepSlot = "1";
+  if (selectedSleepAction?.id) {
+    sleepRow.dataset.sleepActionId = String(selectedSleepAction.id || "");
+  }
+  sleepRow.innerHTML = `
+    <img class="task-avatar" src="${sleepAvatar}" alt="Sono" loading="lazy" />
+    <div class="task-main">
+      <div class="task-title">Sono</div>
+      <div class="task-assignee task-duration">${escapeHtml(sleepDurationText)}</div>
+    </div>
+    <div class="task-time">${escapeHtml(sleepTimeLabel)}</div>
+  `;
+  actionsList.appendChild(sleepRow);
+
   renderActionsProgress();
   renderHomeRunningTask();
   if (document.getElementById("actionsModal")?.classList.contains("active")) {
@@ -3949,6 +3994,9 @@ function renderActions() {
 }
 
 function getActionDurationMinutes(action) {
+  if (isSleepAction(action)) {
+    return getSleepTrackedMinutes(action);
+  }
   const start = new Date(action.startAt).getTime();
   const end = new Date(action.endAt).getTime();
 
@@ -4066,7 +4114,15 @@ async function loadActions() {
 
   try {
     const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`);
-    state.actions = payload.actions || [];
+    state.actions = Array.isArray(payload.actions) ? payload.actions : [];
+    try {
+      const sleepPayload = await apiRequest(`/api/200/sleep-session?date=${encodeURIComponent(toLocalDateKey(date))}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`);
+      const sleepAction = sleepPayload?.action || null;
+      if (sleepAction?.id) {
+        state.actions = state.actions.filter((action) => String(action?.id || "") !== String(sleepAction.id || ""));
+        state.actions.push(sleepAction);
+      }
+    } catch {}
     const nextRunningLocalStarts = {};
     state.actions.forEach((action) => {
       if (normalizeActionStatus(action?.status) !== actionStatuses.inProgress) return;
@@ -4437,23 +4493,181 @@ function startActionsTimeTicker() {
   }
 }
 
+function getActiveSleepAction() {
+  return state.actions.find((action) =>
+    isSleepAction(action)
+    && normalizeAssigneeName(action.assignee) === state.selectedProfile
+    && normalizeActionStatus(action.status) !== actionStatuses.completed
+  ) || getSelectedSleepAction();
+}
+
 function renderSleepLabels() {
-  if (sleepStartLabel) {
-    sleepStartLabel.textContent = `${String(state.sleepConfig.startHour).padStart(2, "0")}:${String(state.sleepConfig.startMinute).padStart(2, "0")}`;
-  }
-  if (sleepEndLabel) {
-    sleepEndLabel.textContent = `${String(state.sleepConfig.endHour).padStart(2, "0")}:${String(state.sleepConfig.endMinute).padStart(2, "0")}`;
+  if (sleepDelayLabel) {
+    sleepDelayLabel.textContent = formatSleepDelayLabel(getSelectedSleepDelayMinutes());
   }
 }
 
-function moveSleepTime(target, deltaMinutes) {
-  const hourKey = target === "start" ? "startHour" : "endHour";
-  const minuteKey = target === "start" ? "startMinute" : "endMinute";
-  const currentTotal = (Number(state.sleepConfig[hourKey] || 0) * 60) + Number(state.sleepConfig[minuteKey] || 0);
-  const wrapped = ((currentTotal + deltaMinutes) % (24 * 60) + (24 * 60)) % (24 * 60);
-  state.sleepConfig[hourKey] = Math.floor(wrapped / 60);
-  state.sleepConfig[minuteKey] = wrapped % 60;
+function moveSleepTime(_target, deltaIndex) {
+  const len = sleepDelayOptions.length;
+  state.sleepFlow.delayIndex = ((state.sleepFlow.delayIndex + deltaIndex) % len + len) % len;
   renderSleepLabels();
+}
+
+function clearSleepControlsTimer() {
+  if (state.sleepFlow.controlsTimerId) {
+    window.clearTimeout(state.sleepFlow.controlsTimerId);
+    state.sleepFlow.controlsTimerId = 0;
+  }
+}
+
+function renderSleepControlsVisibility() {
+  if (sleepSessionControls) {
+    sleepSessionControls.hidden = !state.sleepFlow.controlsVisible;
+  }
+}
+
+function hideSleepControls() {
+  state.sleepFlow.controlsVisible = false;
+  renderSleepControlsVisibility();
+}
+
+function showSleepControlsTemporarily() {
+  state.sleepFlow.controlsVisible = true;
+  renderSleepControlsVisibility();
+  clearSleepControlsTimer();
+  state.sleepFlow.controlsTimerId = window.setTimeout(() => {
+    hideSleepControls();
+  }, 4000);
+}
+
+function clearSleepAudioTimers() {
+  if (state.sleepFlow.audioFadeTimerId) {
+    window.clearTimeout(state.sleepFlow.audioFadeTimerId);
+    state.sleepFlow.audioFadeTimerId = 0;
+  }
+  if (state.sleepFlow.audioStopTimerId) {
+    window.clearTimeout(state.sleepFlow.audioStopTimerId);
+    state.sleepFlow.audioStopTimerId = 0;
+  }
+}
+
+async function ensureSleepFrequencyPlayback() {
+  if (!runningAudio) {
+    return;
+  }
+  const frequencyIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === "Frequency");
+  if (frequencyIndex >= 0) {
+    state.runningPlayer.stationIndex = frequencyIndex;
+  }
+  state.runningPlayer.repeatEnabled = true;
+  const track = getCurrentRunningTrack() || getCurrentRunningStation()?.tracks?.[0] || null;
+  if (!track?.url) {
+    return;
+  }
+  clearSleepAudioTimers();
+  try {
+    await playRunningTrack(track.url);
+  } catch {}
+  state.sleepFlow.audioFadeTimerId = window.setTimeout(() => {
+    void fadeAudioVolume(runningAudio, 0, 10 * 60 * 1000);
+  }, 30 * 60 * 1000);
+  state.sleepFlow.audioStopTimerId = window.setTimeout(() => {
+    if (!runningAudio) {
+      return;
+    }
+    runningAudio.pause();
+    runningAudio.currentTime = 0;
+    renderRunningMusicPlayer();
+  }, 40 * 60 * 1000);
+}
+
+async function activateSleepActionIfNeeded(action) {
+  if (!action || !isSleepAction(action)) {
+    return;
+  }
+  const status = normalizeActionStatus(action.status);
+  if (status !== actionStatuses.pending) {
+    return;
+  }
+  const plannedStartMs = new Date(action.startAt).getTime();
+  if (!Number.isFinite(plannedStartMs) || getServerNowMs() < plannedStartMs || state.sleepFlow.activationRequestInFlight) {
+    return;
+  }
+  state.sleepFlow.activationRequestInFlight = true;
+  try {
+    await apiRequest("/api/200/sleep-session/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        actionId: action.id,
+        actualStartAt: new Date().toISOString()
+      })
+    });
+    await loadActions();
+    await ensureSleepFrequencyPlayback();
+  } catch (error) {
+    if (sleepSessionSubtitle) {
+      sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
+    }
+  } finally {
+    state.sleepFlow.activationRequestInFlight = false;
+  }
+}
+
+function formatSleepCountdown(msRemaining) {
+  const totalSeconds = Math.max(0, Math.ceil(msRemaining / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function renderSleepSessionModal() {
+  const action = getActiveSleepAction();
+  if (!action) {
+    if (sleepSessionStatusLabel) sleepSessionStatusLabel.textContent = "Sono";
+    if (sleepSessionTimeLabel) sleepSessionTimeLabel.textContent = "Sem sessão ativa";
+    if (sleepSessionSubtitle) sleepSessionSubtitle.textContent = "Abra o menu de sono para começar.";
+    hideSleepControls();
+    return;
+  }
+  const status = normalizeActionStatus(action.status);
+  const nowMs = getServerNowMs();
+  if (status === actionStatuses.pending) {
+    const startMs = new Date(action.startAt).getTime();
+    const remainingMs = Math.max(0, startMs - nowMs);
+    if (sleepSessionStatusLabel) sleepSessionStatusLabel.textContent = "Preparando o sono";
+    if (sleepSessionTimeLabel) {
+      sleepSessionTimeLabel.textContent = remainingMs > 0 ? formatSleepCountdown(remainingMs) : "00:00";
+    }
+    if (sleepSessionSubtitle) {
+      sleepSessionSubtitle.textContent = remainingMs > 0 ? "A contagem começa após o tempo escolhido." : "Iniciando contagem do sono...";
+    }
+    void activateSleepActionIfNeeded(action);
+  } else if (status === actionStatuses.inProgress) {
+    if (sleepSessionStatusLabel) sleepSessionStatusLabel.textContent = "Sono em andamento";
+    if (sleepSessionTimeLabel) sleepSessionTimeLabel.textContent = formatMinutesHuman(getSleepTrackedMinutes(action, nowMs));
+    if (sleepSessionSubtitle) sleepSessionSubtitle.textContent = "Toque na tela para mostrar os controles.";
+  } else {
+    if (sleepSessionStatusLabel) sleepSessionStatusLabel.textContent = "Sono finalizado";
+    if (sleepSessionTimeLabel) sleepSessionTimeLabel.textContent = formatMinutesHuman(getSleepTrackedMinutes(action, nowMs));
+    if (sleepSessionSubtitle) sleepSessionSubtitle.textContent = "Sessão concluída.";
+  }
+  if (sleepSessionFinishButton) {
+    sleepSessionFinishButton.hidden = status !== actionStatuses.inProgress;
+  }
+  if (sleepSessionAbortButton) {
+    sleepSessionAbortButton.hidden = status === actionStatuses.completed;
+  }
+  if (sleepSessionContinueButton) {
+    sleepSessionContinueButton.hidden = status === actionStatuses.completed;
+  }
+  renderSleepControlsVisibility();
+}
+
+function openSleepSessionModal() {
+  renderSleepSessionModal();
+  openModal("sleepSessionModal");
+  hideSleepControls();
 }
 
 function getCurrentTimelineEntry(nowMs, exceptId = "") {
@@ -4846,6 +5060,42 @@ function formatClockFromMinutes(totalMinutes) {
   const hour = Math.floor(clamped / 60);
   const minute = clamped % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function formatSleepDelayLabel(totalMinutes) {
+  const value = Math.max(0, Math.round(Number(totalMinutes || 0) || 0));
+  if (value <= 0) {
+    return "Agora";
+  }
+  if (value < 60) {
+    return `${value} minutos`;
+  }
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (minutes <= 0) {
+    return `${hours} hora${hours > 1 ? "s" : ""}`;
+  }
+  return `${hours}h ${minutes}min`;
+}
+
+function getSelectedSleepDelayMinutes() {
+  return Math.max(0, Number(sleepDelayOptions[state.sleepFlow.delayIndex] || 0));
+}
+
+function getSleepTrackedMinutes(action, nowMs = getServerNowMs()) {
+  if (!isSleepAction(action)) {
+    return 0;
+  }
+  const startedAtMs = new Date(action?.startedAt || "").getTime();
+  if (!Number.isFinite(startedAtMs)) {
+    return 0;
+  }
+  const completedAtMs = new Date(action?.completedAt || "").getTime();
+  const endMs = Number.isFinite(completedAtMs) ? completedAtMs : nowMs;
+  if (!Number.isFinite(endMs) || endMs <= startedAtMs) {
+    return 0;
+  }
+  return Math.max(0, Math.round((endMs - startedAtMs) / 60000));
 }
 
 function formatPostponeDelayLabel(totalMinutes) {
@@ -8570,7 +8820,16 @@ async function bootstrapProject200App() {
 }
 
 document.querySelectorAll("[data-open-modal]").forEach((button) => {
-  button.addEventListener("click", () => openModal(button.dataset.openModal));
+  button.addEventListener("click", () => {
+    if (button.id === "openRunningTaskModal") {
+      const sleepAction = getActiveSleepAction();
+      if (sleepAction && normalizeActionStatus(sleepAction.status) !== actionStatuses.completed) {
+        openSleepSessionModal();
+        return;
+      }
+    }
+    openModal(button.dataset.openModal);
+  });
 });
 
 if (window.history && typeof window.history.pushState === "function") {
@@ -9264,8 +9523,13 @@ actionsList.addEventListener("pointercancel", endActionLongPress);
 actionsList.addEventListener("click", async (event) => {
   const sleepRow = event.target.closest("[data-sleep-slot]");
   if (sleepRow) {
-    renderSleepLabels();
-    openModal("sleepConfigModal");
+    const sleepAction = getActiveSleepAction();
+    if (sleepAction && normalizeActionStatus(sleepAction.status) !== actionStatuses.completed) {
+      openSleepSessionModal();
+    } else {
+      renderSleepLabels();
+      openModal("sleepConfigModal");
+    }
     closeActionsModalWithFade();
     return;
   }
@@ -10638,74 +10902,127 @@ project200RegisterForm?.addEventListener("submit", (event) => {
   })();
 });
 
-document.querySelectorAll("[data-sleep-nav]").forEach((button) => {
+document.querySelectorAll("[data-sleep-delay-nav]").forEach((button) => {
   button.addEventListener("click", () => {
     if (sleepNavLongPressHandled) {
       sleepNavLongPressHandled = false;
       return;
     }
-    const target = String(button.dataset.sleepNav || "start");
     const dir = Number(button.dataset.dir || 0);
-    if (!dir) return;
-    moveSleepTime(target, dir * 5);
+    const delayDir = Number(button.dataset.sleepDelayNav || dir || 0);
+    if (!delayDir) return;
+    moveSleepTime("delay", delayDir);
   });
-  button.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    const target = String(button.dataset.sleepNav || "start");
-    const dir = Number(button.dataset.dir || 0);
-    if (!dir) return;
-    sleepNavLongPressHandled = false;
-    if (sleepNavHoldTimer) {
-      window.clearTimeout(sleepNavHoldTimer);
-      sleepNavHoldTimer = null;
-    }
-    if (sleepNavHoldInterval) {
-      window.clearInterval(sleepNavHoldInterval);
-      sleepNavHoldInterval = null;
-    }
-    sleepNavHoldTimer = window.setTimeout(() => {
-      sleepNavLongPressHandled = true;
-      moveSleepTime(target, dir * 60);
-      sleepNavHoldInterval = window.setInterval(() => {
-        moveSleepTime(target, dir * 60);
-      }, 600);
-    }, 500);
-  });
-  ["pointerup", "pointerleave", "pointercancel"].forEach((evt) => {
-    button.addEventListener(evt, () => {
-      if (sleepNavHoldTimer) {
-        window.clearTimeout(sleepNavHoldTimer);
-        sleepNavHoldTimer = null;
-      }
-      if (sleepNavHoldInterval) {
-        window.clearInterval(sleepNavHoldInterval);
-        sleepNavHoldInterval = null;
-      }
-    });
-  });
+});
+
+sleepSessionShell?.addEventListener("click", (event) => {
+  const isControl = event.target.closest("button");
+  if (isControl) {
+    return;
+  }
+  const action = getActiveSleepAction();
+  if (!action || normalizeActionStatus(action.status) === actionStatuses.completed) {
+    return;
+  }
+  showSleepControlsTemporarily();
 });
 
 saveSleepConfigBtn?.addEventListener("click", () => {
-  const baseDate = dateFromOffset(state.activeOffset);
-  const sleepStart = new Date(baseDate);
-  sleepStart.setHours(state.sleepConfig.startHour, state.sleepConfig.startMinute, 0, 0);
-  const sleepEnd = new Date(sleepStart);
-  sleepEnd.setDate(sleepEnd.getDate() + 1);
-  sleepEnd.setHours(state.sleepConfig.endHour, state.sleepConfig.endMinute, 0, 0);
-  const hasOverlap = getVisibleActions().some((action) => {
-    const start = new Date(action.startAt).getTime();
-    const end = new Date(action.endAt).getTime();
-    return end > sleepStart.getTime() && start < sleepEnd.getTime();
-  });
-  if (hasOverlap && !window.confirm("Esse horário de sono sobrepõe tarefas. Deseja continuar mesmo assim?")) {
+  void (async () => {
+    const plannedStartAt = new Date(Date.now() + (getSelectedSleepDelayMinutes() * 60000));
+    try {
+      await apiRequest("/api/200/sleep-session/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+          date: toLocalDateKey(dateFromOffset(state.activeOffset)),
+          plannedStartAt: plannedStartAt.toISOString()
+        })
+      });
+      await loadActions();
+      closeModal(sleepConfigModal);
+      openSleepSessionModal();
+      await ensureSleepFrequencyPlayback();
+    } catch (error) {
+      if (sleepDelayLabel) {
+        sleepDelayLabel.textContent = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
+      }
+    }
+  })();
+});
+
+sleepSessionContinueButton?.addEventListener("click", () => {
+  hideSleepControls();
+});
+
+sleepSessionAbortButton?.addEventListener("click", () => {
+  void (async () => {
+    const action = getActiveSleepAction();
+    if (!action?.id) {
+      closeModal("sleepSessionModal");
+      return;
+    }
+    try {
+      await apiRequest("/api/200/sleep-session/abort", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionId: action.id })
+      });
+      clearSleepAudioTimers();
+      if (runningAudio) {
+        runningAudio.pause();
+      }
+      closeModal("sleepSessionModal");
+      await loadActions();
+    } catch (error) {
+      if (sleepSessionSubtitle) {
+        sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao abortar o sono.";
+      }
+    }
+  })();
+});
+
+sleepSessionFinishButton?.addEventListener("click", () => {
+  void (async () => {
+    const action = getActiveSleepAction();
+    if (!action?.id) {
+      return;
+    }
+    try {
+      await apiRequest("/api/200/sleep-session/finish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionId: action.id,
+          completedAt: new Date().toISOString()
+        })
+      });
+      clearSleepAudioTimers();
+      if (runningAudio) {
+        runningAudio.pause();
+      }
+      closeModal("sleepSessionModal");
+      await loadActions();
+    } catch (error) {
+      if (sleepSessionSubtitle) {
+        sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao finalizar o sono.";
+      }
+    }
+  })();
+});
+
+sleepSessionMusicButton?.addEventListener("click", () => {
+  if (runningAudio && !runningAudio.paused) {
+    runningAudio.pause();
+    renderRunningMusicPlayer();
     return;
   }
-  saveSleepConfig();
-  closeModal(sleepConfigModal);
-  renderActions();
+  void ensureSleepFrequencyPlayback();
 });
 
 loadSleepConfig();
+renderSleepLabels();
 loadOptionsConfig();
 applyScreenLockUi();
 scheduleScreenLockInactivity();
