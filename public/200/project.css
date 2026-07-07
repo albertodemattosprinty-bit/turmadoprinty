@@ -362,11 +362,11 @@ body.project-no-select textarea {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 6px;
+  gap: 0;
   cursor: pointer;
   box-shadow: none;
   transition: transform 0.18s ease, opacity 0.18s ease;
-  padding: 4px 2px;
+  padding: 6px 0;
 }
 
 .hub-action:hover,
@@ -377,26 +377,22 @@ body.project-no-select textarea {
 }
 
 .hub-icon-svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   color: #fff;
   fill: currentColor;
   display: block;
 }
 
 .hub-icon-image {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: block;
   object-fit: contain;
 }
 
 .hub-action-label {
-  color: #fff;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: none;
+  display: none;
 }
 
 .hub-ideas-action {
@@ -2987,12 +2983,47 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .task-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
   font-weight: 700;
   font-size: 1.2rem;
   line-height: 1.1;
+  min-width: 0;
+}
+
+.task-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--task-dot-color, #64748b);
+  flex: 0 0 10px;
+  display: inline-block;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.task-status-dot.is-blinking {
+  animation: task-status-dot-blink 1s ease-in-out infinite;
+}
+
+.task-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes task-status-dot-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.24;
+    transform: scale(0.72);
+  }
 }
 
 .task-meta {
@@ -4762,9 +4793,7 @@ body[data-background-theme="white"] .hub-action-label {
 }
 
 body[data-background-theme="white"] .home-running-toggle {
-  color: #2f3640;
-  background: rgba(47, 54, 64, 0.06);
-  border-color: rgba(47, 54, 64, 0.08);
+  display: none;
 }
 
 body[data-background-theme="white"] .home-running-toggle:hover,
@@ -4774,6 +4803,124 @@ body[data-background-theme="white"] .home-running-toggle:focus-visible {
 
 body[data-background-theme="white"] .hub-icon-image {
   filter: grayscale(1) brightness(0.36) contrast(1.1);
+}
+
+body[data-background-theme="white"] .task-row,
+body[data-background-theme="white"] .task-row.task-in-progress,
+body[data-background-theme="white"] .task-row.task-completed,
+body[data-background-theme="white"] .task-row.task-gave-up,
+body[data-background-theme="white"] .task-row.task-delay-soft,
+body[data-background-theme="white"] .task-row.task-delay-yellow,
+body[data-background-theme="white"] .task-row.task-delay-orange,
+body[data-background-theme="white"] .task-row.task-delay-red,
+body[data-background-theme="white"] .task-row.task-delay-black,
+body[data-background-theme="white"] .task-row.task-free-slot,
+body[data-background-theme="white"] .task-row.task-pending-clean {
+  grid-template-columns: 12px minmax(0, 1fr) max-content;
+  gap: 14px;
+  padding: 14px 0;
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+  animation: none !important;
+}
+
+body[data-background-theme="white"] .task-row .task-avatar {
+  display: none;
+}
+
+body[data-background-theme="white"] .task-status-dot {
+  box-shadow: 0 0 0 1px rgba(47, 54, 64, 0.14);
+}
+
+body[data-background-theme="white"] .task-title,
+body[data-background-theme="white"] .task-title-text,
+body[data-background-theme="white"] .task-row.task-pending-clean .task-title,
+body[data-background-theme="white"] .task-row.task-free-slot .task-title,
+body[data-background-theme="white"] .task-row.task-sleep-slot .task-title {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .task-assignee,
+body[data-background-theme="white"] .task-time,
+body[data-background-theme="white"] .task-row.task-pending-clean .task-assignee,
+body[data-background-theme="white"] .task-row.task-pending-clean .task-time,
+body[data-background-theme="white"] .task-row.task-free-slot .task-assignee,
+body[data-background-theme="white"] .task-row.task-free-slot .task-time,
+body[data-background-theme="white"] .task-row.task-sleep-slot .task-assignee,
+body[data-background-theme="white"] .task-row.task-sleep-slot .task-time {
+  color: rgba(47, 54, 64, 0.74) !important;
+  background: none !important;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+}
+
+body[data-background-theme="white"] #actionsModal .actions-side-btn-right svg,
+body[data-background-theme="white"] #actionsModal .actions-footer-date .date-title {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] #actionsModal .actions-side-btn-left img {
+  filter: grayscale(1) brightness(0.3) contrast(1.05);
+}
+
+body[data-background-theme="white"] .history-mission-status,
+body[data-background-theme="white"] .history-missions-empty .empty-state,
+body[data-background-theme="white"] .history-mission-card-title,
+body[data-background-theme="white"] .history-mission-card-progress {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .history-mission-card {
+  padding: 14px 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body[data-background-theme="white"] .history-mission-card-add,
+body[data-background-theme="white"] .history-mission-card-edit {
+  background: transparent;
+  border: 0;
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .history-mission-card-edit svg {
+  fill: currentColor;
+}
+
+body[data-background-theme="white"] .history-mission-progress-track {
+  background: rgba(47, 54, 64, 0.08);
+}
+
+body[data-background-theme="white"] .history-mission-footer-btn img {
+  filter: grayscale(1) brightness(0.3) contrast(1.05);
+}
+
+body[data-background-theme="white"] .history-mission-footer-btn svg {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .options-content,
+body[data-background-theme="white"] .running-music-default-title,
+body[data-background-theme="white"] .running-music-default-option strong,
+body[data-background-theme="white"] .running-music-default-option,
+body[data-background-theme="white"] .options-note {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .running-music-default-title svg {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .running-music-default-option {
+  background: rgba(47, 54, 64, 0.04);
+  border-color: rgba(47, 54, 64, 0.1);
+}
+
+body[data-background-theme="white"] .running-music-default-top,
+body[data-background-theme="white"] .running-music-default-bottom {
+  color: rgba(47, 54, 64, 0.7);
 }
 
 body[data-background-theme="black"] .global-loading-overlay {
