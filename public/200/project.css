@@ -2391,8 +2391,8 @@ body.running-music-standalone #actionsModal .actions-list {
 
 #actionsModal .actions-list {
   min-height: 0;
-  margin-left: -18px;
-  width: calc(100% + 18px);
+  margin-left: -33px;
+  width: calc(100% + 33px);
   padding-top: 0;
   padding-bottom: calc(8dvh + 22px);
 }
@@ -3903,6 +3903,7 @@ body.running-music-standalone #actionsModal .actions-list {
 
 #actionsModal .actions-side-actions {
   position: fixed;
+  top: auto;
   left: 0;
   right: 0;
   bottom: 0;
@@ -4122,6 +4123,7 @@ body.running-music-standalone #actionsModal .actions-list {
 #historyModal .history-app {
   padding-top: 0;
   grid-template-rows: auto minmax(0, 1fr) 8dvh;
+  padding-bottom: 0;
 }
 
 #historyModal .history-app .actions-head {
@@ -4161,7 +4163,7 @@ body.running-music-standalone #actionsModal .actions-list {
   overscroll-behavior: contain;
   touch-action: pan-y;
   padding-right: 4px;
-  padding-bottom: 10px;
+  padding-bottom: calc(8dvh + 22px);
 }
 
 .missions-app {
@@ -4171,6 +4173,7 @@ body.running-music-standalone #actionsModal .actions-list {
 
 .history-missions-footer {
   position: fixed;
+  top: auto;
   left: 0;
   right: 0;
   bottom: 0;
