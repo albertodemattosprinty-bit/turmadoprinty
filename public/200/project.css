@@ -66,6 +66,48 @@ body[data-background-theme="light"] .app-background-video {
   opacity: 0;
 }
 
+body[data-background-theme="black"] {
+  background:
+    radial-gradient(circle at top, rgba(120, 126, 153, 0.18), transparent 36%),
+    linear-gradient(145deg, #05070f 0%, #101729 45%, #070b15 100%);
+}
+
+body[data-background-theme="orange"] {
+  background:
+    radial-gradient(circle at top left, rgba(255, 233, 151, 0.3), transparent 34%),
+    linear-gradient(145deg, #ff7a18 0%, #ff4d2d 46%, #c21807 100%);
+}
+
+body[data-background-theme="bluevivid"] {
+  background:
+    radial-gradient(circle at top left, rgba(149, 234, 255, 0.3), transparent 34%),
+    linear-gradient(145deg, #16a3ff 0%, #0b63ff 52%, #0037c4 100%);
+}
+
+body[data-background-theme="pinkstrong"] {
+  background:
+    radial-gradient(circle at top left, rgba(255, 190, 216, 0.28), transparent 36%),
+    linear-gradient(145deg, #ff2f92 0%, #ff1660 48%, #b10c53 100%);
+}
+
+body[data-background-theme="bluedark"] {
+  background:
+    radial-gradient(circle at top left, rgba(125, 187, 255, 0.22), transparent 36%),
+    linear-gradient(145deg, #0d2d8f 0%, #09206b 44%, #020d37 100%);
+}
+
+body[data-background-theme="brown"] {
+  background:
+    radial-gradient(circle at top left, rgba(244, 197, 139, 0.24), transparent 34%),
+    linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%);
+}
+
+body[data-background-theme="edge"] {
+  background:
+    radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
+    linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
+}
+
 .conversations-app {
   min-height: min(82dvh, 760px);
   position: relative;
@@ -1327,27 +1369,30 @@ body.screen-locked .project-login-overlay.active {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5em;
+  gap: 0.8em;
 }
 
 .running-mission-quick-row {
   display: flex;
   flex-direction: row;
-  gap: 0.5em;
+  gap: 0.8em;
 }
 
 .running-mission-quick-btn {
-  width: 90px;
-  height: 90px;
+  width: 144px;
+  height: 144px;
   border: 0;
   outline: none;
   background: #fff;
   display: grid;
   place-items: center;
-  padding: 10px 8px;
+  grid-template-rows: 1fr auto;
+  position: relative;
+  padding: 18px 18px 16px;
   text-align: center;
   box-shadow: rgba(50, 50, 93, 0.25) 0 2px 5px -1px, rgba(0, 0, 0, 0.3) 0 1px 3px -1px;
   transition: .2s ease-in-out;
+  overflow: visible;
 }
 
 .running-mission-quick-btn.card1 {
@@ -1416,7 +1461,8 @@ body.screen-locked .project-login-overlay.active {
   width: 30px;
   height: 30px;
   object-fit: contain;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  align-self: end;
 }
 
 .running-mission-quick-card-title {
@@ -1424,14 +1470,26 @@ body.screen-locked .project-login-overlay.active {
   font-size: 0.82rem;
   font-weight: 900;
   line-height: 1.12;
+  align-self: start;
 }
 
-.running-mission-quick-card-meta {
-  display: block;
-  margin-top: 6px;
-  font-size: 0.84rem;
-  font-weight: 700;
-  opacity: 0.78;
+.running-mission-quick-card-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(7, 15, 30, 0.9);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 
 .running-mission-quick-feedback {
@@ -4038,9 +4096,10 @@ body.running-music-standalone #actionsModal .actions-list {
   }
 
   .running-mission-quick-btn {
-    width: min(90px, 22vw);
-    height: min(90px, 22vw);
+    width: min(144px, 35vw);
+    height: min(144px, 35vw);
     border-radius: 22px;
+    padding: 14px 14px 12px;
   }
 }
 

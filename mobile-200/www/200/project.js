@@ -557,6 +557,8 @@ const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption
 const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
 const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
 const toggleBackgroundThemeHint = document.getElementById("toggleBackgroundThemeHint");
+const toggleStopMusicOnFinishOptionButton = document.getElementById("toggleStopMusicOnFinishOption");
+const toggleStopMusicOnFinishHint = document.getElementById("toggleStopMusicOnFinishHint");
 const logoutProject200Button = document.getElementById("logoutProject200Button");
 const profileAvatarModal = document.getElementById("profileAvatarModal");
 const profileAvatarModalTitle = document.getElementById("profileAvatarModalTitle");
@@ -572,6 +574,16 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
 });
+const backgroundThemeModes = [
+  { key: "black", label: "Black" },
+  { key: "orange", label: "Laranja" },
+  { key: "bluevivid", label: "Azul vivo" },
+  { key: "pinkstrong", label: "Rosa forte" },
+  { key: "bluedark", label: "Azul escuro" },
+  { key: "brown", label: "Marrom" },
+  { key: "edge", label: "Edge" },
+  { key: "light", label: "Light" }
+];
 
 let financeTimer = null;
 let platformMetricsTicker = null;
@@ -758,9 +770,10 @@ const state = {
   options: {
     showFreeTime: true,
     completionBeepCycles: 0,
-    backgroundTheme: "modern",
+    backgroundTheme: "black",
     chatTone: "neutral",
-    screenLockEnabled: false
+    screenLockEnabled: false,
+    stopMusicOnFinish: false
   },
   screenLock: {
     locked: false,
@@ -922,7 +935,16 @@ function getProfileAvatarPath(profileOrName) {
 }
 
 function normalizeBackgroundTheme(value) {
-  return String(value || "").trim().toLowerCase() === "light" ? "light" : "modern";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "modern") {
+    return "black";
+  }
+  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "black";
+}
+
+function getBackgroundThemeMode(value) {
+  const normalized = normalizeBackgroundTheme(value);
+  return backgroundThemeModes.find((item) => item.key === normalized) || backgroundThemeModes[0];
 }
 
 function getChatToneMode(value) {
@@ -7465,7 +7487,7 @@ function renderRunningMissionQuickButtons() {
         title.textContent = goal.title;
       }
       if (meta) {
-        meta.textContent = `${Math.max(0, Number(goal.progressValue || 0))}x / ${Math.max(1, Number(goal.targetValue || 1))}x`;
+        meta.textContent = String(Math.max(0, Number(goal.progressValue || 0)));
       }
       button.title = `${goal.title}: ${goal.progressValue} de ${goal.targetValue}`;
       button.setAttribute("aria-label", goal.title);
@@ -7474,7 +7496,7 @@ function renderRunningMissionQuickButtons() {
         title.textContent = definition?.defaultTitle || definition?.label || "Missão rápida";
       }
       if (meta) {
-        meta.textContent = definition ? `0x / ${Math.max(1, Number(definition.targetValue || 1))}x` : "Indisponível";
+        meta.textContent = "0";
       }
       button.title = `Missão indisponível para ${definition?.label || "atalho"}`;
       button.setAttribute("aria-label", definition?.label || "Missão rápida");
@@ -7487,13 +7509,16 @@ async function openRunningMissionQuickModal() {
     window.location.href = "/auth.html?next=/200";
     return;
   }
-  await loadMissions();
-  renderMissions();
   renderRunningMissionQuickButtons();
   if (runningMissionQuickFeedback) {
     runningMissionQuickFeedback.textContent = "";
   }
   openModal("runningMissionQuickModal");
+  void (async () => {
+    await loadMissions();
+    renderMissions();
+    renderRunningMissionQuickButtons();
+  })();
 }
 
 function applyMissionProgressLocally(goalId, delta) {
@@ -8927,12 +8952,14 @@ function loadOptionsConfig() {
     state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
     state.options.chatTone = getChatToneMode(parsed.chatTone).key;
     state.options.screenLockEnabled = parsed.screenLockEnabled === true;
+    state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
-    state.options.backgroundTheme = "modern";
+    state.options.backgroundTheme = "black";
     state.options.chatTone = "neutral";
     state.options.screenLockEnabled = false;
+    state.options.stopMusicOnFinish = false;
   }
   applyBackgroundTheme();
 }
@@ -8944,7 +8971,8 @@ function saveOptionsConfig() {
       completionBeepCycles: Number(state.options.completionBeepCycles || 0),
       backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
       chatTone: getChatToneMode(state.options.chatTone).key,
-      screenLockEnabled: Boolean(state.options.screenLockEnabled)
+      screenLockEnabled: Boolean(state.options.screenLockEnabled),
+      stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish)
     }));
   } catch {}
 }
@@ -9065,8 +9093,12 @@ function renderOptionsModal() {
     toggleTaskBeepHint.textContent = taskBeepOptionLabels.get(Number(state.options.completionBeepCycles || 0)) || "Nenhum";
   }
   if (toggleBackgroundThemeHint) {
-    toggleBackgroundThemeHint.textContent = normalizeBackgroundTheme(state.options.backgroundTheme) === "light" ? "Light" : "Modern";
+    toggleBackgroundThemeHint.textContent = getBackgroundThemeMode(state.options.backgroundTheme).label;
   }
+  if (toggleStopMusicOnFinishHint) {
+    toggleStopMusicOnFinishHint.textContent = state.options.stopMusicOnFinish ? "Encerrar junto" : "Continuar tocando";
+  }
+  toggleStopMusicOnFinishOptionButton?.classList.toggle("is-off", !state.options.stopMusicOnFinish);
   const toneMode = getChatToneMode(state.options.chatTone);
   if (toggleChatToneHint) {
     toggleChatToneHint.textContent = toneMode.label;
@@ -10055,6 +10087,13 @@ async function performRunningFinalize(runningAction) {
   await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
   const after = state.actions.find((item) => item.id === runningAction.id);
   if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
+    if (state.options.stopMusicOnFinish && runningAudio) {
+      try {
+        runningAudio.pause();
+        runningAudio.currentTime = 0;
+      } catch {}
+      renderRunningPlayerUi();
+    }
     const nextAction = getNextTimelineEntryForRunning(runningAction);
     const nextOfNext = nextAction ? getNextTimelineEntryForRunning(nextAction) : null;
     const summary = getCompletionSummaryForSelectedProfile();
@@ -10189,8 +10228,15 @@ toggleTaskBeepOptionButton?.addEventListener("click", () => {
   renderOptionsModal();
 });
 toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
-  state.options.backgroundTheme = normalizeBackgroundTheme(state.options.backgroundTheme) === "light" ? "modern" : "light";
+  const currentIndex = Math.max(0, backgroundThemeModes.findIndex((item) => item.key === getBackgroundThemeMode(state.options.backgroundTheme).key));
+  const nextIndex = (currentIndex + 1) % backgroundThemeModes.length;
+  state.options.backgroundTheme = backgroundThemeModes[nextIndex].key;
   applyBackgroundTheme();
+  saveOptionsConfig();
+  renderOptionsModal();
+});
+toggleStopMusicOnFinishOptionButton?.addEventListener("click", () => {
+  state.options.stopMusicOnFinish = !state.options.stopMusicOnFinish;
   saveOptionsConfig();
   renderOptionsModal();
 });

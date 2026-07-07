@@ -669,9 +669,14 @@
         <span class="running-music-default-bottom" id="toggleTaskBeepHint">Nenhum</span>
       </button>
       <button class="running-music-default-option" type="button" id="toggleBackgroundThemeOption">
-        <span class="running-music-default-top">Alternar entre o visual atual e o novo fundo claro</span>
+        <span class="running-music-default-top">Alternar entre fundos vivos em degrade com leitura forte no branco</span>
         <strong>Background</strong>
         <span class="running-music-default-bottom" id="toggleBackgroundThemeHint">Modern</span>
+      </button>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="toggleStopMusicOnFinishOption">
+        <span class="running-music-default-top">Se ativado, a música fecha sozinha quando a tarefa terminar</span>
+        <strong>Encerrar música ao finalizar</strong>
+        <span class="running-music-default-bottom" id="toggleStopMusicOnFinishHint">Continuar tocando</span>
       </button>
       <button class="running-music-default-option" type="button" id="toggleChatToneOption">
         <span class="running-music-default-top">Estilo atual das Conversas</span>
@@ -1112,26 +1117,26 @@
     <div class="running-mission-quick-main" id="runningMissionQuickGrid">
       <div class="running-mission-quick-row running-mission-quick-row-up">
         <button class="running-mission-quick-btn running-mission-quick-btn-water card1" type="button" data-mission-quick-key="water" aria-label="Beber água">
+          <span class="running-mission-quick-card-badge" data-mission-quick-meta="water">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-water.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Beber água</span>
-          <span class="running-mission-quick-card-meta" data-mission-quick-meta="water">0x / 8x</span>
         </button>
         <button class="running-mission-quick-btn running-mission-quick-btn-shoe card2" type="button" data-mission-quick-key="store" aria-label="Guardar 6 itens">
+          <span class="running-mission-quick-card-badge" data-mission-quick-meta="store">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-store.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Guardar 6 itens</span>
-          <span class="running-mission-quick-card-meta" data-mission-quick-meta="store">0x / 6x</span>
         </button>
       </div>
       <div class="running-mission-quick-row running-mission-quick-row-down">
         <button class="running-mission-quick-btn running-mission-quick-btn-book card3" type="button" data-mission-quick-key="read" aria-label="Ler uma página">
+          <span class="running-mission-quick-card-badge" data-mission-quick-meta="read">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-book.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Ler uma página</span>
-          <span class="running-mission-quick-card-meta" data-mission-quick-meta="read">0x / 6x</span>
         </button>
         <button class="running-mission-quick-btn running-mission-quick-btn-tooth card4" type="button" data-mission-quick-key="brush" aria-label="Escovar os dentes">
+          <span class="running-mission-quick-card-badge" data-mission-quick-meta="brush">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-brush.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Escovar os dentes</span>
-          <span class="running-mission-quick-card-meta" data-mission-quick-meta="brush">0x / 3x</span>
         </button>
       </div>
       <div class="running-mission-quick-feedback" id="runningMissionQuickFeedback" aria-live="polite"></div>
