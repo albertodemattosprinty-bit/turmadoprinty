@@ -7958,7 +7958,7 @@ function renderMissions() {
     missionList.innerHTML = "";
   }
   if (missionsFooter) {
-    missionsFooter.hidden = goals.length === 0;
+    missionsFooter.hidden = false;
   }
   if (!missionList || !goals.length) {
     return;

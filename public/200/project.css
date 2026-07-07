@@ -2277,6 +2277,10 @@ body.running-music-standalone #actionsModal .actions-list {
   gap: 8px;
 }
 
+#actionsModal .actions-head {
+  display: none;
+}
+
 #calendarModal .actions-head {
   flex-wrap: wrap;
   justify-content: space-between;
@@ -2377,6 +2381,20 @@ body.running-music-standalone #actionsModal .actions-list {
   align-content: start;
   gap: 10px;
   padding: 8px 0 calc(8dvh + 30px);
+}
+
+#actionsModal .actions-app {
+  grid-template-rows: auto minmax(0, 1fr) 8dvh;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+#actionsModal .actions-list {
+  min-height: 0;
+  margin-left: -18px;
+  width: calc(100% + 18px);
+  padding-top: 0;
+  padding-bottom: calc(8dvh + 22px);
 }
 
 #calendarModal .actions-list {
@@ -3912,6 +3930,15 @@ body.running-music-standalone #actionsModal .actions-list {
 #actionsModal .actions-side-btn {
   position: static;
   transform: none;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 #actionsModal .actions-side-btn-left,
@@ -3919,14 +3946,14 @@ body.running-music-standalone #actionsModal .actions-list {
   justify-self: center;
 }
 
-#actionsModal .actions-side-btn-right {
-  border: 1px solid rgba(116, 182, 255, 0.92);
-  background: rgba(17, 87, 204, 0.1);
+#actionsModal .actions-side-btn img,
+#actionsModal .actions-side-btn svg {
+  width: 30px;
+  height: 30px;
 }
 
-#actionsModal .actions-side-btn-right svg {
-  width: 26px;
-  height: 26px;
+#actionsModal .actions-side-btn-right svg,
+#actionsModal .actions-side-btn-left img {
   color: #ffffff;
   filter: none;
 }
@@ -4093,14 +4120,12 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 #historyModal .history-app {
-  padding-top: 6px;
+  padding-top: 0;
+  grid-template-rows: auto minmax(0, 1fr) 8dvh;
 }
 
 #historyModal .history-app .actions-head {
-  padding: 0;
-  min-height: 44px;
-  gap: 10px;
-  margin: 0;
+  display: none;
 }
 
 .missions-head {
@@ -4123,7 +4148,7 @@ body.running-music-standalone #actionsModal .actions-list {
   display: grid;
   place-items: center;
   justify-items: center;
-  gap: 18px;
+  gap: 12px;
 }
 
 .history-missions-list {
@@ -4145,13 +4170,45 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .history-missions-footer {
-  position: static;
-  inset: auto;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8dvh;
+  min-height: 72px;
+  max-height: 92px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 6px);
   pointer-events: auto;
-  display: flex;
-  justify-content: flex-end;
-  width: 100%;
-  padding-top: 8px;
+  z-index: 26;
+  background: linear-gradient(180deg, rgba(4, 13, 38, 0) 0%, rgba(4, 13, 38, 0.88) 18%, rgba(2, 11, 34, 0.98) 100%);
+}
+
+.history-mission-footer-btn {
+  justify-self: center;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.history-mission-footer-btn img,
+.history-mission-footer-btn svg {
+  width: 30px;
+  height: 30px;
+  color: #fff;
+}
+
+.history-mission-footer-spacer {
+  min-width: 0;
 }
 
 .history-mission-add-large,

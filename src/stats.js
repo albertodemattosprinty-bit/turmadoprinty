@@ -3,22 +3,78 @@ import { PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 const DEFAULT_SALDO_GOAL_CENTS = 1000000;
 const CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE = 3;
 const closedDailyReportSyncByUser = new Map();
+const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 
-function startOfDay(date) {
-  const value = new Date(date);
-  value.setHours(0, 0, 0, 0);
-  return value;
+function getProjectTimeZoneOffsetMinutes(date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: PROJECT200_TIME_ZONE,
+    timeZoneName: "shortOffset"
+  });
+  const zoneName = formatter.formatToParts(date).find((part) => part.type === "timeZoneName")?.value || "GMT-03:00";
+  const match = zoneName.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/i);
+  if (!match) {
+    return -180;
+  }
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2] || 0);
+  const minutes = Number(match[3] || 0);
+  return sign * ((hours * 60) + minutes);
 }
 
-function addDays(date, amount) {
-  const value = new Date(date);
-  value.setDate(value.getDate() + amount);
-  return value;
+function getProjectCalendarParts(date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: PROJECT200_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(date);
+  const read = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return {
+    year: read("year"),
+    month: read("month"),
+    day: read("day")
+  };
+}
+
+function makeProjectZonedDate(year, month, day, hour = 0, minute = 0, second = 0) {
+  const guessUtcMs = Date.UTC(year, month - 1, day, hour, minute, second, 0);
+  const offsetMinutes = getProjectTimeZoneOffsetMinutes(new Date(guessUtcMs));
+  return new Date(guessUtcMs - (offsetMinutes * 60000));
+}
+
+function startOfProjectDay(date) {
+  const { year, month, day } = getProjectCalendarParts(date);
+  return makeProjectZonedDate(year, month, day, 0, 0, 0);
+}
+
+function addProjectDays(date, amount) {
+  return new Date(date.getTime() + (amount * 86400000));
+}
+
+function startOfProjectWeek(date) {
+  const value = startOfProjectDay(date);
+  const weekdayLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: PROJECT200_TIME_ZONE,
+    weekday: "short"
+  }).format(value);
+  const weekdayMap = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+  };
+  const weekday = weekdayMap[weekdayLabel] ?? 0;
+  const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
+  return addProjectDays(value, -daysSinceMonday);
 }
 
 function resolveStatsRange(scope = "general") {
   const now = new Date();
-  const today = startOfDay(now);
+  const today = startOfProjectDay(now);
   const normalized = String(scope || "").trim().toLowerCase();
   const monthNames = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
@@ -26,29 +82,29 @@ function resolveStatsRange(scope = "general") {
     return { key: "general", label: "Geral", from: null, to: null };
   }
   if (normalized === "today") {
-    return { key: "today", label: "Hoje", from: today, to: addDays(today, 1) };
+    return { key: "today", label: "Hoje", from: today, to: addProjectDays(today, 1) };
   }
   if (normalized === "week") {
-    const weekday = today.getDay();
-    const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
-    const weekStart = addDays(today, -daysSinceMonday);
-    return { key: "week", label: "Esta semana", from: weekStart, to: addDays(weekStart, 7) };
+    const weekStart = startOfProjectWeek(now);
+    return { key: "week", label: "Esta semana", from: weekStart, to: addProjectDays(weekStart, 7) };
   }
   if (normalized === "last15") {
-    return { key: "last15", label: "Ultimos 15 dias", from: addDays(today, -14), to: addDays(today, 1) };
+    return { key: "last15", label: "Ultimos 15 dias", from: addProjectDays(today, -14), to: addProjectDays(today, 1) };
   }
   if (normalized === "last7") {
-    return { key: "last7", label: "Ultimos 7 dias", from: addDays(today, -6), to: addDays(today, 1) };
+    return { key: "last7", label: "Ultimos 7 dias", from: addProjectDays(today, -6), to: addProjectDays(today, 1) };
   }
   if (normalized === "last30") {
-    return { key: "last30", label: "Ultimos 30 dias", from: addDays(today, -29), to: addDays(today, 1) };
+    return { key: "last30", label: "Ultimos 30 dias", from: addProjectDays(today, -29), to: addProjectDays(today, 1) };
   }
   if (/^month-\d{2}$/.test(normalized)) {
     const monthIndex = Number(normalized.slice(-2)) - 1;
-    const year = today.getFullYear();
+    const { year } = getProjectCalendarParts(now);
     if (monthIndex >= 0 && monthIndex <= 11) {
-      const from = new Date(year, monthIndex, 1);
-      const to = monthIndex === 11 ? new Date(year + 1, 0, 1) : new Date(year, monthIndex + 1, 1);
+      const from = makeProjectZonedDate(year, monthIndex + 1, 1, 0, 0, 0);
+      const to = monthIndex === 11
+        ? makeProjectZonedDate(year + 1, 1, 1, 0, 0, 0)
+        : makeProjectZonedDate(year, monthIndex + 2, 1, 0, 0, 0);
       return {
         key: normalized,
         label: monthNames[monthIndex].replace(/^./, (c) => c.toUpperCase()),
@@ -130,7 +186,7 @@ async function syncClosedDailyReports(userId, options = {}) {
   await ensureStatsSchema();
   const maxDays = Math.max(1, Math.trunc(Number(options?.maxDays) || 0)) || CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE;
 
-  const yesterday = startOfDay(new Date());
+  const yesterday = startOfProjectDay(new Date());
   if (!yesterday) {
     return;
   }
@@ -146,13 +202,13 @@ async function syncClosedDailyReports(userId, options = {}) {
     [userId]
   );
 
-  let cursor = last.rows[0]?.report_date ? addDays(new Date(last.rows[0].report_date), 1) : addDays(yesterday, -30);
-  const end = addDays(yesterday, -1);
+  let cursor = last.rows[0]?.report_date ? addProjectDays(startOfProjectDay(new Date(last.rows[0].report_date)), 1) : addProjectDays(yesterday, -30);
+  const end = addProjectDays(yesterday, -1);
   let syncedDays = 0;
 
   while (cursor <= end && syncedDays < maxDays) {
-    const from = startOfDay(cursor);
-    const to = addDays(from, 1);
+    const from = startOfProjectDay(cursor);
+    const to = addProjectDays(from, 1);
     const stats = await buildStatsSummary(userId, {
       from: from.toISOString(),
       to: to.toISOString(),
@@ -167,7 +223,7 @@ async function syncClosedDailyReports(userId, options = {}) {
       `,
       [userId, from.toISOString().slice(0, 10), JSON.stringify(stats)]
     );
-    cursor = addDays(cursor, 1);
+    cursor = addProjectDays(cursor, 1);
     syncedDays += 1;
   }
 }
