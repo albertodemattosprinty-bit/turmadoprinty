@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260706-missions-quick" />
+  <link rel="stylesheet" href="/200/project.css?v=20260706-missions-selector" />
 </head>
 <body>
   <section class="project-login-overlay" id="project200LoginOverlay" aria-hidden="true">
@@ -1066,30 +1066,58 @@
     </div>
   </section>
 
+  <section class="workspace-modal simple-modal" id="missionProgressModal" aria-hidden="true" aria-label="Adicionar progresso da missão">
+    <div class="finance-content history-mission-modal-content">
+      <div class="running-task-name" id="missionProgressTitle">Missão</div>
+      <p class="history-mission-adjust-caption">Adicionar progresso personalizado</p>
+      <div class="history-mission-adjust-stage">
+        <button class="history-mission-sign-btn" type="button" id="missionProgressMinus">-</button>
+        <div class="history-mission-adjust-value" id="missionProgressValue">1</div>
+        <button class="history-mission-sign-btn active" type="button" id="missionProgressPlus">+</button>
+      </div>
+      <div class="history-mission-adjust-presets">
+        <button class="history-mission-preset-btn" type="button" data-mission-progress-add="1">+1</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-progress-add="3">+3</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-progress-add="5">+5</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-progress-add="10">+10</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-progress-add="25">+25</button>
+        <button class="history-mission-preset-btn" type="button" data-mission-progress-add="50">+50</button>
+      </div>
+      <p class="finance-status" id="missionProgressHint" aria-live="polite">Adicionar 1x</p>
+      <p class="finance-status" id="missionProgressStatus" aria-live="polite"></p>
+      <button class="primary-btn" type="button" id="missionProgressConfirm">Adicionar progresso</button>
+      <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Voltar</button>
+    </div>
+  </section>
+
   <section class="workspace-modal simple-modal" id="runningMissionQuickModal" aria-hidden="true" aria-label="Missões rápidas">
     <div class="running-mission-quick-shell">
       <button class="running-mission-quick-close" type="button" id="closeRunningMissionQuickModal" aria-label="Fechar missões rápidas">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
       </button>
       <div class="running-mission-quick-grid" id="runningMissionQuickGrid">
-        <button class="running-mission-quick-btn running-mission-quick-btn-water" type="button" data-mission-quick-key="water" aria-label="Beber água">
-          <img src="/200/icons/mission-water.svg" alt="" aria-hidden="true" />
+        <button class="running-mission-quick-btn running-mission-quick-btn-water card1" type="button" data-mission-quick-key="water" aria-label="Beber água">
+          <span class="running-mission-quick-card-title">Beber água</span>
+          <span class="running-mission-quick-card-meta" data-mission-quick-meta="water">0x / 8x</span>
         </button>
-        <button class="running-mission-quick-btn running-mission-quick-btn-shoe" type="button" data-mission-quick-key="store" aria-label="Guardar 6 itens">
-          <img src="/200/icons/mission-store.svg" alt="" aria-hidden="true" />
+        <button class="running-mission-quick-btn running-mission-quick-btn-shoe card2" type="button" data-mission-quick-key="store" aria-label="Guardar 6 itens">
+          <span class="running-mission-quick-card-title">Guardar 6 itens</span>
+          <span class="running-mission-quick-card-meta" data-mission-quick-meta="store">0x / 6x</span>
         </button>
-        <button class="running-mission-quick-btn running-mission-quick-btn-book" type="button" data-mission-quick-key="read" aria-label="Ler uma página">
-          <img src="/200/icons/mission-book.svg" alt="" aria-hidden="true" />
+        <button class="running-mission-quick-btn running-mission-quick-btn-book card3" type="button" data-mission-quick-key="read" aria-label="Ler uma página">
+          <span class="running-mission-quick-card-title">Ler uma página</span>
+          <span class="running-mission-quick-card-meta" data-mission-quick-meta="read">0x / 6x</span>
         </button>
-        <button class="running-mission-quick-btn running-mission-quick-btn-tooth" type="button" data-mission-quick-key="brush" aria-label="Escovar os dentes">
-          <img src="/200/icons/mission-brush.svg" alt="" aria-hidden="true" />
+        <button class="running-mission-quick-btn running-mission-quick-btn-tooth card4" type="button" data-mission-quick-key="brush" aria-label="Escovar os dentes">
+          <span class="running-mission-quick-card-title">Escovar os dentes</span>
+          <span class="running-mission-quick-card-meta" data-mission-quick-meta="brush">0x / 3x</span>
         </button>
       </div>
       <div class="running-mission-quick-feedback" id="runningMissionQuickFeedback" aria-live="polite"></div>
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260706-missions-editor"></script>
+  <script type="module" src="/200/project.js?v=20260706-missions-selector"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

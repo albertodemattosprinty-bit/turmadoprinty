@@ -77,23 +77,20 @@ function getDefaultExtraGoalOrder(title) {
 async function ensureDefaultExtraGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
-  const existingResult = await query(
+  const seededResult = await query(
     `
-      select title
-      from extra_goals
+      select 1
+      from extra_goal_profiles
       where user_id = $1
         and assigned_profile = $2
+      limit 1
     `,
     [userId, normalizedProfile]
   );
-  const existingTitles = new Set(
-    existingResult.rows.map((row) => normalizeExtraGoalTitle(row.title).toLocaleLowerCase("pt-BR")).filter(Boolean)
-  );
+  if (seededResult.rows[0]) {
+    return;
+  }
   for (const goal of DEFAULT_EXTRA_GOALS) {
-    const normalizedTitle = normalizeExtraGoalTitle(goal.title).toLocaleLowerCase("pt-BR");
-    if (existingTitles.has(normalizedTitle)) {
-      continue;
-    }
     await query(
       `
         insert into extra_goals (
@@ -103,8 +100,15 @@ async function ensureDefaultExtraGoals(userId, profileName = PROJECT200_DEFAULT_
       `,
       [userId, normalizedProfile, normalizeExtraGoalTitle(goal.title), Math.max(1, Math.trunc(Number(goal.targetValue) || 1))]
     );
-    existingTitles.add(normalizedTitle);
   }
+  await query(
+    `
+      insert into extra_goal_profiles (user_id, assigned_profile, seeded_at)
+      values ($1, $2, now())
+      on conflict (user_id, assigned_profile) do nothing
+    `,
+    [userId, normalizedProfile]
+  );
 }
 
 export function summarizeExtraGoals(goals = []) {
@@ -124,6 +128,14 @@ export function summarizeExtraGoals(goals = []) {
 
 export async function ensureExtraGoalsSchema() {
   await query(`
+    create table if not exists extra_goal_profiles (
+      user_id uuid not null references users(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      seeded_at timestamptz not null default now(),
+      primary key (user_id, assigned_profile)
+    );
+  `);
+  await query(`
     create table if not exists extra_goals (
       id uuid primary key default gen_random_uuid(),
       user_id uuid not null references users(id) on delete cascade,
@@ -141,6 +153,16 @@ export async function ensureExtraGoalsSchema() {
   await query("alter table extra_goals add column if not exists progress_date date;");
   await query("update extra_goals set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
   await query("create index if not exists idx_extra_goals_user_profile_created on extra_goals(user_id, assigned_profile, created_at asc);");
+  await query("alter table extra_goal_profiles add column if not exists assigned_profile text not null default 'Usuario';");
+  await query("alter table extra_goal_profiles add column if not exists seeded_at timestamptz not null default now();");
+  await query("update extra_goal_profiles set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
+  await query(`
+    insert into extra_goal_profiles (user_id, assigned_profile, seeded_at)
+    select distinct user_id, assigned_profile, coalesce(min(created_at), now())
+    from extra_goals
+    group by user_id, assigned_profile
+    on conflict (user_id, assigned_profile) do nothing
+  `);
 }
 
 export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, date = new Date()) {

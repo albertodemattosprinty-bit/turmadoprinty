@@ -1307,22 +1307,25 @@ body.screen-locked .project-login-overlay.active {
 
 .running-mission-quick-shell {
   position: relative;
-  width: 100vw;
-  height: 100dvh;
+  width: min(320px, calc(100vw - 32px));
+  min-height: 320px;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 22px;
-  padding: 24px;
-  background: radial-gradient(circle at top, rgba(34, 92, 214, 0.18), transparent 38%), #020611;
+  gap: 18px;
+  padding: 26px 20px 20px;
+  border-radius: 42px;
+  background: rgba(7, 11, 22, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.45);
 }
 
 .running-mission-quick-close {
   position: absolute;
-  top: 18px;
-  right: 18px;
-  width: 48px;
-  height: 48px;
+  top: 12px;
+  right: 12px;
+  width: 42px;
+  height: 42px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
@@ -1337,27 +1340,43 @@ body.screen-locked .project-login-overlay.active {
 }
 
 .running-mission-quick-grid {
-  width: min(560px, 100%);
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 10px;
 }
 
 .running-mission-quick-btn {
-  min-height: min(32vh, 220px);
+  min-height: 96px;
   border: 0;
-  border-radius: 28px;
+  border-radius: 20px;
   display: grid;
   place-items: center;
   color: #fff;
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.28);
+  padding: 16px 12px;
+  text-align: center;
+  box-shadow: rgba(50, 50, 93, 0.25) 0 2px 5px -1px, rgba(0, 0, 0, 0.3) 0 1px 3px -1px;
+  transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
 }
 
-.running-mission-quick-btn svg,
-.running-mission-quick-btn img {
-  width: min(24vw, 86px);
-  height: min(24vw, 86px);
-  object-fit: contain;
+.running-mission-quick-btn.card1 {
+  border-radius: 90px 5px 5px 5px;
+}
+
+.running-mission-quick-btn.card2 {
+  border-radius: 5px 90px 5px 5px;
+}
+
+.running-mission-quick-btn.card3 {
+  border-radius: 5px 5px 5px 90px;
+}
+
+.running-mission-quick-btn.card4 {
+  border-radius: 5px 5px 90px 5px;
+}
+
+.running-mission-quick-btn:hover {
+  transform: scale(1.06);
 }
 
 .running-mission-quick-btn:disabled,
@@ -1366,19 +1385,38 @@ body.screen-locked .project-login-overlay.active {
 }
 
 .running-mission-quick-btn-water {
-  background: linear-gradient(145deg, #2d95ff, #0d4cd1);
+  background: #fff;
+  color: #1259df;
 }
 
 .running-mission-quick-btn-shoe {
-  background: linear-gradient(145deg, #2f3646, #111722);
+  background: #fff;
+  color: #293245;
 }
 
 .running-mission-quick-btn-book {
-  background: linear-gradient(145deg, #d28b21, #8f4f0a);
+  background: #fff;
+  color: #8a520b;
 }
 
 .running-mission-quick-btn-tooth {
-  background: linear-gradient(145deg, #49beff, #1572e6);
+  background: #fff;
+  color: #1e7dea;
+}
+
+.running-mission-quick-card-title {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1.12;
+}
+
+.running-mission-quick-card-meta {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  opacity: 0.78;
 }
 
 .running-mission-quick-feedback {
@@ -2130,6 +2168,17 @@ body.running-music-standalone #actionsModal .actions-list {
   display: block;
 }
 
+#runningMissionQuickModal.workspace-modal {
+  display: none;
+  place-items: center;
+  background: rgba(2, 6, 17, 0.42);
+  backdrop-filter: blur(16px);
+}
+
+#runningMissionQuickModal.workspace-modal.active {
+  display: grid;
+}
+
 .modal-close,
 .wizard-close,
 .circle-nav {
@@ -2391,8 +2440,8 @@ body.running-music-standalone #actionsModal .actions-list {
 
 #actionsModal .actions-list {
   min-height: 0;
-  margin-left: -33px;
-  width: calc(100% + 33px);
+  margin-left: 15px;
+  width: calc(100% - 15px);
   padding-top: 0;
   padding-bottom: calc(8dvh + 22px);
 }

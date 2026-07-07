@@ -364,6 +364,13 @@ const missionAdjustHint = document.getElementById("missionAdjustHint");
 const missionAdjustStatus = document.getElementById("missionAdjustStatus");
 const missionAdjustConfirmButton = document.getElementById("missionAdjustConfirm");
 const missionAdjustDeleteButton = document.getElementById("missionAdjustDelete");
+const missionProgressTitle = document.getElementById("missionProgressTitle");
+const missionProgressMinusButton = document.getElementById("missionProgressMinus");
+const missionProgressPlusButton = document.getElementById("missionProgressPlus");
+const missionProgressValue = document.getElementById("missionProgressValue");
+const missionProgressHint = document.getElementById("missionProgressHint");
+const missionProgressStatus = document.getElementById("missionProgressStatus");
+const missionProgressConfirmButton = document.getElementById("missionProgressConfirm");
 const missionQuickAssignGrid = document.getElementById("missionQuickAssignGrid");
 const runningTaskMissionButton = document.getElementById("runningTaskMissionButton");
 const runningMissionQuickModal = document.getElementById("runningMissionQuickModal");
@@ -707,6 +714,10 @@ const state = {
   missionAdjust: {
     goalId: "",
     targetValue: 1
+  },
+  missionProgress: {
+    goalId: "",
+    deltaValue: 1
   },
   missionQuickSlots: [],
   runningMissionQuick: {
@@ -7166,13 +7177,27 @@ function renderRunningMissionQuickButtons() {
     const key = String(button.dataset.missionQuickKey || "");
     const definition = getMissionQuickDefinitionByKey(key);
     const goal = getMissionQuickGoalByKey(key);
+    const meta = button.querySelector("[data-mission-quick-meta]");
+    const title = button.querySelector(".running-mission-quick-card-title");
     button.disabled = !goal;
     button.classList.toggle("is-disabled", !goal);
     button.setAttribute("aria-pressed", "false");
     if (goal) {
+      if (title) {
+        title.textContent = goal.title;
+      }
+      if (meta) {
+        meta.textContent = `${Math.max(0, Number(goal.progressValue || 0))}x / ${Math.max(1, Number(goal.targetValue || 1))}x`;
+      }
       button.title = `${goal.title}: ${goal.progressValue} de ${goal.targetValue}`;
       button.setAttribute("aria-label", goal.title);
     } else {
+      if (title) {
+        title.textContent = definition?.defaultTitle || definition?.label || "Missão rápida";
+      }
+      if (meta) {
+        meta.textContent = definition ? `0x / ${Math.max(1, Number(definition.targetValue || 1))}x` : "Indisponível";
+      }
       button.title = `Missão indisponível para ${definition?.label || "atalho"}`;
       button.setAttribute("aria-label", definition?.label || "Missão rápida");
     }
@@ -7228,7 +7253,7 @@ function queueRunningMissionQuickIncrement(goal) {
           renderMissions();
           renderRunningMissionQuickButtons();
           const updatedGoal = getMissionQuickGoalByKey(
-            missionQuickDefinitions.find((item) => normalizeMissionTitle(item.title) === normalizeMissionTitle(goal.title))?.key || ""
+            missionQuickDefinitions.find((item) => normalizeMissionTitle(item.defaultTitle) === normalizeMissionTitle(goal.title))?.key || ""
           );
           if (updatedGoal && runningMissionQuickFeedback?.textContent) {
             showRunningMissionQuickFeedback(updatedGoal);
@@ -7921,6 +7946,38 @@ function openMissionAdjustModal(goalId) {
   }
   renderMissionAdjustState();
   openModal("missionAdjustModal");
+}
+
+function renderMissionProgressState() {
+  const deltaValue = Math.max(1, Math.trunc(Number(state.missionProgress?.deltaValue || 1) || 1));
+  state.missionProgress.deltaValue = deltaValue;
+  if (missionProgressValue) {
+    missionProgressValue.textContent = String(deltaValue);
+  }
+  if (missionProgressHint) {
+    missionProgressHint.textContent = `Adicionar ${deltaValue}x`;
+  }
+  missionProgressMinusButton?.classList.remove("active");
+  missionProgressPlusButton?.classList.add("active");
+}
+
+function openMissionProgressModal(goalId) {
+  const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id) === String(goalId));
+  if (!goal) {
+    return;
+  }
+  state.missionProgress = {
+    goalId: String(goal.id || ""),
+    deltaValue: 1
+  };
+  if (missionProgressTitle) {
+    missionProgressTitle.textContent = String(goal.title || "Missão");
+  }
+  if (missionProgressStatus) {
+    missionProgressStatus.textContent = "";
+  }
+  renderMissionProgressState();
+  openModal("missionProgressModal");
 }
 
 function createMissionCard(goal) {
@@ -9381,27 +9438,7 @@ missionList?.addEventListener("click", (event) => {
     if (!goalId) {
       return;
     }
-    void (async () => {
-      try {
-        if (missionStatus) {
-          missionStatus.textContent = "";
-        }
-        await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-            delta: 1
-          })
-        });
-        await loadMissions();
-        renderMissions();
-      } catch (error) {
-        if (missionStatus) {
-          missionStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
-        }
-      }
-    })();
+    openMissionProgressModal(goalId);
     return;
   }
   const editButton = event.target.closest("[data-mission-goal-edit]");
@@ -9463,6 +9500,16 @@ missionAdjustPlusButton?.addEventListener("click", () => {
   renderMissionAdjustState();
 });
 
+missionProgressMinusButton?.addEventListener("click", () => {
+  state.missionProgress.deltaValue = Math.max(1, Math.trunc(Number(state.missionProgress.deltaValue || 1) || 1) - 1);
+  renderMissionProgressState();
+});
+
+missionProgressPlusButton?.addEventListener("click", () => {
+  state.missionProgress.deltaValue = Math.max(1, Math.trunc(Number(state.missionProgress.deltaValue || 1) || 1) + 1);
+  renderMissionProgressState();
+});
+
 document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
   button.addEventListener("click", () => {
     state.missionAdjust.targetValue = Math.max(
@@ -9470,6 +9517,16 @@ document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
       Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionAdjustAdd || 0) || 0))
     );
     renderMissionAdjustState();
+  });
+});
+
+document.querySelectorAll("[data-mission-progress-add]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.missionProgress.deltaValue = Math.max(
+      1,
+      Math.trunc(Number(state.missionProgress.deltaValue || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionProgressAdd || 0) || 0))
+    );
+    renderMissionProgressState();
   });
 });
 
@@ -9498,6 +9555,37 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
     } catch (error) {
       if (missionAdjustStatus) {
         missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
+      }
+    }
+  })();
+});
+
+missionProgressConfirmButton?.addEventListener("click", () => {
+  void (async () => {
+    const goalId = String(state.missionProgress?.goalId || "").trim();
+    const deltaValue = Math.max(1, Math.trunc(Number(state.missionProgress?.deltaValue || 1) || 1));
+    if (!goalId) {
+      return;
+    }
+    if (missionProgressStatus) {
+      missionProgressStatus.textContent = "Adicionando...";
+    }
+    try {
+      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+          delta: deltaValue
+        })
+      });
+      closeModal("missionProgressModal");
+      await loadMissions();
+      renderMissions();
+      renderRunningMissionQuickButtons();
+    } catch (error) {
+      if (missionProgressStatus) {
+        missionProgressStatus.textContent = error instanceof Error ? error.message : "Falha ao adicionar progresso.";
       }
     }
   })();
