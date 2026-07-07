@@ -385,6 +385,8 @@ const homeRunningProgressRing = document.getElementById("homeRunningProgressRing
 const homeRunningPercent = document.getElementById("homeRunningPercent");
 const homeRunningModeTimeBtn = document.getElementById("homeRunningModeTimeBtn");
 const homeRunningModePercentBtn = document.getElementById("homeRunningModePercentBtn");
+const homeRunningDatePrimary = document.getElementById("homeRunningDatePrimary");
+const homeRunningDateSecondary = document.getElementById("homeRunningDateSecondary");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
 const quickTaskTitleInput = document.getElementById("quickTaskTitleInput");
 const quickTaskMinutesInput = document.getElementById("quickTaskMinutesInput");
@@ -586,6 +588,7 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   currency: "BRL"
 });
 const backgroundThemeModes = [
+  { key: "white", label: "Branco" },
   { key: "black", label: "Black" },
   { key: "orange", label: "Laranja" },
   { key: "bluevivid", label: "Azul vivo" },
@@ -782,7 +785,7 @@ const state = {
   options: {
     showFreeTime: true,
     completionBeepCycles: 0,
-    backgroundTheme: "black",
+    backgroundTheme: "white",
     screenLockEnabled: false,
     stopMusicOnFinish: false
   },
@@ -950,7 +953,7 @@ function normalizeBackgroundTheme(value) {
   if (normalized === "modern") {
     return "black";
   }
-  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "black";
+  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "white";
 }
 
 function getBackgroundThemeMode(value) {
@@ -2143,6 +2146,13 @@ function renderHomeRunningTask() {
     if (homeRunningPercent) {
       homeRunningPercent.innerHTML = centerMarkup;
     }
+    const now = new Date();
+    if (homeRunningDatePrimary) {
+      homeRunningDatePrimary.textContent = formatHomeCalendarDate(now);
+    }
+    if (homeRunningDateSecondary) {
+      homeRunningDateSecondary.textContent = formatHomeWeekdayLabel(now);
+    }
     if (homeProfileButton) {
       homeProfileButton.setAttribute("aria-label", ariaLabel);
     }
@@ -3208,6 +3218,25 @@ function formatDateLabel(date) {
   }
 
   return `${date.getDate()} ${monthLabels[date.getMonth()]}`;
+}
+
+function capitalizeFirstLetter(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function formatHomeCalendarDate(date = new Date()) {
+  return capitalizeFirstLetter(new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long"
+  }).format(date));
+}
+
+function formatHomeWeekdayLabel(date = new Date()) {
+  return capitalizeFirstLetter(new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long"
+  }).format(date));
 }
 
 function formatHistoryDateLabel(date) {
@@ -9007,42 +9036,46 @@ function clearProject200SessionState() {
 }
 
 async function bootstrapProject200App() {
-  await hydrateNativeToken();
-  const token = getToken();
-  if (!token) {
-    openProject200LoginOverlay("");
-    renderHomeRunningTask();
-    return;
-  }
+  await runWithGlobalLoading(async () => {
+    await hydrateNativeToken();
+    const token = getToken();
+    if (!token) {
+      openProject200LoginOverlay("");
+      renderHomeRunningTask();
+      return;
+    }
 
-  const sessionOk = await ensureProject200Session();
-  if (sessionOk) {
+    const sessionOk = await ensureProject200Session();
+    if (sessionOk) {
+      try {
+        await loadProject200Profiles();
+        await loadActions();
+        return;
+      } catch (error) {
+        if (isAuthErrorMessage(error?.message)) {
+          clearProject200SessionState();
+          openProject200LoginOverlay("Sua sessão expirou. Entre novamente.");
+          return;
+        }
+      }
+    }
+
     try {
       await loadProject200Profiles();
       await loadActions();
-      return;
+      project200LoginOverlay?.classList.remove("active");
+      project200LoginOverlay?.setAttribute("aria-hidden", "true");
     } catch (error) {
       if (isAuthErrorMessage(error?.message)) {
         clearProject200SessionState();
         openProject200LoginOverlay("Sua sessão expirou. Entre novamente.");
-        return;
+      } else {
+        renderHomeRunningTask();
       }
     }
-  }
-
-  try {
-    await loadProject200Profiles();
-    await loadActions();
-    project200LoginOverlay?.classList.remove("active");
-    project200LoginOverlay?.setAttribute("aria-hidden", "true");
-  } catch (error) {
-    if (isAuthErrorMessage(error?.message)) {
-      clearProject200SessionState();
-      openProject200LoginOverlay("Sua sessão expirou. Entre novamente.");
-    } else {
-      renderHomeRunningTask();
-    }
-  }
+  }, {
+    iconSrc: loadingIconByArea.actions
+  });
 }
 
 function openPrimaryRunningSurface() {
@@ -9134,7 +9167,7 @@ function loadOptionsConfig() {
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
-    state.options.backgroundTheme = "black";
+    state.options.backgroundTheme = "white";
     state.options.screenLockEnabled = false;
     state.options.stopMusicOnFinish = false;
   }
