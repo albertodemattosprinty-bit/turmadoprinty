@@ -1243,7 +1243,6 @@ body.screen-locked .project-login-overlay.active {
   background: linear-gradient(135deg, #22c55e, #16a34a);
   width: 58px;
   height: 58px;
-  order: 4;
 }
 
 .running-task-finalize-btn svg {
@@ -1305,25 +1304,10 @@ body.screen-locked .project-login-overlay.active {
   background: linear-gradient(145deg, #ffb14f, #ef6b24);
 }
 
-.running-mission-quick-shell {
-  position: relative;
-  width: min(320px, calc(100vw - 32px));
-  min-height: 320px;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 18px;
-  padding: 26px 20px 20px;
-  border-radius: 42px;
-  background: rgba(7, 11, 22, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.45);
-}
-
 .running-mission-quick-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  position: fixed;
+  top: 18px;
+  right: 18px;
   width: 42px;
   height: 42px;
   border-radius: 999px;
@@ -1339,24 +1323,31 @@ body.screen-locked .project-login-overlay.active {
   height: 24px;
 }
 
-.running-mission-quick-grid {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.running-mission-quick-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.running-mission-quick-row {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5em;
 }
 
 .running-mission-quick-btn {
-  min-height: 96px;
+  width: 90px;
+  height: 90px;
   border: 0;
-  border-radius: 20px;
+  outline: none;
+  background: #fff;
   display: grid;
   place-items: center;
-  color: #fff;
-  padding: 16px 12px;
+  padding: 10px 8px;
   text-align: center;
   box-shadow: rgba(50, 50, 93, 0.25) 0 2px 5px -1px, rgba(0, 0, 0, 0.3) 0 1px 3px -1px;
-  transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+  transition: .2s ease-in-out;
 }
 
 .running-mission-quick-btn.card1 {
@@ -1376,7 +1367,8 @@ body.screen-locked .project-login-overlay.active {
 }
 
 .running-mission-quick-btn:hover {
-  transform: scale(1.06);
+  cursor: pointer;
+  scale: 1.1;
 }
 
 .running-mission-quick-btn:disabled,
@@ -1385,28 +1377,51 @@ body.screen-locked .project-login-overlay.active {
 }
 
 .running-mission-quick-btn-water {
-  background: #fff;
-  color: #1259df;
+  color: #03A9F4;
 }
 
 .running-mission-quick-btn-shoe {
-  background: #fff;
   color: #293245;
 }
 
 .running-mission-quick-btn-book {
-  background: #fff;
-  color: #8a520b;
+  color: #111;
 }
 
 .running-mission-quick-btn-tooth {
-  background: #fff;
-  color: #1e7dea;
+  color: #8c9eff;
+}
+
+.running-mission-quick-btn-water:hover {
+  background-color: #03A9F4;
+  color: #fff;
+}
+
+.running-mission-quick-btn-shoe:hover {
+  background-color: #293245;
+  color: #fff;
+}
+
+.running-mission-quick-btn-book:hover {
+  background-color: #111;
+  color: #fff;
+}
+
+.running-mission-quick-btn-tooth:hover {
+  background-color: #8c9eff;
+  color: #fff;
+}
+
+.running-mission-quick-card-icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  margin-bottom: 6px;
 }
 
 .running-mission-quick-card-title {
   display: block;
-  font-size: 0.98rem;
+  font-size: 0.82rem;
   font-weight: 900;
   line-height: 1.12;
 }
@@ -2442,7 +2457,7 @@ body.running-music-standalone #actionsModal .actions-list {
   min-height: 0;
   margin-left: 0;
   width: 100%;
-  padding-top: 0;
+  padding-top: 12px;
   padding-bottom: calc(8dvh + 22px);
 }
 
@@ -4018,12 +4033,13 @@ body.running-music-standalone #actionsModal .actions-list {
     gap: 10px;
   }
 
-  .running-mission-quick-grid {
+  .running-mission-quick-main {
     gap: 14px;
   }
 
   .running-mission-quick-btn {
-    min-height: min(26vh, 170px);
+    width: min(90px, 22vw);
+    height: min(90px, 22vw);
     border-radius: 22px;
   }
 }
