@@ -87,6 +87,7 @@ const taskCategoryDefinitions = [
   { id: "digital", name: "Digital" }
 ];
 const sleepDayStartHour = 17;
+const projectTimeZone = "America/Sao_Paulo";
 const taskCategoryMap = new Map(taskCategoryDefinitions.map((item) => [item.id, item]));
 const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo", "Direitos autorais"];
 const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer", "Vestuario", "Saude", "Imprevistos", "Emprestimos e Juros"];
@@ -1246,9 +1247,7 @@ function renderProfileManageOverlay() {
 }
 
 function todayStart() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
+  return projectDateKeyToDate(getProjectDateKey(new Date(getServerNowMs())));
 }
 
 function addDays(date, amount) {
@@ -1257,28 +1256,98 @@ function addDays(date, amount) {
   return next;
 }
 
+function getProjectDateTimeParts(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const fallback = new Date(typeof getServerNowMs === "function" ? getServerNowMs() : Date.now());
+  const safeDate = Number.isNaN(date.getTime()) ? fallback : date;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: projectTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(safeDate);
+  const read = (type, fallbackValue = "00") => parts.find((part) => part.type === type)?.value || fallbackValue;
+  return {
+    year: read("year", "0000"),
+    month: read("month", "01"),
+    day: read("day", "01"),
+    hour: Number(read("hour", "0")),
+    minute: Number(read("minute", "0"))
+  };
+}
+
+function getProjectTimeZoneOffsetMinutes(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: projectTimeZone,
+    timeZoneName: "shortOffset"
+  });
+  const zoneName = formatter.formatToParts(safeDate).find((part) => part.type === "timeZoneName")?.value || "GMT-03:00";
+  const match = zoneName.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/i);
+  if (!match) {
+    return -180;
+  }
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2] || 0);
+  const minutes = Number(match[3] || 0);
+  return sign * ((hours * 60) + minutes);
+}
+
+function makeProjectZonedDate(year, month, day, hour = 0, minute = 0, second = 0) {
+  const guessUtcMs = Date.UTC(year, month - 1, day, hour, minute, second, 0);
+  const offsetMinutes = getProjectTimeZoneOffsetMinutes(new Date(guessUtcMs));
+  return new Date(guessUtcMs - (offsetMinutes * 60000));
+}
+
+function getProjectDateKey(value = new Date()) {
+  const parts = getProjectDateTimeParts(value);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const [year, month, day] = String(dateKey || "").split("-").map((part) => Number(part));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return getProjectDateKey(new Date(getServerNowMs()));
+  }
+  const shifted = makeProjectZonedDate(year, month, day + Number(days || 0), 12, 0, 0);
+  return getProjectDateKey(shifted);
+}
+
+function projectDateKeyToDate(dateKey, hour = 0, minute = 0, second = 0) {
+  const [year, month, day] = String(dateKey || "").split("-").map((part) => Number(part));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return todayStart();
+  }
+  return makeProjectZonedDate(year, month, day, hour, minute, second);
+}
+
 function dateFromOffset(offset) {
-  return addDays(todayStart(), offset);
+  return projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(new Date(getServerNowMs())), offset));
+}
+
+function getSleepDayDateKey(value = new Date()) {
+  const parts = getProjectDateTimeParts(value);
+  const baseKey = `${parts.year}-${parts.month}-${parts.day}`;
+  return parts.hour >= sleepDayStartHour
+    ? addDaysToDateKey(baseKey, 1)
+    : baseKey;
 }
 
 function getSleepDayDate(value = new Date()) {
-  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return todayStart();
-  }
-  if (date.getHours() < sleepDayStartHour) {
-    date.setDate(date.getDate() - 1);
-  }
-  date.setHours(0, 0, 0, 0);
-  return date;
+  return projectDateKeyToDate(getSleepDayDateKey(value));
 }
 
 function getSelectedSleepDayDate() {
-  return addDays(getSleepDayDate(new Date(getServerNowMs())), state.activeOffset);
+  return projectDateKeyToDate(getSelectedSleepDayKey());
 }
 
 function getSelectedSleepDayKey() {
-  return toLocalDateKey(getSelectedSleepDayDate());
+  return addDaysToDateKey(getSleepDayDateKey(new Date(getServerNowMs())), state.activeOffset);
 }
 
 function getVisibleActions() {
@@ -1702,11 +1771,13 @@ function formatRunningCenter(percent, percentPrecise, remainingMinutes, remainin
 }
 
 function formatRunningClockMarkup(date = new Date()) {
-  return `${String(date.getHours()).padStart(2, "0")}<span class="running-task-decimal">:${String(date.getMinutes()).padStart(2, "0")}</span>`;
+  const parts = getProjectDateTimeParts(date);
+  return `${String(parts.hour).padStart(2, "0")}<span class="running-task-decimal">:${String(parts.minute).padStart(2, "0")}</span>`;
 }
 
 function getDayElapsedPercent(date = new Date()) {
-  const totalMinutes = (date.getHours() * 60) + date.getMinutes();
+  const parts = getProjectDateTimeParts(date);
+  const totalMinutes = (parts.hour * 60) + parts.minute;
   return clampPercent((totalMinutes / (24 * 60)) * 100);
 }
 
@@ -3207,17 +3278,16 @@ function getCompletionSummaryForSelectedProfile() {
 }
 
 function isSameDate(a, b) {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
+  return toLocalDateKey(a) === toLocalDateKey(b);
 }
 
 function formatDateLabel(date) {
   if (isSameDate(date, todayStart())) {
     return "Hoje";
   }
-
-  return `${date.getDate()} ${monthLabels[date.getMonth()]}`;
+  const parts = getProjectDateTimeParts(date);
+  const monthIndex = Math.max(0, Math.min(11, Number(parts.month) - 1));
+  return `${Number(parts.day)} ${monthLabels[monthIndex]}`;
 }
 
 function capitalizeFirstLetter(value) {
@@ -3228,6 +3298,7 @@ function capitalizeFirstLetter(value) {
 
 function formatHomeCalendarDate(date = new Date()) {
   return capitalizeFirstLetter(new Intl.DateTimeFormat("pt-BR", {
+    timeZone: projectTimeZone,
     day: "numeric",
     month: "long"
   }).format(date));
@@ -3235,6 +3306,7 @@ function formatHomeCalendarDate(date = new Date()) {
 
 function formatHomeWeekdayLabel(date = new Date()) {
   return capitalizeFirstLetter(new Intl.DateTimeFormat("pt-BR", {
+    timeZone: projectTimeZone,
     weekday: "long"
   }).format(date));
 }
@@ -3247,21 +3319,21 @@ function formatHistoryDateLabel(date) {
 }
 
 function toLocalDateKey(value) {
-  const date = new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+  return getProjectDateKey(value);
 }
 
 function formatTime(value) {
-  const date = new Date(value);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const parts = getProjectDateTimeParts(value);
+  return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
 }
 
 function formatHourChip(value) {
-  const date = new Date(value);
-  return `${date.getHours()}h${String(date.getMinutes()).padStart(2, "0")}`;
+  const parts = getProjectDateTimeParts(value);
+  return `${parts.hour}h${String(parts.minute).padStart(2, "0")}`;
 }
 
 function formatMinutesHuman(totalMinutesValue) {
@@ -3350,17 +3422,7 @@ function getSelectedProfileName() {
 }
 
 function getProjectTodayDateKey() {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  });
-  const parts = formatter.formatToParts(new Date());
-  const year = parts.find((part) => part.type === "year")?.value || "0000";
-  const month = parts.find((part) => part.type === "month")?.value || "01";
-  const day = parts.find((part) => part.type === "day")?.value || "01";
-  return `${year}-${month}-${day}`;
+  return getProjectDateKey(new Date(getServerNowMs()));
 }
 
 function getStatsAvatarPath(assignee) {
@@ -3395,6 +3457,44 @@ function getTaskCategoryName(categoryId) {
   return taskCategoryMap.get(normalized)?.name || "";
 }
 
+function getActionThemeDotColor(action, options = {}) {
+  const delayMinutes = Math.max(0, Number(options.delayMinutes || 0));
+  const status = normalizeActionStatus(action?.status);
+  const categoryId = String(action?.categoryId || "").trim().toLowerCase();
+  const categoryColors = {
+    fe_espiritualidade: "#7c4dff",
+    sono: "#566072",
+    alimentacao: "#d97706",
+    hidratacao: "#1683ff",
+    estudo: "#4f46e5",
+    financeiro: "#8b5e3c",
+    trabalho: "#0f766e",
+    casa: "#059669",
+    lazer: "#ec4899",
+    exercicios: "#ef4444",
+    saude: "#14b8a6",
+    social: "#f97316",
+    familia: "#db2777",
+    higiene: "#0ea5e9",
+    digital: "#475569"
+  };
+
+  if (status === actionStatuses.inProgress) return "#19bf5d";
+  if (status === actionStatuses.completed) return "#16a34a";
+  if (isGivenUpAction(action)) return "#4b5563";
+  if (delayMinutes >= 60) return "#dc2626";
+  if (delayMinutes >= 30) return "#dc2626";
+  if (delayMinutes >= 15) return "#f97316";
+  if (delayMinutes > 0) return "#eab308";
+  return categoryColors[categoryId] || "#64748b";
+}
+
+function buildActionTitleMarkup(title, dotColor = "", isBlinking = false) {
+  const safeTitle = escapeHtml(formatActionTitleForDisplay(title));
+  const safeDotColor = escapeHtml(String(dotColor || "").trim() || "#64748b");
+  return `<span class="task-status-dot${isBlinking ? " is-blinking" : ""}" style="--task-dot-color:${safeDotColor};" aria-hidden="true"></span><span class="task-title-text">${safeTitle}</span>`;
+}
+
 function getTimelineEntryIconPath(entry) {
   if (!entry) return "/200/icons/agenda.svg";
   if (entry.kind === "sleep") return "/200/icons/lua.svg";
@@ -3419,21 +3519,17 @@ function applyRunningStationForCategory(categoryId) {
 }
 
 function buildDateWithTime(date, hour, minute) {
-  const next = new Date(date);
-  next.setHours(hour, minute, 0, 0);
-  return next;
+  const parts = getProjectDateTimeParts(date);
+  return makeProjectZonedDate(Number(parts.year), Number(parts.month), Number(parts.day), hour, minute, 0);
 }
 
 function startOfDayIso(date) {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  return start.toISOString();
+  const parts = getProjectDateTimeParts(date);
+  return makeProjectZonedDate(Number(parts.year), Number(parts.month), Number(parts.day), 0, 0, 0).toISOString();
 }
 
 function nextDayIso(date) {
-  const next = addDays(date, 1);
-  next.setHours(0, 0, 0, 0);
-  return next.toISOString();
+  return projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), 1)).toISOString();
 }
 
 function buildInitialWizardState() {
@@ -4085,13 +4181,15 @@ function renderActions() {
     const slotOwner = state.selectedProfile;
     const slotAvatar = getActionAvatarPath(slotOwner);
     if (action.kind === "sleep") {
+      const dotColor = getActionThemeDotColor(action, { delayMinutes: 0 });
+      const isBlinking = normalizeActionStatus(action?.status || actionStatuses.completed) === actionStatuses.inProgress;
       const row = document.createElement("article");
       row.className = "task-row task-sleep-slot";
       row.dataset.sleepSlot = "1";
       row.innerHTML = `
         <img class="task-avatar" src="${slotAvatar}" alt="Descanso" loading="lazy" />
         <div class="task-main">
-          <div class="task-title">Descanso</div>
+          <div class="task-title">${buildActionTitleMarkup("Descanso", dotColor, isBlinking)}</div>
           <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
         </div>
         <div class="task-time">${formatHourChip(action.startAt)}</div>
@@ -4102,6 +4200,7 @@ function renderActions() {
     if (action.kind === "free") {
       const duration = getActionDurationMinutes(action);
       const ended = getServerNowMs() >= new Date(action.endAt).getTime();
+      const dotColor = ended ? "#94a3b8" : "#64748b";
       const row = document.createElement("article");
       row.className = `task-row task-free-slot${ended ? " task-free-expired" : ""}`;
       row.dataset.freeSlot = "1";
@@ -4110,7 +4209,7 @@ function renderActions() {
       row.innerHTML = `
         <img class="task-avatar" src="${slotAvatar}" alt="Tempo livre" loading="lazy" />
         <div class="task-main">
-          <div class="task-title">Tempo livre</div>
+          <div class="task-title">${buildActionTitleMarkup("Tempo livre", dotColor, false)}</div>
           <div class="task-assignee task-duration">${formatMinutesHuman(duration)}</div>
         </div>
         <div class="task-time">${formatHourChip(action.startAt)}</div>
@@ -4137,10 +4236,12 @@ function renderActions() {
     row.dataset.actionId = action.id;
     row.setAttribute("role", "button");
     row.tabIndex = 0;
+    const dotColor = getActionThemeDotColor(action, { delayMinutes });
+    const isBlinking = status === actionStatuses.inProgress;
     row.innerHTML = `
       <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
       <div class="task-main">
-        <div class="task-title">${escapeHtml(formatActionTitleForDisplay(action.title))}</div>
+        <div class="task-title">${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
         <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
       </div>
       <div class="task-time">${formatHourChip(action.startAt)}</div>
@@ -4157,6 +4258,8 @@ function renderActions() {
   const sleepTrackedMinutes = selectedSleepAction ? getSleepTrackedMinutes(selectedSleepAction) : 0;
   const sleepDurationText = sleepTrackedMinutes > 0 ? formatMinutesHuman(sleepTrackedMinutes) : "";
   const sleepTimeLabel = selectedSleepAction?.startAt ? formatHourChip(selectedSleepAction.startAt) : "";
+  const sleepDotColor = getActionThemeDotColor(selectedSleepAction || { categoryId: "sono", status: sleepStatus }, { delayMinutes: 0 });
+  const sleepBlinking = sleepStatus === actionStatuses.inProgress;
   const sleepRow = document.createElement("article");
   sleepRow.className = `task-row task-sleep-slot${sleepStateClass}`;
   sleepRow.dataset.sleepSlot = "1";
@@ -4166,7 +4269,7 @@ function renderActions() {
   sleepRow.innerHTML = `
     <img class="task-avatar" src="${sleepAvatar}" alt="Sono" loading="lazy" />
     <div class="task-main">
-      <div class="task-title">Sono</div>
+      <div class="task-title">${buildActionTitleMarkup("Sono", sleepDotColor, sleepBlinking)}</div>
       <div class="task-assignee task-duration">${escapeHtml(sleepDurationText)}</div>
     </div>
     <div class="task-time">${escapeHtml(sleepTimeLabel)}</div>
@@ -4247,7 +4350,7 @@ function getDelayClassByMinutes(minutes) {
   if (minutes <= 195) {
     return " task-delay-red";
   }
-  return " task-delay-black";
+  return " task-delay-red";
 }
 
 function renderActionsProgress() {

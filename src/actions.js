@@ -112,8 +112,8 @@ function toSleepSessionDateKey(value = new Date()) {
   }
   const parts = getDatePartsInActionsTimeZone(value);
   const baseKey = `${parts.year}-${parts.month}-${parts.day}`;
-  if (parts.hour < SLEEP_DAY_START_HOUR) {
-    return addDaysToDateKey(baseKey, -1);
+  if (parts.hour >= SLEEP_DAY_START_HOUR) {
+    return addDaysToDateKey(baseKey, 1);
   }
   return baseKey;
 }
