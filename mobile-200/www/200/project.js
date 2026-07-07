@@ -108,6 +108,7 @@ const taskCategoryDefinitions = [
   { id: "higiene", name: "Higiene" },
   { id: "digital", name: "Digital" }
 ];
+const sleepDayStartHour = 17;
 const taskCategoryMap = new Map(taskCategoryDefinitions.map((item) => [item.id, item]));
 const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo", "Direitos autorais"];
 const platformExpenseCategories = ["Alimentacao", "Aluguel", "Carro", "Eventos", "Servicos casa", "Anuncios", "Plataformas", "Lazer", "Vestuario", "Saude", "Imprevistos", "Emprestimos e Juros"];
@@ -397,6 +398,13 @@ const runningMissionQuickModal = document.getElementById("runningMissionQuickMod
 const closeRunningMissionQuickModalButton = document.getElementById("closeRunningMissionQuickModal");
 const runningMissionQuickGrid = document.getElementById("runningMissionQuickGrid");
 const runningMissionQuickFeedback = document.getElementById("runningMissionQuickFeedback");
+const runningMissionQuickFocus = document.getElementById("runningMissionQuickFocus");
+const runningMissionQuickFocusIcon = document.getElementById("runningMissionQuickFocusIcon");
+const runningMissionQuickFocusTitle = document.getElementById("runningMissionQuickFocusTitle");
+const runningMissionQuickFocusProgressFill = document.getElementById("runningMissionQuickFocusProgressFill");
+const runningMissionQuickFocusLinked = document.getElementById("runningMissionQuickFocusLinked");
+const runningMissionQuickFocusLinkedLabel = document.getElementById("runningMissionQuickFocusLinkedLabel");
+const runningMissionQuickFocusLinkedProgressFill = document.getElementById("runningMissionQuickFocusLinkedProgressFill");
 const conversationsMessages = document.getElementById("conversationsMessages");
 const conversationsTranscript = document.getElementById("conversationsTranscript");
 const conversationsStatus = document.getElementById("conversationsStatus");
@@ -525,6 +533,14 @@ const sleepSessionFinishButton = document.getElementById("sleepSessionFinishButt
 const sleepSessionAbortButton = document.getElementById("sleepSessionAbortButton");
 const sleepSessionContinueButton = document.getElementById("sleepSessionContinueButton");
 const saveSleepConfigBtn = document.getElementById("saveSleepConfigBtn");
+const sleepManualModal = document.getElementById("sleepManualModal");
+const sleepManualDateLabel = document.getElementById("sleepManualDateLabel");
+const sleepManualCurrentTotal = document.getElementById("sleepManualCurrentTotal");
+const sleepManualHoursInput = document.getElementById("sleepManualHoursInput");
+const sleepManualMinutesInput = document.getElementById("sleepManualMinutesInput");
+const sleepManualMessage = document.getElementById("sleepManualMessage");
+const sleepManualCancelButton = document.getElementById("sleepManualCancelButton");
+const sleepManualSaveButton = document.getElementById("sleepManualSaveButton");
 const overlapWizard = document.getElementById("overlapWizard");
 const closeOverlapWizard = document.getElementById("closeOverlapWizard");
 const overlapTaskTitle = document.getElementById("overlapTaskTitle");
@@ -607,6 +623,8 @@ let financeTimer = null;
 let platformMetricsTicker = null;
 let longPressTimer = null;
 let longPressHandledActionId = "";
+let sleepLongPressTimer = null;
+let sleepLongPressHandled = false;
 let platformLongPressTimer = null;
 let platformLongPressHandledOccurrenceId = "";
 let actionsDelayTicker = null;
@@ -717,6 +735,7 @@ let postponeNavHoldInterval = null;
 let postponeNavLongPressHandled = false;
 let postponeFeedbackCarouselTimer = null;
 let runningMissionQuickFeedbackTimer = null;
+let runningMissionQuickFocusTimer = null;
 let runningMissionQuickRequestChain = Promise.resolve();
 
 const state = {
@@ -770,7 +789,8 @@ const state = {
   missionQuickSlots: [],
   runningMissionQuick: {
     feedbackGoalKey: "",
-    lastRenderedText: ""
+    lastRenderedText: "",
+    focusKey: ""
   },
   historyTextComposer: {
     step: 1,
@@ -1213,6 +1233,26 @@ function dateFromOffset(offset) {
   return addDays(todayStart(), offset);
 }
 
+function getSleepDayDate(value = new Date()) {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return todayStart();
+  }
+  if (date.getHours() < sleepDayStartHour) {
+    date.setDate(date.getDate() - 1);
+  }
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function getSelectedSleepDayDate() {
+  return addDays(getSleepDayDate(new Date(getServerNowMs())), state.activeOffset);
+}
+
+function getSelectedSleepDayKey() {
+  return toLocalDateKey(getSelectedSleepDayDate());
+}
+
 function getVisibleActions() {
   return state.actions.filter((action) => normalizeAssigneeName(action.assignee) === state.selectedProfile);
 }
@@ -1262,7 +1302,7 @@ function getPendingSleepFlowAction() {
 }
 
 function getSelectedSleepAction() {
-  const selectedDateKey = toLocalDateKey(dateFromOffset(state.activeOffset));
+  const selectedDateKey = getSelectedSleepDayKey();
   return getSleepActionsForSelectedProfile().find((action) => String(action.sleepSessionDate || "").trim() === selectedDateKey)
     || (getPendingSleepFlowAction() && String(getPendingSleepFlowAction().sleepSessionDate || "").trim() === selectedDateKey ? getPendingSleepFlowAction() : null)
     || null;
@@ -3626,6 +3666,7 @@ function closeModal(modal) {
   }
   if (modal.id === "runningMissionQuickModal") {
     clearRunningMissionQuickFeedbackTimer();
+    resetRunningMissionQuickFocusState();
     if (runningMissionQuickFeedback) {
       runningMissionQuickFeedback.textContent = "";
     }
@@ -4186,7 +4227,7 @@ async function loadActions() {
     const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`);
     state.actions = Array.isArray(payload.actions) ? payload.actions : [];
     try {
-      const sleepPayload = await apiRequest(`/api/200/sleep-session?date=${encodeURIComponent(toLocalDateKey(date))}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`);
+      const sleepPayload = await apiRequest(`/api/200/sleep-session?date=${encodeURIComponent(getSelectedSleepDayKey())}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`);
       const sleepAction = sleepPayload?.action || null;
       if (sleepAction?.id) {
         state.sleepFlow.pendingAction = sleepAction;
@@ -4578,6 +4619,35 @@ function renderSleepLabels() {
   if (sleepDelayLabel) {
     sleepDelayLabel.textContent = formatSleepDelayLabel(getSelectedSleepDelayMinutes());
   }
+}
+
+function renderSleepManualSummary() {
+  const hours = Math.max(0, Number(sleepManualHoursInput?.value || 0));
+  const minutes = Math.max(0, Number(sleepManualMinutesInput?.value || 0));
+  const totalMinutes = (hours * 60) + minutes;
+  if (sleepManualMessage) {
+    sleepManualMessage.textContent = totalMinutes > 0 ? `Adicionando ${formatMinutesHuman(totalMinutes)}` : "Escolha quanto deseja somar ao sono.";
+  }
+}
+
+function openSleepManualModal() {
+  const activeSleep = getActiveSleepAction();
+  if (activeSleep && normalizeActionStatus(activeSleep.status) !== actionStatuses.completed) {
+    showToast("Finalize ou aborte o sono em andamento antes de ajustar manualmente.");
+    return;
+  }
+  if (sleepManualDateLabel) {
+    sleepManualDateLabel.textContent = getSelectedSleepDayKey();
+  }
+  if (sleepManualCurrentTotal) {
+    const trackedMinutes = getSelectedSleepAction() ? getSleepTrackedMinutes(getSelectedSleepAction()) : 0;
+    sleepManualCurrentTotal.textContent = trackedMinutes > 0 ? formatMinutesHuman(trackedMinutes) : "0 min";
+  }
+  if (sleepManualHoursInput) sleepManualHoursInput.value = "0";
+  if (sleepManualMinutesInput) sleepManualMinutesInput.value = "0";
+  renderSleepManualSummary();
+  closeActionsModalWithFade();
+  openModal("sleepManualModal");
 }
 
 function moveSleepTime(_target, deltaIndex) {
@@ -5162,16 +5232,29 @@ function getSleepTrackedMinutes(action, nowMs = getServerNowMs()) {
   if (!isSleepAction(action)) {
     return 0;
   }
+  const storedMinutes = Math.max(0, Math.round(Number(action?.sleepTrackedMinutes || 0)));
   const startedAtMs = new Date(action?.startedAt || "").getTime();
   if (!Number.isFinite(startedAtMs)) {
+    if (storedMinutes > 0) {
+      return storedMinutes;
+    }
+    const fallbackStartMs = new Date(action?.startAt || "").getTime();
+    const fallbackEndMs = new Date(action?.completedAt || action?.endAt || "").getTime();
+    if (Number.isFinite(fallbackStartMs) && Number.isFinite(fallbackEndMs) && fallbackEndMs > fallbackStartMs) {
+      return Math.max(0, Math.round((fallbackEndMs - fallbackStartMs) / 60000));
+    }
     return 0;
   }
   const completedAtMs = new Date(action?.completedAt || "").getTime();
   const endMs = Number.isFinite(completedAtMs) ? completedAtMs : nowMs;
   if (!Number.isFinite(endMs) || endMs <= startedAtMs) {
-    return 0;
+    return storedMinutes;
   }
-  return Math.max(0, Math.round((endMs - startedAtMs) / 60000));
+  const liveMinutes = Math.max(0, Math.round((endMs - startedAtMs) / 60000));
+  if (normalizeActionStatus(action?.status) === actionStatuses.completed) {
+    return storedMinutes > 0 ? storedMinutes : liveMinutes;
+  }
+  return storedMinutes + liveMinutes;
 }
 
 function formatPostponeDelayLabel(totalMinutes) {
@@ -6480,6 +6563,24 @@ function endActionLongPress() {
   }
 }
 
+function beginSleepLongPress() {
+  if (sleepLongPressTimer) {
+    window.clearTimeout(sleepLongPressTimer);
+  }
+  sleepLongPressHandled = false;
+  sleepLongPressTimer = window.setTimeout(() => {
+    sleepLongPressHandled = true;
+    openSleepManualModal();
+  }, 3000);
+}
+
+function endSleepLongPress() {
+  if (sleepLongPressTimer) {
+    window.clearTimeout(sleepLongPressTimer);
+    sleepLongPressTimer = null;
+  }
+}
+
 function beginPlatformLongPress(occurrenceId) {
   if (platformLongPressTimer) {
     window.clearTimeout(platformLongPressTimer);
@@ -7632,6 +7733,115 @@ function clearRunningMissionQuickFeedbackTimer() {
   }
 }
 
+function clearRunningMissionQuickFocusTimer() {
+  if (runningMissionQuickFocusTimer) {
+    window.clearTimeout(runningMissionQuickFocusTimer);
+    runningMissionQuickFocusTimer = null;
+  }
+}
+
+function getMissionQuickThemeColor(key) {
+  switch (String(key || "").trim()) {
+    case "water":
+      return "#03A9F4";
+    case "store":
+      return "#293245";
+    case "read":
+      return "#111111";
+    case "brush":
+      return "#8c9eff";
+    default:
+      return "#2563eb";
+  }
+}
+
+function getLinkedStatsAspectByMissionGoalId(goalId) {
+  const normalizedGoalId = String(goalId || "").trim();
+  if (!normalizedGoalId) {
+    return null;
+  }
+  for (const category of statsPointCategories) {
+    const config = getStatsAspectConfigEntry(category.id);
+    if (String(config.missionGoalId || "").trim() === normalizedGoalId) {
+      const entry = buildStatsPointEntry(category, state.statsSummary?.byCategory || {});
+      return {
+        category,
+        entry
+      };
+    }
+  }
+  return null;
+}
+
+function resetRunningMissionQuickFocusState() {
+  clearRunningMissionQuickFocusTimer();
+  state.runningMissionQuick.focusKey = "";
+  if (runningMissionQuickGrid) {
+    runningMissionQuickGrid.hidden = false;
+  }
+  if (runningMissionQuickFocus) {
+    runningMissionQuickFocus.hidden = true;
+    runningMissionQuickFocus.style.color = "";
+  }
+  if (runningMissionQuickFocusProgressFill) {
+    runningMissionQuickFocusProgressFill.style.width = "0%";
+    runningMissionQuickFocusProgressFill.style.background = "";
+  }
+  if (runningMissionQuickFocusLinked) {
+    runningMissionQuickFocusLinked.hidden = true;
+    runningMissionQuickFocusLinked.style.color = "";
+  }
+  if (runningMissionQuickFocusLinkedProgressFill) {
+    runningMissionQuickFocusLinkedProgressFill.style.width = "0%";
+    runningMissionQuickFocusLinkedProgressFill.style.background = "";
+  }
+}
+
+function showRunningMissionQuickFocus(goal, key) {
+  if (!goal || !runningMissionQuickFocus || !runningMissionQuickGrid) {
+    return;
+  }
+  resetRunningMissionQuickFocusState();
+  const color = getMissionQuickThemeColor(key);
+  const progress = Math.max(0, Number(goal.progressValue || 0));
+  const target = Math.max(1, Number(goal.targetValue || 1));
+  const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+  const linkedAspect = getLinkedStatsAspectByMissionGoalId(goal.id);
+  state.runningMissionQuick.focusKey = String(key || "");
+  runningMissionQuickGrid.hidden = true;
+  runningMissionQuickFocus.hidden = false;
+  runningMissionQuickFocus.style.color = color;
+  if (runningMissionQuickFocusIcon) {
+    runningMissionQuickFocusIcon.src = `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
+  }
+  if (runningMissionQuickFocusTitle) {
+    runningMissionQuickFocusTitle.textContent = String(goal.title || "Missão");
+  }
+  if (runningMissionQuickFocusProgressFill) {
+    runningMissionQuickFocusProgressFill.style.background = color;
+    runningMissionQuickFocusProgressFill.style.width = "0%";
+  }
+  if (linkedAspect && runningMissionQuickFocusLinked && runningMissionQuickFocusLinkedLabel && runningMissionQuickFocusLinkedProgressFill) {
+    const linkedColor = color;
+    runningMissionQuickFocusLinked.hidden = false;
+    runningMissionQuickFocusLinked.style.color = linkedColor;
+    runningMissionQuickFocusLinkedLabel.textContent = linkedAspect.category.name;
+    runningMissionQuickFocusLinkedProgressFill.style.background = linkedColor;
+    runningMissionQuickFocusLinkedProgressFill.style.width = "0%";
+    window.requestAnimationFrame(() => {
+      runningMissionQuickFocusLinkedProgressFill.style.width = `${Math.max(0, Math.min(100, Number(linkedAspect.entry?.percent || 0)))}%`;
+    });
+  }
+  window.requestAnimationFrame(() => {
+    if (runningMissionQuickFocusProgressFill) {
+      runningMissionQuickFocusProgressFill.style.width = `${percent}%`;
+    }
+  });
+  runningMissionQuickFocusTimer = window.setTimeout(() => {
+    resetRunningMissionQuickFocusState();
+  }, 1300);
+}
+
 function renderRunningMissionQuickFeedback(goal, mode = "count") {
   if (!runningMissionQuickFeedback) {
     return;
@@ -7667,6 +7877,7 @@ function renderRunningMissionQuickButtons() {
     const goal = getMissionQuickGoalByKey(key);
     const meta = button.querySelector("[data-mission-quick-meta]");
     const title = button.querySelector(".running-mission-quick-card-title");
+    const progressFill = button.querySelector("[data-mission-quick-progress]");
     button.disabled = !goal;
     button.classList.toggle("is-disabled", !goal);
     button.setAttribute("aria-pressed", "false");
@@ -7677,6 +7888,10 @@ function renderRunningMissionQuickButtons() {
       if (meta) {
         meta.textContent = String(Math.max(0, Number(goal.progressValue || 0)));
       }
+      if (progressFill) {
+        const percent = Math.max(0, Math.min(100, Math.round((Math.max(0, Number(goal.progressValue || 0)) / Math.max(1, Number(goal.targetValue || 1))) * 100)));
+        progressFill.style.width = `${percent}%`;
+      }
       button.title = `${goal.title}: ${goal.progressValue} de ${goal.targetValue}`;
       button.setAttribute("aria-label", goal.title);
     } else {
@@ -7685,6 +7900,9 @@ function renderRunningMissionQuickButtons() {
       }
       if (meta) {
         meta.textContent = "0";
+      }
+      if (progressFill) {
+        progressFill.style.width = "0%";
       }
       button.title = `Missão indisponível para ${definition?.label || "atalho"}`;
       button.setAttribute("aria-label", definition?.label || "Missão rápida");
@@ -7701,6 +7919,7 @@ async function openRunningMissionQuickModal() {
   if (runningMissionQuickFeedback) {
     runningMissionQuickFeedback.textContent = "";
   }
+  resetRunningMissionQuickFocusState();
   openModal("runningMissionQuickModal");
   void (async () => {
     await loadMissions();
@@ -7774,6 +7993,7 @@ function handleRunningMissionQuickTap(key) {
   renderMissions();
   renderRunningMissionQuickButtons();
   showRunningMissionQuickFeedback(updatedGoal || goal);
+  showRunningMissionQuickFocus(updatedGoal || goal, key);
   queueRunningMissionQuickIncrement(goal);
 }
 
@@ -9754,6 +9974,7 @@ actionsList.addEventListener("pointerdown", (event) => {
   if (!row) {
     const sleepRow = event.target.closest("[data-sleep-slot]");
     if (sleepRow) {
+      beginSleepLongPress();
       return;
     }
   }
@@ -9769,10 +9990,17 @@ actionsList.addEventListener("pointerdown", (event) => {
 actionsList.addEventListener("pointerup", endActionLongPress);
 actionsList.addEventListener("pointerleave", endActionLongPress);
 actionsList.addEventListener("pointercancel", endActionLongPress);
+actionsList.addEventListener("pointerup", endSleepLongPress);
+actionsList.addEventListener("pointerleave", endSleepLongPress);
+actionsList.addEventListener("pointercancel", endSleepLongPress);
 
 actionsList.addEventListener("click", async (event) => {
   const sleepRow = event.target.closest("[data-sleep-slot]");
   if (sleepRow) {
+    if (sleepLongPressHandled) {
+      sleepLongPressHandled = false;
+      return;
+    }
     const sleepAction = getActiveSleepAction();
     if (sleepAction && normalizeActionStatus(sleepAction.status) !== actionStatuses.completed) {
       openSleepSessionModal();
@@ -11279,7 +11507,7 @@ saveSleepConfigBtn?.addEventListener("click", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          date: toLocalDateKey(dateFromOffset(state.activeOffset)),
+          date: getSelectedSleepDayKey(),
           plannedStartAt: plannedStartAt.toISOString()
         })
       });
@@ -11291,7 +11519,7 @@ saveSleepConfigBtn?.addEventListener("click", () => {
         status: actionStatuses.pending,
         startAt: plannedStartAt.toISOString(),
         endAt: plannedStartAt.toISOString(),
-        sleepSessionDate: toLocalDateKey(dateFromOffset(state.activeOffset))
+        sleepSessionDate: getSelectedSleepDayKey()
       };
       closeModal(sleepConfigModal);
       openSleepSessionModal();
@@ -11300,6 +11528,53 @@ saveSleepConfigBtn?.addEventListener("click", () => {
     } catch (error) {
       if (sleepDelayLabel) {
         sleepDelayLabel.textContent = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
+      }
+    }
+  })();
+});
+
+[sleepManualHoursInput, sleepManualMinutesInput].forEach((input) => {
+  input?.addEventListener("input", () => {
+    const max = input === sleepManualHoursInput ? 24 : 59;
+    const safeValue = Math.max(0, Math.min(max, Number(input.value || 0)));
+    input.value = String(Math.round(safeValue));
+    renderSleepManualSummary();
+  });
+});
+
+sleepManualCancelButton?.addEventListener("click", () => {
+  closeModal("sleepManualModal");
+});
+
+sleepManualSaveButton?.addEventListener("click", () => {
+  void (async () => {
+    const hours = Math.max(0, Number(sleepManualHoursInput?.value || 0));
+    const minutes = Math.max(0, Number(sleepManualMinutesInput?.value || 0));
+    const totalMinutes = (Math.round(hours) * 60) + Math.round(minutes);
+    if (totalMinutes <= 0) {
+      if (sleepManualMessage) {
+        sleepManualMessage.textContent = "Informe pelo menos 1 minuto para somar.";
+      }
+      return;
+    }
+    try {
+      const payload = await apiRequest("/api/200/sleep-session/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+          date: getSelectedSleepDayKey(),
+          minutes: totalMinutes
+        })
+      });
+      if (payload?.action?.id) {
+        state.sleepFlow.pendingAction = payload.action;
+      }
+      closeModal("sleepManualModal");
+      await loadActions();
+    } catch (error) {
+      if (sleepManualMessage) {
+        sleepManualMessage.textContent = error instanceof Error ? error.message : "Falha ao ajustar o sono manualmente.";
       }
     }
   })();

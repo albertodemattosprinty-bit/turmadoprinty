@@ -53,7 +53,7 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getProject200ChatPromptSettings, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveProject200ChatPromptSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { abortSleepSessionAction, activateSleepSessionAction, createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, finishSleepSessionAction, getProject200RuntimeState, getSleepSessionAction, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual, upsertSleepSessionAction } from "./src/actions.js";
+import { abortSleepSessionAction, activateSleepSessionAction, addManualSleepMinutesAction, createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, finishSleepSessionAction, getProject200RuntimeState, getSleepSessionAction, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual, upsertSleepSessionAction } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
@@ -12035,6 +12035,29 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel abortar o sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/manual") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const action = await addManualSleepMinutesAction(user.id, {
+        profileName: body?.profile,
+        sessionDate: body?.date,
+        minutes: body?.minutes
+      });
+      sendJson(response, 200, { ok: true, action });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel ajustar o sono manualmente."
       });
     }
     return;

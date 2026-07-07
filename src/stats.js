@@ -251,7 +251,11 @@ async function buildStatsSummary(userId, range) {
           select
             a.id,
             a.assignee,
-            extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
+            case
+              when lower(coalesce(a.category_id, '')) = 'sono' and a.sleep_session_date is not null then
+                greatest(coalesce(a.sleep_tracked_minutes, 0), extract(epoch from (a.end_at - a.start_at)) / 60.0)
+              else extract(epoch from (a.end_at - a.start_at)) / 60.0
+            end as minutes,
             coalesce(o.status, 'PENDING') as status,
             o.started_at,
             a.start_at
@@ -260,8 +264,19 @@ async function buildStatsSummary(userId, range) {
             on o.user_id = a.user_id
            and o.action_id = a.id
           where a.user_id = $1
-            and ($2::timestamptz is null or a.start_at < $3::timestamptz)
-            and ($2::timestamptz is null or a.end_at > $2::timestamptz)
+            and (
+              (
+                lower(coalesce(a.category_id, '')) = 'sono'
+                and a.sleep_session_date is not null
+                and ($2::timestamptz is null or a.sleep_session_date >= ($2::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
+                and ($3::timestamptz is null or a.sleep_session_date < ($3::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
+              )
+              or (
+                lower(coalesce(a.category_id, '')) <> 'sono'
+                and ($2::timestamptz is null or a.start_at < $3::timestamptz)
+                and ($2::timestamptz is null or a.end_at > $2::timestamptz)
+              )
+            )
         )
         select
           assignee,
@@ -285,15 +300,30 @@ async function buildStatsSummary(userId, range) {
           select
             a.id,
             a.category_id,
-            extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
+            case
+              when lower(coalesce(a.category_id, '')) = 'sono' and a.sleep_session_date is not null then
+                greatest(coalesce(a.sleep_tracked_minutes, 0), extract(epoch from (a.end_at - a.start_at)) / 60.0)
+              else extract(epoch from (a.end_at - a.start_at)) / 60.0
+            end as minutes,
             coalesce(o.status, 'PENDING') as status
           from actions a
           left join action_status_overrides o
             on o.user_id = a.user_id
            and o.action_id = a.id
           where a.user_id = $1
-            and ($2::timestamptz is null or a.start_at < $3::timestamptz)
-            and ($2::timestamptz is null or a.end_at > $2::timestamptz)
+            and (
+              (
+                lower(coalesce(a.category_id, '')) = 'sono'
+                and a.sleep_session_date is not null
+                and ($2::timestamptz is null or a.sleep_session_date >= ($2::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
+                and ($3::timestamptz is null or a.sleep_session_date < ($3::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
+              )
+              or (
+                lower(coalesce(a.category_id, '')) <> 'sono'
+                and ($2::timestamptz is null or a.start_at < $3::timestamptz)
+                and ($2::timestamptz is null or a.end_at > $2::timestamptz)
+              )
+            )
         )
         select
           coalesce(nullif(trim(category_id), ''), 'sem_categoria') as category_id,

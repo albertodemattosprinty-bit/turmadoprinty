@@ -93,6 +93,31 @@
       </div>
     </div>
   </section>
+  <section class="workspace-modal simple-modal" id="sleepManualModal" aria-hidden="true" aria-label="Adicionar sono manualmente">
+    <div class="finance-content running-task-content sleep-manual-content">
+      <div class="running-task-name">Adicionar sono manualmente</div>
+      <div class="sleep-manual-date" id="sleepManualDateLabel">0000-00-00</div>
+      <div class="sleep-manual-total-wrap">
+        <span>Total atual</span>
+        <strong id="sleepManualCurrentTotal">0 min</strong>
+      </div>
+      <div class="sleep-manual-fields">
+        <label class="sleep-manual-field">
+          <span>Horas</span>
+          <input id="sleepManualHoursInput" type="number" min="0" max="24" step="1" value="0" inputmode="numeric" />
+        </label>
+        <label class="sleep-manual-field">
+          <span>Minutos</span>
+          <input id="sleepManualMinutesInput" type="number" min="0" max="59" step="1" value="0" inputmode="numeric" />
+        </label>
+      </div>
+      <p class="sleep-manual-message" id="sleepManualMessage">Escolha quanto deseja somar ao sono.</p>
+      <div class="sleep-manual-actions">
+        <button class="ghost-btn" type="button" id="sleepManualCancelButton">Cancelar</button>
+        <button class="primary-btn" type="button" id="sleepManualSaveButton">Adicionar sono</button>
+      </div>
+    </div>
+  </section>
   <main class="project-shell">
     <section class="home-profile-hero">
       <button class="home-profile-button" id="homeProfileButton" type="button" aria-label="Usuário atual">
@@ -1155,11 +1180,13 @@
           <span class="running-mission-quick-card-badge" data-mission-quick-meta="water">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-water.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Beber água</span>
+          <span class="running-mission-quick-card-progress" aria-hidden="true"><span class="running-mission-quick-card-progress-fill" data-mission-quick-progress="water"></span></span>
         </button>
         <button class="running-mission-quick-btn running-mission-quick-btn-shoe card2" type="button" data-mission-quick-key="store" aria-label="Guardar 6 itens">
           <span class="running-mission-quick-card-badge" data-mission-quick-meta="store">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-store.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Guardar 6 itens</span>
+          <span class="running-mission-quick-card-progress" aria-hidden="true"><span class="running-mission-quick-card-progress-fill" data-mission-quick-progress="store"></span></span>
         </button>
       </div>
       <div class="running-mission-quick-row running-mission-quick-row-down">
@@ -1167,14 +1194,29 @@
           <span class="running-mission-quick-card-badge" data-mission-quick-meta="read">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-book.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Ler uma página</span>
+          <span class="running-mission-quick-card-progress" aria-hidden="true"><span class="running-mission-quick-card-progress-fill" data-mission-quick-progress="read"></span></span>
         </button>
         <button class="running-mission-quick-btn running-mission-quick-btn-tooth card4" type="button" data-mission-quick-key="brush" aria-label="Escovar os dentes">
           <span class="running-mission-quick-card-badge" data-mission-quick-meta="brush">0</span>
           <img class="running-mission-quick-card-icon" src="/200/icons/mission-brush.svg" alt="" aria-hidden="true" />
           <span class="running-mission-quick-card-title">Escovar os dentes</span>
+          <span class="running-mission-quick-card-progress" aria-hidden="true"><span class="running-mission-quick-card-progress-fill" data-mission-quick-progress="brush"></span></span>
         </button>
       </div>
       <div class="running-mission-quick-feedback" id="runningMissionQuickFeedback" aria-live="polite"></div>
+    </div>
+    <div class="running-mission-quick-focus" id="runningMissionQuickFocus" hidden>
+      <img class="running-mission-quick-focus-icon" id="runningMissionQuickFocusIcon" src="/200/icons/mission-water.svg" alt="" aria-hidden="true" />
+      <div class="running-mission-quick-focus-title" id="runningMissionQuickFocusTitle">Beber água</div>
+      <div class="running-mission-quick-focus-progress" aria-hidden="true">
+        <div class="running-mission-quick-focus-progress-fill" id="runningMissionQuickFocusProgressFill"></div>
+      </div>
+      <div class="running-mission-quick-focus-linked" id="runningMissionQuickFocusLinked" hidden>
+        <span class="running-mission-quick-focus-linked-label" id="runningMissionQuickFocusLinkedLabel">Hidratação</span>
+        <div class="running-mission-quick-focus-linked-progress" aria-hidden="true">
+          <div class="running-mission-quick-focus-linked-progress-fill" id="runningMissionQuickFocusLinkedProgressFill"></div>
+        </div>
+      </div>
     </div>
   </section>
 

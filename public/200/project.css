@@ -1353,11 +1353,12 @@ body.screen-locked .project-login-overlay.active {
   width: 42px;
   height: 42px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
+  border: 0;
+  background: #d62828;
   color: #fff;
   display: grid;
   place-items: center;
+  z-index: 2;
 }
 
 .running-mission-quick-close svg {
@@ -1370,6 +1371,7 @@ body.screen-locked .project-login-overlay.active {
   flex-direction: column;
   align-items: center;
   gap: 0.8em;
+  width: min(92vw, 340px);
 }
 
 .running-mission-quick-row {
@@ -1381,39 +1383,39 @@ body.screen-locked .project-login-overlay.active {
 .running-mission-quick-btn {
   width: 144px;
   height: 144px;
-  border: 0;
+  border: 2px solid currentColor;
   outline: none;
   background: #fff;
   display: grid;
   place-items: center;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   position: relative;
   padding: 18px 18px 16px;
   text-align: center;
-  box-shadow: rgba(50, 50, 93, 0.25) 0 2px 5px -1px, rgba(0, 0, 0, 0.3) 0 1px 3px -1px;
+  box-shadow: rgba(50, 50, 93, 0.14) 0 6px 16px -4px, rgba(0, 0, 0, 0.12) 0 2px 6px -3px;
   transition: .2s ease-in-out;
   overflow: visible;
 }
 
 .running-mission-quick-btn.card1 {
-  border-radius: 90px 5px 5px 5px;
+  border-radius: 0;
 }
 
 .running-mission-quick-btn.card2 {
-  border-radius: 5px 90px 5px 5px;
+  border-radius: 0;
 }
 
 .running-mission-quick-btn.card3 {
-  border-radius: 5px 5px 5px 90px;
+  border-radius: 0;
 }
 
 .running-mission-quick-btn.card4 {
-  border-radius: 5px 5px 90px 5px;
+  border-radius: 0;
 }
 
 .running-mission-quick-btn:hover {
   cursor: pointer;
-  scale: 1.1;
+  scale: 1.03;
 }
 
 .running-mission-quick-btn:disabled,
@@ -1458,11 +1460,11 @@ body.screen-locked .project-login-overlay.active {
 }
 
 .running-mission-quick-card-icon {
-  width: 30px;
-  height: 30px;
+  width: 62px;
+  height: 62px;
   object-fit: contain;
-  margin-bottom: 8px;
-  align-self: end;
+  margin-bottom: 10px;
+  align-self: center;
 }
 
 .running-mission-quick-card-title {
@@ -1470,7 +1472,7 @@ body.screen-locked .project-login-overlay.active {
   font-size: 0.82rem;
   font-weight: 900;
   line-height: 1.12;
-  align-self: start;
+  align-self: center;
 }
 
 .running-mission-quick-card-badge {
@@ -1481,7 +1483,7 @@ body.screen-locked .project-login-overlay.active {
   height: 24px;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(7, 15, 30, 0.9);
+  background: currentColor;
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -1492,12 +1494,75 @@ body.screen-locked .project-login-overlay.active {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 
+.running-mission-quick-card-progress {
+  width: 100%;
+  height: 8px;
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.running-mission-quick-card-progress-fill {
+  width: 0;
+  height: 100%;
+  background: currentColor;
+  transition: width 1000ms ease;
+}
+
 .running-mission-quick-feedback {
   min-height: 34px;
-  color: #fff;
+  color: #111827;
   font-size: clamp(1.2rem, 4vw, 1.9rem);
   font-weight: 800;
   text-align: center;
+}
+
+.running-mission-quick-focus {
+  width: min(90vw, 420px);
+  min-height: min(70dvh, 480px);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.running-mission-quick-focus-icon {
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+}
+
+.running-mission-quick-focus-title {
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  font-weight: 900;
+  color: #101828;
+}
+
+.running-mission-quick-focus-progress,
+.running-mission-quick-focus-linked-progress {
+  width: min(82vw, 320px);
+  height: 14px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.running-mission-quick-focus-progress-fill,
+.running-mission-quick-focus-linked-progress-fill {
+  width: 0;
+  height: 100%;
+  transition: width 1000ms ease;
+}
+
+.running-mission-quick-focus-linked {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.running-mission-quick-focus-linked-label {
+  font-size: 1.05rem;
+  font-weight: 900;
 }
 
 .running-fade {
@@ -2244,8 +2309,8 @@ body.running-music-standalone #actionsModal .actions-list {
 #runningMissionQuickModal.workspace-modal {
   display: none;
   place-items: center;
-  background: rgba(2, 6, 17, 0.42);
-  backdrop-filter: blur(16px);
+  background: #ffffff;
+  backdrop-filter: none;
 }
 
 #runningMissionQuickModal.workspace-modal.active {
@@ -2835,6 +2900,69 @@ body.running-music-standalone #actionsModal .actions-list {
 
 .sleep-session-control-btn {
   min-height: 52px;
+}
+
+.sleep-manual-content {
+  gap: 18px;
+  width: min(420px, calc(100vw - 28px));
+}
+
+.sleep-manual-date {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.08em;
+}
+
+.sleep-manual-total-wrap {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.sleep-manual-total-wrap strong {
+  font-size: clamp(1.8rem, 7vw, 2.8rem);
+  color: #fff;
+}
+
+.sleep-manual-fields {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sleep-manual-field {
+  display: grid;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
+}
+
+.sleep-manual-field input {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.sleep-manual-message {
+  min-height: 24px;
+  margin: 0;
+  color: #dfe8ff;
+  text-align: center;
+}
+
+.sleep-manual-actions {
+  width: 100%;
+  display: grid;
+  gap: 10px;
 }
 
 .task-time {
@@ -4098,8 +4226,12 @@ body.running-music-standalone #actionsModal .actions-list {
   .running-mission-quick-btn {
     width: min(144px, 35vw);
     height: min(144px, 35vw);
-    border-radius: 22px;
     padding: 14px 14px 12px;
+  }
+
+  .running-mission-quick-card-icon {
+    width: min(62px, 14vw);
+    height: min(62px, 14vw);
   }
 }
 
