@@ -1001,6 +1001,41 @@
       </div>
     </div>
 
+    <section class="workspace-modal simple-modal" id="statsAspectModal" aria-hidden="true" aria-label="Aspecto da estatística">
+      <div class="finance-content history-mission-modal-content stats-aspect-modal-content">
+        <button class="stats-aspect-assign-trigger" type="button" id="openStatsAspectMissionAssign" aria-label="Atribuir missão">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+        </button>
+        <div class="running-task-name" id="statsAspectTitle">Hidratação</div>
+        <img class="stats-aspect-modal-icon" id="statsAspectIcon" src="/200/category-icons/hidratacao.svg" alt="" aria-hidden="true" />
+        <div class="stats-aspect-meta">
+          <div class="stats-aspect-meta-label">Meta atual</div>
+          <div class="history-mission-adjust-stage">
+            <button class="history-mission-sign-btn" type="button" id="statsAspectTargetMinus">-</button>
+            <div class="history-mission-adjust-value" id="statsAspectTargetValue">15</div>
+            <button class="history-mission-sign-btn active" type="button" id="statsAspectTargetPlus">+</button>
+          </div>
+          <div class="stats-aspect-meta-copy" id="statsAspectMetaCopy">15 minutos</div>
+        </div>
+        <div class="stats-aspect-task-copy">Tarefas: <strong id="statsAspectTaskMinutes">0 minutos</strong></div>
+        <div class="stats-aspect-task-copy">Progresso atual: <strong id="statsAspectProgressSummary">0%</strong></div>
+        <p class="finance-status" id="statsAspectStatus" aria-live="polite"></p>
+        <button class="primary-btn" type="button" id="statsAspectSaveButton">Salvar meta</button>
+        <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
+      </div>
+    </section>
+
+    <section class="workspace-modal simple-modal" id="statsAspectMissionAssignModal" aria-hidden="true" aria-label="Atribuir missão ao aspecto">
+      <div class="finance-content history-mission-modal-content stats-aspect-assign-content">
+        <div class="running-task-name">Atribuir missão</div>
+        <p class="options-note" id="statsAspectMissionAssignLabel">Selecione uma missão para controlar este aspecto.</p>
+        <select class="text-field options-text-field" id="statsAspectMissionSelect"></select>
+        <p class="finance-status" id="statsAspectMissionStatus" aria-live="polite"></p>
+        <button class="primary-btn" type="button" id="statsAspectMissionSaveButton">Salvar atribuição</button>
+        <button class="ghost-btn running-music-default-close" type="button" id="statsAspectMissionClearButton">Remover missão</button>
+      </div>
+    </section>
+
     <div class="action-wizard" id="financeEntryConfirmWizard" aria-hidden="true">
       <div class="wizard-panel">
         <header class="wizard-head">
@@ -1087,9 +1122,9 @@
   </section>
 
   <section class="workspace-modal simple-modal" id="missionProgressModal" aria-hidden="true" aria-label="Adicionar progresso da missão">
-    <div class="finance-content history-mission-modal-content">
+    <div class="finance-content history-mission-modal-content mission-progress-modal-content">
       <div class="running-task-name" id="missionProgressTitle">Missão</div>
-      <p class="history-mission-adjust-caption">Adicionar progresso personalizado</p>
+      <p class="history-mission-adjust-caption">Atualizar progresso personalizado</p>
       <div class="history-mission-adjust-stage">
         <button class="history-mission-sign-btn" type="button" id="missionProgressMinus">-</button>
         <div class="history-mission-adjust-value" id="missionProgressValue">1</div>
@@ -1103,9 +1138,9 @@
         <button class="history-mission-preset-btn" type="button" data-mission-progress-add="25">+25</button>
         <button class="history-mission-preset-btn" type="button" data-mission-progress-add="50">+50</button>
       </div>
-      <p class="finance-status" id="missionProgressHint" aria-live="polite">Adicionar 1x</p>
+      <p class="finance-status" id="missionProgressHint" aria-live="polite">Adicionando 0</p>
       <p class="finance-status" id="missionProgressStatus" aria-live="polite"></p>
-      <button class="primary-btn" type="button" id="missionProgressConfirm">Adicionar progresso</button>
+      <button class="primary-btn mission-progress-confirm-btn" type="button" id="missionProgressConfirm">Atualizar progresso</button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Voltar</button>
     </div>
   </section>
