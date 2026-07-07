@@ -50,7 +50,7 @@ import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema,
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getAlbumRehearsalCodeForOwner, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent, redeemAlbumRehearsalCode } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
-import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getProject200ChatPromptSettings, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveProject200ChatPromptSettings, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
+import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { abortSleepSessionAction, activateSleepSessionAction, addManualSleepMinutesAction, createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, finishSleepSessionAction, getProject200RuntimeState, getSleepSessionAction, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual, upsertSleepSessionAction } from "./src/actions.js";
@@ -60,7 +60,6 @@ import { approveConstitutionVersion, createConstitutionVersion, ensureConstituti
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
-import { appendProject200ChatMessages, createProject200Chat, getProject200Chat, markProject200ChatRead, saveProject200ChatNotificationPermission } from "./src/project200-chats.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
 import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
@@ -3921,18 +3920,6 @@ function createMiniChatTitleFromMessage(message) {
   return cleaned.slice(0, 32).replace(/[.!?]+$/g, "") || "Novo chat";
 }
 
-function createProject200ChatTitleFromMessage(message) {
-  const cleaned = String(message || "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!cleaned) {
-    return "Conversas";
-  }
-
-  return cleaned.slice(0, 36).replace(/[.!?]+$/g, "") || "Conversas";
-}
-
 function getProjectTimeZoneOffsetMinutes(date) {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: PROJECT200_TIME_ZONE,
@@ -4043,46 +4030,6 @@ function summarizeProject200OwnProgress(actions = []) {
   };
 }
 
-function buildProject200ToneInstructions(toneKey, ownWeekProgress) {
-  const normalizedToneKey = String(toneKey || "neutral").trim().toLowerCase();
-  const completionPercent = Math.max(0, Math.round(Number(ownWeekProgress?.completionPercent || 0)));
-  const plannedMinutes10d = Math.max(0, Math.round(Number(ownWeekProgress?.plannedMinutesNext10Days || 0)));
-
-  let plannedBand = "abaixo do ideal";
-  if (plannedMinutes10d >= 6000) {
-    plannedBand = "ideal";
-  } else if (plannedMinutes10d >= 4000) {
-    plannedBand = "media minima";
-  } else if (plannedMinutes10d >= 2000) {
-    plannedBand = "pouco, mas bom pra comecar";
-  } else if (plannedMinutes10d >= 1000) {
-    plannedBand = "fraco";
-  } else if (plannedMinutes10d >= 500) {
-    plannedBand = "muito baixo";
-  } else {
-    plannedBand = "criticamente baixo";
-  }
-
-  const baseInstruction = `Minutos agendados nos proximos 10 dias: ${plannedMinutes10d}. Classificacao: ${plannedBand}. Abaixo de 4000, cobre o usuario de acordo com o tom selecionado e empurre para aumentar a agenda.`;
-
-  if (normalizedToneKey === "motivator") {
-    return `${baseInstruction} No estilo motivador, reconheca qualquer progresso real, mas deixe claro quando a agenda ainda esta curta e proponha subir o volume com firmeza positiva.`;
-  }
-  if (normalizedToneKey === "strict") {
-    if (plannedMinutes10d < 1000 || completionPercent < 50) {
-      return `${baseInstruction} No estilo exigente, seja duro e incisivo. Se estiver muito abaixo da media ou com disciplina baixa, exponha sem enfeite que a agenda esta fraca e que ele precisa reagir agora.`;
-    }
-    return `${baseInstruction} No estilo exigente, seja firme, direto e cobrador. Se estiver abaixo de 4000, trate como agenda insuficiente e pressione por mais compromisso.`;
-  }
-  if (normalizedToneKey === "playful") {
-    return `${baseInstruction} No estilo descontraido, mantenha leveza e humor, mas ainda lembre com clareza quando a agenda dos proximos 10 dias estiver fraca.`;
-  }
-  if (normalizedToneKey === "street") {
-    return `${baseInstruction} No estilo descolado, use texto curto, girias leves e foco em cumprir tarefa. Se estiver abaixo de 4000, deixa claro que a agenda ta curta e precisa subir.`;
-  }
-  return `${baseInstruction} No estilo neutro, fale de forma objetiva e sem drama, deixando explicito quando a agenda estiver abaixo da media minima de 4000.`;
-}
-
 function summarizeProject200ScheduledMinutes(actions) {
   return (Array.isArray(actions) ? actions : []).reduce((sum, action) => {
     const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
@@ -4163,20 +4110,6 @@ function formatProject200CompletedActionLine(action) {
   return `${completedLabel} | ${assignee} | ${title} | concluida`;
 }
 
-function normalizeProject200ChatReply(text) {
-  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
-  if (!cleaned) {
-    return "Foca na próxima tarefa e me chama no microfone que eu te puxo pelo que está pendente.";
-  }
-  if (cleaned.length <= 500 && cleaned.length >= 60) {
-    return cleaned;
-  }
-  if (cleaned.length > 500) {
-    return `${cleaned.slice(0, 497).trim()}...`;
-  }
-  return `${cleaned} Me chama no microfone que eu cruzo isso com tua rotina e te passo o próximo passo.`;
-}
-
 function filterProject200ActionsByProfile(actions, profileName) {
   const normalizedProfile = normalizeStoredProject200ProfileName(profileName);
   return (Array.isArray(actions) ? actions : []).filter((action) => (
@@ -4212,148 +4145,6 @@ function summarizeProject200ProfileProgress(actions) {
     lateStartMinutes,
     completionPercent: totalMinutes > 0 ? Math.round((completedMinutes / totalMinutes) * 100) : 0
   };
-}
-
-async function buildProject200ChatContext(user, profileName) {
-  const selectedProfile = normalizeStoredProject200ProfileName(profileName);
-  const now = new Date();
-  const todayStart = startOfProjectDay(now);
-  const tomorrow = addProjectDays(todayStart, 1);
-  const weekStart = startOfProjectWeek(now);
-  const nextWeek = addProjectDays(weekStart, 7);
-  const next10Days = addProjectDays(todayStart, 10);
-
-  const [todayActions, weekActions, next10DayActions, runtimeState, globalWeekStats, financeMonthSummary, financeTodaySummary, financeNotes, extraGoals] = await Promise.all([
-    listUserActions(user.id, { from: todayStart.toISOString(), to: tomorrow.toISOString() }),
-    listUserActions(user.id, { from: weekStart.toISOString(), to: nextWeek.toISOString() }),
-    listUserActions(user.id, { from: todayStart.toISOString(), to: next10Days.toISOString() }),
-    getProject200RuntimeState(user.id),
-    getStatsSummary(user.id, "week"),
-    summarizeProject200PersonalFinance(user.id, "month-".concat(String(now.getMonth() + 1).padStart(2, "0"))),
-    summarizeProject200PersonalFinance(user.id, "today"),
-    getProject200FinanceNotes(user.id),
-    listExtraGoals(user.id, selectedProfile, now)
-  ]);
-
-  const todayProfileActions = filterProject200ActionsByProfile(todayActions, selectedProfile);
-  const weekProfileActions = filterProject200ActionsByProfile(weekActions, selectedProfile);
-  const next10DayProfileActions = filterProject200ActionsByProfile(next10DayActions, selectedProfile);
-  const ownWeekProgress = summarizeProject200ProfileProgress(weekProfileActions);
-  const plannedMinutesNext10Days = summarizeProject200ScheduledMinutes(next10DayProfileActions);
-  const plannedMinutesBand = describeProject200PlannedMinutesBand(plannedMinutesNext10Days);
-  const runningLine = normalizeStoredProject200ProfileName(runtimeState?.assignee) === selectedProfile && runtimeState?.actionTitle
-    ? `${runtimeState.actionTitle} (${runtimeState.eventType || "start"})`
-    : "nenhuma";
-  const nowMs = now.getTime();
-
-  const pendingToday = todayProfileActions
-    .filter((action) => String(action?.status || "").trim().toUpperCase() !== "COMPLETED")
-    .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
-  const completedToday = todayProfileActions
-    .filter((action) => String(action?.status || "").trim().toUpperCase() === "COMPLETED")
-    .sort((left, right) => {
-      const leftTs = new Date(left.completedAt || left.statusUpdatedAt || left.endAt || 0).getTime();
-      const rightTs = new Date(right.completedAt || right.statusUpdatedAt || right.endAt || 0).getTime();
-      return rightTs - leftTs;
-    });
-  const completedWeek = weekProfileActions
-    .filter((action) => String(action?.status || "").trim().toUpperCase() === "COMPLETED")
-    .sort((left, right) => {
-      const leftTs = new Date(left.completedAt || left.statusUpdatedAt || left.endAt || 0).getTime();
-      const rightTs = new Date(right.completedAt || right.statusUpdatedAt || right.endAt || 0).getTime();
-      return rightTs - leftTs;
-    });
-  const overdueToday = pendingToday.filter((action) => {
-    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
-    return Number.isFinite(startAt) && startAt < nowMs;
-  });
-  const upcomingToday = pendingToday.filter((action) => {
-    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
-    return Number.isFinite(startAt) && startAt >= nowMs;
-  });
-  const overduePendingMinutes = overdueToday.reduce((sum, action) => {
-    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
-    if (!Number.isFinite(startAt) || startAt >= nowMs) {
-      return sum;
-    }
-    return sum + Math.max(0, Math.round((nowMs - startAt) / 60000));
-  }, 0);
-
-  const selectedWeekStats = globalWeekStats?.byAssignee?.[selectedProfile] || {};
-  const todayCompletedPoints = todayProfileActions.reduce((sum, action) => {
-    if (String(action?.status || "").trim().toUpperCase() !== "COMPLETED") {
-      return sum;
-    }
-    const startAt = action?.startAt ? new Date(action.startAt).getTime() : NaN;
-    const endAt = action?.endAt ? new Date(action.endAt).getTime() : NaN;
-    if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
-      return sum;
-    }
-    return sum + Math.max(0, Math.round((endAt - startAt) / 60000));
-  }, 0);
-  const selectedWeekSummary = {
-    totalMinutes: Number(selectedWeekStats?.totalMinutes || ownWeekProgress.totalMinutes || 0),
-    completedMinutes: Number(selectedWeekStats?.completedMinutes || ownWeekProgress.completedMinutes || 0),
-    lateStartMinutes: overduePendingMinutes,
-    completionPercent: ownWeekProgress.completionPercent,
-    plannedMinutesNext10Days
-  };
-  const financeNotesText = clipProject200Text(financeNotes?.notes || "", 320);
-  const extraGoalsSummary = summarizeExtraGoals(extraGoals);
-
-  return {
-    ownWeekProgress: selectedWeekSummary,
-    contextText: [
-      `Usuario logado: ${user.username || user.email || "usuario"}.`,
-      `Perfil ativo do /200: ${selectedProfile}.`,
-      `Agora no Brasil (${PROJECT200_TIME_ZONE}): ${formatProjectNowLabel(now)}.`,
-      `Tarefa em andamento do perfil: ${runningLine}.`,
-      `Semana do perfil: ${selectedWeekSummary.completionPercent}% | ${selectedWeekSummary.completedMinutes}/${selectedWeekSummary.totalMinutes} min concluidos.`,
-      `Minutos agendados nos proximos 10 dias: ${plannedMinutesNext10Days}. Faixa: ${plannedMinutesBand}. Referencia: 500 muito baixo, 1000 fraco, 2000 pouco mas bom para comecar, 4000 media minima, acima de 6000 ideal.`,
-      `Pontos do perfil hoje: ${todayCompletedPoints}.`,
-      `Pontos do perfil na semana: ${selectedWeekSummary.completedMinutes}.`,
-      `Tarefas concluidas hoje: ${completedToday.length ? completedToday.slice(0, 8).map((item) => formatProject200CompletedActionLine(item)).join(" | ") : "nenhuma"}.`,
-      `Ultimas tarefas concluidas na semana: ${completedWeek.length ? completedWeek.slice(0, 8).map((item) => formatProject200CompletedActionLine(item)).join(" | ") : "nenhuma"}.`,
-      `Atraso pendente agora: ${selectedWeekSummary.lateStartMinutes}m em ${overdueToday.length} tarefa(s) ainda nao concluidas.`,
-      `Pendencias atrasadas de hoje: ${overdueToday.length ? overdueToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
-      `Proximas tarefas de hoje: ${upcomingToday.length ? upcomingToday.slice(0, 6).map((item) => formatProject200ActionLine(item, now)).join(" | ") : "nenhuma"}.`,
-      `Financeiro pessoal hoje: entradas ${Math.round(Number(financeTodaySummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeTodaySummary?.expenseCents || 0) / 100)} reais | pendencias ${Number(financeTodaySummary?.pendingCount || 0)}.`,
-      `Financeiro pessoal do mes: entradas ${Math.round(Number(financeMonthSummary?.incomeCents || 0) / 100)} reais | saidas ${Math.round(Number(financeMonthSummary?.expenseCents || 0) / 100)} reais | saldo atual ${Math.round(Number(financeMonthSummary?.balanceCents || 0) / 100)} reais | lancamentos ${Number(financeMonthSummary?.totalEntries || 0)}.`,
-      `Notas financeiras pessoais: ${financeNotesText || "vazias"}.`,
-      `Missoes extras do perfil hoje: ${extraGoalsSummary.total ? extraGoalsSummary.lines.join(" | ") : "nenhuma"}.`,
-      `Faltas nas missoes extras de hoje: ${extraGoalsSummary.missingLines.length ? extraGoalsSummary.missingLines.join(" | ") : "nenhuma"}.`,
-      `Considere somente os dados deste perfil, sem misturar informacoes de outros perfis da conta.`
-    ].join("\n")
-  };
-}
-
-async function buildProject200ChatSystemPrompt({ user, chat, toneKey, profileName }) {
-  const recentMessages = Array.isArray(chat?.messages) ? chat.messages.slice(-16) : [];
-  const memory = recentMessages
-    .filter((item) => item.role === "user")
-    .map((item) => `Usuario: ${clipProject200Text(item.content, 180)}`)
-    .join(" | ");
-  const { ownWeekProgress, contextText } = await buildProject200ChatContext(user, profileName);
-  const globalPromptSettings = await getProject200ChatPromptSettings();
-  const tonePromptKey = String(toneKey || "neutral").trim().toLowerCase();
-  const globalPrompt = String(globalPromptSettings?.prompts?.[tonePromptKey] || "").trim();
-
-  return [
-    "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto.",
-    "Voce e o chat de Conversas do /200, neutro por padrao e moldado apenas pelo contexto do /200.",
-    "Para comentar o usuario, foque primeiro nos dados de acoes e estatisticas. Quando o assunto pedir, voce tambem pode usar o financeiro pessoal, as notas financeiras e as missoes extras do usuario.",
-    "Regras obrigatorias: resposta entre 60 e 500 caracteres; sem markdown; texto corrido ou no maximo duas frases curtas; fale como mensageiro fluido e rapido.",
-    "Sempre que fizer sentido, puxe o foco para tarefa atrasada, tarefa atual, proxima tarefa, disciplina semanal ou missao extra faltando no dia.",
-    "Nunca cobre como atrasada uma tarefa que ja esteja concluida, mesmo que ela tenha sido concluida depois do horario.",
-    "Se o usuario pedir algo fora da rotina, ainda responda, mas mantenha consciencia do contexto do /200.",
-    "Nao herde tom, vocabulario, tema, religiosidade, ministerio infantil ou qualquer persona externa ao /200.",
-    "Cada nova resposta deve tratar o Contexto vivo do /200 como uma consulta fresca do backend. Se a memoria recente da conversa conflitar com o contexto vivo, o contexto vivo vence.",
-    "Use a memoria recente apenas para entender o assunto e a forma de responder. Nunca use a memoria recente para afirmar status, atraso, conclusao ou inexistencia de tarefas; esses fatos devem vir somente do Contexto vivo do /200.",
-    buildProject200ToneInstructions(tonePromptKey, ownWeekProgress),
-    globalPrompt ? `Use exatamente este prompt global do estilo selecionado, escrito pela RoseMattos: ${globalPrompt}` : "",
-    `Memoria recente da conversa: ${memory || "vazia"}.`,
-    `Contexto vivo do /200:\n${contextText}`
-  ].filter(Boolean).join("\n\n");
 }
 
 async function buildMiniChatCompletionPrompt({ user, chat, modeKey, message, extraContext = "" }) {
@@ -7842,163 +7633,6 @@ async function handleMiniChatMessageRequest(request, response, chatId) {
   }
 }
 
-async function handleProject200ChatDetailRequest(request, response) {
-  const user = await requireAuth(request, response);
-  if (!user) {
-    return;
-  }
-
-  try {
-    const requestUrl = new URL(request.url || "/api/200/chat", `http://${request.headers.host || "localhost"}`);
-    const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
-    const toneKey = String(requestUrl.searchParams.get("tone") || "neutral").trim().toLowerCase();
-    let chat = await getProject200Chat(user.id, selectedProfile, toneKey);
-    if (!chat) {
-      chat = await createProject200Chat(user.id, selectedProfile, toneKey, { title: "Conversas" });
-    }
-    sendJson(response, 200, { ok: true, chat, profile: selectedProfile, tone: toneKey });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel carregar as conversas."
-    });
-  }
-}
-
-async function handleProject200ChatMessageRequest(request, response) {
-  const user = await requireAuth(request, response);
-  if (!user) {
-    return;
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    sendJson(response, 503, {
-      error: "OPENAI_API_KEY nao configurada.",
-      hint: "Defina OPENAI_API_KEY no Render ou no arquivo .env local."
-    });
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, { error: error.message });
-    return;
-  }
-
-  const message = String(body?.message || "").trim();
-  if (!message) {
-    sendJson(response, 400, { error: "Mensagem ausente." });
-    return;
-  }
-
-  const toneKey = String(body?.tone || "neutral").trim().toLowerCase();
-  const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
-
-  try {
-    let chat = await getProject200Chat(user.id, selectedProfile, toneKey);
-    if (!chat) {
-      chat = await createProject200Chat(user.id, selectedProfile, toneKey, { title: createProject200ChatTitleFromMessage(message) });
-    }
-
-    const userEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
-    const currentMessages = [...(chat.messages || [])].slice(-20);
-    const system = await buildProject200ChatSystemPrompt({
-      user,
-      chat: { ...chat, messages: currentMessages },
-      toneKey,
-      profileName: selectedProfile
-    });
-
-    const completion = await createChatCompletion(apiKey, {
-      model: OPENAI_INSTANT_MODEL || "gpt-4.1-nano",
-      temperature: 0.7,
-      max_completion_tokens: 260,
-      messages: [
-        { role: "system", content: system },
-        ...currentMessages
-          .filter((item) => item.role === "user" || item.role === "assistant")
-          .map((item) => ({
-            role: item.role,
-            content: String(item.content || "")
-          })),
-        { role: "user", content: message }
-      ]
-    }, {
-      timeoutMs: 30000,
-      timeoutMessage: "A resposta da OpenAI demorou demais para o chat do /200."
-    });
-
-    const replyText = normalizeProject200ChatReply(extractChatCompletionText(completion));
-    const assistantEntry = { role: "assistant", content: replyText, createdAt: new Date().toISOString() };
-    const nextChat = await appendProject200ChatMessages(user.id, selectedProfile, toneKey, [userEntry, assistantEntry], {
-      title: chat.title === "Conversas" ? createProject200ChatTitleFromMessage(message) : chat.title,
-      lastMessageAt: new Date().toISOString()
-    });
-
-    sendJson(response, 200, {
-      ok: true,
-      model: OPENAI_INSTANT_MODEL || "gpt-4.1-nano",
-      profile: selectedProfile,
-      chat: nextChat,
-      replyText
-    });
-  } catch (error) {
-    sendJson(response, 500, {
-      error: "Falha ao gerar resposta das conversas do /200.",
-      details: error instanceof Error ? error.message : "Erro desconhecido."
-    });
-  }
-}
-
-async function handleProject200ChatPromptGetRequest(request, response) {
-  const adminUser = await requireAdmin(request, response);
-  if (!adminUser) {
-    return;
-  }
-
-  try {
-    const settings = await getProject200ChatPromptSettings();
-    sendJson(response, 200, { ok: true, settings, user: sanitizeUser(adminUser) });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel carregar o prompt global do /200."
-    });
-  }
-}
-
-async function handleProject200ChatPromptSaveRequest(request, response) {
-  const adminUser = await requireAdmin(request, response);
-  if (!adminUser) {
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, { error: error.message });
-    return;
-  }
-
-  try {
-    const current = await getProject200ChatPromptSettings();
-    const toneKey = String(body?.tone || "neutral").trim().toLowerCase();
-    const settings = await saveProject200ChatPromptSettings({
-      prompts: {
-        ...(current?.prompts || {}),
-        [toneKey]: String(body?.prompt || "")
-      }
-    });
-    sendJson(response, 200, { ok: true, settings, user: sanitizeUser(adminUser) });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel salvar o prompt global do /200."
-    });
-  }
-}
-
 async function createStripeCheckout({ request, user, product }) {
   const stripe = getStripeClient();
   const baseUrl = getBaseUrl(request);
@@ -11395,26 +11029,6 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Não foi possível exportar os dados do /200."
       });
     }
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/200/chat") {
-    await handleProject200ChatDetailRequest(request, response);
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/chat/messages") {
-    await handleProject200ChatMessageRequest(request, response);
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/admin/project200/chat-prompt") {
-    await handleProject200ChatPromptGetRequest(request, response);
-    return;
-  }
-
-  if (request.method === "PUT" && pathname === "/api/admin/project200/chat-prompt") {
-    await handleProject200ChatPromptSaveRequest(request, response);
     return;
   }
 

@@ -25,8 +25,6 @@ export const DEFAULT_BANNERS = {
 
 export const DEFAULT_TEXT_OVERRIDES = {};
 export const DEFAULT_ALBUM_ZIP_LINKS = {};
-export const DEFAULT_PROJECT200_CHAT_PROMPT = "";
-const PROJECT200_CHAT_TONE_KEYS = ["neutral", "motivator", "strict", "playful", "street"];
 
 export const DEFAULT_SCHEDULE = [
   { monthLabel: "Setembro", dateLabel: "06/09", place: "Igreja Assembleia de Deus Belem", city: "Pinheiros - SP", time: "10:00" },
@@ -212,15 +210,6 @@ export async function ensureSiteConfigSchema() {
         [JSON.stringify(DEFAULT_ALBUM_ZIP_LINKS)]
       );
 
-      await query(
-        `
-          insert into app_settings (key, value)
-          values ('project200_chat_prompt', $1::jsonb)
-          on conflict (key) do nothing
-        `,
-        [JSON.stringify({ prompts: buildDefaultProject200ChatPrompts() })]
-      );
-
       const existingAgenda = await query("select count(*)::int as total from agenda_events");
 
       if ((existingAgenda.rows[0]?.total || 0) === 0) {
@@ -376,60 +365,6 @@ export async function saveAlbumZipLink({ productId, albumName, zipUrl, sourceTyp
   );
 
   return normalizeAlbumZipLinks(payload);
-}
-
-function buildDefaultProject200ChatPrompts() {
-  return PROJECT200_CHAT_TONE_KEYS.reduce((accumulator, key) => {
-    accumulator[key] = DEFAULT_PROJECT200_CHAT_PROMPT;
-    return accumulator;
-  }, {});
-}
-
-function normalizeProject200ChatPrompts(value) {
-  const source = typeof value?.prompts === "object" && value?.prompts
-    ? value.prompts
-    : typeof value === "object" && value
-      ? value
-      : {};
-  const legacyPrompt = String(value?.prompt || "").trim().slice(0, 12000);
-  const prompts = buildDefaultProject200ChatPrompts();
-  for (const key of PROJECT200_CHAT_TONE_KEYS) {
-    const raw = String(source?.[key] || "").trim().slice(0, 12000);
-    prompts[key] = raw || legacyPrompt || "";
-  }
-  return prompts;
-}
-
-export async function getProject200ChatPromptSettings() {
-  if (!hasDatabase()) {
-    return { prompts: buildDefaultProject200ChatPrompts() };
-  }
-
-  await ensureSiteConfigSchema();
-  const result = await query("select value from app_settings where key = 'project200_chat_prompt' limit 1");
-  return {
-    prompts: normalizeProject200ChatPrompts(result.rows[0]?.value || {})
-  };
-}
-
-export async function saveProject200ChatPromptSettings({ prompts }) {
-  await ensureSiteConfigSchema();
-  const payload = {
-    prompts: normalizeProject200ChatPrompts({ prompts })
-  };
-
-  await query(
-    `
-      insert into app_settings (key, value, updated_at)
-      values ('project200_chat_prompt', $1::jsonb, now())
-      on conflict (key) do update
-        set value = excluded.value,
-            updated_at = now()
-    `,
-    [JSON.stringify(payload)]
-  );
-
-  return payload;
 }
 
 export async function getScheduleEntries() {

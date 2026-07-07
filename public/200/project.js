@@ -15,28 +15,6 @@ const taskBeepOptionLabels = new Map([
   [5, "Cinco vezes"],
   [10, "Dez vezes"]
 ]);
-const chatToneModes = [
-  {
-    key: "neutral",
-    label: "Neutro"
-  },
-  {
-    key: "motivator",
-    label: "Motivador"
-  },
-  {
-    key: "strict",
-    label: "Exigente"
-  },
-  {
-    key: "playful",
-    label: "Descontraído"
-  },
-  {
-    key: "street",
-    label: "Descolado"
-  }
-];
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const actionStatuses = {
   pending: "PENDING",
@@ -315,9 +293,6 @@ const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption
 const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
 const toggleScreenLockOptionButton = document.getElementById("toggleScreenLockOption");
 const toggleScreenLockHint = document.getElementById("toggleScreenLockHint");
-const toggleChatToneOptionButton = document.getElementById("toggleChatToneOption");
-const toggleChatToneHint = document.getElementById("toggleChatToneHint");
-const chatToneDetailHint = document.getElementById("chatToneDetailHint");
 const openProject200ExportModalButton = document.getElementById("openProject200ExportModal");
 const project200ExportModal = document.getElementById("project200ExportModal");
 const project200ExportUsernameInput = document.getElementById("project200ExportUsername");
@@ -405,19 +380,11 @@ const runningMissionQuickFocusProgressFill = document.getElementById("runningMis
 const runningMissionQuickFocusLinked = document.getElementById("runningMissionQuickFocusLinked");
 const runningMissionQuickFocusLinkedLabel = document.getElementById("runningMissionQuickFocusLinkedLabel");
 const runningMissionQuickFocusLinkedProgressFill = document.getElementById("runningMissionQuickFocusLinkedProgressFill");
-const conversationsMessages = document.getElementById("conversationsMessages");
-const conversationsTranscript = document.getElementById("conversationsTranscript");
-const conversationsStatus = document.getElementById("conversationsStatus");
-const conversationsMicButton = document.getElementById("conversationsMicButton");
-const conversationsToneChip = document.getElementById("conversationsToneChip");
-const openConversationsPromptButton = document.getElementById("openConversationsPromptButton");
-const conversationsPromptInput = document.getElementById("conversationsPromptInput");
-const conversationsPromptMessage = document.getElementById("conversationsPromptMessage");
-const saveConversationsPromptButton = document.getElementById("saveConversationsPromptButton");
-const conversationsPromptToneChip = document.getElementById("conversationsPromptToneChip");
-const conversationsPromptToneLabel = document.getElementById("conversationsPromptToneLabel");
 const homeDateTimeLabel = document.getElementById("homeDateTimeLabel");
-const openRunningTaskModalButton = document.getElementById("openRunningTaskModal");
+const homeRunningProgressRing = document.getElementById("homeRunningProgressRing");
+const homeRunningPercent = document.getElementById("homeRunningPercent");
+const homeRunningModeTimeBtn = document.getElementById("homeRunningModeTimeBtn");
+const homeRunningModePercentBtn = document.getElementById("homeRunningModePercentBtn");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
 const quickTaskTitleInput = document.getElementById("quickTaskTitleInput");
 const quickTaskMinutesInput = document.getElementById("quickTaskMinutesInput");
@@ -566,6 +533,8 @@ const project200RegisterTabButton = document.getElementById("project200RegisterT
 const project200LoginPanel = document.getElementById("project200LoginPanel");
 const project200RegisterPanel = document.getElementById("project200RegisterPanel");
 const project200LoginMessage = document.getElementById("project200LoginMessage");
+const globalLoadingOverlay = document.getElementById("globalLoadingOverlay");
+const globalLoadingIcon = document.getElementById("globalLoadingIcon");
 const profileManageOverlay = document.getElementById("profileManageOverlay");
 const profileManageTitle = document.getElementById("profileManageTitle");
 const profileManageTargetLabel = document.getElementById("profileManageTargetLabel");
@@ -582,7 +551,6 @@ const project200CreateProfileNameInput = document.getElementById("project200Crea
 const project200CreateProfileMessage = document.getElementById("project200CreateProfileMessage");
 const project200CreateProfileConfirmButton = document.getElementById("project200CreateProfileConfirm");
 const homeProfileButton = document.getElementById("homeProfileButton");
-const homeProfileAvatar = document.getElementById("homeProfileAvatar");
 const homeProfileName = document.getElementById("homeProfileName");
 const profileRenameInput = document.getElementById("profileRenameInput");
 const profileRenameMessage = document.getElementById("profileRenameMessage");
@@ -602,6 +570,15 @@ const profileAvatarFileInput = document.getElementById("profileAvatarFileInput")
 const profileAvatarChooseButton = document.getElementById("profileAvatarChooseButton");
 const profileAvatarFileName = document.getElementById("profileAvatarFileName");
 const profileAvatarMessage = document.getElementById("profileAvatarMessage");
+const loadingIconByArea = {
+  actions: "/200/icons/acts.svg",
+  missions: "/200/icons/target.svg",
+  stats: "/200/icons/stats.svg",
+  ideas: "/200/icons/text.svg",
+  options: "/200/icons/options.svg"
+};
+let globalLoadingCount = 0;
+let globalLoadingPreferredIcon = loadingIconByArea.actions;
 const profileAvatarUploadButton = document.getElementById("profileAvatarUploadButton");
 const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -636,15 +613,6 @@ let historyAudioContext = null;
 let historyAudioAnalyser = null;
 let historySpeechMonitorTimer = null;
 let historyLastSpeechAt = 0;
-let conversationsMediaRecorder = null;
-let conversationsMediaStream = null;
-let conversationsAudioContext = null;
-let conversationsAudioAnalyser = null;
-let conversationsSpeechMonitorTimer = null;
-let conversationsLastSpeechAt = 0;
-let conversationsTypingTimer = null;
-let conversationsIsRecording = false;
-let conversationsPromptToneKey = "neutral";
 let financeEntryConfirmResolve = null;
 let actionMediaRecorder = null;
 let actionMediaStream = null;
@@ -771,7 +739,6 @@ const state = {
   actions: [],
   historySystem: [],
   historyTexts: [],
-  conversationChat: null,
   authUser: null,
   profiles: [],
   selectedProfile: defaultProjectProfileName,
@@ -816,7 +783,6 @@ const state = {
     showFreeTime: true,
     completionBeepCycles: 0,
     backgroundTheme: "black",
-    chatTone: "neutral",
     screenLockEnabled: false,
     stopMusicOnFinish: false
   },
@@ -992,11 +958,6 @@ function getBackgroundThemeMode(value) {
   return backgroundThemeModes.find((item) => item.key === normalized) || backgroundThemeModes[0];
 }
 
-function getChatToneMode(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  return chatToneModes.find((item) => item.key === normalized) || chatToneModes[0];
-}
-
 function applyBackgroundTheme() {
   document.body.dataset.backgroundTheme = normalizeBackgroundTheme(state.options.backgroundTheme);
 }
@@ -1101,6 +1062,74 @@ function setToken(token) {
   persistTokenToNative(token);
 }
 
+function getActiveModalLoadingIcon() {
+  const activeModalId = String(document.querySelector(".workspace-modal.active")?.id || "").trim();
+  if (activeModalId === "historyModal" || activeModalId === "missionCreateModal" || activeModalId === "missionAdjustModal" || activeModalId === "missionProgressModal" || activeModalId === "runningMissionQuickModal") {
+    return loadingIconByArea.missions;
+  }
+  if (activeModalId === "statsModal" || activeModalId === "statsAspectModal" || activeModalId === "statsAspectAssignModal") {
+    return loadingIconByArea.stats;
+  }
+  if (activeModalId === "optionsModal" || activeModalId === "profileAvatarModal" || activeModalId === "profileRenameModal" || activeModalId === "profileManageOverlay") {
+    return loadingIconByArea.options;
+  }
+  if (activeModalId === "ideasModal") {
+    return loadingIconByArea.ideas;
+  }
+  return loadingIconByArea.actions;
+}
+
+function resolveLoadingIconForPath(path = "", preferredIcon = "") {
+  const normalizedPath = String(path || "").trim().toLowerCase();
+  if (normalizedPath.includes("/api/200/goals") || normalizedPath.includes("/api/200/goal-progress") || normalizedPath.includes("/api/200/stats-aspects")) {
+    return loadingIconByArea.missions;
+  }
+  if (normalizedPath.includes("/api/200/stats") || normalizedPath.includes("/api/stats") || normalizedPath.includes("/api/history")) {
+    return loadingIconByArea.stats;
+  }
+  if (normalizedPath.includes("/api/200/profiles") || normalizedPath.includes("/api/auth/register")) {
+    return loadingIconByArea.options;
+  }
+  if (normalizedPath.includes("/api/auth") || normalizedPath.includes("/api/actions") || normalizedPath.includes("/api/runtime")) {
+    return loadingIconByArea.actions;
+  }
+  return String(preferredIcon || "").trim() || globalLoadingPreferredIcon || getActiveModalLoadingIcon();
+}
+
+function beginGlobalLoading(iconSrc = "") {
+  globalLoadingCount += 1;
+  const resolvedIcon = resolveLoadingIconForPath("", iconSrc);
+  globalLoadingPreferredIcon = resolvedIcon || globalLoadingPreferredIcon;
+  if (globalLoadingIcon && resolvedIcon) {
+    globalLoadingIcon.src = resolvedIcon;
+  }
+  if (globalLoadingOverlay) {
+    globalLoadingOverlay.hidden = false;
+    globalLoadingOverlay.setAttribute("aria-hidden", "false");
+  }
+}
+
+function endGlobalLoading() {
+  globalLoadingCount = Math.max(0, globalLoadingCount - 1);
+  if (globalLoadingCount > 0) {
+    return;
+  }
+  if (globalLoadingOverlay) {
+    globalLoadingOverlay.hidden = true;
+    globalLoadingOverlay.setAttribute("aria-hidden", "true");
+  }
+}
+
+async function runWithGlobalLoading(task, options = {}) {
+  const iconSrc = resolveLoadingIconForPath(options.path || "", options.iconSrc || "");
+  beginGlobalLoading(iconSrc);
+  try {
+    return await task();
+  } finally {
+    endGlobalLoading();
+  }
+}
+
 function readSelectedProfile() {
   const saved = String(window.localStorage.getItem(projectProfileKey) || "");
   const matched = getProfileByName(saved);
@@ -1140,10 +1169,6 @@ function applySelectedProfile(profile) {
 }
 
 function renderHomeProfileHero() {
-  if (homeProfileAvatar) {
-    homeProfileAvatar.src = "/200/branding/mindset-trainer.png";
-    homeProfileAvatar.alt = "Mindset Trainer";
-  }
   if (homeProfileName) {
     homeProfileName.textContent = "";
   }
@@ -1643,10 +1668,18 @@ function getRunningRingDashOffset(percent) {
   return RUNNING_RING_CIRCUMFERENCE * (1 - (safe / 100));
 }
 
+function setProgressRingPercent(ringElement, percent) {
+  if (!ringElement) return;
+  ringElement.style.strokeDasharray = `${RUNNING_RING_CIRCUMFERENCE} ${RUNNING_RING_CIRCUMFERENCE}`;
+  ringElement.style.strokeDashoffset = String(getRunningRingDashOffset(percent));
+}
+
 function setRunningRingPercent(percent) {
-  if (!runningTaskProgressRing) return;
-  runningTaskProgressRing.style.strokeDasharray = `${RUNNING_RING_CIRCUMFERENCE} ${RUNNING_RING_CIRCUMFERENCE}`;
-  runningTaskProgressRing.style.strokeDashoffset = String(getRunningRingDashOffset(percent));
+  setProgressRingPercent(runningTaskProgressRing, percent);
+}
+
+function setHomeRingPercent(percent) {
+  setProgressRingPercent(homeRunningProgressRing, percent);
 }
 
 function formatRunningCenter(percent, percentPrecise, remainingMinutes, remainingSeconds, showPercent) {
@@ -1681,6 +1714,8 @@ function formatRunningDateTitle(date = new Date()) {
 function updateRunningCenterModeButtons(mode) {
   if (runningModePercentBtn) runningModePercentBtn.classList.toggle("active", mode === "percent");
   if (runningModeTimeBtn) runningModeTimeBtn.classList.toggle("active", mode === "time");
+  if (homeRunningModePercentBtn) homeRunningModePercentBtn.classList.toggle("active", mode === "percent");
+  if (homeRunningModeTimeBtn) homeRunningModeTimeBtn.classList.toggle("active", mode === "time");
 }
 
 function setRunningCompletionVisualState(isCompletion) {
@@ -2099,10 +2134,25 @@ function anchorToCurrentAction() {
 }
 
 function renderHomeRunningTask() {
-  if (state.runningCompletion.active) {
-    if (openRunningTaskModalButton) {
-      openRunningTaskModalButton.hidden = false;
+  const syncHomeWidget = ({
+    percent = 0,
+    centerMarkup = "0%",
+    ariaLabel = "Painel da rotina"
+  } = {}) => {
+    setHomeRingPercent(percent);
+    if (homeRunningPercent) {
+      homeRunningPercent.innerHTML = centerMarkup;
     }
+    if (homeProfileButton) {
+      homeProfileButton.setAttribute("aria-label", ariaLabel);
+    }
+  };
+  if (state.runningCompletion.active) {
+    syncHomeWidget({
+      percent: state.runningCompletion.displayPercent,
+      centerMarkup: formatRunningPercentMarkup(state.runningCompletion.displayPercent),
+      ariaLabel: "Painel da rotina em conclusão"
+    });
     if (state.runningCompletion.phase === "celebration") {
       renderRunningCompletionCelebration();
       return;
@@ -2121,9 +2171,6 @@ function renderHomeRunningTask() {
     state.runningPlayer.defaultAppliedActionId = runningActionId;
   }
   const hasRunning = Boolean(action);
-  if (openRunningTaskModalButton) {
-    openRunningTaskModalButton.hidden = false;
-  }
   if (!runningTaskName || !runningTaskProgressRing || !runningTaskPercent || !runningTaskMinutesLeft || !runningTaskNextName) {
     return;
   }
@@ -2132,12 +2179,13 @@ function renderHomeRunningTask() {
     const now = new Date();
     const dayElapsedPercent = getDayElapsedPercent(now);
     const showPercent = state.runningCenterMode === "percent";
+    const homeCenterMarkup = showPercent ? formatRunningPercentMarkup(dayElapsedPercent) : formatRunningClockMarkup(now);
     runningTaskName.innerHTML = formatRunningTaskTitleMarkup(formatRunningDateTitle(now));
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
     }
     setRunningRingPercent(dayElapsedPercent);
-    runningTaskPercent.innerHTML = showPercent ? formatRunningPercentMarkup(dayElapsedPercent) : formatRunningClockMarkup(now);
+    runningTaskPercent.innerHTML = homeCenterMarkup;
     runningTaskMinutesLeft.textContent = state.runningIdleTopMode === "percent"
       ? `${Math.round(dayElapsedPercent)}% do dia já passou`
       : "Toque aqui para ver % do dia";
@@ -2167,11 +2215,17 @@ function renderHomeRunningTask() {
       runningTaskStartNextButton.dataset.actionId = String(nextPending?.id || "");
       runningTaskStartNextButton.dataset.kind = "action";
     }
+    syncHomeWidget({
+      percent: dayElapsedPercent,
+      centerMarkup: homeCenterMarkup,
+      ariaLabel: "Painel da rotina sem tarefa em andamento"
+    });
     renderRunningMusicPlayer();
     return;
   }
   if (isSleepAction(action)) {
     const sleepMinutes = getSleepTrackedMinutes(action);
+    const sleepCenterMarkup = formatRunningClockMarkup(new Date());
     runningTaskName.innerHTML = formatRunningTaskTitleMarkup("Sono");
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
@@ -2179,7 +2233,7 @@ function renderHomeRunningTask() {
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     runningTaskMinutesLeft.textContent = sleepMinutes > 0 ? formatMinutesHuman(sleepMinutes) : "Preparando";
     setRunningRingPercent(100);
-    runningTaskPercent.innerHTML = formatRunningClockMarkup(new Date());
+    runningTaskPercent.innerHTML = sleepCenterMarkup;
     setRunningNextDisplay("Toque para abrir", 0);
     if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = false;
     if (runningTaskListButton) runningTaskListButton.hidden = false;
@@ -2190,6 +2244,11 @@ function renderHomeRunningTask() {
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
     if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
     if (runningTaskStartNextButton) runningTaskStartNextButton.hidden = true;
+    syncHomeWidget({
+      percent: 100,
+      centerMarkup: sleepCenterMarkup,
+      ariaLabel: "Sono em andamento"
+    });
     renderRunningMusicPlayer();
     return;
   }
@@ -2217,7 +2276,8 @@ function renderHomeRunningTask() {
     : state.runningCenterMode === "time"
       ? false
       : false;
-  runningTaskPercent.innerHTML = formatRunningCenter(percent, percentPrecise, estimatedRemaining, remainingSeconds, showPercent);
+  const runningCenterMarkup = formatRunningCenter(percent, percentPrecise, estimatedRemaining, remainingSeconds, showPercent);
+  runningTaskPercent.innerHTML = runningCenterMarkup;
   updateRunningCenterModeButtons(showPercent ? "percent" : "time");
   void tryPlayRunningMinuteCue(String(action.id || ""), estimatedRemaining);
   if (remainingSeconds <= 0) {
@@ -2250,6 +2310,11 @@ function renderHomeRunningTask() {
   if (runningTaskStartNextButton) {
     runningTaskStartNextButton.hidden = true;
   }
+  syncHomeWidget({
+    percent,
+    centerMarkup: runningCenterMarkup,
+    ariaLabel: `${formatActionTitleForDisplay(action.title)} em andamento`
+  });
   renderRunningMusicPlayer();
 }
 
@@ -3404,18 +3469,23 @@ async function apiRequest(path, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(getApiUrl(path), {
-    ...options,
-    headers
+  return runWithGlobalLoading(async () => {
+    const response = await fetch(getApiUrl(path), {
+      ...options,
+      headers
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(payload?.error || "Falha na requisicao.");
+    }
+
+    return payload;
+  }, {
+    path,
+    iconSrc: options.loadingIcon || ""
   });
-
-  const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(payload?.error || "Falha na requisicao.");
-  }
-
-  return payload;
 }
 
 async function apiRequestWithTimeout(path, options = {}, timeoutMs = 12000) {
@@ -3537,20 +3607,6 @@ function openModal(id) {
     startFinancePresentation();
   }
 
-  if (id === "conversationsModal") {
-    renderOptionsModal();
-    void loadConversationChat();
-  }
-
-  if (id === "conversationsPromptModal") {
-    if (conversationsPromptMessage) {
-      conversationsPromptMessage.textContent = "";
-    }
-    conversationsPromptToneKey = getChatToneMode(state.options.chatTone).key;
-    void loadConversationsPromptEditor();
-    window.setTimeout(() => conversationsPromptInput?.focus(), 40);
-  }
-
   if (id === "profileRenameModal") {
     if (profileRenameMessage) {
       profileRenameMessage.textContent = "";
@@ -3642,13 +3698,6 @@ function closeModal(modal) {
     closeHistoryTextComposer();
   }
 
-  if (modal.id === "conversationsModal") {
-    stopConversationMic();
-    if (conversationsTypingTimer) {
-      window.clearInterval(conversationsTypingTimer);
-      conversationsTypingTimer = null;
-    }
-  }
   if (modal.id === "profileAvatarModal") {
     resetProfileAvatarModal();
     profileAvatarTargetId = "";
@@ -5545,10 +5594,13 @@ async function ensureProject200Session() {
     return false;
   }
   try {
-    const response = await fetch(getApiUrl("/api/auth/me"), {
+    const response = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/me"), {
       headers: {
         Authorization: `Bearer ${token}`
       }
+    }), {
+      path: "/api/auth/me",
+      iconSrc: loadingIconByArea.actions
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -5743,13 +5795,16 @@ async function submitProfileAvatarGeneration() {
   renderProfileAvatarModal();
 
   try {
-    const response = await fetch(getApiUrl(`/api/200/profiles/${encodeURIComponent(profile.id)}/avatar/generate`), {
+    const response = await runWithGlobalLoading(() => fetch(getApiUrl(`/api/200/profiles/${encodeURIComponent(profile.id)}/avatar/generate`), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": profileAvatarReferenceFile.type || "application/octet-stream"
       },
       body: profileAvatarReferenceFile
+    }), {
+      path: "/api/200/profiles/avatar/generate",
+      iconSrc: loadingIconByArea.options
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -5808,13 +5863,16 @@ async function submitProfileAvatarUpload() {
   renderProfileAvatarModal();
 
   try {
-    const response = await fetch(getApiUrl(`/api/200/profiles/${encodeURIComponent(profile.id)}/avatar/upload`), {
+    const response = await runWithGlobalLoading(() => fetch(getApiUrl(`/api/200/profiles/${encodeURIComponent(profile.id)}/avatar/upload`), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": profileAvatarReferenceFile.type || "application/octet-stream"
       },
       body: profileAvatarReferenceFile
+    }), {
+      path: "/api/200/profiles/avatar/upload",
+      iconSrc: loadingIconByArea.options
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -8124,301 +8182,6 @@ async function saveTaskComposer() {
   }
 }
 
-function renderConversationMessages() {
-  if (!conversationsMessages) {
-    return;
-  }
-  const shouldStick = conversationsMessages.scrollHeight - conversationsMessages.scrollTop - conversationsMessages.clientHeight < 90;
-  const messages = Array.isArray(state.conversationChat?.messages) ? state.conversationChat.messages : [];
-  conversationsMessages.innerHTML = "";
-  if (!messages.length) {
-    conversationsMessages.innerHTML = '<div class="empty-state">Sem mensagens</div>';
-    return;
-  }
-  messages.forEach((entry) => {
-    const role = entry.role === "assistant" ? "assistant" : "user";
-    const bubble = document.createElement("article");
-    bubble.className = `conversation-bubble conversation-bubble-${role}`;
-    bubble.dataset.conversationRole = role;
-    bubble.innerHTML = `
-      <div class="conversation-bubble-label">${role === "assistant" ? "Conversas" : "Você"}</div>
-      <div class="conversation-bubble-text">${escapeHtml(String(entry.content || ""))}</div>
-    `;
-    conversationsMessages.appendChild(bubble);
-  });
-  if (shouldStick) {
-    conversationsMessages.scrollTop = conversationsMessages.scrollHeight;
-  }
-}
-
-function typeConversationAssistantReply(text) {
-  if (!conversationsMessages) {
-    return;
-  }
-  if (conversationsTypingTimer) {
-    window.clearInterval(conversationsTypingTimer);
-    conversationsTypingTimer = null;
-  }
-  renderConversationMessages();
-  conversationsMessages.scrollTop = conversationsMessages.scrollHeight;
-}
-
-function updateConversationMicButtonVisual() {
-  if (!conversationsMicButton) {
-    return;
-  }
-  conversationsMicButton.classList.toggle("mic-active", conversationsIsRecording);
-  conversationsMicButton.classList.toggle("mic-idle", !conversationsIsRecording);
-  conversationsMicButton.setAttribute("aria-label", conversationsIsRecording ? "Enviar gravação" : "Falar com o chat");
-  conversationsMicButton.innerHTML = conversationsIsRecording
-    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z" fill="currentColor"/></svg>'
-    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m6-4a1 1 0 0 1 2 0 8 8 0 0 1-7 7.94V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.06A8 8 0 0 1 4 11a1 1 0 1 1 2 0 6 6 0 0 0 12 0"/></svg>';
-}
-
-async function loadConversationChat() {
-  if (!getToken()) {
-    state.conversationChat = { messages: [] };
-    renderConversationMessages();
-    return;
-  }
-  showDbLoadingState(conversationsMessages, 220);
-  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
-  const toneKey = getChatToneMode(state.options.chatTone).key;
-  try {
-    const payload = await apiRequest(`/api/200/chat?profile=${encodeURIComponent(profile)}&tone=${encodeURIComponent(toneKey)}`);
-    state.conversationChat = payload.chat || { messages: [] };
-    renderConversationMessages();
-    if (conversationsStatus) {
-      conversationsStatus.hidden = true;
-      conversationsStatus.textContent = "";
-    }
-  } catch (error) {
-    state.conversationChat = { messages: [] };
-    renderConversationMessages();
-    if (conversationsStatus) {
-      conversationsStatus.hidden = false;
-      conversationsStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar esta conversa.";
-    }
-  }
-}
-
-async function loadConversationsPromptEditor() {
-  if (!isProject200AdminUser()) {
-    return;
-  }
-  if (conversationsPromptMessage) {
-    showDbLoadingState(conversationsPromptMessage, 84);
-  }
-  try {
-    const payload = await apiRequest(`/api/admin/project200/chat-prompt?tone=${encodeURIComponent(conversationsPromptToneKey)}`);
-    const prompt = String(payload?.settings?.prompts?.[conversationsPromptToneKey] || "");
-    if (conversationsPromptInput) {
-      conversationsPromptInput.value = prompt;
-    }
-    if (conversationsPromptToneLabel) {
-      conversationsPromptToneLabel.textContent = getChatToneMode(conversationsPromptToneKey).label;
-    }
-    if (conversationsPromptMessage) {
-      conversationsPromptMessage.textContent = "";
-    }
-  } catch (error) {
-    if (conversationsPromptMessage) {
-      conversationsPromptMessage.textContent = error instanceof Error ? error.message : "Falha ao carregar prompt.";
-    }
-  }
-}
-
-async function saveConversationsPromptEditor() {
-  if (!isProject200AdminUser()) {
-    return;
-  }
-  if (conversationsPromptMessage) {
-    conversationsPromptMessage.textContent = "Salvando...";
-  }
-  if (saveConversationsPromptButton) {
-    saveConversationsPromptButton.disabled = true;
-  }
-  try {
-    const payload = await apiRequest("/api/admin/project200/chat-prompt", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tone: conversationsPromptToneKey,
-        prompt: String(conversationsPromptInput?.value || "")
-      })
-    });
-    const prompt = String(payload?.settings?.prompts?.[conversationsPromptToneKey] || "");
-    if (conversationsPromptInput) {
-      conversationsPromptInput.value = prompt;
-    }
-    if (conversationsPromptMessage) {
-      conversationsPromptMessage.textContent = "Prompt global salvo.";
-    }
-  } catch (error) {
-    if (conversationsPromptMessage) {
-      conversationsPromptMessage.textContent = error instanceof Error ? error.message : "Falha ao salvar prompt.";
-    }
-  } finally {
-    if (saveConversationsPromptButton) {
-      saveConversationsPromptButton.disabled = false;
-    }
-  }
-}
-
-async function sendConversationMessage(text) {
-  const message = String(text || "").trim();
-  if (!message) {
-    if (conversationsStatus) {
-      conversationsStatus.textContent = "Não consegui entender sua fala.";
-    }
-    return;
-  }
-  if (!state.conversationChat) {
-    state.conversationChat = { messages: [] };
-  }
-  const optimisticUserEntry = { role: "user", content: message, createdAt: new Date().toISOString() };
-  state.conversationChat.messages = [...(state.conversationChat.messages || []), optimisticUserEntry];
-  renderConversationMessages();
-  if (conversationsStatus) {
-    conversationsStatus.textContent = "Pensando rápido...";
-  }
-  try {
-    const payload = await apiRequest("/api/200/chat/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message,
-        tone: getChatToneMode(state.options.chatTone).key,
-        profile: String(state.selectedProfile || getDefaultProfileName()).trim()
-      })
-    });
-    state.conversationChat = payload.chat || state.conversationChat;
-    typeConversationAssistantReply(String(payload.replyText || ""));
-    if (conversationsStatus) {
-      conversationsStatus.textContent = "Resposta pronta.";
-    }
-  } catch (error) {
-    state.conversationChat.messages = (state.conversationChat.messages || []).slice(0, -1);
-    renderConversationMessages();
-    if (conversationsStatus) {
-      conversationsStatus.textContent = error instanceof Error ? error.message : "Falha ao conversar.";
-    }
-  }
-}
-
-function stopConversationMic() {
-  if (conversationsSpeechMonitorTimer) {
-    window.clearInterval(conversationsSpeechMonitorTimer);
-    conversationsSpeechMonitorTimer = null;
-  }
-  if (conversationsMediaRecorder && conversationsMediaRecorder.state !== "inactive") {
-    conversationsMediaRecorder.stop();
-  }
-  conversationsMediaRecorder = null;
-  conversationsAudioAnalyser = null;
-  if (conversationsAudioContext) {
-    conversationsAudioContext.close().catch(() => {});
-    conversationsAudioContext = null;
-  }
-  if (conversationsMediaStream) {
-    conversationsMediaStream.getTracks().forEach((track) => track.stop());
-    conversationsMediaStream = null;
-  }
-  conversationsIsRecording = false;
-  updateConversationMicButtonVisual();
-}
-
-async function startConversationMic() {
-  if (conversationsMediaRecorder && conversationsMediaRecorder.state !== "inactive") {
-    if (conversationsStatus) {
-      conversationsStatus.textContent = "Enviando gravação...";
-    }
-    stopConversationMic();
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    conversationsMediaStream = stream;
-    conversationsAudioContext = new AudioContext();
-    const source = conversationsAudioContext.createMediaStreamSource(stream);
-    conversationsAudioAnalyser = conversationsAudioContext.createAnalyser();
-    conversationsAudioAnalyser.fftSize = 2048;
-    source.connect(conversationsAudioAnalyser);
-
-    const chunks = [];
-    conversationsMediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-    conversationsMediaRecorder.ondataavailable = (event) => {
-      if (event.data?.size) {
-        chunks.push(event.data);
-      }
-    };
-    conversationsMediaRecorder.onstop = async () => {
-      const blob = new Blob(chunks, { type: "audio/webm" });
-      if (!blob.size) {
-        if (conversationsStatus) {
-          conversationsStatus.textContent = "Sem áudio captado.";
-        }
-        return;
-      }
-      try {
-        if (conversationsStatus) {
-          conversationsStatus.textContent = "Transcrevendo...";
-        }
-        const base64 = await blob.arrayBuffer().then((buffer) => arrayBufferToBase64(buffer));
-        const transcribed = await apiRequest("/api/audio/transcribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm", fileName: "project200-chat.webm" })
-        });
-        const spoken = String(transcribed?.text || "").trim();
-        if (conversationsTranscript) {
-          conversationsTranscript.textContent = spoken || "Não entendi. Tenta falar de novo.";
-        }
-        await sendConversationMessage(spoken);
-      } catch (error) {
-        if (conversationsStatus) {
-          conversationsStatus.textContent = error instanceof Error ? error.message : "Falha no microfone.";
-        }
-      }
-    };
-    conversationsMediaRecorder.start();
-    conversationsIsRecording = true;
-    updateConversationMicButtonVisual();
-    if (conversationsStatus) {
-      conversationsStatus.textContent = "Microfone ouvindo...";
-    }
-    conversationsLastSpeechAt = Date.now();
-    conversationsSpeechMonitorTimer = window.setInterval(() => {
-      if (!conversationsAudioAnalyser) {
-        return;
-      }
-      const buffer = new Uint8Array(conversationsAudioAnalyser.fftSize);
-      conversationsAudioAnalyser.getByteTimeDomainData(buffer);
-      let sum = 0;
-      for (let i = 0; i < buffer.length; i += 1) {
-        const value = (buffer[i] - 128) / 128;
-        sum += value * value;
-      }
-      const rms = Math.sqrt(sum / buffer.length);
-      if (rms > 0.02) {
-        conversationsLastSpeechAt = Date.now();
-      }
-      if (Date.now() - conversationsLastSpeechAt >= 2000) {
-        if (conversationsStatus) {
-          conversationsStatus.textContent = "Silêncio detectado. Enviando...";
-        }
-        stopConversationMic();
-      }
-    }, 110);
-  } catch (error) {
-    if (conversationsStatus) {
-      conversationsStatus.textContent = error instanceof Error ? error.message : "Falha ao abrir microfone.";
-    }
-    stopConversationMic();
-  }
-}
-
 function openQuickTaskModal() {
   if (quickTaskTitleInput) {
     quickTaskTitleInput.value = "";
@@ -9282,14 +9045,20 @@ async function bootstrapProject200App() {
   }
 }
 
+function openPrimaryRunningSurface() {
+  const sleepAction = getActiveSleepAction();
+  if (sleepAction && normalizeActionStatus(sleepAction.status) !== actionStatuses.completed) {
+    openSleepSessionModal();
+    return;
+  }
+  openModal("runningTaskModal");
+}
+
 document.querySelectorAll("[data-open-modal]").forEach((button) => {
   button.addEventListener("click", () => {
-    if (button.id === "openRunningTaskModal") {
-      const sleepAction = getActiveSleepAction();
-      if (sleepAction && normalizeActionStatus(sleepAction.status) !== actionStatuses.completed) {
-        openSleepSessionModal();
-        return;
-      }
+    const loadingIcon = String(button.dataset.loadingIcon || "").trim();
+    if (loadingIcon) {
+      globalLoadingPreferredIcon = loadingIcon;
     }
     openModal(button.dataset.openModal);
   });
@@ -9360,14 +9129,12 @@ function loadOptionsConfig() {
       ? Number(parsed.completionBeepCycles)
       : 0;
     state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
-    state.options.chatTone = getChatToneMode(parsed.chatTone).key;
     state.options.screenLockEnabled = parsed.screenLockEnabled === true;
     state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
     state.options.backgroundTheme = "black";
-    state.options.chatTone = "neutral";
     state.options.screenLockEnabled = false;
     state.options.stopMusicOnFinish = false;
   }
@@ -9380,7 +9147,6 @@ function saveOptionsConfig() {
       showFreeTime: Boolean(state.options.showFreeTime),
       completionBeepCycles: Number(state.options.completionBeepCycles || 0),
       backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
-      chatTone: getChatToneMode(state.options.chatTone).key,
       screenLockEnabled: Boolean(state.options.screenLockEnabled),
       stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish)
     }));
@@ -9509,23 +9275,10 @@ function renderOptionsModal() {
     toggleStopMusicOnFinishHint.textContent = state.options.stopMusicOnFinish ? "Encerrar junto" : "Continuar tocando";
   }
   toggleStopMusicOnFinishOptionButton?.classList.toggle("is-off", !state.options.stopMusicOnFinish);
-  const toneMode = getChatToneMode(state.options.chatTone);
-  if (toggleChatToneHint) {
-    toggleChatToneHint.textContent = toneMode.label;
-  }
   if (toggleScreenLockHint) {
     toggleScreenLockHint.textContent = state.options.screenLockEnabled ? "Ativada" : "Desbloqueada";
   }
   toggleScreenLockOptionButton?.classList.toggle("is-off", !state.options.screenLockEnabled);
-  if (chatToneDetailHint) {
-    chatToneDetailHint.textContent = "";
-  }
-  if (conversationsToneChip) {
-    conversationsToneChip.textContent = toneMode.label;
-  }
-  if (openConversationsPromptButton) {
-    openConversationsPromptButton.hidden = !isProject200AdminUser();
-  }
 }
 
 function resetProject200ExportModal() {
@@ -10737,14 +10490,6 @@ toggleStopMusicOnFinishOptionButton?.addEventListener("click", () => {
   saveOptionsConfig();
   renderOptionsModal();
 });
-toggleChatToneOptionButton?.addEventListener("click", () => {
-  const currentIndex = Math.max(0, chatToneModes.findIndex((item) => item.key === getChatToneMode(state.options.chatTone).key));
-  const nextIndex = (currentIndex + 1) % chatToneModes.length;
-  state.options.chatTone = chatToneModes[nextIndex].key;
-  saveOptionsConfig();
-  renderOptionsModal();
-  void loadConversationChat();
-});
 toggleScreenLockOptionButton?.addEventListener("click", () => {
   state.options.screenLockEnabled = !state.options.screenLockEnabled;
   if (!state.options.screenLockEnabled) {
@@ -10800,9 +10545,6 @@ document.addEventListener("pointerdown", (event) => {
 document.addEventListener("keydown", () => {
   registerScreenLockActivity();
 }, true);
-conversationsMicButton?.addEventListener("click", () => {
-  void startConversationMic();
-});
 quickTaskStartButton?.addEventListener("click", () => {
   void (async () => {
     const runningAction = getRunningActionForSelectedProfile();
@@ -10828,21 +10570,6 @@ quickTaskStartButton?.addEventListener("click", () => {
     }
     await submitQuickTaskStart(choice === "finalize_and_start" ? "finalize" : "abort");
   })();
-});
-conversationsToneChip?.addEventListener("click", () => {
-  openModal("optionsModal");
-});
-openConversationsPromptButton?.addEventListener("click", () => {
-  openModal("conversationsPromptModal");
-});
-conversationsPromptToneChip?.addEventListener("click", () => {
-  const currentIndex = Math.max(0, chatToneModes.findIndex((item) => item.key === getChatToneMode(conversationsPromptToneKey).key));
-  const nextIndex = (currentIndex + 1) % chatToneModes.length;
-  conversationsPromptToneKey = chatToneModes[nextIndex].key;
-  void loadConversationsPromptEditor();
-});
-saveConversationsPromptButton?.addEventListener("click", () => {
-  void saveConversationsPromptEditor();
 });
 profileRenameConfirmButton?.addEventListener("click", () => {
   void saveProfileRename();
@@ -11080,13 +10807,14 @@ homeProfileButton?.addEventListener("contextmenu", (event) => {
 homeProfileButton?.addEventListener("click", () => {
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
   if (!profile) {
+    openPrimaryRunningSurface();
     return;
   }
   if (profileLongPressHandledProfile === profile) {
     profileLongPressHandledProfile = "";
     return;
   }
-  openProfileAvatarModal(profile);
+  openPrimaryRunningSurface();
 });
 homeProfileName?.addEventListener("contextmenu", (event) => {
   event.preventDefault();
@@ -11148,6 +10876,16 @@ homeProfileButton?.addEventListener("pointerdown", (event) => {
     profilePressStartedAt = 0;
     profilePressProfile = "";
   });
+});
+homeRunningModePercentBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  state.runningCenterMode = state.runningCenterMode === "percent" ? "auto" : "percent";
+  renderHomeRunningTask();
+});
+homeRunningModeTimeBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  state.runningCenterMode = state.runningCenterMode === "time" ? "auto" : "time";
+  renderHomeRunningTask();
 });
 profileAvatarChooseButton?.addEventListener("click", () => {
   profileAvatarFileInput?.click();
@@ -11378,10 +11116,13 @@ project200LoginForm?.addEventListener("submit", (event) => {
   if (project200LoginMessage) project200LoginMessage.textContent = "Entrando...";
   void (async () => {
     try {
-      const response = await fetch(getApiUrl("/api/auth/login"), {
+      const response = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
+      }), {
+        path: "/api/auth/login",
+        iconSrc: loadingIconByArea.actions
       });
       const data = await response.json();
       if (!response.ok || !data?.token) {
@@ -11435,20 +11176,26 @@ project200RegisterForm?.addEventListener("submit", (event) => {
   if (project200LoginMessage) project200LoginMessage.textContent = "Criando conta...";
   void (async () => {
     try {
-      const registerResponse = await fetch(getApiUrl("/api/auth/register"), {
+      const registerResponse = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, username, password })
+      }), {
+        path: "/api/auth/register",
+        iconSrc: loadingIconByArea.options
       });
       const registerData = await registerResponse.json();
       if (!registerResponse.ok) {
         throw new Error(registerData?.error || "Falha no cadastro.");
       }
 
-      const loginResponse = await fetch(getApiUrl("/api/auth/login"), {
+      const loginResponse = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
+      }), {
+        path: "/api/auth/login",
+        iconSrc: loadingIconByArea.actions
       });
       const loginData = await loginResponse.json();
       if (!loginResponse.ok || !loginData?.token) {
@@ -11685,7 +11432,6 @@ document.addEventListener("resume", () => {
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
 });
-startHomeDateTimeTicker();
 startRunningTaskTicker();
 void loadRunningMusicStations();
 if (runningMusicProgressTicker) {
