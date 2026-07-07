@@ -582,6 +582,7 @@ const loadingIconByArea = {
 };
 let globalLoadingCount = 0;
 let globalLoadingPreferredIcon = loadingIconByArea.actions;
+let startupLoadingActive = false;
 const profileAvatarUploadButton = document.getElementById("profileAvatarUploadButton");
 const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -1132,6 +1133,22 @@ async function runWithGlobalLoading(task, options = {}) {
   } finally {
     endGlobalLoading();
   }
+}
+
+function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
+  if (startupLoadingActive) {
+    return;
+  }
+  startupLoadingActive = true;
+  beginGlobalLoading(iconSrc);
+}
+
+function endStartupLoading() {
+  if (!startupLoadingActive) {
+    return;
+  }
+  startupLoadingActive = false;
+  endGlobalLoading();
 }
 
 function readSelectedProfile() {
@@ -4405,10 +4422,10 @@ async function loadActions() {
   showDbLoadingState(actionsList, 220);
 
   try {
-    const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`);
+    const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`, {}, 7000);
     state.actions = Array.isArray(payload.actions) ? payload.actions : [];
     try {
-      const sleepPayload = await apiRequest(`/api/200/sleep-session?date=${encodeURIComponent(getSelectedSleepDayKey())}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`);
+      const sleepPayload = await apiRequestWithTimeout(`/api/200/sleep-session?date=${encodeURIComponent(getSelectedSleepDayKey())}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {}, 5000);
       const sleepAction = sleepPayload?.action || null;
       if (sleepAction?.id) {
         state.sleepFlow.pendingAction = sleepAction;
@@ -4433,7 +4450,7 @@ async function loadActions() {
       state.serverNowCapturedAtMs = Date.now();
     }
     try {
-      const runtimePayload = await apiRequest(runtimeStateEndpoint);
+      const runtimePayload = await apiRequestWithTimeout(runtimeStateEndpoint, {}, 5000);
       state.runtimeState = runtimePayload?.runtimeState || null;
       const runtimeActionId = String(state.runtimeState?.actionId || "").trim();
       const runtimeStartedAt = new Date(state.runtimeState?.startedAt || "").getTime();
@@ -5725,11 +5742,14 @@ async function ensureProject200Session() {
     clearScreenLockInactivityTimer();
     return false;
   }
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 7000);
   try {
     const response = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/me"), {
       headers: {
         Authorization: `Bearer ${token}`
-      }
+      },
+      signal: controller.signal
     }), {
       path: "/api/auth/me",
       iconSrc: loadingIconByArea.actions
@@ -5753,7 +5773,12 @@ async function ensureProject200Session() {
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
     scheduleScreenLockInactivity();
     return true;
-  } catch {
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      state.profileLock = "";
+      state.authUser = null;
+      return false;
+    }
     state.profileLock = "";
     state.authUser = null;
     project200LoginOverlay?.classList.add("active");
@@ -5761,11 +5786,13 @@ async function ensureProject200Session() {
     unlockProject200Screen();
     clearScreenLockInactivityTimer();
     return false;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
 async function loadProject200Profiles() {
-  const payload = await apiRequest("/api/200/profiles");
+  const payload = await apiRequestWithTimeout("/api/200/profiles", {}, 7000);
   state.profiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
   applySelectedProfile(readSelectedProfile());
   renderProfileFooter();
@@ -9139,7 +9166,7 @@ function clearProject200SessionState() {
 }
 
 async function bootstrapProject200App() {
-  await runWithGlobalLoading(async () => {
+  try {
     await hydrateNativeToken();
     const token = getToken();
     if (!token) {
@@ -9176,9 +9203,9 @@ async function bootstrapProject200App() {
         renderHomeRunningTask();
       }
     }
-  }, {
-    iconSrc: loadingIconByArea.actions
-  });
+  } finally {
+    endStartupLoading();
+  }
 }
 
 function openPrimaryRunningSurface() {
@@ -10928,6 +10955,7 @@ historyTextForm?.addEventListener("submit", (event) => {
   })();
 });
 state.profileLock = "";
+beginStartupLoading(loadingIconByArea.actions);
 applySelectedProfile(readSelectedProfile());
 void bootstrapProject200App();
 
