@@ -1188,13 +1188,25 @@ function isSleepAction(action) {
   return String(action?.categoryId || "").trim().toLowerCase() === "sono" && Boolean(String(action?.sleepSessionDate || "").trim());
 }
 
+function getSelectedSleepProfileKey() {
+  return normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
+}
+
+function getSleepActionsForSelectedProfile() {
+  const profileKey = getSelectedSleepProfileKey();
+  return state.actions
+    .filter((action) => isSleepAction(action) && normalizeAssigneeName(action.assignee) === profileKey)
+    .slice()
+    .sort((a, b) => {
+      const aTime = new Date(a?.createdAt || a?.startAt || 0).getTime();
+      const bTime = new Date(b?.createdAt || b?.startAt || 0).getTime();
+      return bTime - aTime;
+    });
+}
+
 function getSelectedSleepAction() {
   const selectedDateKey = toLocalDateKey(dateFromOffset(state.activeOffset));
-  return state.actions.find((action) =>
-    isSleepAction(action)
-    && normalizeAssigneeName(action.assignee) === state.selectedProfile
-    && String(action.sleepSessionDate || "").trim() === selectedDateKey
-  ) || null;
+  return getSleepActionsForSelectedProfile().find((action) => String(action.sleepSessionDate || "").trim() === selectedDateKey) || null;
 }
 
 function buildActionTimelineEntries() {
@@ -3964,10 +3976,9 @@ function renderActions() {
     ? " task-in-progress"
     : (sleepStatus === actionStatuses.completed ? " task-completed" : " task-pending-clean");
   const sleepAvatar = getActionAvatarPath(state.selectedProfile);
-  const sleepDurationText = selectedSleepAction
-    ? (getSleepTrackedMinutes(selectedSleepAction) > 0 ? formatMinutesHuman(getSleepTrackedMinutes(selectedSleepAction)) : "Sem tempo definido")
-    : "Sem tempo definido";
-  const sleepTimeLabel = selectedSleepAction?.startAt ? formatHourChip(selectedSleepAction.startAt) : "--";
+  const sleepTrackedMinutes = selectedSleepAction ? getSleepTrackedMinutes(selectedSleepAction) : 0;
+  const sleepDurationText = sleepTrackedMinutes > 0 ? formatMinutesHuman(sleepTrackedMinutes) : "";
+  const sleepTimeLabel = selectedSleepAction?.startAt ? formatHourChip(selectedSleepAction.startAt) : "";
   const sleepRow = document.createElement("article");
   sleepRow.className = `task-row task-sleep-slot${sleepStateClass}`;
   sleepRow.dataset.sleepSlot = "1";
@@ -4494,11 +4505,10 @@ function startActionsTimeTicker() {
 }
 
 function getActiveSleepAction() {
-  return state.actions.find((action) =>
-    isSleepAction(action)
-    && normalizeAssigneeName(action.assignee) === state.selectedProfile
-    && normalizeActionStatus(action.status) !== actionStatuses.completed
-  ) || getSelectedSleepAction();
+  return getSleepActionsForSelectedProfile().find((action) => normalizeActionStatus(action.status) !== actionStatuses.completed)
+    || getSelectedSleepAction()
+    || getSleepActionsForSelectedProfile()[0]
+    || null;
 }
 
 function renderSleepLabels() {
@@ -4625,8 +4635,8 @@ function renderSleepSessionModal() {
   const action = getActiveSleepAction();
   if (!action) {
     if (sleepSessionStatusLabel) sleepSessionStatusLabel.textContent = "Sono";
-    if (sleepSessionTimeLabel) sleepSessionTimeLabel.textContent = "Sem sessão ativa";
-    if (sleepSessionSubtitle) sleepSessionSubtitle.textContent = "Abra o menu de sono para começar.";
+    if (sleepSessionTimeLabel) sleepSessionTimeLabel.textContent = "";
+    if (sleepSessionSubtitle) sleepSessionSubtitle.textContent = "Escolha quando quer iniciar o sono.";
     hideSleepControls();
     return;
   }

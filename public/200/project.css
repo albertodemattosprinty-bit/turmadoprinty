@@ -2440,8 +2440,8 @@ body.running-music-standalone #actionsModal .actions-list {
 
 #actionsModal .actions-list {
   min-height: 0;
-  margin-left: 15px;
-  width: calc(100% - 15px);
+  margin-left: 0;
+  width: 100%;
   padding-top: 0;
   padding-bottom: calc(8dvh + 22px);
 }
@@ -2487,9 +2487,9 @@ body.running-music-standalone #actionsModal .actions-list {
   grid-template-columns: 52px minmax(0, 1fr) max-content;
   align-items: center;
   gap: 12px;
-  width: calc(100% + 15px);
-  margin-left: -15px;
-  padding: 14px 0 14px 15px;
+  width: 100%;
+  margin-left: 0;
+  padding: 14px 12px 14px 18px;
   border: 0;
   border-radius: 0;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.10) 50%, rgba(255, 255, 255, 0.00) 100%);
@@ -3890,7 +3890,7 @@ body.running-music-standalone #actionsModal .actions-list {
   .task-row {
     grid-template-columns: 40px minmax(0, 1fr) max-content;
     gap: 10px;
-    padding: 14px 0;
+    padding: 14px 10px 14px 18px;
   }
 
   .task-row.stats-mission-row {
