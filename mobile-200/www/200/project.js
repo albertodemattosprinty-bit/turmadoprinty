@@ -1422,7 +1422,10 @@ function getPendingSleepFlowAction() {
   if (!action || !isSleepAction(action)) {
     return null;
   }
-  return normalizeAssigneeName(action.assignee) === getSelectedSleepProfileKey() ? action : null;
+  if (normalizeAssigneeName(action.assignee) !== getSelectedSleepProfileKey()) {
+    return null;
+  }
+  return String(action.sleepSessionDate || "").trim() === getSelectedSleepDayKey() ? action : null;
 }
 
 function getSelectedSleepAction() {
@@ -4444,13 +4447,13 @@ async function loadActions(options = {}) {
       const sleepPayload = await apiRequestWithTimeout(`/api/200/sleep-session?date=${encodeURIComponent(getSelectedSleepDayKey())}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
         skipGlobalLoading: true
       }, 5000);
-      const sleepAction = buildSleepFlowAction(sleepPayload?.action || null, preservedSleepAction || undefined);
+      const hasServerSleepAction = sleepPayload?.action && typeof sleepPayload.action === "object" && String(sleepPayload.action.id || "").trim();
+      const sleepAction = hasServerSleepAction
+        ? buildSleepFlowAction(sleepPayload.action, preservedSleepAction || undefined)
+        : null;
       if (sleepAction?.id) {
         state.sleepFlow.pendingAction = sleepAction;
         upsertSleepActionIntoState(sleepAction);
-      } else if (shouldPreserveSleepFlowAction(preservedSleepAction)) {
-        state.sleepFlow.pendingAction = preservedSleepAction;
-        upsertSleepActionIntoState(preservedSleepAction);
       } else {
         state.sleepFlow.pendingAction = null;
       }
@@ -4831,11 +4834,7 @@ function startActionsTimeTicker() {
 }
 
 function getActiveSleepAction() {
-  return getSelectedSleepAction()
-    || getPendingSleepFlowAction()
-    || getSleepActionsForSelectedProfile().find((action) => normalizeActionStatus(action.status) !== actionStatuses.completed)
-    || getSleepActionsForSelectedProfile()[0]
-    || null;
+  return getSelectedSleepAction() || null;
 }
 
 function isTemporarySleepActionId(actionId) {
