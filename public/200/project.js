@@ -4411,7 +4411,7 @@ function showDbLoadingState(target, minHeight = 140) {
   target.innerHTML = buildDbLoadingMarkup(minHeight);
 }
 
-async function loadActions() {
+async function loadActions(options = {}) {
   renderDateHeader();
 
   if (!getToken()) {
@@ -4422,21 +4422,29 @@ async function loadActions() {
 
   const date = dateFromOffset(state.activeOffset);
   showDbLoadingState(actionsList, 220);
+  const preservedSleepAction = buildSleepFlowAction(options?.preserveSleepAction || state.sleepFlow?.pendingAction || null);
 
   try {
     const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`, {}, 7000);
     state.actions = Array.isArray(payload.actions) ? payload.actions : [];
     try {
       const sleepPayload = await apiRequestWithTimeout(`/api/200/sleep-session?date=${encodeURIComponent(getSelectedSleepDayKey())}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {}, 5000);
-      const sleepAction = sleepPayload?.action || null;
+      const sleepAction = buildSleepFlowAction(sleepPayload?.action || null, preservedSleepAction || undefined);
       if (sleepAction?.id) {
         state.sleepFlow.pendingAction = sleepAction;
-        state.actions = state.actions.filter((action) => String(action?.id || "") !== String(sleepAction.id || ""));
-        state.actions.push(sleepAction);
+        upsertSleepActionIntoState(sleepAction);
+      } else if (shouldPreserveSleepFlowAction(preservedSleepAction)) {
+        state.sleepFlow.pendingAction = preservedSleepAction;
+        upsertSleepActionIntoState(preservedSleepAction);
       } else {
         state.sleepFlow.pendingAction = null;
       }
-    } catch {}
+    } catch {
+      if (shouldPreserveSleepFlowAction(preservedSleepAction)) {
+        state.sleepFlow.pendingAction = preservedSleepAction;
+        upsertSleepActionIntoState(preservedSleepAction);
+      }
+    }
     const nextRunningLocalStarts = {};
     state.actions.forEach((action) => {
       if (normalizeActionStatus(action?.status) !== actionStatuses.inProgress) return;
@@ -4813,6 +4821,45 @@ function getActiveSleepAction() {
     || getSelectedSleepAction()
     || getSleepActionsForSelectedProfile()[0]
     || null;
+}
+
+function buildSleepFlowAction(action, fallback = {}) {
+  const base = action && typeof action === "object" ? { ...action } : {};
+  const fallbackProfile = normalizeAssigneeName(fallback.assignee || state.selectedProfile || getDefaultProfileName());
+  const fallbackDateKey = String(fallback.sleepSessionDate || getSelectedSleepDayKey()).trim();
+  const fallbackStartAt = String(fallback.startAt || new Date(getServerNowMs()).toISOString()).trim();
+  const fallbackStatus = normalizeActionStatus(fallback.status || actionStatuses.pending);
+  const nextAction = {
+    ...fallback,
+    ...base
+  };
+
+  nextAction.assignee = normalizeAssigneeName(nextAction.assignee || fallbackProfile);
+  nextAction.categoryId = String(nextAction.categoryId || "sono").trim().toLowerCase();
+  nextAction.title = String(nextAction.title || sleepPlaceholderTitle).trim() || sleepPlaceholderTitle;
+  nextAction.status = normalizeActionStatus(nextAction.status || fallbackStatus);
+  nextAction.sleepSessionDate = String(nextAction.sleepSessionDate || fallbackDateKey).trim();
+  nextAction.startAt = String(nextAction.startAt || fallbackStartAt).trim() || fallbackStartAt;
+  nextAction.endAt = String(nextAction.endAt || nextAction.startAt).trim() || nextAction.startAt;
+
+  return isSleepAction(nextAction) ? nextAction : null;
+}
+
+function shouldPreserveSleepFlowAction(action) {
+  if (!action || !isSleepAction(action)) {
+    return false;
+  }
+  const status = normalizeActionStatus(action.status);
+  return status === actionStatuses.pending || status === actionStatuses.inProgress;
+}
+
+function upsertSleepActionIntoState(action) {
+  const safeAction = buildSleepFlowAction(action);
+  if (!safeAction) {
+    return;
+  }
+  state.actions = state.actions.filter((entry) => String(entry?.id || "") !== String(safeAction.id || ""));
+  state.actions.push(safeAction);
 }
 
 function renderSleepLabels() {
@@ -11452,29 +11499,32 @@ sleepSessionShell?.addEventListener("click", (event) => {
 saveSleepConfigBtn?.addEventListener("click", () => {
   void (async () => {
     const plannedStartAt = new Date(Date.now() + (getSelectedSleepDelayMinutes() * 60000));
+    const selectedProfileName = normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
+    const selectedSleepDateKey = getSelectedSleepDayKey();
     try {
       const payload = await apiRequest("/api/200/sleep-session/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          date: getSelectedSleepDayKey(),
+          profile: selectedProfileName,
+          date: selectedSleepDateKey,
           plannedStartAt: plannedStartAt.toISOString()
         })
       });
-      state.sleepFlow.pendingAction = payload?.action ? { ...payload.action } : {
+      const fallbackSleepAction = {
         id: `sleep-pending-${Date.now()}`,
         title: "Sono",
-        assignee: String(state.selectedProfile || getDefaultProfileName()).trim(),
+        assignee: selectedProfileName,
         categoryId: "sono",
         status: actionStatuses.pending,
         startAt: plannedStartAt.toISOString(),
         endAt: plannedStartAt.toISOString(),
-        sleepSessionDate: getSelectedSleepDayKey()
+        sleepSessionDate: selectedSleepDateKey
       };
+      state.sleepFlow.pendingAction = buildSleepFlowAction(payload?.action, fallbackSleepAction) || fallbackSleepAction;
       closeModal(sleepConfigModal);
+      await loadActions({ preserveSleepAction: state.sleepFlow.pendingAction });
       openSleepSessionModal();
-      await loadActions();
       await ensureSleepFrequencyPlayback();
     } catch (error) {
       if (sleepDelayLabel) {
