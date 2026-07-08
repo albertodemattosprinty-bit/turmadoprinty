@@ -1155,9 +1155,9 @@ function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
   }
   startupLoadingActive = true;
   if (projectShell) {
-    projectShell.hidden = true;
+    projectShell.hidden = false;
   }
-  beginGlobalLoading(iconSrc);
+  void iconSrc;
 }
 
 function endStartupLoading() {
@@ -1168,7 +1168,6 @@ function endStartupLoading() {
   if (projectShell) {
     projectShell.hidden = false;
   }
-  endGlobalLoading();
 }
 
 function readSelectedProfile() {
