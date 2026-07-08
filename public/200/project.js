@@ -2966,13 +2966,26 @@ function renderRunningMusicList() {
   }
 }
 
-function openRunningMusicListModal() {
+async function openRunningMusicListModal() {
   if (!runningMusicListModal) {
     return;
   }
+  if (!Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) {
+    runningMusicListModal.classList.add("active");
+    runningMusicListModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("running-music-list-open");
+    runningMusicListItems.innerHTML = '<div class="empty-state">Carregando estações...</div>';
+    try {
+      await loadRunningMusicStations();
+    } catch {
+      // Keep the modal open and let the empty state render below if loading fails.
+    }
+  }
+  ensureRunningStationHasTracks();
   if (!runningTaskModalElement?.classList.contains("active")) {
     document.body.classList.add("running-music-standalone");
   }
+  renderRunningMusicPlayer();
   renderRunningMusicList();
   runningMusicListModal.classList.add("active");
   runningMusicListModal.setAttribute("aria-hidden", "false");

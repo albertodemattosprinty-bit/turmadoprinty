@@ -607,6 +607,8 @@ export async function listUserActions(userId, { from, to }) {
         a.music_track_url,
         a.assignee,
         a.category_id,
+        a.svg_icon_url,
+        a.svg_icon_label,
         a.start_at,
         a.end_at,
         a.repeat_group_id,
