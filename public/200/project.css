@@ -269,6 +269,25 @@ body.project-no-select textarea {
   padding: clamp(12px, 3vh, 28px) 0 clamp(20px, 4vh, 36px);
 }
 
+.home-running-task-title {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+  min-height: 52px;
+}
+
+.home-running-task-line {
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 800;
+  line-height: 1.04;
+  font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+  max-width: min(340px, calc(100vw - 48px));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .home-profile-button {
   border: 0;
   background: transparent;
@@ -317,6 +336,13 @@ body.project-no-select textarea {
   font-size: clamp(0.98rem, 2.9vw, 1.2rem);
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+.home-running-actions {
+  grid-row: auto;
+  height: auto;
+  align-self: auto;
+  margin-top: 2px;
 }
 
 .home-running-toggle {
@@ -4799,6 +4825,7 @@ body[data-background-theme="white"] .running-progress-ring-bg {
 }
 
 body[data-background-theme="white"] .running-task-percent,
+body[data-background-theme="white"] .home-running-task-line,
 body[data-background-theme="white"] .home-running-date-line,
 body[data-background-theme="white"] .hub-action-label {
   color: #2f3640;

@@ -405,8 +405,17 @@ const homeRunningProgressRing = document.getElementById("homeRunningProgressRing
 const homeRunningPercent = document.getElementById("homeRunningPercent");
 const homeRunningModeTimeBtn = document.getElementById("homeRunningModeTimeBtn");
 const homeRunningModePercentBtn = document.getElementById("homeRunningModePercentBtn");
+const homeRunningTaskTitle = document.getElementById("homeRunningTaskTitle");
+const homeRunningTaskLinePrimary = document.getElementById("homeRunningTaskLinePrimary");
+const homeRunningTaskLineSecondary = document.getElementById("homeRunningTaskLineSecondary");
 const homeRunningDatePrimary = document.getElementById("homeRunningDatePrimary");
 const homeRunningDateSecondary = document.getElementById("homeRunningDateSecondary");
+const homeRunningActions = document.getElementById("homeRunningActions");
+const homeRunningListButton = document.getElementById("homeRunningListButton");
+const homeRunningRestoreButton = document.getElementById("homeRunningRestoreButton");
+const homeRunningFinalizeButton = document.getElementById("homeRunningFinalizeButton");
+const homeRunningMusicButton = document.getElementById("homeRunningMusicButton");
+const homeRunningMissionButton = document.getElementById("homeRunningMissionButton");
 const runningTaskModalElement = document.getElementById("runningTaskModal");
 const quickTaskTitleInput = document.getElementById("quickTaskTitleInput");
 const quickTaskMinutesInput = document.getElementById("quickTaskMinutesInput");
@@ -1881,6 +1890,31 @@ function renderRunningCompletionCelebration() {
   }
 }
 
+function splitHomeTaskTitle(title = "") {
+  const words = String(title || "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) {
+    return ["", ""];
+  }
+  if (words.length === 1) {
+    return [words[0], ""];
+  }
+  const midpoint = Math.ceil(words.length / 2);
+  return [words.slice(0, midpoint).join(" "), words.slice(midpoint).join(" ")];
+}
+
+function setHomeTaskTitle(title = "", visible = false) {
+  if (homeRunningTaskTitle) {
+    homeRunningTaskTitle.hidden = !visible;
+  }
+  const [primary, secondary] = splitHomeTaskTitle(title);
+  if (homeRunningTaskLinePrimary) {
+    homeRunningTaskLinePrimary.textContent = visible ? primary : "";
+  }
+  if (homeRunningTaskLineSecondary) {
+    homeRunningTaskLineSecondary.textContent = visible ? secondary : "";
+  }
+}
+
 function renderRunningCompletionNextView() {
   const nextAction = state.runningCompletion.nextAction;
   if (!runningTaskName || !runningTaskPercent || !runningTaskMinutesLeft || !runningTaskNextName || !nextAction) {
@@ -2172,7 +2206,7 @@ function anchorToCurrentAction() {
 }
 
 function renderHomeRunningTask() {
-  if (getToken() && !state.homeSnapshotReady) {
+  if (!state.homeSnapshotReady) {
     setHomeRingPercent(0);
     if (homeRunningPercent) {
       homeRunningPercent.innerHTML = "";
@@ -2183,6 +2217,10 @@ function renderHomeRunningTask() {
     if (homeRunningDateSecondary) {
       homeRunningDateSecondary.textContent = "";
     }
+    setHomeTaskTitle("", false);
+    if (homeRunningActions) {
+      homeRunningActions.hidden = true;
+    }
     if (homeProfileButton) {
       homeProfileButton.setAttribute("aria-label", "Carregando rotina");
     }
@@ -2191,7 +2229,10 @@ function renderHomeRunningTask() {
   const syncHomeWidget = ({
     percent = 0,
     centerMarkup = "0%",
-    ariaLabel = "Painel da rotina"
+    ariaLabel = "Painel da rotina",
+    primaryLine = "",
+    secondaryLine = "",
+    useCalendarDate = true
   } = {}) => {
     setHomeRingPercent(percent);
     if (homeRunningPercent) {
@@ -2199,10 +2240,10 @@ function renderHomeRunningTask() {
     }
     const now = new Date(getServerNowMs());
     if (homeRunningDatePrimary) {
-      homeRunningDatePrimary.textContent = formatHomeCalendarDate(now);
+      homeRunningDatePrimary.textContent = useCalendarDate ? formatHomeCalendarDate(now) : primaryLine;
     }
     if (homeRunningDateSecondary) {
-      homeRunningDateSecondary.textContent = formatHomeWeekdayLabel(now);
+      homeRunningDateSecondary.textContent = useCalendarDate ? formatHomeWeekdayLabel(now) : secondaryLine;
     }
     if (homeProfileButton) {
       homeProfileButton.setAttribute("aria-label", ariaLabel);
@@ -2273,6 +2314,10 @@ function renderHomeRunningTask() {
       runningTaskStartNextButton.dataset.actionId = String(nextPending?.id || "");
       runningTaskStartNextButton.dataset.kind = "action";
     }
+    setHomeTaskTitle("", false);
+    if (homeRunningActions) {
+      homeRunningActions.hidden = true;
+    }
     syncHomeWidget({
       percent: dayElapsedPercent,
       centerMarkup: homeCenterMarkup,
@@ -2324,8 +2369,24 @@ function renderHomeRunningTask() {
       ? "Tempo livre"
       : formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
+    if (homeRunningDatePrimary) {
+      homeRunningDatePrimary.textContent = "Próxima tarefa";
+    }
+    if (homeRunningDateSecondary) {
+      homeRunningDateSecondary.textContent = nextLabel;
+    }
   } else {
     setRunningNextDisplay("Sem próxima tarefa", 0);
+    if (homeRunningDatePrimary) {
+      homeRunningDatePrimary.textContent = "Próxima tarefa";
+    }
+    if (homeRunningDateSecondary) {
+      homeRunningDateSecondary.textContent = "Sem próxima tarefa";
+    }
+  }
+  setHomeTaskTitle(formatActionTitleForDisplay(action.title), true);
+  if (homeRunningActions) {
+    homeRunningActions.hidden = false;
   }
   if (runningTaskListButton) runningTaskListButton.hidden = false;
   if (runningTaskMissionButton) runningTaskMissionButton.hidden = false;
@@ -2340,7 +2401,12 @@ function renderHomeRunningTask() {
   syncHomeWidget({
     percent,
     centerMarkup: runningCenterMarkup,
-    ariaLabel: `${formatActionTitleForDisplay(action.title)} em andamento`
+    ariaLabel: `${formatActionTitleForDisplay(action.title)} em andamento`,
+    primaryLine: "Próxima tarefa",
+    secondaryLine: nextAction
+      ? (nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title))
+      : "Sem próxima tarefa",
+    useCalendarDate: false
   });
   renderRunningMusicPlayer();
 }
@@ -10966,6 +11032,27 @@ runningTaskMissionButton?.addEventListener("click", () => {
   void openRunningMissionQuickModal();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
+homeRunningListButton?.addEventListener("click", () => {
+  openModal("actionsModal");
+});
+homeRunningRestoreButton?.addEventListener("click", () => {
+  const runningAction = getRunningActionForSelectedProfile();
+  if (!runningAction) return;
+  openRunningConfirmModal("abort", runningAction, () => {
+    void performRunningRestore(runningAction);
+  });
+});
+homeRunningFinalizeButton?.addEventListener("click", () => {
+  const runningAction = getRunningActionForSelectedProfile();
+  if (!runningAction) return;
+  openRunningConfirmModal("finalize", runningAction, () => {
+    void performRunningFinalize(runningAction);
+  });
+});
+homeRunningMusicButton?.addEventListener("click", toggleRunningPlayPause);
+homeRunningMissionButton?.addEventListener("click", () => {
+  void openRunningMissionQuickModal();
+});
 runningPlayerList?.addEventListener("click", () => {
   state.startDecisionContext.actionId = "";
   openRunningMusicListModal();
