@@ -1,11 +1,12 @@
 import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
+import { getProject200SleepTotalMinutesForRange, PROJECT200_SLEEP_CATEGORY_ID, PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES } from "./project200-sleep.js";
 const DEFAULT_SALDO_GOAL_CENTS = 1000000;
 const CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE = 3;
 const closedDailyReportSyncByUser = new Map();
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
 const PROJECT200_STATS_ASPECT_CATEGORIES = new Set([
-  "sono",
+  PROJECT200_SLEEP_CATEGORY_ID,
   "alimentacao",
   "hidratacao",
   "estudo",
@@ -197,11 +198,12 @@ export async function ensureStatsSchema() {
 }
 
 function normalizeProject200StatsAspectRow(row) {
+  const categoryId = normalizeProject200StatsCategoryId(row?.category_id);
   const missionGoalIds = normalizeProject200MissionGoalIds(row?.mission_goal_ids);
   return {
-    categoryId: normalizeProject200StatsCategoryId(row?.category_id),
-    targetMinutes: Math.max(1, Math.trunc(Number(row?.target_minutes || 1) || 1)),
-    missionGoalIds
+    categoryId,
+    targetMinutes: Math.max(1, Math.trunc(Number(row?.target_minutes || (categoryId === PROJECT200_SLEEP_CATEGORY_ID ? PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES : 1)) || 1)),
+    missionGoalIds: categoryId === PROJECT200_SLEEP_CATEGORY_ID ? [] : missionGoalIds
   };
 }
 
@@ -239,8 +241,8 @@ export async function updateProject200StatsAspectConfig(userId, profileName = PR
   if (!normalizedCategoryId) {
     throw new Error("Categoria de estatística inválida.");
   }
-  const targetMinutes = Math.max(1, Math.trunc(Number(payload?.targetMinutes || 1) || 1));
-  const missionGoalIds = normalizeProject200MissionGoalIds(payload?.missionGoalIds);
+  const targetMinutes = Math.max(1, Math.trunc(Number(payload?.targetMinutes || (normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES : 1)) || 1));
+  const missionGoalIds = normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? [] : normalizeProject200MissionGoalIds(payload?.missionGoalIds);
   await query(
     `
       insert into project200_stats_aspects (
@@ -361,18 +363,14 @@ function scheduleClosedDailyReportsSync(userId) {
 }
 
 async function buildStatsSummary(userId, range) {
-  const [actionsResult, categoryResult, incomeResult, expenseResult, balanceResult] = await Promise.all([
+  const [actionsResult, categoryResult, incomeResult, expenseResult, balanceResult, sleepTotalMinutes] = await Promise.all([
     query(
       `
         with action_status as (
           select
             a.id,
             a.assignee,
-            case
-              when lower(coalesce(a.category_id, '')) = 'sono' and a.sleep_session_date is not null then
-                greatest(coalesce(a.sleep_tracked_minutes, 0), extract(epoch from (a.end_at - a.start_at)) / 60.0)
-              else extract(epoch from (a.end_at - a.start_at)) / 60.0
-            end as minutes,
+            extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
             coalesce(o.status, 'PENDING') as status,
             o.started_at,
             a.start_at
@@ -381,19 +379,9 @@ async function buildStatsSummary(userId, range) {
             on o.user_id = a.user_id
            and o.action_id = a.id
           where a.user_id = $1
-            and (
-              (
-                lower(coalesce(a.category_id, '')) = 'sono'
-                and a.sleep_session_date is not null
-                and ($2::timestamptz is null or a.sleep_session_date >= ($2::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
-                and ($3::timestamptz is null or a.sleep_session_date < ($3::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
-              )
-              or (
-                lower(coalesce(a.category_id, '')) <> 'sono'
-                and ($2::timestamptz is null or a.start_at < $3::timestamptz)
-                and ($2::timestamptz is null or a.end_at > $2::timestamptz)
-              )
-            )
+            and lower(coalesce(a.category_id, '')) <> 'sono'
+            and ($2::timestamptz is null or a.start_at < $3::timestamptz)
+            and ($2::timestamptz is null or a.end_at > $2::timestamptz)
         )
         select
           assignee,
@@ -417,30 +405,16 @@ async function buildStatsSummary(userId, range) {
           select
             a.id,
             a.category_id,
-            case
-              when lower(coalesce(a.category_id, '')) = 'sono' and a.sleep_session_date is not null then
-                greatest(coalesce(a.sleep_tracked_minutes, 0), extract(epoch from (a.end_at - a.start_at)) / 60.0)
-              else extract(epoch from (a.end_at - a.start_at)) / 60.0
-            end as minutes,
+            extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
             coalesce(o.status, 'PENDING') as status
           from actions a
           left join action_status_overrides o
             on o.user_id = a.user_id
            and o.action_id = a.id
           where a.user_id = $1
-            and (
-              (
-                lower(coalesce(a.category_id, '')) = 'sono'
-                and a.sleep_session_date is not null
-                and ($2::timestamptz is null or a.sleep_session_date >= ($2::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
-                and ($3::timestamptz is null or a.sleep_session_date < ($3::timestamptz at time zone '${PROJECT200_TIME_ZONE}')::date)
-              )
-              or (
-                lower(coalesce(a.category_id, '')) <> 'sono'
-                and ($2::timestamptz is null or a.start_at < $3::timestamptz)
-                and ($2::timestamptz is null or a.end_at > $2::timestamptz)
-              )
-            )
+            and lower(coalesce(a.category_id, '')) <> 'sono'
+            and ($2::timestamptz is null or a.start_at < $3::timestamptz)
+            and ($2::timestamptz is null or a.end_at > $2::timestamptz)
         )
         select
           coalesce(nullif(trim(category_id), ''), 'sem_categoria') as category_id,
@@ -481,7 +455,11 @@ async function buildStatsSummary(userId, range) {
         limit 1
       `,
       [userId]
-    )
+    ),
+    getProject200SleepTotalMinutesForRange(userId, {
+      from: range.from || null,
+      to: range.to || null
+    })
   ]);
 
   const totalMinutes = actionsResult.rows.reduce((sum, row) => sum + Number(row.total_minutes || 0), 0);
@@ -499,6 +477,7 @@ async function buildStatsSummary(userId, range) {
     const categoryId = String(row.category_id || "").trim().toLowerCase() || "sem_categoria";
     byCategory[categoryId] = Number(row.completed_minutes || 0);
   }
+  byCategory[PROJECT200_SLEEP_CATEGORY_ID] = Math.max(0, Number(sleepTotalMinutes || 0));
 
   return {
     rangeKey: range.key,

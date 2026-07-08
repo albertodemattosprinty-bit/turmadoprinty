@@ -53,8 +53,9 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { abortSleepSessionAction, activateSleepSessionAction, addManualSleepMinutesAction, createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, finishSleepSessionAction, getProject200RuntimeState, getSleepSessionAction, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual, upsertSleepSessionAction } from "./src/actions.js";
+import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
+import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession } from "./src/project200-sleep.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
@@ -3610,7 +3611,6 @@ async function handleProject200ActionInterpret(request, response) {
 
 const PROJECT200_TASK_CATEGORIES = [
   { id: "fe_espiritualidade", name: "Fé" },
-  { id: "sono", name: "Sono" },
   { id: "alimentacao", name: "Alimentação" },
   { id: "hidratacao", name: "Hidratação" },
   { id: "estudo", name: "Estudo" },
@@ -3633,7 +3633,6 @@ function inferProject200CategoryLocally(title) {
     .toLowerCase();
   const pick = (id) => PROJECT200_TASK_CATEGORIES.find((item) => item.id === id) || PROJECT200_TASK_CATEGORIES[0];
   if (/\b(agua|hidrata|garrafa|beber)\b/.test(normalized)) return pick("hidratacao");
-  if (/\b(dormir|sono|cochilar|acordar|descanso)\b/.test(normalized)) return pick("sono");
   if (/\b(cafe|almoco|jantar|comida|refeicao|lanche|cozinhar)\b/.test(normalized)) return pick("alimentacao");
   if (/\b(estudar|estudo|ler|leitura|curso|aula|revisao)\b/.test(normalized)) return pick("estudo");
   if (/\b(fatura|conta|pix|pagar|orcamento|invest|finance|dinheiro)\b/.test(normalized)) return pick("financeiro");
@@ -11413,6 +11412,90 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/200/sleep-session") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const profile = requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME;
+      const session = await getProject200SleepSession(user.id, profile);
+      sendJson(response, 200, { ok: true, session });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar a sessão de sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/start") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const session = await startProject200SleepSession(user.id, {
+        profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME,
+        delayMinutes: body?.delayMinutes
+      });
+      sendJson(response, 200, { ok: true, session });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel iniciar o sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/finish") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const result = await finishProject200SleepSession(user.id, {
+        profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME,
+        completedAt: body?.completedAt
+      });
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel encerrar o sono."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/sleep-session/abort") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const result = await abortProject200SleepSession(user.id, {
+        profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME
+      });
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel abortar o sono."
+      });
+    }
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/platform/entries") {
     try {
       const user = await requireAuth(request, response);
@@ -11584,137 +11667,6 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel iniciar a tarefa rapida."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/200/sleep-session") {
-    try {
-      const user = await requireAuth(request, response);
-
-      if (!user) {
-        return;
-      }
-
-      const sessionDate = searchParams.get("date") || new Date().toISOString();
-      const profileName = searchParams.get("profile") || undefined;
-      const action = await getSleepSessionAction(user.id, profileName, sessionDate);
-      sendJson(response, 200, { ok: true, action });
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel carregar o sono."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/sleep-session/start") {
-    try {
-      const user = await requireAuth(request, response);
-
-      if (!user) {
-        return;
-      }
-
-      const body = await readJsonBody(request);
-      const action = await upsertSleepSessionAction(user.id, {
-        profileName: body?.profile,
-        sessionDate: body?.date,
-        plannedStartAt: body?.plannedStartAt
-      });
-      sendJson(response, 201, { ok: true, action });
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel iniciar o sono."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/sleep-session/activate") {
-    try {
-      const user = await requireAuth(request, response);
-
-      if (!user) {
-        return;
-      }
-
-      const body = await readJsonBody(request);
-      const action = await activateSleepSessionAction(user.id, {
-        actionId: body?.actionId,
-        actualStartAt: body?.actualStartAt
-      });
-      sendJson(response, 200, { ok: true, action });
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel ativar o sono."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/sleep-session/finish") {
-    try {
-      const user = await requireAuth(request, response);
-
-      if (!user) {
-        return;
-      }
-
-      const body = await readJsonBody(request);
-      const action = await finishSleepSessionAction(user.id, {
-        actionId: body?.actionId,
-        completedAt: body?.completedAt
-      });
-      sendJson(response, 200, { ok: true, action });
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel finalizar o sono."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/sleep-session/abort") {
-    try {
-      const user = await requireAuth(request, response);
-
-      if (!user) {
-        return;
-      }
-
-      const body = await readJsonBody(request);
-      const result = await abortSleepSessionAction(user.id, {
-        actionId: body?.actionId
-      });
-      sendJson(response, 200, { ok: true, result });
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel abortar o sono."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/200/sleep-session/manual") {
-    try {
-      const user = await requireAuth(request, response);
-
-      if (!user) {
-        return;
-      }
-
-      const body = await readJsonBody(request);
-      const action = await addManualSleepMinutesAction(user.id, {
-        profileName: body?.profile,
-        sessionDate: body?.date,
-        minutes: body?.minutes
-      });
-      sendJson(response, 200, { ok: true, action });
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel ajustar o sono manualmente."
       });
     }
     return;

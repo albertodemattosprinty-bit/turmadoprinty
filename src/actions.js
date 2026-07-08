@@ -11,10 +11,7 @@ const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
 const DEFAULT_CATEGORY_ID = "";
 const QUICK_TASK_CATEGORY_ID = "quick_task";
 const SLEEP_ACTION_CATEGORY_ID = "sono";
-const SLEEP_ACTION_TITLE = "Sono";
 const ACTIONS_TIME_ZONE = "America/Sao_Paulo";
-const SLEEP_PLACEHOLDER_DURATION_MINUTES = 20 * 60;
-const SLEEP_DAY_START_HOUR = 17;
 
 function toIso(value) {
   if (!value) {
@@ -53,6 +50,7 @@ function normalizeAssignee(value) {
 function normalizeCategoryId(value) {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw) return DEFAULT_CATEGORY_ID;
+  if (raw === SLEEP_ACTION_CATEGORY_ID) return DEFAULT_CATEGORY_ID;
   return raw.replace(/[^a-z0-9_]/g, "");
 }
 
@@ -74,73 +72,6 @@ function toDateKey(value = new Date()) {
   const month = parts.find((part) => part.type === "month")?.value || "01";
   const day = parts.find((part) => part.type === "day")?.value || "01";
   return `${year}-${month}-${day}`;
-}
-
-function getDatePartsInActionsTimeZone(value = new Date()) {
-  const date = value instanceof Date ? value : new Date(value);
-  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: ACTIONS_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false
-  });
-  const parts = formatter.formatToParts(safeDate);
-  return {
-    year: parts.find((part) => part.type === "year")?.value || "0000",
-    month: parts.find((part) => part.type === "month")?.value || "01",
-    day: parts.find((part) => part.type === "day")?.value || "01",
-    hour: Number(parts.find((part) => part.type === "hour")?.value || "0")
-  };
-}
-
-function addDaysToDateKey(dateKey, days) {
-  const [year, month, day] = String(dateKey || "").split("-").map((part) => Number(part));
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return toDateKey(new Date());
-  }
-  const shifted = new Date(Date.UTC(year, month - 1, day + Number(days || 0), 12, 0, 0));
-  return shifted.toISOString().slice(0, 10);
-}
-
-function toSleepSessionDateKey(value = new Date()) {
-  const raw = String(value || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    return raw;
-  }
-  const parts = getDatePartsInActionsTimeZone(value);
-  const baseKey = `${parts.year}-${parts.month}-${parts.day}`;
-  if (parts.hour >= SLEEP_DAY_START_HOUR) {
-    return addDaysToDateKey(baseKey, 1);
-  }
-  return baseKey;
-}
-
-function parseSleepTrackedMinutes(value) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 0;
-  }
-  return Math.max(0, Math.round(parsed));
-}
-
-function buildSleepAnchorDate(sessionDateKey, minutes = 0) {
-  const [year, month, day] = String(sessionDateKey || "").split("-").map((part) => Number(part));
-  const safeYear = Number.isInteger(year) ? year : 1970;
-  const safeMonth = Number.isInteger(month) ? month : 1;
-  const safeDay = Number.isInteger(day) ? day : 1;
-  const anchor = new Date(Date.UTC(safeYear, safeMonth - 1, safeDay, 20, 0, 0));
-  const safeMinutes = Math.max(0, Math.round(Number(minutes || 0)));
-  return {
-    startAt: anchor,
-    endAt: new Date(anchor.getTime() + (safeMinutes * 60000))
-  };
-}
-
-function buildSleepPlaceholderEnd(startAt) {
-  return new Date(startAt.getTime() + (SLEEP_PLACEHOLDER_DURATION_MINUTES * 60000));
 }
 
 function getNextActionStatus(currentStatus) {
@@ -179,8 +110,6 @@ function normalizeAction(row) {
     repeatGroupId: row.repeat_group_id || null,
     repeatRule: row.repeat_rule || "none",
     repeatDays: Array.isArray(row.repeat_days) ? row.repeat_days : [],
-    sleepSessionDate: row.sleep_session_date ? toDateKey(row.sleep_session_date) : "",
-    sleepTrackedMinutes: parseSleepTrackedMinutes(row.sleep_tracked_minutes),
     status: normalizeActionStatus(row.status_override),
     startedAt: toIso(row.status_started_at),
     completedAt: toIso(row.status_completed_at),
@@ -373,8 +302,6 @@ async function getUserActionById(userId, actionId) {
         a.repeat_group_id,
         a.repeat_rule,
         a.repeat_days,
-        a.sleep_session_date,
-        a.sleep_tracked_minutes,
         a.created_at,
         o.status as status_override,
         o.started_at as status_started_at,
@@ -491,8 +418,6 @@ async function reshapeActionsForQuickTask(userId, assignee, rangeStartAt, rangeE
         a.repeat_group_id,
         a.repeat_rule,
         a.repeat_days,
-        a.sleep_session_date,
-        a.sleep_tracked_minutes,
         a.created_at,
         o.status as status_override,
         o.started_at as status_started_at,
@@ -572,8 +497,6 @@ export async function listUserActions(userId, { from, to }) {
         a.repeat_group_id,
         a.repeat_rule,
         a.repeat_days,
-        a.sleep_session_date,
-        a.sleep_tracked_minutes,
         a.created_at,
         o.status as status_override,
         o.started_at as status_started_at,
@@ -584,6 +507,7 @@ export async function listUserActions(userId, { from, to }) {
         on o.user_id = a.user_id
        and o.action_id = a.id
       where a.user_id = $1
+        and lower(coalesce(a.category_id, '')) <> '${SLEEP_ACTION_CATEGORY_ID}'
         and a.start_at < $3
         and a.end_at > $2
       order by a.start_at asc, a.created_at asc
@@ -670,7 +594,7 @@ export async function createUserAction(userId, payload) {
     `
       insert into actions (user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
       values ${placeholders.join(", ")}
-      returning id, user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, sleep_session_date, created_at
+      returning id, user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
     `,
     values
   );
@@ -1173,341 +1097,6 @@ export async function createQuickUserAction(userId, payload = {}) {
     throw new Error("Nao foi possivel criar a tarefa rapida.");
   }
   return updateUserActionStatus(userId, action.id);
-}
-
-async function getSleepSessionActionRow(userId, assignee, sessionDateKey) {
-  const result = await query(
-    `
-      select
-        a.id,
-        a.user_id,
-        a.title,
-        a.music_default_mode,
-        a.music_station_name,
-        a.music_track_name,
-        a.music_track_url,
-        a.assignee,
-        a.category_id,
-        a.start_at,
-        a.end_at,
-        a.repeat_group_id,
-        a.repeat_rule,
-        a.repeat_days,
-        a.sleep_session_date,
-        a.sleep_tracked_minutes,
-        a.created_at,
-        o.status as status_override,
-        o.started_at as status_started_at,
-        o.completed_at as status_completed_at,
-        o.updated_at as status_updated_at
-      from actions a
-      left join action_status_overrides o
-        on o.user_id = a.user_id
-       and o.action_id = a.id
-      where a.user_id = $1
-        and a.assignee = $2
-        and a.sleep_session_date = $3::date
-        and a.category_id = $4
-      order by a.created_at desc
-      limit 1
-    `,
-    [userId, assignee, sessionDateKey, SLEEP_ACTION_CATEGORY_ID]
-  );
-  return result.rows[0] ? normalizeAction(result.rows[0]) : null;
-}
-
-export async function getSleepSessionAction(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, sessionDate = new Date()) {
-  await ensureActionsSchema();
-  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(profileName), { fallbackToDefault: true });
-  const sessionDateKey = toSleepSessionDateKey(sessionDate);
-  return getSleepSessionActionRow(userId, assignee, sessionDateKey);
-}
-
-export async function upsertSleepSessionAction(userId, payload = {}) {
-  await ensureActionsSchema();
-  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.profileName), { fallbackToDefault: true });
-  const sessionDateKey = toSleepSessionDateKey(payload?.sessionDate || new Date());
-  const plannedStartAt = parseDate(payload?.plannedStartAt, "Horario inicial do sono");
-  const plannedEndAt = buildSleepPlaceholderEnd(plannedStartAt);
-  const existing = await getSleepSessionActionRow(userId, assignee, sessionDateKey);
-
-  if (existing?.id) {
-    await query(
-      `
-        update actions
-           set title = $3,
-               assignee = $4,
-               category_id = $5,
-               music_default_mode = 'station',
-               music_station_name = 'Frequency',
-               music_track_name = null,
-               music_track_url = null,
-               start_at = $6::timestamptz,
-               end_at = $7::timestamptz,
-               repeat_group_id = null,
-               repeat_rule = 'none',
-               repeat_days = '[]'::jsonb,
-               sleep_session_date = $8::date
-         where user_id = $1
-           and id = $2
-      `,
-      [userId, existing.id, SLEEP_ACTION_TITLE, assignee, SLEEP_ACTION_CATEGORY_ID, plannedStartAt.toISOString(), plannedEndAt.toISOString(), sessionDateKey]
-    );
-    await query(
-      `
-        insert into action_status_overrides (
-          user_id, action_id, repeat_group_id, status, started_at, completed_at
-        )
-        values ($1, $2, null, $3, null, null)
-        on conflict (user_id, action_id) do update
-          set repeat_group_id = null,
-              status = excluded.status,
-              started_at = null,
-              completed_at = null,
-              updated_at = now()
-      `,
-      [userId, existing.id, ACTION_STATUS_PENDING]
-    );
-    return getUserActionById(userId, existing.id);
-  }
-
-  const result = await query(
-    `
-      insert into actions (
-        user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url,
-        assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, sleep_session_date
-      )
-      values ($1, $2, 'station', $3, null, null, $4, $5, $6::timestamptz, $7::timestamptz, null, 'none', '[]'::jsonb, $8::date)
-      returning id
-    `,
-    [userId, SLEEP_ACTION_TITLE, "Frequency", assignee, SLEEP_ACTION_CATEGORY_ID, plannedStartAt.toISOString(), plannedEndAt.toISOString(), sessionDateKey]
-  );
-  return getUserActionById(userId, result.rows[0]?.id);
-}
-
-export async function activateSleepSessionAction(userId, payload = {}) {
-  await ensureActionsSchema();
-  const action = await getUserActionById(userId, payload?.actionId);
-  if (!action || action.categoryId !== SLEEP_ACTION_CATEGORY_ID || !action.sleepSessionDate) {
-    throw new Error("Sessao de sono nao encontrada.");
-  }
-  const actualStartAt = parseDate(payload?.actualStartAt, "Inicio real do sono");
-  const placeholderEndAt = buildSleepPlaceholderEnd(actualStartAt);
-  await query(
-    `
-      update actions
-         set start_at = $3::timestamptz,
-             end_at = $4::timestamptz,
-             music_default_mode = 'station',
-             music_station_name = 'Frequency',
-             music_track_name = null,
-             music_track_url = null
-       where user_id = $1
-         and id = $2
-    `,
-    [userId, action.id, actualStartAt.toISOString(), placeholderEndAt.toISOString()]
-  );
-  await query(
-    `
-      insert into action_status_overrides (
-        user_id, action_id, repeat_group_id, status, started_at, completed_at
-      )
-      values ($1, $2, null, $3, $4::timestamptz, null)
-      on conflict (user_id, action_id) do update
-        set repeat_group_id = null,
-            status = excluded.status,
-            started_at = excluded.started_at,
-            completed_at = null,
-            updated_at = now()
-    `,
-    [userId, action.id, ACTION_STATUS_IN_PROGRESS, actualStartAt.toISOString()]
-  );
-  await upsertProject200RuntimeState(userId, {
-    actionId: action.id,
-    actionTitle: SLEEP_ACTION_TITLE,
-    eventType: "start",
-    startedAt: actualStartAt.toISOString(),
-    occurredAt: actualStartAt.toISOString()
-  });
-  return getUserActionById(userId, action.id);
-}
-
-export async function finishSleepSessionAction(userId, payload = {}) {
-  await ensureActionsSchema();
-  const action = await getUserActionById(userId, payload?.actionId);
-  if (!action || action.categoryId !== SLEEP_ACTION_CATEGORY_ID || !action.sleepSessionDate) {
-    throw new Error("Sessao de sono nao encontrada.");
-  }
-  const completedAt = parseDate(payload?.completedAt, "Fim do sono");
-  const startedAt = parseDate(action.startedAt || action.startAt, "Inicio do sono");
-  if (completedAt <= startedAt) {
-    throw new Error("O fim do sono precisa ser depois do inicio.");
-  }
-  const baseMinutes = parseSleepTrackedMinutes(action.sleepTrackedMinutes);
-  const sessionMinutes = getActionDurationMinutesFromRange(startedAt, completedAt);
-  const totalTrackedMinutes = baseMinutes + sessionMinutes;
-  await query(
-    `
-      update actions
-         set end_at = $3::timestamptz,
-             sleep_tracked_minutes = $4
-       where user_id = $1
-         and id = $2
-    `,
-    [userId, action.id, completedAt.toISOString(), totalTrackedMinutes]
-  );
-  await query(
-    `
-      insert into action_status_overrides (
-        user_id, action_id, repeat_group_id, status, started_at, completed_at
-      )
-      values ($1, $2, null, $3, $4::timestamptz, $5::timestamptz)
-      on conflict (user_id, action_id) do update
-        set repeat_group_id = null,
-            status = excluded.status,
-            started_at = excluded.started_at,
-            completed_at = excluded.completed_at,
-            updated_at = now()
-    `,
-    [userId, action.id, ACTION_STATUS_COMPLETED, startedAt.toISOString(), completedAt.toISOString()]
-  );
-  await upsertProject200RuntimeState(userId, {
-    actionId: action.id,
-    actionTitle: SLEEP_ACTION_TITLE,
-    eventType: "complete",
-    startedAt: startedAt.toISOString(),
-    occurredAt: completedAt.toISOString()
-  });
-  return getUserActionById(userId, action.id);
-}
-
-export async function abortSleepSessionAction(userId, payload = {}) {
-  await ensureActionsSchema();
-  const action = await getUserActionById(userId, payload?.actionId);
-  if (!action || action.categoryId !== SLEEP_ACTION_CATEGORY_ID || !action.sleepSessionDate) {
-    throw new Error("Sessao de sono nao encontrada.");
-  }
-  const hasTrackedMinutes = parseSleepTrackedMinutes(action.sleepTrackedMinutes) > 0;
-  if (hasTrackedMinutes) {
-    const fallbackCompletedAt = new Date().toISOString();
-    await query(
-      `
-        insert into action_status_overrides (
-          user_id, action_id, repeat_group_id, status, started_at, completed_at
-        )
-        values ($1, $2, null, $3, null, $4::timestamptz)
-        on conflict (user_id, action_id) do update
-          set repeat_group_id = null,
-              status = excluded.status,
-              started_at = excluded.started_at,
-              completed_at = excluded.completed_at,
-              updated_at = now()
-      `,
-      [userId, action.id, ACTION_STATUS_COMPLETED, fallbackCompletedAt]
-    );
-    await upsertProject200RuntimeState(userId, {
-      actionId: action.id,
-      actionTitle: SLEEP_ACTION_TITLE,
-      eventType: "abort",
-      startedAt: null,
-      occurredAt: fallbackCompletedAt
-    });
-    return getUserActionById(userId, action.id);
-  }
-  await query("delete from action_status_overrides where user_id = $1 and action_id = $2", [userId, action.id]);
-  await query("delete from actions where user_id = $1 and id = $2", [userId, action.id]);
-  await upsertProject200RuntimeState(userId, {
-    actionId: action.id,
-    actionTitle: SLEEP_ACTION_TITLE,
-    eventType: "abort",
-    startedAt: null,
-    occurredAt: new Date().toISOString()
-  });
-  return { ok: true };
-}
-
-export async function addManualSleepMinutesAction(userId, payload = {}) {
-  await ensureActionsSchema();
-  const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.profileName), { fallbackToDefault: true });
-  const sessionDateKey = toSleepSessionDateKey(payload?.sessionDate || new Date());
-  const minutesToAdd = parseSleepTrackedMinutes(payload?.minutes);
-  if (minutesToAdd <= 0) {
-    throw new Error("Informe quantos minutos deseja adicionar.");
-  }
-
-  const existing = await getSleepSessionActionRow(userId, assignee, sessionDateKey);
-  if (existing?.id) {
-    if (normalizeActionStatus(existing.status) === ACTION_STATUS_IN_PROGRESS) {
-      throw new Error("Finalize o sono em andamento antes de ajustar manualmente.");
-    }
-    const nextTrackedMinutes = parseSleepTrackedMinutes(existing.sleepTrackedMinutes) + minutesToAdd;
-    if (!parseSleepTrackedMinutes(existing.sleepTrackedMinutes)) {
-      const anchor = buildSleepAnchorDate(sessionDateKey, nextTrackedMinutes);
-      await query(
-        `
-          update actions
-             set start_at = $3::timestamptz,
-                 end_at = $4::timestamptz,
-                 sleep_tracked_minutes = $5
-           where user_id = $1
-             and id = $2
-        `,
-        [userId, existing.id, anchor.startAt.toISOString(), anchor.endAt.toISOString(), nextTrackedMinutes]
-      );
-    } else {
-      await query(
-        `
-          update actions
-             set sleep_tracked_minutes = $3
-           where user_id = $1
-             and id = $2
-        `,
-        [userId, existing.id, nextTrackedMinutes]
-      );
-    }
-    const anchorCompletedAt = new Date().toISOString();
-    await query(
-      `
-        insert into action_status_overrides (
-          user_id, action_id, repeat_group_id, status, started_at, completed_at
-        )
-        values ($1, $2, null, $3, null, $4::timestamptz)
-        on conflict (user_id, action_id) do update
-          set repeat_group_id = null,
-              status = excluded.status,
-              started_at = excluded.started_at,
-              completed_at = excluded.completed_at,
-              updated_at = now()
-      `,
-      [userId, existing.id, ACTION_STATUS_COMPLETED, anchorCompletedAt]
-    );
-    return getUserActionById(userId, existing.id);
-  }
-
-  const anchor = buildSleepAnchorDate(sessionDateKey, minutesToAdd);
-  const insertResult = await query(
-    `
-      insert into actions (
-        user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url,
-        assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, sleep_session_date, sleep_tracked_minutes
-      )
-      values ($1, $2, 'station', $3, null, null, $4, $5, $6::timestamptz, $7::timestamptz, null, 'none', '[]'::jsonb, $8::date, $9)
-      returning id
-    `,
-    [userId, SLEEP_ACTION_TITLE, "Frequency", assignee, SLEEP_ACTION_CATEGORY_ID, anchor.startAt.toISOString(), anchor.endAt.toISOString(), sessionDateKey, minutesToAdd]
-  );
-  const actionId = insertResult.rows[0]?.id;
-  const anchorCompletedAt = anchor.endAt.toISOString();
-  await query(
-    `
-      insert into action_status_overrides (
-        user_id, action_id, repeat_group_id, status, started_at, completed_at
-      )
-      values ($1, $2, null, $3, null, $4::timestamptz)
-    `,
-    [userId, actionId, ACTION_STATUS_COMPLETED, anchorCompletedAt]
-  );
-  return getUserActionById(userId, actionId);
 }
 
 export async function extendQuickUserAction(userId, actionId, payload = {}) {
