@@ -31,7 +31,9 @@ body {
 body {
   font-family: "Exo 2", sans-serif;
   color: #123b73;
-  background: #030712;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 38%),
+    linear-gradient(145deg, #f8f8f5 0%, #f2f2ed 48%, #ecece7 100%);
   overflow: hidden;
   position: relative;
   touch-action: pan-y;
@@ -4816,7 +4818,7 @@ body[data-background-theme="white"] .task-row.task-delay-red,
 body[data-background-theme="white"] .task-row.task-delay-black,
 body[data-background-theme="white"] .task-row.task-free-slot,
 body[data-background-theme="white"] .task-row.task-pending-clean {
-  grid-template-columns: 12px minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: 14px;
   padding: 14px 0;
   background: transparent !important;
@@ -4827,6 +4829,14 @@ body[data-background-theme="white"] .task-row.task-pending-clean {
 
 body[data-background-theme="white"] .task-row .task-avatar {
   display: none;
+}
+
+body[data-background-theme="white"] .task-row .task-main {
+  grid-column: 1;
+}
+
+body[data-background-theme="white"] .task-row .task-time {
+  grid-column: 2;
 }
 
 body[data-background-theme="white"] .task-status-dot {

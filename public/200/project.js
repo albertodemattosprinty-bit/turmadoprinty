@@ -583,6 +583,8 @@ const loadingIconByArea = {
 let globalLoadingCount = 0;
 let globalLoadingPreferredIcon = loadingIconByArea.actions;
 let startupLoadingActive = false;
+let homeSnapshotHydrationPromise = null;
+let lastHomeSnapshotHydratedAtMs = 0;
 const profileAvatarUploadButton = document.getElementById("profileAvatarUploadButton");
 const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -5799,6 +5801,46 @@ async function loadProject200Profiles() {
   renderHistorySpeakerSelectionOptions();
 }
 
+function shouldRefreshHomeSnapshot(force = false) {
+  if (!getToken()) {
+    return false;
+  }
+  if (force) {
+    return true;
+  }
+  if (!state.serverNowMs) {
+    return true;
+  }
+  return (Date.now() - lastHomeSnapshotHydratedAtMs) > 45000;
+}
+
+async function refreshHomeSnapshot(options = {}) {
+  const force = options?.force === true;
+  renderHomeRunningTask();
+  if (!shouldRefreshHomeSnapshot(force)) {
+    return;
+  }
+  if (homeSnapshotHydrationPromise) {
+    return homeSnapshotHydrationPromise;
+  }
+  homeSnapshotHydrationPromise = (async () => {
+    try {
+      if (!getProfilesList().length) {
+        try {
+          await loadProject200Profiles();
+        } catch {}
+      }
+      await loadActions();
+      lastHomeSnapshotHydratedAtMs = Date.now();
+    } catch {
+      renderHomeRunningTask();
+    } finally {
+      homeSnapshotHydrationPromise = null;
+    }
+  })();
+  return homeSnapshotHydrationPromise;
+}
+
 async function createProject200ProfileFromModal() {
   const name = String(project200CreateProfileNameInput?.value || "").trim();
   if (!name) {
@@ -9178,8 +9220,7 @@ async function bootstrapProject200App() {
     const sessionOk = await ensureProject200Session();
     if (sessionOk) {
       try {
-        await loadProject200Profiles();
-        await loadActions();
+        await refreshHomeSnapshot({ force: true });
         return;
       } catch (error) {
         if (isAuthErrorMessage(error?.message)) {
@@ -9191,8 +9232,7 @@ async function bootstrapProject200App() {
     }
 
     try {
-      await loadProject200Profiles();
-      await loadActions();
+      await refreshHomeSnapshot({ force: true });
       project200LoginOverlay?.classList.remove("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
     } catch (error) {
@@ -11580,6 +11620,7 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     startRunningTaskTicker();
     scheduleScreenLockInactivity();
+    void refreshHomeSnapshot();
     return;
   }
   clearScreenLockInactivityTimer();
@@ -11587,16 +11628,20 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("focus", () => {
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
+  void refreshHomeSnapshot();
 });
 window.addEventListener("pageshow", () => {
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
+  void refreshHomeSnapshot();
 });
 document.addEventListener("resume", () => {
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
+  void refreshHomeSnapshot();
 });
 startRunningTaskTicker();
+void refreshHomeSnapshot({ force: true });
 void loadRunningMusicStations();
 if (runningMusicProgressTicker) {
   window.clearInterval(runningMusicProgressTicker);
