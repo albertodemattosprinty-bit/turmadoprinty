@@ -800,7 +800,7 @@ const state = {
   options: {
     showFreeTime: true,
     completionBeepCycles: 0,
-    backgroundTheme: "black",
+    backgroundTheme: "edge",
     screenLockEnabled: false,
     stopMusicOnFinish: false
   },
@@ -980,7 +980,7 @@ function normalizeBackgroundTheme(value) {
   if (normalized === "modern") {
     return "black";
   }
-  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "black";
+  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "edge";
 }
 
 function getBackgroundThemeMode(value) {
@@ -9653,7 +9653,7 @@ function loadOptionsConfig() {
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
-    state.options.backgroundTheme = "white";
+    state.options.backgroundTheme = "edge";
     state.options.screenLockEnabled = false;
     state.options.stopMusicOnFinish = false;
   }
