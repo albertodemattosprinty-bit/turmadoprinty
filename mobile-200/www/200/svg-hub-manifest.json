@@ -1,0 +1,2638 @@
+{
+  "generatedAt": "2026-07-08T04:18:59.305Z",
+  "sourceDir": "C:/Users/Lucas/Pictures/DeHoje/SVG HUB",
+  "assetPrefix": "project200/svg-hub",
+  "total": 263,
+  "assets": [
+    {
+      "id": "abacate",
+      "fileName": "abacate, fruta, alimento.svg",
+      "label": "abacate",
+      "keywords": [
+        "abacate",
+        "fruta",
+        "alimento"
+      ]
+    },
+    {
+      "id": "abalado",
+      "fileName": "abalado, triste, afetado.svg",
+      "label": "abalado",
+      "keywords": [
+        "abalado",
+        "triste",
+        "afetado"
+      ]
+    },
+    {
+      "id": "abelha",
+      "fileName": "abelha, inseto, mel.svg",
+      "label": "abelha",
+      "keywords": [
+        "abelha",
+        "inseto",
+        "mel"
+      ]
+    },
+    {
+      "id": "adaga",
+      "fileName": "adaga, arma, l mina.svg",
+      "label": "adaga",
+      "keywords": [
+        "adaga",
+        "arma",
+        "lâmina"
+      ]
+    },
+    {
+      "id": "alarme",
+      "fileName": "alarme, despertador, acordar.svg",
+      "label": "alarme",
+      "keywords": [
+        "alarme",
+        "despertador",
+        "acordar"
+      ]
+    },
+    {
+      "id": "alfinete-de-seguranca",
+      "fileName": "alfinete de seguran a, costura, prender.svg",
+      "label": "alfinete de segurança",
+      "keywords": [
+        "alfinete de segurança",
+        "costura",
+        "prender"
+      ]
+    },
+    {
+      "id": "alfinete",
+      "fileName": "alfinete, fixar, marcador.svg",
+      "label": "alfinete",
+      "keywords": [
+        "alfinete",
+        "fixar",
+        "marcador"
+      ]
+    },
+    {
+      "id": "alienigena",
+      "fileName": "alien gena, extraterrestre, ET.svg",
+      "label": "alienígena",
+      "keywords": [
+        "alienígena",
+        "extraterrestre",
+        "ET"
+      ]
+    },
+    {
+      "id": "alto-falante",
+      "fileName": "alto-falante, som, udio.svg",
+      "label": "alto-falante",
+      "keywords": [
+        "alto-falante",
+        "som",
+        "ááudio"
+      ]
+    },
+    {
+      "id": "alvo",
+      "fileName": "alvo, objetivo, meta.svg",
+      "label": "alvo",
+      "keywords": [
+        "alvo",
+        "objetivo",
+        "meta"
+      ]
+    },
+    {
+      "id": "amamentar",
+      "fileName": "amamentar, maternidade, beb.svg",
+      "label": "amamentar",
+      "keywords": [
+        "amamentar",
+        "maternidade",
+        "bebê"
+      ]
+    },
+    {
+      "id": "ambulancia",
+      "fileName": "ambulancia, cone, s mbolo.svg",
+      "label": "ambulancia",
+      "keywords": [
+        "ambulancia",
+        "ícone",
+        "símbolo"
+      ]
+    },
+    {
+      "id": "ampulheta",
+      "fileName": "ampulheta, tempo, espera.svg",
+      "label": "ampulheta",
+      "keywords": [
+        "ampulheta",
+        "tempo",
+        "espera"
+      ]
+    },
+    {
+      "id": "anotacoes",
+      "fileName": "anota es, notas, escrever.svg",
+      "label": "anotações",
+      "keywords": [
+        "anotações",
+        "notas",
+        "escrever"
+      ]
+    },
+    {
+      "id": "apaixonado",
+      "fileName": "apaixonado, amor, romance.svg",
+      "label": "apaixonado",
+      "keywords": [
+        "apaixonado",
+        "amor",
+        "romance"
+      ]
+    },
+    {
+      "id": "aranha",
+      "fileName": "aranha, inseto, teia.svg",
+      "label": "aranha",
+      "keywords": [
+        "aranha",
+        "inseto",
+        "teia"
+      ]
+    },
+    {
+      "id": "arco-iris",
+      "fileName": "arco- ris, cores, natureza.svg",
+      "label": "arco-íris",
+      "keywords": [
+        "arco-íris",
+        "cores",
+        "natureza"
+      ]
+    },
+    {
+      "id": "arco",
+      "fileName": "arco, curva, estrutura.svg",
+      "label": "arco",
+      "keywords": [
+        "arco",
+        "curva",
+        "estrutura"
+      ]
+    },
+    {
+      "id": "bussola",
+      "fileName": "b ssola, dire o, navega o.svg",
+      "label": "bússola",
+      "keywords": [
+        "bússola",
+        "direção",
+        "navegação"
+      ]
+    },
+    {
+      "id": "balao-de-conversa",
+      "fileName": "bal o de conversa, mensagem, chat.svg",
+      "label": "balão de conversa",
+      "keywords": [
+        "balão de conversa",
+        "mensagem",
+        "chat"
+      ]
+    },
+    {
+      "id": "bala",
+      "fileName": "bala, doce, guloseima.svg",
+      "label": "bala",
+      "keywords": [
+        "bala",
+        "doce",
+        "guloseima"
+      ]
+    },
+    {
+      "id": "balde",
+      "fileName": "balde, limpeza, recipiente.svg",
+      "label": "balde",
+      "keywords": [
+        "balde",
+        "limpeza",
+        "recipiente"
+      ]
+    },
+    {
+      "id": "baleia",
+      "fileName": "baleia, mar, animal.svg",
+      "label": "baleia",
+      "keywords": [
+        "baleia",
+        "mar",
+        "animal"
+      ]
+    },
+    {
+      "id": "balsa",
+      "fileName": "balsa, travessia, barco.svg",
+      "label": "balsa",
+      "keywords": [
+        "balsa",
+        "travessia",
+        "barco"
+      ]
+    },
+    {
+      "id": "banana",
+      "fileName": "banana, fruta, alimento.svg",
+      "label": "banana",
+      "keywords": [
+        "banana",
+        "fruta",
+        "alimento"
+      ]
+    },
+    {
+      "id": "banco-central",
+      "fileName": "banco central, finan as, economia.svg",
+      "label": "banco central",
+      "keywords": [
+        "banco central",
+        "finanças",
+        "economia"
+      ]
+    },
+    {
+      "id": "banheira",
+      "fileName": "banheira, banho, relaxar.svg",
+      "label": "banheira",
+      "keywords": [
+        "banheira",
+        "banho",
+        "relaxar"
+      ]
+    },
+    {
+      "id": "banho",
+      "fileName": "banho, banheira, higiene.svg",
+      "label": "banho",
+      "keywords": [
+        "banho",
+        "banheira",
+        "higiene"
+      ]
+    },
+    {
+      "id": "banjo",
+      "fileName": "banjo, m sica, instrumento.svg",
+      "label": "banjo",
+      "keywords": [
+        "banjo",
+        "música",
+        "instrumento"
+      ]
+    },
+    {
+      "id": "barco",
+      "fileName": "barco, navegar, gua.svg",
+      "label": "barco",
+      "keywords": [
+        "barco",
+        "navegar",
+        "gua"
+      ]
+    },
+    {
+      "id": "barraca",
+      "fileName": "barraca, acampamento, aventura.svg",
+      "label": "barraca",
+      "keywords": [
+        "barraca",
+        "acampamento",
+        "aventura"
+      ]
+    },
+    {
+      "id": "basquete",
+      "fileName": "basquete, bola, esporte.svg",
+      "label": "basquete",
+      "keywords": [
+        "basquete",
+        "bola",
+        "esporte"
+      ]
+    },
+    {
+      "id": "batata-frita",
+      "fileName": "batata frita, lanche, comida.svg",
+      "label": "batata frita",
+      "keywords": [
+        "batata frita",
+        "lanche",
+        "comida"
+      ]
+    },
+    {
+      "id": "bateria-cheia",
+      "fileName": "bateria cheia, energia, celular.svg",
+      "label": "bateria cheia",
+      "keywords": [
+        "bateria cheia",
+        "energia",
+        "celular"
+      ]
+    },
+    {
+      "id": "batom",
+      "fileName": "batom, maquiagem, beleza.svg",
+      "label": "batom",
+      "keywords": [
+        "batom",
+        "maquiagem",
+        "beleza"
+      ]
+    },
+    {
+      "id": "bebeee",
+      "fileName": "beb , crian a, inf ncia.svg",
+      "label": "bebêêê",
+      "keywords": [
+        "bebêê",
+        "criança",
+        "infância"
+      ]
+    },
+    {
+      "id": "bebeeida-quente",
+      "fileName": "bebida quente, caf , ch.svg",
+      "label": "bebêêida quente",
+      "keywords": [
+        "bebêida quente",
+        "café",
+        "ch"
+      ]
+    },
+    {
+      "id": "bicicleta",
+      "fileName": "bicicleta, pedalar, transporte.svg",
+      "label": "bicicleta",
+      "keywords": [
+        "bicicleta",
+        "pedalar",
+        "transporte"
+      ]
+    },
+    {
+      "id": "bola-de-cristal",
+      "fileName": "bola de cristal, magia, previs o.svg",
+      "label": "bola de cristal",
+      "keywords": [
+        "bola de cristal",
+        "magia",
+        "previsão"
+      ]
+    },
+    {
+      "id": "boliche",
+      "fileName": "boliche, pinos, jogo.svg",
+      "label": "boliche",
+      "keywords": [
+        "boliche",
+        "pinos",
+        "jogo"
+      ]
+    },
+    {
+      "id": "bolo",
+      "fileName": "bolo, festa, sobremesa.svg",
+      "label": "bolo",
+      "keywords": [
+        "bolo",
+        "festa",
+        "sobremesa"
+      ]
+    },
+    {
+      "id": "bolsa",
+      "fileName": "bolsa, acess rio, carteira.svg",
+      "label": "bolsa",
+      "keywords": [
+        "bolsa",
+        "acess rio",
+        "carteira"
+      ]
+    },
+    {
+      "id": "bolsa-2",
+      "fileName": "bolsa, carteira, acess rio.svg",
+      "label": "bolsa",
+      "keywords": [
+        "bolsa",
+        "carteira",
+        "acess rio"
+      ]
+    },
+    {
+      "id": "bomba",
+      "fileName": "bomba, explos o, perigo.svg",
+      "label": "bomba",
+      "keywords": [
+        "bomba",
+        "explosão",
+        "perigo"
+      ]
+    },
+    {
+      "id": "bon",
+      "fileName": "bon , chap u, acess rio.svg",
+      "label": "bon",
+      "keywords": [
+        "bon",
+        "chap u",
+        "acess rio"
+      ]
+    },
+    {
+      "id": "borboleta",
+      "fileName": "borboleta, inseto, natureza.svg",
+      "label": "borboleta",
+      "keywords": [
+        "borboleta",
+        "inseto",
+        "natureza"
+      ]
+    },
+    {
+      "id": "boxe",
+      "fileName": "boxe, luta, esporte.svg",
+      "label": "boxe",
+      "keywords": [
+        "boxe",
+        "luta",
+        "esporte"
+      ]
+    },
+    {
+      "id": "bravo",
+      "fileName": "bravo, raiva, irritado.svg",
+      "label": "bravo",
+      "keywords": [
+        "bravo",
+        "raiva",
+        "irritado"
+      ]
+    },
+    {
+      "id": "brincalh-o",
+      "fileName": "brincalh o, divers o, feliz.svg",
+      "label": "brincalh o",
+      "keywords": [
+        "brincalh o",
+        "divers o",
+        "feliz"
+      ]
+    },
+    {
+      "id": "brinde",
+      "fileName": "brinde, ta as, comemora o.svg",
+      "label": "brinde",
+      "keywords": [
+        "brinde",
+        "taças",
+        "comemoração"
+      ]
+    },
+    {
+      "id": "bumerangue",
+      "fileName": "bumerangue, volta, lan ar.svg",
+      "label": "bumerangue",
+      "keywords": [
+        "bumerangue",
+        "volta",
+        "lançar"
+      ]
+    },
+    {
+      "id": "buqu",
+      "fileName": "buqu , flores, presente.svg",
+      "label": "buqu",
+      "keywords": [
+        "buqu",
+        "flores",
+        "presente"
+      ]
+    },
+    {
+      "id": "cerebro",
+      "fileName": "c rebro, mente, pensamento.svg",
+      "label": "cérebro",
+      "keywords": [
+        "cérebro",
+        "mente",
+        "pensamento"
+      ]
+    },
+    {
+      "id": "cachorro",
+      "fileName": "cachorro, c o, animal.svg",
+      "label": "cachorro",
+      "keywords": [
+        "cachorro",
+        "c o",
+        "animal"
+      ]
+    },
+    {
+      "id": "cacto",
+      "fileName": "cacto, deserto, planta.svg",
+      "label": "cacto",
+      "keywords": [
+        "cacto",
+        "deserto",
+        "planta"
+      ]
+    },
+    {
+      "id": "cal-a-jeans",
+      "fileName": "cal a jeans, roupa, vestu rio.svg",
+      "label": "cal a jeans",
+      "keywords": [
+        "cal a jeans",
+        "roupa",
+        "vestuário"
+      ]
+    },
+    {
+      "id": "cama",
+      "fileName": "cama, descanso, dormir.svg",
+      "label": "cama",
+      "keywords": [
+        "cama",
+        "descanso",
+        "dormir"
+      ]
+    },
+    {
+      "id": "camelo",
+      "fileName": "camelo, deserto, animal.svg",
+      "label": "camelo",
+      "keywords": [
+        "camelo",
+        "deserto",
+        "animal"
+      ]
+    },
+    {
+      "id": "caminh-o",
+      "fileName": "caminh o, transporte, carga.svg",
+      "label": "caminh o",
+      "keywords": [
+        "caminh o",
+        "transporte",
+        "carga"
+      ]
+    },
+    {
+      "id": "capacete-militar",
+      "fileName": "capacete militar, ex rcito, prote o.svg",
+      "label": "capacete militar",
+      "keywords": [
+        "capacete militar",
+        "exército",
+        "proteção"
+      ]
+    },
+    {
+      "id": "caracol",
+      "fileName": "caracol, lentid o, animal.svg",
+      "label": "caracol",
+      "keywords": [
+        "caracol",
+        "lentidão",
+        "animal"
+      ]
+    },
+    {
+      "id": "carnaval",
+      "fileName": "carnaval, festa, folia.svg",
+      "label": "carnaval",
+      "keywords": [
+        "carnaval",
+        "festa",
+        "folia"
+      ]
+    },
+    {
+      "id": "carne",
+      "fileName": "carne, bife, alimento.svg",
+      "label": "carne",
+      "keywords": [
+        "carne",
+        "bife",
+        "alimento"
+      ]
+    },
+    {
+      "id": "carro",
+      "fileName": "carro, autom vel, tr nsito.svg",
+      "label": "carro",
+      "keywords": [
+        "carro",
+        "automóvel",
+        "trânsito"
+      ]
+    },
+    {
+      "id": "carrossel",
+      "fileName": "carrossel, parque, divers o.svg",
+      "label": "carrossel",
+      "keywords": [
+        "carrossel",
+        "parque",
+        "divers o"
+      ]
+    },
+    {
+      "id": "casa",
+      "fileName": "casa, lar, resid ncia.svg",
+      "label": "casa",
+      "keywords": [
+        "casa",
+        "lar",
+        "residência"
+      ]
+    },
+    {
+      "id": "castelo",
+      "fileName": "castelo, reino, fortaleza.svg",
+      "label": "castelo",
+      "keywords": [
+        "castelo",
+        "reino",
+        "fortaleza"
+      ]
+    },
+    {
+      "id": "castor",
+      "fileName": "castor, animal, natureza.svg",
+      "label": "castor",
+      "keywords": [
+        "castor",
+        "animal",
+        "natureza"
+      ]
+    },
+    {
+      "id": "cavalo",
+      "fileName": "cavalo, animal, fazenda.svg",
+      "label": "cavalo",
+      "keywords": [
+        "cavalo",
+        "animal",
+        "fazenda"
+      ]
+    },
+    {
+      "id": "cenoura",
+      "fileName": "cenoura, legume, alimento.svg",
+      "label": "cenoura",
+      "keywords": [
+        "cenoura",
+        "legume",
+        "alimento"
+      ]
+    },
+    {
+      "id": "cereja",
+      "fileName": "cereja, fruta, doce.svg",
+      "label": "cereja",
+      "keywords": [
+        "cereja",
+        "fruta",
+        "doce"
+      ]
+    },
+    {
+      "id": "cerveja",
+      "fileName": "cerveja, bebida, brinde.svg",
+      "label": "cerveja",
+      "keywords": [
+        "cerveja",
+        "bebêida",
+        "brinde"
+      ]
+    },
+    {
+      "id": "cesta",
+      "fileName": "cesta, palha, armazenar.svg",
+      "label": "cesta",
+      "keywords": [
+        "cesta",
+        "palha",
+        "armazenar"
+      ]
+    },
+    {
+      "id": "champanhe",
+      "fileName": "champanhe, brinde, festa.svg",
+      "label": "champanhe",
+      "keywords": [
+        "champanhe",
+        "brinde",
+        "festa"
+      ]
+    },
+    {
+      "id": "chegada",
+      "fileName": "chegada, meta, final.svg",
+      "label": "chegada",
+      "keywords": [
+        "chegada",
+        "meta",
+        "final"
+      ]
+    },
+    {
+      "id": "chocolate",
+      "fileName": "chocolate, doce, sobremesa.svg",
+      "label": "chocolate",
+      "keywords": [
+        "chocolate",
+        "doce",
+        "sobremesa"
+      ]
+    },
+    {
+      "id": "chuva",
+      "fileName": "chuva, nuvem, temporal.svg",
+      "label": "chuva",
+      "keywords": [
+        "chuva",
+        "nuvem",
+        "temporal"
+      ]
+    },
+    {
+      "id": "chuveiro",
+      "fileName": "chuveiro, banho, higiene.svg",
+      "label": "chuveiro",
+      "keywords": [
+        "chuveiro",
+        "banho",
+        "higiene"
+      ]
+    },
+    {
+      "id": "cigarro",
+      "fileName": "cigarro, fumo, tabaco.svg",
+      "label": "cigarro",
+      "keywords": [
+        "cigarro",
+        "fumo",
+        "tabaco"
+      ]
+    },
+    {
+      "id": "cisne",
+      "fileName": "cisne, ave, eleg ncia.svg",
+      "label": "cisne",
+      "keywords": [
+        "cisne",
+        "ave",
+        "elegância"
+      ]
+    },
+    {
+      "id": "cofrinho",
+      "fileName": "cofrinho, economia, dinheiro.svg",
+      "label": "cofrinho",
+      "keywords": [
+        "cofrinho",
+        "economia",
+        "dinheiro"
+      ]
+    },
+    {
+      "id": "colete-de-seguranca",
+      "fileName": "colete de seguran a, prote o, obra.svg",
+      "label": "colete de segurança",
+      "keywords": [
+        "colete de segurança",
+        "proteção",
+        "obra"
+      ]
+    },
+    {
+      "id": "colis-o",
+      "fileName": "colis o, batida, impacto.svg",
+      "label": "colis o",
+      "keywords": [
+        "colis o",
+        "batida",
+        "impacto"
+      ]
+    },
+    {
+      "id": "confuso",
+      "fileName": "confuso, d vida, incerto.svg",
+      "label": "confuso",
+      "keywords": [
+        "confuso",
+        "d vida",
+        "incerto"
+      ]
+    },
+    {
+      "id": "copo-com-canudo",
+      "fileName": "copo com canudo, bebida, suco.svg",
+      "label": "copo com canudo",
+      "keywords": [
+        "copo com canudo",
+        "bebêida",
+        "suco"
+      ]
+    },
+    {
+      "id": "coracao",
+      "fileName": "cora o, amor, afeto.svg",
+      "label": "coração",
+      "keywords": [
+        "coração",
+        "amor",
+        "afeto"
+      ]
+    },
+    {
+      "id": "coracao-2",
+      "fileName": "cora o, rg o, sa de.svg",
+      "label": "coração",
+      "keywords": [
+        "coração",
+        "rg o",
+        "saúde"
+      ]
+    },
+    {
+      "id": "coroa",
+      "fileName": "coroa, realeza, rei.svg",
+      "label": "coroa",
+      "keywords": [
+        "coroa",
+        "realeza",
+        "rei"
+      ]
+    },
+    {
+      "id": "corte-de-cabelo",
+      "fileName": "corte de cabelo, barbeiro, sal o.svg",
+      "label": "corte de cabelo",
+      "keywords": [
+        "corte de cabelo",
+        "barbeiro",
+        "salão"
+      ]
+    },
+    {
+      "id": "coxa-de-frango",
+      "fileName": "coxa de frango, comida, carne.svg",
+      "label": "coxa de frango",
+      "keywords": [
+        "coxa de frango",
+        "comida",
+        "carne"
+      ]
+    },
+    {
+      "id": "creme",
+      "fileName": "creme, sobremesa, doce.svg",
+      "label": "creme",
+      "keywords": [
+        "creme",
+        "sobremesa",
+        "doce"
+      ]
+    },
+    {
+      "id": "crocodilo",
+      "fileName": "crocodilo, r ptil, animal.svg",
+      "label": "crocodilo",
+      "keywords": [
+        "crocodilo",
+        "réptil",
+        "animal"
+      ]
+    },
+    {
+      "id": "culos-escuros",
+      "fileName": "culos escuros, sol, acess rio.svg",
+      "label": "culos escuros",
+      "keywords": [
+        "culos escuros",
+        "sol",
+        "acess rio"
+      ]
+    },
+    {
+      "id": "culos",
+      "fileName": "culos, vis o, acess rio.svg",
+      "label": "culos",
+      "keywords": [
+        "culos",
+        "visão",
+        "acess rio"
+      ]
+    },
+    {
+      "id": "curativo",
+      "fileName": "curativo, bandagem, machucado (2).svg",
+      "label": "curativo",
+      "keywords": [
+        "curativo",
+        "bandagem",
+        "machucado"
+      ]
+    },
+    {
+      "id": "curativo-2",
+      "fileName": "curativo, bandagem, machucado.svg",
+      "label": "curativo",
+      "keywords": [
+        "curativo",
+        "bandagem",
+        "machucado"
+      ]
+    },
+    {
+      "id": "dado",
+      "fileName": "dado, jogo, sorte.svg",
+      "label": "dado",
+      "keywords": [
+        "dado",
+        "jogo",
+        "sorte"
+      ]
+    },
+    {
+      "id": "desd-m",
+      "fileName": "desd m, desprezo, indiferen a.svg",
+      "label": "desd m",
+      "keywords": [
+        "desd m",
+        "desprezo",
+        "indiferen a"
+      ]
+    },
+    {
+      "id": "dinheiro",
+      "fileName": "dinheiro, d lar, c dula.svg",
+      "label": "dinheiro",
+      "keywords": [
+        "dinheiro",
+        "d lar",
+        "c dula"
+      ]
+    },
+    {
+      "id": "disco-voador",
+      "fileName": "disco voador, ovni, extraterrestre.svg",
+      "label": "disco voador",
+      "keywords": [
+        "disco voador",
+        "ovni",
+        "extraterrestre"
+      ]
+    },
+    {
+      "id": "doente",
+      "fileName": "doente, mal-estar, enfermo.svg",
+      "label": "doente",
+      "keywords": [
+        "doente",
+        "mal-estar",
+        "enfermo"
+      ]
+    },
+    {
+      "id": "doze-e-meia",
+      "fileName": "doze e meia, hor rio, rel gio.svg",
+      "label": "doze e meia",
+      "keywords": [
+        "doze e meia",
+        "horário",
+        "relógio"
+      ]
+    },
+    {
+      "id": "email",
+      "fileName": "email, correio, mensagem.svg",
+      "label": "email",
+      "keywords": [
+        "email",
+        "correio",
+        "mensagem"
+      ]
+    },
+    {
+      "id": "emocao",
+      "fileName": "emo o, sentimento, humor.svg",
+      "label": "emoção",
+      "keywords": [
+        "emoção",
+        "sentimento",
+        "humor"
+      ]
+    },
+    {
+      "id": "engrenagem",
+      "fileName": "engrenagem, configura es, ajuste.svg",
+      "label": "engrenagem",
+      "keywords": [
+        "engrenagem",
+        "configurações",
+        "ajuste"
+      ]
+    },
+    {
+      "id": "erva",
+      "fileName": "erva, tempero, planta.svg",
+      "label": "erva",
+      "keywords": [
+        "erva",
+        "tempero",
+        "planta"
+      ]
+    },
+    {
+      "id": "escada",
+      "fileName": "escada, subir, altura.svg",
+      "label": "escada",
+      "keywords": [
+        "escada",
+        "subir",
+        "altura"
+      ]
+    },
+    {
+      "id": "escovar-os-dentes",
+      "fileName": "escovar os dentes, higiene, dentes.svg",
+      "label": "escovar os dentes",
+      "keywords": [
+        "escovar os dentes",
+        "higiene",
+        "dentes"
+      ]
+    },
+    {
+      "id": "escrever",
+      "fileName": "escrever, m o, anota o.svg",
+      "label": "escrever",
+      "keywords": [
+        "escrever",
+        "m o",
+        "anota o"
+      ]
+    },
+    {
+      "id": "espaguete",
+      "fileName": "espaguete, massa, comida.svg",
+      "label": "espaguete",
+      "keywords": [
+        "espaguete",
+        "massa",
+        "comida"
+      ]
+    },
+    {
+      "id": "esquerda",
+      "fileName": "esquerda, voltar, dire o.svg",
+      "label": "esquerda",
+      "keywords": [
+        "esquerda",
+        "voltar",
+        "direção"
+      ]
+    },
+    {
+      "id": "esquilo",
+      "fileName": "esquilo, animal, natureza.svg",
+      "label": "esquilo",
+      "keywords": [
+        "esquilo",
+        "animal",
+        "natureza"
+      ]
+    },
+    {
+      "id": "est-tua-da-liberdade",
+      "fileName": "est tua da liberdade, monumento, viagem.svg",
+      "label": "est tua da liberdade",
+      "keywords": [
+        "est tua da liberdade",
+        "monumento",
+        "viagem"
+      ]
+    },
+    {
+      "id": "est-vel",
+      "fileName": "est vel, neutro, calmo.svg",
+      "label": "est vel",
+      "keywords": [
+        "est vel",
+        "neutro",
+        "calmo"
+      ]
+    },
+    {
+      "id": "estacao",
+      "fileName": "esta o, trem, embarque.svg",
+      "label": "estação",
+      "keywords": [
+        "estação",
+        "trem",
+        "embarque"
+      ]
+    },
+    {
+      "id": "etiqueta",
+      "fileName": "etiqueta, r tulo, marcador.svg",
+      "label": "etiqueta",
+      "keywords": [
+        "etiqueta",
+        "rótulo",
+        "marcador"
+      ]
+    },
+    {
+      "id": "faxina",
+      "fileName": "faxina, limpeza, organiza o.svg",
+      "label": "faxina",
+      "keywords": [
+        "faxina",
+        "limpeza",
+        "organização"
+      ]
+    },
+    {
+      "id": "ferramentas",
+      "fileName": "ferramentas, manuten o, conserto.svg",
+      "label": "ferramentas",
+      "keywords": [
+        "ferramentas",
+        "manutenção",
+        "conserto"
+      ]
+    },
+    {
+      "id": "fita",
+      "fileName": "fita, la o, enfeite.svg",
+      "label": "fita",
+      "keywords": [
+        "fita",
+        "laço",
+        "enfeite"
+      ]
+    },
+    {
+      "id": "flor",
+      "fileName": "flor, natureza, jardim.svg",
+      "label": "flor",
+      "keywords": [
+        "flor",
+        "natureza",
+        "jardim"
+      ]
+    },
+    {
+      "id": "foguete",
+      "fileName": "foguete, espa o, lan amento.svg",
+      "label": "foguete",
+      "keywords": [
+        "foguete",
+        "espa o",
+        "lançamento"
+      ]
+    },
+    {
+      "id": "formatura",
+      "fileName": "formatura, estudo, diploma.svg",
+      "label": "formatura",
+      "keywords": [
+        "formatura",
+        "estudo",
+        "diploma"
+      ]
+    },
+    {
+      "id": "formiga",
+      "fileName": "formiga, inseto, trabalho.svg",
+      "label": "formiga",
+      "keywords": [
+        "formiga",
+        "inseto",
+        "trabalho"
+      ]
+    },
+    {
+      "id": "foto",
+      "fileName": "foto, imagem, c mera.svg",
+      "label": "foto",
+      "keywords": [
+        "foto",
+        "imagem",
+        "c mera"
+      ]
+    },
+    {
+      "id": "frio",
+      "fileName": "frio, gelado, resfriado.svg",
+      "label": "frio",
+      "keywords": [
+        "frio",
+        "gelado",
+        "resfriado"
+      ]
+    },
+    {
+      "id": "futebol-americano",
+      "fileName": "futebol americano, bola, esporte.svg",
+      "label": "futebol americano",
+      "keywords": [
+        "futebol americano",
+        "bola",
+        "esporte"
+      ]
+    },
+    {
+      "id": "futebol",
+      "fileName": "futebol, bola, esporte.svg",
+      "label": "futebol",
+      "keywords": [
+        "futebol",
+        "bola",
+        "esporte"
+      ]
+    },
+    {
+      "id": "g-nio",
+      "fileName": "g nio, magia, desejo.svg",
+      "label": "g nio",
+      "keywords": [
+        "g nio",
+        "magia",
+        "desejo"
+      ]
+    },
+    {
+      "id": "galinha",
+      "fileName": "galinha, ave, animal.svg",
+      "label": "galinha",
+      "keywords": [
+        "galinha",
+        "ave",
+        "animal"
+      ]
+    },
+    {
+      "id": "gancho",
+      "fileName": "gancho, pendurar, suporte.svg",
+      "label": "gancho",
+      "keywords": [
+        "gancho",
+        "pendurar",
+        "suporte"
+      ]
+    },
+    {
+      "id": "gato",
+      "fileName": "gato, felino, animal.svg",
+      "label": "gato",
+      "keywords": [
+        "gato",
+        "felino",
+        "animal"
+      ]
+    },
+    {
+      "id": "gema",
+      "fileName": "gema, joia, pedra preciosa.svg",
+      "label": "gema",
+      "keywords": [
+        "gema",
+        "joia",
+        "pedra preciosa"
+      ]
+    },
+    {
+      "id": "girafa",
+      "fileName": "girafa, animal, savana.svg",
+      "label": "girafa",
+      "keywords": [
+        "girafa",
+        "animal",
+        "savana"
+      ]
+    },
+    {
+      "id": "girassol",
+      "fileName": "girassol, flor, natureza.svg",
+      "label": "girassol",
+      "keywords": [
+        "girassol",
+        "flor",
+        "natureza"
+      ]
+    },
+    {
+      "id": "giz-de-cera",
+      "fileName": "giz de cera, desenho, colorir.svg",
+      "label": "giz de cera",
+      "keywords": [
+        "giz de cera",
+        "desenho",
+        "colorir"
+      ]
+    },
+    {
+      "id": "globo",
+      "fileName": "globo, mundo, geografia.svg",
+      "label": "globo",
+      "keywords": [
+        "globo",
+        "mundo",
+        "geografia"
+      ]
+    },
+    {
+      "id": "golfe",
+      "fileName": "golfe, bola, esporte.svg",
+      "label": "golfe",
+      "keywords": [
+        "golfe",
+        "bola",
+        "esporte"
+      ]
+    },
+    {
+      "id": "gorila",
+      "fileName": "gorila, animal, selva.svg",
+      "label": "gorila",
+      "keywords": [
+        "gorila",
+        "animal",
+        "selva"
+      ]
+    },
+    {
+      "id": "grafico",
+      "fileName": "gr fico, computador, an lise.svg",
+      "label": "gráfico",
+      "keywords": [
+        "gráfico",
+        "computador",
+        "an lise"
+      ]
+    },
+    {
+      "id": "grafico-2",
+      "fileName": "gr fico, estat stica, crescimento.svg",
+      "label": "gráfico",
+      "keywords": [
+        "gráfico",
+        "estatística",
+        "crescimento"
+      ]
+    },
+    {
+      "id": "guarda-chuva",
+      "fileName": "guarda-chuva, chuva, prote o.svg",
+      "label": "guarda-chuva",
+      "keywords": [
+        "guarda-chuva",
+        "chuva",
+        "proteção"
+      ]
+    },
+    {
+      "id": "guaxinim",
+      "fileName": "guaxinim, animal, natureza.svg",
+      "label": "guaxinim",
+      "keywords": [
+        "guaxinim",
+        "animal",
+        "natureza"
+      ]
+    },
+    {
+      "id": "handebol",
+      "fileName": "handebol, esporte, jogo.svg",
+      "label": "handebol",
+      "keywords": [
+        "handebol",
+        "esporte",
+        "jogo"
+      ]
+    },
+    {
+      "id": "hashi",
+      "fileName": "hashi, comida japonesa, refei o.svg",
+      "label": "hashi",
+      "keywords": [
+        "hashi",
+        "comida japonesa",
+        "refeição"
+      ]
+    },
+    {
+      "id": "idosa",
+      "fileName": "idosa, senhora, velhice.svg",
+      "label": "idosa",
+      "keywords": [
+        "idosa",
+        "senhora",
+        "velhice"
+      ]
+    },
+    {
+      "id": "idoso",
+      "fileName": "idoso, senhor, velhice.svg",
+      "label": "idoso",
+      "keywords": [
+        "idoso",
+        "senhor",
+        "velhice"
+      ]
+    },
+    {
+      "id": "igreja",
+      "fileName": "igreja, f , templo.svg",
+      "label": "igreja",
+      "keywords": [
+        "igreja",
+        "fé",
+        "templo"
+      ]
+    },
+    {
+      "id": "impressionado",
+      "fileName": "impressionado, surpreso, uau.svg",
+      "label": "impressionado",
+      "keywords": [
+        "impressionado",
+        "surpreso",
+        "uau"
+      ]
+    },
+    {
+      "id": "improdutivo",
+      "fileName": "improdutivo, parado, desanimado.svg",
+      "label": "improdutivo",
+      "keywords": [
+        "improdutivo",
+        "parado",
+        "desanimado"
+      ]
+    },
+    {
+      "id": "ioio",
+      "fileName": "ioi , brinquedo, inf ncia.svg",
+      "label": "ioiô",
+      "keywords": [
+        "ioiô",
+        "brinquedo",
+        "infância"
+      ]
+    },
+    {
+      "id": "janela",
+      "fileName": "janela, abertura, casa.svg",
+      "label": "janela",
+      "keywords": [
+        "janela",
+        "abertura",
+        "casa"
+      ]
+    },
+    {
+      "id": "joystick",
+      "fileName": "joystick, controle, videogame.svg",
+      "label": "joystick",
+      "keywords": [
+        "joystick",
+        "controle",
+        "videogame"
+      ]
+    },
+    {
+      "id": "kiwi",
+      "fileName": "kiwi, fruta, alimento.svg",
+      "label": "kiwi",
+      "keywords": [
+        "kiwi",
+        "fruta",
+        "alimento"
+      ]
+    },
+    {
+      "id": "lingua",
+      "fileName": "l ngua, boca, express o.svg",
+      "label": "língua",
+      "keywords": [
+        "língua",
+        "boca",
+        "expressão"
+      ]
+    },
+    {
+      "id": "lanterna",
+      "fileName": "lanterna, luz, iluminar.svg",
+      "label": "lanterna",
+      "keywords": [
+        "lanterna",
+        "luz",
+        "iluminar"
+      ]
+    },
+    {
+      "id": "lavar-as-maos",
+      "fileName": "lavar as m os, higiene, limpeza.svg",
+      "label": "lavar as mãos",
+      "keywords": [
+        "lavar as mãos",
+        "higiene",
+        "limpeza"
+      ]
+    },
+    {
+      "id": "livro-aberto",
+      "fileName": "livro aberto, leitura, estudo.svg",
+      "label": "livro aberto",
+      "keywords": [
+        "livro aberto",
+        "leitura",
+        "estudo"
+      ]
+    },
+    {
+      "id": "livros",
+      "fileName": "livros, leitura, estudo.svg",
+      "label": "livros",
+      "keywords": [
+        "livros",
+        "leitura",
+        "estudo"
+      ]
+    },
+    {
+      "id": "lixeira",
+      "fileName": "lixeira, descartar, papel.svg",
+      "label": "lixeira",
+      "keywords": [
+        "lixeira",
+        "descartar",
+        "papel"
+      ]
+    },
+    {
+      "id": "localizacao",
+      "fileName": "localiza o, mapa, pin.svg",
+      "label": "localização",
+      "keywords": [
+        "localização",
+        "mapa",
+        "pin"
+      ]
+    },
+    {
+      "id": "lua-crescente",
+      "fileName": "lua crescente, noite, sono.svg",
+      "label": "lua crescente",
+      "keywords": [
+        "lua crescente",
+        "noite",
+        "sono"
+      ]
+    },
+    {
+      "id": "lua-minguante",
+      "fileName": "lua minguante, noite, lua.svg",
+      "label": "lua minguante",
+      "keywords": [
+        "lua minguante",
+        "noite",
+        "lua"
+      ]
+    },
+    {
+      "id": "lupa",
+      "fileName": "lupa, buscar, procurar (2).svg",
+      "label": "lupa",
+      "keywords": [
+        "lupa",
+        "buscar",
+        "procurar"
+      ]
+    },
+    {
+      "id": "lupa-2",
+      "fileName": "lupa, buscar, procurar.svg",
+      "label": "lupa",
+      "keywords": [
+        "lupa",
+        "buscar",
+        "procurar"
+      ]
+    },
+    {
+      "id": "maos-erguidas",
+      "fileName": "m os erguidas, ora o, gesto.svg",
+      "label": "mãos erguidas",
+      "keywords": [
+        "mãos erguidas",
+        "oração",
+        "gesto"
+      ]
+    },
+    {
+      "id": "macaco",
+      "fileName": "macaco, animal, selva.svg",
+      "label": "macaco",
+      "keywords": [
+        "macaco",
+        "animal",
+        "selva"
+      ]
+    },
+    {
+      "id": "machucado",
+      "fileName": "machucado, dor, ferido.svg",
+      "label": "machucado",
+      "keywords": [
+        "machucado",
+        "dor",
+        "ferido"
+      ]
+    },
+    {
+      "id": "mala-executiva",
+      "fileName": "mala executiva, trabalho, neg cios.svg",
+      "label": "mala executiva",
+      "keywords": [
+        "mala executiva",
+        "trabalho",
+        "negócios"
+      ]
+    },
+    {
+      "id": "mamadeira",
+      "fileName": "mamadeira, beb , alimenta o.svg",
+      "label": "mamadeira",
+      "keywords": [
+        "mamadeira",
+        "bebêê",
+        "alimenta o"
+      ]
+    },
+    {
+      "id": "manga",
+      "fileName": "manga, fruta, alimento.svg",
+      "label": "manga",
+      "keywords": [
+        "manga",
+        "fruta",
+        "alimento"
+      ]
+    },
+    {
+      "id": "marcador",
+      "fileName": "marcador, favorito, salvar.svg",
+      "label": "marcador",
+      "keywords": [
+        "marcador",
+        "favorito",
+        "salvar"
+      ]
+    },
+    {
+      "id": "medalha",
+      "fileName": "medalha, vit ria, conquista.svg",
+      "label": "medalha",
+      "keywords": [
+        "medalha",
+        "vitória",
+        "conquista"
+      ]
+    },
+    {
+      "id": "megafone",
+      "fileName": "megafone, an ncio, voz.svg",
+      "label": "megafone",
+      "keywords": [
+        "megafone",
+        "an ncio",
+        "voz"
+      ]
+    },
+    {
+      "id": "meias",
+      "fileName": "meias, roupa, vestu rio.svg",
+      "label": "meias",
+      "keywords": [
+        "meias",
+        "roupa",
+        "vestuário"
+      ]
+    },
+    {
+      "id": "mensageiro",
+      "fileName": "mensageiro, hotel, servi o.svg",
+      "label": "mensageiro",
+      "keywords": [
+        "mensageiro",
+        "hotel",
+        "serviço"
+      ]
+    },
+    {
+      "id": "mesquita",
+      "fileName": "mesquita, religi o, templo.svg",
+      "label": "mesquita",
+      "keywords": [
+        "mesquita",
+        "religião",
+        "templo"
+      ]
+    },
+    {
+      "id": "moai",
+      "fileName": "moai, est tua, monumento.svg",
+      "label": "moai",
+      "keywords": [
+        "moai",
+        "est tua",
+        "monumento"
+      ]
+    },
+    {
+      "id": "mochila",
+      "fileName": "mochila, escola, material.svg",
+      "label": "mochila",
+      "keywords": [
+        "mochila",
+        "escola",
+        "material"
+      ]
+    },
+    {
+      "id": "moeda",
+      "fileName": "moeda, dinheiro, valor.svg",
+      "label": "moeda",
+      "keywords": [
+        "moeda",
+        "dinheiro",
+        "valor"
+      ]
+    },
+    {
+      "id": "molho-de-tomate",
+      "fileName": "molho de tomate, lata, cozinha.svg",
+      "label": "molho de tomate",
+      "keywords": [
+        "molho de tomate",
+        "lata",
+        "cozinha"
+      ]
+    },
+    {
+      "id": "montanha",
+      "fileName": "montanha, natureza, trilha.svg",
+      "label": "montanha",
+      "keywords": [
+        "montanha",
+        "natureza",
+        "trilha"
+      ]
+    },
+    {
+      "id": "mouse",
+      "fileName": "mouse, computador, clique.svg",
+      "label": "mouse",
+      "keywords": [
+        "mouse",
+        "computador",
+        "clique"
+      ]
+    },
+    {
+      "id": "musculaco",
+      "fileName": "muscula o, peso, exerc cio.svg",
+      "label": "musculaço",
+      "keywords": [
+        "musculaço",
+        "peso",
+        "exercício"
+      ]
+    },
+    {
+      "id": "natacao",
+      "fileName": "nata o, nadar, esporte.svg",
+      "label": "natação",
+      "keywords": [
+        "natação",
+        "nadar",
+        "esporte"
+      ]
+    },
+    {
+      "id": "nervoso",
+      "fileName": "nervoso, estressado, tenso.svg",
+      "label": "nervoso",
+      "keywords": [
+        "nervoso",
+        "estressado",
+        "tenso"
+      ]
+    },
+    {
+      "id": "aanfora",
+      "fileName": "nfora, vaso, cer mica.svg",
+      "label": "âânfora",
+      "keywords": [
+        "ânfora",
+        "vaso",
+        "cer mica"
+      ]
+    },
+    {
+      "id": "notebook",
+      "fileName": "notebook, computador, trabalho.svg",
+      "label": "notebook",
+      "keywords": [
+        "notebook",
+        "computador",
+        "trabalho"
+      ]
+    },
+    {
+      "id": "osso",
+      "fileName": "osso, corpo, animal.svg",
+      "label": "osso",
+      "keywords": [
+        "osso",
+        "corpo",
+        "animal"
+      ]
+    },
+    {
+      "id": "p",
+      "fileName": "p , caminhada, corpo.svg",
+      "label": "p",
+      "keywords": [
+        "p",
+        "caminhada",
+        "corpo"
+      ]
+    },
+    {
+      "id": "pilula",
+      "fileName": "p lula, rem dio, sa de.svg",
+      "label": "pílula",
+      "keywords": [
+        "pílula",
+        "remédio",
+        "saúde"
+      ]
+    },
+    {
+      "id": "pao",
+      "fileName": "p o, padaria, alimento.svg",
+      "label": "pão",
+      "keywords": [
+        "pão",
+        "padaria",
+        "alimento"
+      ]
+    },
+    {
+      "id": "pacote",
+      "fileName": "pacote, encomenda, entrega.svg",
+      "label": "pacote",
+      "keywords": [
+        "pacote",
+        "encomenda",
+        "entrega"
+      ]
+    },
+    {
+      "id": "palhaco",
+      "fileName": "palha o, circo, divers o.svg",
+      "label": "palhaço",
+      "keywords": [
+        "palhaço",
+        "circo",
+        "divers o"
+      ]
+    },
+    {
+      "id": "palmeira",
+      "fileName": "palmeira, praia, tropical.svg",
+      "label": "palmeira",
+      "keywords": [
+        "palmeira",
+        "praia",
+        "tropical"
+      ]
+    },
+    {
+      "id": "parque-nacional",
+      "fileName": "parque nacional, natureza, preserva o.svg",
+      "label": "parque nacional",
+      "keywords": [
+        "parque nacional",
+        "natureza",
+        "preservação"
+      ]
+    },
+    {
+      "id": "passarinho",
+      "fileName": "passarinho, ave, natureza.svg",
+      "label": "passarinho",
+      "keywords": [
+        "passarinho",
+        "ave",
+        "natureza"
+      ]
+    },
+    {
+      "id": "pasta",
+      "fileName": "pasta, arquivo, documentos.svg",
+      "label": "pasta",
+      "keywords": [
+        "pasta",
+        "arquivo",
+        "documentos"
+      ]
+    },
+    {
+      "id": "peao",
+      "fileName": "pe o, xadrez, estrat gia.svg",
+      "label": "peão",
+      "keywords": [
+        "peão",
+        "xadrez",
+        "estratégia"
+      ]
+    },
+    {
+      "id": "pensativo",
+      "fileName": "pensativo, reflex o, pensar.svg",
+      "label": "pensativo",
+      "keywords": [
+        "pensativo",
+        "reflexão",
+        "pensar"
+      ]
+    },
+    {
+      "id": "pepino",
+      "fileName": "pepino, legume, alimento.svg",
+      "label": "pepino",
+      "keywords": [
+        "pepino",
+        "legume",
+        "alimento"
+      ]
+    },
+    {
+      "id": "pergaminho",
+      "fileName": "pergaminho, documento, hist ria.svg",
+      "label": "pergaminho",
+      "keywords": [
+        "pergaminho",
+        "documento",
+        "história"
+      ]
+    },
+    {
+      "id": "picareta",
+      "fileName": "picareta, ferramenta, minera o.svg",
+      "label": "picareta",
+      "keywords": [
+        "picareta",
+        "ferramenta",
+        "mineração"
+      ]
+    },
+    {
+      "id": "pirulito",
+      "fileName": "pirulito, doce, guloseima.svg",
+      "label": "pirulito",
+      "keywords": [
+        "pirulito",
+        "doce",
+        "guloseima"
+      ]
+    },
+    {
+      "id": "pizza",
+      "fileName": "pizza, comida, fatia.svg",
+      "label": "pizza",
+      "keywords": [
+        "pizza",
+        "comida",
+        "fatia"
+      ]
+    },
+    {
+      "id": "porco",
+      "fileName": "porco, animal, fazenda.svg",
+      "label": "porco",
+      "keywords": [
+        "porco",
+        "animal",
+        "fazenda"
+      ]
+    },
+    {
+      "id": "pote-de-mel",
+      "fileName": "pote de mel, mel, doce.svg",
+      "label": "pote de mel",
+      "keywords": [
+        "pote de mel",
+        "mel",
+        "doce"
+      ]
+    },
+    {
+      "id": "prancheta",
+      "fileName": "prancheta, anota es, organiza o.svg",
+      "label": "prancheta",
+      "keywords": [
+        "prancheta",
+        "anotações",
+        "organização"
+      ]
+    },
+    {
+      "id": "quebra-cabeca",
+      "fileName": "quebra-cabe a, pe a, encaixe.svg",
+      "label": "quebra-cabeça",
+      "keywords": [
+        "quebra-cabeça",
+        "peça",
+        "encaixe"
+      ]
+    },
+    {
+      "id": "queijo",
+      "fileName": "queijo, latic nio, alimento.svg",
+      "label": "queijo",
+      "keywords": [
+        "queijo",
+        "laticínio",
+        "alimento"
+      ]
+    },
+    {
+      "id": "radioativo",
+      "fileName": "radioativo, perigo, toxicidade.svg",
+      "label": "radioativo",
+      "keywords": [
+        "radioativo",
+        "perigo",
+        "toxicidade"
+      ]
+    },
+    {
+      "id": "rato",
+      "fileName": "rato, animal, roedor.svg",
+      "label": "rato",
+      "keywords": [
+        "rato",
+        "animal",
+        "roedor"
+      ]
+    },
+    {
+      "id": "reclamando",
+      "fileName": "reclamando, queixa, insatisfeito.svg",
+      "label": "reclamando",
+      "keywords": [
+        "reclamando",
+        "queixa",
+        "insatisfeito"
+      ]
+    },
+    {
+      "id": "relogio-de-pulso",
+      "fileName": "rel gio de pulso, hora, acess rio.svg",
+      "label": "relógio de pulso",
+      "keywords": [
+        "relógio de pulso",
+        "hora",
+        "acess rio"
+      ]
+    },
+    {
+      "id": "resfriado",
+      "fileName": "resfriado, doente, gripe.svg",
+      "label": "resfriado",
+      "keywords": [
+        "resfriado",
+        "doente",
+        "gripe"
+      ]
+    },
+    {
+      "id": "rindo",
+      "fileName": "rindo, feliz, alegria.svg",
+      "label": "rindo",
+      "keywords": [
+        "rindo",
+        "feliz",
+        "alegria"
+      ]
+    },
+    {
+      "id": "rolo-de-papel",
+      "fileName": "rolo de papel, papel, banheiro.svg",
+      "label": "rolo de papel",
+      "keywords": [
+        "rolo de papel",
+        "papel",
+        "banheiro"
+      ]
+    },
+    {
+      "id": "rosa",
+      "fileName": "rosa, flor, romance.svg",
+      "label": "rosa",
+      "keywords": [
+        "rosa",
+        "flor",
+        "romance"
+      ]
+    },
+    {
+      "id": "aarvore-de-natal",
+      "fileName": "rvore de natal, natal, festa.svg",
+      "label": "áárvore de natal",
+      "keywords": [
+        "árvore de natal",
+        "natal",
+        "festa"
+      ]
+    },
+    {
+      "id": "sabao",
+      "fileName": "sab o, limpeza, higiene.svg",
+      "label": "sabão",
+      "keywords": [
+        "sabão",
+        "limpeza",
+        "higiene"
+      ]
+    },
+    {
+      "id": "salto-alto",
+      "fileName": "salto alto, sapato, moda.svg",
+      "label": "salto alto",
+      "keywords": [
+        "salto alto",
+        "sapato",
+        "moda"
+      ]
+    },
+    {
+      "id": "sanduiche",
+      "fileName": "sandu che, lanche, comida.svg",
+      "label": "sanduíche",
+      "keywords": [
+        "sanduíche",
+        "lanche",
+        "comida"
+      ]
+    },
+    {
+      "id": "sapo",
+      "fileName": "sapo, anf bio, animal.svg",
+      "label": "sapo",
+      "keywords": [
+        "sapo",
+        "anfébio",
+        "animal"
+      ]
+    },
+    {
+      "id": "selfie",
+      "fileName": "selfie, foto, celular.svg",
+      "label": "selfie",
+      "keywords": [
+        "selfie",
+        "foto",
+        "celular"
+      ]
+    },
+    {
+      "id": "serra",
+      "fileName": "serra, corte, ferramenta.svg",
+      "label": "serra",
+      "keywords": [
+        "serra",
+        "corte",
+        "ferramenta"
+      ]
+    },
+    {
+      "id": "sinagoga",
+      "fileName": "sinagoga, religi o, templo.svg",
+      "label": "sinagoga",
+      "keywords": [
+        "sinagoga",
+        "religião",
+        "templo"
+      ]
+    },
+    {
+      "id": "sino",
+      "fileName": "sino, notifica o, igreja.svg",
+      "label": "sino",
+      "keywords": [
+        "sino",
+        "notificação",
+        "igreja"
+      ]
+    },
+    {
+      "id": "skate",
+      "fileName": "skate, radical, esporte.svg",
+      "label": "skate",
+      "keywords": [
+        "skate",
+        "radical",
+        "esporte"
+      ]
+    },
+    {
+      "id": "soco",
+      "fileName": "soco, punho, luta.svg",
+      "label": "soco",
+      "keywords": [
+        "soco",
+        "punho",
+        "luta"
+      ]
+    },
+    {
+      "id": "sol",
+      "fileName": "sol, dia, calor.svg",
+      "label": "sol",
+      "keywords": [
+        "sol",
+        "dia",
+        "calor"
+      ]
+    },
+    {
+      "id": "som",
+      "fileName": "som, udio, volume.svg",
+      "label": "som",
+      "keywords": [
+        "som",
+        "áudio",
+        "volume"
+      ]
+    },
+    {
+      "id": "sonolento",
+      "fileName": "sonolento, sono, cansado.svg",
+      "label": "sonolento",
+      "keywords": [
+        "sonolento",
+        "sono",
+        "cansado"
+      ]
+    },
+    {
+      "id": "sorvete",
+      "fileName": "sorvete, gelado, sobremesa.svg",
+      "label": "sorvete",
+      "keywords": [
+        "sorvete",
+        "gelado",
+        "sobremesa"
+      ]
+    },
+    {
+      "id": "subir",
+      "fileName": "subir, cima, dire o.svg",
+      "label": "subir",
+      "keywords": [
+        "subir",
+        "cima",
+        "direção"
+      ]
+    },
+    {
+      "id": "suco",
+      "fileName": "suco, caixinha, bebida.svg",
+      "label": "suco",
+      "keywords": [
+        "suco",
+        "caixinha",
+        "bebêida"
+      ]
+    },
+    {
+      "id": "super-heroi",
+      "fileName": "super-her i, for a, fantasia.svg",
+      "label": "super-herói",
+      "keywords": [
+        "super-herói",
+        "força",
+        "fantasia"
+      ]
+    },
+    {
+      "id": "taca-de-vinho",
+      "fileName": "ta a de vinho, bebida, brinde.svg",
+      "label": "taça de vinho",
+      "keywords": [
+        "taça de vinho",
+        "bebêida",
+        "brinde"
+      ]
+    },
+    {
+      "id": "tambor",
+      "fileName": "tambor, bateria, m sica.svg",
+      "label": "tambor",
+      "keywords": [
+        "tambor",
+        "bateria",
+        "música"
+      ]
+    },
+    {
+      "id": "teclado",
+      "fileName": "teclado, digita o, computador.svg",
+      "label": "teclado",
+      "keywords": [
+        "teclado",
+        "digita o",
+        "computador"
+      ]
+    },
+    {
+      "id": "teia",
+      "fileName": "teia, aranha, rede.svg",
+      "label": "teia",
+      "keywords": [
+        "teia",
+        "aranha",
+        "rede"
+      ]
+    },
+    {
+      "id": "teleferico",
+      "fileName": "telef rico, bondinho, montanha.svg",
+      "label": "teleférico",
+      "keywords": [
+        "teleférico",
+        "bondinho",
+        "montanha"
+      ]
+    },
+    {
+      "id": "televisao",
+      "fileName": "televis o, tv, tela.svg",
+      "label": "televisão",
+      "keywords": [
+        "televisão",
+        "tv",
+        "tela"
+      ]
+    },
+    {
+      "id": "terco",
+      "fileName": "ter o, ora o, f.svg",
+      "label": "terço",
+      "keywords": [
+        "terço",
+        "oração",
+        "f"
+      ]
+    },
+    {
+      "id": "tigela",
+      "fileName": "tigela, recipiente, cozinha.svg",
+      "label": "tigela",
+      "keywords": [
+        "tigela",
+        "recipiente",
+        "cozinha"
+      ]
+    },
+    {
+      "id": "tiranossauro",
+      "fileName": "tiranossauro, dinossauro, pr -hist ria.svg",
+      "label": "tiranossauro",
+      "keywords": [
+        "tiranossauro",
+        "dinossauro",
+        "pr -história"
+      ]
+    },
+    {
+      "id": "tomada",
+      "fileName": "tomada, energia, eletricidade.svg",
+      "label": "tomada",
+      "keywords": [
+        "tomada",
+        "energia",
+        "eletricidade"
+      ]
+    },
+    {
+      "id": "torre",
+      "fileName": "torre, tokyo tower, viagem.svg",
+      "label": "torre",
+      "keywords": [
+        "torre",
+        "tokyo tower",
+        "viagem"
+      ]
+    },
+    {
+      "id": "trabalhador",
+      "fileName": "trabalhador, escrit rio, profissional.svg",
+      "label": "trabalhador",
+      "keywords": [
+        "trabalhador",
+        "escrit rio",
+        "profissional"
+      ]
+    },
+    {
+      "id": "trator",
+      "fileName": "trator, fazenda, m quina.svg",
+      "label": "trator",
+      "keywords": [
+        "trator",
+        "fazenda",
+        "máquina"
+      ]
+    },
+    {
+      "id": "trem-bala",
+      "fileName": "trem-bala, transporte, velocidade.svg",
+      "label": "trem-bala",
+      "keywords": [
+        "trem-bala",
+        "transporte",
+        "velocidade"
+      ]
+    },
+    {
+      "id": "trofeu",
+      "fileName": "trof u, ta a, vit ria.svg",
+      "label": "troféu",
+      "keywords": [
+        "troféu",
+        "taça",
+        "vitória"
+      ]
+    },
+    {
+      "id": "tubo-de-ensaio",
+      "fileName": "tubo de ensaio, ci ncia, laborat rio.svg",
+      "label": "tubo de ensaio",
+      "keywords": [
+        "tubo de ensaio",
+        "ci ncia",
+        "laboratório"
+      ]
+    },
+    {
+      "id": "uma-hora",
+      "fileName": "uma hora, rel gio, hor rio.svg",
+      "label": "uma hora",
+      "keywords": [
+        "uma hora",
+        "relógio",
+        "horário"
+      ]
+    },
+    {
+      "id": "urso",
+      "fileName": "urso, animal, natureza.svg",
+      "label": "urso",
+      "keywords": [
+        "urso",
+        "animal",
+        "natureza"
+      ]
+    },
+    {
+      "id": "uvas",
+      "fileName": "uvas, fruta, cacho.svg",
+      "label": "uvas",
+      "keywords": [
+        "uvas",
+        "fruta",
+        "cacho"
+      ]
+    },
+    {
+      "id": "vampiro",
+      "fileName": "vampiro, fantasia, terror.svg",
+      "label": "vampiro",
+      "keywords": [
+        "vampiro",
+        "fantasia",
+        "terror"
+      ]
+    },
+    {
+      "id": "vassoura",
+      "fileName": "vassoura, limpeza, faxina.svg",
+      "label": "vassoura",
+      "keywords": [
+        "vassoura",
+        "limpeza",
+        "faxina"
+      ]
+    },
+    {
+      "id": "veleiro",
+      "fileName": "veleiro, barco, mar.svg",
+      "label": "veleiro",
+      "keywords": [
+        "veleiro",
+        "barco",
+        "mar"
+      ]
+    },
+    {
+      "id": "viatura",
+      "fileName": "viatura, pol cia, emerg ncia.svg",
+      "label": "viatura",
+      "keywords": [
+        "viatura",
+        "polícia",
+        "emerg ncia"
+      ]
+    },
+    {
+      "id": "videogame",
+      "fileName": "videogame, jogo, console.svg",
+      "label": "videogame",
+      "keywords": [
+        "videogame",
+        "jogo",
+        "console"
+      ]
+    },
+    {
+      "id": "violino",
+      "fileName": "violino, m sica, instrumento.svg",
+      "label": "violino",
+      "keywords": [
+        "violino",
+        "música",
+        "instrumento"
+      ]
+    },
+    {
+      "id": "vulcao",
+      "fileName": "vulc o, lava, natureza.svg",
+      "label": "vulcão",
+      "keywords": [
+        "vulcão",
+        "lava",
+        "natureza"
+      ]
+    },
+    {
+      "id": "waffle",
+      "fileName": "waffle, caf da manh , comida.svg",
+      "label": "waffle",
+      "keywords": [
+        "waffle",
+        "caféda manh",
+        "comida"
+      ]
+    },
+    {
+      "id": "zumbi",
+      "fileName": "zumbi, terror, monstro.svg",
+      "label": "zumbi",
+      "keywords": [
+        "zumbi",
+        "terror",
+        "monstro"
+      ]
+    }
+  ]
+}

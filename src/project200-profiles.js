@@ -43,6 +43,8 @@ function normalizeProfileRow(row) {
     name: row.name,
     avatarPreset: row.avatar_preset || PROJECT200_DEFAULT_PROFILE_AVATAR,
     avatarDataUrl: String(row.avatar_data_url || "").trim(),
+    svgIconUrl: String(row.svg_icon_url || "").trim(),
+    svgIconLabel: String(row.svg_icon_label || "").trim(),
     isImmutable: Boolean(row.is_immutable),
     isSystem: Boolean(row.is_system),
     createdAt: toIso(row.created_at),
@@ -164,6 +166,8 @@ export async function ensureProject200ProfilesSchema() {
       name text not null,
       avatar_preset text not null default 'default-user',
       avatar_data_url text not null default '',
+      svg_icon_url text not null default '',
+      svg_icon_label text not null default '',
       is_immutable boolean not null default false,
       is_system boolean not null default false,
       sort_order integer not null default 100,
@@ -173,6 +177,8 @@ export async function ensureProject200ProfilesSchema() {
     );
   `);
   await query("alter table project200_profiles add column if not exists avatar_data_url text not null default '';");
+  await query("alter table project200_profiles add column if not exists svg_icon_url text not null default '';");
+  await query("alter table project200_profiles add column if not exists svg_icon_label text not null default '';");
   await query("create unique index if not exists idx_project200_profiles_unique_name on project200_profiles (user_id, lower(name)) where deleted_at is null;");
   await query("create index if not exists idx_project200_profiles_user_sort on project200_profiles (user_id, sort_order, created_at);");
 }
@@ -446,6 +452,45 @@ export async function updateProject200ProfileAvatar(userId, profileId, payload =
         returning *
       `,
       [userId, profile.id, avatarDataUrl]
+    );
+
+    await client.query("commit");
+    return normalizeProfileRow(result.rows[0]);
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateProject200ProfileSvgIcon(userId, profileId, payload = {}) {
+  await ensureProject200ProfilesSchema();
+  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
+
+  const client = await db.connect();
+  try {
+    await client.query("begin");
+    await seedDefaultProfiles(client, userId);
+
+    const profile = await getProfileByIdWithClient(client, userId, profileId);
+    if (!profile) {
+      throw new Error("Usuario nao encontrado.");
+    }
+
+    const result = await client.query(
+      `
+        update project200_profiles
+        set svg_icon_url = $3,
+            svg_icon_label = $4,
+            updated_at = now()
+        where user_id = $1
+          and id = $2
+          and deleted_at is null
+        returning *
+      `,
+      [userId, profile.id, svgIconUrl, svgIconLabel]
     );
 
     await client.query("commit");

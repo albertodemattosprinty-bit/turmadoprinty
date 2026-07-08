@@ -101,6 +101,8 @@ function normalizeAction(row) {
     title: row.title,
     assignee: normalizeAssignee(row.assignee),
     categoryId: normalizeCategoryId(row.category_id),
+    svgIconUrl: String(row.svg_icon_url || "").trim(),
+    svgIconLabel: String(row.svg_icon_label || "").trim(),
     musicDefaultMode: String(row.music_default_mode || "").trim() === "station" ? "station" : "track",
     musicStationName: String(row.music_station_name || "").trim(),
     musicTrackName: String(row.music_track_name || "").trim(),
@@ -188,6 +190,8 @@ export async function ensureActionsSchema() {
   await query("alter table actions add column if not exists category_id text not null default '';");
   await query("alter table actions add column if not exists sleep_session_date date;");
   await query("alter table actions add column if not exists sleep_tracked_minutes integer not null default 0;");
+  await query("alter table actions add column if not exists svg_icon_url text not null default '';");
+  await query("alter table actions add column if not exists svg_icon_label text not null default '';");
 
   await query("create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);");
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");
@@ -297,6 +301,8 @@ async function getUserActionById(userId, actionId) {
         a.music_track_url,
         a.assignee,
         a.category_id,
+        a.svg_icon_url,
+        a.svg_icon_label,
         a.start_at,
         a.end_at,
         a.repeat_group_id,
@@ -360,9 +366,9 @@ async function cloneActionOccurrence(userId, action, startAt, endAt) {
     `
       insert into actions (
         user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url,
-        assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days
+        assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::timestamptz, $11, $12, $13::jsonb)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::timestamptz, $12::timestamptz, $13, $14, $15::jsonb)
     `,
     [
       userId,
@@ -373,6 +379,8 @@ async function cloneActionOccurrence(userId, action, startAt, endAt) {
       action.musicTrackUrl || null,
       action.assignee,
       action.categoryId || "",
+      action.svgIconUrl || "",
+      action.svgIconLabel || "",
       startAt.toISOString(),
       endAt.toISOString(),
       action.repeatGroupId || null,
@@ -413,6 +421,8 @@ async function reshapeActionsForQuickTask(userId, assignee, rangeStartAt, rangeE
         a.music_track_url,
         a.assignee,
         a.category_id,
+        a.svg_icon_url,
+        a.svg_icon_label,
         a.start_at,
         a.end_at,
         a.repeat_group_id,
@@ -524,6 +534,8 @@ export async function createUserAction(userId, payload) {
   const title = String(payload?.title || "").trim();
   const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
   const categoryId = normalizeCategoryId(payload?.categoryId);
+  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
@@ -574,12 +586,14 @@ export async function createUserAction(userId, payload) {
   const repeatGroupId = occurrences.length > 1 || repeatRule !== "none" ? crypto.randomUUID() : null;
   const values = [];
   const placeholders = occurrences.map((occurrence, index) => {
-    const offset = index * 9;
+    const offset = index * 11;
     values.push(
       userId,
       title,
       assignee,
       categoryId,
+      svgIconUrl,
+      svgIconLabel,
       occurrence.startAt.toISOString(),
       occurrence.endAt.toISOString(),
       repeatGroupId,
@@ -587,14 +601,14 @@ export async function createUserAction(userId, payload) {
       JSON.stringify(repeatDays)
     );
 
-    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}::jsonb)`;
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}::jsonb)`;
   });
 
   const result = await query(
     `
-      insert into actions (user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
+      insert into actions (user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
       values ${placeholders.join(", ")}
-      returning id, user_id, title, assignee, category_id, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
+      returning id, user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
     `,
     values
   );
@@ -723,6 +737,8 @@ export async function updateUserAction(userId, actionId, payload) {
   const title = String(payload?.title || "").trim();
   const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
   const categoryId = normalizeCategoryId(payload?.categoryId || action?.categoryId);
+  const svgIconUrl = String(payload?.svgIconUrl || action?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || action?.svgIconLabel || "").trim();
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const applyTo = String(payload?.applyTo || "").trim().toLowerCase() === "series" ? "series" : "single";
@@ -782,10 +798,12 @@ export async function updateUserAction(userId, actionId, payload) {
                set title = $3,
                    assignee = $4,
                    category_id = $5,
-                   start_at = $6::timestamptz,
-                   end_at = $7::timestamptz,
-                   repeat_rule = $8,
-                   repeat_days = $9::jsonb
+                   svg_icon_url = $6,
+                   svg_icon_label = $7,
+                   start_at = $8::timestamptz,
+                   end_at = $9::timestamptz,
+                   repeat_rule = $10,
+                   repeat_days = $11::jsonb
              where user_id = $1
                and id = $2
           `,
@@ -795,6 +813,8 @@ export async function updateUserAction(userId, actionId, payload) {
             title,
             assignee,
             categoryId,
+            svgIconUrl,
+            svgIconLabel,
             item.startAt.toISOString(),
             item.endAt.toISOString(),
             repeatRule,
@@ -817,6 +837,8 @@ export async function updateUserAction(userId, actionId, payload) {
       title,
       assignee,
       categoryId,
+      svgIconUrl,
+      svgIconLabel,
       repeatRule,
       repeatDays,
       occurrences
@@ -842,11 +864,13 @@ export async function updateUserAction(userId, actionId, payload) {
       set title = $3,
           assignee = $4,
           category_id = $5,
-          start_at = $6::timestamptz,
-          end_at = $7::timestamptz,
-          repeat_group_id = $8,
-          repeat_rule = $9,
-          repeat_days = $10::jsonb
+          svg_icon_url = $6,
+          svg_icon_label = $7,
+          start_at = $8::timestamptz,
+          end_at = $9::timestamptz,
+          repeat_group_id = $10,
+          repeat_rule = $11,
+          repeat_days = $12::jsonb
       where user_id = $1
         and id = $2
       returning id
@@ -857,6 +881,8 @@ export async function updateUserAction(userId, actionId, payload) {
       title,
       assignee,
       categoryId,
+      svgIconUrl,
+      svgIconLabel,
       occurrence.startAt.toISOString(),
       occurrence.endAt.toISOString(),
       nextRepeatGroupId,

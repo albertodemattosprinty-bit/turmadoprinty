@@ -59,6 +59,8 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
     userId: row.user_id,
     profileName: normalizeExtraGoalProfile(row.assigned_profile),
     title: normalizeExtraGoalTitle(row.title),
+    svgIconUrl: String(row.svg_icon_url || "").trim(),
+    svgIconLabel: String(row.svg_icon_label || "").trim(),
     targetValue,
     progressValue,
     remainingValue: Math.max(0, targetValue - progressValue),
@@ -142,6 +144,8 @@ export async function ensureExtraGoalsSchema() {
       assigned_profile text not null default 'Usuario',
       title text not null,
       target_value integer not null default 1,
+      svg_icon_url text not null default '',
+      svg_icon_label text not null default '',
       progress_value integer not null default 0,
       progress_date date,
       created_at timestamptz not null default now(),
@@ -151,6 +155,8 @@ export async function ensureExtraGoalsSchema() {
   await query("alter table extra_goals add column if not exists assigned_profile text not null default 'Usuario';");
   await query("alter table extra_goals add column if not exists progress_value integer not null default 0;");
   await query("alter table extra_goals add column if not exists progress_date date;");
+  await query("alter table extra_goals add column if not exists svg_icon_url text not null default '';");
+  await query("alter table extra_goals add column if not exists svg_icon_label text not null default '';");
   await query("update extra_goals set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
   await query("create index if not exists idx_extra_goals_user_profile_created on extra_goals(user_id, assigned_profile, created_at asc);");
   await query("alter table extra_goal_profiles add column if not exists assigned_profile text not null default 'Usuario';");
@@ -178,6 +184,8 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
         assigned_profile,
         title,
         target_value,
+        svg_icon_url,
+        svg_icon_label,
         progress_value,
         progress_date,
         to_char(progress_date, 'YYYY-MM-DD') as progress_date_key,
@@ -207,6 +215,8 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
   const title = normalizeExtraGoalTitle(payload?.title);
   const targetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
+  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
   if (!title) {
     throw new Error("Informe o nome da missao.");
   }
@@ -216,11 +226,11 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   await query(
     `
       insert into extra_goals (
-        user_id, assigned_profile, title, target_value, progress_value, progress_date, created_at, updated_at
+        user_id, assigned_profile, title, target_value, svg_icon_url, svg_icon_label, progress_value, progress_date, created_at, updated_at
       )
-      values ($1, $2, $3, $4, 0, null, now(), now())
+      values ($1, $2, $3, $4, $5, $6, 0, null, now(), now())
     `,
-    [userId, normalizedProfile, title, targetValue]
+    [userId, normalizedProfile, title, targetValue, svgIconUrl, svgIconLabel]
   );
   return listExtraGoals(userId, normalizedProfile);
 }
@@ -283,6 +293,8 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
     throw new Error("Missao invalida.");
   }
   const nextTargetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
+  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
   if (!nextTargetValue) {
     throw new Error("Informe a unidade diaria da missao.");
   }
@@ -290,12 +302,14 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
     `
       update extra_goals
       set target_value = $4,
+          svg_icon_url = $5,
+          svg_icon_label = $6,
           updated_at = now()
       where id = $1
         and user_id = $2
         and assigned_profile = $3
     `,
-    [safeGoalId, userId, normalizedProfile, nextTargetValue]
+    [safeGoalId, userId, normalizedProfile, nextTargetValue, svgIconUrl, svgIconLabel]
   );
   return listExtraGoals(userId, normalizedProfile);
 }

@@ -63,7 +63,8 @@ import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProj
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
 import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
-import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName } from "./src/project200-profiles.js";
+import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
+import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -224,6 +225,18 @@ function buildAlbumZipPublicUrlFromKey(key) {
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join("/")}`;
+}
+
+function buildPublicR2UrlFromKey(key) {
+  return `${R2_PUBLIC_BASE_URL}/${String(key || "")
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+function buildProject200SvgAssetUrl(fileName) {
+  return buildPublicR2UrlFromKey(`project200/svg-hub/${String(fileName || "").trim()}`);
 }
 
 async function listPublicR2AssetsByPrefix(prefix) {
@@ -3418,6 +3431,13 @@ async function handleExtraGoalCreateRequest(request, response) {
   }
 
   try {
+    if ((!body?.svgIconUrl || !body?.svgIconLabel) && String(body?.title || "").trim()) {
+      const suggestion = await suggestProject200SvgAsset(body.title, { kind: "mission" });
+      if (suggestion) {
+        body.svgIconUrl = suggestion.url;
+        body.svgIconLabel = suggestion.label;
+      }
+    }
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const goals = await createExtraGoal(user.id, selectedProfile, body);
     const summary = summarizeExtraGoals(goals);
@@ -3470,6 +3490,13 @@ async function handleExtraGoalUpdateRequest(request, response, goalId) {
   }
 
   try {
+    if ((!body?.svgIconUrl || !body?.svgIconLabel) && String(body?.title || "").trim()) {
+      const suggestion = await suggestProject200SvgAsset(body.title, { kind: "mission" });
+      if (suggestion) {
+        body.svgIconUrl = suggestion.url;
+        body.svgIconLabel = suggestion.label;
+      }
+    }
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const goals = await updateExtraGoal(user.id, selectedProfile, goalId, body);
     const summary = summarizeExtraGoals(goals);
@@ -3649,6 +3676,67 @@ function inferProject200CategoryLocally(title) {
   return pick("trabalho");
 }
 
+async function suggestProject200SvgAsset(text, options = {}) {
+  const input = String(text || "").trim();
+  const kind = String(options?.kind || "task").trim().toLowerCase() || "task";
+  const candidates = await findProject200SvgCandidates(input, 24);
+  const fallback = candidates[0] || null;
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!fallback) {
+    return null;
+  }
+
+  if (!apiKey) {
+    return {
+      id: fallback.id,
+      label: fallback.label,
+      fileName: fallback.fileName,
+      keywords: Array.isArray(fallback.keywords) ? fallback.keywords : [],
+      url: buildProject200SvgAssetUrl(fallback.fileName),
+      model: "local-fallback"
+    };
+  }
+
+  try {
+    const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+    const completion = await createChatCompletion(apiKey, {
+      model,
+      temperature: 0,
+      messages: [
+        {
+          role: "system",
+          content: `Escolha somente um SVG para ${kind} com base no texto. Responda JSON puro {"id":"..."} usando apenas um dos ids listados. Prefira o SVG mais concreto, útil e visualmente intuitivo.`
+        },
+        {
+          role: "user",
+          content: `Texto: ${input.slice(0, 300)}\n\nSVGs candidatos:\n${buildProject200SvgSearchPrompt(candidates)}`
+        }
+      ]
+    });
+    const raw = extractChatCompletionText(completion);
+    const parsed = JSON.parse(raw);
+    const chosen = findProject200SvgById(candidates, parsed?.id) || fallback;
+    return {
+      id: chosen.id,
+      label: chosen.label,
+      fileName: chosen.fileName,
+      keywords: Array.isArray(chosen.keywords) ? chosen.keywords : [],
+      url: buildProject200SvgAssetUrl(chosen.fileName),
+      model
+    };
+  } catch {
+    return {
+      id: fallback.id,
+      label: fallback.label,
+      fileName: fallback.fileName,
+      keywords: Array.isArray(fallback.keywords) ? fallback.keywords : [],
+      url: buildProject200SvgAssetUrl(fallback.fileName),
+      model: "local-fallback"
+    };
+  }
+}
+
 async function handleProject200ActionCategorize(request, response) {
   const apiKey = process.env.OPENAI_API_KEY;
   let body;
@@ -3695,6 +3783,77 @@ async function handleProject200ActionCategorize(request, response) {
   } catch {
     const local = inferProject200CategoryLocally(title);
     sendJson(response, 200, { ok: true, category: local, model: "local-fallback" });
+  }
+}
+
+async function handleProject200SvgSuggest(request, response) {
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, { error: error.message });
+    return;
+  }
+
+  const text = String(body?.text || "").trim();
+  const kind = String(body?.kind || "task").trim().toLowerCase() || "task";
+  if (text.length < 2) {
+    sendJson(response, 400, { error: "Texto ausente." });
+    return;
+  }
+
+  try {
+    const asset = await suggestProject200SvgAsset(text, { kind });
+    sendJson(response, 200, {
+      ok: true,
+      asset
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel sugerir o SVG."
+    });
+  }
+}
+
+async function handleProject200ProfileSvgSuggestRequest(request, response, profileId) {
+  const authUser = await requireAuth(request, response);
+  if (!authUser) {
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch (error) {
+    body = {};
+  }
+
+  try {
+    const profiles = await listProject200Profiles(authUser.id);
+    const profile = profiles.find((item) => String(item.id || "").trim() === String(profileId || "").trim());
+    if (!profile) {
+      sendJson(response, 404, { error: "Usuario nao encontrado." });
+      return;
+    }
+    const text = String(body?.text || profile.name || "").trim();
+    const asset = await suggestProject200SvgAsset(text, { kind: "profile" });
+    if (!asset) {
+      sendJson(response, 404, { error: "Nenhum SVG encontrado." });
+      return;
+    }
+    const updatedProfile = await updateProject200ProfileSvgIcon(authUser.id, profile.id, {
+      svgIconUrl: asset.url,
+      svgIconLabel: asset.label
+    });
+    sendJson(response, 200, {
+      ok: true,
+      profile: updatedProfile,
+      asset
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel escolher o SVG do usuario."
+    });
   }
 }
 
@@ -10234,6 +10393,15 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/200/svg-icons/suggest") {
+    const user = await requireAuth(request, response);
+    if (!user) {
+      return;
+    }
+    await handleProject200SvgSuggest(request, response);
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/mini/aulas/gerar") {
     await handleMiniLessonPlanGenerate(request, response);
     return;
@@ -10958,6 +11126,14 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname.startsWith("/api/200/profiles/") && pathname.endsWith("/svg-icon/suggest")) {
+    const profileId = decodeURIComponent(
+      pathname.slice("/api/200/profiles/".length, pathname.length - "/svg-icon/suggest".length)
+    );
+    await handleProject200ProfileSvgSuggestRequest(request, response, profileId);
+    return;
+  }
+
   if (request.method === "POST" && pathname.startsWith("/api/200/profiles/") && pathname.endsWith("/avatar/upload")) {
     const profileId = decodeURIComponent(
       pathname.slice("/api/200/profiles/".length, pathname.length - "/avatar/upload".length)
@@ -11641,6 +11817,13 @@ const server = http.createServer(async (request, response) => {
       }
 
       const body = await readJsonBody(request);
+      if ((!body?.svgIconUrl || !body?.svgIconLabel) && String(body?.title || "").trim()) {
+        const suggestion = await suggestProject200SvgAsset(body.title, { kind: "task" });
+        if (suggestion) {
+          body.svgIconUrl = suggestion.url;
+          body.svgIconLabel = suggestion.label;
+        }
+      }
       const actions = await createUserAction(user.id, body);
 
       sendJson(response, 201, { ok: true, actions });
@@ -11705,6 +11888,13 @@ const server = http.createServer(async (request, response) => {
 
       const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)$/, "$1"));
       const body = await readJsonBody(request);
+      if ((!body?.svgIconUrl || !body?.svgIconLabel) && String(body?.title || "").trim()) {
+        const suggestion = await suggestProject200SvgAsset(body.title, { kind: "task" });
+        if (suggestion) {
+          body.svgIconUrl = suggestion.url;
+          body.svgIconLabel = suggestion.label;
+        }
+      }
       const action = await updateUserAction(user.id, actionId, body);
 
       sendJson(response, action ? 200 : 404, {

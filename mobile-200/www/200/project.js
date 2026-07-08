@@ -630,6 +630,7 @@ let runningTaskTicker = null;
 let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
+let actionSvgSuggestTimer = null;
 let actionCategoryTargetActionId = "";
 let actionCategorySelectionId = "";
 let actionsTimeTicker = null;
@@ -655,6 +656,7 @@ let profileAvatarTargetId = "";
 let profileAvatarReferenceFile = null;
 let profileAvatarReferenceDataUrl = "";
 let profileAvatarBusy = false;
+let profileSvgSuggestBusy = false;
 let startDecisionResolver = null;
 const runningAudio = typeof Audio !== "undefined" ? new Audio() : null;
 const runningMinuteCueAudio = typeof Audio !== "undefined" ? new Audio() : null;
@@ -705,6 +707,8 @@ let postponeNavLongPressHandled = false;
 let postponeFeedbackCarouselTimer = null;
 let runningMissionQuickFeedbackTimer = null;
 let runningMissionQuickFocusTimer = null;
+let missionSvgSuggestTimer = null;
+let missionCreateSuggestedIcon = null;
 let runningMissionQuickRequestChain = Promise.resolve();
 
 const state = {
@@ -938,6 +942,11 @@ function getProfileAvatarPath(profileOrName) {
   }
   const preset = String(profile?.avatarPreset || "").trim().toLowerCase();
   return avatarPresetToPath[preset] || defaultProfileAvatarDataUrl;
+}
+
+function getProfileSvgIconPath(profileOrName) {
+  const profile = typeof profileOrName === "string" ? getProfileByName(profileOrName) : profileOrName;
+  return String(profile?.svgIconUrl || "").trim();
 }
 
 function normalizeBackgroundTheme(value) {
@@ -1196,7 +1205,7 @@ function renderProfileFooter() {
   }
   profileFooter.innerHTML = getProfilesList().map((profile) => `
     <button class="profile-chip${profile.name === state.selectedProfile ? " active" : ""}" type="button" data-profile="${escapeHtml(profile.name)}" aria-label="${escapeHtml(profile.name)}">
-      <img class="task-avatar" src="${getProfileAvatarPath(profile)}" alt="${escapeHtml(profile.name)}" />
+      <img class="task-avatar" src="${getProfileSvgIconPath(profile) || getProfileAvatarPath(profile)}" alt="${escapeHtml(String(profile.svgIconLabel || profile.name || ""))}" />
     </button>
   `).join("");
   renderHomeProfileHero();
@@ -1209,7 +1218,7 @@ function renderHistorySpeakerSelectionOptions() {
   }
   historyTextAvatarGrid.innerHTML = getProfilesList().map((profile) => `
     <button class="history-avatar-btn${profile.name === state.historyTextComposer.speaker ? " active" : ""}" type="button" data-history-speaker="${escapeHtml(profile.name)}">
-      <img class="task-avatar" src="${getProfileAvatarPath(profile)}" alt="${escapeHtml(profile.name)}" />
+      <img class="task-avatar" src="${getProfileSvgIconPath(profile) || getProfileAvatarPath(profile)}" alt="${escapeHtml(String(profile.svgIconLabel || profile.name || ""))}" />
       <span>${escapeHtml(profile.name)}</span>
     </button>
   `).join("");
@@ -3332,6 +3341,35 @@ function getActionAvatarPath(assignee) {
   return getProfileAvatarPath(assignee);
 }
 
+function getActionDisplayIcon(action) {
+  const svgIconUrl = String(action?.svgIconUrl || "").trim();
+  if (svgIconUrl) {
+    return {
+      src: svgIconUrl,
+      alt: String(action?.svgIconLabel || action?.title || "Ícone da tarefa"),
+      categoryIcon: true
+    };
+  }
+  const assignee = normalizeAssigneeName(action?.assignee || "");
+  return {
+    src: getActionAvatarPath(assignee),
+    alt: `Avatar de ${assignee}`,
+    categoryIcon: false
+  };
+}
+
+function getMissionDisplayIcon(goal) {
+  const svgIconUrl = String(goal?.svgIconUrl || "").trim();
+  if (svgIconUrl) {
+    return {
+      src: svgIconUrl,
+      alt: String(goal?.svgIconLabel || goal?.title || "Ícone da missão"),
+      categoryIcon: true
+    };
+  }
+  return null;
+}
+
 function getTaskCategoryIconPath(categoryId) {
   const normalized = String(categoryId || "").trim().toLowerCase();
   if (!normalized) return "";
@@ -3445,6 +3483,8 @@ function buildInitialWizardState() {
     endMinute: end.getMinutes(),
     categoryId: "",
     categoryName: "",
+    svgIconUrl: "",
+    svgIconLabel: "",
     editingActionId: null,
     replaceOverlaps: false
   };
@@ -4090,7 +4130,7 @@ function renderActions() {
     }
     const status = normalizeActionStatus(action.status);
     const assignee = normalizeAssigneeName(action.assignee);
-    const avatarPath = getActionAvatarPath(assignee);
+    const actionIcon = getActionDisplayIcon(action);
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
       : (status === actionStatuses.completed ? " task-completed" : "");
@@ -4110,7 +4150,7 @@ function renderActions() {
     const dotColor = getActionThemeDotColor(action, { delayMinutes });
     const isBlinking = status === actionStatuses.inProgress;
     row.innerHTML = `
-      <img class="task-avatar" src="${avatarPath}" alt="${escapeHtml(`Avatar de ${assignee}`)}" loading="lazy" />
+      ${buildTaskAvatarMarkup(actionIcon.src, actionIcon.alt, { categoryIcon: actionIcon.categoryIcon })}
       <div class="task-main">
         <div class="task-title">${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
         <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
@@ -4435,6 +4475,10 @@ function closeWizard() {
     window.clearTimeout(actionCategoryInterpretTimer);
     actionCategoryInterpretTimer = null;
   }
+  if (actionSvgSuggestTimer) {
+    window.clearTimeout(actionSvgSuggestTimer);
+    actionSvgSuggestTimer = null;
+  }
   hideActionAiConfirmation();
   if (actionCategoryModal) {
     actionCategoryModal.classList.remove("active");
@@ -4450,11 +4494,11 @@ function closeWizard() {
 function renderActionCategoryPicker() {
   const selectedId = String(state.wizard.categoryId || "").trim().toLowerCase();
   const selectedName = getTaskCategoryName(selectedId);
-  const selectedIcon = getTaskCategoryIconPath(selectedId);
+  const selectedIcon = String(state.wizard.svgIconUrl || "").trim() || getTaskCategoryIconPath(selectedId);
   const profileAvatar = getActionAvatarPath(getWizardAssigneeName());
   if (actionCategoryPreviewIcon) {
     actionCategoryPreviewIcon.src = selectedIcon || profileAvatar;
-    actionCategoryPreviewIcon.alt = selectedName || "Avatar do usuário";
+    actionCategoryPreviewIcon.alt = String(state.wizard.svgIconLabel || "").trim() || selectedName || "Avatar do usuário";
   }
   if (actionCategoryPreviewLabel) {
     actionCategoryPreviewLabel.textContent = selectedName || "Categoria automática";
@@ -4812,6 +4856,8 @@ function openTaskComposer(action = null, options = {}) {
     state.wizard.endMinute = endAt.getMinutes();
     state.wizard.categoryId = String(action.categoryId || "").trim().toLowerCase();
     state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
+    state.wizard.svgIconUrl = String(action.svgIconUrl || "").trim();
+    state.wizard.svgIconLabel = String(action.svgIconLabel || "").trim();
     state.wizard.editingActionId = action.id;
     state.wizard.repeatOpen = String(action.repeatRule || "none") !== "none";
     state.wizard.repeatMode = normalizeRepeatMode(String(action.repeatRule || "none"));
@@ -5492,10 +5538,10 @@ function renderProfileAvatarModal() {
     profileAvatarModalTitle.textContent = `Foto de ${profile.name}`;
   }
   if (profileAvatarModalHint) {
-    profileAvatarModalHint.textContent = `Envie uma foto de ${profile.name} para usar direto no perfil ou gerar uma versao estilo Disney Pixar com o gpt-image-1.`;
+    profileAvatarModalHint.textContent = `Envie uma foto de ${profile.name} para usar direto no perfil, gerar uma versao estilo Disney Pixar com o gpt-image-1, ou toque no preview para deixar a IA escolher um SVG.`;
   }
   if (profileAvatarPreview) {
-    profileAvatarPreview.src = profileAvatarReferenceDataUrl || getProfileAvatarPath(profile);
+    profileAvatarPreview.src = profileAvatarReferenceDataUrl || getProfileSvgIconPath(profile) || getProfileAvatarPath(profile);
     profileAvatarPreview.alt = `Preview de ${profile.name}`;
   }
   if (profileAvatarFileName) {
@@ -5664,6 +5710,59 @@ async function submitProfileAvatarUpload() {
   } finally {
     profileAvatarBusy = false;
     renderProfileAvatarModal();
+  }
+}
+
+async function submitProfileSvgSuggestion() {
+  const profile = getProfileById(profileAvatarTargetId) || getProfileByName(state.selectedProfile);
+  if (!profile || profileSvgSuggestBusy) {
+    return;
+  }
+  const token = getToken();
+  if (!token) {
+    window.location.href = "/auth.html?next=/200";
+    return;
+  }
+  profileSvgSuggestBusy = true;
+  if (profileAvatarMessage) {
+    profileAvatarMessage.textContent = "Escolhendo SVG...";
+  }
+  try {
+    const response = await runWithGlobalLoading(() => fetch(getApiUrl(`/api/200/profiles/${encodeURIComponent(profile.id)}/svg-icon/suggest`), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ text: profile.name })
+    }), {
+      path: "/api/200/profiles/svg-icon/suggest",
+      method: "POST"
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || "Falha ao escolher o SVG.");
+    }
+    if (payload?.profile) {
+      state.profiles = (Array.isArray(state.profiles) ? state.profiles : []).map((item) => (
+        String(item?.id || "") === String(payload.profile.id || "") ? payload.profile : item
+      ));
+      await loadActions();
+      await loadMissions();
+      renderMissions();
+      renderProfileFooter();
+      renderHomeProfileHero();
+      renderProfileAvatarModal();
+    }
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = `SVG escolhido: ${String(payload?.asset?.label || "ícone")}.`;
+    }
+  } catch (error) {
+    if (profileAvatarMessage) {
+      profileAvatarMessage.textContent = error instanceof Error ? error.message : "Falha ao escolher o SVG.";
+    }
+  } finally {
+    profileSvgSuggestBusy = false;
   }
 }
 
@@ -6235,6 +6334,8 @@ async function saveAction() {
         title: taskTitle.value.trim(),
         assignee: getWizardAssigneeName(),
         categoryId: String(state.wizard.categoryId || "").trim().toLowerCase(),
+        svgIconUrl: String(state.wizard.svgIconUrl || "").trim(),
+        svgIconLabel: String(state.wizard.svgIconLabel || "").trim(),
         repeatRule,
         repeatDays,
         applyTo,
@@ -7901,7 +8002,7 @@ function showRunningMissionQuickFocus(goal, key) {
   runningMissionQuickFocus.hidden = false;
   runningMissionQuickFocus.style.color = color;
   if (runningMissionQuickFocusIcon) {
-    runningMissionQuickFocusIcon.src = `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
+    runningMissionQuickFocusIcon.src = String(goal.svgIconUrl || "").trim() || `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
   }
   if (runningMissionQuickFocusTitle) {
     runningMissionQuickFocusTitle.textContent = String(goal.title || "Missão");
@@ -7964,6 +8065,7 @@ function renderRunningMissionQuickButtons() {
     const key = String(button.dataset.missionQuickKey || "");
     const definition = getMissionQuickDefinitionByKey(key);
     const goal = getMissionQuickGoalByKey(key);
+    const icon = button.querySelector("img");
     const meta = button.querySelector("[data-mission-quick-meta]");
     const title = button.querySelector(".running-mission-quick-card-title");
     const progressFill = button.querySelector("[data-mission-quick-progress]");
@@ -7971,6 +8073,9 @@ function renderRunningMissionQuickButtons() {
     button.classList.toggle("is-disabled", !goal);
     button.setAttribute("aria-pressed", "false");
     if (goal) {
+      if (icon) {
+        icon.src = String(goal.svgIconUrl || "").trim() || `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
+      }
       if (title) {
         title.textContent = goal.title;
       }
@@ -7984,6 +8089,9 @@ function renderRunningMissionQuickButtons() {
       button.title = `${goal.title}: ${goal.progressValue} de ${goal.targetValue}`;
       button.setAttribute("aria-label", goal.title);
     } else {
+      if (icon) {
+        icon.src = `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
+      }
       if (title) {
         title.textContent = definition?.defaultTitle || definition?.label || "Missão rápida";
       }
@@ -8430,6 +8538,11 @@ function openMissionCreateModal() {
   if (missionCreateStatus) {
     missionCreateStatus.textContent = "";
   }
+  missionCreateSuggestedIcon = null;
+  if (missionSvgSuggestTimer) {
+    window.clearTimeout(missionSvgSuggestTimer);
+    missionSvgSuggestTimer = null;
+  }
   openModal("missionCreateModal");
   window.setTimeout(() => missionTitleInput?.focus(), 60);
 }
@@ -8491,14 +8604,18 @@ function createMissionCard(goal) {
   const progress = Math.max(0, Number(goal.progressValue || 0));
   const target = Math.max(1, Number(goal.targetValue || 1));
   const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+  const goalIcon = getMissionDisplayIcon(goal);
   const card = document.createElement("article");
   card.className = "history-mission-card";
   card.dataset.goalId = String(goal.id || "");
   card.innerHTML = `
     <div class="history-mission-card-top">
-      <div>
+      <div class="history-mission-card-info">
+        ${goalIcon ? buildTaskAvatarMarkup(goalIcon.src, goalIcon.alt, { categoryIcon: goalIcon.categoryIcon }) : ""}
+        <div>
         <h3 class="history-mission-card-title">${escapeHtml(String(goal.title || "Missão"))}</h3>
         <div class="history-mission-card-progress">${escapeHtml(`${progress} de ${target}`)}</div>
+        </div>
       </div>
       <div class="history-mission-card-actions">
         <button class="history-mission-card-edit" type="button" data-mission-goal-edit="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Editar ${String(goal.title || "missão")}`)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg></button>
@@ -9121,6 +9238,15 @@ if (window.history && typeof window.history.pushState === "function") {
   } catch {}
 }
 
+async function suggestSvgIconFromText(text, kind = "task") {
+  const payload = await apiRequest("/api/200/svg-icons/suggest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, kind })
+  });
+  return payload?.asset || null;
+}
+
 function getTaskBeepAudioContext() {
   if (typeof window === "undefined") {
     return null;
@@ -9445,15 +9571,33 @@ taskTitle?.addEventListener("input", () => {
   if (actionCategoryInterpretTimer) {
     window.clearTimeout(actionCategoryInterpretTimer);
   }
+  if (actionSvgSuggestTimer) {
+    window.clearTimeout(actionSvgSuggestTimer);
+  }
   const title = taskTitle.value.trim();
   if (!title) {
     state.wizard.categoryId = "";
     state.wizard.categoryName = "";
+    state.wizard.svgIconUrl = "";
+    state.wizard.svgIconLabel = "";
     renderActionCategoryPicker();
     return;
   }
   actionCategoryInterpretTimer = window.setTimeout(() => {
     void interpretActionCategoryFromTitle(title);
+  }, 3000);
+  actionSvgSuggestTimer = window.setTimeout(() => {
+    void (async () => {
+      try {
+        const asset = await suggestSvgIconFromText(title, "task");
+        if (!asset || taskTitle.value.trim() !== title) {
+          return;
+        }
+        state.wizard.svgIconUrl = String(asset.url || "").trim();
+        state.wizard.svgIconLabel = String(asset.label || "").trim();
+        renderActionCategoryPicker();
+      } catch {}
+    })();
   }, 3000);
 });
 closePlatformWizardButton?.addEventListener("click", closePlatformWizard);
@@ -9973,6 +10117,33 @@ statsMissionsList?.addEventListener("click", (event) => {
 
 openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
 openMissionCreateButton?.addEventListener("click", openMissionCreateModal);
+missionTitleInput?.addEventListener("input", () => {
+  if (missionSvgSuggestTimer) {
+    window.clearTimeout(missionSvgSuggestTimer);
+  }
+  const title = String(missionTitleInput?.value || "").trim();
+  missionCreateSuggestedIcon = null;
+  if (!title) {
+    if (missionCreateStatus) {
+      missionCreateStatus.textContent = "";
+    }
+    return;
+  }
+  missionSvgSuggestTimer = window.setTimeout(() => {
+    void (async () => {
+      try {
+        const asset = await suggestSvgIconFromText(title, "mission");
+        if (!asset || String(missionTitleInput?.value || "").trim() !== title) {
+          return;
+        }
+        missionCreateSuggestedIcon = asset;
+        if (missionCreateStatus) {
+          missionCreateStatus.textContent = `SVG sugerido: ${asset.label}`;
+        }
+      } catch {}
+    })();
+  }, 3000);
+});
 missionCreateConfirmButton?.addEventListener("click", () => {
   void (async () => {
     const title = String(missionTitleInput?.value || "").trim();
@@ -9999,7 +10170,9 @@ missionCreateConfirmButton?.addEventListener("click", () => {
         body: JSON.stringify({
           title,
           targetValue,
-          profile: String(state.selectedProfile || getDefaultProfileName()).trim()
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+          svgIconUrl: String(missionCreateSuggestedIcon?.url || "").trim(),
+          svgIconLabel: String(missionCreateSuggestedIcon?.label || "").trim()
         })
       });
       closeModal("missionCreateModal");
@@ -10224,6 +10397,7 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
   void (async () => {
     const goalId = String(state.missionAdjust?.goalId || "").trim();
     const targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust?.targetValue || 1) || 1));
+    const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId) || null;
     if (!goalId) {
       return;
     }
@@ -10236,7 +10410,9 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          targetValue
+          targetValue,
+          svgIconUrl: String(goal?.svgIconUrl || "").trim(),
+          svgIconLabel: String(goal?.svgIconLabel || "").trim()
         })
       });
       closeModal("missionAdjustModal");
@@ -11006,6 +11182,9 @@ homeRunningModeTimeBtn?.addEventListener("click", (event) => {
 });
 profileAvatarChooseButton?.addEventListener("click", () => {
   profileAvatarFileInput?.click();
+});
+profileAvatarPreview?.addEventListener("click", () => {
+  void submitProfileSvgSuggestion();
 });
 profileAvatarFileInput?.addEventListener("change", () => {
   const file = profileAvatarFileInput.files?.[0] || null;

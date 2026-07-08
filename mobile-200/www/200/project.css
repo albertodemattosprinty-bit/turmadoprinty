@@ -4516,6 +4516,13 @@ body.running-music-standalone #actionsModal .actions-list {
   align-items: start;
 }
 
+.history-mission-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .history-mission-card-title {
   margin: 0;
   font-size: 1.18rem;
