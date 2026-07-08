@@ -784,6 +784,8 @@ const state = {
     delayIndex: 0,
     pendingAction: null,
     activationRequestInFlight: false,
+    activationCooldownUntilMs: 0,
+    lastActivationError: "",
     controlsVisible: false,
     controlsTimerId: 0,
     audioFadeTimerId: 0,
@@ -4829,8 +4831,8 @@ function startActionsTimeTicker() {
 }
 
 function getActiveSleepAction() {
-  return getPendingSleepFlowAction()
-    || getSelectedSleepAction()
+  return getSelectedSleepAction()
+    || getPendingSleepFlowAction()
     || getSleepActionsForSelectedProfile().find((action) => normalizeActionStatus(action.status) !== actionStatuses.completed)
     || getSleepActionsForSelectedProfile()[0]
     || null;
@@ -4868,6 +4870,27 @@ function shouldPreserveSleepFlowAction(action) {
   }
   const status = normalizeActionStatus(action.status);
   return status === actionStatuses.pending || status === actionStatuses.inProgress;
+}
+
+async function fetchSleepSessionActionForFlow(referenceAction = null) {
+  const fallbackAction = buildSleepFlowAction(referenceAction || state.sleepFlow?.pendingAction || null);
+  const profileName = String(fallbackAction?.assignee || state.selectedProfile || getDefaultProfileName()).trim();
+  const sessionDateKey = String(fallbackAction?.sleepSessionDate || getSelectedSleepDayKey()).trim();
+  if (!profileName || !sessionDateKey) {
+    return null;
+  }
+  const sleepPayload = await apiRequestWithTimeout(`/api/200/sleep-session?date=${encodeURIComponent(sessionDateKey)}&profile=${encodeURIComponent(profileName)}`, {
+    skipGlobalLoading: true
+  }, 5000);
+  const sleepAction = sleepPayload?.action && typeof sleepPayload.action === "object"
+    ? buildSleepFlowAction(sleepPayload.action, fallbackAction || undefined)
+    : null;
+  if (!sleepAction?.id) {
+    return null;
+  }
+  state.sleepFlow.pendingAction = sleepAction;
+  upsertSleepActionIntoState(sleepAction);
+  return sleepAction;
 }
 
 function upsertSleepActionIntoState(action) {
@@ -4996,23 +5019,32 @@ async function activateSleepActionIfNeeded(action) {
   if (status !== actionStatuses.pending) {
     return;
   }
+  if (Date.now() < Number(state.sleepFlow.activationCooldownUntilMs || 0)) {
+    return;
+  }
   const plannedStartMs = new Date(action.startAt).getTime();
   if (!Number.isFinite(plannedStartMs) || getServerNowMs() < plannedStartMs || state.sleepFlow.activationRequestInFlight) {
     return;
   }
   state.sleepFlow.activationRequestInFlight = true;
+  state.sleepFlow.lastActivationError = "";
   try {
     let nextAction = action;
     if (isTemporarySleepActionId(nextAction.id)) {
       if (sleepSessionSubtitle) {
         sleepSessionSubtitle.textContent = "Preparando início do sono...";
       }
-      await loadActions({
-        preserveSleepAction: nextAction,
-        silent: true
-      });
-      nextAction = getSelectedSleepAction() || getPendingSleepFlowAction() || getActiveSleepAction() || nextAction;
+      const hydratedAction = await fetchSleepSessionActionForFlow(nextAction).catch(() => null);
+      if (!hydratedAction) {
+        await loadActions({
+          preserveSleepAction: nextAction,
+          silent: true
+        });
+      }
+      nextAction = getSelectedSleepAction() || getPendingSleepFlowAction() || getActiveSleepAction() || hydratedAction || nextAction;
       if (!nextAction?.id || isTemporarySleepActionId(nextAction.id)) {
+        state.sleepFlow.lastActivationError = "Sessão de sono não encontrada.";
+        state.sleepFlow.activationCooldownUntilMs = Date.now() + 1500;
         return;
       }
     }
@@ -5026,6 +5058,8 @@ async function activateSleepActionIfNeeded(action) {
       }),
       skipGlobalLoading: true
     });
+    state.sleepFlow.lastActivationError = "";
+    state.sleepFlow.activationCooldownUntilMs = 0;
     if (payload?.action?.id) {
       state.sleepFlow.pendingAction = payload.action;
     }
@@ -5035,8 +5069,11 @@ async function activateSleepActionIfNeeded(action) {
     });
     await ensureSleepFrequencyPlayback();
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
+    state.sleepFlow.lastActivationError = errorMessage;
+    state.sleepFlow.activationCooldownUntilMs = Date.now() + 1500;
     if (sleepSessionSubtitle) {
-      sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
+      sleepSessionSubtitle.textContent = errorMessage;
     }
   } finally {
     state.sleepFlow.activationRequestInFlight = false;
@@ -5069,7 +5106,9 @@ function renderSleepSessionModal() {
       sleepSessionTimeLabel.textContent = remainingMs > 0 ? formatSleepCountdown(remainingMs) : "00:00";
     }
     if (sleepSessionSubtitle) {
-      sleepSessionSubtitle.textContent = remainingMs > 0 ? "O sono começará após a contagem regressiva." : "Preparando início do sono...";
+      sleepSessionSubtitle.textContent = remainingMs > 0
+        ? "O sono começará após a contagem regressiva."
+        : (state.sleepFlow.lastActivationError || "Preparando início do sono...");
     }
     void activateSleepActionIfNeeded(action);
   } else if (status === actionStatuses.inProgress) {
@@ -11654,6 +11693,8 @@ saveSleepConfigBtn?.addEventListener("click", () => {
     const plannedStartAt = new Date(Date.now() + (getSelectedSleepDelayMinutes() * 60000));
     const selectedProfileName = normalizeAssigneeName(state.selectedProfile || getDefaultProfileName());
     const selectedSleepDateKey = getSelectedSleepDayKey();
+    state.sleepFlow.lastActivationError = "";
+    state.sleepFlow.activationCooldownUntilMs = 0;
     try {
       const payload = await apiRequest("/api/200/sleep-session/start", {
         method: "POST",
