@@ -2306,10 +2306,14 @@ body.running-music-standalone #actionsModal .actions-list {
 
 #svgSelectorModal.workspace-modal {
   display: none;
+  place-items: stretch;
+  background: rgba(5, 7, 15, 0.76);
+  backdrop-filter: blur(14px);
+  z-index: 1700;
 }
 
 #svgSelectorModal.workspace-modal.active {
-  display: block;
+  display: grid;
 }
 
 .svg-selector-content {
@@ -2827,6 +2831,15 @@ body.running-music-standalone #actionsModal .actions-list {
   background: transparent;
 }
 
+.task-avatar-category {
+  display: inline-block;
+  background-color: transparent;
+  background-image: var(--task-avatar-icon);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
 .task-row:hover {
   transform: translateY(-11px);
 }
@@ -3175,6 +3188,7 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .stats-point-progress {
+  grid-column: 1 / -1;
   width: 100%;
   height: 12px;
   border-radius: 999px;
@@ -4750,6 +4764,11 @@ body[data-background-theme="light"] .svg-selector-content { background: rgba(16,
 body[data-background-theme="white"] .svg-selector-content {
   background: linear-gradient(145deg, rgba(248, 248, 245, 0.98), rgba(236, 236, 231, 0.98));
   color: #2f3640;
+}
+
+body[data-background-theme="white"] #svgSelectorModal.workspace-modal {
+  background: rgba(243, 243, 238, 0.94);
+  backdrop-filter: blur(16px);
 }
 
 body[data-background-theme="white"] .svg-selector-item {
