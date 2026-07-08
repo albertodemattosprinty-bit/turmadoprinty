@@ -1104,23 +1104,20 @@ function resolveLoadingIconForPath(path = "", preferredIcon = "") {
 }
 
 function beginGlobalLoading(iconSrc = "") {
-  globalLoadingCount += 1;
+  globalLoadingCount = 0;
   const resolvedIcon = resolveLoadingIconForPath("", iconSrc);
   globalLoadingPreferredIcon = resolvedIcon || globalLoadingPreferredIcon;
   if (globalLoadingIcon && resolvedIcon) {
     globalLoadingIcon.src = resolvedIcon;
   }
   if (globalLoadingOverlay) {
-    globalLoadingOverlay.hidden = false;
-    globalLoadingOverlay.setAttribute("aria-hidden", "false");
+    globalLoadingOverlay.hidden = true;
+    globalLoadingOverlay.setAttribute("aria-hidden", "true");
   }
 }
 
 function endGlobalLoading() {
-  globalLoadingCount = Math.max(0, globalLoadingCount - 1);
-  if (globalLoadingCount > 0) {
-    return;
-  }
+  globalLoadingCount = 0;
   if (globalLoadingOverlay) {
     globalLoadingOverlay.hidden = true;
     globalLoadingOverlay.setAttribute("aria-hidden", "true");
