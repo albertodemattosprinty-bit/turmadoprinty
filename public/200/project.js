@@ -4830,10 +4830,14 @@ function startActionsTimeTicker() {
 
 function getActiveSleepAction() {
   return getPendingSleepFlowAction()
-    || getSleepActionsForSelectedProfile().find((action) => normalizeActionStatus(action.status) !== actionStatuses.completed)
     || getSelectedSleepAction()
+    || getSleepActionsForSelectedProfile().find((action) => normalizeActionStatus(action.status) !== actionStatuses.completed)
     || getSleepActionsForSelectedProfile()[0]
     || null;
+}
+
+function isTemporarySleepActionId(actionId) {
+  return String(actionId || "").trim().startsWith("sleep-pending-");
 }
 
 function buildSleepFlowAction(action, fallback = {}) {
@@ -4996,25 +5000,28 @@ async function activateSleepActionIfNeeded(action) {
   if (!Number.isFinite(plannedStartMs) || getServerNowMs() < plannedStartMs || state.sleepFlow.activationRequestInFlight) {
     return;
   }
-  const actualStartAtIso = new Date().toISOString();
-  const optimisticAction = buildSleepFlowAction({
-    ...action,
-    status: actionStatuses.inProgress,
-    startedAt: actualStartAtIso,
-    startAt: actualStartAtIso
-  }, action);
-  if (optimisticAction) {
-    state.sleepFlow.pendingAction = optimisticAction;
-    upsertSleepActionIntoState(optimisticAction);
-    renderSleepSessionModal();
-  }
   state.sleepFlow.activationRequestInFlight = true;
   try {
+    let nextAction = action;
+    if (isTemporarySleepActionId(nextAction.id)) {
+      if (sleepSessionSubtitle) {
+        sleepSessionSubtitle.textContent = "Preparando início do sono...";
+      }
+      await loadActions({
+        preserveSleepAction: nextAction,
+        silent: true
+      });
+      nextAction = getSelectedSleepAction() || getPendingSleepFlowAction() || getActiveSleepAction() || nextAction;
+      if (!nextAction?.id || isTemporarySleepActionId(nextAction.id)) {
+        return;
+      }
+    }
+    const actualStartAtIso = new Date().toISOString();
     const payload = await apiRequest("/api/200/sleep-session/activate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        actionId: action.id,
+        actionId: nextAction.id,
         actualStartAt: actualStartAtIso
       }),
       skipGlobalLoading: true
@@ -5023,15 +5030,11 @@ async function activateSleepActionIfNeeded(action) {
       state.sleepFlow.pendingAction = payload.action;
     }
     await loadActions({
-      preserveSleepAction: state.sleepFlow.pendingAction || optimisticAction,
+      preserveSleepAction: state.sleepFlow.pendingAction || nextAction,
       silent: true
     });
     await ensureSleepFrequencyPlayback();
   } catch (error) {
-    state.sleepFlow.pendingAction = buildSleepFlowAction(action, action);
-    if (state.sleepFlow.pendingAction) {
-      upsertSleepActionIntoState(state.sleepFlow.pendingAction);
-    }
     if (sleepSessionSubtitle) {
       sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
     }
@@ -5066,7 +5069,7 @@ function renderSleepSessionModal() {
       sleepSessionTimeLabel.textContent = remainingMs > 0 ? formatSleepCountdown(remainingMs) : "00:00";
     }
     if (sleepSessionSubtitle) {
-      sleepSessionSubtitle.textContent = remainingMs > 0 ? "O sono começará após a contagem regressiva." : "Iniciando contagem do sono...";
+      sleepSessionSubtitle.textContent = remainingMs > 0 ? "O sono começará após a contagem regressiva." : "Preparando início do sono...";
     }
     void activateSleepActionIfNeeded(action);
   } else if (status === actionStatuses.inProgress) {
