@@ -570,6 +570,14 @@ const profileAvatarFileInput = document.getElementById("profileAvatarFileInput")
 const profileAvatarChooseButton = document.getElementById("profileAvatarChooseButton");
 const profileAvatarFileName = document.getElementById("profileAvatarFileName");
 const profileAvatarMessage = document.getElementById("profileAvatarMessage");
+const svgSelectorModal = document.getElementById("svgSelectorModal");
+const svgSelectorTitle = document.getElementById("svgSelectorTitle");
+const svgSelectorHint = document.getElementById("svgSelectorHint");
+const svgSelectorPreview = document.getElementById("svgSelectorPreview");
+const svgSelectorStatus = document.getElementById("svgSelectorStatus");
+const svgSelectorGrid = document.getElementById("svgSelectorGrid");
+const svgSelectorSaveButton = document.getElementById("svgSelectorSaveButton");
+const projectShell = document.querySelector(".project-shell");
 const loadingIconByArea = {
   actions: "/200/icons/acts.svg",
   missions: "/200/icons/target.svg",
@@ -630,7 +638,6 @@ let runningTaskTicker = null;
 let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
-let actionSvgSuggestTimer = null;
 let actionCategoryTargetActionId = "";
 let actionCategorySelectionId = "";
 let actionsTimeTicker = null;
@@ -707,11 +714,9 @@ let postponeNavLongPressHandled = false;
 let postponeFeedbackCarouselTimer = null;
 let runningMissionQuickFeedbackTimer = null;
 let runningMissionQuickFocusTimer = null;
-let missionSvgSuggestTimer = null;
-let missionCreateSuggestedIcon = null;
 let runningMissionQuickRequestChain = Promise.resolve();
-const pendingActionSvgSuggestionIds = new Set();
-const pendingMissionSvgSuggestionIds = new Set();
+let svgAssetLibraryPromise = null;
+const defaultTaskSvgPath = "/200/icons/task-default.svg";
 const defaultMissionSvgPath = "/200/icons/target.svg";
 
 const state = {
@@ -785,9 +790,16 @@ const state = {
   options: {
     showFreeTime: true,
     completionBeepCycles: 0,
-    backgroundTheme: "white",
+    backgroundTheme: "black",
     screenLockEnabled: false,
     stopMusicOnFinish: false
+  },
+  svgAssets: [],
+  svgSelector: {
+    targetKind: "",
+    targetId: "",
+    selectedUrl: "",
+    selectedLabel: ""
   },
   screenLock: {
     locked: false,
@@ -957,7 +969,7 @@ function normalizeBackgroundTheme(value) {
   if (normalized === "modern") {
     return "black";
   }
-  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "white";
+  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "black";
 }
 
 function getBackgroundThemeMode(value) {
@@ -1131,6 +1143,9 @@ function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
     return;
   }
   startupLoadingActive = true;
+  if (projectShell) {
+    projectShell.hidden = true;
+  }
   beginGlobalLoading(iconSrc);
 }
 
@@ -1139,6 +1154,9 @@ function endStartupLoading() {
     return;
   }
   startupLoadingActive = false;
+  if (projectShell) {
+    projectShell.hidden = false;
+  }
   endGlobalLoading();
 }
 
@@ -2161,7 +2179,7 @@ function renderHomeRunningTask() {
     if (homeRunningPercent) {
       homeRunningPercent.innerHTML = centerMarkup;
     }
-    const now = new Date();
+    const now = new Date(getServerNowMs());
     if (homeRunningDatePrimary) {
       homeRunningDatePrimary.textContent = formatHomeCalendarDate(now);
     }
@@ -2201,22 +2219,19 @@ function renderHomeRunningTask() {
   }
   if (!hasRunning) {
     state.runningPlayer.defaultAppliedActionId = "";
-    const now = new Date();
+    const now = new Date(getServerNowMs());
     const dayElapsedPercent = getDayElapsedPercent(now);
-    const showPercent = state.runningCenterMode === "percent";
-    const homeCenterMarkup = showPercent ? formatRunningPercentMarkup(dayElapsedPercent) : formatRunningClockMarkup(now);
+    const homeCenterMarkup = formatRunningClockMarkup(now);
     runningTaskName.innerHTML = formatRunningTaskTitleMarkup(formatRunningDateTitle(now));
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
     }
     setRunningRingPercent(dayElapsedPercent);
     runningTaskPercent.innerHTML = homeCenterMarkup;
-    runningTaskMinutesLeft.textContent = state.runningIdleTopMode === "percent"
-      ? `${Math.round(dayElapsedPercent)}% do dia já passou`
-      : "Toque aqui para ver % do dia";
+    runningTaskMinutesLeft.textContent = "Toque aqui para abrir em andamento";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     setRunningIdleVisualState(true);
-    updateRunningCenterModeButtons(showPercent ? "percent" : "time");
+    updateRunningCenterModeButtons("time");
     if (runningTaskNextLabel) {
       runningTaskNextLabel.classList.add("running-fade");
       runningTaskNextLabel.classList.remove("is-hidden");
@@ -3353,11 +3368,10 @@ function getActionDisplayIcon(action) {
       categoryIcon: true
     };
   }
-  const assignee = normalizeAssigneeName(action?.assignee || "");
   return {
-    src: getActionAvatarPath(assignee),
-    alt: `Avatar de ${assignee}`,
-    categoryIcon: false
+    src: defaultTaskSvgPath,
+    alt: "Ícone padrão da tarefa",
+    categoryIcon: true
   };
 }
 
@@ -4326,7 +4340,6 @@ async function loadActions(options = {}) {
     } catch {
       state.runtimeState = null;
     }
-    queueMissingActionSvgSuggestions(state.actions);
     renderActions();
     registerDayCloseEventIfNeeded();
   } catch (error) {
@@ -4483,10 +4496,6 @@ function closeWizard() {
     window.clearTimeout(actionCategoryInterpretTimer);
     actionCategoryInterpretTimer = null;
   }
-  if (actionSvgSuggestTimer) {
-    window.clearTimeout(actionSvgSuggestTimer);
-    actionSvgSuggestTimer = null;
-  }
   hideActionAiConfirmation();
   if (actionCategoryModal) {
     actionCategoryModal.classList.remove("active");
@@ -4577,6 +4586,138 @@ async function saveActionCategory(actionId, categoryId) {
     })
   })));
   await loadActions();
+}
+
+async function loadSvgAssetLibrary() {
+  if (!svgAssetLibraryPromise) {
+    svgAssetLibraryPromise = fetch("/200/svg-hub-manifest.json")
+      .then((response) => response.json())
+      .then((payload) => Array.isArray(payload?.assets) ? payload.assets : [])
+      .catch(() => []);
+  }
+  return await svgAssetLibraryPromise;
+}
+
+function setSvgSelectorPreview(url = "", label = "") {
+  if (!svgSelectorPreview) {
+    return;
+  }
+  const safeUrl = String(url || "").trim().replaceAll("'", "%27");
+  svgSelectorPreview.style.setProperty("--task-avatar-icon", `url('${safeUrl}')`);
+  svgSelectorPreview.setAttribute("aria-label", label || "Preview do SVG");
+}
+
+function renderSvgSelectorModal() {
+  if (!svgSelectorGrid) {
+    return;
+  }
+  const assets = Array.isArray(state.svgAssets) ? state.svgAssets : [];
+  const selectedUrl = String(state.svgSelector?.selectedUrl || "").trim();
+  svgSelectorGrid.innerHTML = "";
+  assets.forEach((asset) => {
+    const fileName = String(asset?.fileName || "").trim();
+    if (!fileName) {
+      return;
+    }
+    const assetUrl = `/200/svg-hub/${encodeURIComponent(fileName)}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `svg-selector-item${selectedUrl === assetUrl ? " is-selected" : ""}`;
+    button.dataset.svgUrl = assetUrl;
+    button.dataset.svgLabel = String(asset?.label || asset?.id || "SVG").trim();
+    button.innerHTML = buildTaskAvatarMarkup(assetUrl, String(asset?.label || "SVG"), { categoryIcon: true });
+    svgSelectorGrid.appendChild(button);
+  });
+  setSvgSelectorPreview(selectedUrl, String(state.svgSelector?.selectedLabel || "").trim());
+}
+
+async function openSvgSelectorModal(targetKind, targetId) {
+  state.svgSelector.targetKind = String(targetKind || "").trim();
+  state.svgSelector.targetId = String(targetId || "").trim();
+  if (svgSelectorTitle) {
+    svgSelectorTitle.textContent = targetKind === "mission" ? "SVG da missão" : "SVG da tarefa";
+  }
+  if (svgSelectorHint) {
+    svgSelectorHint.textContent = targetKind === "mission"
+      ? "Escolha um SVG da biblioteca para salvar nesta missão."
+      : "Escolha um SVG da biblioteca para salvar nesta tarefa.";
+  }
+  if (svgSelectorStatus) {
+    svgSelectorStatus.textContent = "Carregando SVGs...";
+  }
+  if (targetKind === "mission") {
+    const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === String(targetId || ""));
+    state.svgSelector.selectedUrl = String(goal?.svgIconUrl || "").trim() || defaultMissionSvgPath;
+    state.svgSelector.selectedLabel = String(goal?.svgIconLabel || goal?.title || "Ícone da missão").trim();
+  } else {
+    const action = (Array.isArray(state.actions) ? state.actions : []).find((item) => String(item.id || "") === String(targetId || ""));
+    state.svgSelector.selectedUrl = String(action?.svgIconUrl || "").trim() || defaultTaskSvgPath;
+    state.svgSelector.selectedLabel = String(action?.svgIconLabel || action?.title || "Ícone da tarefa").trim();
+  }
+  renderSvgSelectorModal();
+  openModal("svgSelectorModal");
+  state.svgAssets = await loadSvgAssetLibrary();
+  renderSvgSelectorModal();
+  if (svgSelectorStatus) {
+    svgSelectorStatus.textContent = "";
+  }
+}
+
+async function saveSvgSelectorChoice() {
+  const targetKind = String(state.svgSelector?.targetKind || "").trim();
+  const targetId = String(state.svgSelector?.targetId || "").trim();
+  const selectedUrl = String(state.svgSelector?.selectedUrl || "").trim();
+  const selectedLabel = String(state.svgSelector?.selectedLabel || "").trim();
+  if (!targetKind || !targetId || !selectedUrl) {
+    return;
+  }
+  if (svgSelectorStatus) {
+    svgSelectorStatus.textContent = "Salvando SVG...";
+  }
+  if (targetKind === "mission") {
+    const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === targetId);
+    const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(targetId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+        targetValue: Math.max(1, Math.trunc(Number(goal?.targetValue || 1) || 1)),
+        svgIconUrl: selectedUrl,
+        svgIconLabel: selectedLabel
+      })
+    });
+    if (Array.isArray(payload?.goals)) {
+      state.missions = payload.goals;
+      renderMissions();
+      renderRunningMissionQuickButtons();
+    }
+  } else {
+    const action = (Array.isArray(state.actions) ? state.actions : []).find((item) => String(item.id || "") === targetId);
+    if (!action) {
+      return;
+    }
+    const payload = await apiRequest(`/api/actions/${encodeURIComponent(targetId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: action.title,
+        assignee: action.assignee,
+        categoryId: String(action.categoryId || "").trim().toLowerCase(),
+        svgIconUrl: selectedUrl,
+        svgIconLabel: selectedLabel,
+        occurrences: [{ startAt: action.startAt, endAt: action.endAt }]
+      })
+    });
+    if (payload?.action) {
+      updateActionInState(payload.action);
+      renderActions();
+      renderHomeRunningTask();
+    }
+  }
+  if (svgSelectorStatus) {
+    svgSelectorStatus.textContent = "SVG salvo.";
+  }
+  window.setTimeout(() => closeModal("svgSelectorModal"), 180);
 }
 
 function renderWizard() {
@@ -5432,36 +5573,6 @@ function updateMissionInState(nextGoal) {
   ));
 }
 
-async function requestActionSvgSuggestion(actionId) {
-  const safeActionId = String(actionId || "").trim();
-  if (!safeActionId || pendingActionSvgSuggestionIds.has(safeActionId)) {
-    return;
-  }
-  pendingActionSvgSuggestionIds.add(safeActionId);
-  try {
-    const payload = await apiRequest(`/api/actions/${encodeURIComponent(safeActionId)}/svg-icon/suggest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({})
-    });
-    if (payload?.action) {
-      updateActionInState(payload.action);
-      renderActions();
-    }
-  } catch {} finally {
-    pendingActionSvgSuggestionIds.delete(safeActionId);
-  }
-}
-
-function queueMissingActionSvgSuggestions(actions = state.actions) {
-  (Array.isArray(actions) ? actions : []).forEach((action) => {
-    if (!action || String(action.svgIconUrl || "").trim() || !String(action.title || "").trim()) {
-      return;
-    }
-    void requestActionSvgSuggestion(action.id);
-  });
-}
-
 async function loadProject200Profiles() {
   const payload = await apiRequestWithTimeout("/api/200/profiles", {}, 7000);
   state.profiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
@@ -5485,7 +5596,6 @@ function shouldRefreshHomeSnapshot(force = false) {
 
 async function refreshHomeSnapshot(options = {}) {
   const force = options?.force === true;
-  renderHomeRunningTask();
   if (!shouldRefreshHomeSnapshot(force)) {
     return;
   }
@@ -7587,7 +7697,6 @@ async function loadMissions() {
   try {
     const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}`);
     state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
-    queueMissingMissionSvgSuggestions(state.missions);
     if (missionStatus) {
       missionStatus.textContent = "";
     }
@@ -7597,39 +7706,6 @@ async function loadMissions() {
       missionStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar missões.";
     }
   }
-}
-
-async function requestMissionSvgSuggestion(goalId) {
-  const safeGoalId = String(goalId || "").trim();
-  if (!safeGoalId || pendingMissionSvgSuggestionIds.has(safeGoalId)) {
-    return;
-  }
-  pendingMissionSvgSuggestionIds.add(safeGoalId);
-  try {
-    const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(safeGoalId)}/svg-icon/suggest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        profile: String(state.selectedProfile || getDefaultProfileName()).trim()
-      })
-    });
-    if (payload?.goal) {
-      updateMissionInState(payload.goal);
-      renderMissions();
-      renderRunningMissionQuickButtons();
-    }
-  } catch {} finally {
-    pendingMissionSvgSuggestionIds.delete(safeGoalId);
-  }
-}
-
-function queueMissingMissionSvgSuggestions(goals = state.missions) {
-  (Array.isArray(goals) ? goals : []).forEach((goal) => {
-    if (!goal || String(goal.svgIconUrl || "").trim() || !String(goal.title || "").trim()) {
-      return;
-    }
-    void requestMissionSvgSuggestion(goal.id);
-  });
 }
 
 function buildDefaultMissionQuickSlots() {
@@ -8639,11 +8715,6 @@ function openMissionCreateModal() {
   if (missionCreateStatus) {
     missionCreateStatus.textContent = "";
   }
-  missionCreateSuggestedIcon = null;
-  if (missionSvgSuggestTimer) {
-    window.clearTimeout(missionSvgSuggestTimer);
-    missionSvgSuggestTimer = null;
-  }
   openModal("missionCreateModal");
   window.setTimeout(() => missionTitleInput?.focus(), 60);
 }
@@ -9339,15 +9410,6 @@ if (window.history && typeof window.history.pushState === "function") {
   } catch {}
 }
 
-async function suggestSvgIconFromText(text, kind = "task") {
-  const payload = await apiRequest("/api/200/svg-icons/suggest", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, kind })
-  });
-  return payload?.asset || null;
-}
-
 function getTaskBeepAudioContext() {
   if (typeof window === "undefined") {
     return null;
@@ -9672,9 +9734,6 @@ taskTitle?.addEventListener("input", () => {
   if (actionCategoryInterpretTimer) {
     window.clearTimeout(actionCategoryInterpretTimer);
   }
-  if (actionSvgSuggestTimer) {
-    window.clearTimeout(actionSvgSuggestTimer);
-  }
   const title = taskTitle.value.trim();
   if (!title) {
     state.wizard.categoryId = "";
@@ -9686,19 +9745,6 @@ taskTitle?.addEventListener("input", () => {
   }
   actionCategoryInterpretTimer = window.setTimeout(() => {
     void interpretActionCategoryFromTitle(title);
-  }, 3000);
-  actionSvgSuggestTimer = window.setTimeout(() => {
-    void (async () => {
-      try {
-        const asset = await suggestSvgIconFromText(title, "task");
-        if (!asset || taskTitle.value.trim() !== title) {
-          return;
-        }
-        state.wizard.svgIconUrl = String(asset.url || "").trim();
-        state.wizard.svgIconLabel = String(asset.label || "").trim();
-        renderActionCategoryPicker();
-      } catch {}
-    })();
   }, 3000);
 });
 closePlatformWizardButton?.addEventListener("click", closePlatformWizard);
@@ -10038,14 +10084,7 @@ actionsList.addEventListener("click", async (event) => {
   }
   const clickedAvatar = event.target.closest(".task-avatar");
   if (clickedAvatar) {
-    const action = state.actions.find((item) => String(item.id) === String(row.dataset.actionId));
-    state.wizard.categoryId = String(action?.categoryId || "").trim().toLowerCase();
-    state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
-    actionCategorySelectionId = String(state.wizard.categoryId || "").trim().toLowerCase();
-    actionCategoryTargetActionId = String(row.dataset.actionId || "");
-    renderActionCategoryPicker();
-    renderActionCategoryModal();
-    openModal("actionCategoryModal");
+    void openSvgSelectorModal("task", row.dataset.actionId || "");
     return;
   }
   const actionId = row.dataset.actionId;
@@ -10192,6 +10231,12 @@ constitutionAvatars?.addEventListener("click", (event) => {
 });
 
 missionList?.addEventListener("click", (event) => {
+  const avatar = event.target.closest(".task-avatar");
+  const missionCard = event.target.closest("[data-goal-id]");
+  if (avatar && missionCard) {
+    void openSvgSelectorModal("mission", missionCard.dataset.goalId || "");
+    return;
+  }
   const adjustButton = event.target.closest("[data-mission-goal-adjust]");
   if (adjustButton) {
     const goalId = String(adjustButton.dataset.missionGoalAdjust || "").trim();
@@ -10219,31 +10264,9 @@ statsMissionsList?.addEventListener("click", (event) => {
 openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
 openMissionCreateButton?.addEventListener("click", openMissionCreateModal);
 missionTitleInput?.addEventListener("input", () => {
-  if (missionSvgSuggestTimer) {
-    window.clearTimeout(missionSvgSuggestTimer);
+  if (missionCreateStatus) {
+    missionCreateStatus.textContent = "";
   }
-  const title = String(missionTitleInput?.value || "").trim();
-  missionCreateSuggestedIcon = null;
-  if (!title) {
-    if (missionCreateStatus) {
-      missionCreateStatus.textContent = "";
-    }
-    return;
-  }
-  missionSvgSuggestTimer = window.setTimeout(() => {
-    void (async () => {
-      try {
-        const asset = await suggestSvgIconFromText(title, "mission");
-        if (!asset || String(missionTitleInput?.value || "").trim() !== title) {
-          return;
-        }
-        missionCreateSuggestedIcon = asset;
-        if (missionCreateStatus) {
-          missionCreateStatus.textContent = `SVG sugerido: ${asset.label}`;
-        }
-      } catch {}
-    })();
-  }, 3000);
 });
 missionCreateConfirmButton?.addEventListener("click", () => {
   void (async () => {
@@ -10272,8 +10295,8 @@ missionCreateConfirmButton?.addEventListener("click", () => {
           title,
           targetValue,
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          svgIconUrl: String(missionCreateSuggestedIcon?.url || "").trim(),
-          svgIconLabel: String(missionCreateSuggestedIcon?.label || "").trim()
+          svgIconUrl: "",
+          svgIconLabel: ""
         })
       });
       closeModal("missionCreateModal");
@@ -10520,9 +10543,6 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
       closeModal("missionAdjustModal");
       await loadMissions();
       renderMissions();
-      if (!String(goal?.svgIconUrl || "").trim()) {
-        void requestMissionSvgSuggestion(goalId);
-      }
     } catch (error) {
       if (missionAdjustStatus) {
         missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
@@ -10554,10 +10574,6 @@ missionProgressConfirmButton?.addEventListener("click", () => {
       await loadMissions();
       renderMissions();
       renderRunningMissionQuickButtons();
-      const updatedGoal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId);
-      if (updatedGoal && !String(updatedGoal.svgIconUrl || "").trim()) {
-        void requestMissionSvgSuggestion(goalId);
-      }
     } catch (error) {
       if (missionProgressStatus) {
         missionProgressStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar progresso.";
@@ -10616,6 +10632,20 @@ runningMissionQuickGrid?.addEventListener("click", (event) => {
 
 closeRunningMissionQuickModalButton?.addEventListener("click", () => {
   closeModal("runningMissionQuickModal");
+});
+
+svgSelectorGrid?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-svg-url]");
+  if (!button) {
+    return;
+  }
+  state.svgSelector.selectedUrl = String(button.dataset.svgUrl || "").trim();
+  state.svgSelector.selectedLabel = String(button.dataset.svgLabel || "").trim();
+  renderSvgSelectorModal();
+});
+
+svgSelectorSaveButton?.addEventListener("click", () => {
+  void saveSvgSelectorChoice();
 });
 
 openHistoryTextComposerButton?.addEventListener("click", openHistoryTextComposer);

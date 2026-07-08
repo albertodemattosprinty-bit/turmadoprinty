@@ -53,7 +53,7 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual, updateUserActionSvgIcon } from "./src/actions.js";
+import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession } from "./src/project200-sleep.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
@@ -62,7 +62,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, getExtraGoalById, listExtraGoals, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalSvgIcon } from "./src/extra-goals.js";
+import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 
@@ -3839,102 +3839,6 @@ async function handleProject200ProfileSvgSuggestRequest(request, response, profi
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel escolher o SVG do usuario."
-    });
-  }
-}
-
-async function handleProject200ActionSvgSuggestRequest(request, response, actionId) {
-  const authUser = await requireAuth(request, response);
-  if (!authUser) {
-    return;
-  }
-
-  try {
-    const action = await getUserActionById(authUser.id, actionId);
-    if (!action) {
-      sendJson(response, 404, { error: "Tarefa nao encontrada." });
-      return;
-    }
-    if (String(action.svgIconUrl || "").trim()) {
-      sendJson(response, 200, {
-        ok: true,
-        action,
-        asset: {
-          url: action.svgIconUrl,
-          label: String(action.svgIconLabel || action.title || "").trim()
-        }
-      });
-      return;
-    }
-    const asset = await suggestProject200SvgAsset(action.title, { kind: "task" });
-    if (!asset) {
-      sendJson(response, 404, { error: "Nenhum SVG encontrado." });
-      return;
-    }
-    const updatedAction = await updateUserActionSvgIcon(authUser.id, action.id, {
-      svgIconUrl: asset.url,
-      svgIconLabel: asset.label
-    });
-    sendJson(response, 200, {
-      ok: true,
-      action: updatedAction,
-      asset
-    });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel escolher o SVG da tarefa."
-    });
-  }
-}
-
-async function handleProject200ExtraGoalSvgSuggestRequest(request, response, goalId) {
-  const authUser = await requireAuth(request, response);
-  if (!authUser) {
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    body = {};
-  }
-
-  try {
-    const selectedProfile = await resolveProject200ProfileName(authUser.id, body?.profile, { fallbackToDefault: true });
-    const goal = await getExtraGoalById(authUser.id, selectedProfile, goalId);
-    if (!goal) {
-      sendJson(response, 404, { error: "Missao nao encontrada." });
-      return;
-    }
-    if (String(goal.svgIconUrl || "").trim()) {
-      sendJson(response, 200, {
-        ok: true,
-        goal,
-        asset: {
-          url: goal.svgIconUrl,
-          label: String(goal.svgIconLabel || goal.title || "").trim()
-        }
-      });
-      return;
-    }
-    const asset = await suggestProject200SvgAsset(goal.title, { kind: "mission" });
-    if (!asset) {
-      sendJson(response, 404, { error: "Nenhum SVG encontrado." });
-      return;
-    }
-    const updatedGoal = await updateExtraGoalSvgIcon(authUser.id, selectedProfile, goal.id, {
-      svgIconUrl: asset.url,
-      svgIconLabel: asset.label
-    });
-    sendJson(response, 200, {
-      ok: true,
-      goal: updatedGoal,
-      asset
-    });
-  } catch (error) {
-    sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Nao foi possivel escolher o SVG da missao."
     });
   }
 }
@@ -11216,14 +11120,6 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && pathname.startsWith("/api/200/extra-goals/") && pathname.endsWith("/svg-icon/suggest")) {
-    const goalId = decodeURIComponent(
-      pathname.slice("/api/200/extra-goals/".length, pathname.length - "/svg-icon/suggest".length)
-    );
-    await handleProject200ExtraGoalSvgSuggestRequest(request, response, goalId);
-    return;
-  }
-
   if (request.method === "POST" && pathname.startsWith("/api/200/profiles/") && pathname.endsWith("/avatar/upload")) {
     const profileId = decodeURIComponent(
       pathname.slice("/api/200/profiles/".length, pathname.length - "/avatar/upload".length)
@@ -11956,18 +11852,6 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel excluir a acao."
-      });
-    }
-    return;
-  }
-
-  if (request.method === "POST" && pathname.match(/^\/api\/actions\/[^/]+\/svg-icon\/suggest$/)) {
-    try {
-      const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)\/svg-icon\/suggest$/, "$1"));
-      await handleProject200ActionSvgSuggestRequest(request, response, actionId);
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel escolher o SVG da tarefa."
       });
     }
     return;

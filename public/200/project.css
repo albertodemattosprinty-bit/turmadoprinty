@@ -2304,6 +2304,88 @@ body.running-music-standalone #actionsModal .actions-list {
   display: block;
 }
 
+#svgSelectorModal.workspace-modal {
+  display: none;
+}
+
+#svgSelectorModal.workspace-modal.active {
+  display: block;
+}
+
+.svg-selector-content {
+  width: 100vw;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  box-shadow: none;
+  padding: 28px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(5, 7, 15, 0.98), rgba(16, 23, 41, 0.98));
+}
+
+.svg-selector-header {
+  display: grid;
+  gap: 8px;
+  padding-right: 56px;
+}
+
+.svg-selector-preview {
+  display: grid;
+  place-items: center;
+}
+
+.svg-selector-preview-icon {
+  width: 76px;
+  height: 76px;
+}
+
+.svg-selector-grid {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding-right: 4px;
+  align-content: start;
+}
+
+.svg-selector-item {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.svg-selector-item:hover,
+.svg-selector-item:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.svg-selector-item.is-selected {
+  border-color: rgba(125, 240, 110, 0.9);
+  background: rgba(125, 240, 110, 0.18);
+}
+
+.svg-selector-item .task-avatar {
+  width: 62px;
+  height: 62px;
+}
+
+.svg-selector-actions {
+  display: grid;
+  gap: 10px;
+}
+
 #runningMissionQuickModal.workspace-modal {
   display: none;
   place-items: center;
@@ -4658,6 +4740,34 @@ body[data-background-theme="white"] .global-loading-overlay {
     linear-gradient(145deg, #f8f8f5 0%, #f2f2ed 48%, #ecece7 100%);
 }
 
+body[data-background-theme="orange"] .svg-selector-content { background: linear-gradient(145deg, rgba(255, 122, 24, 0.96), rgba(194, 24, 7, 0.97)); }
+body[data-background-theme="bluevivid"] .svg-selector-content { background: linear-gradient(145deg, rgba(22, 163, 255, 0.96), rgba(0, 55, 196, 0.97)); }
+body[data-background-theme="pinkstrong"] .svg-selector-content { background: linear-gradient(145deg, rgba(255, 47, 146, 0.96), rgba(177, 12, 83, 0.97)); }
+body[data-background-theme="bluedark"] .svg-selector-content { background: linear-gradient(145deg, rgba(13, 45, 143, 0.96), rgba(2, 13, 55, 0.98)); }
+body[data-background-theme="brown"] .svg-selector-content { background: linear-gradient(145deg, rgba(158, 90, 45, 0.96), rgba(49, 20, 11, 0.98)); }
+body[data-background-theme="edge"] .svg-selector-content { background: linear-gradient(145deg, rgba(0, 183, 255, 0.96), rgba(35, 209, 161, 0.96)); }
+body[data-background-theme="light"] .svg-selector-content { background: rgba(16, 51, 118, 0.94); }
+body[data-background-theme="white"] .svg-selector-content {
+  background: linear-gradient(145deg, rgba(248, 248, 245, 0.98), rgba(236, 236, 231, 0.98));
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .svg-selector-item {
+  border-color: rgba(47, 54, 64, 0.14);
+  background: rgba(47, 54, 64, 0.04);
+}
+
+body[data-background-theme="white"] .svg-selector-item:hover,
+body[data-background-theme="white"] .svg-selector-item:focus-visible {
+  border-color: rgba(47, 54, 64, 0.26);
+  background: rgba(47, 54, 64, 0.08);
+}
+
+body[data-background-theme="white"] .svg-selector-item.is-selected {
+  border-color: rgba(17, 154, 69, 0.82);
+  background: rgba(17, 154, 69, 0.12);
+}
+
 body[data-background-theme="white"] .global-loading-icon {
   filter: brightness(0) saturate(0) invert(20%) sepia(8%) saturate(536%) hue-rotate(176deg) brightness(94%) contrast(86%);
 }
@@ -5463,4 +5573,14 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
 
 .chip-btn-danger {
   background: #7f1d1d;
+}
+
+@media (min-width: 960px) {
+  .svg-selector-content {
+    padding-inline: 32px;
+  }
+
+  .svg-selector-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }

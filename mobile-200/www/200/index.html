@@ -713,6 +713,28 @@
     </div>
   </section>
 
+  <section class="workspace-modal" id="svgSelectorModal" aria-hidden="true" aria-label="Selecionar SVG">
+    <div class="svg-selector-content">
+      <button class="modal-close" type="button" data-close-modal aria-label="Fechar seletor de SVG"><svg viewBox="0 0 24 24"><path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <div class="svg-selector-header">
+        <div class="running-music-default-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span id="svgSelectorTitle">Escolher SVG</span>
+        </div>
+        <p class="options-note" id="svgSelectorHint">Escolha um SVG da lista para salvar neste item.</p>
+      </div>
+      <div class="svg-selector-preview">
+        <span class="task-avatar task-avatar-category svg-selector-preview-icon" id="svgSelectorPreview" role="img" aria-label="Preview do SVG"></span>
+      </div>
+      <p class="finance-status" id="svgSelectorStatus" aria-live="polite"></p>
+      <div class="svg-selector-grid" id="svgSelectorGrid"></div>
+      <div class="svg-selector-actions">
+        <button class="primary-btn" type="button" id="svgSelectorSaveButton">Salvar SVG</button>
+        <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Cancelar</button>
+      </div>
+    </div>
+  </section>
+
   <section class="workspace-modal simple-modal" id="project200CreateProfileModal" aria-hidden="true" aria-label="Criar usuário do Projeto 200">
     <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
     <div class="finance-content options-content">
@@ -1171,7 +1193,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260708-sleep-rebuild-1"></script>
+  <script type="module" src="/200/project.js?v=20260708-svg-selector-1"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>
