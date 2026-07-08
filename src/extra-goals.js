@@ -76,6 +76,73 @@ function getDefaultExtraGoalOrder(title) {
   return index >= 0 ? index : Number.POSITIVE_INFINITY;
 }
 
+async function getStoredExtraGoalSvgDefault(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, title = "") {
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeTitle = normalizeExtraGoalTitle(title);
+  if (!safeTitle) {
+    return null;
+  }
+  const result = await query(
+    `
+      select svg_icon_url, svg_icon_label
+      from extra_goal_svg_defaults
+      where user_id = $1
+        and assigned_profile = $2
+        and title = $3
+      limit 1
+    `,
+    [userId, normalizedProfile, safeTitle]
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+  return {
+    svgIconUrl: String(row.svg_icon_url || "").trim(),
+    svgIconLabel: String(row.svg_icon_label || "").trim()
+  };
+}
+
+async function saveExtraGoalSvgDefault(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, title = "", svgIconUrl = "", svgIconLabel = "") {
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeTitle = normalizeExtraGoalTitle(title);
+  if (!safeTitle) {
+    return;
+  }
+  await query(
+    `
+      insert into extra_goal_svg_defaults (user_id, assigned_profile, title, svg_icon_url, svg_icon_label, updated_at)
+      values ($1, $2, $3, $4, $5, now())
+      on conflict (user_id, assigned_profile, title)
+      do update
+         set svg_icon_url = excluded.svg_icon_url,
+             svg_icon_label = excluded.svg_icon_label,
+             updated_at = now()
+    `,
+    [userId, normalizedProfile, safeTitle, String(svgIconUrl || "").trim(), String(svgIconLabel || "").trim()]
+  );
+}
+
+async function applyExtraGoalSvgDefaultToMatchingGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, title = "", svgIconUrl = "", svgIconLabel = "") {
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeTitle = normalizeExtraGoalTitle(title);
+  if (!safeTitle) {
+    return;
+  }
+  await query(
+    `
+      update extra_goals
+         set svg_icon_url = $4,
+             svg_icon_label = $5,
+             updated_at = now()
+       where user_id = $1
+         and assigned_profile = $2
+         and title = $3
+    `,
+    [userId, normalizedProfile, safeTitle, String(svgIconUrl || "").trim(), String(svgIconLabel || "").trim()]
+  );
+}
+
 async function ensureDefaultExtraGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
@@ -93,14 +160,22 @@ async function ensureDefaultExtraGoals(userId, profileName = PROJECT200_DEFAULT_
     return;
   }
   for (const goal of DEFAULT_EXTRA_GOALS) {
+    const storedSvgDefault = await getStoredExtraGoalSvgDefault(userId, normalizedProfile, goal.title);
     await query(
       `
         insert into extra_goals (
-          user_id, assigned_profile, title, target_value, progress_value, progress_date, created_at, updated_at
+          user_id, assigned_profile, title, target_value, svg_icon_url, svg_icon_label, progress_value, progress_date, created_at, updated_at
         )
-        values ($1, $2, $3, $4, 0, null, now(), now())
+        values ($1, $2, $3, $4, $5, $6, 0, null, now(), now())
       `,
-      [userId, normalizedProfile, normalizeExtraGoalTitle(goal.title), Math.max(1, Math.trunc(Number(goal.targetValue) || 1))]
+      [
+        userId,
+        normalizedProfile,
+        normalizeExtraGoalTitle(goal.title),
+        Math.max(1, Math.trunc(Number(goal.targetValue) || 1)),
+        String(storedSvgDefault?.svgIconUrl || "").trim(),
+        String(storedSvgDefault?.svgIconLabel || "").trim()
+      ]
     );
   }
   await query(
@@ -169,6 +244,18 @@ export async function ensureExtraGoalsSchema() {
     group by user_id, assigned_profile
     on conflict (user_id, assigned_profile) do nothing
   `);
+  await query(`
+    create table if not exists extra_goal_svg_defaults (
+      user_id uuid not null references users(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      title text not null,
+      svg_icon_url text not null default '',
+      svg_icon_label text not null default '',
+      updated_at timestamptz not null default now(),
+      primary key (user_id, assigned_profile, title)
+    );
+  `);
+  await query("create index if not exists idx_extra_goal_svg_defaults_user_profile on extra_goal_svg_defaults(user_id, assigned_profile, updated_at desc);");
 }
 
 export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, date = new Date()) {
@@ -250,8 +337,9 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
   const title = normalizeExtraGoalTitle(payload?.title);
   const targetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
-  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
-  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
+  const storedSvgDefault = await getStoredExtraGoalSvgDefault(userId, normalizedProfile, title);
+  const svgIconUrl = String(payload?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
   if (!title) {
     throw new Error("Informe o nome da missao.");
   }
@@ -267,6 +355,9 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
     `,
     [userId, normalizedProfile, title, targetValue, svgIconUrl, svgIconLabel]
   );
+  if (svgIconUrl) {
+    await saveExtraGoalSvgDefault(userId, normalizedProfile, title, svgIconUrl, svgIconLabel);
+  }
   return listExtraGoals(userId, normalizedProfile);
 }
 
@@ -328,8 +419,11 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
     throw new Error("Missao invalida.");
   }
   const nextTargetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
-  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
-  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
+  const currentGoal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
+  const currentTitle = normalizeExtraGoalTitle(currentGoal?.title || payload?.title);
+  const storedSvgDefault = await getStoredExtraGoalSvgDefault(userId, normalizedProfile, currentTitle);
+  const svgIconUrl = String(payload?.svgIconUrl || currentGoal?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || currentGoal?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
   if (!nextTargetValue) {
     throw new Error("Informe a unidade diaria da missao.");
   }
@@ -346,6 +440,10 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
     `,
     [safeGoalId, userId, normalizedProfile, nextTargetValue, svgIconUrl, svgIconLabel]
   );
+  if (svgIconUrl && currentTitle) {
+    await saveExtraGoalSvgDefault(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
+    await applyExtraGoalSvgDefaultToMatchingGoals(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
+  }
   return listExtraGoals(userId, normalizedProfile);
 }
 
@@ -373,6 +471,12 @@ export async function updateExtraGoalSvgIcon(userId, profileName = PROJECT200_DE
   );
   if (!result.rows[0]) {
     throw new Error("Missao nao encontrada.");
+  }
+  const currentGoal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
+  const currentTitle = normalizeExtraGoalTitle(currentGoal?.title || "");
+  if (svgIconUrl && currentTitle) {
+    await saveExtraGoalSvgDefault(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
+    await applyExtraGoalSvgDefaultToMatchingGoals(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
   }
   return getExtraGoalById(userId, normalizedProfile, safeGoalId);
 }

@@ -2413,6 +2413,7 @@ async function loadRunningMusicStations() {
   } else {
     state.runningPlayer.stationIndex = 0;
   }
+  ensureRunningStationHasTracks(previousStationName);
   syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
 
   try {
@@ -2427,6 +2428,7 @@ async function loadRunningMusicStations() {
         ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
         : -1;
       state.runningPlayer.stationIndex = refreshedStationIndex >= 0 ? refreshedStationIndex : 0;
+      ensureRunningStationHasTracks(previousStationName);
       syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
     }
   } catch {
@@ -2440,6 +2442,50 @@ async function loadRunningMusicStations() {
 
 function getCurrentRunningStation() {
   return state.runningPlayer.stations[state.runningPlayer.stationIndex] || null;
+}
+
+function getFirstRunningStationWithTracksIndex() {
+  return state.runningPlayer.stations.findIndex((station) =>
+    Array.isArray(station?.tracks) && station.tracks.some((track) => String(track?.url || "").trim())
+  );
+}
+
+function ensureRunningStationHasTracks(preferredStationName = "") {
+  const stations = Array.isArray(state.runningPlayer.stations) ? state.runningPlayer.stations : [];
+  if (!stations.length) {
+    state.runningPlayer.stationIndex = 0;
+    return null;
+  }
+
+  const currentIndex = Number.isFinite(state.runningPlayer.stationIndex) ? state.runningPlayer.stationIndex : 0;
+  const currentStation = stations[currentIndex] || null;
+  const currentHasTracks = Array.isArray(currentStation?.tracks) && currentStation.tracks.some((track) => String(track?.url || "").trim());
+  if (currentHasTracks) {
+    state.runningPlayer.stationIndex = currentIndex;
+    return currentStation;
+  }
+
+  const preferredName = String(preferredStationName || "").trim();
+  if (preferredName) {
+    const preferredIndex = stations.findIndex((station) =>
+      String(station?.name || "").trim() === preferredName
+      && Array.isArray(station?.tracks)
+      && station.tracks.some((track) => String(track?.url || "").trim())
+    );
+    if (preferredIndex >= 0) {
+      state.runningPlayer.stationIndex = preferredIndex;
+      return stations[preferredIndex];
+    }
+  }
+
+  const fallbackIndex = getFirstRunningStationWithTracksIndex();
+  if (fallbackIndex >= 0) {
+    state.runningPlayer.stationIndex = fallbackIndex;
+    return stations[fallbackIndex];
+  }
+
+  state.runningPlayer.stationIndex = 0;
+  return stations[0] || null;
 }
 
 function getRunningFavoriteSet() {
@@ -2820,7 +2866,7 @@ function renderRunningMusicList() {
     return;
   }
 
-  const station = getCurrentRunningStation();
+  const station = ensureRunningStationHasTracks();
   const track = getRunningPlaybackState().track || getCurrentRunningTrack();
   const tracks = getRunningDisplayedTracks(station);
   const preference = getRunningDefaultPreferenceForCurrentTask();

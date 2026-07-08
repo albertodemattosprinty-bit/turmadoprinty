@@ -54,6 +54,14 @@ function normalizeCategoryId(value) {
   return raw.replace(/[^a-z0-9_]/g, "");
 }
 
+function normalizeActionTitle(value) {
+  return String(value || "")
+    .normalize("NFC")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 160);
+}
+
 function toDateKey(value = new Date()) {
   const raw = String(value || "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
@@ -197,6 +205,17 @@ export async function ensureActionsSchema() {
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");
   await query("create index if not exists idx_actions_user_assignee on actions(user_id, assignee);");
   await query("create index if not exists idx_actions_sleep_session on actions(user_id, assignee, sleep_session_date);");
+  await query(`
+    create table if not exists action_svg_defaults (
+      user_id uuid not null references users(id) on delete cascade,
+      title text not null,
+      svg_icon_url text not null default '',
+      svg_icon_label text not null default '',
+      updated_at timestamptz not null default now(),
+      primary key (user_id, title)
+    );
+  `);
+  await query("create index if not exists idx_action_svg_defaults_user on action_svg_defaults(user_id, updated_at desc);");
 
   await query(`
     create table if not exists action_status_overrides (
@@ -227,6 +246,67 @@ export async function ensureActionsSchema() {
     );
   `);
   await query("create index if not exists idx_project200_runtime_state_user_time on project200_runtime_state(user_id, updated_at desc);");
+}
+
+async function getStoredActionSvgDefault(userId, title) {
+  const safeTitle = normalizeActionTitle(title);
+  if (!safeTitle) {
+    return null;
+  }
+  const result = await query(
+    `
+      select svg_icon_url, svg_icon_label
+      from action_svg_defaults
+      where user_id = $1
+        and title = $2
+      limit 1
+    `,
+    [userId, safeTitle]
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+  return {
+    svgIconUrl: String(row.svg_icon_url || "").trim(),
+    svgIconLabel: String(row.svg_icon_label || "").trim()
+  };
+}
+
+async function saveActionSvgDefault(userId, title, svgIconUrl = "", svgIconLabel = "") {
+  const safeTitle = normalizeActionTitle(title);
+  if (!safeTitle) {
+    return;
+  }
+  await query(
+    `
+      insert into action_svg_defaults (user_id, title, svg_icon_url, svg_icon_label, updated_at)
+      values ($1, $2, $3, $4, now())
+      on conflict (user_id, title)
+      do update
+         set svg_icon_url = excluded.svg_icon_url,
+             svg_icon_label = excluded.svg_icon_label,
+             updated_at = now()
+    `,
+    [userId, safeTitle, String(svgIconUrl || "").trim(), String(svgIconLabel || "").trim()]
+  );
+}
+
+async function applyActionSvgDefaultToMatchingActions(userId, title, svgIconUrl = "", svgIconLabel = "") {
+  const safeTitle = normalizeActionTitle(title);
+  if (!safeTitle) {
+    return;
+  }
+  await query(
+    `
+      update actions
+         set svg_icon_url = $3,
+             svg_icon_label = $4
+       where user_id = $1
+         and title = $2
+    `,
+    [userId, safeTitle, String(svgIconUrl || "").trim(), String(svgIconLabel || "").trim()]
+  );
 }
 
 function normalizeRuntimeState(row) {
@@ -556,11 +636,12 @@ export async function listUserActions(userId, { from, to }) {
 export async function createUserAction(userId, payload) {
   await ensureActionsSchema();
 
-  const title = String(payload?.title || "").trim();
+  const title = normalizeActionTitle(payload?.title);
   const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
   const categoryId = normalizeCategoryId(payload?.categoryId);
-  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
-  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
+  const storedSvgDefault = await getStoredActionSvgDefault(userId, title);
+  const svgIconUrl = String(payload?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
@@ -637,6 +718,10 @@ export async function createUserAction(userId, payload) {
     `,
     values
   );
+
+  if (svgIconUrl) {
+    await saveActionSvgDefault(userId, title, svgIconUrl, svgIconLabel);
+  }
 
   return result.rows.map(normalizeAction);
 }
@@ -725,7 +810,7 @@ function parseActionOccurrences(payload) {
 export async function setActionMusicDefaultByTitle(userId, title, payload = {}) {
   await ensureActionsSchema();
 
-  const safeTitle = String(title || "").trim();
+  const safeTitle = normalizeActionTitle(title);
   const defaultMode = String(payload?.mode || "").trim().toLowerCase() === "station" ? "station" : "track";
   const stationName = String(payload?.stationName || "").trim() || null;
   const trackName = String(payload?.trackName || "").trim() || null;
@@ -759,11 +844,12 @@ export async function updateUserAction(userId, actionId, payload) {
     throw new Error("Tarefa nao encontrada.");
   }
 
-  const title = String(payload?.title || "").trim();
+  const title = normalizeActionTitle(payload?.title || action?.title);
   const assignee = await resolveProject200ProfileName(userId, normalizeAssignee(payload?.assignee), { fallbackToDefault: true });
   const categoryId = normalizeCategoryId(payload?.categoryId || action?.categoryId);
-  const svgIconUrl = String(payload?.svgIconUrl || action?.svgIconUrl || "").trim();
-  const svgIconLabel = String(payload?.svgIconLabel || action?.svgIconLabel || "").trim();
+  const storedSvgDefault = await getStoredActionSvgDefault(userId, title);
+  const svgIconUrl = String(payload?.svgIconUrl || action?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || action?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
   const applyTo = String(payload?.applyTo || "").trim().toLowerCase() === "series" ? "series" : "single";
@@ -847,6 +933,10 @@ export async function updateUserAction(userId, actionId, payload) {
           ]
         );
       }
+      if (svgIconUrl) {
+        await saveActionSvgDefault(userId, title, svgIconUrl, svgIconLabel);
+        await applyActionSvgDefaultToMatchingActions(userId, title, svgIconUrl, svgIconLabel);
+      }
       return getUserActionById(userId, action.id);
     }
 
@@ -869,6 +959,10 @@ export async function updateUserAction(userId, actionId, payload) {
       occurrences
     });
     const preferred = created.find((item) => item.startAt === action.startAt) || created[0] || null;
+    if (svgIconUrl) {
+      await saveActionSvgDefault(userId, title, svgIconUrl, svgIconLabel);
+      await applyActionSvgDefaultToMatchingActions(userId, title, svgIconUrl, svgIconLabel);
+    }
     return preferred;
   }
 
@@ -931,6 +1025,11 @@ export async function updateUserAction(userId, actionId, payload) {
       `,
       [userId, action.id]
     );
+  }
+
+  if (svgIconUrl) {
+    await saveActionSvgDefault(userId, title, svgIconUrl, svgIconLabel);
+    await applyActionSvgDefaultToMatchingActions(userId, title, svgIconUrl, svgIconLabel);
   }
 
   return getUserActionById(userId, action.id);

@@ -12100,7 +12100,13 @@ const server = http.createServer(async (request, response) => {
     }
   }
 
-  const requestedPath = pathname === "/" ? "index.html" : pathname.slice(1);
+  let requestedPath = pathname === "/" ? "index.html" : pathname.slice(1);
+  try {
+    requestedPath = decodeURIComponent(requestedPath);
+  } catch {
+    // Keep the raw path when the URL is malformed.
+  }
+  requestedPath = requestedPath.replace(/^[/\\]+/, "");
   const resolvedPath = path.join(publicDir, requestedPath);
   const htmlResolvedPath = path.join(publicDir, `${requestedPath}.html`);
 
