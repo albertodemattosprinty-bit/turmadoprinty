@@ -282,7 +282,7 @@ export async function getProject200RuntimeState(userId) {
   return normalizeRuntimeState(result.rows[0]);
 }
 
-async function getUserActionById(userId, actionId) {
+export async function getUserActionById(userId, actionId) {
   const trimmedActionId = String(actionId || "").trim();
 
   if (!trimmedActionId) {
@@ -325,6 +325,31 @@ async function getUserActionById(userId, actionId) {
   );
 
   return result.rows[0] ? normalizeAction(result.rows[0]) : null;
+}
+
+export async function updateUserActionSvgIcon(userId, actionId, payload = {}) {
+  await ensureActionsSchema();
+  const safeActionId = String(actionId || "").trim();
+  if (!safeActionId) {
+    throw new Error("Tarefa nao encontrada.");
+  }
+  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
+  const result = await query(
+    `
+      update actions
+         set svg_icon_url = $3,
+             svg_icon_label = $4
+       where user_id = $1
+         and id = $2
+       returning id
+    `,
+    [userId, safeActionId, svgIconUrl, svgIconLabel]
+  );
+  if (!result.rows[0]) {
+    throw new Error("Tarefa nao encontrada.");
+  }
+  return getUserActionById(userId, safeActionId);
 }
 
 async function setActionCompletedAt(userId, action, completedAt) {

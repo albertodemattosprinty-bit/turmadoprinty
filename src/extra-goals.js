@@ -210,6 +210,41 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     });
 }
 
+export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, date = new Date()) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeGoalId = String(goalId || "").trim();
+  if (!safeGoalId) {
+    throw new Error("Missao invalida.");
+  }
+  const dateKey = toDateKey(date);
+  const result = await query(
+    `
+      select
+        id,
+        user_id,
+        assigned_profile,
+        title,
+        target_value,
+        svg_icon_url,
+        svg_icon_label,
+        progress_value,
+        progress_date,
+        to_char(progress_date, 'YYYY-MM-DD') as progress_date_key,
+        created_at,
+        updated_at
+      from extra_goals
+      where user_id = $1
+        and assigned_profile = $2
+        and id = $3
+      limit 1
+    `,
+    [userId, normalizedProfile, safeGoalId]
+  );
+  const row = result.rows[0];
+  return row ? normalizeExtraGoalRow(row, dateKey) : null;
+}
+
 export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, payload = {}) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
@@ -312,6 +347,34 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
     [safeGoalId, userId, normalizedProfile, nextTargetValue, svgIconUrl, svgIconLabel]
   );
   return listExtraGoals(userId, normalizedProfile);
+}
+
+export async function updateExtraGoalSvgIcon(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, payload = {}) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeGoalId = String(goalId || "").trim();
+  if (!safeGoalId) {
+    throw new Error("Missao invalida.");
+  }
+  const svgIconUrl = String(payload?.svgIconUrl || "").trim();
+  const svgIconLabel = String(payload?.svgIconLabel || "").trim();
+  const result = await query(
+    `
+      update extra_goals
+         set svg_icon_url = $4,
+             svg_icon_label = $5,
+             updated_at = now()
+       where id = $1
+         and user_id = $2
+         and assigned_profile = $3
+       returning id
+    `,
+    [safeGoalId, userId, normalizedProfile, svgIconUrl, svgIconLabel]
+  );
+  if (!result.rows[0]) {
+    throw new Error("Missao nao encontrada.");
+  }
+  return getExtraGoalById(userId, normalizedProfile, safeGoalId);
 }
 
 export async function deleteExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId) {

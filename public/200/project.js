@@ -710,6 +710,9 @@ let runningMissionQuickFocusTimer = null;
 let missionSvgSuggestTimer = null;
 let missionCreateSuggestedIcon = null;
 let runningMissionQuickRequestChain = Promise.resolve();
+const pendingActionSvgSuggestionIds = new Set();
+const pendingMissionSvgSuggestionIds = new Set();
+const defaultMissionSvgPath = "/200/icons/target.svg";
 
 const state = {
   activeOffset: 0,
@@ -3367,7 +3370,11 @@ function getMissionDisplayIcon(goal) {
       categoryIcon: true
     };
   }
-  return null;
+  return {
+    src: defaultMissionSvgPath,
+    alt: String(goal?.title || "Ícone da missão"),
+    categoryIcon: true
+  };
 }
 
 function getTaskCategoryIconPath(categoryId) {
@@ -4319,6 +4326,7 @@ async function loadActions(options = {}) {
     } catch {
       state.runtimeState = null;
     }
+    queueMissingActionSvgSuggestions(state.actions);
     renderActions();
     registerDayCloseEventIfNeeded();
   } catch (error) {
@@ -5398,6 +5406,60 @@ async function ensureProject200Session() {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function updateActionInState(nextAction) {
+  const actionId = String(nextAction?.id || "").trim();
+  if (!actionId) {
+    return;
+  }
+  state.actions = (Array.isArray(state.actions) ? state.actions : []).map((action) => (
+    String(action?.id || "").trim() === actionId
+      ? { ...action, ...nextAction }
+      : action
+  ));
+}
+
+function updateMissionInState(nextGoal) {
+  const goalId = String(nextGoal?.id || "").trim();
+  if (!goalId) {
+    return;
+  }
+  state.missions = (Array.isArray(state.missions) ? state.missions : []).map((goal) => (
+    String(goal?.id || "").trim() === goalId
+      ? { ...goal, ...nextGoal }
+      : goal
+  ));
+}
+
+async function requestActionSvgSuggestion(actionId) {
+  const safeActionId = String(actionId || "").trim();
+  if (!safeActionId || pendingActionSvgSuggestionIds.has(safeActionId)) {
+    return;
+  }
+  pendingActionSvgSuggestionIds.add(safeActionId);
+  try {
+    const payload = await apiRequest(`/api/actions/${encodeURIComponent(safeActionId)}/svg-icon/suggest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    if (payload?.action) {
+      updateActionInState(payload.action);
+      renderActions();
+    }
+  } catch {} finally {
+    pendingActionSvgSuggestionIds.delete(safeActionId);
+  }
+}
+
+function queueMissingActionSvgSuggestions(actions = state.actions) {
+  (Array.isArray(actions) ? actions : []).forEach((action) => {
+    if (!action || String(action.svgIconUrl || "").trim() || !String(action.title || "").trim()) {
+      return;
+    }
+    void requestActionSvgSuggestion(action.id);
+  });
 }
 
 async function loadProject200Profiles() {
@@ -7525,6 +7587,7 @@ async function loadMissions() {
   try {
     const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}`);
     state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
+    queueMissingMissionSvgSuggestions(state.missions);
     if (missionStatus) {
       missionStatus.textContent = "";
     }
@@ -7534,6 +7597,39 @@ async function loadMissions() {
       missionStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar missões.";
     }
   }
+}
+
+async function requestMissionSvgSuggestion(goalId) {
+  const safeGoalId = String(goalId || "").trim();
+  if (!safeGoalId || pendingMissionSvgSuggestionIds.has(safeGoalId)) {
+    return;
+  }
+  pendingMissionSvgSuggestionIds.add(safeGoalId);
+  try {
+    const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(safeGoalId)}/svg-icon/suggest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profile: String(state.selectedProfile || getDefaultProfileName()).trim()
+      })
+    });
+    if (payload?.goal) {
+      updateMissionInState(payload.goal);
+      renderMissions();
+      renderRunningMissionQuickButtons();
+    }
+  } catch {} finally {
+    pendingMissionSvgSuggestionIds.delete(safeGoalId);
+  }
+}
+
+function queueMissingMissionSvgSuggestions(goals = state.missions) {
+  (Array.isArray(goals) ? goals : []).forEach((goal) => {
+    if (!goal || String(goal.svgIconUrl || "").trim() || !String(goal.title || "").trim()) {
+      return;
+    }
+    void requestMissionSvgSuggestion(goal.id);
+  });
 }
 
 function buildDefaultMissionQuickSlots() {
@@ -10183,6 +10279,7 @@ missionCreateConfirmButton?.addEventListener("click", () => {
       closeModal("missionCreateModal");
       await loadMissions();
       renderMissions();
+      renderRunningMissionQuickButtons();
     } catch (error) {
       if (missionCreateStatus) {
         missionCreateStatus.textContent = error instanceof Error ? error.message : "Falha ao criar missão.";
@@ -10423,6 +10520,9 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
       closeModal("missionAdjustModal");
       await loadMissions();
       renderMissions();
+      if (!String(goal?.svgIconUrl || "").trim()) {
+        void requestMissionSvgSuggestion(goalId);
+      }
     } catch (error) {
       if (missionAdjustStatus) {
         missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
@@ -10454,6 +10554,10 @@ missionProgressConfirmButton?.addEventListener("click", () => {
       await loadMissions();
       renderMissions();
       renderRunningMissionQuickButtons();
+      const updatedGoal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId);
+      if (updatedGoal && !String(updatedGoal.svgIconUrl || "").trim()) {
+        void requestMissionSvgSuggestion(goalId);
+      }
     } catch (error) {
       if (missionProgressStatus) {
         missionProgressStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar progresso.";
