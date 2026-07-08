@@ -7249,14 +7249,19 @@ function createStatsPointRow(entry) {
   row.className = "task-row stats-point-row";
   row.dataset.statsAspectId = String(entry.id || "");
   row.innerHTML = `
-    <div class="stats-point-head">
-      <img class="stats-point-icon" src="${iconPath}" alt="${escapeHtml(entry.name)}" loading="lazy" />
-      <div class="task-main">
-        <div class="task-title">${escapeHtml(entry.name)}</div>
+    <div class="stats-point-layout">
+      <div class="stats-point-icon-wrap">
+        <img class="stats-point-icon" src="${iconPath}" alt="${escapeHtml(entry.name)}" loading="lazy" />
       </div>
-    </div>
-    <div class="stats-point-progress" aria-hidden="true">
-      <div class="stats-point-progress-fill" style="width:${progressPercent}%; background:linear-gradient(90deg, rgba(255,255,255,0.16) 0%, ${progressColor} 100%);"></div>
+      <div class="task-main">
+        <div class="stats-point-title-row">
+          <div class="task-title">${escapeHtml(entry.name)}</div>
+          <div class="stats-point-percent">${progressPercent}%</div>
+        </div>
+      </div>
+      <div class="stats-point-progress" aria-hidden="true">
+        <div class="stats-point-progress-fill" style="width:${progressPercent}%; background:linear-gradient(90deg, rgba(255,255,255,0.16) 0%, ${progressColor} 100%);"></div>
+      </div>
     </div>
   `;
   return row;
@@ -7682,7 +7687,7 @@ function getComputedSleepSessionSnapshot(session) {
     return null;
   }
   const scheduledStartAtMs = new Date(session.scheduledStartAt || "").getTime();
-  const nowMs = Date.now();
+  const nowMs = getServerNowMs();
   const hasStarted = Number.isFinite(scheduledStartAtMs) && nowMs >= scheduledStartAtMs;
   const trackedMinutes = hasStarted ? Math.max(0, Math.floor((nowMs - scheduledStartAtMs) / 60000)) : 0;
   const countdownRemainingSeconds = hasStarted || !Number.isFinite(scheduledStartAtMs)

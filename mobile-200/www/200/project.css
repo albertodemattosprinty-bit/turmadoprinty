@@ -343,12 +343,14 @@ body.project-no-select textarea {
 
 .project-hub {
   order: 3;
-  width: calc(100vw - 2px);
-  margin: auto auto max(0px, env(safe-area-inset-bottom, 0px));
-  padding: 12px 0 calc(10px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  margin: 0;
+  padding: 12px 2px calc(10px + env(safe-area-inset-bottom, 0px));
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
+  justify-items: stretch;
+  align-items: center;
   border-radius: 0;
   background: transparent;
   backdrop-filter: none;
@@ -3036,16 +3038,24 @@ body.running-music-standalone #actionsModal .actions-list {
 
 .task-row.stats-point-row {
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  padding: 14px 14px 16px;
+  gap: 0;
+  padding: 14px 14px 14px;
   cursor: default;
 }
 
-.stats-point-head {
+.stats-point-layout {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 14px;
   align-items: center;
+}
+
+.stats-point-icon-wrap {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
 }
 
 .stats-point-icon {
@@ -3055,8 +3065,15 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 .task-row.stats-point-row .task-main {
-  gap: 2px;
+  gap: 8px;
   min-width: 0;
+}
+
+.stats-point-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
 }
 
 .task-row.stats-point-row .task-title {
@@ -3066,6 +3083,13 @@ body.running-music-standalone #actionsModal .actions-list {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.stats-point-percent {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.88);
+  justify-self: end;
 }
 
 .stats-point-progress {
@@ -4714,6 +4738,7 @@ body[data-background-theme="white"] .task-row.task-free-slot .task-title {
 
 body[data-background-theme="white"] .task-assignee,
 body[data-background-theme="white"] .task-time,
+body[data-background-theme="white"] .stats-point-percent,
 body[data-background-theme="white"] .task-row.task-pending-clean .task-assignee,
 body[data-background-theme="white"] .task-row.task-pending-clean .task-time,
 body[data-background-theme="white"] .task-row.task-free-slot .task-assignee,
