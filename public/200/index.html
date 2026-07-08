@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260708-svg-grid-fix-1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260708-home-radio-fix-1" />
 </head>
 <body data-background-theme="white">
   <section class="project-login-overlay" id="project200LoginOverlay" aria-hidden="true">
@@ -713,23 +713,23 @@
     </div>
   </section>
 
-  <section class="workspace-modal" id="svgSelectorModal" aria-hidden="true" aria-label="Selecionar SVG">
+  <section class="workspace-modal" id="svgSelectorModal" aria-hidden="true" aria-label="Selecionar ícone">
     <div class="svg-selector-content">
-      <button class="modal-close" type="button" data-close-modal aria-label="Fechar seletor de SVG"><svg viewBox="0 0 24 24"><path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <button class="modal-close" type="button" data-close-modal aria-label="Fechar seletor de ícone"><svg viewBox="0 0 24 24"><path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       <div class="svg-selector-header">
         <div class="running-music-default-title">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span id="svgSelectorTitle">Escolher SVG</span>
+          <span id="svgSelectorTitle">Escolher ícone</span>
         </div>
-        <p class="options-note" id="svgSelectorHint">Escolha um SVG da lista para salvar neste item.</p>
+        <p class="options-note" id="svgSelectorHint">Escolha um ícone da lista para salvar neste item.</p>
       </div>
       <div class="svg-selector-preview">
-        <span class="task-avatar task-avatar-category svg-selector-preview-icon" id="svgSelectorPreview" role="img" aria-label="Preview do SVG"></span>
+        <img class="task-avatar task-avatar-category svg-selector-preview-icon" id="svgSelectorPreview" src="/200/icons/task-default.svg" alt="Preview do ícone" loading="lazy" />
       </div>
       <p class="finance-status" id="svgSelectorStatus" aria-live="polite"></p>
       <div class="svg-selector-grid" id="svgSelectorGrid"></div>
       <div class="svg-selector-actions">
-        <button class="primary-btn" type="button" id="svgSelectorSaveButton">Salvar SVG</button>
+        <button class="primary-btn" type="button" id="svgSelectorSaveButton">Salvar ícone</button>
         <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Cancelar</button>
       </div>
     </div>
@@ -1193,7 +1193,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260708-svg-grid-fix-1"></script>
+  <script type="module" src="/200/project.js?v=20260708-home-radio-fix-1"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

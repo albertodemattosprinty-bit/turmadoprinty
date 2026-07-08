@@ -590,6 +590,7 @@ let globalLoadingPreferredIcon = loadingIconByArea.actions;
 let startupLoadingActive = false;
 let homeSnapshotHydrationPromise = null;
 let lastHomeSnapshotHydratedAtMs = 0;
+let homeBootstrapRetryTimer = null;
 let statsAspectConfigHydrationPromise = null;
 const profileAvatarUploadButton = document.getElementById("profileAvatarUploadButton");
 const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
@@ -817,6 +818,7 @@ const state = {
   overlapCandidateIndex: 0,
   serverNowMs: 0,
   serverNowCapturedAtMs: 0,
+  homeSnapshotReady: false,
   postpone: {
     actionId: "",
     dayOffset: 0,
@@ -2170,6 +2172,22 @@ function anchorToCurrentAction() {
 }
 
 function renderHomeRunningTask() {
+  if (getToken() && !state.homeSnapshotReady) {
+    setHomeRingPercent(0);
+    if (homeRunningPercent) {
+      homeRunningPercent.innerHTML = "";
+    }
+    if (homeRunningDatePrimary) {
+      homeRunningDatePrimary.textContent = "";
+    }
+    if (homeRunningDateSecondary) {
+      homeRunningDateSecondary.textContent = "";
+    }
+    if (homeProfileButton) {
+      homeProfileButton.setAttribute("aria-label", "Carregando rotina");
+    }
+    return;
+  }
   const syncHomeWidget = ({
     percent = 0,
     centerMarkup = "0%",
@@ -2381,7 +2399,7 @@ async function loadRunningMusicStations() {
     const payload = await apiRequest("/api/200/music/stations");
     const stations = Array.isArray(payload?.stations) ? payload.stations : [];
     const validStations = stations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
-    if (validStations.length && !state.runningPlayer.stations.length) {
+    if (validStations.length) {
       state.runningPlayer.stations = validStations;
     }
   } catch {
@@ -2400,8 +2418,9 @@ async function loadRunningMusicStations() {
   try {
     const payload = await apiRequest("/api/200/music/stations");
     const stations = Array.isArray(payload?.stations) ? payload.stations : [];
-    if (stations.length) {
-      state.runningPlayer.stations = stations;
+    const validStations = stations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
+    if (validStations.length) {
+      state.runningPlayer.stations = validStations;
       state.runningPlayer.favoriteTrackUrls = new Set(Array.isArray(payload?.preferences?.favoriteTrackUrls) ? payload.preferences.favoriteTrackUrls : []);
       state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
       const refreshedStationIndex = previousStationName
@@ -3400,10 +3419,8 @@ function getTaskCategoryIconPath(categoryId) {
 function buildTaskAvatarMarkup(src, alt, options = {}) {
   const safeSrc = String(src || "").trim();
   const safeAlt = escapeHtml(alt || "");
-  if (options.categoryIcon && safeSrc) {
-    return `<span class="task-avatar task-avatar-category" style="--task-avatar-icon:url('${escapeHtml(safeSrc)}')" role="img" aria-label="${safeAlt}"></span>`;
-  }
-  return `<img class="task-avatar" src="${safeSrc}" alt="${safeAlt}" loading="lazy" />`;
+  const categoryClass = options.categoryIcon ? " task-avatar-category" : "";
+  return `<img class="task-avatar${categoryClass}" src="${safeSrc}" alt="${safeAlt}" loading="lazy" />`;
 }
 
 function getTaskCategoryName(categoryId) {
@@ -4299,6 +4316,7 @@ async function loadActions(options = {}) {
 
   if (!getToken()) {
     state.actions = [];
+    state.homeSnapshotReady = false;
     renderActions();
     return;
   }
@@ -4325,6 +4343,9 @@ async function loadActions(options = {}) {
     if (Number.isFinite(parsedServerNow)) {
       state.serverNowMs = parsedServerNow;
       state.serverNowCapturedAtMs = Date.now();
+      state.homeSnapshotReady = true;
+    } else {
+      state.homeSnapshotReady = false;
     }
     try {
       const runtimePayload = await apiRequestWithTimeout(runtimeStateEndpoint, {}, 5000);
@@ -4343,6 +4364,7 @@ async function loadActions(options = {}) {
     renderActions();
     registerDayCloseEventIfNeeded();
   } catch (error) {
+    state.homeSnapshotReady = false;
     actionsProgress.hidden = true;
     actionsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
   }
@@ -4602,9 +4624,8 @@ function setSvgSelectorPreview(url = "", label = "") {
   if (!svgSelectorPreview) {
     return;
   }
-  const safeUrl = String(url || "").trim().replaceAll("'", "%27");
-  svgSelectorPreview.style.setProperty("--task-avatar-icon", `url('${safeUrl}')`);
-  svgSelectorPreview.setAttribute("aria-label", label || "Preview do SVG");
+  svgSelectorPreview.src = String(url || "").trim() || defaultTaskSvgPath;
+  svgSelectorPreview.alt = label || "Preview do ícone";
 }
 
 function renderSvgSelectorModal() {
@@ -4624,8 +4645,8 @@ function renderSvgSelectorModal() {
     button.type = "button";
     button.className = `svg-selector-item${selectedUrl === assetUrl ? " is-selected" : ""}`;
     button.dataset.svgUrl = assetUrl;
-    button.dataset.svgLabel = String(asset?.label || asset?.id || "SVG").trim();
-    button.innerHTML = buildTaskAvatarMarkup(assetUrl, String(asset?.label || "SVG"), { categoryIcon: true });
+    button.dataset.svgLabel = String(asset?.label || asset?.id || "Ícone").trim();
+    button.innerHTML = buildTaskAvatarMarkup(assetUrl, String(asset?.label || "Ícone"), { categoryIcon: true });
     svgSelectorGrid.appendChild(button);
   });
   setSvgSelectorPreview(selectedUrl, String(state.svgSelector?.selectedLabel || "").trim());
@@ -4635,15 +4656,15 @@ async function openSvgSelectorModal(targetKind, targetId) {
   state.svgSelector.targetKind = String(targetKind || "").trim();
   state.svgSelector.targetId = String(targetId || "").trim();
   if (svgSelectorTitle) {
-    svgSelectorTitle.textContent = targetKind === "mission" ? "SVG da missão" : "SVG da tarefa";
+    svgSelectorTitle.textContent = targetKind === "mission" ? "Ícone da missão" : "Ícone da tarefa";
   }
   if (svgSelectorHint) {
     svgSelectorHint.textContent = targetKind === "mission"
-      ? "Escolha um SVG da biblioteca para salvar nesta missão."
-      : "Escolha um SVG da biblioteca para salvar nesta tarefa.";
+      ? "Escolha um ícone da biblioteca para salvar nesta missão."
+      : "Escolha um ícone da biblioteca para salvar nesta tarefa.";
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Carregando SVGs...";
+    svgSelectorStatus.textContent = "Carregando ícones...";
   }
   if (targetKind === "mission") {
     const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === String(targetId || ""));
@@ -4672,7 +4693,7 @@ async function saveSvgSelectorChoice() {
     return;
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Salvando SVG...";
+    svgSelectorStatus.textContent = "Salvando ícone...";
   }
   if (targetKind === "mission") {
     const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === targetId);
@@ -4715,7 +4736,7 @@ async function saveSvgSelectorChoice() {
     }
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "SVG salvo.";
+    svgSelectorStatus.textContent = "Ícone salvo.";
   }
   window.setTimeout(() => closeModal("svgSelectorModal"), 180);
 }
@@ -5588,7 +5609,7 @@ function shouldRefreshHomeSnapshot(force = false) {
   if (force) {
     return true;
   }
-  if (!state.serverNowMs) {
+  if (!state.serverNowMs || !state.homeSnapshotReady) {
     return true;
   }
   return (Date.now() - lastHomeSnapshotHydratedAtMs) > 45000;
@@ -5609,9 +5630,22 @@ async function refreshHomeSnapshot(options = {}) {
           await loadProject200Profiles();
         } catch {}
       }
+      state.homeSnapshotReady = false;
       await loadActions();
+      if (!state.homeSnapshotReady) {
+        throw new Error("HOME_SNAPSHOT_PENDING");
+      }
       lastHomeSnapshotHydratedAtMs = Date.now();
+      if (startupLoadingActive) {
+        endStartupLoading();
+      }
     } catch {
+      if (startupLoadingActive && getToken() && !homeBootstrapRetryTimer) {
+        homeBootstrapRetryTimer = window.setTimeout(() => {
+          homeBootstrapRetryTimer = null;
+          void refreshHomeSnapshot({ force: true });
+        }, 600);
+      }
       renderHomeRunningTask();
     } finally {
       homeSnapshotHydrationPromise = null;
@@ -7234,13 +7268,13 @@ function isSleepStatsCategory(categoryId) {
 
 function formatSleepTimerValue(totalSeconds) {
   const safeTotalSeconds = Math.max(0, Math.trunc(Number(totalSeconds || 0) || 0));
-  const hours = Math.trunc(safeTotalSeconds / 3600);
-  const minutes = Math.trunc((safeTotalSeconds % 3600) / 60);
-  const seconds = safeTotalSeconds % 60;
-  if (hours > 0) {
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  }
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  const totalMinutes = Math.max(0, Math.ceil(safeTotalSeconds / 60));
+  const hours = Math.trunc(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return {
+    hoursText: String(hours).padStart(2, "0"),
+    minutesText: String(minutes).padStart(2, "0")
+  };
 }
 
 function getStatsAspectConfigEntry(categoryId) {
@@ -7916,9 +7950,10 @@ function renderSleepModalState() {
     sleepSessionTitle.textContent = "SONO";
   }
   if (sleepSessionTime) {
-    sleepSessionTime.textContent = session.phase === "countdown"
+    const timerParts = session.phase === "countdown"
       ? formatSleepTimerValue(session.countdownRemainingSeconds)
       : formatSleepTimerValue(session.trackedMinutes * 60);
+    sleepSessionTime.innerHTML = `<span class="sleep-time-part">${timerParts.hoursText}</span><span class="sleep-time-separator" aria-hidden="true">:</span><span class="sleep-time-part">${timerParts.minutesText}</span>`;
   }
   if (sleepSessionSubtitle) {
     if (session.phase === "countdown") {
@@ -7940,6 +7975,7 @@ function renderSleepModalState() {
   if (sleepModalControls) {
     sleepModalControls.hidden = !state.sleepModal.controlsVisible;
   }
+  sleepModalShell?.classList.toggle("sleep-controls-visible", Boolean(state.sleepModal.controlsVisible && isActiveSession));
 }
 
 function shiftSleepDelay(direction) {
@@ -9317,6 +9353,13 @@ function clearProject200SessionState() {
   state.profiles = [];
   state.historySystem = [];
   state.historyTexts = [];
+  state.serverNowMs = 0;
+  state.serverNowCapturedAtMs = 0;
+  state.homeSnapshotReady = false;
+  if (homeBootstrapRetryTimer) {
+    window.clearTimeout(homeBootstrapRetryTimer);
+    homeBootstrapRetryTimer = null;
+  }
   unlockProject200Screen();
   clearScreenLockInactivityTimer();
   renderProfileFooter();
@@ -9363,12 +9406,28 @@ async function bootstrapProject200App() {
       }
     }
   } finally {
+    if (homeBootstrapRetryTimer) {
+      window.clearTimeout(homeBootstrapRetryTimer);
+      homeBootstrapRetryTimer = null;
+    }
+    if (getToken() && !state.homeSnapshotReady) {
+      homeBootstrapRetryTimer = window.setTimeout(() => {
+        homeBootstrapRetryTimer = null;
+        void refreshHomeSnapshot({ force: true });
+      }, 600);
+      return;
+    }
     endStartupLoading();
   }
 }
 
 function openPrimaryRunningSurface() {
-  openModal("runningTaskModal");
+  if (!getToken()) {
+    openModal("runningTaskModal");
+    return;
+  }
+  const hasAnyTasks = getVisibleActions().length > 0;
+  openModal(hasAnyTasks ? "actionsModal" : "runningTaskModal");
 }
 
 document.querySelectorAll("[data-open-modal]").forEach((button) => {
@@ -11295,7 +11354,11 @@ homeProfileButton?.addEventListener("pointerdown", (event) => {
         return;
       }
       profileLongPressHandledProfile = profilePressProfile;
-      openProfileManageOverlay(profilePressProfile);
+      if (!getToken()) {
+        window.location.href = "/auth.html?next=/200";
+        return;
+      }
+      openTaskComposer();
     }, 500);
   }
 });

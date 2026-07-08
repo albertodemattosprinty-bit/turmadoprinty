@@ -2833,11 +2833,6 @@ body.running-music-standalone #actionsModal .actions-list {
 
 .task-avatar-category {
   display: inline-block;
-  background-color: transparent;
-  background-image: var(--task-avatar-icon);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
 }
 
 .task-row:hover {
@@ -4879,7 +4874,8 @@ body[data-background-theme="white"] .task-row.task-free-slot .task-time {
 }
 
 body[data-background-theme="white"] #actionsModal .actions-side-btn-right svg,
-body[data-background-theme="white"] #actionsModal .actions-footer-date .date-title {
+body[data-background-theme="white"] #actionsModal .actions-footer-date .date-title,
+body[data-background-theme="white"] #actionsModal .actions-side-plus {
   color: #2f3640;
 }
 
@@ -4939,6 +4935,54 @@ body[data-background-theme="white"] .running-music-default-title svg {
 body[data-background-theme="white"] .running-music-default-option {
   background: rgba(47, 54, 64, 0.04);
   border-color: rgba(47, 54, 64, 0.1);
+}
+
+body[data-background-theme="white"] .running-music-default-content,
+body[data-background-theme="white"] .running-music-default-choice-content {
+  background: linear-gradient(145deg, rgba(248, 248, 245, 0.98), rgba(236, 236, 231, 0.98));
+  border: 1px solid rgba(47, 54, 64, 0.1);
+  border-radius: 28px;
+  padding: 24px 20px;
+  box-shadow: 0 24px 60px rgba(47, 54, 64, 0.12);
+}
+
+body[data-background-theme="white"] .running-music-list-panel {
+  border-color: rgba(47, 54, 64, 0.1);
+  background: linear-gradient(145deg, rgba(248, 248, 245, 0.98), rgba(236, 236, 231, 0.98));
+  box-shadow: 0 24px 60px rgba(47, 54, 64, 0.12);
+}
+
+body[data-background-theme="white"] .running-music-list-title-wrap,
+body[data-background-theme="white"] .running-music-list-close,
+body[data-background-theme="white"] .running-music-list-station-nav,
+body[data-background-theme="white"] .running-music-track-row,
+body[data-background-theme="white"] .running-music-list-default-btn {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] .running-music-list-close {
+  border-color: rgba(47, 54, 64, 0.14);
+  background: rgba(47, 54, 64, 0.06);
+}
+
+body[data-background-theme="white"] .running-music-track-row,
+body[data-background-theme="white"] .running-music-track-row[role="button"] {
+  border-color: rgba(47, 54, 64, 0.1);
+  background: rgba(47, 54, 64, 0.04);
+}
+
+body[data-background-theme="white"] .running-music-track-row.is-current {
+  border-color: rgba(18, 60, 143, 0.34);
+  background: rgba(18, 60, 143, 0.08);
+}
+
+body[data-background-theme="white"] .running-music-list-default-btn {
+  background: #123c8f;
+  color: #fff;
+}
+
+body[data-background-theme="white"] .running-music-list-default-btn svg {
+  color: #d7e5ff;
 }
 
 body[data-background-theme="white"] .running-music-default-top,
@@ -5223,6 +5267,30 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   font-weight: 900;
   line-height: 0.94;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.06em;
+}
+
+.sleep-time-part {
+  display: inline-block;
+  min-width: 1.7ch;
+  text-align: center;
+}
+
+.sleep-time-separator {
+  display: inline-block;
+  animation: sleepColonBlink 1000ms steps(1, end) infinite;
+}
+
+@keyframes sleepColonBlink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0.2;
+  }
 }
 
 .sleep-modal-subtitle,
@@ -5267,7 +5335,7 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
 .sleep-modal-control-button {
   width: min(100%, 320px);
   min-height: 58px;
-  border-radius: 0;
+  border-radius: 18px;
 }
 
 .sleep-modal-start-button {
@@ -5277,13 +5345,15 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
 
 .sleep-modal-controls {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-  padding: 0 24px;
+  inset: 0;
+  padding: 24px;
   display: grid;
+  align-content: center;
   justify-items: center;
-  gap: 10px;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(16px);
+  z-index: 3;
 }
 
 .sleep-modal-controls[hidden] {
@@ -5291,7 +5361,7 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
 }
 
 .sleep-modal-controls .ghost-btn {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.1);
   color: #c1c6d1;
   border-color: rgba(255, 255, 255, 0.1);
 }
@@ -5303,6 +5373,11 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
 
 .sleep-modal-abort-button {
   color: #ff8f8f !important;
+}
+
+.sleep-modal-shell.sleep-controls-visible .sleep-modal-session {
+  filter: blur(12px);
+  opacity: 0.25;
 }
 
 .history-mission-adjust-caption {
