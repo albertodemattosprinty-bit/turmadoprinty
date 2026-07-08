@@ -229,12 +229,14 @@ const statsAspectTargetValue = document.getElementById("statsAspectTargetValue")
 const statsAspectMetaCopy = document.getElementById("statsAspectMetaCopy");
 const statsAspectTaskMinutes = document.getElementById("statsAspectTaskMinutes");
 const statsAspectProgressSummary = document.getElementById("statsAspectProgressSummary");
+const statsAspectLinkedGoals = document.getElementById("statsAspectLinkedGoals");
 const statsAspectStatus = document.getElementById("statsAspectStatus");
 const statsAspectSaveButton = document.getElementById("statsAspectSaveButton");
 const openStatsAspectMissionAssignButton = document.getElementById("openStatsAspectMissionAssign");
 const statsAspectMissionAssignModal = document.getElementById("statsAspectMissionAssignModal");
 const statsAspectMissionAssignLabel = document.getElementById("statsAspectMissionAssignLabel");
-const statsAspectMissionSelect = document.getElementById("statsAspectMissionSelect");
+const statsAspectMissionSelectedSummary = document.getElementById("statsAspectMissionSelectedSummary");
+const statsAspectMissionOptions = document.getElementById("statsAspectMissionOptions");
 const statsAspectMissionStatus = document.getElementById("statsAspectMissionStatus");
 const statsAspectMissionSaveButton = document.getElementById("statsAspectMissionSaveButton");
 const statsAspectMissionClearButton = document.getElementById("statsAspectMissionClearButton");
@@ -585,6 +587,7 @@ let globalLoadingPreferredIcon = loadingIconByArea.actions;
 let startupLoadingActive = false;
 let homeSnapshotHydrationPromise = null;
 let lastHomeSnapshotHydratedAtMs = 0;
+let statsAspectConfigHydrationPromise = null;
 const profileAvatarUploadButton = document.getElementById("profileAvatarUploadButton");
 const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
 const moneyFormatter = new Intl.NumberFormat("pt-BR", {
@@ -737,7 +740,7 @@ const state = {
   statsAspectModal: {
     categoryId: "",
     targetMinutes: 0,
-    missionGoalId: ""
+    missionGoalIds: []
   },
   missions: [],
   constitutionVersions: [],
@@ -1128,6 +1131,9 @@ function endGlobalLoading() {
 }
 
 async function runWithGlobalLoading(task, options = {}) {
+  if (options.skipGlobalLoading) {
+    return task();
+  }
   const iconSrc = resolveLoadingIconForPath(options.path || "", options.iconSrc || "");
   beginGlobalLoading(iconSrc);
   try {
@@ -3628,7 +3634,8 @@ async function apiRequest(path, options = {}) {
     return payload;
   }, {
     path,
-    iconSrc: options.loadingIcon || ""
+    iconSrc: options.loadingIcon || "",
+    skipGlobalLoading: options.skipGlobalLoading === true
   });
 }
 
@@ -4421,14 +4428,20 @@ async function loadActions(options = {}) {
   }
 
   const date = dateFromOffset(state.activeOffset);
-  showDbLoadingState(actionsList, 220);
+  if (options.silent !== true) {
+    showDbLoadingState(actionsList, 220);
+  }
   const preservedSleepAction = buildSleepFlowAction(options?.preserveSleepAction || state.sleepFlow?.pendingAction || null);
 
   try {
-    const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`, {}, 7000);
+    const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`, {
+      skipGlobalLoading: options.silent === true
+    }, 7000);
     state.actions = Array.isArray(payload.actions) ? payload.actions : [];
     try {
-      const sleepPayload = await apiRequestWithTimeout(`/api/200/sleep-session?date=${encodeURIComponent(getSelectedSleepDayKey())}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {}, 5000);
+      const sleepPayload = await apiRequestWithTimeout(`/api/200/sleep-session?date=${encodeURIComponent(getSelectedSleepDayKey())}&profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
+        skipGlobalLoading: true
+      }, 5000);
       const sleepAction = buildSleepFlowAction(sleepPayload?.action || null, preservedSleepAction || undefined);
       if (sleepAction?.id) {
         state.sleepFlow.pendingAction = sleepAction;
@@ -4983,6 +4996,18 @@ async function activateSleepActionIfNeeded(action) {
   if (!Number.isFinite(plannedStartMs) || getServerNowMs() < plannedStartMs || state.sleepFlow.activationRequestInFlight) {
     return;
   }
+  const actualStartAtIso = new Date().toISOString();
+  const optimisticAction = buildSleepFlowAction({
+    ...action,
+    status: actionStatuses.inProgress,
+    startedAt: actualStartAtIso,
+    startAt: actualStartAtIso
+  }, action);
+  if (optimisticAction) {
+    state.sleepFlow.pendingAction = optimisticAction;
+    upsertSleepActionIntoState(optimisticAction);
+    renderSleepSessionModal();
+  }
   state.sleepFlow.activationRequestInFlight = true;
   try {
     const payload = await apiRequest("/api/200/sleep-session/activate", {
@@ -4990,15 +5015,23 @@ async function activateSleepActionIfNeeded(action) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         actionId: action.id,
-        actualStartAt: new Date().toISOString()
-      })
+        actualStartAt: actualStartAtIso
+      }),
+      skipGlobalLoading: true
     });
     if (payload?.action?.id) {
       state.sleepFlow.pendingAction = payload.action;
     }
-    await loadActions();
+    await loadActions({
+      preserveSleepAction: state.sleepFlow.pendingAction || optimisticAction,
+      silent: true
+    });
     await ensureSleepFrequencyPlayback();
   } catch (error) {
+    state.sleepFlow.pendingAction = buildSleepFlowAction(action, action);
+    if (state.sleepFlow.pendingAction) {
+      upsertSleepActionIntoState(state.sleepFlow.pendingAction);
+    }
     if (sleepSessionSubtitle) {
       sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
     }
@@ -7465,7 +7498,9 @@ function getStatsAspectConfigEntry(categoryId) {
   const config = state.statsAspectConfig?.[normalized] || {};
   return {
     targetMinutes: Math.max(1, Math.trunc(Number(config.targetMinutes || fallback?.targetPoints || 1) || 1)),
-    missionGoalId: String(config.missionGoalId || "").trim()
+    missionGoalIds: Array.isArray(config.missionGoalIds)
+      ? [...new Set(config.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
+      : (String(config.missionGoalId || "").trim() ? [String(config.missionGoalId || "").trim()] : [])
   };
 }
 
@@ -7475,6 +7510,13 @@ function getCurrentMissionGoalById(goalId) {
     return null;
   }
   return (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item?.id || "") === normalized) || null;
+}
+
+function getCurrentMissionGoalsByIds(goalIds) {
+  const ids = Array.isArray(goalIds) ? goalIds : [];
+  return ids
+    .map((goalId) => getCurrentMissionGoalById(goalId))
+    .filter(Boolean);
 }
 
 function getVisibleCategoryTaskMinutes(categoryId) {
@@ -7490,13 +7532,13 @@ function getVisibleCategoryTaskMinutes(categoryId) {
 
 function buildStatsPointEntry(category, byCategory = {}) {
   const config = getStatsAspectConfigEntry(category.id);
-  const missionGoal = getCurrentMissionGoalById(config.missionGoalId);
+  const missionGoals = getCurrentMissionGoalsByIds(config.missionGoalIds);
   const taskMinutes = getVisibleCategoryTaskMinutes(category.id);
-  const points = missionGoal
-    ? Math.max(0, Number(missionGoal.progressValue || 0))
+  const points = missionGoals.length
+    ? missionGoals.reduce((sum, goal) => sum + Math.max(0, Number(goal.progressValue || 0)), 0)
     : Math.max(0, Number(byCategory?.[category.id] || 0));
-  const targetPoints = missionGoal
-    ? Math.max(1, Number(missionGoal.targetValue || 1))
+  const targetPoints = missionGoals.length
+    ? missionGoals.reduce((sum, goal) => sum + Math.max(1, Number(goal.targetValue || 1)), 0)
     : Math.max(1, Number(config.targetMinutes || category.targetPoints || 1));
   const percent = Math.max(0, Math.min(100, Math.round((points / targetPoints) * 100)));
   return {
@@ -7506,8 +7548,8 @@ function buildStatsPointEntry(category, byCategory = {}) {
     targetPoints,
     percent,
     taskMinutes,
-    missionGoalId: missionGoal ? String(missionGoal.id || "") : "",
-    missionTitle: missionGoal ? String(missionGoal.title || "") : ""
+    missionGoalIds: missionGoals.map((goal) => String(goal.id || "")),
+    missionTitles: missionGoals.map((goal) => String(goal.title || "Missão")).filter(Boolean)
   };
 }
 
@@ -7543,13 +7585,19 @@ function renderStatsAspectModalState() {
     statsAspectTaskMinutes.textContent = formatMinutesHuman(currentEntry.taskMinutes || 0);
   }
   if (statsAspectProgressSummary) {
-    const label = currentEntry.missionTitle
-      ? `${currentEntry.percent}% via ${currentEntry.missionTitle}`
+    const linkedMissionLabel = Array.isArray(currentEntry.missionTitles) && currentEntry.missionTitles.length
+      ? `${currentEntry.percent}% via ${currentEntry.missionTitles.join(" + ")}`
       : `${currentEntry.percent}%`;
-    statsAspectProgressSummary.textContent = label;
+    statsAspectProgressSummary.textContent = linkedMissionLabel;
+  }
+  if (statsAspectLinkedGoals) {
+    const titles = Array.isArray(currentEntry.missionTitles) ? currentEntry.missionTitles.filter(Boolean) : [];
+    statsAspectLinkedGoals.innerHTML = titles.length
+      ? `Missões vinculadas: <strong>${escapeHtml(titles.join(" + "))}</strong>`
+      : "Missões vinculadas: <strong>Nenhuma</strong>";
   }
   if (statsAspectMissionAssignLabel) {
-    statsAspectMissionAssignLabel.textContent = `Selecione uma missão para controlar ${category.name}.`;
+    statsAspectMissionAssignLabel.textContent = `Selecione uma ou mais missões para controlar ${category.name}.`;
   }
 }
 
@@ -7562,7 +7610,7 @@ function openStatsAspectModal(categoryId) {
   state.statsAspectModal = {
     categoryId: category.id,
     targetMinutes: config.targetMinutes,
-    missionGoalId: config.missionGoalId
+    missionGoalIds: [...config.missionGoalIds]
   };
   if (statsAspectStatus) {
     statsAspectStatus.textContent = "";
@@ -7572,16 +7620,38 @@ function openStatsAspectModal(categoryId) {
 }
 
 function renderStatsAspectMissionOptions() {
-  if (!statsAspectMissionSelect) {
+  if (!statsAspectMissionOptions || !statsAspectMissionSelectedSummary) {
     return;
   }
-  const options = ['<option value="">Usar tarefas do dia</option>'].concat(
-    (Array.isArray(state.missions) ? state.missions : []).map((goal) => (
-      `<option value="${escapeHtml(String(goal.id || ""))}">${escapeHtml(String(goal.title || "Missão"))}</option>`
-    ))
-  );
-  statsAspectMissionSelect.innerHTML = options.join("");
-  statsAspectMissionSelect.value = String(state.statsAspectModal?.missionGoalId || "");
+  const selectedIds = new Set((Array.isArray(state.statsAspectModal?.missionGoalIds) ? state.statsAspectModal.missionGoalIds : []).map((item) => String(item || "").trim()).filter(Boolean));
+  const missions = Array.isArray(state.missions) ? state.missions : [];
+  const selectedGoals = missions.filter((goal) => selectedIds.has(String(goal.id || "")));
+  statsAspectMissionSelectedSummary.textContent = selectedGoals.length
+    ? `Vinculadas: ${selectedGoals.map((goal) => String(goal.title || "Missão")).join(" + ")}`
+    : "Nenhuma missão vinculada.";
+  if (!missions.length) {
+    statsAspectMissionOptions.innerHTML = '<div class="empty-state">Sem missões cadastradas.</div>';
+    return;
+  }
+  const items = missions.map((goal) => {
+    const goalId = String(goal.id || "");
+    const isActive = selectedIds.has(goalId);
+    const progress = Math.max(0, Number(goal.progressValue || 0));
+    const target = Math.max(1, Number(goal.targetValue || 1));
+    const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+    return `
+      <button class="stats-aspect-mission-option${isActive ? " is-active" : ""}" type="button" data-stats-mission-option="${escapeHtml(goalId)}">
+        <div class="stats-aspect-mission-option-head">
+          <strong>${escapeHtml(String(goal.title || "Missão"))}</strong>
+          <span>${escapeHtml(`${progress}/${target}`)}</span>
+        </div>
+        <div class="stats-aspect-mission-option-progress" aria-hidden="true">
+          <span style="width:${percent}%;"></span>
+        </div>
+      </button>
+    `;
+  });
+  statsAspectMissionOptions.innerHTML = items.join("");
 }
 
 function createStatsPointRow(entry) {
@@ -7680,64 +7750,35 @@ async function loadStatsSummary() {
   }
 
   try {
-    const scope = getActiveStatsScope();
-    statsScopeLabel.textContent = scope.label;
-    const loadingTarget = isPointsStatsScope(scope) ? statsMissionsList : statsRankingList;
-    const hiddenTarget = isPointsStatsScope(scope) ? statsRankingList : statsMissionsList;
-    if (hiddenTarget) {
-      hiddenTarget.hidden = true;
+    if (statsMissionsList) {
+      statsMissionsList.hidden = false;
+      showDbLoadingState(statsMissionsList, 220);
     }
-    if (loadingTarget) {
-      loadingTarget.hidden = false;
-      showDbLoadingState(loadingTarget, 220);
-    }
-    if (isPointsStatsScope(scope)) {
-      await loadMissions();
-      const [todaySummary, last7Summary, last30Summary] = await Promise.all([
-        apiRequest("/api/stats/summary?scope=today"),
-        apiRequest("/api/stats/summary?scope=last7"),
-        apiRequest("/api/stats/summary?scope=last30")
-      ]);
-      const summary = todaySummary?.summary || {};
-      const byCategory = summary?.byCategory || {};
-      state.statsSummary = summary;
-      state.statsPointsOverview = {
-        total: getNonSleepCompletedMinutes(summary),
-        last7: getNonSleepCompletedMinutes(last7Summary?.summary || {}),
-        last30: getNonSleepCompletedMinutes(last30Summary?.summary || {})
-      };
-      state.statsMissions = statsPointCategories.map((category) => buildStatsPointEntry(category, byCategory));
-      renderMissionSummary();
-      renderStatsMissions();
-      if (statsMissionSummary) {
-        statsMissionSummary.hidden = false;
-      }
-      if (statsMissionsList) {
-        statsMissionsList.hidden = false;
-      }
-      if (statsRankingList) {
-        statsRankingList.hidden = true;
-      }
-      return;
-    }
-
-    const summaryResult = await apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`);
-    state.statsSummary = summaryResult.summary || {};
-    state.statsGlobalProfiles = Array.isArray(summaryResult.summary?.globalProfiles) ? summaryResult.summary.globalProfiles : [];
-    state.statsMissions = [];
-    state.statsPointsOverview = null;
-    buildStatsRankingFromSummary();
-    renderStatsRanking();
     if (statsMissionSummary) {
       statsMissionSummary.hidden = true;
     }
     if (statsRankingList) {
-      statsRankingList.hidden = false;
+      statsRankingList.hidden = true;
     }
+    await loadMissions();
+    await hydrateStatsAspectConfig(state.selectedProfile || getDefaultProfileName(), {
+      force: true,
+      skipGlobalLoading: true
+    });
+    const todaySummary = await apiRequest("/api/stats/summary?scope=today", {
+      skipGlobalLoading: true
+    });
+    const summary = todaySummary?.summary || {};
+    const byCategory = summary?.byCategory || {};
+    state.statsSummary = summary;
+    state.statsGlobalProfiles = Array.isArray(summary?.globalProfiles) ? summary.globalProfiles : [];
+    state.statsRanking = [];
+    state.statsPointsOverview = null;
+    state.statsMissions = statsPointCategories.map((category) => buildStatsPointEntry(category, byCategory));
+    renderStatsMissions();
   } catch (error) {
-    const target = isPointsStatsScope(getActiveStatsScope()) ? statsMissionsList : statsRankingList;
-    if (target) {
-      target.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha")}</div>`;
+    if (statsMissionsList) {
+      statsMissionsList.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha")}</div>`;
     }
   }
 }
@@ -7954,49 +7995,93 @@ function loadMissionQuickSlots(profileName = state.selectedProfile || getDefault
   state.missionQuickSlots = readMissionQuickSlots(profileName);
 }
 
-function getStatsAspectConfigStorageKey(profileName = state.selectedProfile || getDefaultProfileName()) {
-  const userId = String(state.authUser?.id || "guest").trim() || "guest";
-  const profile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
-  return `project_200_stats_aspects_v1:${userId}:${profile}`;
-}
-
 function buildDefaultStatsAspectConfig() {
   return Object.fromEntries(statsPointCategories.map((category) => [category.id, {
     targetMinutes: Math.max(1, Number(category.targetPoints || 1)),
-    missionGoalId: ""
+    missionGoalIds: []
   }]));
 }
 
-function readStatsAspectConfig(profileName = state.selectedProfile || getDefaultProfileName()) {
-  const fallback = buildDefaultStatsAspectConfig();
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(getStatsAspectConfigStorageKey(profileName)) || "{}");
-    return Object.fromEntries(statsPointCategories.map((category) => {
-      const entry = parsed?.[category.id] || {};
-      return [category.id, {
-        targetMinutes: Math.max(1, Math.trunc(Number(entry.targetMinutes || category.targetPoints || 1) || 1)),
-        missionGoalId: String(entry.missionGoalId || "").trim()
-      }];
-    }));
-  } catch {
-    return fallback;
-  }
-}
-
-function persistStatsAspectConfig(profileName = state.selectedProfile || getDefaultProfileName()) {
-  const serialized = Object.fromEntries(statsPointCategories.map((category) => {
-    const entry = state.statsAspectConfig?.[category.id] || {};
+function normalizeStatsAspectConfigMap(rawConfig = {}) {
+  return Object.fromEntries(statsPointCategories.map((category) => {
+    const entry = rawConfig?.[category.id] || {};
+    const missionGoalIds = Array.isArray(entry.missionGoalIds)
+      ? [...new Set(entry.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
+      : (String(entry.missionGoalId || "").trim() ? [String(entry.missionGoalId || "").trim()] : []);
     return [category.id, {
       targetMinutes: Math.max(1, Math.trunc(Number(entry.targetMinutes || category.targetPoints || 1) || 1)),
-      missionGoalId: String(entry.missionGoalId || "").trim()
+      missionGoalIds
     }];
   }));
-  state.statsAspectConfig = serialized;
-  window.localStorage.setItem(getStatsAspectConfigStorageKey(profileName), JSON.stringify(serialized));
+}
+
+function buildStatsAspectConfigPayload(categoryId) {
+  const entry = state.statsAspectConfig?.[categoryId] || {};
+  return {
+    targetMinutes: Math.max(1, Math.trunc(Number(entry.targetMinutes || 1) || 1)),
+    missionGoalIds: Array.isArray(entry.missionGoalIds)
+      ? [...new Set(entry.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
+      : []
+  };
 }
 
 function loadStatsAspectConfig(profileName = state.selectedProfile || getDefaultProfileName()) {
-  state.statsAspectConfig = readStatsAspectConfig(profileName);
+  state.statsAspectConfig = buildDefaultStatsAspectConfig();
+  void hydrateStatsAspectConfig(profileName, { force: true });
+}
+
+async function hydrateStatsAspectConfig(profileName = state.selectedProfile || getDefaultProfileName(), options = {}) {
+  if (!getToken()) {
+    state.statsAspectConfig = buildDefaultStatsAspectConfig();
+    return state.statsAspectConfig;
+  }
+  const normalizedProfile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
+  if (statsAspectConfigHydrationPromise && options?.force !== true) {
+    return statsAspectConfigHydrationPromise;
+  }
+  statsAspectConfigHydrationPromise = (async () => {
+    try {
+      const payload = await apiRequest(`/api/200/stats-aspects?profile=${encodeURIComponent(normalizedProfile)}`, {
+        skipGlobalLoading: options?.skipGlobalLoading === true
+      });
+      const normalized = normalizeStatsAspectConfigMap(payload?.config || {});
+      if ((normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName) === normalizedProfile) {
+        state.statsAspectConfig = normalized;
+      }
+      return normalized;
+    } catch {
+      const fallback = normalizeStatsAspectConfigMap(state.statsAspectConfig || {});
+      if ((normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName) === normalizedProfile) {
+        state.statsAspectConfig = fallback;
+      }
+      return fallback;
+    } finally {
+      statsAspectConfigHydrationPromise = null;
+    }
+  })();
+  return statsAspectConfigHydrationPromise;
+}
+
+async function persistStatsAspectConfig(categoryId, profileName = state.selectedProfile || getDefaultProfileName()) {
+  const normalizedCategoryId = String(categoryId || "").trim().toLowerCase();
+  if (!normalizedCategoryId) {
+    throw new Error("Categoria inválida.");
+  }
+  const normalizedProfile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
+  const payload = buildStatsAspectConfigPayload(normalizedCategoryId);
+  const result = await apiRequest(`/api/200/stats-aspects/${encodeURIComponent(normalizedCategoryId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      profile: normalizedProfile,
+      targetMinutes: payload.targetMinutes,
+      missionGoalIds: payload.missionGoalIds
+    }),
+    skipGlobalLoading: true
+  });
+  const normalized = normalizeStatsAspectConfigMap(result?.config || {});
+  state.statsAspectConfig = normalized;
+  return normalized;
 }
 
 function normalizeMissionTitle(value) {
@@ -8068,7 +8153,7 @@ function getLinkedStatsAspectByMissionGoalId(goalId) {
   }
   for (const category of statsPointCategories) {
     const config = getStatsAspectConfigEntry(category.id);
-    if (String(config.missionGoalId || "").trim() === normalizedGoalId) {
+    if (Array.isArray(config.missionGoalIds) && config.missionGoalIds.includes(normalizedGoalId)) {
       const entry = buildStatsPointEntry(category, state.statsSummary?.byCategory || {});
       return {
         category,
@@ -9314,6 +9399,24 @@ document.querySelectorAll("[data-open-modal]").forEach((button) => {
   });
 });
 
+document.querySelectorAll("[data-switch-modal]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const targetModalId = String(button.dataset.switchModal || "").trim();
+    if (!targetModalId) {
+      return;
+    }
+    const loadingIcon = String(button.dataset.loadingIcon || "").trim();
+    if (loadingIcon) {
+      globalLoadingPreferredIcon = loadingIcon;
+    }
+    const currentModal = button.closest(".workspace-modal");
+    if (currentModal) {
+      closeModal(currentModal);
+    }
+    openModal(targetModalId);
+  });
+});
+
 if (window.history && typeof window.history.pushState === "function") {
   try {
     window.history.pushState({ project200Guard: true }, "", window.location.href);
@@ -10264,20 +10367,31 @@ statsAspectTargetPlusButton?.addEventListener("click", () => {
 });
 
 statsAspectSaveButton?.addEventListener("click", () => {
-  const categoryId = String(state.statsAspectModal?.categoryId || "").trim().toLowerCase();
-  if (!categoryId) {
-    return;
-  }
-  state.statsAspectConfig[categoryId] = {
-    ...getStatsAspectConfigEntry(categoryId),
-    targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
-    missionGoalId: String(state.statsAspectModal.missionGoalId || "").trim()
-  };
-  persistStatsAspectConfig();
-  if (statsAspectStatus) {
-    statsAspectStatus.textContent = "Meta atualizada.";
-  }
-  void loadStatsSummary();
+  void (async () => {
+    const categoryId = String(state.statsAspectModal?.categoryId || "").trim().toLowerCase();
+    if (!categoryId) {
+      return;
+    }
+    state.statsAspectConfig[categoryId] = {
+      ...getStatsAspectConfigEntry(categoryId),
+      targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
+      missionGoalIds: Array.isArray(state.statsAspectModal.missionGoalIds)
+        ? [...new Set(state.statsAspectModal.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
+        : []
+    };
+    try {
+      await persistStatsAspectConfig(categoryId);
+      if (statsAspectStatus) {
+        statsAspectStatus.textContent = "Meta atualizada.";
+      }
+      await loadStatsSummary();
+      renderStatsAspectModalState();
+    } catch (error) {
+      if (statsAspectStatus) {
+        statsAspectStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a meta.";
+      }
+    }
+  })();
 });
 
 openStatsAspectMissionAssignButton?.addEventListener("click", () => {
@@ -10291,38 +10405,74 @@ openStatsAspectMissionAssignButton?.addEventListener("click", () => {
   })();
 });
 
-statsAspectMissionSaveButton?.addEventListener("click", () => {
-  const categoryId = String(state.statsAspectModal?.categoryId || "").trim().toLowerCase();
-  if (!categoryId) {
+statsAspectMissionOptions?.addEventListener("click", (event) => {
+  const optionButton = event.target.closest("[data-stats-mission-option]");
+  if (!optionButton) {
     return;
   }
-  state.statsAspectModal.missionGoalId = String(statsAspectMissionSelect?.value || "").trim();
-  state.statsAspectConfig[categoryId] = {
-    ...getStatsAspectConfigEntry(categoryId),
-    targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
-    missionGoalId: state.statsAspectModal.missionGoalId
-  };
-  persistStatsAspectConfig();
-  closeModal("statsAspectMissionAssignModal");
-  renderStatsAspectModalState();
-  void loadStatsSummary();
+  const goalId = String(optionButton.dataset.statsMissionOption || "").trim();
+  if (!goalId) {
+    return;
+  }
+  const selectedIds = new Set((Array.isArray(state.statsAspectModal?.missionGoalIds) ? state.statsAspectModal.missionGoalIds : []).map((item) => String(item || "").trim()).filter(Boolean));
+  if (selectedIds.has(goalId)) {
+    selectedIds.delete(goalId);
+  } else {
+    selectedIds.add(goalId);
+  }
+  state.statsAspectModal.missionGoalIds = [...selectedIds];
+  renderStatsAspectMissionOptions();
+});
+
+statsAspectMissionSaveButton?.addEventListener("click", () => {
+  void (async () => {
+    const categoryId = String(state.statsAspectModal?.categoryId || "").trim().toLowerCase();
+    if (!categoryId) {
+      return;
+    }
+    state.statsAspectConfig[categoryId] = {
+      ...getStatsAspectConfigEntry(categoryId),
+      targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
+      missionGoalIds: Array.isArray(state.statsAspectModal.missionGoalIds)
+        ? [...new Set(state.statsAspectModal.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
+        : []
+    };
+    try {
+      await persistStatsAspectConfig(categoryId);
+      closeModal("statsAspectMissionAssignModal");
+      await loadStatsSummary();
+      renderStatsAspectModalState();
+    } catch (error) {
+      if (statsAspectMissionStatus) {
+        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a atribuição.";
+      }
+    }
+  })();
 });
 
 statsAspectMissionClearButton?.addEventListener("click", () => {
-  const categoryId = String(state.statsAspectModal?.categoryId || "").trim().toLowerCase();
-  if (!categoryId) {
-    return;
-  }
-  state.statsAspectModal.missionGoalId = "";
-  state.statsAspectConfig[categoryId] = {
-    ...getStatsAspectConfigEntry(categoryId),
-    targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
-    missionGoalId: ""
-  };
-  persistStatsAspectConfig();
-  closeModal("statsAspectMissionAssignModal");
-  renderStatsAspectModalState();
-  void loadStatsSummary();
+  void (async () => {
+    const categoryId = String(state.statsAspectModal?.categoryId || "").trim().toLowerCase();
+    if (!categoryId) {
+      return;
+    }
+    state.statsAspectModal.missionGoalIds = [];
+    state.statsAspectConfig[categoryId] = {
+      ...getStatsAspectConfigEntry(categoryId),
+      targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
+      missionGoalIds: []
+    };
+    try {
+      await persistStatsAspectConfig(categoryId);
+      closeModal("statsAspectMissionAssignModal");
+      await loadStatsSummary();
+      renderStatsAspectModalState();
+    } catch (error) {
+      if (statsAspectMissionStatus) {
+        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao limpar as missões.";
+      }
+    }
+  })();
 });
 
 missionProgressMinusButton?.addEventListener("click", () => {
@@ -11523,7 +11673,7 @@ saveSleepConfigBtn?.addEventListener("click", () => {
       };
       state.sleepFlow.pendingAction = buildSleepFlowAction(payload?.action, fallbackSleepAction) || fallbackSleepAction;
       closeModal(sleepConfigModal);
-      await loadActions({ preserveSleepAction: state.sleepFlow.pendingAction });
+      await loadActions({ preserveSleepAction: state.sleepFlow.pendingAction, silent: true });
       openSleepSessionModal();
       await ensureSleepFrequencyPlayback();
     } catch (error) {

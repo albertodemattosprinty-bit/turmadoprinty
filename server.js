@@ -55,7 +55,7 @@ import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugify
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { abortSleepSessionAction, activateSleepSessionAction, addManualSleepMinutesAction, createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, finishSleepSessionAction, getProject200RuntimeState, getSleepSessionAction, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual, upsertSleepSessionAction } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
-import { ensureStatsSchema, getStatsGoals, getStatsSummary, updateStatsGoals } from "./src/stats.js";
+import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
@@ -11365,6 +11365,49 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel atualizar metas."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/stats-aspects") {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const profile = requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME;
+      const config = await getProject200StatsAspectConfig(user.id, profile);
+      sendJson(response, 200, { ok: true, config });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar as configuracoes das metricas."
+      });
+    }
+    return;
+  }
+
+  if ((request.method === "PUT" || request.method === "PATCH") && pathname.startsWith("/api/200/stats-aspects/")) {
+    try {
+      const user = await requireAuth(request, response);
+
+      if (!user) {
+        return;
+      }
+
+      const categoryId = decodeURIComponent(pathname.slice("/api/200/stats-aspects/".length));
+      const body = await readJsonBody(request);
+      const profile = body?.profile || PROJECT200_DEFAULT_PROFILE_NAME;
+      const config = await updateProject200StatsAspectConfig(user.id, profile, categoryId, {
+        targetMinutes: body?.targetMinutes,
+        missionGoalIds: body?.missionGoalIds
+      });
+      sendJson(response, 200, { ok: true, config });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar as configuracoes das metricas."
       });
     }
     return;

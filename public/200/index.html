@@ -976,44 +976,35 @@
   </section>
 
   <section class="workspace-modal" id="statsModal" aria-hidden="true" aria-label="Estatísticas">
-    <div class="actions-app">
-      <header class="actions-head">
-        <button class="circle-nav" type="button" data-stats-scope-nav="-1" aria-label="Escopo anterior">
-          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
-        </button>
-        <button class="date-title" type="button" id="statsScopeLabel">Pontos</button>
-        <button class="circle-nav" type="button" data-stats-scope-nav="1" aria-label="Próximo escopo">
-          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
-        </button>
-      </header>
-
-      <section class="finance-overview" id="statsMissionSummary">
-        <article class="finance-metric">
-          <span>Hoje</span>
-          <strong id="statsMissionTotal">0</strong>
-        </article>
-        <article class="finance-metric">
-          <span>Ultimos 7 dias</span>
-          <strong id="statsMissionCompleted">0</strong>
-        </article>
-        <article class="finance-metric">
-          <span>Ultimos 30 dias</span>
-          <strong id="statsMissionPending">0</strong>
-        </article>
-      </section>
-
-      <div class="actions-list">
+    <div class="actions-app stats-actions-app">
+      <div class="actions-list stats-actions-list">
         <div id="statsMissionsList"></div>
-        <div id="statsRankingList"></div>
       </div>
-      <div class="actions-side-actions stats-side-actions">
-        <button class="icon-action-btn actions-side-btn actions-side-btn-right" type="button" data-close-modal aria-label="Fechar estatísticas">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
+      <section class="project-hub stats-footer-hub" aria-label="Navegação de estatísticas">
+        <button class="hub-action" type="button" data-switch-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
+          <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Ações</span>
         </button>
-      </div>
+        <button class="hub-action" type="button" data-switch-modal="historyModal" data-loading-icon="/200/icons/target.svg" aria-label="Missões">
+          <img class="hub-icon-image" src="/200/icons/target.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Missões</span>
+        </button>
+        <button class="hub-action" type="button" aria-label="Estatísticas atuais" aria-current="page">
+          <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Estatísticas</span>
+        </button>
+        <button class="hub-action hub-ideas-action" type="button" data-switch-modal="ideasModal" data-loading-icon="/200/icons/text.svg" aria-label="Ideias">
+          <img class="hub-icon-image" src="/200/icons/text.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Ideias</span>
+        </button>
+        <button class="hub-action" type="button" data-switch-modal="optionsModal" data-loading-icon="/200/icons/options.svg" aria-label="Opções">
+          <img class="hub-icon-image" src="/200/icons/options.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Opções</span>
+        </button>
+      </section>
     </div>
 
-    <section class="workspace-modal simple-modal" id="statsAspectModal" aria-hidden="true" aria-label="Aspecto da estatística">
+    <section class="workspace-modal" id="statsAspectModal" aria-hidden="true" aria-label="Aspecto da estatística">
       <div class="finance-content history-mission-modal-content stats-aspect-modal-content">
         <button class="stats-aspect-assign-trigger" type="button" id="openStatsAspectMissionAssign" aria-label="Atribuir missão">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
@@ -1031,20 +1022,23 @@
         </div>
         <div class="stats-aspect-task-copy">Tarefas: <strong id="statsAspectTaskMinutes">0 minutos</strong></div>
         <div class="stats-aspect-task-copy">Progresso atual: <strong id="statsAspectProgressSummary">0%</strong></div>
+        <div class="stats-aspect-task-copy" id="statsAspectLinkedGoals">Missões vinculadas: <strong>Nenhuma</strong></div>
         <p class="finance-status" id="statsAspectStatus" aria-live="polite"></p>
         <button class="primary-btn" type="button" id="statsAspectSaveButton">Salvar meta</button>
         <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
       </div>
     </section>
 
-    <section class="workspace-modal simple-modal" id="statsAspectMissionAssignModal" aria-hidden="true" aria-label="Atribuir missão ao aspecto">
+    <section class="workspace-modal" id="statsAspectMissionAssignModal" aria-hidden="true" aria-label="Atribuir missão ao aspecto">
       <div class="finance-content history-mission-modal-content stats-aspect-assign-content">
         <div class="running-task-name">Atribuir missão</div>
-        <p class="options-note" id="statsAspectMissionAssignLabel">Selecione uma missão para controlar este aspecto.</p>
-        <select class="text-field options-text-field" id="statsAspectMissionSelect"></select>
+        <p class="options-note" id="statsAspectMissionAssignLabel">Selecione uma ou mais missões para controlar este aspecto.</p>
+        <div class="stats-aspect-selected-summary" id="statsAspectMissionSelectedSummary">Nenhuma missão vinculada.</div>
+        <div class="stats-aspect-mission-options" id="statsAspectMissionOptions"></div>
         <p class="finance-status" id="statsAspectMissionStatus" aria-live="polite"></p>
         <button class="primary-btn" type="button" id="statsAspectMissionSaveButton">Salvar atribuição</button>
-        <button class="ghost-btn running-music-default-close" type="button" id="statsAspectMissionClearButton">Remover missão</button>
+        <button class="ghost-btn running-music-default-close" type="button" id="statsAspectMissionClearButton">Remover missões</button>
+        <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
       </div>
     </section>
 

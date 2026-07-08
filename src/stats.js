@@ -1,9 +1,44 @@
 import { query } from "./db.js";
-import { PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
+import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 const DEFAULT_SALDO_GOAL_CENTS = 1000000;
 const CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE = 3;
 const closedDailyReportSyncByUser = new Map();
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
+const PROJECT200_STATS_ASPECT_CATEGORIES = new Set([
+  "sono",
+  "alimentacao",
+  "hidratacao",
+  "estudo",
+  "financeiro",
+  "trabalho",
+  "casa",
+  "exercicios",
+  "social",
+  "familia",
+  "higiene",
+  "lazer"
+]);
+
+function normalizeProject200StatsProfile(value) {
+  return normalizeStoredProject200ProfileName(value || PROJECT200_DEFAULT_PROFILE_NAME);
+}
+
+function normalizeProject200StatsCategoryId(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return PROJECT200_STATS_ASPECT_CATEGORIES.has(normalized) ? normalized : "";
+}
+
+function normalizeProject200MissionGoalIds(value) {
+  const list = Array.isArray(value) ? value : [];
+  const unique = new Set();
+  for (const item of list) {
+    const normalized = String(item || "").trim();
+    if (normalized) {
+      unique.add(normalized);
+    }
+  }
+  return [...unique];
+}
 
 function getProjectTimeZoneOffsetMinutes(date) {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -138,6 +173,88 @@ export async function ensureStatsSchema() {
       unique (user_id, report_date)
     );
   `);
+
+  await query(`
+    create table if not exists project200_stats_aspects (
+      user_id uuid not null references users(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      category_id text not null,
+      target_minutes integer not null default 1,
+      mission_goal_ids jsonb not null default '[]'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      primary key (user_id, assigned_profile, category_id)
+    );
+  `);
+  await query("alter table project200_stats_aspects add column if not exists assigned_profile text not null default 'Usuario';");
+  await query("alter table project200_stats_aspects add column if not exists category_id text not null default '';");
+  await query("alter table project200_stats_aspects add column if not exists target_minutes integer not null default 1;");
+  await query("alter table project200_stats_aspects add column if not exists mission_goal_ids jsonb not null default '[]'::jsonb;");
+  await query("alter table project200_stats_aspects add column if not exists created_at timestamptz not null default now();");
+  await query("alter table project200_stats_aspects add column if not exists updated_at timestamptz not null default now();");
+  await query("update project200_stats_aspects set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
+  await query("create index if not exists idx_project200_stats_aspects_user_profile on project200_stats_aspects(user_id, assigned_profile, updated_at desc);");
+}
+
+function normalizeProject200StatsAspectRow(row) {
+  const missionGoalIds = normalizeProject200MissionGoalIds(row?.mission_goal_ids);
+  return {
+    categoryId: normalizeProject200StatsCategoryId(row?.category_id),
+    targetMinutes: Math.max(1, Math.trunc(Number(row?.target_minutes || 1) || 1)),
+    missionGoalIds
+  };
+}
+
+export async function getProject200StatsAspectConfig(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
+  await ensureStatsSchema();
+  const normalizedProfile = normalizeProject200StatsProfile(profileName);
+  const result = await query(
+    `
+      select category_id, target_minutes, mission_goal_ids
+      from project200_stats_aspects
+      where user_id = $1
+        and assigned_profile = $2
+      order by category_id asc
+    `,
+    [userId, normalizedProfile]
+  );
+  const config = {};
+  for (const row of result.rows) {
+    const normalized = normalizeProject200StatsAspectRow(row);
+    if (!normalized.categoryId) {
+      continue;
+    }
+    config[normalized.categoryId] = {
+      targetMinutes: normalized.targetMinutes,
+      missionGoalIds: normalized.missionGoalIds
+    };
+  }
+  return config;
+}
+
+export async function updateProject200StatsAspectConfig(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, categoryId, payload = {}) {
+  await ensureStatsSchema();
+  const normalizedProfile = normalizeProject200StatsProfile(profileName);
+  const normalizedCategoryId = normalizeProject200StatsCategoryId(categoryId);
+  if (!normalizedCategoryId) {
+    throw new Error("Categoria de estatística inválida.");
+  }
+  const targetMinutes = Math.max(1, Math.trunc(Number(payload?.targetMinutes || 1) || 1));
+  const missionGoalIds = normalizeProject200MissionGoalIds(payload?.missionGoalIds);
+  await query(
+    `
+      insert into project200_stats_aspects (
+        user_id, assigned_profile, category_id, target_minutes, mission_goal_ids, created_at, updated_at
+      )
+      values ($1, $2, $3, $4, $5::jsonb, now(), now())
+      on conflict (user_id, assigned_profile, category_id) do update
+        set target_minutes = excluded.target_minutes,
+            mission_goal_ids = excluded.mission_goal_ids,
+            updated_at = now()
+    `,
+    [userId, normalizedProfile, normalizedCategoryId, targetMinutes, JSON.stringify(missionGoalIds)]
+  );
+  return getProject200StatsAspectConfig(userId, normalizedProfile);
 }
 
 export async function getStatsGoals(userId) {
