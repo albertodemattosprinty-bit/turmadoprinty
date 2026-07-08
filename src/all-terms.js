@@ -36,6 +36,7 @@ export async function ensureAllTermsSchema() {
   await query(`
     create table if not exists "all-terms" (
       id uuid primary key default gen_random_uuid(),
+      user_id uuid references users(id) on delete set null,
       answers jsonb not null,
       event_date date not null,
       event_time text not null,
@@ -43,7 +44,9 @@ export async function ensureAllTermsSchema() {
       created_at timestamptz not null default now()
     );
   `);
+  await query(`alter table "all-terms" add column if not exists user_id uuid references users(id) on delete set null;`);
   await query(`create index if not exists idx_all_terms_event_date_time on "all-terms"(event_date asc, event_time_sort asc, created_at asc);`);
+  await query(`create index if not exists idx_all_terms_user_id_created_at on "all-terms"(user_id, created_at desc);`);
 }
 
 function normalizeMonthValue(rawMonth) {
@@ -137,7 +140,7 @@ export function sanitizeTermAnswers(input) {
   return answers;
 }
 
-export async function createAllTermEntry(rawAnswers) {
+export async function createAllTermEntry(rawAnswers, userId = null) {
   await ensureAllTermsSchema();
   const answers = sanitizeTermAnswers(rawAnswers);
   const eventDate = parseEventDate(answers);
@@ -145,11 +148,11 @@ export async function createAllTermEntry(rawAnswers) {
 
   const result = await query(
     `
-      insert into "all-terms" (answers, event_date, event_time, event_time_sort)
-      values ($1::jsonb, $2::date, $3, $4)
-      returning id, answers, event_date, event_time, event_time_sort, created_at;
+      insert into "all-terms" (user_id, answers, event_date, event_time, event_time_sort)
+      values ($1, $2::jsonb, $3::date, $4, $5)
+      returning id, user_id, answers, event_date, event_time, event_time_sort, created_at;
     `,
-    [JSON.stringify(answers), eventDate, answers.horario, eventTimeSort]
+    [userId || null, JSON.stringify(answers), eventDate, answers.horario, eventTimeSort]
   );
 
   return result.rows[0];
@@ -173,7 +176,7 @@ export async function listAllTermsByDate(dateIso) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, answers, event_date, event_time, created_at
+      select id, user_id, answers, event_date, event_time, created_at
       from "all-terms"
       where event_date = $1::date
       order by event_time_sort asc, created_at asc;
@@ -183,6 +186,7 @@ export async function listAllTermsByDate(dateIso) {
 
   return result.rows.map((row) => ({
     id: row.id,
+    userId: row.user_id || null,
     answers: row.answers || {},
     eventDate: row.event_date,
     eventTime: row.event_time,
@@ -209,7 +213,7 @@ export async function getAllTermById(termId) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, answers, event_date, event_time, created_at
+      select id, user_id, answers, event_date, event_time, created_at
       from "all-terms"
       where id = $1
       limit 1;
@@ -224,6 +228,39 @@ export async function getAllTermById(termId) {
 
   return {
     id: row.id,
+    userId: row.user_id || null,
+    answers: row.answers || {},
+    eventDate: row.event_date,
+    eventTime: row.event_time,
+    createdAt: row.created_at
+  };
+}
+
+export async function getLatestTermByUserId(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  await ensureAllTermsSchema();
+  const result = await query(
+    `
+      select id, user_id, answers, event_date, event_time, created_at
+      from "all-terms"
+      where user_id = $1
+      order by created_at desc
+      limit 1;
+    `,
+    [userId]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    userId: row.user_id || null,
     answers: row.answers || {},
     eventDate: row.event_date,
     eventTime: row.event_time,

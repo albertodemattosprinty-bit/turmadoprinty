@@ -109,7 +109,7 @@ function redirectToNext() {
 }
 
 function redirectAfterRegister() {
-  window.location.href = "/index.html";
+  redirectToNext();
 }
 
 function setAuthOutput(message) {

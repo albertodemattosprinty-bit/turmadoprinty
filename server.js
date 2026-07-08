@@ -52,7 +52,7 @@ import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscripti
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
-import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
+import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession } from "./src/project200-sleep.js";
@@ -8102,6 +8102,11 @@ function buildTermPdfBuffer(term) {
 }
 
 async function handleCreateTerm(request, response) {
+  const authUser = await requireAuth(request, response);
+  if (!authUser) {
+    return;
+  }
+
   if (!hasDatabase()) {
     sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
     return;
@@ -8109,7 +8114,7 @@ async function handleCreateTerm(request, response) {
 
   try {
     const body = await readJsonBody(request);
-    const term = await createAllTermEntry(body?.answers || {});
+    const term = await createAllTermEntry(body?.answers || {}, authUser.id);
     const answers = term?.answers || {};
     const months = [
       "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
@@ -8151,6 +8156,39 @@ async function handleCreateTerm(request, response) {
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel salvar o termo."
+    });
+  }
+}
+
+async function handleGetContractorPanel(request, response) {
+  const authUser = await requireAuth(request, response);
+  if (!authUser) {
+    return;
+  }
+
+  try {
+    const term = await getLatestTermByUserId(authUser.id);
+
+    sendJson(response, 200, {
+      ok: true,
+      user: sanitizeUser(authUser),
+      panel: {
+        hasTerm: Boolean(term),
+        term: term
+          ? {
+              id: term.id,
+              answers: term.answers || {},
+              eventDate: term.eventDate,
+              eventTime: term.eventTime,
+              createdAt: term.createdAt,
+              pdfUrl: `/api/terms/${term.id}/pdf`
+            }
+          : null
+      }
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar o painel do contratante."
     });
   }
 }
@@ -10857,6 +10895,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/terms") {
     await handleCreateTerm(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/contractor-panel") {
+    await handleGetContractorPanel(request, response);
     return;
   }
 

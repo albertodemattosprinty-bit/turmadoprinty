@@ -268,6 +268,37 @@
       color: rgba(255,255,255,0.92);
     }
 
+    .button-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(4, 24, 66, 0.64);
+      backdrop-filter: blur(6px);
+      z-index: 20;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+
+    .auth-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .auth-overlay-card {
+      width: min(420px, 100%);
+      text-align: center;
+    }
+
     @media (max-width: 560px) {
       .card { padding: 24px 16px; border-radius: 18px; }
       .picker { grid-template-columns: 48px 1fr 48px; }
@@ -276,6 +307,16 @@
   </style>
 </head>
 <body>
+  <section class="auth-overlay" id="authOverlay">
+    <div class="card auth-overlay-card">
+      <h1>Validando seu acesso</h1>
+      <p class="intro-copy" id="authOverlayMessage">Conferindo seu login para liberar o termo do evento.</p>
+      <div class="actions">
+        <a class="btn-primary button-link" id="authOverlayLink" href="/auth.html?next=/termo" hidden>Entrar agora</a>
+      </div>
+    </div>
+  </section>
+
   <section class="screen active" data-screen="intro">
     <div class="card">
       <h1>Formulário do Evento</h1>
@@ -365,6 +406,7 @@
       <p class="success-copy" id="successCopy">Seu formulário foi preenchido com sucesso.</p>
       <div class="actions">
         <button class="btn-secondary" id="downloadPdfBtn" type="button" style="display:none;">Baixar PDF</button>
+        <a class="btn-secondary button-link" id="contractorPanelBtn" href="/painel-do-contratante">Abrir painel</a>
         <button class="btn-primary" id="restartBtn" type="button">Preencher novamente</button>
       </div>
     </div>
@@ -374,6 +416,59 @@
   <div class="progress-label" id="progressLabel">Etapa 0/29</div>
 
   <script>
+    const sessionStorageKey = "turma_do_printy_token";
+    const authOverlay = document.getElementById("authOverlay");
+    const authOverlayMessage = document.getElementById("authOverlayMessage");
+    const authOverlayLink = document.getElementById("authOverlayLink");
+
+    function getToken() {
+      return window.localStorage.getItem(sessionStorageKey) || "";
+    }
+
+    function getAuthHeaders(extraHeaders = {}) {
+      const token = getToken();
+      return {
+        ...extraHeaders,
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
+    }
+
+    function redirectToLogin() {
+      window.location.href = "/auth.html?next=/termo";
+    }
+
+    async function ensureAuthenticatedAccess() {
+      const token = getToken();
+      if (!token) {
+        authOverlayMessage.textContent = "Entre com login e senha para preencher o termo do seu evento.";
+        authOverlayLink.hidden = false;
+        window.setTimeout(redirectToLogin, 500);
+        return false;
+      }
+
+      try {
+        const response = await fetch("/api/auth/me", {
+          headers: getAuthHeaders()
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || !data?.user) {
+          window.localStorage.removeItem(sessionStorageKey);
+          authOverlayMessage.textContent = data?.error || "Sua sessao expirou. Entre novamente para continuar.";
+          authOverlayLink.hidden = false;
+          window.setTimeout(redirectToLogin, 700);
+          return false;
+        }
+
+        authOverlay.classList.add("hidden");
+        return true;
+      } catch (error) {
+        authOverlayMessage.textContent = error instanceof Error ? error.message : "Nao foi possivel validar seu acesso.";
+        authOverlayLink.hidden = false;
+        return false;
+      }
+    }
+
     const historyOptions = [
       "Fábrica de heróis",
       "História de Samuel",
@@ -448,6 +543,7 @@
     const restartBtn = document.getElementById("restartBtn");
     const successCopy = document.getElementById("successCopy");
     const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+    const contractorPanelBtn = document.getElementById("contractorPanelBtn");
     const agreementH1 = document.getElementById("agreementH1");
     const agreementH2 = document.getElementById("agreementH2");
     const agreementIcon = document.getElementById("agreementIcon");
@@ -658,7 +754,7 @@
             try {
               const response = await fetch("/api/terms/checkout", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ stripeProductId: answers.pagamentoStripeProduto })
               });
               const data = await response.json();
@@ -796,7 +892,7 @@
       try {
         const response = await fetch("/api/terms", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ answers })
         });
         const data = await response.json();
@@ -808,6 +904,7 @@
         currentPdfUrl = data.pdfUrl || "";
         successCopy.textContent = "Seu formulário foi preenchido com sucesso e já foi salvo no sistema.";
         downloadPdfBtn.style.display = currentPdfUrl ? "inline-block" : "none";
+        contractorPanelBtn.style.display = "inline-flex";
 
         showScreen("success");
         currentStep = steps.length + 1;
@@ -848,6 +945,7 @@
       signatureError.textContent = "";
       successCopy.textContent = "Seu formulário foi preenchido com sucesso.";
       downloadPdfBtn.style.display = "none";
+      contractorPanelBtn.style.display = "inline-flex";
       showScreen("intro");
       updateProgress();
     });
@@ -920,6 +1018,7 @@
     });
 
     updateProgress();
+    void ensureAuthenticatedAccess();
   </script>
 </body>
 </html>

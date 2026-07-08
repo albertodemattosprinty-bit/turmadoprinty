@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Painel do Contratante</title>
+  <style>
+    :root {
+      --bg-top: #18385f;
+      --bg-bottom: #f5efe2;
+      --card: rgba(255, 255, 255, 0.88);
+      --card-strong: #ffffff;
+      --text: #19324f;
+      --muted: #58708f;
+      --line: rgba(25, 50, 79, 0.12);
+      --accent: #d58733;
+      --accent-strong: #b96824;
+      --success: #2c9f62;
+      --shadow: 0 24px 60px rgba(17, 34, 56, 0.14);
+      --radius: 28px;
+      --font-body: "Aptos", "Segoe UI", sans-serif;
+      --font-display: "Georgia", "Cambria", serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: var(--font-body);
+      background:
+        radial-gradient(circle at top left, rgba(255, 218, 166, 0.32), transparent 28%),
+        linear-gradient(180deg, var(--bg-top) 0%, #315782 26%, #f1efe8 26.1%, var(--bg-bottom) 100%);
+    }
+
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 64px;
+    }
+
+    .hero {
+      padding: 28px;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, rgba(15, 36, 60, 0.92), rgba(40, 85, 136, 0.88));
+      box-shadow: var(--shadow);
+      color: #fff;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3.3rem);
+      line-height: 1.04;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin-top: 14px;
+      max-width: 700px;
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 1.05rem;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 999px;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .button-primary {
+      background: linear-gradient(135deg, #f0b356, var(--accent-strong));
+      color: #fff;
+      box-shadow: 0 14px 28px rgba(212, 126, 39, 0.24);
+    }
+
+    .button-secondary {
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .summary-grid,
+    .sections-grid {
+      display: grid;
+      gap: 18px;
+      margin-top: 22px;
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .sections-grid {
+      grid-template-columns: 1.2fr 0.8fr;
+      align-items: start;
+    }
+
+    .card {
+      border-radius: 24px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      backdrop-filter: blur(10px);
+    }
+
+    .metric-label,
+    .card-label {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      font-size: clamp(1.1rem, 2.6vw, 1.6rem);
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .metric-value.countdown {
+      color: var(--accent-strong);
+    }
+
+    .section-title {
+      font-size: 1.35rem;
+      margin-bottom: 8px;
+    }
+
+    .section-copy {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .event-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .event-item {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: var(--card-strong);
+      border: 1px solid var(--line);
+    }
+
+    .event-item strong {
+      display: block;
+      font-size: 0.94rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .event-item span {
+      display: block;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .placeholder-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .placeholder-item {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.56);
+      border: 1px dashed rgba(25, 50, 79, 0.18);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: rgba(44, 159, 98, 0.14);
+      color: var(--success);
+      font-weight: 800;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 44px 24px;
+    }
+
+    .empty-state p {
+      margin-top: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .loading-shell {
+      display: grid;
+      place-items: center;
+      min-height: 60vh;
+    }
+
+    .loading-card {
+      width: min(420px, calc(100% - 32px));
+      text-align: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 900px) {
+      .summary-grid,
+      .sections-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section id="loadingState" class="loading-shell">
+      <div class="card loading-card">
+        <p class="eyebrow">Painel do contratante</p>
+        <h2>Montando o seu ambiente</h2>
+        <p class="section-copy">Estamos carregando os dados do seu evento.</p>
+      </div>
+    </section>
+
+    <section id="panelState" class="hidden">
+      <div class="hero">
+        <div class="hero-top">
+          <div>
+            <p class="eyebrow">Terceiro passo do fluxo</p>
+            <h1>Painel do contratante</h1>
+          </div>
+          <div class="status-pill">Evento vinculado ao seu login</div>
+        </div>
+        <p id="heroCopy">Aqui vai ficar tudo sobre o seu evento: resumo, pagamentos, materiais de divulgação e os próximos combinados.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="/termo">Atualizar termo</a>
+          <a class="button button-secondary" id="pdfLink" href="/termo">Baixar PDF do termo</a>
+        </div>
+      </div>
+
+      <section class="summary-grid">
+        <article class="card">
+          <span class="metric-label">Nome da igreja</span>
+          <strong class="metric-value" id="churchValue">-</strong>
+        </article>
+        <article class="card">
+          <span class="metric-label">Data do evento</span>
+          <strong class="metric-value" id="dateValue">-</strong>
+        </article>
+        <article class="card">
+          <span class="metric-label">Horario</span>
+          <strong class="metric-value" id="timeValue">-</strong>
+        </article>
+        <article class="card">
+          <span class="metric-label">Contagem regressiva</span>
+          <strong class="metric-value countdown" id="countdownValue">-</strong>
+        </article>
+      </section>
+
+      <section class="sections-grid">
+        <article class="card">
+          <span class="card-label">Resumo inicial</span>
+          <h2 class="section-title">Base do evento</h2>
+          <p class="section-copy">Esse primeiro bloco já nasce com as informações principais trazidas do termo, para servir de base para tudo que vier depois.</p>
+          <div class="event-list">
+            <div class="event-item">
+              <strong>Contratante</strong>
+              <span id="contractorValue">-</span>
+            </div>
+            <div class="event-item">
+              <strong>Cidade</strong>
+              <span id="cityValue">-</span>
+            </div>
+            <div class="event-item">
+              <strong>Historia escolhida</strong>
+              <span id="storyValue">-</span>
+            </div>
+            <div class="event-item">
+              <strong>WhatsApp</strong>
+              <span id="whatsappValue">-</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <span class="card-label">Estrutura prevista</span>
+          <h2 class="section-title">Proximas sessoes</h2>
+          <p class="section-copy">Deixei o painel pronto para crescer por etapas sem perder o vínculo com o evento e com o login do usuário.</p>
+          <div class="placeholder-list">
+            <div class="placeholder-item">
+              <strong>Pagamentos</strong>
+              <p class="section-copy">Status do sinal, vencimentos e comprovantes.</p>
+            </div>
+            <div class="placeholder-item">
+              <strong>Materiais de divulgacao</strong>
+              <p class="section-copy">Artes, textos e arquivos do evento em um so lugar.</p>
+            </div>
+            <div class="placeholder-item">
+              <strong>Checklist do evento</strong>
+              <p class="section-copy">Orientacoes, pendencias e alinhamentos finais.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </section>
+
+    <section id="emptyState" class="hidden">
+      <div class="card empty-state">
+        <p class="eyebrow">Painel do contratante</p>
+        <h2>Seu painel já está pronto para nascer</h2>
+        <p>Assim que o termo for preenchido neste login, este ambiente passa a mostrar automaticamente as informações básicas do evento.</p>
+        <div class="hero-actions" style="justify-content:center;">
+          <a class="button button-primary" href="/termo">Preencher termo</a>
+          <a class="button button-secondary" href="/eventos26">Voltar para eventos</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { getApiUrl } from "/api.js";
+
+    const sessionStorageKey = "turma_do_printy_token";
+    const loadingState = document.getElementById("loadingState");
+    const panelState = document.getElementById("panelState");
+    const emptyState = document.getElementById("emptyState");
+    const pdfLink = document.getElementById("pdfLink");
+
+    const churchValue = document.getElementById("churchValue");
+    const dateValue = document.getElementById("dateValue");
+    const timeValue = document.getElementById("timeValue");
+    const countdownValue = document.getElementById("countdownValue");
+    const contractorValue = document.getElementById("contractorValue");
+    const cityValue = document.getElementById("cityValue");
+    const storyValue = document.getElementById("storyValue");
+    const whatsappValue = document.getElementById("whatsappValue");
+    const heroCopy = document.getElementById("heroCopy");
+
+    function getToken() {
+      return window.localStorage.getItem(sessionStorageKey) || "";
+    }
+
+    function redirectToLogin() {
+      window.location.href = "/auth.html?next=/painel-do-contratante";
+    }
+
+    function formatEventDate(answers) {
+      const day = String(answers?.dia || "").trim();
+      const month = String(answers?.mes || "").trim();
+      const year = String(answers?.ano || "").trim();
+      return [day, month, year].filter(Boolean).join(" de ");
+    }
+
+    function buildEventDateObject(term) {
+      const dateIso = String(term?.eventDate || "").trim();
+      if (!dateIso) {
+        return null;
+      }
+
+      const [year, month, day] = dateIso.split("-").map((part) => Number(part));
+      if (!Number.isInteger(day) || !Number.isInteger(month) || !Number.isInteger(year)) {
+        return null;
+      }
+
+      return new Date(year, month - 1, day, 0, 0, 0, 0);
+    }
+
+    function formatCountdown(term) {
+      const eventDate = buildEventDateObject(term);
+      if (!eventDate) {
+        return "A definir";
+      }
+
+      const diff = eventDate.getTime() - Date.now();
+      if (diff <= 0) {
+        return "Evento chegando";
+      }
+
+      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      return `${days} dias`;
+    }
+
+    function fillPanel(term) {
+      const answers = term?.answers || {};
+      churchValue.textContent = answers.igreja || "-";
+      dateValue.textContent = formatEventDate(answers) || "-";
+      timeValue.textContent = answers.horario || "-";
+      countdownValue.textContent = formatCountdown(term);
+      contractorValue.textContent = answers.contratante || "-";
+      cityValue.textContent = answers.cidade || "-";
+      storyValue.textContent = answers.historia || "-";
+      whatsappValue.textContent = answers.whatsapp || "-";
+      heroCopy.textContent = `Tudo o que for entrando no seu fluxo do evento pode nascer daqui. Hoje o painel já mostra o resumo base de ${answers.igreja || "seu evento"} e fica vinculado ao seu login.`;
+      pdfLink.href = term?.pdfUrl || "/termo";
+    }
+
+    async function loadPanel() {
+      const token = getToken();
+      if (!token) {
+        redirectToLogin();
+        return;
+      }
+
+      try {
+        const response = await fetch(getApiUrl("/api/contractor-panel"), {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (response.status === 401) {
+          window.localStorage.removeItem(sessionStorageKey);
+          redirectToLogin();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Nao foi possivel carregar o painel.");
+        }
+
+        loadingState.classList.add("hidden");
+
+        if (!data?.panel?.term) {
+          emptyState.classList.remove("hidden");
+          return;
+        }
+
+        fillPanel(data.panel.term);
+        panelState.classList.remove("hidden");
+      } catch (error) {
+        loadingState.innerHTML = `
+          <div class="card loading-card">
+            <p class="eyebrow">Painel do contratante</p>
+            <h2>Falha ao carregar</h2>
+            <p class="section-copy">${error instanceof Error ? error.message : "Erro desconhecido."}</p>
+          </div>
+        `;
+      }
+    }
+
+    void loadPanel();
+  </script>
+</body>
+</html>
