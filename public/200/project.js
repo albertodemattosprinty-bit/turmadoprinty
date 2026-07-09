@@ -5097,7 +5097,7 @@ function renderTaskComposerModal() {
   startDecisionMicButton.hidden = false;
   startDecisionMicButton.classList.toggle("is-active", actionMediaRecorder && actionMediaRecorder.state !== "inactive");
   if (closeStartDecisionModal) {
-    closeStartDecisionModal.hidden = mode === "edit";
+    closeStartDecisionModal.hidden = false;
   }
 
   renderTaskComposerMeta(
@@ -5139,26 +5139,33 @@ function renderTaskComposerModal() {
 
     const secondary = document.createElement("button");
     secondary.type = "button";
-    secondary.className = `decision-btn ${mode === "create" ? "decision-btn-edit" : "decision-btn-remove"}`;
-    secondary.innerHTML = `<span>${mode === "create" ? "Voltar" : "Excluir"}</span>`;
-    secondary.addEventListener("click", async () => {
-      if (mode === "create") {
-        closeStartDecisionModalWith("cancel");
-        return;
-      }
-      const action = findActionById(state.startDecisionContext.actionId);
-      if (!action) {
-        closeStartDecisionModalWith("cancel");
-        return;
-      }
-      if (!window.confirm("Excluir essa tarefa? Se for repetida, toda a rede sera removida.")) {
-        return;
-      }
-      await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, { method: "DELETE" });
-      closeStartDecisionModalWith("remove");
-      await loadActions();
+    secondary.className = `decision-btn ${mode === "create" ? "decision-btn-edit" : "decision-btn-back"}`;
+    secondary.innerHTML = "<span>Voltar</span>";
+    secondary.addEventListener("click", () => {
+      closeStartDecisionModalWith("cancel");
     });
     startDecisionActions.appendChild(secondary);
+
+    if (mode === "edit") {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "decision-btn decision-btn-remove";
+      removeButton.innerHTML = "<span>Excluir</span>";
+      removeButton.addEventListener("click", async () => {
+        const action = findActionById(state.startDecisionContext.actionId);
+        if (!action) {
+          closeStartDecisionModalWith("cancel");
+          return;
+        }
+        if (!window.confirm("Excluir essa tarefa? Se for repetida, toda a rede sera removida.")) {
+          return;
+        }
+        await apiRequest(`/api/actions/${encodeURIComponent(action.id)}`, { method: "DELETE" });
+        closeStartDecisionModalWith("remove");
+        await loadActions();
+      });
+      startDecisionActions.appendChild(removeButton);
+    }
   }
 }
 
@@ -9580,7 +9587,7 @@ async function bootstrapProject200App() {
 
 function openPrimaryRunningSurface() {
   if (!getToken()) {
-    openModal("runningTaskModal");
+    redirectToProject200Login();
     return;
   }
   const hasAnyTasks = getVisibleActions().length > 0;

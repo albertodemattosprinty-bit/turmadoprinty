@@ -11,8 +11,18 @@
 </head>
 <body data-background-theme="edge">
   <script>
-    (function applyStoredProject200Theme() {
+    (function bootstrapProject200Access() {
       try {
+        var tokenMatch = document.cookie.match(/(?:^|;\s*)turma_do_printy_token=([^;]+)/);
+        var storedToken = window.localStorage.getItem("turma_do_printy_token") || "";
+        var cookieToken = tokenMatch && tokenMatch[1] ? decodeURIComponent(tokenMatch[1]) : "";
+        if (!String(storedToken || cookieToken || "").trim()) {
+          var target = /\/200\/index\.html$/i.test(window.location.pathname || "")
+            ? "/log/index.html?next=/200"
+            : "/log?next=/200";
+          window.location.replace(target);
+          return;
+        }
         var raw = window.localStorage.getItem("project_200_options_v1");
         var parsed = raw ? JSON.parse(raw) : null;
         var theme = String(parsed && parsed.backgroundTheme || "").trim().toLowerCase();
@@ -46,27 +56,11 @@
   <main class="project-shell">
     <section class="home-profile-hero">
       <div class="home-running-widget-shell">
-        <button class="running-circle-toggle running-circle-toggle-left home-running-toggle" id="homeRunningModePercentBtn" type="button" aria-label="Mostrar porcentagem">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h3V9H4zm6 0h3V5h-3zm6 0h3V12h-3z"/></svg>
-        </button>
-        <button class="home-profile-button" id="homeProfileButton" type="button" aria-label="Painel da rotina">
-          <div class="home-running-widget">
-            <svg class="running-progress-ring home-running-progress-ring" viewBox="0 0 120 120" aria-hidden="true">
-              <circle class="running-progress-ring-bg" cx="60" cy="60" r="48"></circle>
-              <circle class="running-progress-ring-fill" id="homeRunningProgressRing" cx="60" cy="60" r="48"></circle>
-            </svg>
-            <div class="running-task-percent home-running-percent" id="homeRunningPercent">0%</div>
-          </div>
-        </button>
-        <button class="running-circle-toggle running-circle-toggle-right home-running-toggle" id="homeRunningModeTimeBtn" type="button" aria-label="Mostrar tempo">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
+        <button class="home-profile-button home-profile-play-button" id="homeProfileButton" type="button" aria-label="Abrir andamento">
+          <svg class="home-profile-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z" fill="currentColor"/></svg>
         </button>
       </div>
       <span class="home-profile-name" id="homeProfileName" hidden>Usuario</span>
-      <div class="home-running-date" aria-live="polite">
-        <span class="home-running-date-line" id="homeRunningDatePrimary"></span>
-        <span class="home-running-date-line" id="homeRunningDateSecondary"></span>
-      </div>
     </section>
     <section class="project-hub" aria-label="Projeto 200">
       <button class="hub-action" type="button" data-open-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
