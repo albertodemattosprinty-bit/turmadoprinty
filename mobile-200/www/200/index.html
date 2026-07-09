@@ -9,7 +9,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/200/project.css?v=20260708-home-radio-fix-1" />
 </head>
-<body data-background-theme="white">
+<body data-background-theme="edge">
+  <script>
+    (function applyStoredProject200Theme() {
+      try {
+        var raw = window.localStorage.getItem("project_200_options_v1");
+        var parsed = raw ? JSON.parse(raw) : null;
+        var theme = String(parsed && parsed.backgroundTheme || "").trim().toLowerCase();
+        if (theme === "modern") theme = "black";
+        var allowed = ["white", "black", "orange", "bluevivid", "pinkstrong", "bluedark", "brown", "edge", "light"];
+        if (allowed.indexOf(theme) !== -1) {
+          document.body.setAttribute("data-background-theme", theme);
+        }
+      } catch {}
+    })();
+  </script>
   <section class="project-login-overlay" id="profileManageOverlay" aria-hidden="true">
     <div class="project-login-card">
       <h2 id="profileManageTitle">Gerenciar usuário</h2>
@@ -49,6 +63,10 @@
         </button>
       </div>
       <span class="home-profile-name" id="homeProfileName" hidden>Usuario</span>
+      <div class="home-running-date" aria-live="polite">
+        <span class="home-running-date-line" id="homeRunningDatePrimary"></span>
+        <span class="home-running-date-line" id="homeRunningDateSecondary"></span>
+      </div>
     </section>
     <section class="project-hub" aria-label="Projeto 200">
       <button class="hub-action" type="button" data-open-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
@@ -63,13 +81,13 @@
         <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Estat.</span>
       </button>
-      <button class="hub-action hub-ideas-action" type="button" data-open-modal="ideasModal" data-loading-icon="/200/icons/text.svg" aria-label="Ideias">
-        <img class="hub-icon-image" src="/200/icons/text.svg" alt="" aria-hidden="true" />
-        <span class="hub-action-label">Ideias</span>
-      </button>
       <button class="hub-action" type="button" data-open-modal="optionsModal" data-loading-icon="/200/icons/options.svg" aria-label="Opções">
         <img class="hub-icon-image" src="/200/icons/options.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Opções</span>
+      </button>
+      <button class="hub-action" type="button" id="homeLogoutButton" aria-label="Sair">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 12h9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="hub-action-label">Sair</span>
       </button>
     </section>
     <section class="profile-selector profile-footer" id="profileFooter" aria-label="Usuários"></section>
@@ -553,7 +571,7 @@
 
       <div class="auth-alert" id="constitutionAuthAlert" hidden>
         <span>Entre na sua conta para editar e aprovar versões da constituição.</span>
-        <a href="/auth.html?next=/200">Entrar</a>
+        <a href="/log?next=/200">Entrar</a>
       </div>
 
       <article class="constitution-text-wrap">

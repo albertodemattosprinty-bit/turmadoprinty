@@ -551,6 +551,7 @@ const project200CreateProfileNameInput = document.getElementById("project200Crea
 const project200CreateProfileMessage = document.getElementById("project200CreateProfileMessage");
 const project200CreateProfileConfirmButton = document.getElementById("project200CreateProfileConfirm");
 const homeProfileButton = document.getElementById("homeProfileButton");
+const homeLogoutButton = document.getElementById("homeLogoutButton");
 const homeProfileName = document.getElementById("homeProfileName");
 const profileRenameInput = document.getElementById("profileRenameInput");
 const profileRenameMessage = document.getElementById("profileRenameMessage");
@@ -591,6 +592,7 @@ let startupLoadingActive = false;
 let homeSnapshotHydrationPromise = null;
 let lastHomeSnapshotHydratedAtMs = 0;
 let homeBootstrapRetryTimer = null;
+let homeDeviceClockTimer = null;
 let statsAspectConfigHydrationPromise = null;
 const profileAvatarUploadButton = document.getElementById("profileAvatarUploadButton");
 const profileAvatarGenerateButton = document.getElementById("profileAvatarGenerateButton");
@@ -971,7 +973,7 @@ function normalizeBackgroundTheme(value) {
   if (normalized === "modern") {
     return "black";
   }
-  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "black";
+  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "edge";
 }
 
 function getBackgroundThemeMode(value) {
@@ -1003,6 +1005,14 @@ function isNativeCapacitorApp() {
   }
   const platform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "";
   return platform === "android" || platform === "ios";
+}
+
+function getProject200LoginPath() {
+  return isNativeCapacitorApp() ? "/log/index.html?next=/200" : "/log?next=/200";
+}
+
+function redirectToProject200Login() {
+  window.location.replace(getProject200LoginPath());
 }
 
 async function hydrateNativeToken() {
@@ -2181,12 +2191,12 @@ function renderHomeRunningTask() {
     if (homeRunningPercent) {
       homeRunningPercent.innerHTML = centerMarkup;
     }
-    const now = new Date(getServerNowMs());
+    const now = new Date();
     if (homeRunningDatePrimary) {
-      homeRunningDatePrimary.textContent = formatHomeCalendarDate(now);
+      homeRunningDatePrimary.textContent = formatHomeDeviceClock(now);
     }
     if (homeRunningDateSecondary) {
-      homeRunningDateSecondary.textContent = formatHomeWeekdayLabel(now);
+      homeRunningDateSecondary.textContent = formatHomeDeviceDate(now);
     }
     if (homeProfileButton) {
       homeProfileButton.setAttribute("aria-label", ariaLabel);
@@ -3242,6 +3252,41 @@ function formatHomeWeekdayLabel(date = new Date()) {
   }).format(date));
 }
 
+function formatHomeDeviceClock(date = new Date()) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function formatHomeDeviceDate(date = new Date()) {
+  return capitalizeFirstLetter(new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit"
+  }).format(date));
+}
+
+function syncHomeDeviceClock() {
+  if (!homeRunningDatePrimary || !homeRunningDateSecondary || !state.homeSnapshotReady) {
+    return;
+  }
+  if (state.runningCompletion.active || getRunningActionForSelectedProfile()) {
+    return;
+  }
+  const now = new Date();
+  homeRunningDatePrimary.textContent = formatHomeDeviceClock(now);
+  homeRunningDateSecondary.textContent = formatHomeDeviceDate(now);
+}
+
+function startHomeDeviceClock() {
+  syncHomeDeviceClock();
+  if (homeDeviceClockTimer) {
+    window.clearInterval(homeDeviceClockTimer);
+  }
+  homeDeviceClockTimer = window.setInterval(syncHomeDeviceClock, 1000);
+}
+
 function formatHistoryDateLabel(date) {
   if (isSameDate(date, todayStart())) {
     return "Hoje";
@@ -4033,7 +4078,7 @@ async function loadFinanceSummary() {
     if (saveFinanceNotesButton) {
       saveFinanceNotesButton.disabled = true;
     }
-    financeStatus.innerHTML = 'Entre para ver seu financeiro. <a href="/auth.html?next=/200">Entrar</a>';
+    financeStatus.innerHTML = 'Entre para ver seu financeiro. <a href="/log?next=/200">Entrar</a>';
     return;
   }
 
@@ -5786,7 +5831,7 @@ async function submitProfileAvatarGeneration() {
 
   const token = getToken();
   if (!token) {
-    window.location.href = "/auth.html?next=/200";
+    redirectToProject200Login();
     return;
   }
 
@@ -5854,7 +5899,7 @@ async function submitProfileAvatarUpload() {
 
   const token = getToken();
   if (!token) {
-    window.location.href = "/auth.html?next=/200";
+    redirectToProject200Login();
     return;
   }
 
@@ -5914,7 +5959,7 @@ async function submitProfileSvgSuggestion() {
   }
   const token = getToken();
   if (!token) {
-    window.location.href = "/auth.html?next=/200";
+    redirectToProject200Login();
     return;
   }
   profileSvgSuggestBusy = true;
@@ -8310,7 +8355,7 @@ function renderRunningMissionQuickButtons() {
 
 async function openRunningMissionQuickModal() {
   if (!getToken()) {
-    window.location.href = "/auth.html?next=/200";
+    redirectToProject200Login();
     return;
   }
   renderRunningMissionQuickButtons();
@@ -9362,8 +9407,7 @@ async function bootstrapProject200App() {
     await hydrateNativeToken();
     const token = getToken();
     if (!token) {
-      openProject200LoginOverlay("");
-      renderHomeRunningTask();
+      redirectToProject200Login();
       return;
     }
 
@@ -9375,7 +9419,7 @@ async function bootstrapProject200App() {
       } catch (error) {
         if (isAuthErrorMessage(error?.message)) {
           clearProject200SessionState();
-          openProject200LoginOverlay("Sua sessão expirou. Entre novamente.");
+          redirectToProject200Login();
           return;
         }
       }
@@ -9388,7 +9432,7 @@ async function bootstrapProject200App() {
     } catch (error) {
       if (isAuthErrorMessage(error?.message)) {
         clearProject200SessionState();
-        openProject200LoginOverlay("Sua sessão expirou. Entre novamente.");
+        redirectToProject200Login();
       } else {
         renderHomeRunningTask();
       }
@@ -9516,7 +9560,7 @@ function loadOptionsConfig() {
   } catch {
     state.options.showFreeTime = true;
     state.options.completionBeepCycles = 0;
-    state.options.backgroundTheme = "white";
+    state.options.backgroundTheme = "edge";
     state.options.screenLockEnabled = false;
     state.options.stopMusicOnFinish = false;
   }
@@ -9745,7 +9789,7 @@ document.querySelectorAll("[data-constitution-nav]").forEach((button) => {
 
 openActionWizardButton.addEventListener("click", () => {
   if (!getToken()) {
-    window.location.href = "/auth.html?next=/200";
+    redirectToProject200Login();
     return;
   }
 
@@ -10238,7 +10282,7 @@ renderDateHeader();
 
 openPlatformWizardButton?.addEventListener("click", () => {
   if (!getToken()) {
-    window.location.href = "/auth.html?next=/200";
+    redirectToProject200Login();
     return;
   }
   openPlatformWizard();
@@ -11059,11 +11103,14 @@ logoutProject200Button?.addEventListener("click", () => {
   }
   clearProject200SessionState();
   closeModal("optionsModal");
-  openProject200LoginOverlay("Login removido deste aparelho.");
+  redirectToProject200Login();
+});
+homeLogoutButton?.addEventListener("click", () => {
+  logoutProject200Button?.click();
 });
 openProject200ExportModalButton?.addEventListener("click", () => {
   if (!getToken()) {
-    window.location.href = "/auth.html?next=/200";
+    redirectToProject200Login();
     return;
   }
   openModal("project200ExportModal");
@@ -11343,7 +11390,7 @@ homeProfileButton?.addEventListener("pointerdown", (event) => {
       }
       profileLongPressHandledProfile = profilePressProfile;
       if (!getToken()) {
-        window.location.href = "/auth.html?next=/200";
+        redirectToProject200Login();
         return;
       }
       openTaskComposer();
@@ -11708,6 +11755,7 @@ project200RegisterForm?.addEventListener("submit", (event) => {
 loadOptionsConfig();
 applyScreenLockUi();
 scheduleScreenLockInactivity();
+startHomeDeviceClock();
 
 document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));
@@ -11729,16 +11777,19 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("focus", () => {
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
+  syncHomeDeviceClock();
   void refreshHomeSnapshot();
 });
 window.addEventListener("pageshow", () => {
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
+  syncHomeDeviceClock();
   void refreshHomeSnapshot();
 });
 document.addEventListener("resume", () => {
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
+  syncHomeDeviceClock();
   void refreshHomeSnapshot();
 });
 startRunningTaskTicker();
