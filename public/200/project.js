@@ -583,8 +583,8 @@ const profileAvatarFileInput = document.getElementById("profileAvatarFileInput")
 const profileAvatarChooseButton = document.getElementById("profileAvatarChooseButton");
 const profileAvatarFileName = document.getElementById("profileAvatarFileName");
 const profileAvatarMessage = document.getElementById("profileAvatarMessage");
-const homeRunningSurfaceActiveSvg = `<g><path fill="#7BD9BF" d="M454.516 236.265 82.152 3.538C74.976-.947 65.934-1.183 58.535 2.917c-7.399 4.099-11.99 11.894-11.99 20.354v232.727 232.727c0 8.46 4.591 16.254 11.992 20.356 3.516 1.949 7.401 2.917 11.281 2.917 4.287 0 8.567-1.184 12.335-3.537l372.364-232.726c6.805-4.253 10.938-11.711 10.938-19.735 0 0 0 0 0-.002 0-8.022-4.134-15.48-10.937-19.733Z"/><path fill="#66B4BA" d="M58.537 509.082c3.516 1.949 7.401 2.917 11.281 2.917 4.287 0 8.567-1.184 12.335-3.537l372.364-232.726c6.805-4.253 10.938-11.711 10.938-19.735v-.002H46.545v232.727c0 8.461 4.591 16.254 11.992 20.356Z"/></g>`;
-const homeRunningSurfaceIdleSvg = `<g transform="translate(1 1)"><path fill="#CCCCCC" d="M502.467 255c0 136.533-110.933 247.467-247.467 247.467S7.533 391.533 7.533 255 118.467 7.533 255 7.533 502.467 118.467 502.467 255"/><path fill="#E2E3E5" d="M476.867 255c0 136.533-98.987 247.467-221.867 247.467S33.133 391.533 33.133 255 132.12 7.533 255 7.533 476.867 118.467 476.867 255"/><path fill="#FFFFFF" d="M33.133 255C33.133 118.467 132.12 7.533 255 7.533 118.467 7.533 7.533 118.467 7.533 255S118.467 502.467 255 502.467C132.12 502.467 33.133 391.533 33.133 255"/><path fill="#B6B6B6" d="M255 511C114.2 511-1 395.8-1 255S114.2-1 255-1s256 115.2 256 256S395.8 511 255 511Zm0-494.933C123.587 16.067 16.067 123.587 16.067 255S123.587 493.933 255 493.933 493.933 386.413 493.933 255 386.413 16.067 255 16.067Z"/><polygon fill="#E0E0E0" points="383,255 195.267,383 195.267,257.56 195.267,127"/><path fill="#F0F0F0" d="M361.667 247.32c-14.507-23.04-58.027-43.52-81.92-59.733-20.48-13.653-40.96-23.893-59.733-39.253v220.16c5.12-3.413 11.093-5.973 16.213-9.387-1.707-4.267 0-9.387 3.413-11.093s6.827-2.56 11.093-3.413c1.707 0 3.413 0 4.267 0 17.067-15.36 33.28-31.573 53.76-42.667.853 0 .853 0 1.707-.853.853-.853.853-.853 1.707-1.707 11.093-6.827 23.04-12.8 34.987-18.773-1.707-3.413-.853-8.533 3.413-11.093 5.12-3.413 11.093-5.973 17.067-6.827.853 0 1.707 0 2.56 0 3.413-5.973 0-11.093-8.533-13.653"/><path fill="#B6B6B6" d="M195.267 391.533c-1.707 0-2.56 0-4.267-.853-2.56-1.707-4.267-4.267-4.267-7.68V127c0-3.413 1.707-5.973 4.267-7.68 2.56-1.707 5.973-.853 8.533.853l187.733 128c2.56 1.707 3.413 4.267 3.413 6.827 0 2.56-1.707 5.12-3.413 6.827l-187.733 128c-.853.853-2.56 1.706-4.266 1.706Zm8.533-248.32v223.573L367.64 255 203.8 143.213Z"/></g>`;
+const homeRunningSurfaceActiveIconPath = "/200/icons/home-running-surface-active.svg";
+const homeRunningSurfaceIdleIconPath = "/200/icons/home-running-surface-idle.svg";
 const svgSelectorModal = document.getElementById("svgSelectorModal");
 const svgSelectorTitle = document.getElementById("svgSelectorTitle");
 const svgSelectorHint = document.getElementById("svgSelectorHint");
@@ -2205,7 +2205,16 @@ function anchorToCurrentAction() {
 }
 
 function renderHomeRunningTask() {
+  const setHomeRunningSurfaceState = (isRunning) => {
+    if (homeRunningSurfaceIcon) {
+      homeRunningSurfaceIcon.src = isRunning ? homeRunningSurfaceActiveIconPath : homeRunningSurfaceIdleIconPath;
+    }
+    if (homeRunningSurfaceButton) {
+      homeRunningSurfaceButton.setAttribute("aria-label", isRunning ? "Abrir atividade em andamento" : "Abrir andamento");
+    }
+  };
   if (!state.homeSnapshotReady) {
+    setHomeRunningSurfaceState(false);
     setHomeRingPercent(0);
     if (homeRunningPercent) {
       homeRunningPercent.innerHTML = "";
@@ -2276,6 +2285,7 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
+    setHomeRunningSurfaceState(false);
     state.runningPlayer.defaultAppliedActionId = "";
     const now = new Date(getServerNowMs());
     const dayElapsedPercent = getDayElapsedPercent(now);
@@ -2326,6 +2336,7 @@ function renderHomeRunningTask() {
     return;
   }
   const { percent, percentPrecise, elapsedMinutes, durationMinutes, scheduleDeltaMinutes } = getRunningActionProgressState(action);
+  setHomeRunningSurfaceState(true);
   if (state.runningEndBell.actionId !== runningActionId) {
     state.runningEndBell.actionId = runningActionId;
     state.runningEndBell.played = false;
@@ -11277,8 +11288,8 @@ logoutProject200Button?.addEventListener("click", () => {
   closeModal("optionsModal");
   redirectToProject200Login();
 });
-homeLogoutButton?.addEventListener("click", () => {
-  logoutProject200Button?.click();
+homeRunningSurfaceButton?.addEventListener("click", () => {
+  openPrimaryRunningSurface();
 });
 openProject200ExportModalButton?.addEventListener("click", () => {
   if (!getToken()) {
