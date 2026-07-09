@@ -3380,10 +3380,9 @@ function formatHomeWeekdayLabel(date = new Date()) {
 }
 
 function formatHomeDeviceClock(date = new Date()) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
 
 function formatHomeDeviceDate(date = new Date()) {

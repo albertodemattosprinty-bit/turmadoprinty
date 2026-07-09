@@ -2050,6 +2050,34 @@ body.running-music-standalone #actionsModal .actions-list {
   grid-template-rows: 30fr 40fr 30fr;
   align-items: stretch;
   gap: 0;
+  position: relative;
+}
+
+.start-decision-home-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.start-decision-home-btn:hover,
+.start-decision-home-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.start-decision-home-btn svg {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 .start-decision-top,
