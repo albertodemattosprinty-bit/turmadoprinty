@@ -334,17 +334,14 @@ body.project-no-select textarea {
   padding: 0;
   display: grid;
   place-items: center;
-  width: min(320px, calc(100vw - 72px));
+  width: auto;
   cursor: pointer;
 }
 
 .home-profile-play-button {
-  width: min(220px, calc(100vw - 120px));
-  aspect-ratio: 1 / 1;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.24);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .home-profile-play-icon {
@@ -357,7 +354,7 @@ body.project-no-select textarea {
 
 .home-running-widget-shell {
   position: relative;
-  width: min(220px, calc(100vw - 120px));
+  width: auto;
   display: grid;
   place-items: center;
 }

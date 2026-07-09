@@ -547,6 +547,7 @@ const profileReassignTargetHint = document.getElementById("profileReassignTarget
 const profileReassignConfirmButton = document.getElementById("profileReassignConfirm");
 const profileFooter = document.getElementById("profileFooter");
 const openProject200CreateProfileModalButton = document.getElementById("openProject200CreateProfileModal");
+const openProfileAvatarModalFromOptionsButton = document.getElementById("openProfileAvatarModalFromOptions");
 const project200CreateProfileNameInput = document.getElementById("project200CreateProfileName");
 const project200CreateProfileMessage = document.getElementById("project200CreateProfileMessage");
 const project200CreateProfileConfirmButton = document.getElementById("project200CreateProfileConfirm");
@@ -3407,7 +3408,19 @@ function getActionAvatarPath(assignee) {
   return getProfileAvatarPath(assignee);
 }
 
+function isBlackBackgroundThemeActive() {
+  return getBackgroundThemeMode(state.options.backgroundTheme).key === "black";
+}
+
 function getActionDisplayIcon(action) {
+  if (isBlackBackgroundThemeActive()) {
+    const assignee = String(action?.assignee || state.selectedProfile || getDefaultProfileName()).trim();
+    return {
+      src: getActionAvatarPath(assignee),
+      alt: assignee ? `Foto de ${assignee}` : "Foto do usuario",
+      categoryIcon: false
+    };
+  }
   const svgIconUrl = String(action?.svgIconUrl || "").trim();
   if (svgIconUrl) {
     return {
@@ -3491,7 +3504,10 @@ function getActionThemeDotColor(action, options = {}) {
 function buildActionTitleMarkup(title, dotColor = "", isBlinking = false) {
   const safeTitle = escapeHtml(formatActionTitleForDisplay(title));
   const safeDotColor = escapeHtml(String(dotColor || "").trim() || "#64748b");
-  return `<span class="task-status-dot${isBlinking ? " is-blinking" : ""}" style="--task-dot-color:${safeDotColor};" aria-hidden="true"></span><span class="task-title-text">${safeTitle}</span>`;
+  const dotMarkup = isBlackBackgroundThemeActive()
+    ? ""
+    : `<span class="task-status-dot${isBlinking ? " is-blinking" : ""}" style="--task-dot-color:${safeDotColor};" aria-hidden="true"></span>`;
+  return `${dotMarkup}<span class="task-title-text">${safeTitle}</span>`;
 }
 
 function getStationNameForCategory(categoryId) {
@@ -4931,7 +4947,8 @@ function buildPendingStartActionButtons(targetAction) {
   void targetAction;
   return [
     { label: "Iniciar", value: "start", primary: true },
-    { label: "Excluir", value: "remove" }
+    { label: "Excluir", value: "remove" },
+    { label: "Voltar", value: "cancel" }
   ];
 }
 
@@ -5194,9 +5211,6 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     if (startDecisionActions) {
       startDecisionActions.innerHTML = "";
       buttons.forEach((item) => {
-        if (item.value === "cancel") {
-          return;
-        }
         const btn = document.createElement("button");
         btn.type = "button";
         const icons = {
@@ -11549,6 +11563,13 @@ openProject200CreateProfileModalButton?.addEventListener("click", () => {
   project200CreateProfileMessage.textContent = "";
   project200CreateProfileNameInput.value = "";
   openModal("project200CreateProfileModal");
+});
+openProfileAvatarModalFromOptionsButton?.addEventListener("click", () => {
+  const profile = getProfileByName(state.selectedProfile) || getDefaultProfile();
+  if (!profile?.name) {
+    return;
+  }
+  openProfileAvatarModal(profile.name);
 });
 project200CreateProfileConfirmButton?.addEventListener("click", () => {
   void (async () => {
