@@ -49,12 +49,12 @@ const statsPointCategories = [
   { id: "alimentacao", name: "Alimentação", targetPoints: 30 },
   { id: "hidratacao", name: "Hidratação", targetPoints: 15 },
   { id: "estudo", name: "Estudo", targetPoints: 30 },
-  { id: "financeiro", name: "Financeiro", targetPoints: 30 },
+  { id: "financeiro", name: "Habilidades", targetPoints: 30 },
   { id: "trabalho", name: "Trabalho", targetPoints: 360 },
   { id: "casa", name: "Casa", targetPoints: 120 },
   { id: "exercicios", name: "Exercícios", targetPoints: 30 },
   { id: "social", name: "Social", targetPoints: 30 },
-  { id: "familia", name: "Familia", targetPoints: 30 },
+  { id: "familia", name: "Propósito", targetPoints: 30 },
   { id: "higiene", name: "Higiene", targetPoints: 15 },
   { id: "lazer", name: "Lazer", targetPoints: 90 }
 ];
@@ -72,14 +72,14 @@ const taskCategoryDefinitions = [
   { id: "alimentacao", name: "Alimentação" },
   { id: "hidratacao", name: "Hidratação" },
   { id: "estudo", name: "Estudo" },
-  { id: "financeiro", name: "Financeiro" },
+  { id: "financeiro", name: "Habilidades" },
   { id: "trabalho", name: "Trabalho" },
   { id: "casa", name: "Casa" },
   { id: "lazer", name: "Lazer" },
   { id: "exercicios", name: "Exercícios" },
   { id: "saude", name: "Saúde" },
   { id: "social", name: "Social" },
-  { id: "familia", name: "Família" },
+  { id: "familia", name: "Propósito" },
   { id: "higiene", name: "Higiene" },
   { id: "digital", name: "Digital" }
 ];
@@ -552,6 +552,7 @@ const project200CreateProfileNameInput = document.getElementById("project200Crea
 const project200CreateProfileMessage = document.getElementById("project200CreateProfileMessage");
 const project200CreateProfileConfirmButton = document.getElementById("project200CreateProfileConfirm");
 const homeProfileButton = document.getElementById("homeProfileButton");
+const homePlayTime = document.getElementById("homePlayTime");
 const homeLogoutButton = document.getElementById("homeLogoutButton");
 const homeProfileName = document.getElementById("homeProfileName");
 const profileRenameInput = document.getElementById("profileRenameInput");
@@ -3269,6 +3270,9 @@ function formatHomeDeviceDate(date = new Date()) {
 }
 
 function syncHomeDeviceClock() {
+  if (homePlayTime) {
+    homePlayTime.textContent = formatHomeDeviceClock(new Date());
+  }
   if (!homeRunningDatePrimary || !homeRunningDateSecondary || !state.homeSnapshotReady) {
     return;
   }
@@ -9479,8 +9483,7 @@ function openPrimaryRunningSurface() {
     redirectToProject200Login();
     return;
   }
-  const hasAnyTasks = getVisibleActions().length > 0;
-  openModal(hasAnyTasks ? "actionsModal" : "runningTaskModal");
+  openModal("runningTaskModal");
 }
 
 document.querySelectorAll("[data-open-modal]").forEach((button) => {
