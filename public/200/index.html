@@ -10,38 +10,6 @@
   <link rel="stylesheet" href="/200/project.css?v=20260708-home-radio-fix-1" />
 </head>
 <body data-background-theme="edge">
-  <section class="project-login-overlay" id="project200LoginOverlay" aria-hidden="true">
-    <div class="project-login-card">
-      <img class="project-login-logo" src="/200/branding/mindset-trainer.png" alt="Mindset Trainer" />
-      <div class="project-login-tabs" role="tablist" aria-label="Acesso do aplicativo">
-        <button class="project-login-tab active" type="button" id="project200LoginTabButton" data-project-login-tab="login" aria-selected="true">Entrar</button>
-        <button class="project-login-tab" type="button" id="project200RegisterTabButton" data-project-login-tab="register" aria-selected="false">Cadastrar</button>
-      </div>
-      <div class="project-login-panel active" id="project200LoginPanel">
-        <form id="project200LoginForm">
-          <label for="project200Username">Usuário</label>
-          <input id="project200Username" type="text" autocomplete="username" required />
-          <label for="project200Password">Senha</label>
-          <input id="project200Password" type="password" autocomplete="current-password" required />
-          <button type="submit" class="primary-btn">Entrar</button>
-        </form>
-      </div>
-      <div class="project-login-panel" id="project200RegisterPanel" hidden>
-        <form id="project200RegisterForm">
-          <label for="project200RegisterName">Nome</label>
-          <input id="project200RegisterName" type="text" autocomplete="name" required />
-          <label for="project200RegisterUsername">Usuário</label>
-          <input id="project200RegisterUsername" type="text" autocomplete="username" required />
-          <label for="project200RegisterPassword">Senha</label>
-          <input id="project200RegisterPassword" type="password" autocomplete="new-password" required />
-          <label for="project200RegisterPasswordConfirm">Confirmar senha</label>
-          <input id="project200RegisterPasswordConfirm" type="password" autocomplete="new-password" required />
-          <button type="submit" class="primary-btn">Cadastrar</button>
-        </form>
-      </div>
-      <p id="project200LoginMessage" class="project-login-message"></p>
-    </div>
-  </section>
   <section class="project-login-overlay" id="profileManageOverlay" aria-hidden="true">
     <div class="project-login-card">
       <h2 id="profileManageTitle">Gerenciar usuário</h2>
@@ -85,10 +53,6 @@
         </button>
       </div>
       <span class="home-profile-name" id="homeProfileName" hidden>Usuario</span>
-      <div class="home-running-date" id="homeRunningDate" aria-live="polite">
-        <span class="home-running-date-line" id="homeRunningDatePrimary"></span>
-        <span class="home-running-date-line" id="homeRunningDateSecondary"></span>
-      </div>
       <div class="running-task-actions home-running-actions" id="homeRunningActions" hidden>
         <button class="running-task-circle-btn running-task-list-btn" type="button" id="homeRunningListButton" aria-label="Abrir lista de tarefas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
         <button class="running-task-circle-btn running-task-restore-btn" type="button" id="homeRunningRestoreButton" aria-label="Desfazer tarefa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12h8a5 5 0 0 1 0 10h-1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -372,8 +336,7 @@
   <section class="workspace-modal" id="actionsModal" aria-hidden="true" aria-label="AçÃµes">
     <div class="actions-app">
       <div class="auth-alert" id="actionsAuthAlert" hidden>
-        <span>Entre na sua conta para salvar a agenda.</span>
-        <a href="/auth.html?next=/200">Entrar</a>
+        <span>Faça login em outro fluxo do app para sincronizar a agenda nesta conta.</span>
       </div>
 
       <div class="actions-list" id="actionsList" aria-live="polite"></div>
@@ -684,11 +647,6 @@
         <span class="running-music-default-top">Adicionar um novo usuário local do /200</span>
         <strong>Criar usuario</strong>
         <span class="running-music-default-bottom">Cada usuário terá as próprias tarefas e persona</span>
-      </button>
-      <button class="running-music-default-option" type="button" id="logoutProject200Button">
-        <span class="running-music-default-top">Remover a sessão salva deste aparelho</span>
-        <strong>Sair do login</strong>
-        <span class="running-music-default-bottom">Pede usuário e senha novamente</span>
       </button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>

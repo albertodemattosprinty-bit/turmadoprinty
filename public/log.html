@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turma do Printy | Log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: radial-gradient(circle at top, #eff6ff 0%, #dbeafe 38%, #f8fafc 100%);
+      --card: rgba(255, 255, 255, 0.94);
+      --line: rgba(15, 23, 42, 0.09);
+      --text: #13233f;
+      --muted: #5a6d88;
+      --primary: #2563eb;
+      --primary-strong: #1d4ed8;
+      --soft: rgba(148, 163, 184, 0.16);
+      --shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Exo 2", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .log-shell {
+      width: min(100%, 460px);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+      backdrop-filter: blur(16px);
+    }
+
+    .log-brand {
+      display: grid;
+      justify-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .log-brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .log-brand-row img {
+      object-fit: contain;
+      filter: drop-shadow(0 10px 22px rgba(37, 99, 235, 0.18));
+    }
+
+    .log-brand-row img:first-child {
+      width: 92px;
+      height: 92px;
+    }
+
+    .log-brand-row img:last-child {
+      width: 74px;
+      height: 74px;
+    }
+
+    .log-brand h1 {
+      margin: 0;
+      font-size: 1.55rem;
+      line-height: 1.05;
+      text-align: center;
+    }
+
+    .log-brand p {
+      margin: 0;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.96rem;
+    }
+
+    .log-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 18px 0 16px;
+    }
+
+    .log-tab,
+    .log-submit,
+    .log-link,
+    .log-me {
+      border: 0;
+      border-radius: 16px;
+      font: inherit;
+    }
+
+    .log-tab {
+      min-height: 48px;
+      background: #e7eefc;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .log-tab.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .log-panel {
+      display: grid;
+      gap: 12px;
+    }
+
+    .log-panel[hidden] { display: none; }
+
+    .log-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .log-field span {
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .log-field input {
+      width: 100%;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font: inherit;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.98);
+    }
+
+    .log-submit,
+    .log-link,
+    .log-me {
+      min-height: 52px;
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 16px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    .log-submit {
+      margin-top: 6px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .log-link,
+    .log-me {
+      margin-top: 12px;
+      background: var(--soft);
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .log-submit:active,
+    .log-link:active,
+    .log-me:active,
+    .log-tab:active {
+      transform: scale(0.985);
+    }
+
+    .log-output {
+      margin: 12px 0 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #b91c1c;
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="log-shell">
+    <section>
+      <div class="log-brand">
+        <div class="log-brand-row">
+          <img src="/logo.png" alt="Turma do Printy">
+          <img src="/200/branding/mindset-trainer.png" alt="Projeto 200">
+        </div>
+        <h1>Login minimalista</h1>
+        <p id="auth-status" aria-live="polite">Entre ou cadastre sua conta para continuar.</p>
+      </div>
+
+      <div class="log-tabs" role="tablist" aria-label="Acesso da conta">
+        <button class="log-tab active" type="button" data-log-tab="login" role="tab" aria-selected="true">Entrar</button>
+        <button class="log-tab" type="button" data-log-tab="register" role="tab" aria-selected="false">Cadastrar</button>
+      </div>
+
+      <div class="log-panel active" data-log-panel="login" role="tabpanel">
+        <form id="login-form" class="log-panel">
+          <label class="log-field">
+            <span>Usuário</span>
+            <input id="login-username" type="text" placeholder="Nome de usuario" aria-label="Nome de usuario">
+          </label>
+          <label class="log-field">
+            <span>Senha</span>
+            <input id="login-password" type="password" placeholder="Senha" aria-label="Senha">
+          </label>
+          <button type="submit" class="log-submit">Entrar</button>
+        </form>
+      </div>
+
+      <div class="log-panel" data-log-panel="register" role="tabpanel" hidden>
+        <form id="register-form" class="log-panel">
+          <label class="log-field">
+            <span>Nome</span>
+            <input id="register-name" type="text" placeholder="Nome" aria-label="Nome">
+          </label>
+          <label class="log-field">
+            <span>Usuário</span>
+            <input id="register-username" type="text" placeholder="Nome de usuario" aria-label="Nome de usuario">
+          </label>
+          <label class="log-field">
+            <span>Senha</span>
+            <input id="register-password" type="password" placeholder="Senha" aria-label="Senha">
+          </label>
+          <label class="log-field">
+            <span>Confirmar senha</span>
+            <input id="register-password-confirm" type="password" placeholder="Confirmar senha" aria-label="Confirmar senha">
+          </label>
+          <button type="submit" class="log-submit">Cadastrar</button>
+        </form>
+      </div>
+
+      <a id="return-link" class="log-link" href="/200">Voltar para o Projeto 200</a>
+      <pre id="auth-output" class="log-output" hidden></pre>
+      <button id="me-button" class="log-me" type="button" hidden>Ver minha sessao</button>
+    </section>
+  </main>
+  <script type="module" src="/log.js"></script>
+</body>
+</html>

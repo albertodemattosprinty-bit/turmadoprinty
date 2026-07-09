@@ -4635,6 +4635,10 @@ function closeWizard() {
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
+  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open", "quick-task-open");
+  if (!document.querySelector(".workspace-modal.active")) {
+    document.body.classList.remove("modal-open");
+  }
   actionWizard.classList.remove("active");
   actionWizard.setAttribute("aria-hidden", "true");
 }
@@ -11659,7 +11663,10 @@ project200CreateProfileNameInput?.addEventListener("keydown", (event) => {
     });
   }
 });
-closeStartDecisionModal?.addEventListener("click", () => closeStartDecisionModalWith("cancel"));
+closeStartDecisionModal?.addEventListener("click", () => {
+  closeStartDecisionModalWith("cancel");
+  navigateToProjectHome();
+});
 closePostponeTaskModal?.addEventListener("click", closePostponeTaskModalView);
 closePostponeReplaceModal?.addEventListener("click", closePostponeReplaceModalView);
 postponeOnlyFree?.addEventListener("change", () => {
