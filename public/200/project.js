@@ -573,6 +573,8 @@ const homeProfileButton = document.getElementById("homeProfileButton");
 const homePlayTime = document.getElementById("homePlayTime");
 const homeRunningSurfaceButton = document.getElementById("homeRunningSurfaceButton");
 const homeRunningSurfaceIcon = document.getElementById("homeRunningSurfaceIcon");
+const statsRunningSurfaceButton = document.getElementById("statsRunningSurfaceButton");
+const statsRunningSurfaceIcon = document.getElementById("statsRunningSurfaceIcon");
 const homeProfileName = document.getElementById("homeProfileName");
 const profileRenameInput = document.getElementById("profileRenameInput");
 const profileRenameMessage = document.getElementById("profileRenameMessage");
@@ -2219,8 +2221,14 @@ function renderHomeRunningTask() {
     if (homeRunningSurfaceIcon) {
       homeRunningSurfaceIcon.src = isRunning ? homeRunningSurfaceActiveIconPath : homeRunningSurfaceIdleIconPath;
     }
+    if (statsRunningSurfaceIcon) {
+      statsRunningSurfaceIcon.src = isRunning ? homeRunningSurfaceActiveIconPath : homeRunningSurfaceIdleIconPath;
+    }
     if (homeRunningSurfaceButton) {
       homeRunningSurfaceButton.setAttribute("aria-label", isRunning ? "Abrir atividade em andamento" : "Abrir andamento");
+    }
+    if (statsRunningSurfaceButton) {
+      statsRunningSurfaceButton.setAttribute("aria-label", isRunning ? "Abrir atividade em andamento" : "Abrir andamento");
     }
   };
   if (!state.homeSnapshotReady) {
@@ -11363,6 +11371,9 @@ logoutProject200Button?.addEventListener("click", () => {
   redirectToProject200Login();
 });
 homeRunningSurfaceButton?.addEventListener("click", () => {
+  openPrimaryRunningSurface();
+});
+statsRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();
 });
 openProject200ExportModalButton?.addEventListener("click", () => {

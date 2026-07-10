@@ -2793,24 +2793,34 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 #statsModal .actions-app.stats-actions-app {
-  grid-template-rows: minmax(0, 1fr) 7dvh;
+  grid-template-rows: minmax(0, 1fr) auto;
   padding-top: 0;
   padding-bottom: 0;
+  overflow: hidden;
 }
 
 #statsModal .actions-list.stats-actions-list {
   min-height: 0;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding-top: 12px;
-  padding-bottom: calc(7dvh + 22px);
+  padding-right: 12px;
+  padding-bottom: 10px;
+  padding-left: 12px;
+  overflow-x: hidden;
 }
 
 .stats-footer-hub {
   align-self: end;
-  height: 7dvh;
-  min-height: 56px;
-  padding-top: 0;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2px);
+  width: 100%;
+  max-width: 100%;
+  margin-top: auto;
+  padding-top: 12px;
+  padding-right: 2px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: 2px;
+  box-sizing: border-box;
 }
 
 #calendarModal .actions-list {
@@ -3255,6 +3265,11 @@ body.running-music-standalone #actionsModal .actions-list {
   gap: 0;
   padding: 14px 14px 14px;
   cursor: default;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: transparent;
 }
 
 .stats-point-layout {
@@ -3262,6 +3277,10 @@ body.running-music-standalone #actionsModal .actions-list {
   grid-template-columns: 52px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .stats-point-icon-wrap {
@@ -4186,6 +4205,11 @@ body.running-music-standalone #actionsModal .actions-list {
     width: calc(100vw - 2px);
     gap: 8px;
     padding-inline: 0;
+  }
+
+  #statsModal .stats-footer-hub {
+    width: 100%;
+    padding-inline: 2px;
   }
 
   .home-profile-hero {
