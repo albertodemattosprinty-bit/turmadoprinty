@@ -1399,8 +1399,6 @@ async function getContextPrompt() {
 }
 
 let stripeClient = null;
-const STRIPE_PIX_PAYMENT_METHOD_TYPES = ["pix"];
-
 function getStripeClient() {
   if (!STRIPE_SECRET_KEY) {
     throw new Error("STRIPE_SECRET_KEY nao configurada.");
@@ -7786,7 +7784,6 @@ async function createStripeCheckout({ request, user, product }) {
   const referenceId = `printy-${product.id}-${crypto.randomUUID()}`;
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    payment_method_types: STRIPE_PIX_PAYMENT_METHOD_TYPES,
     success_url: buildStripeSuccessUrl(baseUrl, "/produto.html", "album", product.id),
     cancel_url: `${baseUrl}/produto.html?album=${encodeURIComponent(product.id)}`,
     locale: "pt-BR",

@@ -19,7 +19,7 @@ const albumPriceInput = document.getElementById("album-price-input");
 const albumSaveButton = document.getElementById("album-save-button");
 const albumAdminStatus = document.getElementById("album-admin-status");
 const pageLoadingOverlay = document.getElementById("page-loading-overlay");
-const PIX_BUY_BUTTON_LABEL = "Pagar com Pix";
+const BUY_BUTTON_LABEL = "Comprar";
 const allowedAdminIdentities = new Set(["rosemattos", "lucasm"]);
 
 let accessState = {
@@ -911,7 +911,7 @@ function setBuyButtonState({ label, onClick, disabled = false, ariaLabel = "" })
     return;
   }
 
-  const nextLabel = String(label || "").trim() || PIX_BUY_BUTTON_LABEL;
+  const nextLabel = String(label || "").trim() || BUY_BUTTON_LABEL;
   buyAlbumButton.disabled = disabled;
   buyAlbumButton.setAttribute("aria-label", ariaLabel || nextLabel);
   buyAlbumButton.innerHTML = `
@@ -1453,7 +1453,7 @@ async function confirmReturnedCheckoutIfNeeded(albumId) {
 
   try {
     if (purchaseStatus) {
-      purchaseStatus.textContent = "Confirmando pagamento Pix do album...";
+      purchaseStatus.textContent = "Confirmando pagamento do album...";
     }
 
     const response = await fetch(getApiUrl("/api/payments/stripe/checkout/confirm"), {
@@ -1475,9 +1475,9 @@ async function confirmReturnedCheckoutIfNeeded(albumId) {
     }
 
     if (purchaseStatus && payload.paymentStatus === "PAID") {
-      purchaseStatus.textContent = "Pix confirmado. Seu album ja foi liberado.";
+      purchaseStatus.textContent = "Pagamento confirmado. Seu album ja foi liberado.";
     } else if (purchaseStatus && payload.paymentStatus) {
-      purchaseStatus.textContent = "Checkout Pix recebido. Assim que o Stripe confirmar o pagamento, o album sera liberado.";
+      purchaseStatus.textContent = "Checkout recebido. Assim que a Stripe confirmar o pagamento, o album sera liberado.";
     }
   } catch (error) {
     if (purchaseStatus) {
@@ -1508,7 +1508,7 @@ function setPurchaseStatus(albumId) {
   }
 
   if (params.get("payment") === "return") {
-    purchaseStatus.textContent = "Pix iniciado no Stripe. Aguarde a confirmacao para liberar seus downloads.";
+    purchaseStatus.textContent = "Checkout iniciado na Stripe. Aguarde a confirmacao para liberar seus downloads.";
     return;
   }
 
@@ -1529,9 +1529,9 @@ async function startCheckout(albumId) {
   }
 
   setBuyButtonState({
-    label: "Abrindo Pix...",
+    label: "Abrindo compra...",
     disabled: true,
-    ariaLabel: "Abrindo checkout Pix"
+    ariaLabel: "Abrindo checkout de compra"
   });
 
   try {
@@ -1567,11 +1567,11 @@ async function startCheckout(albumId) {
       purchaseStatus.textContent = error instanceof Error ? error.message : "Erro ao iniciar pagamento.";
     }
     setBuyButtonState({
-      label: PIX_BUY_BUTTON_LABEL,
+      label: BUY_BUTTON_LABEL,
       onClick: async () => {
         await startCheckout(albumId);
       },
-      ariaLabel: "Pagar album com Pix"
+      ariaLabel: "Comprar album"
     });
   }
 }
@@ -4965,9 +4965,9 @@ async function loadAlbumDetail() {
       purchaseStatus.textContent = "Escolha um album pela pagina de produtos.";
     }
     setBuyButtonState({
-      label: PIX_BUY_BUTTON_LABEL,
+      label: BUY_BUTTON_LABEL,
       disabled: true,
-      ariaLabel: "Pagar album com Pix"
+      ariaLabel: "Comprar album"
     });
     setRehearseButtonState({
       label: "Ensaiar",
@@ -5025,11 +5025,11 @@ async function loadAlbumDetail() {
         buyAlbumButton.hidden = false;
       }
       setBuyButtonState({
-        label: PIX_BUY_BUTTON_LABEL,
+        label: BUY_BUTTON_LABEL,
         onClick: async () => {
           await startCheckout(album.id);
         },
-        ariaLabel: "Pagar album com Pix"
+        ariaLabel: "Comprar album"
       });
     }
 
@@ -5047,9 +5047,9 @@ async function loadAlbumDetail() {
       purchaseStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido.";
     }
     setBuyButtonState({
-      label: PIX_BUY_BUTTON_LABEL,
+      label: BUY_BUTTON_LABEL,
       disabled: true,
-      ariaLabel: "Pagar album com Pix"
+      ariaLabel: "Comprar album"
     });
     setRehearseButtonState({
       label: "Ensaiar",
