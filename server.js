@@ -8341,31 +8341,53 @@ async function handleTermStripeCheckout(request, response) {
   }
 
   const stripeProductId = String(body?.stripeProductId || "").trim();
-  if (!stripeProductId) {
-    sendJson(response, 400, { error: "Produto Stripe nao informado." });
+  const amountCents = Math.max(0, Math.trunc(Number(body?.amountCents || 0) || 0));
+  const itemName = String(body?.itemName || "Turma do Printy").trim() || "Turma do Printy";
+  const returnPathRaw = String(body?.returnPath || "/termo").trim();
+  const returnPath = /^\/termo(?:\?.*)?$/.test(returnPathRaw) ? returnPathRaw : "/termo";
+  if (!stripeProductId && !amountCents) {
+    sendJson(response, 400, { error: "Produto ou valor do checkout nao informado." });
     return;
   }
 
   try {
     const stripe = getStripeClient();
-    const prices = await stripe.prices.list({
-      product: stripeProductId,
-      active: true,
-      limit: 1
-    });
+    const baseUrl = getBaseUrl(request);
+    const separator = returnPath.includes("?") ? "&" : "?";
+    let lineItems = [];
+    if (amountCents > 0) {
+      lineItems = [{
+        price_data: {
+          currency: "brl",
+          unit_amount: amountCents,
+          product_data: {
+            name: itemName
+          }
+        },
+        quantity: 1
+      }];
+    } else {
+      const prices = await stripe.prices.list({
+        product: stripeProductId,
+        active: true,
+        limit: 1
+      });
 
-    const price = prices.data[0];
-    if (!price?.id) {
-      sendJson(response, 404, { error: "Preco ativo nao encontrado para este produto." });
-      return;
+      const price = prices.data[0];
+      if (!price?.id) {
+        sendJson(response, 404, { error: "Preco ativo nao encontrado para este produto." });
+        return;
+      }
+
+      lineItems = [{ price: price.id, quantity: 1 }];
     }
 
-    const baseUrl = getBaseUrl(request);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price: price.id, quantity: 1 }],
-      success_url: `${baseUrl}/termo?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/termo?payment=cancel`
+      locale: "pt-BR",
+      line_items: lineItems,
+      success_url: `${baseUrl}${returnPath}${separator}payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${returnPath}${separator}payment=cancel`
     });
 
     sendJson(response, 200, { ok: true, payUrl: session.url || "" });

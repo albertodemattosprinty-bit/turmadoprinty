@@ -417,9 +417,29 @@
 
   <script>
     const sessionStorageKey = "turma_do_printy_token";
+    const termUrl = new URL(window.location.href);
+    const termParams = termUrl.searchParams;
     const authOverlay = document.getElementById("authOverlay");
     const authOverlayMessage = document.getElementById("authOverlayMessage");
     const authOverlayLink = document.getElementById("authOverlayLink");
+    const termVariantKey = termParams.get("source") === "eventosproposta" ? "eventosproposta" : "default";
+    const termVariantConfigs = {
+      default: {
+        financeAgreementText: "O valor de uma (1) apresentação: R$ 3.400,00\nO valor de duas (2) apresentações: R$ 5.100,00\n\nO transporte para a cidade de São Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor será definido mediante orçamento prévio.",
+        paymentOptions: [
+          { key: "one", label: "Uma (1) apresentação", priceLabel: "R$ 3.400,00", stripeProductId: "prod_UXGPN4quiGCV2S" },
+          { key: "two", label: "Duas (2) apresentações", priceLabel: "R$ 5.100,00", stripeProductId: "prod_UXFnHWguWzdbst" }
+        ]
+      },
+      eventosproposta: {
+        financeAgreementText: "O valor de uma (1) apresentação: R$ 4.200,00\nO valor de duas (2) apresentações: R$ 5.100,00\n\nO transporte para a cidade de São Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor será definido mediante orçamento prévio.",
+        paymentOptions: [
+          { key: "one", label: "Uma (1) apresentação", priceLabel: "R$ 4.200,00", amountCents: 420000, itemName: "Turma do Printy - Uma (1) apresentação" },
+          { key: "two", label: "Duas (2) apresentações", priceLabel: "R$ 5.100,00", stripeProductId: "prod_UXFnHWguWzdbst" }
+        ]
+      }
+    };
+    const currentTermConfig = termVariantConfigs[termVariantKey] || termVariantConfigs.default;
 
     function getToken() {
       return window.localStorage.getItem(sessionStorageKey) || "";
@@ -433,8 +453,20 @@
       };
     }
 
+    function buildTermReturnPath() {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("payment");
+      params.delete("session_id");
+      const query = params.toString();
+      return query ? `/termo?${query}` : "/termo";
+    }
+
+    if (authOverlayLink) {
+      authOverlayLink.href = `/auth.html?next=${encodeURIComponent(buildTermReturnPath())}`;
+    }
+
     function redirectToLogin() {
-      window.location.href = "/auth.html?next=/termo";
+      window.location.href = `/auth.html?next=${encodeURIComponent(buildTermReturnPath())}`;
     }
 
     async function ensureAuthenticatedAccess() {
@@ -576,7 +608,7 @@
         h2: "Agradecemos pela contratação da Turma do Printy. Gentilmente pedimos que atentem à importância do correto e imediato preenchimento deste documento, pois ele será utilizado como registro oficial das informações do evento, bem como para a gravação do vídeo de divulgação e para a inclusão da agenda no site e nas mídias sociais."
       },
       { icon: `<path d="M3 11L12 4L21 11" stroke="white" stroke-width="1.8"/><path d="M6 10v10h12V10" stroke="white" stroke-width="1.8"/>`, h1: "Compromisso da igreja", h2: "" },
-      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M9 9c1-1 5-1 6 1s-1 3-3 3-4 1-3 3 4 2 6 0" stroke="white" stroke-width="1.8"/>`, h1: "Financeiro/Logístico", h2: "O valor de uma (1) apresentação: R$ 3.400,00\nO valor de duas (2) apresentações: R$ 5.100,00\n\nO transporte para a cidade de São Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor será definido mediante orçamento prévio." },
+      { icon: `<circle cx="12" cy="12" r="9" stroke="white" stroke-width="1.8"/><path d="M9 9c1-1 5-1 6 1s-1 3-3 3-4 1-3 3 4 2 6 0" stroke="white" stroke-width="1.8"/>`, h1: "Financeiro/Logístico", h2: currentTermConfig.financeAgreementText },
       { icon: `<path d="M12 4c4 3 5 6 5 8a5 5 0 1 1-10 0c0-2 1-5 5-8z" stroke="white" stroke-width="1.8"/><path d="M12 14c1 0 2-.8 2-2" stroke="white" stroke-width="1.8"/>`, h1: "ALIMENTAÇÃO", h2: "A equipe é composta pelo mínimo de 3 pessoas e máximo de 6, a depender da história escolhida. A alimentação pode ser na igreja, hotel ou restaurante.\n\nCafé da manhã - Almoço - Jantar, a depender do horário do evento ou solicitação prévia da equipe." },
       { icon: `<path d="M4 14h16l-1.5 4H5.5L4 14z" stroke="white" stroke-width="1.8"/><circle cx="8" cy="18.5" r="1.5" fill="white"/><circle cx="16" cy="18.5" r="1.5" fill="white"/>`, h1: "ESTACIONAMENTO", h2: "Solicitamos liberação de vaga na porta da igreja para 2 carros para descarga de equipamento, ou acesso a estacionamento próprio." },
       { icon: `<rect x="4" y="6" width="16" height="12" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 10h8M8 14h6" stroke="white" stroke-width="1.8"/>`, h1: "SALA / CAMARIM", h2: "Precisamos de uma sala exclusiva para a Turma do Printy, próxima ao palco/púlpito. Sempre lembrando que iremos nos adequar ao espaço físico da igreja. Também solicitamos:\nCadeiras e mesas para figurinos e acessórios\n\nÁgua mineral ou água de coco (norte e nordeste) disponível no palco durante a apresentação." },
@@ -588,10 +620,7 @@
       { icon: `<rect x="6" y="4" width="12" height="16" rx="2" stroke="white" stroke-width="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="white" stroke-width="1.8"/>`, h1: "Considerações finais", h2: "As informações utilizadas serão exatamente as informadas no termo de compromisso pelo contratante. Se houver alguma variação necessária, como nome de congresso/evento, escrita/pronúncia de nomes próprios, igreja/end, deverá ser informada no campo \"Notas adicionais\" deste formulário. O material é enviado 8 dias após o preenchimento do contrato." }
     ];
 
-    const paymentOptions = [
-      { key: "one", label: "Uma (1) apresentação", priceLabel: "R$ 3.400,00", stripeProductId: "prod_UXGPN4quiGCV2S" },
-      { key: "two", label: "Duas (2) apresentações", priceLabel: "R$ 5.100,00", stripeProductId: "prod_UXFnHWguWzdbst" }
-    ];
+    const paymentOptions = currentTermConfig.paymentOptions;
 
     const totalStages = 1 + steps.length + (agreementSteps.length - 1) + 3 + 1 + 1;
 
@@ -752,10 +781,21 @@
         if (payNowBtn) {
           payNowBtn.addEventListener("click", async () => {
             try {
+              const selectedOption = paymentOptions.find((item) => item.key === answers.pagamentoOpcao) || null;
+              const requestBody = {
+                stripeProductId: answers.pagamentoStripeProduto,
+                returnPath: buildTermReturnPath()
+              };
+              if (selectedOption?.amountCents) {
+                requestBody.amountCents = selectedOption.amountCents;
+                requestBody.itemName = selectedOption.itemName || selectedOption.label || "Apresentação Turma do Printy";
+                delete requestBody.stripeProductId;
+              }
+
               const response = await fetch("/api/terms/checkout", {
                 method: "POST",
                 headers: getAuthHeaders({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ stripeProductId: answers.pagamentoStripeProduto })
+                body: JSON.stringify(requestBody)
               });
               const data = await response.json();
               if (!response.ok || !data?.payUrl) {
