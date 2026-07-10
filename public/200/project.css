@@ -5375,11 +5375,101 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
 }
 
 .history-mission-modal-content {
-  width: min(460px, calc(100% - 28px));
-  min-height: 0;
+  width: 100vw;
+  max-width: 100vw;
+  min-height: 100dvh;
   background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  border: 0;
+  box-shadow: none;
+}
+
+.history-mission-modal-shell {
+  height: 100dvh;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.history-mission-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-mission-modal-close {
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.84);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.history-mission-modal-close svg {
+  width: 24px;
+  height: 24px;
+}
+
+.history-mission-modal-body {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.history-mission-modal-footer {
+  display: grid;
+  gap: 14px;
+  align-items: center;
+}
+
+.history-mission-modal-footer-one {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.history-mission-modal-footer-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.history-mission-modal-footer-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.history-mission-footer-icon {
+  width: min(100%, 84px);
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  color: #fff;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.history-mission-footer-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.history-mission-footer-icon-blue {
+  background: linear-gradient(145deg, #2d95ff 0%, #0b56d6 100%);
+}
+
+.history-mission-footer-icon-green {
+  background: linear-gradient(145deg, #31c56d 0%, #12783d 100%);
+}
+
+.history-mission-footer-icon-red {
+  background: linear-gradient(145deg, #ff5e5e 0%, #b51d1d 100%);
 }
 
 #sleepModal.workspace-modal {
@@ -5553,14 +5643,6 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   opacity: 0.25;
 }
 
-.history-mission-adjust-caption {
-  margin: -8px 0 4px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-
 .history-mission-adjust-stage {
   width: 100%;
   display: grid;
@@ -5591,18 +5673,6 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   place-items: center;
   font-size: 2rem;
   font-weight: 900;
-}
-
-.history-mission-quick-access {
-  display: grid;
-  gap: 10px;
-}
-
-.history-mission-quick-access-title {
-  text-align: center;
-  font-size: 0.96rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.88);
 }
 
 .history-mission-quick-access-grid {
@@ -5638,16 +5708,177 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
 .history-mission-adjust-presets {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
 .history-mission-preset-btn {
-  min-height: 56px;
+  width: 100%;
+  aspect-ratio: 1;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(145deg, #2d95ff 0%, #0f4fd8 100%);
+  font-size: 1.3rem;
+  font-weight: 800;
+  box-shadow: 0 16px 28px rgba(10, 41, 112, 0.35);
+}
+
+.history-mission-time-summary,
+.history-mission-time-prompt,
+.history-mission-time-unit-label {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.history-mission-time-prompt {
+  font-size: 1.18rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.history-mission-time-unit-label {
+  font-size: 1.05rem;
+}
+
+.history-mission-modal-shell .text-field.options-text-field {
+  min-height: 60px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.history-mission-modal-shell .finance-status {
+  margin: 0;
+  text-align: center;
+}
+
+.history-mission-run-shell {
+  width: 100vw;
+  min-height: 100dvh;
+  background: #000;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 20px;
+  position: relative;
+}
+
+.history-mission-run-head {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.history-mission-run-back {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
   font-size: 1rem;
   font-weight: 800;
+}
+
+.history-mission-run-body {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 28px;
+}
+
+.history-mission-run-title {
+  text-align: center;
+}
+
+.history-mission-run-ring-wrap {
+  position: relative;
+  width: min(72vw, 320px);
+  aspect-ratio: 1;
+}
+
+.history-mission-run-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.history-mission-run-ring-bg,
+.history-mission-run-ring-fill {
+  fill: none;
+  stroke-width: 6;
+}
+
+.history-mission-run-ring-bg {
+  stroke: rgba(255, 255, 255, 0.22);
+}
+
+.history-mission-run-ring-fill {
+  stroke: #24d166;
+  stroke-linecap: round;
+  stroke-dasharray: 301.59 301.59;
+  stroke-dashoffset: 301.59;
+  transition: stroke-dashoffset 0.9s linear;
+}
+
+.history-mission-run-icon-wrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.history-mission-run-icon {
+  width: 44%;
+  height: 44%;
+  object-fit: contain;
+}
+
+.history-mission-run-footer {
+  display: grid;
+}
+
+.history-mission-run-complete {
+  min-height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #31c56d 0%, #12783d 100%);
+  color: #fff;
+}
+
+.history-mission-run-confirm {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.history-mission-run-confirm-card {
+  width: min(100%, 360px);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.history-mission-run-confirm-title {
+  text-align: center;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.history-mission-run-confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.history-mission-card {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 .history-item {
