@@ -26,9 +26,9 @@ const missionQuickDefinitions = [
 ];
 const missionHistoryScopes = [
   { key: "today", label: "Hoje" },
-  { key: "last7", label: "Ultimos 7 dias" },
-  { key: "last30", label: "Ultimos 30 dias" },
-  { key: "last180", label: "Ultimos 180 dias" }
+  { key: "last7", label: "7 dias" },
+  { key: "last15", label: "15 dias" },
+  { key: "last30", label: "30 dias" }
 ];
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
@@ -9064,12 +9064,7 @@ function createMissionCard(goal) {
   const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
   const goalIcon = getMissionDisplayIcon(goal);
   const historyRangeActive = isMissionHistoryRangeActive();
-  const progressLabel = historyRangeActive
-    ? `${Math.max(0, Math.trunc(Number(goal.completedDays || 0) || 0))} de ${target} dias concluidos`
-    : `${progress} de ${target}`;
-  const historyMeta = historyRangeActive
-    ? `<div class="history-mission-card-meta">${escapeHtml(`Ativa em ${Math.max(0, Math.trunc(Number(goal.activeDays || 0) || 0))} dia(s) • Total ${Math.max(0, Math.trunc(Number(goal.totalProgressValue || 0) || 0))}`)}</div>`
-    : "";
+  const progressLabel = `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
   const card = document.createElement("article");
   card.className = "history-mission-card";
   card.dataset.goalId = String(goal.id || "");
@@ -9080,7 +9075,6 @@ function createMissionCard(goal) {
         <div>
         <h3 class="history-mission-card-title">${escapeHtml(String(goal.title || "Missão"))}</h3>
         <div class="history-mission-card-progress">${escapeHtml(progressLabel)}</div>
-        ${historyMeta}
         </div>
       </div>
       <div class="history-mission-card-actions">

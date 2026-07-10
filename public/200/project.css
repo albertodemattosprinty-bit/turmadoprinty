@@ -4285,17 +4285,14 @@ body.running-music-standalone #actionsModal .actions-list {
   }
 
   #actionsModal .actions-side-actions {
-    grid-template-columns: 62px minmax(0, 1fr) 62px;
+    grid-template-columns: 62px 48px minmax(0, 1fr) 48px 62px;
     min-height: 68px;
     padding-left: 10px;
     padding-right: 10px;
   }
 
-  #actionsModal .actions-footer-date {
-    gap: 8px;
-  }
-
-  #actionsModal .actions-footer-date .date-title {
+  #actionsModal .actions-footer-label,
+  #historyModal .history-mission-scope-label {
     font-size: clamp(0.96rem, 4.2vw, 1.35rem);
   }
 
@@ -4392,14 +4389,6 @@ body.running-music-standalone #actionsModal .actions-list {
   background: transparent;
 }
 
-.actions-footer-date {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-width: 0;
-}
-
 #actionsModal .actions-side-btn {
   position: static;
   transform: none;
@@ -4419,6 +4408,10 @@ body.running-music-standalone #actionsModal .actions-list {
   justify-self: center;
 }
 
+#actionsModal .actions-footer-nav {
+  justify-self: center;
+}
+
 #actionsModal .actions-side-btn img,
 #actionsModal .actions-side-btn svg {
   width: 30px;
@@ -4431,24 +4424,42 @@ body.running-music-standalone #actionsModal .actions-list {
   filter: none;
 }
 
-#actionsModal .actions-footer-date .circle-nav {
+#actionsModal .actions-footer-nav {
   width: auto;
   height: auto;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
-  font-size: 24px;
+  border: 0;
   background: transparent;
+  box-shadow: none;
 }
 
-#actionsModal .actions-footer-date .circle-nav:hover,
-#actionsModal .actions-footer-date .circle-nav:focus-visible {
-  background: transparent;
+#actionsModal .actions-footer-nav svg {
+  width: 30px;
+  height: 30px;
+  color: #fff;
 }
 
-#actionsModal .actions-footer-date .date-title {
+#actionsModal .actions-footer-nav:hover,
+#actionsModal .actions-footer-nav:focus-visible {
+  background: transparent;
+  transform: none;
+}
+
+#actionsModal .actions-footer-label,
+.history-mission-scope-label {
   min-width: 0;
   font-size: clamp(1rem, 4vw, 1.55rem);
   color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  justify-self: center;
 }
 
 .actions-side-plus {
@@ -4668,7 +4679,7 @@ body.running-music-standalone #actionsModal .actions-list {
   min-height: 72px;
   max-height: 92px;
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  grid-template-columns: 72px 56px minmax(0, 1fr) 56px 72px;
   align-items: center;
   gap: 10px;
   padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 6px);
@@ -4785,15 +4796,6 @@ body.running-music-standalone #actionsModal .actions-list {
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.96rem;
   font-weight: 700;
-}
-
-.history-mission-card-meta {
-  margin-top: 4px;
-  color: rgba(255, 255, 255, 0.56);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 .history-mission-card-actions {
@@ -5020,7 +5022,7 @@ body[data-background-theme="white"] .task-row.task-free-slot .task-time {
 }
 
 body[data-background-theme="white"] #actionsModal .actions-side-btn-right svg,
-body[data-background-theme="white"] #actionsModal .actions-footer-date .date-title,
+body[data-background-theme="white"] #actionsModal .actions-footer-label,
 body[data-background-theme="white"] #actionsModal .actions-side-plus {
   color: #2f3640;
 }
@@ -5033,7 +5035,6 @@ body[data-background-theme="white"] .history-mission-status,
 body[data-background-theme="white"] .history-missions-empty .empty-state,
 body[data-background-theme="white"] .history-mission-card-title,
 body[data-background-theme="white"] .history-mission-card-progress,
-body[data-background-theme="white"] .history-mission-card-meta,
 body[data-background-theme="white"] .history-mission-scope-label {
   color: #2f3640;
 }

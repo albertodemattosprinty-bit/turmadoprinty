@@ -5,8 +5,8 @@ const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
 export const EXTRA_GOAL_HISTORY_SCOPES = [
   { key: "today", label: "Hoje", days: 1 },
   { key: "last7", label: "Ultimos 7 dias", days: 7 },
-  { key: "last30", label: "Ultimos 30 dias", days: 30 },
-  { key: "last180", label: "Ultimos 180 dias", days: 180 }
+  { key: "last15", label: "Ultimos 15 dias", days: 15 },
+  { key: "last30", label: "Ultimos 30 dias", days: 30 }
 ];
 const DEFAULT_EXTRA_GOALS = [
   { title: "Beber água", targetValue: 8 },
@@ -400,19 +400,16 @@ export async function listExtraGoalsByScope(userId, profileName = PROJECT200_DEF
     },
     goals: goals.map((goal) => {
       const history = historyByGoalId.get(String(goal.id || "").trim()) || {};
-      const completedDays = Math.max(0, Math.trunc(Number(history.completed_days || 0) || 0));
-      const activeDays = Math.max(0, Math.trunc(Number(history.active_days || 0) || 0));
       const totalProgressValue = Math.max(0, Math.trunc(Number(history.total_progress_value || 0) || 0));
+      const expandedTargetValue = Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1)) * scope.days;
       return {
         ...goal,
         isHistoryRange: true,
-        completedDays,
-        activeDays,
         totalProgressValue,
-        progressValue: completedDays,
-        targetValue: scope.days,
-        remainingValue: Math.max(0, scope.days - completedDays),
-        percent: scope.days > 0 ? Math.max(0, Math.min(100, Math.round((completedDays / scope.days) * 100))) : 0,
+        progressValue: totalProgressValue,
+        targetValue: expandedTargetValue,
+        remainingValue: Math.max(0, expandedTargetValue - totalProgressValue),
+        percent: expandedTargetValue > 0 ? Math.max(0, Math.min(100, Math.round((totalProgressValue / expandedTargetValue) * 100))) : 0,
         scopeKey: scope.key
       };
     })
