@@ -754,6 +754,24 @@ const touchClickSoundUrls = [
   "/200/sfx/touch-4.mp3"
 ];
 const missionProgressSoundUrl = "/200/sfx/mission-passou.mp3";
+const touchClickAudioPool = typeof Audio !== "undefined"
+  ? touchClickSoundUrls.map((url) => {
+      const primary = new Audio(url);
+      const secondary = new Audio(url);
+      primary.preload = "auto";
+      secondary.preload = "auto";
+      primary.volume = 0.6;
+      secondary.volume = 0.6;
+      try {
+        primary.load();
+        secondary.load();
+      } catch {}
+      return [primary, secondary];
+    })
+  : [];
+const missionProgressAudioPool = typeof Audio !== "undefined"
+  ? [new Audio(missionProgressSoundUrl), new Audio(missionProgressSoundUrl)]
+  : [];
 const RUNNING_RING_RADIUS = 48;
 const RUNNING_RING_CIRCUMFERENCE = 2 * Math.PI * RUNNING_RING_RADIUS;
 const RUNNING_RING_FULL_OFFSET = -0.8;
@@ -783,6 +801,13 @@ if (runningPunctualityUpAudio) {
 if (runningPunctualityDownAudio) {
   runningPunctualityDownAudio.preload = "auto";
 }
+missionProgressAudioPool.forEach((audio) => {
+  audio.preload = "auto";
+  audio.volume = 0.72;
+  try {
+    audio.load();
+  } catch {}
+});
 let runningMusicProgressTicker = null;
 let runningNextMetricTimer = null;
 let taskBeepAudioContext = null;
@@ -806,6 +831,8 @@ let runningMissionQuickRequestChain = Promise.resolve();
 let runningMissionQuickSpotlightTimer = null;
 let missionCardHoldTimer = null;
 let missionCardHoldGoalId = "";
+let missionCardPressedGoalId = "";
+let missionCardHoldTriggered = false;
 let missionRunTicker = null;
 let sleepFrequencyMonitorTicker = null;
 let sleepFrequencyFadeToken = 0;
@@ -2268,7 +2295,7 @@ function fadeAudioVolume(audio, target, durationMs) {
 }
 
 function playRandomTouchClickSound() {
-  if (typeof Audio === "undefined" || !Array.isArray(touchClickSoundUrls) || !touchClickSoundUrls.length) {
+  if (!Array.isArray(touchClickAudioPool) || !touchClickAudioPool.length) {
     return;
   }
   const now = Date.now();
@@ -2276,15 +2303,14 @@ function playRandomTouchClickSound() {
     return;
   }
   lastTouchClickSoundAt = now;
-  const randomIndex = Math.floor(Math.random() * touchClickSoundUrls.length);
-  const soundUrl = String(touchClickSoundUrls[randomIndex] || "").trim();
-  if (!soundUrl) {
+  const randomIndex = Math.floor(Math.random() * touchClickAudioPool.length);
+  const audioPair = touchClickAudioPool[randomIndex] || [];
+  const clickAudio = audioPair.find((audio) => audio.paused || audio.ended) || audioPair[0];
+  if (!clickAudio) {
     return;
   }
   try {
-    const clickAudio = new Audio(soundUrl);
-    clickAudio.preload = "auto";
-    clickAudio.volume = 0.6;
+    clickAudio.currentTime = 0;
     void clickAudio.play().catch(() => {});
   } catch {
     // ignore touch sound failures
@@ -2292,13 +2318,15 @@ function playRandomTouchClickSound() {
 }
 
 function playMissionProgressSound() {
-  if (typeof Audio === "undefined") {
+  if (!Array.isArray(missionProgressAudioPool) || !missionProgressAudioPool.length) {
     return;
   }
   try {
-    const missionAudio = new Audio(missionProgressSoundUrl);
-    missionAudio.preload = "auto";
-    missionAudio.volume = 0.72;
+    const missionAudio = missionProgressAudioPool.find((audio) => audio.paused || audio.ended) || missionProgressAudioPool[0];
+    if (!missionAudio) {
+      return;
+    }
+    missionAudio.currentTime = 0;
     void missionAudio.play().catch(() => {});
   } catch {
     // ignore mission progress sound failures
@@ -11464,7 +11492,8 @@ missionList?.addEventListener("click", (event) => {
     return;
   }
   if (missionCard && !event.target.closest("[data-mission-goal-edit]")) {
-    if (missionCardHoldGoalId) {
+    if (missionCardHoldTriggered) {
+      missionCardHoldTriggered = false;
       return;
     }
     openMissionRunModal(missionCard.dataset.goalId || "");
@@ -11488,14 +11517,18 @@ missionList?.addEventListener("pointerdown", (event) => {
   if (missionCardHoldTimer) {
     window.clearTimeout(missionCardHoldTimer);
   }
-  missionCardHoldGoalId = goalId;
+  missionCardPressedGoalId = goalId;
+  missionCardHoldGoalId = "";
+  missionCardHoldTriggered = false;
   missionCardHoldTimer = window.setTimeout(() => {
     missionCardHoldTimer = null;
-    if (!missionCardHoldGoalId) {
+    if (!missionCardPressedGoalId) {
       return;
     }
+    missionCardHoldGoalId = missionCardPressedGoalId;
+    missionCardHoldTriggered = true;
     openMissionProgressModal(missionCardHoldGoalId);
-  }, 300);
+  }, 500);
 });
 ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
   missionList?.addEventListener(eventName, () => {
@@ -11504,8 +11537,9 @@ missionList?.addEventListener("pointerdown", (event) => {
       missionCardHoldTimer = null;
     }
     window.setTimeout(() => {
+      missionCardPressedGoalId = "";
       missionCardHoldGoalId = "";
-    }, 0);
+    }, missionCardHoldTriggered ? 80 : 0);
   });
 });
 
@@ -12004,12 +12038,8 @@ openMissionAdjustTimeButton?.addEventListener("click", () => {
   openMissionTimeModal("adjust");
 });
 missionCreateCloseButton?.addEventListener("click", () => {
-  if (!state.missionCreate?.timeConfigured) {
-    if (missionCreateStatus) {
-      missionCreateStatus.textContent = "Defina o tempo por unidade antes de fechar a missão.";
-    }
-    openMissionTimeModal("create");
-    return;
+  if (missionCreateStatus) {
+    missionCreateStatus.textContent = "";
   }
   closeModal("missionCreateModal");
 });
