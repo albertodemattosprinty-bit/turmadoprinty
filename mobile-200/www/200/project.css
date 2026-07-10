@@ -207,6 +207,48 @@ svg {
   align-items: center;
   gap: 12px;
   padding: 14px 20px 16px;
+  position: relative;
+}
+
+.home-sleep-float-button {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top, 0px));
+  right: 18px;
+  z-index: 12;
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.home-sleep-float-button .hub-icon-svg {
+  width: 30px;
+  height: 30px;
+}
+
+.home-hero {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 54px 0 8px;
+}
+
+.home-hero-image {
+  width: min(92vw, 980px);
+  max-width: 100%;
+  max-height: min(56vh, 620px);
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.22));
 }
 
 .global-loading-overlay {
@@ -430,7 +472,7 @@ body.project-no-select textarea {
   margin-top: auto;
   padding: 12px 2px calc(10px + env(safe-area-inset-bottom, 0px));
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   justify-items: stretch;
   align-items: center;
@@ -4901,18 +4943,70 @@ body.running-music-standalone #actionsModal .actions-list {
   gap: 14px;
   position: relative;
   overflow-y: auto;
-  background: transparent;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.14), transparent 34%),
+    linear-gradient(145deg, rgba(5, 7, 15, 0.98), rgba(16, 23, 41, 0.98));
 }
 
-body[data-background-theme="black"] .stats-aspect-modal-content { background: transparent; }
-body[data-background-theme="orange"] .stats-aspect-modal-content { background: transparent; }
-body[data-background-theme="bluevivid"] .stats-aspect-modal-content { background: transparent; }
-body[data-background-theme="pinkstrong"] .stats-aspect-modal-content { background: transparent; }
-body[data-background-theme="bluedark"] .stats-aspect-modal-content { background: transparent; }
-body[data-background-theme="brown"] .stats-aspect-modal-content { background: transparent; }
-body[data-background-theme="edge"] .stats-aspect-modal-content { background: transparent; }
-body[data-background-theme="white"] .stats-aspect-modal-content { background: transparent; color: #2f3640; }
-body[data-background-theme="light"] .stats-aspect-modal-content { background: transparent; }
+body[data-background-theme="black"] .stats-aspect-modal-content,
+body[data-background-theme="black"] .stats-aspect-assign-content {
+  background:
+    radial-gradient(circle at top, rgba(120, 126, 153, 0.18), transparent 36%),
+    linear-gradient(145deg, #05070f 0%, #101729 45%, #070b15 100%);
+}
+
+body[data-background-theme="orange"] .stats-aspect-modal-content,
+body[data-background-theme="orange"] .stats-aspect-assign-content {
+  background:
+    radial-gradient(circle at top left, rgba(255, 233, 151, 0.3), transparent 34%),
+    linear-gradient(145deg, #ff7a18 0%, #ff4d2d 46%, #c21807 100%);
+}
+
+body[data-background-theme="bluevivid"] .stats-aspect-modal-content,
+body[data-background-theme="bluevivid"] .stats-aspect-assign-content {
+  background:
+    radial-gradient(circle at top left, rgba(149, 234, 255, 0.3), transparent 34%),
+    linear-gradient(145deg, #16a3ff 0%, #0b63ff 52%, #0037c4 100%);
+}
+
+body[data-background-theme="pinkstrong"] .stats-aspect-modal-content,
+body[data-background-theme="pinkstrong"] .stats-aspect-assign-content {
+  background:
+    radial-gradient(circle at top left, rgba(255, 190, 216, 0.28), transparent 36%),
+    linear-gradient(145deg, #ff2f92 0%, #ff1660 48%, #b10c53 100%);
+}
+
+body[data-background-theme="bluedark"] .stats-aspect-modal-content,
+body[data-background-theme="bluedark"] .stats-aspect-assign-content {
+  background:
+    radial-gradient(circle at top left, rgba(125, 187, 255, 0.22), transparent 36%),
+    linear-gradient(145deg, #0d2d8f 0%, #09206b 44%, #020d37 100%);
+}
+
+body[data-background-theme="brown"] .stats-aspect-modal-content,
+body[data-background-theme="brown"] .stats-aspect-assign-content {
+  background:
+    radial-gradient(circle at top left, rgba(244, 197, 139, 0.24), transparent 34%),
+    linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%);
+}
+
+body[data-background-theme="edge"] .stats-aspect-modal-content,
+body[data-background-theme="edge"] .stats-aspect-assign-content {
+  background:
+    radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
+    linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
+}
+
+body[data-background-theme="white"] .stats-aspect-modal-content,
+body[data-background-theme="white"] .stats-aspect-assign-content {
+  background: linear-gradient(145deg, rgba(248, 248, 245, 0.98), rgba(236, 236, 231, 0.98));
+  color: #2f3640;
+}
+
+body[data-background-theme="light"] .stats-aspect-modal-content,
+body[data-background-theme="light"] .stats-aspect-assign-content {
+  background: linear-gradient(145deg, rgba(16, 51, 118, 0.96), rgba(11, 96, 179, 0.94));
+}
 
 body[data-background-theme="white"] .global-loading-overlay {
   background:
@@ -5268,18 +5362,10 @@ body[data-background-theme="light"] .global-loading-overlay {
   align-content: start;
   gap: 14px;
   overflow-y: auto;
-  background: transparent;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.14), transparent 34%),
+    linear-gradient(145deg, rgba(5, 7, 15, 0.98), rgba(16, 23, 41, 0.98));
 }
-
-body[data-background-theme="black"] .stats-aspect-assign-content { background: transparent; }
-body[data-background-theme="orange"] .stats-aspect-assign-content { background: transparent; }
-body[data-background-theme="bluevivid"] .stats-aspect-assign-content { background: transparent; }
-body[data-background-theme="pinkstrong"] .stats-aspect-assign-content { background: transparent; }
-body[data-background-theme="bluedark"] .stats-aspect-assign-content { background: transparent; }
-body[data-background-theme="brown"] .stats-aspect-assign-content { background: transparent; }
-body[data-background-theme="edge"] .stats-aspect-assign-content { background: transparent; }
-body[data-background-theme="white"] .stats-aspect-assign-content { background: transparent; color: #2f3640; }
-body[data-background-theme="light"] .stats-aspect-assign-content { background: transparent; }
 
 .stats-aspect-selected-summary {
   text-align: center;
