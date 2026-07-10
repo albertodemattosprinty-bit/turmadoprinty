@@ -54,6 +54,10 @@
     </div>
   </section>
   <main class="project-shell">
+    <button class="home-social-float-button" type="button" id="homeSocialButton" aria-label="Abrir amizades">
+      <span class="home-social-float-badge" id="homeSocialBadge" hidden>0</span>
+      <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.2a4.1 4.1 0 1 0-4.1-4.1 4.1 4.1 0 0 0 4.1 4.1zm0 2c-4 0-7.2 2-7.2 4.5 0 .7.6 1.3 1.3 1.3h11.8c.7 0 1.3-.6 1.3-1.3 0-2.5-3.2-4.5-7.2-4.5z" fill="currentColor"/></svg>
+    </button>
     <button class="home-sleep-float-button" type="button" id="homeSleepButton" aria-label="Abrir sono">
       <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.4A8.8 8.8 0 0 1 9.6 3.8a9.2 9.2 0 1 0 10.6 10.6z" fill="currentColor"/></svg>
     </button>
@@ -1004,6 +1008,31 @@
       </div>
     </section>
 
+    <section class="workspace-modal" id="socialModal" aria-hidden="true" aria-label="Amizades">
+      <div class="social-modal-shell" id="socialModalShell">
+        <button class="sleep-modal-close social-modal-close" type="button" data-close-modal aria-label="Fechar amizades">Fechar</button>
+        <div class="social-modal-header">
+          <div class="social-modal-title">Amigos</div>
+          <div class="social-modal-subtitle">Convites, ranking leve e acesso rápido aos pontos do período.</div>
+        </div>
+        <div class="social-modal-plus-wrap">
+          <button class="social-modal-plus-button" type="button" id="socialInviteToggleButton" aria-label="Adicionar amigo">+</button>
+        </div>
+        <div class="social-invite-form" id="socialInviteForm" hidden>
+          <input class="text-field social-invite-input" id="socialInviteInput" type="text" autocomplete="off" placeholder="Digite o nome do amigo" />
+          <button class="primary-btn social-invite-submit" type="button" id="socialInviteSubmitButton">Enviar convite</button>
+        </div>
+        <p class="social-modal-status" id="socialModalStatus" aria-live="polite"></p>
+        <div class="social-modal-list" id="socialModalList"></div>
+        <div class="social-scope-footer" id="socialScopeFooter" aria-label="Filtro de período">
+          <button class="social-scope-chip active" type="button" data-social-scope="today">Hoje</button>
+          <button class="social-scope-chip" type="button" data-social-scope="last7">7 dias</button>
+          <button class="social-scope-chip" type="button" data-social-scope="last15">15 dias</button>
+          <button class="social-scope-chip" type="button" data-social-scope="last30">30 dias</button>
+        </div>
+      </div>
+    </section>
+
     <div class="action-wizard" id="financeEntryConfirmWizard" aria-hidden="true">
       <div class="wizard-panel">
         <header class="wizard-head">
@@ -1231,6 +1260,21 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
     </button>
     <div class="running-mission-quick-main" id="runningMissionQuickGrid" aria-live="polite"></div>
+    <div class="running-mission-quick-spotlight" id="runningMissionQuickSpotlight" hidden aria-hidden="true">
+      <div class="running-mission-quick-spotlight-circle-wrap">
+        <svg class="running-mission-quick-spotlight-ring" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <linearGradient id="runningMissionQuickSpotlightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22d3ee"></stop>
+              <stop offset="100%" stop-color="#22c55e"></stop>
+            </linearGradient>
+          </defs>
+          <circle class="running-mission-quick-spotlight-ring-track" cx="50" cy="50" r="44"></circle>
+          <circle class="running-mission-quick-spotlight-ring-fill" id="runningMissionQuickSpotlightFill" cx="50" cy="50" r="44"></circle>
+        </svg>
+        <img class="running-mission-quick-spotlight-icon" id="runningMissionQuickSpotlightIcon" src="/200/icons/target.svg" alt="" aria-hidden="true" />
+      </div>
+    </div>
   </section>
 
   <script type="module" src="/200/project.js?v=20260708-remove-global-loading-1"></script>

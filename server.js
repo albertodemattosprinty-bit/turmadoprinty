@@ -65,6 +65,7 @@ import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject
 import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoalsByScope, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
+import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, rejectProject200FriendInvite } from "./src/project200-friends.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2571,6 +2572,7 @@ async function ensurePaymentsReady(response) {
     await ensureConstitutionSchema();
     await ensureProject200ProfileLinksSchema();
     await ensureExtraGoalsSchema();
+    await ensureProject200FriendsSchema();
   } catch (error) {
     sendJson(response, 503, {
       error: error instanceof Error ? error.message : "Falha ao preparar o schema de pagamentos.",
@@ -11015,6 +11017,88 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Erro ao buscar usuário."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/friends") {
+    try {
+      const authUser = await requireAuth(request, response);
+
+      if (!authUser) {
+        return;
+      }
+
+      const scope = String(requestUrl.searchParams.get("scope") || "today").trim().toLowerCase();
+      const snapshot = await getProject200FriendsSnapshot(authUser.id, scope);
+      sendJson(response, 200, { ok: true, ...snapshot });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar os amigos."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/friends/invite") {
+    try {
+      const authUser = await requireAuth(request, response);
+
+      if (!authUser) {
+        return;
+      }
+
+      const body = await readJsonBody(request);
+      const targetUserId = String(body?.targetUserId || "").trim();
+      if (!targetUserId) {
+        sendJson(response, 400, { error: "Informe o usuario do convite." });
+        return;
+      }
+
+      const result = await createProject200FriendInvite(authUser.id, targetUserId);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel enviar o convite."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/friends\/[^/]+\/accept$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+
+      if (!authUser) {
+        return;
+      }
+
+      const friendshipId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/accept$/, "$1"));
+      const result = await acceptProject200FriendInvite(authUser.id, friendshipId);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel aceitar o convite."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/friends\/[^/]+\/reject$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+
+      if (!authUser) {
+        return;
+      }
+
+      const friendshipId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/reject$/, "$1"));
+      const result = await rejectProject200FriendInvite(authUser.id, friendshipId);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel recusar o convite."
       });
     }
     return;

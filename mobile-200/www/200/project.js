@@ -430,6 +430,9 @@ const runningTaskMissionButton = document.getElementById("runningTaskMissionButt
 const runningMissionQuickModal = document.getElementById("runningMissionQuickModal");
 const closeRunningMissionQuickModalButton = document.getElementById("closeRunningMissionQuickModal");
 const runningMissionQuickGrid = document.getElementById("runningMissionQuickGrid");
+const runningMissionQuickSpotlight = document.getElementById("runningMissionQuickSpotlight");
+const runningMissionQuickSpotlightIcon = document.getElementById("runningMissionQuickSpotlightIcon");
+const runningMissionQuickSpotlightFill = document.getElementById("runningMissionQuickSpotlightFill");
 const runningMissionQuickFeedback = document.getElementById("runningMissionQuickFeedback");
 const runningMissionQuickFocus = document.getElementById("runningMissionQuickFocus");
 const runningMissionQuickFocusIcon = document.getElementById("runningMissionQuickFocusIcon");
@@ -602,7 +605,16 @@ const homeProfileButton = document.getElementById("homeProfileButton");
 const homePlayTime = document.getElementById("homePlayTime");
 const homeRunningSurfaceButton = document.getElementById("homeRunningSurfaceButton");
 const homeRunningSurfaceIcon = document.getElementById("homeRunningSurfaceIcon");
+const homeSocialButton = document.getElementById("homeSocialButton");
+const homeSocialBadge = document.getElementById("homeSocialBadge");
 const homeSleepButton = document.getElementById("homeSleepButton");
+const socialModal = document.getElementById("socialModal");
+const socialInviteToggleButton = document.getElementById("socialInviteToggleButton");
+const socialInviteForm = document.getElementById("socialInviteForm");
+const socialInviteInput = document.getElementById("socialInviteInput");
+const socialInviteSubmitButton = document.getElementById("socialInviteSubmitButton");
+const socialModalStatus = document.getElementById("socialModalStatus");
+const socialModalList = document.getElementById("socialModalList");
 const statsRunningSurfaceButton = document.getElementById("statsRunningSurfaceButton");
 const statsRunningSurfaceIcon = document.getElementById("statsRunningSurfaceIcon");
 const homeProfileName = document.getElementById("homeProfileName");
@@ -786,6 +798,7 @@ let postponeFeedbackCarouselTimer = null;
 let runningMissionQuickFeedbackTimer = null;
 let runningMissionQuickFocusTimer = null;
 let runningMissionQuickRequestChain = Promise.resolve();
+let runningMissionQuickSpotlightTimer = null;
 let missionCardHoldTimer = null;
 let missionCardHoldGoalId = "";
 let missionRunTicker = null;
@@ -795,6 +808,7 @@ let sleepMusicHoldTimer = null;
 let sleepMusicHoldTriggered = false;
 let lastTouchClickSoundAt = 0;
 let svgAssetLibraryPromise = null;
+let socialSnapshotHydrationPromise = null;
 const defaultTaskSvgPath = "/200/icons/task-default.svg";
 const defaultMissionSvgPath = "/200/icons/target.svg";
 
@@ -834,6 +848,15 @@ const state = {
     musicTrackIndex: 0,
     lastPhase: "",
     fadeStarted: false
+  },
+  social: {
+    scopeKey: "today",
+    loading: false,
+    inviteComposerOpen: false,
+    pendingCount: 0,
+    self: null,
+    incomingInvites: [],
+    friends: []
   },
   missions: [],
   constitutionVersions: [],
@@ -876,7 +899,9 @@ const state = {
   runningMissionQuick: {
     feedbackGoalKey: "",
     lastRenderedText: "",
-    focusKey: ""
+    focusKey: "",
+    isAnimating: false,
+    spotlightGoalId: ""
   },
   historyTextComposer: {
     step: 1,
@@ -1064,6 +1089,43 @@ function getProfileAvatarPath(profileOrName) {
 function getProfileSvgIconPath(profileOrName) {
   const profile = typeof profileOrName === "string" ? getProfileByName(profileOrName) : profileOrName;
   return String(profile?.svgIconUrl || "").trim();
+}
+
+function getSocialCardAvatarPath(entry) {
+  const customAvatar = String(entry?.avatarDataUrl || "").trim();
+  if (customAvatar.startsWith("data:image/")) {
+    return customAvatar;
+  }
+  const svgIconUrl = String(entry?.svgIconUrl || "").trim();
+  if (svgIconUrl) {
+    return svgIconUrl;
+  }
+  const preset = String(entry?.avatarPreset || "").trim().toLowerCase();
+  return avatarPresetToPath[preset] || "";
+}
+
+function getSocialCardInitials(entry) {
+  const explicit = String(entry?.initials || "").trim();
+  if (explicit) {
+    return explicit.slice(0, 2).toUpperCase();
+  }
+  const source = String(entry?.name || entry?.username || "U").trim();
+  const parts = source.split(/\s+/u).filter(Boolean);
+  if (!parts.length) {
+    return "U";
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase() || "U";
+}
+
+function renderSocialCardAvatar(entry) {
+  const avatarPath = getSocialCardAvatarPath(entry);
+  if (avatarPath) {
+    return `<img src="${escapeHtml(avatarPath)}" alt="${escapeHtml(String(entry?.name || "Avatar"))}" loading="lazy" />`;
+  }
+  return `<span>${escapeHtml(getSocialCardInitials(entry))}</span>`;
 }
 
 function normalizeBackgroundTheme(value) {
@@ -4343,6 +4405,7 @@ function closeModal(modal) {
     setRunningHomeVisibility(true);
   }
   if (modal.id === "runningMissionQuickModal") {
+    resetRunningMissionQuickSpotlight();
     clearRunningMissionQuickFeedbackTimer();
     resetRunningMissionQuickFocusState();
     if (runningMissionQuickFeedback) {
@@ -4380,6 +4443,10 @@ function closeModal(modal) {
       void syncSleepFrequencyPlayback();
     }
     renderSleepModalState();
+  }
+  if (modal.id === "socialModal") {
+    state.social.inviteComposerOpen = false;
+    renderSocialModal();
   }
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
@@ -6083,6 +6150,11 @@ async function ensureProject200Session() {
   const token = getToken();
   if (!token) {
     state.authUser = null;
+    state.social.pendingCount = 0;
+    state.social.self = null;
+    state.social.incomingInvites = [];
+    state.social.friends = [];
+    renderSocialModal();
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
     unlockProject200Screen();
@@ -6107,6 +6179,11 @@ async function ensureProject200Session() {
         setToken("");
         state.profileLock = "";
         state.authUser = null;
+        state.social.pendingCount = 0;
+        state.social.self = null;
+        state.social.incomingInvites = [];
+        state.social.friends = [];
+        renderSocialModal();
         project200LoginOverlay?.classList.add("active");
         project200LoginOverlay?.setAttribute("aria-hidden", "false");
         unlockProject200Screen();
@@ -6124,10 +6201,16 @@ async function ensureProject200Session() {
     if (error?.name === "AbortError") {
       state.profileLock = "";
       state.authUser = null;
+      renderSocialModal();
       return false;
     }
     state.profileLock = "";
     state.authUser = null;
+    state.social.pendingCount = 0;
+    state.social.self = null;
+    state.social.incomingInvites = [];
+    state.social.friends = [];
+    renderSocialModal();
     project200LoginOverlay?.classList.add("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "false");
     unlockProject200Screen();
@@ -6200,6 +6283,10 @@ async function refreshHomeSnapshot(options = {}) {
       }
       state.homeSnapshotReady = false;
       await loadActions();
+      await loadSocialSnapshot({
+        skipGlobalLoading: true,
+        silent: true
+      });
       if (!state.homeSnapshotReady) {
         throw new Error("HOME_SNAPSHOT_PENDING");
       }
@@ -8629,6 +8716,198 @@ async function openSleepModal() {
   }
 }
 
+function renderSocialBadge() {
+  const count = Math.max(0, Math.trunc(Number(state.social?.pendingCount || 0) || 0));
+  if (!homeSocialBadge) {
+    return;
+  }
+  homeSocialBadge.hidden = count <= 0;
+  homeSocialBadge.textContent = String(count);
+}
+
+function renderSocialScopeFooter() {
+  document.querySelectorAll("[data-social-scope]").forEach((button) => {
+    button.classList.toggle("active", String(button.dataset.socialScope || "") === String(state.social?.scopeKey || "today"));
+  });
+}
+
+function renderSocialModal() {
+  renderSocialBadge();
+  renderSocialScopeFooter();
+  if (socialInviteForm) {
+    socialInviteForm.hidden = !state.social.inviteComposerOpen;
+  }
+  if (socialInviteToggleButton) {
+    socialInviteToggleButton.textContent = state.social.inviteComposerOpen ? "×" : "+";
+  }
+  if (socialModalList) {
+    const cards = [];
+    if (state.social?.self) {
+      cards.push(`
+        <article class="social-card social-card--self">
+          <div class="social-card-avatar">${renderSocialCardAvatar(state.social.self)}</div>
+          <div class="social-card-body">
+            <div class="social-card-name">${escapeHtml(String(state.social.self.name || "Você"))}</div>
+            <div class="social-card-copy">Você</div>
+          </div>
+          <div class="social-card-points">Pontos<br><strong>${escapeHtml(String(Math.max(0, Number(state.social.self.points || 0))))}</strong></div>
+        </article>
+      `);
+    }
+    for (const invite of Array.isArray(state.social?.incomingInvites) ? state.social.incomingInvites : []) {
+      const fromUser = invite?.fromUser || {};
+      cards.push(`
+        <article class="social-card social-card--invite">
+          <div class="social-card-avatar">${renderSocialCardAvatar(fromUser)}</div>
+          <div class="social-card-body">
+            <div class="social-card-name">${escapeHtml(String(fromUser.name || "Usuario"))}</div>
+            <div class="social-card-copy">${escapeHtml(String(fromUser.name || "Usuario"))} quer ser seu amigo.</div>
+          </div>
+          <div class="social-card-actions">
+            <button class="social-card-action is-accept" type="button" data-social-accept="${escapeHtml(String(invite.id || ""))}">Aceitar</button>
+            <button class="social-card-action is-reject" type="button" data-social-reject="${escapeHtml(String(invite.id || ""))}">Recusar</button>
+          </div>
+        </article>
+      `);
+    }
+    for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
+      cards.push(`
+        <article class="social-card social-card--friend">
+          <div class="social-card-avatar">${renderSocialCardAvatar(friend)}</div>
+          <div class="social-card-body">
+            <div class="social-card-name">${escapeHtml(String(friend.name || "Usuario"))}</div>
+            <div class="social-card-copy">Pontos</div>
+          </div>
+          <div class="social-card-points"><strong>${escapeHtml(String(Math.max(0, Number(friend.points || 0))))}</strong></div>
+        </article>
+      `);
+    }
+    if (!cards.length) {
+      cards.push(`<div class="social-empty-state">Nenhum item por aqui ainda.</div>`);
+    }
+    socialModalList.innerHTML = cards.join("");
+  }
+}
+
+async function loadSocialSnapshot(options = {}) {
+  if (!getToken()) {
+    state.social.pendingCount = 0;
+    state.social.self = null;
+    state.social.incomingInvites = [];
+    state.social.friends = [];
+    renderSocialModal();
+    return null;
+  }
+  if (socialSnapshotHydrationPromise && options?.force !== true) {
+    return socialSnapshotHydrationPromise;
+  }
+  socialSnapshotHydrationPromise = (async () => {
+    try {
+      const payload = await apiRequest(`/api/200/friends?scope=${encodeURIComponent(String(state.social?.scopeKey || "today"))}`, {
+        skipGlobalLoading: options?.skipGlobalLoading === true
+      });
+      state.social.pendingCount = Math.max(0, Number(payload?.pendingCount || 0) || 0);
+      state.social.self = payload?.self || null;
+      state.social.incomingInvites = Array.isArray(payload?.incomingInvites) ? payload.incomingInvites : [];
+      state.social.friends = Array.isArray(payload?.friends) ? payload.friends : [];
+      renderSocialModal();
+      return payload;
+    } catch (error) {
+      if (socialModalStatus && options?.silent !== true) {
+        socialModalStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar amizades.";
+      }
+      renderSocialModal();
+      return null;
+    } finally {
+      socialSnapshotHydrationPromise = null;
+    }
+  })();
+  return socialSnapshotHydrationPromise;
+}
+
+async function openSocialModal() {
+  if (socialModalStatus) {
+    socialModalStatus.textContent = "";
+  }
+  await loadSocialSnapshot({
+    force: true,
+    skipGlobalLoading: true,
+    silent: true
+  });
+  renderSocialModal();
+  openModal("socialModal");
+}
+
+async function submitSocialInvite() {
+  const rawInput = String(socialInviteInput?.value || "").trim();
+  if (!rawInput) {
+    if (socialModalStatus) {
+      socialModalStatus.textContent = "Digite o nome do amigo.";
+    }
+    return;
+  }
+  try {
+    if (socialModalStatus) {
+      socialModalStatus.textContent = "Procurando amigo...";
+    }
+    const lookup = await apiRequest(`/api/200/users/lookup?username=${encodeURIComponent(rawInput)}`, {
+      skipGlobalLoading: true
+    });
+    const targetUserId = String(lookup?.user?.id || "").trim();
+    if (!targetUserId) {
+      throw new Error("Usuario nao encontrado.");
+    }
+    if (socialModalStatus) {
+      socialModalStatus.textContent = "Enviando convite...";
+    }
+    await apiRequest("/api/200/friends/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetUserId }),
+      skipGlobalLoading: true
+    });
+    if (socialInviteInput) {
+      socialInviteInput.value = "";
+    }
+    state.social.inviteComposerOpen = false;
+    if (socialModalStatus) {
+      socialModalStatus.textContent = `Convite enviado para ${String(lookup?.user?.name || lookup?.user?.username || "o amigo")}.`;
+    }
+    await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+  } catch (error) {
+    if (socialModalStatus) {
+      socialModalStatus.textContent = error instanceof Error ? error.message : "Falha ao enviar convite.";
+    }
+  } finally {
+    renderSocialModal();
+  }
+}
+
+async function respondToSocialInvite(friendshipId, action) {
+  const normalizedId = String(friendshipId || "").trim();
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (!normalizedId || (normalizedAction !== "accept" && normalizedAction !== "reject")) {
+    return;
+  }
+  try {
+    if (socialModalStatus) {
+      socialModalStatus.textContent = normalizedAction === "accept" ? "Aceitando convite..." : "Recusando convite...";
+    }
+    await apiRequest(`/api/200/friends/${encodeURIComponent(normalizedId)}/${normalizedAction === "accept" ? "accept" : "reject"}`, {
+      method: "POST",
+      skipGlobalLoading: true
+    });
+    if (socialModalStatus) {
+      socialModalStatus.textContent = normalizedAction === "accept" ? "Amizade confirmada." : "Convite recusado.";
+    }
+    await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+  } catch (error) {
+    if (socialModalStatus) {
+      socialModalStatus.textContent = error instanceof Error ? error.message : "Falha ao responder convite.";
+    }
+  }
+}
+
 async function startSleepSessionFlow() {
   if (!getToken()) {
     return;
@@ -8758,6 +9037,30 @@ function clearRunningMissionQuickFocusTimer() {
   if (runningMissionQuickFocusTimer) {
     window.clearTimeout(runningMissionQuickFocusTimer);
     runningMissionQuickFocusTimer = null;
+  }
+}
+
+function clearRunningMissionQuickSpotlightTimer() {
+  if (runningMissionQuickSpotlightTimer) {
+    window.clearTimeout(runningMissionQuickSpotlightTimer);
+    runningMissionQuickSpotlightTimer = null;
+  }
+}
+
+function resetRunningMissionQuickSpotlight() {
+  clearRunningMissionQuickSpotlightTimer();
+  state.runningMissionQuick.isAnimating = false;
+  state.runningMissionQuick.spotlightGoalId = "";
+  if (runningMissionQuickSpotlight) {
+    runningMissionQuickSpotlight.hidden = true;
+    runningMissionQuickSpotlight.setAttribute("aria-hidden", "true");
+  }
+  if (runningMissionQuickGrid) {
+    runningMissionQuickGrid.hidden = false;
+  }
+  if (runningMissionQuickSpotlightFill) {
+    runningMissionQuickSpotlightFill.style.transition = "none";
+    runningMissionQuickSpotlightFill.style.strokeDashoffset = "276.46";
   }
 }
 
@@ -8909,6 +9212,9 @@ function renderRunningMissionQuickButtons() {
   if (!runningMissionQuickGrid) {
     return;
   }
+  if (state.runningMissionQuick?.isAnimating) {
+    return;
+  }
   const goals = (Array.isArray(state.missions) ? state.missions : [])
     .slice()
     .sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "pt-BR"));
@@ -8966,6 +9272,7 @@ async function openRunningMissionQuickModal() {
     redirectToProject200Login();
     return;
   }
+  resetRunningMissionQuickSpotlight();
   renderRunningMissionQuickButtons();
   if (runningMissionQuickFeedback) {
     runningMissionQuickFeedback.textContent = "";
@@ -9013,7 +9320,6 @@ function queueRunningMissionQuickIncrement(goal) {
           state.missions = payload.goals;
           renderMissions();
           renderRunningMissionQuickButtons();
-          playMissionProgressSound();
           const updatedGoal = getMissionQuickGoalById(goal.id);
           if (updatedGoal && runningMissionQuickFeedback?.textContent) {
             showRunningMissionQuickFeedback(updatedGoal);
@@ -9030,6 +9336,38 @@ function queueRunningMissionQuickIncrement(goal) {
     });
 }
 
+function startRunningMissionQuickSpotlight(goal) {
+  if (!goal || !runningMissionQuickGrid || !runningMissionQuickSpotlight || !runningMissionQuickSpotlightIcon || !runningMissionQuickSpotlightFill) {
+    handleRunningMissionQuickTap(String(goal?.id || ""));
+    return;
+  }
+  const visualKey = getMissionQuickVisualKey(goal, 0);
+  const iconPath = String(goal.svgIconUrl || "").trim() || `/200/icons/mission-${visualKey === "store" ? "store" : visualKey === "read" ? "book" : visualKey === "brush" ? "brush" : "water"}.svg`;
+  state.runningMissionQuick.isAnimating = true;
+  state.runningMissionQuick.spotlightGoalId = String(goal.id || "");
+  runningMissionQuickGrid.hidden = true;
+  runningMissionQuickSpotlight.hidden = false;
+  runningMissionQuickSpotlight.setAttribute("aria-hidden", "false");
+  runningMissionQuickSpotlightIcon.src = iconPath;
+  runningMissionQuickSpotlightFill.style.transition = "none";
+  runningMissionQuickSpotlightFill.style.strokeDashoffset = "276.46";
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      runningMissionQuickSpotlightFill.style.transition = "stroke-dashoffset 2000ms linear";
+      runningMissionQuickSpotlightFill.style.strokeDashoffset = "0";
+    });
+  });
+  clearRunningMissionQuickSpotlightTimer();
+  runningMissionQuickSpotlightTimer = window.setTimeout(() => {
+    applyMissionProgressLocally(goal.id, 1);
+    renderMissions();
+    resetRunningMissionQuickSpotlight();
+    renderRunningMissionQuickButtons();
+    playMissionProgressSound();
+    queueRunningMissionQuickIncrement(goal);
+  }, 2000);
+}
+
 function handleRunningMissionQuickTap(key) {
   const goal = getMissionQuickGoalById(key);
   if (!goal) {
@@ -9038,11 +9376,10 @@ function handleRunningMissionQuickTap(key) {
     }
     return;
   }
-  applyMissionProgressLocally(goal.id, 1);
-  const updatedGoal = getMissionQuickGoalById(goal.id);
-  renderMissions();
-  renderRunningMissionQuickButtons();
-  queueRunningMissionQuickIncrement(goal);
+  if (state.runningMissionQuick?.isAnimating) {
+    return;
+  }
+  startRunningMissionQuickSpotlight(goal);
 }
 
 function assignMissionQuickSlot(slotKey) {
@@ -10132,6 +10469,11 @@ function clearProject200SessionState() {
   setToken("");
   state.profileLock = "";
   state.authUser = null;
+  state.social.pendingCount = 0;
+  state.social.self = null;
+  state.social.incomingInvites = [];
+  state.social.friends = [];
+  state.social.inviteComposerOpen = false;
   state.actions = [];
   state.profiles = [];
   state.historySystem = [];
@@ -10150,6 +10492,7 @@ function clearProject200SessionState() {
   renderActions();
   renderMissions();
   renderHomeRunningTask();
+  renderSocialModal();
 }
 
 async function bootstrapProject200App() {
@@ -12104,8 +12447,56 @@ logoutProject200Button?.addEventListener("click", () => {
 homeRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();
 });
+homeSocialButton?.addEventListener("click", () => {
+  void openSocialModal();
+});
 homeSleepButton?.addEventListener("click", () => {
+  if (sleepModalFeedback) {
+    sleepModalFeedback.textContent = "";
+  }
   void openSleepModal();
+});
+socialInviteToggleButton?.addEventListener("click", () => {
+  state.social.inviteComposerOpen = !state.social.inviteComposerOpen;
+  if (socialModalStatus) {
+    socialModalStatus.textContent = "";
+  }
+  renderSocialModal();
+  if (state.social.inviteComposerOpen) {
+    window.setTimeout(() => socialInviteInput?.focus(), 40);
+  }
+});
+socialInviteSubmitButton?.addEventListener("click", () => {
+  void submitSocialInvite();
+});
+socialInviteInput?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  void submitSocialInvite();
+});
+socialModalList?.addEventListener("click", (event) => {
+  const acceptButton = event.target.closest("[data-social-accept]");
+  if (acceptButton) {
+    void respondToSocialInvite(String(acceptButton.dataset.socialAccept || ""), "accept");
+    return;
+  }
+  const rejectButton = event.target.closest("[data-social-reject]");
+  if (rejectButton) {
+    void respondToSocialInvite(String(rejectButton.dataset.socialReject || ""), "reject");
+  }
+});
+document.querySelectorAll("[data-social-scope]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const nextScope = String(button.dataset.socialScope || "").trim().toLowerCase();
+    if (!nextScope || nextScope === state.social.scopeKey) {
+      return;
+    }
+    state.social.scopeKey = nextScope;
+    renderSocialScopeFooter();
+    void loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+  });
 });
 statsRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();
@@ -12677,6 +13068,7 @@ project200LoginForm?.addEventListener("submit", (event) => {
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
       await loadProject200Profiles();
       await loadActions();
+      await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
       scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {
@@ -12752,6 +13144,7 @@ project200RegisterForm?.addEventListener("submit", (event) => {
       setProject200AuthTab("login");
       await loadProject200Profiles();
       await loadActions();
+      await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
       scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {
@@ -12765,6 +13158,7 @@ loadOptionsConfig();
 applyScreenLockUi();
 scheduleScreenLockInactivity();
 startHomeDeviceClock();
+renderSocialModal();
 
 document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));
