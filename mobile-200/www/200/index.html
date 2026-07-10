@@ -54,15 +54,6 @@
     </div>
   </section>
   <main class="project-shell">
-    <section class="home-profile-hero">
-      <div class="home-running-widget-shell">
-        <button class="home-profile-button home-profile-play-button" id="homeProfileButton" type="button" aria-label="Abrir andamento">
-          <svg class="home-profile-play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z" fill="currentColor"/></svg>
-        </button>
-        <span class="home-play-time" id="homePlayTime">00:00</span>
-      </div>
-      <span class="home-profile-name" id="homeProfileName" hidden>Usuario</span>
-    </section>
     <section class="project-hub" aria-label="Projeto 200">
       <button class="hub-action" type="button" data-open-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
         <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
@@ -85,7 +76,6 @@
         <span class="hub-action-label">Andam.</span>
       </button>
     </section>
-    <section class="profile-selector profile-footer" id="profileFooter" aria-label="Usuários"></section>
   </main>
   <div class="screen-lock-overlay" id="screenLockOverlay" aria-hidden="true" hidden>
     <div class="screen-lock-corner" aria-hidden="true">
@@ -655,6 +645,11 @@
         <strong>Foto do usuario</strong>
         <span class="running-music-default-bottom">Abre o fluxo de foto de perfil do usuário selecionado</span>
       </button>
+      <button class="running-music-default-option" type="button" id="logoutProject200Button">
+        <span class="running-music-default-top">Encerrar o login salvo neste aparelho</span>
+        <strong>Sair do login</strong>
+        <span class="running-music-default-bottom">Limpa a sessão atual e abre /log</span>
+      </button>
       <button class="ghost-btn running-music-default-close" type="button" data-close-modal>Fechar</button>
     </div>
   </section>
@@ -1034,7 +1029,13 @@
         <button class="icon-action-btn history-mission-footer-btn" type="button" id="openMissionCreateButton" aria-label="Adicionar missão">
           <img src="/200/icons/target.svg" alt="" aria-hidden="true" />
         </button>
-        <div class="history-mission-footer-spacer" aria-hidden="true"></div>
+        <button class="icon-action-btn history-mission-footer-btn history-mission-scope-btn" type="button" id="missionScopePrevButton" aria-label="Periodo anterior">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 5.3 8 12l6.7 6.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="history-mission-footer-spacer history-mission-scope-label" id="missionScopeLabel" aria-live="polite">Hoje</div>
+        <button class="icon-action-btn history-mission-footer-btn history-mission-scope-btn" type="button" id="missionScopeNextButton" aria-label="Proximo periodo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 5.3 16 12l-6.7 6.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         <button class="icon-action-btn history-mission-footer-btn" type="button" data-close-modal aria-label="Voltar para a home">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.4 12 4l9 7.4v8.1a1.5 1.5 0 0 1-1.5 1.5h-4.8v-6.2H9.3V21H4.5A1.5 1.5 0 0 1 3 19.5z" fill="currentColor"/></svg>
         </button>

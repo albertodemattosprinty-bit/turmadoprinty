@@ -62,7 +62,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoals, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
+import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoalsByScope, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 
@@ -3406,9 +3406,10 @@ async function handleExtraGoalsListRequest(request, response) {
   try {
     const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
     const selectedProfile = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
-    const goals = await listExtraGoals(user.id, selectedProfile);
+    const scopedGoals = await listExtraGoalsByScope(user.id, selectedProfile, requestUrl.searchParams.get("scope"));
+    const goals = Array.isArray(scopedGoals?.goals) ? scopedGoals.goals : [];
     const summary = summarizeExtraGoals(goals);
-    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary, scope: scopedGoals?.scope || null });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel carregar as missoes."

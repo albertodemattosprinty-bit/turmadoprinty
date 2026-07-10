@@ -2,6 +2,12 @@ import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
+export const EXTRA_GOAL_HISTORY_SCOPES = [
+  { key: "today", label: "Hoje", days: 1 },
+  { key: "last7", label: "Ultimos 7 dias", days: 7 },
+  { key: "last30", label: "Ultimos 30 dias", days: 30 },
+  { key: "last180", label: "Ultimos 180 dias", days: 180 }
+];
 const DEFAULT_EXTRA_GOALS = [
   { title: "Beber água", targetValue: 8 },
   { title: "Guardar 6 itens", targetValue: 6 },
@@ -68,6 +74,11 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null
   };
+}
+
+function getExtraGoalHistoryScope(scopeKey = "today") {
+  const normalized = String(scopeKey || "today").trim().toLowerCase();
+  return EXTRA_GOAL_HISTORY_SCOPES.find((scope) => scope.key === normalized) || EXTRA_GOAL_HISTORY_SCOPES[0];
 }
 
 function getDefaultExtraGoalOrder(title) {
@@ -234,6 +245,24 @@ export async function ensureExtraGoalsSchema() {
   await query("alter table extra_goals add column if not exists svg_icon_label text not null default '';");
   await query("update extra_goals set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
   await query("create index if not exists idx_extra_goals_user_profile_created on extra_goals(user_id, assigned_profile, created_at asc);");
+  await query(`
+    create table if not exists extra_goal_progress_history (
+      user_id uuid not null references users(id) on delete cascade,
+      goal_id uuid not null references extra_goals(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      scope_date date not null,
+      progress_value integer not null default 0,
+      target_value integer not null default 1,
+      updated_at timestamptz not null default now(),
+      primary key (user_id, goal_id, scope_date)
+    );
+  `);
+  await query("alter table extra_goal_progress_history add column if not exists assigned_profile text not null default 'Usuario';");
+  await query("alter table extra_goal_progress_history add column if not exists progress_value integer not null default 0;");
+  await query("alter table extra_goal_progress_history add column if not exists target_value integer not null default 1;");
+  await query("alter table extra_goal_progress_history add column if not exists updated_at timestamptz not null default now();");
+  await query("update extra_goal_progress_history set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
+  await query("create index if not exists idx_extra_goal_progress_history_user_profile_date on extra_goal_progress_history(user_id, assigned_profile, scope_date desc);");
   await query("alter table extra_goal_profiles add column if not exists assigned_profile text not null default 'Usuario';");
   await query("alter table extra_goal_profiles add column if not exists seeded_at timestamptz not null default now();");
   await query("update extra_goal_profiles set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
@@ -256,6 +285,39 @@ export async function ensureExtraGoalsSchema() {
     );
   `);
   await query("create index if not exists idx_extra_goal_svg_defaults_user_profile on extra_goal_svg_defaults(user_id, assigned_profile, updated_at desc);");
+}
+
+async function syncExtraGoalProgressHistory(userId, goal, dateKey = toDateKey()) {
+  const goalId = String(goal?.id || "").trim();
+  const normalizedProfile = normalizeExtraGoalProfile(goal?.profileName);
+  if (!goalId || !normalizedProfile || !getStoredDateKey(dateKey)) {
+    return;
+  }
+  const progressValue = Math.max(0, Math.trunc(Number(goal?.progressValue || 0) || 0));
+  const targetValue = Math.max(1, Math.trunc(Number(goal?.targetValue || 0) || 1));
+  await query(
+    `
+      insert into extra_goal_progress_history (
+        user_id, goal_id, assigned_profile, scope_date, progress_value, target_value, updated_at
+      )
+      values ($1, $2, $3, $4::date, $5, $6, now())
+      on conflict (user_id, goal_id, scope_date)
+      do update
+         set assigned_profile = excluded.assigned_profile,
+             progress_value = excluded.progress_value,
+             target_value = excluded.target_value,
+             updated_at = now()
+    `,
+    [userId, goalId, normalizedProfile, dateKey, progressValue, targetValue]
+  );
+}
+
+async function syncCurrentExtraGoalHistory(userId, goals = [], dateKey = toDateKey()) {
+  for (const goal of Array.isArray(goals) ? goals : []) {
+    if (Number(goal?.progressValue || 0) > 0) {
+      await syncExtraGoalProgressHistory(userId, goal, dateKey);
+    }
+  }
 }
 
 export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, date = new Date()) {
@@ -285,7 +347,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     `,
     [userId, normalizedProfile]
   );
-  return result.rows
+  const goals = result.rows
     .map((row) => normalizeExtraGoalRow(row, dateKey))
     .sort((left, right) => {
       const leftOrder = getDefaultExtraGoalOrder(left.title);
@@ -295,6 +357,66 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
       }
       return String(left.title || "").localeCompare(String(right.title || ""), "pt-BR");
     });
+  await syncCurrentExtraGoalHistory(userId, goals, dateKey);
+  return goals;
+}
+
+export async function listExtraGoalsByScope(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, scopeKey = "today") {
+  const scope = getExtraGoalHistoryScope(scopeKey);
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const goals = await listExtraGoals(userId, normalizedProfile);
+  if (scope.key === "today") {
+    return {
+      scope,
+      goals
+    };
+  }
+
+  const endDateKey = toDateKey();
+  const startDateKey = toDateKey(new Date(Date.now() - ((scope.days - 1) * 24 * 60 * 60 * 1000)));
+  const result = await query(
+    `
+      select
+        goal_id,
+        count(*) filter (where progress_value >= target_value and target_value > 0) as completed_days,
+        count(*) filter (where progress_value > 0) as active_days,
+        coalesce(sum(progress_value), 0) as total_progress_value,
+        max(updated_at) as updated_at
+      from extra_goal_progress_history
+      where user_id = $1
+        and assigned_profile = $2
+        and scope_date >= $3::date
+        and scope_date <= $4::date
+      group by goal_id
+    `,
+    [userId, normalizedProfile, startDateKey, endDateKey]
+  );
+  const historyByGoalId = new Map(result.rows.map((row) => [String(row.goal_id || "").trim(), row]));
+  return {
+    scope: {
+      ...scope,
+      startDateKey,
+      endDateKey
+    },
+    goals: goals.map((goal) => {
+      const history = historyByGoalId.get(String(goal.id || "").trim()) || {};
+      const completedDays = Math.max(0, Math.trunc(Number(history.completed_days || 0) || 0));
+      const activeDays = Math.max(0, Math.trunc(Number(history.active_days || 0) || 0));
+      const totalProgressValue = Math.max(0, Math.trunc(Number(history.total_progress_value || 0) || 0));
+      return {
+        ...goal,
+        isHistoryRange: true,
+        completedDays,
+        activeDays,
+        totalProgressValue,
+        progressValue: completedDays,
+        targetValue: scope.days,
+        remainingValue: Math.max(0, scope.days - completedDays),
+        percent: scope.days > 0 ? Math.max(0, Math.min(100, Math.round((completedDays / scope.days) * 100))) : 0,
+        scopeKey: scope.key
+      };
+    })
+  };
 }
 
 export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, date = new Date()) {
@@ -408,7 +530,12 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
     `,
     [safeGoalId, userId, normalizedProfile, nextProgress, dateKey]
   );
-  return listExtraGoals(userId, normalizedProfile, dateKey);
+  const goals = await listExtraGoals(userId, normalizedProfile, dateKey);
+  const updatedGoal = goals.find((goal) => String(goal.id || "").trim() === safeGoalId) || null;
+  if (updatedGoal) {
+    await syncExtraGoalProgressHistory(userId, updatedGoal, dateKey);
+  }
+  return goals;
 }
 
 export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, payload = {}) {
@@ -444,7 +571,12 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
     await saveExtraGoalSvgDefault(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
     await applyExtraGoalSvgDefaultToMatchingGoals(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
   }
-  return listExtraGoals(userId, normalizedProfile);
+  const goals = await listExtraGoals(userId, normalizedProfile);
+  const updatedGoal = goals.find((goal) => String(goal.id || "").trim() === safeGoalId) || null;
+  if (updatedGoal) {
+    await syncExtraGoalProgressHistory(userId, updatedGoal, toDateKey());
+  }
+  return goals;
 }
 
 export async function updateExtraGoalSvgIcon(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, payload = {}) {

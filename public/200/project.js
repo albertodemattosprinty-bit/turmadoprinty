@@ -24,6 +24,12 @@ const missionQuickDefinitions = [
   { key: "read", label: "Livro", defaultTitle: "Ler uma página", targetValue: 6 },
   { key: "brush", label: "Dente", defaultTitle: "Escovar os dentes", targetValue: 3 }
 ];
+const missionHistoryScopes = [
+  { key: "today", label: "Hoje" },
+  { key: "last7", label: "Ultimos 7 dias" },
+  { key: "last30", label: "Ultimos 30 dias" },
+  { key: "last180", label: "Ultimos 180 dias" }
+];
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
   { key: "points", label: "Pontos" },
@@ -366,6 +372,9 @@ const missionStatus = document.getElementById("missionStatus");
 const missionsEmpty = document.getElementById("missionsEmpty");
 const missionList = document.getElementById("missionList");
 const missionsFooter = document.getElementById("missionsFooter");
+const missionScopePrevButton = document.getElementById("missionScopePrevButton");
+const missionScopeLabel = document.getElementById("missionScopeLabel");
+const missionScopeNextButton = document.getElementById("missionScopeNextButton");
 const openMissionCreateHeroButton = document.getElementById("openMissionCreateHero");
 const openMissionCreateButton = document.getElementById("openMissionCreateButton");
 const missionTitleInput = document.getElementById("missionTitleInput");
@@ -779,6 +788,7 @@ const state = {
   selectedProfile: defaultProjectProfileName,
   profileLock: "",
   historyOffset: 0,
+  missionHistoryScopeIndex: 0,
   missionAdjust: {
     goalId: "",
     targetValue: 1
@@ -3435,6 +3445,27 @@ function formatHistoryDateLabel(date) {
     return "Hoje";
   }
   return `${String(date.getDate()).padStart(2, "0")} ${monthLabels[date.getMonth()]}`;
+}
+
+function getMissionHistoryScope() {
+  return missionHistoryScopes[state.missionHistoryScopeIndex] || missionHistoryScopes[0];
+}
+
+function isMissionHistoryRangeActive() {
+  return getMissionHistoryScope().key !== "today";
+}
+
+function renderMissionScopeControls() {
+  const scope = getMissionHistoryScope();
+  if (missionScopeLabel) {
+    missionScopeLabel.textContent = scope.label;
+  }
+  if (missionScopePrevButton) {
+    missionScopePrevButton.disabled = state.missionHistoryScopeIndex <= 0;
+  }
+  if (missionScopeNextButton) {
+    missionScopeNextButton.disabled = state.missionHistoryScopeIndex >= missionHistoryScopes.length - 1;
+  }
 }
 
 function toLocalDateKey(value) {
@@ -7920,20 +7951,43 @@ async function loadHistoryFromApi() {
 async function loadMissions() {
   if (!getToken()) {
     state.missions = [];
+    renderMissionScopeControls();
     return;
   }
   showDbLoadingState(missionList || missionsEmpty || missionStatus, 220);
   const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  const scope = getMissionHistoryScope();
+  renderMissionScopeControls();
   try {
-    const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}`);
+    const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`);
     state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
     if (missionStatus) {
       missionStatus.textContent = "";
     }
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha ao carregar missões.";
+    if (/usuario invalido/i.test(message)) {
+      await loadProject200Profiles().catch(() => null);
+      applySelectedProfile(getDefaultProfileName());
+      try {
+        const retryScope = getMissionHistoryScope();
+        const retryPayload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(getDefaultProfileName())}&scope=${encodeURIComponent(retryScope.key)}`);
+        state.missions = Array.isArray(retryPayload?.goals) ? retryPayload.goals : [];
+        if (missionStatus) {
+          missionStatus.textContent = "";
+        }
+        return;
+      } catch (retryError) {
+        state.missions = [];
+        if (missionStatus) {
+          missionStatus.textContent = retryError instanceof Error ? retryError.message : "Falha ao carregar missões.";
+        }
+        return;
+      }
+    }
     state.missions = [];
     if (missionStatus) {
-      missionStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar missões.";
+      missionStatus.textContent = message;
     }
   }
 }
@@ -9009,6 +9063,13 @@ function createMissionCard(goal) {
   const target = Math.max(1, Number(goal.targetValue || 1));
   const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
   const goalIcon = getMissionDisplayIcon(goal);
+  const historyRangeActive = isMissionHistoryRangeActive();
+  const progressLabel = historyRangeActive
+    ? `${Math.max(0, Math.trunc(Number(goal.completedDays || 0) || 0))} de ${target} dias concluidos`
+    : `${progress} de ${target}`;
+  const historyMeta = historyRangeActive
+    ? `<div class="history-mission-card-meta">${escapeHtml(`Ativa em ${Math.max(0, Math.trunc(Number(goal.activeDays || 0) || 0))} dia(s) • Total ${Math.max(0, Math.trunc(Number(goal.totalProgressValue || 0) || 0))}`)}</div>`
+    : "";
   const card = document.createElement("article");
   card.className = "history-mission-card";
   card.dataset.goalId = String(goal.id || "");
@@ -9018,12 +9079,13 @@ function createMissionCard(goal) {
         ${goalIcon ? buildTaskAvatarMarkup(goalIcon.src, goalIcon.alt, { categoryIcon: goalIcon.categoryIcon }) : ""}
         <div>
         <h3 class="history-mission-card-title">${escapeHtml(String(goal.title || "Missão"))}</h3>
-        <div class="history-mission-card-progress">${escapeHtml(`${progress} de ${target}`)}</div>
+        <div class="history-mission-card-progress">${escapeHtml(progressLabel)}</div>
+        ${historyMeta}
         </div>
       </div>
       <div class="history-mission-card-actions">
         <button class="history-mission-card-edit" type="button" data-mission-goal-edit="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Editar ${String(goal.title || "missão")}`)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg></button>
-        <button class="history-mission-card-add" type="button" data-mission-goal-adjust="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Atualizar ${String(goal.title || "missão")}`)}">+</button>
+        <button class="history-mission-card-add" type="button" data-mission-goal-adjust="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Atualizar ${String(goal.title || "missão")}`)}"${historyRangeActive ? " hidden" : ""}>+</button>
       </div>
     </div>
     <div class="history-mission-progress-track" aria-hidden="true">
@@ -9035,6 +9097,7 @@ function createMissionCard(goal) {
 
 function renderMissions() {
   const goals = Array.isArray(state.missions) ? state.missions : [];
+  renderMissionScopeControls();
   if (missionsEmpty) {
     missionsEmpty.hidden = goals.length > 0;
   }
@@ -9055,6 +9118,17 @@ function renderMissions() {
 
 function moveHistoryDate(amount) {
   state.historyOffset += amount;
+  renderMissions();
+}
+
+async function shiftMissionHistoryScope(direction) {
+  const nextIndex = Math.max(0, Math.min(missionHistoryScopes.length - 1, state.missionHistoryScopeIndex + direction));
+  if (nextIndex === state.missionHistoryScopeIndex) {
+    renderMissionScopeControls();
+    return;
+  }
+  state.missionHistoryScopeIndex = nextIndex;
+  await loadMissions();
   renderMissions();
 }
 
@@ -10516,6 +10590,12 @@ statsMissionsList?.addEventListener("click", (event) => {
 
 openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
 openMissionCreateButton?.addEventListener("click", openMissionCreateModal);
+missionScopePrevButton?.addEventListener("click", () => {
+  void shiftMissionHistoryScope(-1);
+});
+missionScopeNextButton?.addEventListener("click", () => {
+  void shiftMissionHistoryScope(1);
+});
 missionTitleInput?.addEventListener("input", () => {
   if (missionCreateStatus) {
     missionCreateStatus.textContent = "";
@@ -11951,6 +12031,7 @@ document.querySelectorAll("[data-history-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveHistoryDate(Number(button.dataset.historyDayNav)));
 });
 
+renderMissionScopeControls();
 handleSwipe(historyDateLabel, moveHistoryDate);
 handleSwipe(historyTimelineList, moveHistoryDate);
 preventEdgeSwipeNavigation();
