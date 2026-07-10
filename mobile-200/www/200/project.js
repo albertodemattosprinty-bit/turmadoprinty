@@ -24,6 +24,7 @@ const missionQuickDefinitions = [
   { key: "read", label: "Livro", defaultTitle: "Ler uma página", targetValue: 6 },
   { key: "brush", label: "Dente", defaultTitle: "Escovar os dentes", targetValue: 3 }
 ];
+const runningMissionQuickToneKeys = ["water", "store", "read", "brush", "energy", "sun"];
 const missionHistoryScopes = [
   { key: "today", label: "Hoje" },
   { key: "last7", label: "7 dias" },
@@ -729,6 +730,13 @@ const runningEndBellAudio = typeof Audio !== "undefined" ? new Audio("/200/bicyc
 const runningPunctualityUpAudio = typeof Audio !== "undefined" ? new Audio("/200/coin-punctuality.mp3") : null;
 const runningPunctualityDownAudio = typeof Audio !== "undefined" ? new Audio("/200/pause-punctuality.mp3") : null;
 const sleepFrequencyAudio = typeof Audio !== "undefined" ? new Audio() : null;
+const touchClickSoundUrls = [
+  "/200/sfx/touch-1.mp3",
+  "/200/sfx/touch-2.mp3",
+  "/200/sfx/touch-3.mp3",
+  "/200/sfx/touch-4.mp3"
+];
+const missionProgressSoundUrl = "/200/sfx/mission-passou.mp3";
 const RUNNING_RING_RADIUS = 48;
 const RUNNING_RING_CIRCUMFERENCE = 2 * Math.PI * RUNNING_RING_RADIUS;
 const RUNNING_RING_FULL_OFFSET = -0.8;
@@ -739,6 +747,7 @@ const SLEEP_FREQUENCY_STATION_NAME = "Frequency";
 const SLEEP_FREQUENCY_FADE_MS = 15 * 60 * 1000;
 const SLEEP_DIRECT_TRACK_URL = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/trilhas/videoplayback%20(3).m4a";
 const SLEEP_DIRECT_TRACK_HOLD_MS = 500;
+const TOUCH_CLICK_SOUND_THROTTLE_MS = 45;
 const RUNNING_NEXT_METRIC_PROGRESS_MS = 1500;
 const RUNNING_NEXT_METRIC_PUNCTUALITY_MS = 2500;
 const RUNNING_STATUS_ROTATION_MS = 2000;
@@ -784,6 +793,7 @@ let sleepFrequencyMonitorTicker = null;
 let sleepFrequencyFadeToken = 0;
 let sleepMusicHoldTimer = null;
 let sleepMusicHoldTriggered = false;
+let lastTouchClickSoundAt = 0;
 let svgAssetLibraryPromise = null;
 const defaultTaskSvgPath = "/200/icons/task-default.svg";
 const defaultMissionSvgPath = "/200/icons/target.svg";
@@ -2188,6 +2198,44 @@ function fadeAudioVolume(audio, target, durationMs) {
       }
     }, 40);
   });
+}
+
+function playRandomTouchClickSound() {
+  if (typeof Audio === "undefined" || !Array.isArray(touchClickSoundUrls) || !touchClickSoundUrls.length) {
+    return;
+  }
+  const now = Date.now();
+  if (now - lastTouchClickSoundAt < TOUCH_CLICK_SOUND_THROTTLE_MS) {
+    return;
+  }
+  lastTouchClickSoundAt = now;
+  const randomIndex = Math.floor(Math.random() * touchClickSoundUrls.length);
+  const soundUrl = String(touchClickSoundUrls[randomIndex] || "").trim();
+  if (!soundUrl) {
+    return;
+  }
+  try {
+    const clickAudio = new Audio(soundUrl);
+    clickAudio.preload = "auto";
+    clickAudio.volume = 0.6;
+    void clickAudio.play().catch(() => {});
+  } catch {
+    // ignore touch sound failures
+  }
+}
+
+function playMissionProgressSound() {
+  if (typeof Audio === "undefined") {
+    return;
+  }
+  try {
+    const missionAudio = new Audio(missionProgressSoundUrl);
+    missionAudio.preload = "auto";
+    missionAudio.volume = 0.72;
+    void missionAudio.play().catch(() => {});
+  } catch {
+    // ignore mission progress sound failures
+  }
 }
 
 function renderSleepMusicToggleState() {
@@ -8695,6 +8743,10 @@ function getMissionQuickGoalByKey(key) {
   return goals.find((goal) => normalizeMissionTitle(goal.title) === normalizedTitle) || null;
 }
 
+function getMissionQuickGoalById(goalId) {
+  return (Array.isArray(state.missions) ? state.missions : []).find((goal) => String(goal.id || "") === String(goalId || "")) || null;
+}
+
 function clearRunningMissionQuickFeedbackTimer() {
   if (runningMissionQuickFeedbackTimer) {
     window.clearTimeout(runningMissionQuickFeedbackTimer);
@@ -8719,9 +8771,26 @@ function getMissionQuickThemeColor(key) {
       return "#111111";
     case "brush":
       return "#8c9eff";
+    case "energy":
+      return "#0ea5e9";
+    case "sun":
+      return "#f59e0b";
     default:
       return "#2563eb";
   }
+}
+
+function getMissionQuickVisualKey(goal, index = 0) {
+  const safeGoalId = String(goal?.id || "").trim();
+  if (safeGoalId) {
+    for (const definition of missionQuickDefinitions) {
+      const matchedGoal = getMissionQuickGoalByKey(definition.key);
+      if (String(matchedGoal?.id || "") === safeGoalId) {
+        return definition.key;
+      }
+    }
+  }
+  return runningMissionQuickToneKeys[((Math.max(0, Number(index) || 0)) % runningMissionQuickToneKeys.length + runningMissionQuickToneKeys.length) % runningMissionQuickToneKeys.length];
 }
 
 function getLinkedStatsAspectByMissionGoalId(goalId) {
@@ -8840,49 +8909,55 @@ function renderRunningMissionQuickButtons() {
   if (!runningMissionQuickGrid) {
     return;
   }
-  runningMissionQuickGrid.querySelectorAll("[data-mission-quick-key]").forEach((button) => {
-    const key = String(button.dataset.missionQuickKey || "");
-    const definition = getMissionQuickDefinitionByKey(key);
-    const goal = getMissionQuickGoalByKey(key);
-    const icon = button.querySelector("img");
-    const meta = button.querySelector("[data-mission-quick-meta]");
-    const title = button.querySelector(".running-mission-quick-card-title");
-    const progressFill = button.querySelector("[data-mission-quick-progress]");
-    button.disabled = !goal;
-    button.classList.toggle("is-disabled", !goal);
-    button.setAttribute("aria-pressed", "false");
-    if (goal) {
-      if (icon) {
-        icon.src = String(goal.svgIconUrl || "").trim() || `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
-      }
-      if (title) {
-        title.textContent = goal.title;
-      }
-      if (meta) {
-        meta.textContent = String(Math.max(0, Number(goal.progressValue || 0)));
-      }
-      if (progressFill) {
-        const percent = Math.max(0, Math.min(100, Math.round((Math.max(0, Number(goal.progressValue || 0)) / Math.max(1, Number(goal.targetValue || 1))) * 100)));
-        progressFill.style.width = `${percent}%`;
-      }
-      button.title = `${goal.title}: ${goal.progressValue} de ${goal.targetValue}`;
-      button.setAttribute("aria-label", goal.title);
-    } else {
-      if (icon) {
-        icon.src = `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
-      }
-      if (title) {
-        title.textContent = definition?.defaultTitle || definition?.label || "Missão rápida";
-      }
-      if (meta) {
-        meta.textContent = "0";
-      }
-      if (progressFill) {
-        progressFill.style.width = "0%";
-      }
-      button.title = `Missão indisponível para ${definition?.label || "atalho"}`;
-      button.setAttribute("aria-label", definition?.label || "Missão rápida");
-    }
+  const goals = (Array.isArray(state.missions) ? state.missions : [])
+    .slice()
+    .sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "pt-BR"));
+  if (!goals.length) {
+    runningMissionQuickGrid.innerHTML = '<div class="running-mission-quick-empty">Nenhuma missão rápida disponível.</div>';
+    return;
+  }
+  runningMissionQuickGrid.innerHTML = goals.map((goal, index) => {
+    const visualKey = getMissionQuickVisualKey(goal, index);
+    const iconPath = String(goal.svgIconUrl || "").trim() || `/200/icons/mission-${visualKey === "store" ? "store" : visualKey === "read" ? "book" : visualKey === "brush" ? "brush" : "water"}.svg`;
+    const progress = Math.max(0, Number(goal.progressValue || 0));
+    const target = Math.max(1, Number(goal.targetValue || 1));
+    const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+    const circumference = 276.46;
+    const dashOffset = (circumference * (100 - percent)) / 100;
+    return `
+      <button
+        class="running-mission-quick-btn${progress <= 0 ? " is-zero-progress" : ""}"
+        type="button"
+        data-mission-quick-goal-id="${escapeHtml(String(goal.id || ""))}"
+        data-mission-quick-tone="${escapeHtml(visualKey)}"
+        aria-label="${escapeHtml(String(goal.title || "Missão"))}"
+        title="${escapeHtml(`${String(goal.title || "Missão")}: ${progress} de ${target}`)}"
+        style="--mission-quick-color:${escapeHtml(getMissionQuickThemeColor(visualKey))};"
+      >
+        <span class="running-mission-quick-card-badge">${escapeHtml(String(progress))}</span>
+        <span class="running-mission-quick-card-circle-wrap">
+          <svg class="running-mission-quick-card-ring${progress <= 0 ? " is-hidden" : ""}" viewBox="0 0 100 100" aria-hidden="true">
+            <defs>
+              <linearGradient id="runningMissionQuickGradient-${escapeHtml(String(goal.id || `goal-${index}`))}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1f9dff"></stop>
+                <stop offset="100%" stop-color="#3ae4ca"></stop>
+              </linearGradient>
+            </defs>
+            <circle class="running-mission-quick-card-ring-track" cx="50" cy="50" r="44"></circle>
+            <circle class="running-mission-quick-card-ring-fill" cx="50" cy="50" r="44" data-progress-offset="${dashOffset}" style="stroke-dashoffset:276.46;stroke:url(#runningMissionQuickGradient-${escapeHtml(String(goal.id || `goal-${index}`))});"></circle>
+          </svg>
+          <span class="running-mission-quick-card-icon-shell">
+            <img class="running-mission-quick-card-icon" src="${escapeHtml(iconPath)}" alt="" aria-hidden="true" />
+          </span>
+        </span>
+        <span class="running-mission-quick-card-title">${escapeHtml(String(goal.title || "Missão"))}</span>
+      </button>
+    `;
+  }).join("");
+  window.requestAnimationFrame(() => {
+    runningMissionQuickGrid.querySelectorAll(".running-mission-quick-card-ring-fill").forEach((element) => {
+      element.style.strokeDashoffset = String(element.dataset.progressOffset || "276.46");
+    });
   });
 }
 
@@ -8938,9 +9013,8 @@ function queueRunningMissionQuickIncrement(goal) {
           state.missions = payload.goals;
           renderMissions();
           renderRunningMissionQuickButtons();
-          const updatedGoal = getMissionQuickGoalByKey(
-            missionQuickDefinitions.find((item) => normalizeMissionTitle(item.defaultTitle) === normalizeMissionTitle(goal.title))?.key || ""
-          );
+          playMissionProgressSound();
+          const updatedGoal = getMissionQuickGoalById(goal.id);
           if (updatedGoal && runningMissionQuickFeedback?.textContent) {
             showRunningMissionQuickFeedback(updatedGoal);
           }
@@ -8957,7 +9031,7 @@ function queueRunningMissionQuickIncrement(goal) {
 }
 
 function handleRunningMissionQuickTap(key) {
-  const goal = getMissionQuickGoalByKey(key);
+  const goal = getMissionQuickGoalById(key);
   if (!goal) {
     if (runningMissionQuickFeedback) {
       runningMissionQuickFeedback.textContent = "Missão não encontrada.";
@@ -8965,11 +9039,9 @@ function handleRunningMissionQuickTap(key) {
     return;
   }
   applyMissionProgressLocally(goal.id, 1);
-  const updatedGoal = getMissionQuickGoalByKey(key);
+  const updatedGoal = getMissionQuickGoalById(goal.id);
   renderMissions();
   renderRunningMissionQuickButtons();
-  showRunningMissionQuickFeedback(updatedGoal || goal);
-  showRunningMissionQuickFocus(updatedGoal || goal, key);
   queueRunningMissionQuickIncrement(goal);
 }
 
@@ -9472,6 +9544,7 @@ async function finalizeMissionRun() {
         delta: 1
       })
     });
+    playMissionProgressSound();
     closeModal("missionRunModal");
     await loadMissions();
     renderMissions();
@@ -11478,6 +11551,9 @@ missionProgressConfirmButton?.addEventListener("click", () => {
           delta: deltaValue
         })
       });
+      if (deltaValue > 0) {
+        playMissionProgressSound();
+      }
       closeModal("missionProgressModal");
       await loadMissions();
       renderMissions();
@@ -11607,11 +11683,11 @@ missionRunCompleteButton?.addEventListener("click", () => {
 });
 
 runningMissionQuickGrid?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-mission-quick-key]");
+  const button = event.target.closest("[data-mission-quick-goal-id]");
   if (!button) {
     return;
   }
-  handleRunningMissionQuickTap(String(button.dataset.missionQuickKey || ""));
+  handleRunningMissionQuickTap(String(button.dataset.missionQuickGoalId || ""));
 });
 
 closeRunningMissionQuickModalButton?.addEventListener("click", () => {
@@ -11977,6 +12053,12 @@ document.addEventListener("pointerdown", (event) => {
     return;
   }
   registerScreenLockActivity();
+}, true);
+document.addEventListener("pointerup", (event) => {
+  if (event.pointerType === "mouse" && Number(event.button) !== 0) {
+    return;
+  }
+  playRandomTouchClickSound();
 }, true);
 document.addEventListener("keydown", () => {
   registerScreenLockActivity();
