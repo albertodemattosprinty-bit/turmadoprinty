@@ -9991,7 +9991,6 @@ function createMissionCard(goal) {
   const goalIcon = getMissionDisplayIcon(goal);
   const historyRangeActive = isMissionHistoryRangeActive();
   const progressLabel = `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
-  const durationLabel = getMissionUnitDurationMinutes(goal) > 0 ? ` • ${formatMissionUnitDurationLabel(goal.unitDurationMinutes)}` : "";
   const card = document.createElement("article");
   card.className = "history-mission-card";
   card.dataset.goalId = String(goal.id || "");
@@ -10002,7 +10001,7 @@ function createMissionCard(goal) {
         ${goalIcon ? buildTaskAvatarMarkup(goalIcon.src, goalIcon.alt, { categoryIcon: goalIcon.categoryIcon }) : ""}
         <div>
         <h3 class="history-mission-card-title">${escapeHtml(String(goal.title || "Missão"))}</h3>
-        <div class="history-mission-card-progress">${escapeHtml(`${progressLabel}${durationLabel}`)}</div>
+        <div class="history-mission-card-progress">${escapeHtml(progressLabel)}</div>
         </div>
       </div>
       <div class="history-mission-card-actions">
