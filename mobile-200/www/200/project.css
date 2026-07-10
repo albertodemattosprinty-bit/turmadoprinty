@@ -5982,10 +5982,49 @@ body[data-background-theme="white"] #socialModal.workspace-modal {
   gap: 16px;
   background: var(--social-bg);
   color: var(--social-text);
+  position: relative;
 }
 
 .social-modal-close {
   color: var(--social-soft-text);
+}
+
+body.social-modal-loading .project-shell {
+  filter: blur(14px);
+  transition: filter 220ms ease;
+}
+
+.social-modal-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  background: rgba(7, 15, 28, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.social-modal-loading-spinner {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.16);
+  border-top-color: rgba(255, 255, 255, 0.94);
+  animation: socialModalSpin 900ms linear infinite;
+}
+
+.social-modal-loading-copy {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+@keyframes socialModalSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .social-modal-header {
@@ -6014,6 +6053,14 @@ body[data-background-theme="white"] #socialModal.workspace-modal {
   place-items: center;
 }
 
+.social-modal-shell.has-friends .social-modal-header {
+  display: none;
+}
+
+.social-modal-shell.has-friends .social-modal-plus-wrap {
+  justify-items: start;
+}
+
 .social-modal-plus-button {
   width: 82px;
   height: 82px;
@@ -6025,6 +6072,15 @@ body[data-background-theme="white"] #socialModal.workspace-modal {
   font-weight: 300;
   line-height: 1;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+.social-modal-shell.has-friends .social-modal-plus-button {
+  width: 58px;
+  height: 58px;
+  background: linear-gradient(145deg, #3ddc6c, #149945);
+  color: #fff;
+  font-size: 2.4rem;
+  font-weight: 500;
 }
 
 .social-invite-form {
@@ -6098,6 +6154,7 @@ body[data-background-theme="white"] .social-card {
   place-items: center;
   font-size: 1.1rem;
   font-weight: 900;
+  position: relative;
 }
 
 .social-card-avatar img,
@@ -6111,6 +6168,23 @@ body[data-background-theme="white"] .social-card {
   min-width: 0;
   display: grid;
   gap: 4px;
+}
+
+.social-card-rank {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 32, 55, 0.94);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
 }
 
 .social-card-name {
@@ -6170,8 +6244,26 @@ body[data-background-theme="white"] .social-card {
 
 .social-scope-footer {
   display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 52px;
+  gap: 10px;
+  min-height: 7vh;
+  align-items: center;
+}
+
+.social-scope-chip-row {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.social-scope-nav {
+  min-height: 48px;
+  border: 1px solid var(--social-card-border);
+  border-radius: 999px;
+  background: var(--social-card-bg);
+  color: var(--social-soft-text);
+  font-size: 1.5rem;
+  font-weight: 800;
 }
 
 .social-scope-chip {

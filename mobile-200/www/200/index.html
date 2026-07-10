@@ -1012,11 +1012,15 @@
   <section class="workspace-modal" id="socialModal" aria-hidden="true" aria-label="Amizades">
       <div class="social-modal-shell" id="socialModalShell">
         <button class="sleep-modal-close social-modal-close" type="button" data-close-modal aria-label="Fechar amizades">Fechar</button>
-        <div class="social-modal-header">
-          <div class="social-modal-title">Amigos</div>
-          <div class="social-modal-subtitle">Convites, ranking leve e acesso rápido aos pontos do período.</div>
+        <div class="social-modal-loading" id="socialModalLoading" hidden>
+          <div class="social-modal-loading-spinner" aria-hidden="true"></div>
+          <div class="social-modal-loading-copy">Carregando amigos...</div>
         </div>
-        <div class="social-modal-plus-wrap">
+        <div class="social-modal-header" id="socialModalHeader">
+          <div class="social-modal-title">Amigos</div>
+          <div class="social-modal-subtitle" id="socialModalSubtitle">Convites, ranking leve e acesso rápido aos pontos do período.</div>
+        </div>
+        <div class="social-modal-plus-wrap" id="socialModalPlusWrap">
           <button class="social-modal-plus-button" type="button" id="socialInviteToggleButton" aria-label="Adicionar amigo">+</button>
         </div>
         <div class="social-invite-form" id="socialInviteForm" hidden>
@@ -1026,10 +1030,14 @@
         <p class="social-modal-status" id="socialModalStatus" aria-live="polite"></p>
         <div class="social-modal-list" id="socialModalList"></div>
         <div class="social-scope-footer" id="socialScopeFooter" aria-label="Filtro de período">
-          <button class="social-scope-chip active" type="button" data-social-scope="today">Hoje</button>
-          <button class="social-scope-chip" type="button" data-social-scope="last7">7 dias</button>
-          <button class="social-scope-chip" type="button" data-social-scope="last15">15 dias</button>
-          <button class="social-scope-chip" type="button" data-social-scope="last30">30 dias</button>
+          <button class="social-scope-nav" type="button" id="socialScopePrevButton" aria-label="Período anterior">‹</button>
+          <div class="social-scope-chip-row">
+            <button class="social-scope-chip active" type="button" data-social-scope="today">Hoje</button>
+            <button class="social-scope-chip" type="button" data-social-scope="last7">7 dias</button>
+            <button class="social-scope-chip" type="button" data-social-scope="last15">15 dias</button>
+            <button class="social-scope-chip" type="button" data-social-scope="last30">30 dias</button>
+          </div>
+          <button class="social-scope-nav" type="button" id="socialScopeNextButton" aria-label="Próximo período">›</button>
         </div>
       </div>
     </section>

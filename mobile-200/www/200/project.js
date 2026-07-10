@@ -609,12 +609,17 @@ const homeSocialButton = document.getElementById("homeSocialButton");
 const homeSocialBadge = document.getElementById("homeSocialBadge");
 const homeSleepButton = document.getElementById("homeSleepButton");
 const socialModal = document.getElementById("socialModal");
+const socialModalShell = document.getElementById("socialModalShell");
+const socialModalLoading = document.getElementById("socialModalLoading");
+const socialModalSubtitle = document.getElementById("socialModalSubtitle");
 const socialInviteToggleButton = document.getElementById("socialInviteToggleButton");
 const socialInviteForm = document.getElementById("socialInviteForm");
 const socialInviteInput = document.getElementById("socialInviteInput");
 const socialInviteSubmitButton = document.getElementById("socialInviteSubmitButton");
 const socialModalStatus = document.getElementById("socialModalStatus");
 const socialModalList = document.getElementById("socialModalList");
+const socialScopePrevButton = document.getElementById("socialScopePrevButton");
+const socialScopeNextButton = document.getElementById("socialScopeNextButton");
 const statsRunningSurfaceButton = document.getElementById("statsRunningSurfaceButton");
 const statsRunningSurfaceIcon = document.getElementById("statsRunningSurfaceIcon");
 const homeProfileName = document.getElementById("homeProfileName");
@@ -4446,6 +4451,8 @@ function closeModal(modal) {
   }
   if (modal.id === "socialModal") {
     state.social.inviteComposerOpen = false;
+    state.social.loading = false;
+    document.body.classList.remove("social-modal-loading");
     renderSocialModal();
   }
   if (!document.querySelector(".workspace-modal.active")) {
@@ -8731,29 +8738,53 @@ function renderSocialScopeFooter() {
   });
 }
 
+function getSocialScopeIndex() {
+  return missionHistoryScopes.findIndex((item) => item.key === String(state.social?.scopeKey || "today"));
+}
+
 function renderSocialModal() {
   renderSocialBadge();
   renderSocialScopeFooter();
+  document.body.classList.toggle("social-modal-loading", Boolean(state.social?.loading));
+  socialModalLoading && (socialModalLoading.hidden = !state.social.loading);
   if (socialInviteForm) {
     socialInviteForm.hidden = !state.social.inviteComposerOpen;
   }
   if (socialInviteToggleButton) {
     socialInviteToggleButton.textContent = state.social.inviteComposerOpen ? "×" : "+";
   }
+  const rankedUsers = [];
+  if (state.social?.self) {
+    rankedUsers.push({ ...state.social.self, isSelf: true });
+  }
+  for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
+    rankedUsers.push({ ...friend, isSelf: false });
+  }
+  rankedUsers.sort((left, right) => {
+    if (Number(right.points || 0) !== Number(left.points || 0)) {
+      return Number(right.points || 0) - Number(left.points || 0);
+    }
+    return String(left.name || "").localeCompare(String(right.name || ""), "pt-BR");
+  });
+  const hasFriends = rankedUsers.length > 1;
+  socialModalShell?.classList.toggle("has-friends", hasFriends);
+  if (socialModalSubtitle) {
+    socialModalSubtitle.hidden = hasFriends;
+  }
   if (socialModalList) {
     const cards = [];
-    if (state.social?.self) {
+    rankedUsers.forEach((entry, index) => {
       cards.push(`
-        <article class="social-card social-card--self">
-          <div class="social-card-avatar">${renderSocialCardAvatar(state.social.self)}</div>
+        <article class="social-card ${entry.isSelf ? "social-card--self" : "social-card--friend"}">
+          <div class="social-card-avatar">${renderSocialCardAvatar(entry)}<span class="social-card-rank">${escapeHtml(`${index + 1}º`)}</span></div>
           <div class="social-card-body">
-            <div class="social-card-name">${escapeHtml(String(state.social.self.name || "Você"))}</div>
-            <div class="social-card-copy">Você</div>
+            <div class="social-card-name">${escapeHtml(String(entry.name || "Você"))}</div>
+            <div class="social-card-copy">${entry.isSelf ? "Você" : "Pontos"}</div>
           </div>
-          <div class="social-card-points">Pontos<br><strong>${escapeHtml(String(Math.max(0, Number(state.social.self.points || 0))))}</strong></div>
+          <div class="social-card-points">Pontos<br><strong>${escapeHtml(String(Math.max(0, Number(entry.points || 0))))}</strong></div>
         </article>
       `);
-    }
+    });
     for (const invite of Array.isArray(state.social?.incomingInvites) ? state.social.incomingInvites : []) {
       const fromUser = invite?.fromUser || {};
       cards.push(`
@@ -8802,6 +8833,11 @@ async function loadSocialSnapshot(options = {}) {
     return socialSnapshotHydrationPromise;
   }
   socialSnapshotHydrationPromise = (async () => {
+    const shouldShowLoading = options?.showLoading === true;
+    if (shouldShowLoading) {
+      state.social.loading = true;
+      renderSocialModal();
+    }
     try {
       const payload = await apiRequest(`/api/200/friends?scope=${encodeURIComponent(String(state.social?.scopeKey || "today"))}`, {
         skipGlobalLoading: options?.skipGlobalLoading === true
@@ -8819,6 +8855,10 @@ async function loadSocialSnapshot(options = {}) {
       renderSocialModal();
       return null;
     } finally {
+      if (shouldShowLoading) {
+        state.social.loading = false;
+        renderSocialModal();
+      }
       socialSnapshotHydrationPromise = null;
     }
   })();
@@ -8829,13 +8869,16 @@ async function openSocialModal() {
   if (socialModalStatus) {
     socialModalStatus.textContent = "";
   }
+  state.social.loading = true;
+  renderSocialModal();
+  openModal("socialModal");
   await loadSocialSnapshot({
     force: true,
     skipGlobalLoading: true,
-    silent: true
+    silent: true,
+    showLoading: true
   });
   renderSocialModal();
-  openModal("socialModal");
 }
 
 async function submitSocialInvite() {
