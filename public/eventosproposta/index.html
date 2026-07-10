@@ -62,6 +62,115 @@
       box-shadow: none;
     }
 
+    .proposal-photo-section {
+      position: relative;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      isolation: isolate;
+    }
+
+    .proposal-photo-section::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(8, 26, 56, 0.94) 0%, rgba(12, 39, 84, 0.74) 38%, rgba(17, 54, 112, 0.24) 100%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .proposal-photo-section > .sheet-inner {
+      position: relative;
+      z-index: 1;
+    }
+
+    .proposal-photo-section.hero::before,
+    .proposal-photo-section.video-hero::before {
+      background: linear-gradient(to top, rgba(6, 20, 46, 0.96) 0%, rgba(11, 37, 82, 0.82) 44%, rgba(17, 54, 112, 0.26) 100%);
+    }
+
+    .proposal-bg-1 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/12.png"); }
+    .proposal-bg-2 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/13.png"); }
+    .proposal-bg-3 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/14.png"); }
+    .proposal-bg-4 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/15.png"); }
+    .proposal-bg-5 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/16.png"); }
+    .proposal-bg-6 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/18.png"); }
+    .proposal-bg-7 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/19.png"); }
+    .proposal-bg-8 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/20.png"); }
+    .proposal-bg-9 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/12.png"); }
+    .proposal-bg-10 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/portifolio/13.png"); }
+
+    .proposal-photo-section,
+    .proposal-photo-section h1,
+    .proposal-photo-section h2,
+    .proposal-photo-section h3,
+    .proposal-photo-section h4,
+    .proposal-photo-section p,
+    .proposal-photo-section li,
+    .proposal-photo-section strong,
+    .proposal-photo-section span {
+      color: #ffffff;
+    }
+
+    .proposal-photo-section .section-copy,
+    .proposal-photo-section .lead,
+    .proposal-photo-section .card p,
+    .proposal-photo-section .theme-card p,
+    .proposal-photo-section .logistics-card p,
+    .proposal-photo-section .media-card p,
+    .proposal-photo-section .price-card p,
+    .proposal-photo-section .fit-list li,
+    .proposal-photo-section .timeline-copy p,
+    .proposal-photo-section .closing-note p,
+    .proposal-photo-section .footer-note,
+    .proposal-photo-section .stat span,
+    .proposal-photo-section .quote-band span,
+    .proposal-photo-section .logistics-card ul,
+    .proposal-photo-section .fit-list ul {
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .proposal-photo-section .stat,
+    .proposal-photo-section .card,
+    .proposal-photo-section .theme-card,
+    .proposal-photo-section .logistics-card,
+    .proposal-photo-section .media-card,
+    .proposal-photo-section .price-card,
+    .proposal-photo-section .fit-list,
+    .proposal-photo-section .flow-step,
+    .proposal-photo-section .timeline-item,
+    .proposal-photo-section .quote-band {
+      background: rgba(8, 27, 58, 0.56);
+      border-color: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
+    }
+
+    .proposal-photo-section .timeline-year,
+    .proposal-photo-section .theme-badge,
+    .proposal-photo-section .tag,
+    .proposal-photo-section .flow-step strong {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.24);
+      color: #ffffff;
+    }
+
+    .proposal-photo-section .price-highlight,
+    .proposal-photo-section .stat strong,
+    .proposal-photo-section .quote-band p {
+      color: #ffffff;
+    }
+
+    .proposal-photo-section .media-card img,
+    .proposal-photo-section .timeline-item img {
+      opacity: 0.96;
+    }
+
+    .proposal-photo-section .closing-note {
+      background: rgba(4, 18, 40, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
     .sheet-inner {
       max-width: var(--page-width);
       margin: 0 auto;
@@ -760,7 +869,7 @@
 </head>
 <body>
   <main class="document">
-    <section class="sheet hero">
+    <section class="sheet hero proposal-photo-section proposal-bg-1">
       <div class="sheet-inner">
         <div class="hero-grid">
           <div>
@@ -791,7 +900,7 @@
       </div>
     </section>
 
-    <section class="sheet video-hero">
+    <section class="sheet video-hero proposal-photo-section proposal-bg-2">
       <div class="sheet-inner">
         <div class="video-shell">
           <div class="video-copy">
@@ -813,7 +922,7 @@
       </div>
     </section>
 
-    <section class="sheet">
+    <section class="sheet proposal-photo-section proposal-bg-3">
       <div class="sheet-inner">
         <div class="section-header">
           <h2>Mais de quatro décadas usando arte, fé e criatividade para alcançar crianças.</h2>
@@ -845,7 +954,7 @@
       </div>
     </section>
 
-    <section class="sheet">
+    <section class="sheet proposal-photo-section proposal-bg-4">
       <div class="sheet-inner">
         <div class="section-header">
           <h2>Uma experiência em capítulos, não apenas uma peça infantil.</h2>
@@ -911,7 +1020,7 @@
       </div>
     </section>
 
-    <section class="sheet">
+    <section class="sheet proposal-photo-section proposal-bg-5">
       <div class="sheet-inner">
         <div class="section-header">
           <h2>Temas bíblicos que podem ser escolhidos para o seu evento.</h2>
@@ -975,7 +1084,7 @@
       </div>
     </section>
 
-    <section class="sheet">
+    <section class="sheet proposal-photo-section proposal-bg-6">
       <div class="sheet-inner">
         <div class="section-header">
           <h2>Bastidores, estrada e história para a igreja contratar com tranquilidade.</h2>
@@ -1011,7 +1120,7 @@
       </div>
     </section>
 
-    <section class="sheet">
+    <section class="sheet proposal-photo-section proposal-bg-7">
       <div class="sheet-inner">
         <div class="section-header">
           <h2>Marcos que mostram constância, repertório e credibilidade.</h2>
@@ -1074,7 +1183,7 @@
       </div>
     </section>
 
-    <section class="sheet">
+    <section class="sheet proposal-photo-section proposal-bg-8">
       <div class="sheet-inner">
         <div class="section-header">
           <h2>O que a igreja precisa disponibilizar para receber a equipe.</h2>
@@ -1120,7 +1229,7 @@
       </div>
     </section>
 
-    <section class="sheet" id="investimento">
+    <section class="sheet proposal-photo-section proposal-bg-9" id="investimento">
       <div class="sheet-inner">
         <div class="section-header">
           <h2>Contexto, valor e condições para fechamento da data.</h2>
@@ -1169,7 +1278,7 @@
       </div>
     </section>
 
-    <section class="sheet">
+    <section class="sheet proposal-photo-section proposal-bg-10">
       <div class="sheet-inner">
         <div class="closing-grid">
           <div class="closing-note">
