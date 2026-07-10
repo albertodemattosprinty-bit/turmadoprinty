@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260708-home-radio-fix-1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260710-home-sleep-frequency" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -74,6 +74,10 @@
       <button class="hub-action" type="button" id="homeRunningSurfaceButton" aria-label="Abrir andamento">
         <img class="hub-icon-image" id="homeRunningSurfaceIcon" src="/200/icons/home-running-surface-idle.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Andam.</span>
+      </button>
+      <button class="hub-action" type="button" id="homeSleepButton" aria-label="Abrir sono">
+        <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.4A8.8 8.8 0 0 1 9.6 3.8a9.2 9.2 0 1 0 10.6 10.6z" fill="currentColor"/></svg>
+        <span class="hub-action-label">Sono</span>
       </button>
     </section>
   </main>
@@ -970,6 +974,9 @@
     <section class="workspace-modal" id="sleepModal" aria-hidden="true" aria-label="Sono">
       <div class="sleep-modal-shell" id="sleepModalShell">
         <button class="sleep-modal-close" type="button" id="sleepModalCloseButton" aria-label="Fechar modal do sono">Fechar</button>
+        <button class="sleep-music-toggle" type="button" id="sleepMusicToggleButton" aria-label="Ativar música da rádio Frequency">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg>
+        </button>
         <div class="sleep-modal-setup" id="sleepModalSetup">
           <div class="sleep-modal-title">SONO</div>
           <div class="sleep-modal-subtitle" id="sleepModalSetupSubtitle">Escolha em quanto tempo quer começar a dormir</div>

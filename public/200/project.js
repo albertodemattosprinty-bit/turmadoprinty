@@ -263,6 +263,7 @@ const sleepModalControls = document.getElementById("sleepModalControls");
 const sleepContinueButton = document.getElementById("sleepContinueButton");
 const sleepFinishButton = document.getElementById("sleepFinishButton");
 const sleepAbortButton = document.getElementById("sleepAbortButton");
+const sleepMusicToggleButton = document.getElementById("sleepMusicToggleButton");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
@@ -600,6 +601,7 @@ const homeProfileButton = document.getElementById("homeProfileButton");
 const homePlayTime = document.getElementById("homePlayTime");
 const homeRunningSurfaceButton = document.getElementById("homeRunningSurfaceButton");
 const homeRunningSurfaceIcon = document.getElementById("homeRunningSurfaceIcon");
+const homeSleepButton = document.getElementById("homeSleepButton");
 const statsRunningSurfaceButton = document.getElementById("statsRunningSurfaceButton");
 const statsRunningSurfaceIcon = document.getElementById("statsRunningSurfaceIcon");
 const homeProfileName = document.getElementById("homeProfileName");
@@ -726,12 +728,17 @@ const runningSuccessAudio = typeof Audio !== "undefined" ? new Audio("/200/5star
 const runningEndBellAudio = typeof Audio !== "undefined" ? new Audio("/200/bicycleBell.ogg") : null;
 const runningPunctualityUpAudio = typeof Audio !== "undefined" ? new Audio("/200/coin-punctuality.mp3") : null;
 const runningPunctualityDownAudio = typeof Audio !== "undefined" ? new Audio("/200/pause-punctuality.mp3") : null;
+const sleepFrequencyAudio = typeof Audio !== "undefined" ? new Audio() : null;
 const RUNNING_RING_RADIUS = 48;
 const RUNNING_RING_CIRCUMFERENCE = 2 * Math.PI * RUNNING_RING_RADIUS;
 const RUNNING_RING_FULL_OFFSET = -0.8;
 const RUNNING_COMPLETION_ANIMATION_MS = 1200;
 const RUNNING_COMPLETION_HOLD_MS = 1000;
 const RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS = 2000;
+const SLEEP_FREQUENCY_STATION_NAME = "Frequency";
+const SLEEP_FREQUENCY_FADE_MS = 15 * 60 * 1000;
+const SLEEP_DIRECT_TRACK_URL = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/trilhas/videoplayback%20(3).m4a";
+const SLEEP_DIRECT_TRACK_HOLD_MS = 500;
 const RUNNING_NEXT_METRIC_PROGRESS_MS = 1500;
 const RUNNING_NEXT_METRIC_PUNCTUALITY_MS = 2500;
 const RUNNING_STATUS_ROTATION_MS = 2000;
@@ -773,6 +780,10 @@ let runningMissionQuickRequestChain = Promise.resolve();
 let missionCardHoldTimer = null;
 let missionCardHoldGoalId = "";
 let missionRunTicker = null;
+let sleepFrequencyMonitorTicker = null;
+let sleepFrequencyFadeToken = 0;
+let sleepMusicHoldTimer = null;
+let sleepMusicHoldTriggered = false;
 let svgAssetLibraryPromise = null;
 const defaultTaskSvgPath = "/200/icons/task-default.svg";
 const defaultMissionSvgPath = "/200/icons/target.svg";
@@ -806,7 +817,13 @@ const state = {
   sleepModal: {
     delayIndex: 0,
     session: null,
-    controlsVisible: false
+    controlsVisible: false,
+    musicEnabled: false,
+    musicLoading: false,
+    musicMode: "frequency",
+    musicTrackIndex: 0,
+    lastPhase: "",
+    fadeStarted: false
   },
   missions: [],
   constitutionVersions: [],
@@ -2170,6 +2187,209 @@ function fadeAudioVolume(audio, target, durationMs) {
         resolve();
       }
     }, 40);
+  });
+}
+
+function renderSleepMusicToggleState() {
+  if (!sleepMusicToggleButton) {
+    return;
+  }
+  const isActive = Boolean(state.sleepModal?.musicEnabled);
+  const isLoading = Boolean(state.sleepModal?.musicLoading);
+  const isDirectMode = String(state.sleepModal?.musicMode || "frequency") === "direct";
+  sleepMusicToggleButton.classList.toggle("is-active", isActive);
+  sleepMusicToggleButton.classList.toggle("is-direct", isActive && isDirectMode);
+  sleepMusicToggleButton.classList.toggle("is-loading", isLoading);
+  sleepMusicToggleButton.setAttribute(
+    "aria-label",
+    isActive
+      ? (isDirectMode ? "Desativar trilha direta do sono" : "Desativar música da rádio Frequency")
+      : "Ativar música do sono"
+  );
+}
+
+function getSleepFrequencyStationFromList(stations) {
+  return (Array.isArray(stations) ? stations : []).find((station) =>
+    String(station?.name || "").trim().toLowerCase() === SLEEP_FREQUENCY_STATION_NAME.toLowerCase()
+    && Array.isArray(station?.tracks)
+    && station.tracks.some((track) => String(track?.url || "").trim())
+  ) || null;
+}
+
+async function loadSleepFrequencyStation() {
+  const existing = getSleepFrequencyStationFromList(state.runningPlayer?.stations);
+  if (existing) {
+    return existing;
+  }
+  try {
+    const response = await fetch("/200/radio-stations.json", { cache: "no-store" });
+    if (response.ok) {
+      const payload = await response.json();
+      const station = getSleepFrequencyStationFromList(payload?.stations);
+      if (station) {
+        return station;
+      }
+    }
+  } catch {
+    // keep fallback path
+  }
+  try {
+    const payload = await apiRequest("/api/200/music/stations", { skipGlobalLoading: true });
+    return getSleepFrequencyStationFromList(payload?.stations);
+  } catch {
+    return null;
+  }
+}
+
+function stopSleepFrequencyMonitor() {
+  if (sleepFrequencyMonitorTicker) {
+    window.clearInterval(sleepFrequencyMonitorTicker);
+    sleepFrequencyMonitorTicker = null;
+  }
+}
+
+async function stopSleepFrequencyPlayback({ keepEnabled = false } = {}) {
+  sleepFrequencyFadeToken += 1;
+  stopSleepFrequencyMonitor();
+  if (sleepFrequencyAudio) {
+    sleepFrequencyAudio.pause();
+    sleepFrequencyAudio.currentTime = 0;
+    sleepFrequencyAudio.removeAttribute("src");
+    sleepFrequencyAudio.load();
+    sleepFrequencyAudio.volume = 1;
+  }
+  state.sleepModal.fadeStarted = false;
+  state.sleepModal.lastPhase = "";
+  if (!keepEnabled) {
+    state.sleepModal.musicEnabled = false;
+    state.sleepModal.musicMode = "frequency";
+  }
+  state.sleepModal.musicLoading = false;
+  renderSleepMusicToggleState();
+}
+
+async function playSleepFrequencyCurrentTrack() {
+  if (!sleepFrequencyAudio || !state.sleepModal?.musicEnabled) {
+    return false;
+  }
+  if (String(state.sleepModal?.musicMode || "frequency") === "direct") {
+    sleepFrequencyAudio.loop = true;
+    sleepFrequencyAudio.volume = 1;
+    if (normalizeRunningTrackUrl(sleepFrequencyAudio.src || "") !== normalizeRunningTrackUrl(SLEEP_DIRECT_TRACK_URL)) {
+      sleepFrequencyAudio.src = SLEEP_DIRECT_TRACK_URL;
+    }
+    try {
+      await sleepFrequencyAudio.play();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const station = await loadSleepFrequencyStation();
+  const tracks = Array.isArray(station?.tracks) ? station.tracks.filter((track) => String(track?.url || "").trim()) : [];
+  if (!tracks.length) {
+    return false;
+  }
+  const trackIndex = ((Number(state.sleepModal?.musicTrackIndex || 0) % tracks.length) + tracks.length) % tracks.length;
+  const track = tracks[trackIndex] || tracks[0];
+  state.sleepModal.musicTrackIndex = trackIndex;
+  sleepFrequencyAudio.loop = Boolean(state.sleepModal?.fadeStarted);
+  sleepFrequencyAudio.volume = 1;
+  if (normalizeRunningTrackUrl(sleepFrequencyAudio.src || "") !== normalizeRunningTrackUrl(track.url || "")) {
+    sleepFrequencyAudio.src = String(track.url || "").trim();
+  }
+  try {
+    await sleepFrequencyAudio.play();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function advanceSleepFrequencyTrack() {
+  if (String(state.sleepModal?.musicMode || "frequency") === "direct") {
+    return;
+  }
+  const station = await loadSleepFrequencyStation();
+  const tracks = Array.isArray(station?.tracks) ? station.tracks.filter((track) => String(track?.url || "").trim()) : [];
+  if (!tracks.length || !state.sleepModal?.musicEnabled) {
+    return;
+  }
+  state.sleepModal.musicTrackIndex = (Number(state.sleepModal?.musicTrackIndex || 0) + 1) % tracks.length;
+  await playSleepFrequencyCurrentTrack();
+}
+
+function startSleepFrequencyMonitor() {
+  stopSleepFrequencyMonitor();
+  sleepFrequencyMonitorTicker = window.setInterval(() => {
+    void syncSleepFrequencyPlayback();
+  }, 1000);
+}
+
+async function startSleepFrequencyFadeOut() {
+  if (!sleepFrequencyAudio || sleepFrequencyAudio.paused || state.sleepModal.fadeStarted !== true) {
+    return;
+  }
+  const fadeToken = ++sleepFrequencyFadeToken;
+  sleepFrequencyAudio.loop = true;
+  await fadeAudioVolume(sleepFrequencyAudio, 0, SLEEP_FREQUENCY_FADE_MS);
+  if (fadeToken !== sleepFrequencyFadeToken) {
+    return;
+  }
+  await stopSleepFrequencyPlayback();
+}
+
+async function syncSleepFrequencyPlayback() {
+  renderSleepMusicToggleState();
+  if (!state.sleepModal?.musicEnabled) {
+    stopSleepFrequencyMonitor();
+    return;
+  }
+  if (String(state.sleepModal?.musicMode || "frequency") === "direct") {
+    stopSleepFrequencyMonitor();
+    state.sleepModal.fadeStarted = false;
+    state.sleepModal.lastPhase = "";
+    await playSleepFrequencyCurrentTrack();
+    return;
+  }
+  const session = getComputedSleepSessionSnapshot(state.sleepModal?.session);
+  if (!session) {
+    state.sleepModal.lastPhase = "";
+    state.sleepModal.fadeStarted = false;
+    if (!sleepModalElement?.classList.contains("active")) {
+      await stopSleepFrequencyPlayback();
+      return;
+    }
+    startSleepFrequencyMonitor();
+    await playSleepFrequencyCurrentTrack();
+    return;
+  }
+  startSleepFrequencyMonitor();
+  const previousPhase = String(state.sleepModal?.lastPhase || "").trim();
+  const currentPhase = String(session.phase || "").trim();
+  state.sleepModal.lastPhase = currentPhase;
+  if (currentPhase === "countdown") {
+    state.sleepModal.fadeStarted = false;
+    sleepFrequencyFadeToken += 1;
+    await playSleepFrequencyCurrentTrack();
+    return;
+  }
+  if (!state.sleepModal.fadeStarted) {
+    await playSleepFrequencyCurrentTrack();
+  }
+  if (currentPhase === "sleeping" && (!state.sleepModal.fadeStarted || previousPhase !== "sleeping")) {
+    state.sleepModal.fadeStarted = true;
+    void startSleepFrequencyFadeOut();
+  }
+}
+
+if (sleepFrequencyAudio) {
+  sleepFrequencyAudio.preload = "auto";
+  sleepFrequencyAudio.addEventListener("ended", () => {
+    if (!state.sleepModal?.musicEnabled || state.sleepModal?.fadeStarted || String(state.sleepModal?.musicMode || "frequency") === "direct") {
+      return;
+    }
+    void advanceSleepFrequencyTrack();
   });
 }
 
@@ -4106,6 +4326,11 @@ function closeModal(modal) {
   if (modal.id === "sleepModal") {
     stopSleepModalTicker();
     state.sleepModal.controlsVisible = false;
+    if (!state.sleepModal?.session) {
+      void stopSleepFrequencyPlayback();
+    } else if (state.sleepModal?.musicEnabled) {
+      void syncSleepFrequencyPlayback();
+    }
     renderSleepModalState();
   }
   if (!document.querySelector(".workspace-modal.active")) {
@@ -8257,6 +8482,7 @@ function startSleepModalTicker() {
 function renderSleepModalState() {
   const session = getComputedSleepSessionSnapshot(state.sleepModal?.session);
   const isActiveSession = Boolean(session);
+  renderSleepMusicToggleState();
   if (sleepModalCloseButton) {
     sleepModalCloseButton.hidden = isActiveSession;
   }
@@ -8350,6 +8576,9 @@ async function openSleepModal() {
   });
   renderSleepModalState();
   openModal("sleepModal");
+  if (state.sleepModal?.musicEnabled) {
+    void syncSleepFrequencyPlayback();
+  }
 }
 
 async function startSleepSessionFlow() {
@@ -8373,6 +8602,9 @@ async function startSleepSessionFlow() {
     state.sleepModal.session = payload?.session || null;
     state.sleepModal.controlsVisible = false;
     renderSleepModalState();
+    if (state.sleepModal?.musicEnabled) {
+      void syncSleepFrequencyPlayback();
+    }
   } catch (error) {
     if (sleepModalFeedback) {
       sleepModalFeedback.textContent = error instanceof Error ? error.message : "Falha ao iniciar o sono.";
@@ -8394,6 +8626,7 @@ async function finishSleepSessionFlow() {
     });
     state.sleepModal.session = null;
     state.sleepModal.controlsVisible = false;
+    await stopSleepFrequencyPlayback();
     await loadStatsSummary();
     closeModal("sleepModal");
     closeModal("statsAspectModal");
@@ -8419,6 +8652,7 @@ async function abortSleepSessionFlow() {
     });
     state.sleepModal.session = null;
     state.sleepModal.controlsVisible = false;
+    await stopSleepFrequencyPlayback();
     renderSleepModalState();
     closeModal("sleepModal");
   } catch (error) {
@@ -11038,6 +11272,102 @@ sleepStartButton?.addEventListener("click", () => {
   void startSleepSessionFlow();
 });
 
+async function toggleSleepFrequencyMode() {
+  if (state.sleepModal?.musicLoading) {
+    return;
+  }
+  const nextEnabled = !Boolean(state.sleepModal?.musicEnabled);
+  state.sleepModal.musicLoading = true;
+  if (!nextEnabled) {
+    renderSleepMusicToggleState();
+    await stopSleepFrequencyPlayback();
+    return;
+  }
+  state.sleepModal.musicEnabled = true;
+  state.sleepModal.musicMode = "frequency";
+  state.sleepModal.fadeStarted = false;
+  state.sleepModal.lastPhase = "";
+  renderSleepMusicToggleState();
+  const started = await playSleepFrequencyCurrentTrack();
+  state.sleepModal.musicLoading = false;
+  if (!started) {
+    state.sleepModal.musicEnabled = false;
+    state.sleepModal.musicMode = "frequency";
+    if (sleepModalFeedback) {
+      sleepModalFeedback.textContent = "Nao foi possivel iniciar a radio Frequency agora.";
+    }
+    renderSleepMusicToggleState();
+    return;
+  }
+  if (sleepModalFeedback) {
+    sleepModalFeedback.textContent = "";
+  }
+  await syncSleepFrequencyPlayback();
+  renderSleepMusicToggleState();
+}
+
+async function activateSleepDirectTrackMode() {
+  if (state.sleepModal?.musicLoading) {
+    return;
+  }
+  state.sleepModal.musicLoading = true;
+  sleepFrequencyFadeToken += 1;
+  stopSleepFrequencyMonitor();
+  if (sleepFrequencyAudio) {
+    sleepFrequencyAudio.pause();
+    sleepFrequencyAudio.currentTime = 0;
+  }
+  state.sleepModal.musicEnabled = true;
+  state.sleepModal.musicMode = "direct";
+  state.sleepModal.fadeStarted = false;
+  state.sleepModal.lastPhase = "";
+  renderSleepMusicToggleState();
+  const started = await playSleepFrequencyCurrentTrack();
+  state.sleepModal.musicLoading = false;
+  if (!started) {
+    state.sleepModal.musicEnabled = false;
+    state.sleepModal.musicMode = "frequency";
+    if (sleepModalFeedback) {
+      sleepModalFeedback.textContent = "Nao foi possivel iniciar essa trilha agora.";
+    }
+    renderSleepMusicToggleState();
+    return;
+  }
+  if (sleepModalFeedback) {
+    sleepModalFeedback.textContent = "";
+  }
+  renderSleepMusicToggleState();
+}
+
+sleepMusicToggleButton?.addEventListener("click", () => {
+  if (sleepMusicHoldTriggered) {
+    sleepMusicHoldTriggered = false;
+    return;
+  }
+  void toggleSleepFrequencyMode();
+});
+
+["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
+  sleepMusicToggleButton?.addEventListener(eventName, () => {
+    if (sleepMusicHoldTimer) {
+      window.clearTimeout(sleepMusicHoldTimer);
+      sleepMusicHoldTimer = null;
+    }
+  });
+});
+
+sleepMusicToggleButton?.addEventListener("pointerdown", () => {
+  if (sleepMusicHoldTimer) {
+    window.clearTimeout(sleepMusicHoldTimer);
+  }
+  sleepMusicHoldTriggered = false;
+  sleepMusicHoldTimer = window.setTimeout(() => {
+    sleepMusicHoldTimer = null;
+    sleepMusicHoldTriggered = true;
+    void activateSleepDirectTrackMode();
+  }, SLEEP_DIRECT_TRACK_HOLD_MS);
+});
+
 sleepModalCloseButton?.addEventListener("click", () => {
   closeModal("sleepModal");
 });
@@ -11691,6 +12021,9 @@ logoutProject200Button?.addEventListener("click", () => {
 });
 homeRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();
+});
+homeSleepButton?.addEventListener("click", () => {
+  void openSleepModal();
 });
 statsRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();

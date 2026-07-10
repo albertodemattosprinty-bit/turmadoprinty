@@ -430,7 +430,7 @@ body.project-no-select textarea {
   margin-top: auto;
   padding: 12px 2px calc(10px + env(safe-area-inset-bottom, 0px));
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   justify-items: stretch;
   align-items: center;
@@ -5505,6 +5505,48 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.sleep-music-toggle {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f7f9ff;
+  opacity: 0.5;
+  transition: opacity 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.sleep-music-toggle svg {
+  width: 28px;
+  height: 28px;
+}
+
+.sleep-music-toggle.is-active {
+  opacity: 1;
+  background: linear-gradient(145deg, rgba(46, 126, 255, 0.9), rgba(19, 75, 188, 0.92));
+}
+
+.sleep-music-toggle.is-direct {
+  background: linear-gradient(145deg, rgba(35, 178, 255, 0.98), rgba(10, 88, 211, 0.98));
+  box-shadow: 0 0 0 1px rgba(129, 216, 255, 0.35), 0 12px 28px rgba(10, 88, 211, 0.28);
+}
+
+.sleep-music-toggle.is-loading {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.sleep-music-toggle:hover,
+.sleep-music-toggle:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .sleep-modal-setup,
