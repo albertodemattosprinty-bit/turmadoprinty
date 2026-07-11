@@ -89,8 +89,8 @@
       background: linear-gradient(to top, rgba(6, 20, 46, 0.96) 0%, rgba(11, 37, 82, 0.82) 44%, rgba(17, 54, 112, 0.26) 100%);
     }
 
-    .proposal-bg-1 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-01.jpg"); }
-    .proposal-bg-2 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-02.png"); }
+    .proposal-bg-1 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-08.jpg"); }
+    .proposal-bg-2 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-04.jpg"); }
     .proposal-bg-3 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-03.png"); }
     .proposal-bg-4 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-04.jpg"); }
     .proposal-bg-5 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-05.png"); }
@@ -175,6 +175,38 @@
     .proposal-photo-section .media-card img,
     .proposal-photo-section .timeline-item img {
       opacity: 0.96;
+    }
+
+    .custom-story {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .custom-story-card {
+      background: rgba(8, 27, 58, 0.56);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 24px;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
+    }
+
+    .custom-story-card img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 320px;
+      object-fit: cover;
+    }
+
+    .custom-story-copy {
+      padding: 28px;
+      display: grid;
+      gap: 16px;
+      align-content: center;
     }
 
     .proposal-photo-section .closing-note {
@@ -827,7 +859,8 @@
       .logistics-grid,
       .price-layout,
       .closing-grid,
-      .media-grid {
+      .media-grid,
+      .custom-story {
         grid-template-columns: 1fr;
       }
 
@@ -1019,7 +1052,7 @@
             </div>
             <div class="hero-card">
               <strong>Formato</strong>
-              <span>Apresentação de cerca de 1h15 com abertura musical, oração, humor, personagens e ministração da Palavra.</span>
+              <span>Apresentação de cerca de 1h15 com abertura musical, oração, teatro, humor, personagens e ministração da Palavra e apelo.</span>
             </div>
             <div class="hero-card">
               <strong>Contratação</strong>
@@ -1073,7 +1106,7 @@
             <span>Trajetória construída ao longo de décadas em projetos, espetáculos e ações com crianças.</span>
           </div>
           <div class="stat">
-            <strong>6 temas</strong>
+            <strong>Temas</strong>
             <span>Histórias bíblicas e espetáculos prontos para diferentes contextos da programação infantil.</span>
           </div>
           <div class="stat">
@@ -1121,15 +1154,15 @@
               <strong>04</strong>
               <div>
                 <h4>Pregação da Palavra</h4>
-                <p>A história bíblica chega com clareza, emoção, beleza visual e aplicação prática.</p>
+                <p>A história bíblica chega com clareza, emoção, beleza visual, aplicação prática e um convite real para a criança responder à Palavra.</p>
               </div>
             </article>
           </div>
 
           <div>
             <div class="quote-band">
-              <p>"A criança ri primeiro, participa depois e então guarda a verdade bíblica com mais profundidade."</p>
-              <span>Esse é o coração da proposta: criar abertura emocional para que o Evangelho seja recebido com alegria e atenção.</span>
+              <p>Uma experiência cristã bem conduzida abre o coração da criança para ouvir, sentir e lembrar da verdade bíblica com mais profundidade.</p>
+              <span>Quando a mensagem é vivida com beleza, participação e presença de Deus, o Evangelho não passa apenas pela atenção: ele encontra espaço para permanecer na memória e no coração.</span>
             </div>
             <div class="pillars" style="margin-top: 18px;">
               <article class="card">
@@ -1209,6 +1242,24 @@
               <span class="tag">4 a 6 pessoas</span>
               <span class="tag">Especial 2026</span>
             </div>
+          </article>
+        </div>
+
+        <div class="custom-story">
+          <article class="custom-story-card">
+            <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-07.jpg" alt="Alberto de Mattos apresentando proposta personalizada para congresso infantil">
+          </article>
+          <article class="custom-story-card custom-story-copy">
+            <span class="tag">Do seu jeito</span>
+            <h3>Programamos o roteiro e a direção do cronograma para o tema do seu congresso.</h3>
+            <p>
+              Quando a igreja já tem um tema, uma campanha ou um direcionamento ministerial, ajustamos a condução
+              do evento para que a apresentação converse com esse contexto de forma coerente e especial.
+            </p>
+            <p>
+              A ideia é que cada momento faça sentido dentro da proposta do seu congresso, desde a abertura até o
+              apelo, valorizando o que Deus já colocou no coração da liderança para aquele dia.
+            </p>
           </article>
         </div>
       </div>
