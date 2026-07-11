@@ -109,7 +109,7 @@
     .proposal-photo-section li,
     .proposal-photo-section strong,
     .proposal-photo-section span {
-      color: #ffffff;
+      color: #ffffff !important;
     }
 
     .proposal-photo-section .section-copy,
@@ -127,7 +127,7 @@
     .proposal-photo-section .quote-band span,
     .proposal-photo-section .logistics-card ul,
     .proposal-photo-section .fit-list ul {
-      color: rgba(255, 255, 255, 0.92);
+      color: #ffffff !important;
     }
 
     .proposal-photo-section .stat,
@@ -158,7 +158,7 @@
     .proposal-photo-section .price-highlight,
     .proposal-photo-section .stat strong,
     .proposal-photo-section .quote-band p {
-      color: #ffffff;
+      color: #ffffff !important;
     }
 
     .proposal-photo-section .section-header h2,
@@ -169,7 +169,7 @@
     .proposal-photo-section .video-loading-card span,
     .proposal-photo-section .hero-card span,
     .proposal-photo-section .quote-card span {
-      color: #ffffff;
+      color: #ffffff !important;
     }
 
     .proposal-photo-section .media-card img,
@@ -841,9 +841,13 @@
     }
 
     @media (max-width: 640px) {
-      html,
+      html {
+        background: #041428 !important;
+      }
+
       body {
-        background: #041428;
+        position: relative;
+        background: transparent !important;
       }
 
       body::before {
@@ -853,13 +857,38 @@
         background:
           linear-gradient(to top, rgba(3, 15, 34, 0.92) 0%, rgba(4, 20, 40, 0.72) 38%, rgba(4, 20, 40, 0.22) 100%),
           url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/mobile-stage-background.png") center top / cover no-repeat;
-        z-index: -2;
+        z-index: 0;
         pointer-events: none;
       }
 
       .document {
         position: relative;
         z-index: 1;
+      }
+
+      .proposal-photo-section,
+      .proposal-photo-section h1,
+      .proposal-photo-section h2,
+      .proposal-photo-section h3,
+      .proposal-photo-section h4,
+      .proposal-photo-section p,
+      .proposal-photo-section li,
+      .proposal-photo-section span,
+      .proposal-photo-section strong,
+      .proposal-photo-section .section-copy,
+      .proposal-photo-section .lead,
+      .proposal-photo-section .footer-note,
+      .proposal-photo-section .timeline-copy p,
+      .proposal-photo-section .timeline-copy h3,
+      .proposal-photo-section .flow-step h4,
+      .proposal-photo-section .flow-step p,
+      .proposal-photo-section .quote-band p,
+      .proposal-photo-section .quote-band span,
+      .proposal-photo-section .logistics-card ul,
+      .proposal-photo-section .fit-list ul,
+      .proposal-photo-section .video-loading-card strong,
+      .proposal-photo-section .video-loading-card span {
+        color: #ffffff !important;
       }
 
       .proposal-photo-section {
@@ -870,12 +899,12 @@
       }
 
       .proposal-photo-section::before {
-        background: linear-gradient(to top, rgba(6, 20, 46, 0.9) 0%, rgba(8, 28, 65, 0.74) 42%, rgba(12, 40, 87, 0.22) 100%);
+        background: linear-gradient(to top, rgba(6, 20, 46, 0.78) 0%, rgba(8, 28, 65, 0.58) 42%, rgba(12, 40, 87, 0.08) 100%);
       }
 
       .proposal-photo-section.hero::before,
       .proposal-photo-section.video-hero::before {
-        background: linear-gradient(to top, rgba(4, 16, 40, 0.93) 0%, rgba(8, 28, 65, 0.82) 50%, rgba(15, 48, 103, 0.28) 100%);
+        background: linear-gradient(to top, rgba(4, 16, 40, 0.8) 0%, rgba(8, 28, 65, 0.6) 50%, rgba(15, 48, 103, 0.12) 100%);
       }
 
       .media-card img,
@@ -904,7 +933,7 @@
       .proposal-photo-section .quote-band,
       .proposal-photo-section .closing-note {
         backdrop-filter: blur(8px);
-        background: rgba(5, 22, 48, 0.58);
+        background: rgba(5, 22, 48, 0.42);
       }
 
       h1 {
