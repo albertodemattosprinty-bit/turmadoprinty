@@ -909,16 +909,19 @@
 
       .media-card img,
       .timeline-item img {
-        display: none;
+        display: block;
       }
 
-      .media-card,
-      .timeline-item {
+      .media-card {
         grid-template-rows: auto;
       }
 
+      .timeline-item {
+        grid-template-rows: 220px auto;
+      }
+
       .video-stage {
-        display: none;
+        display: block;
       }
 
       .proposal-photo-section .stat,
