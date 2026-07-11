@@ -161,6 +161,17 @@
       color: #ffffff;
     }
 
+    .proposal-photo-section .section-header h2,
+    .proposal-photo-section .timeline-copy h3,
+    .proposal-photo-section .flow-step h4,
+    .proposal-photo-section .quote-band p,
+    .proposal-photo-section .video-loading-card strong,
+    .proposal-photo-section .video-loading-card span,
+    .proposal-photo-section .hero-card span,
+    .proposal-photo-section .quote-card span {
+      color: #ffffff;
+    }
+
     .proposal-photo-section .media-card img,
     .proposal-photo-section .timeline-item img {
       opacity: 0.96;
@@ -830,18 +841,55 @@
     }
 
     @media (max-width: 640px) {
+      html,
+      body {
+        background: #041428;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background:
+          linear-gradient(to top, rgba(3, 15, 34, 0.92) 0%, rgba(4, 20, 40, 0.72) 38%, rgba(4, 20, 40, 0.22) 100%),
+          url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/mobile-stage-background.png") center top / cover no-repeat;
+        z-index: -2;
+        pointer-events: none;
+      }
+
+      .document {
+        position: relative;
+        z-index: 1;
+      }
+
       .proposal-photo-section {
-        background-size: auto 100%;
+        background-image: none !important;
+        background-size: auto;
         background-position: center top;
+        background-color: transparent;
       }
 
       .proposal-photo-section::before {
-        background: linear-gradient(to top, rgba(6, 20, 46, 0.96) 0%, rgba(10, 31, 70, 0.84) 42%, rgba(17, 54, 112, 0.34) 100%);
+        background: linear-gradient(to top, rgba(6, 20, 46, 0.9) 0%, rgba(8, 28, 65, 0.74) 42%, rgba(12, 40, 87, 0.22) 100%);
       }
 
       .proposal-photo-section.hero::before,
       .proposal-photo-section.video-hero::before {
-        background: linear-gradient(to top, rgba(4, 16, 40, 0.97) 0%, rgba(8, 28, 65, 0.88) 50%, rgba(15, 48, 103, 0.34) 100%);
+        background: linear-gradient(to top, rgba(4, 16, 40, 0.93) 0%, rgba(8, 28, 65, 0.82) 50%, rgba(15, 48, 103, 0.28) 100%);
+      }
+
+      .media-card img,
+      .timeline-item img {
+        display: none;
+      }
+
+      .media-card,
+      .timeline-item {
+        grid-template-rows: auto;
+      }
+
+      .video-stage {
+        display: none;
       }
 
       .proposal-photo-section .stat,
@@ -856,6 +904,7 @@
       .proposal-photo-section .quote-band,
       .proposal-photo-section .closing-note {
         backdrop-filter: blur(8px);
+        background: rgba(5, 22, 48, 0.58);
       }
 
       h1 {
