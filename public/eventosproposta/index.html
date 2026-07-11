@@ -829,6 +829,55 @@
       }
     }
 
+    @media (max-width: 640px) {
+      .proposal-photo-section {
+        background-size: auto 100%;
+        background-position: center top;
+      }
+
+      .proposal-photo-section::before {
+        background: linear-gradient(to top, rgba(6, 20, 46, 0.96) 0%, rgba(10, 31, 70, 0.84) 42%, rgba(17, 54, 112, 0.34) 100%);
+      }
+
+      .proposal-photo-section.hero::before,
+      .proposal-photo-section.video-hero::before {
+        background: linear-gradient(to top, rgba(4, 16, 40, 0.97) 0%, rgba(8, 28, 65, 0.88) 50%, rgba(15, 48, 103, 0.34) 100%);
+      }
+
+      .proposal-photo-section .stat,
+      .proposal-photo-section .card,
+      .proposal-photo-section .theme-card,
+      .proposal-photo-section .logistics-card,
+      .proposal-photo-section .media-card,
+      .proposal-photo-section .price-card,
+      .proposal-photo-section .fit-list,
+      .proposal-photo-section .flow-step,
+      .proposal-photo-section .timeline-item,
+      .proposal-photo-section .quote-band,
+      .proposal-photo-section .closing-note {
+        backdrop-filter: blur(8px);
+      }
+
+      h1 {
+        font-size: 30px;
+      }
+
+      h2,
+      .closing-note h3,
+      .video-copy h2 {
+        font-size: 24px;
+      }
+
+      .price-highlight,
+      .video-loading-card strong {
+        font-size: 34px;
+      }
+
+      .sheet-inner {
+        padding: 24px 16px;
+      }
+    }
+
     @media print {
       @page {
         size: A4;
