@@ -3978,8 +3978,8 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   margin: 0 auto;
   border: 0;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.96);
+  color: #0b356c;
   font-size: 1.3rem;
   font-weight: 800;
   padding: 16px 18px;
@@ -4236,8 +4236,9 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
 }
 
 .primary-btn {
-  background: var(--white);
-  color: var(--ink);
+  background: linear-gradient(135deg, #1598ff 0%, #1765d8 52%, #153ba9 100%);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(10, 75, 181, 0.28);
 }
 
 #wizardNext {
@@ -5899,6 +5900,11 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   outline: none;
 }
 
+.text-field::placeholder {
+  color: rgba(11, 53, 108, 0.68);
+  opacity: 1;
+}
+
 .sleep-modal-setup,
 .sleep-modal-session {
   width: min(100%, 420px);
@@ -6393,8 +6399,8 @@ body[data-background-theme="white"] .social-card {
 }
 
 .social-scope-chip.active {
-  background: rgba(255, 255, 255, 0.94);
-  color: #0f2037;
+  background: linear-gradient(135deg, #1598ff 0%, #1765d8 52%, #153ba9 100%);
+  color: #fff;
 }
 
 body[data-background-theme="light"] .social-scope-chip.active,
@@ -6504,8 +6510,9 @@ body[data-background-theme="white"] .social-scope-chip.active {
 .history-mission-modal-shell .text-field.options-text-field {
   min-height: 60px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(30, 93, 173, 0.18);
+  color: #0b356c;
 }
 
 .history-mission-modal-shell .finance-status {
@@ -7064,6 +7071,87 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
 
 .chip-btn-danger {
   background: #7f1d1d;
+}
+
+/* Every immersive layer receives the selected application theme. */
+body[data-background-theme="black"] { --project-modal-theme: radial-gradient(circle at top, rgba(120, 126, 153, 0.18), transparent 36%), linear-gradient(145deg, #05070f 0%, #101729 45%, #070b15 100%); }
+body[data-background-theme="orange"] { --project-modal-theme: radial-gradient(circle at top left, rgba(255, 233, 151, 0.3), transparent 34%), linear-gradient(145deg, #ff7a18 0%, #ff4d2d 46%, #c21807 100%); }
+body[data-background-theme="bluevivid"] { --project-modal-theme: radial-gradient(circle at top left, rgba(149, 234, 255, 0.3), transparent 34%), linear-gradient(145deg, #16a3ff 0%, #0b63ff 52%, #0037c4 100%); }
+body[data-background-theme="pinkstrong"] { --project-modal-theme: radial-gradient(circle at top left, rgba(255, 190, 216, 0.28), transparent 36%), linear-gradient(145deg, #ff2f92 0%, #ff1660 48%, #b10c53 100%); }
+body[data-background-theme="bluedark"] { --project-modal-theme: radial-gradient(circle at top left, rgba(125, 187, 255, 0.22), transparent 36%), linear-gradient(145deg, #0d2d8f 0%, #09206b 44%, #020d37 100%); }
+body[data-background-theme="brown"] { --project-modal-theme: radial-gradient(circle at top left, rgba(244, 197, 139, 0.24), transparent 34%), linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%); }
+body[data-background-theme="edge"] { --project-modal-theme: radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%), linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%); }
+body[data-background-theme="light"] { --project-modal-theme: url("/200/background-light.png") center center / cover no-repeat; }
+body[data-background-theme="white"] { --project-modal-theme: radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 38%), linear-gradient(145deg, #f8f8f5 0%, #f2f2ed 48%, #ecece7 100%); }
+
+body .workspace-modal,
+body .action-wizard {
+  background: var(--project-modal-theme, linear-gradient(145deg, #0d2d8f, #020d37)) !important;
+  background-attachment: fixed !important;
+  backdrop-filter: none;
+}
+
+body .action-wizard > .wizard-panel {
+  background: transparent !important;
+  backdrop-filter: none;
+}
+
+/* Mission containers fade from 40% on the left to fully transparent on the right. */
+.history-mission-card,
+.task-row.task-mission-entry.task-pending-clean,
+.task-row.stats-mission-row {
+  background: linear-gradient(90deg, rgba(8, 31, 83, 0.4) 0%, rgba(8, 31, 83, 0) 100%) !important;
+  box-shadow: none;
+}
+
+body[data-background-theme="light"] :is(.history-mission-card, .task-row.task-mission-entry.task-pending-clean, .task-row.stats-mission-row),
+body[data-background-theme="white"] :is(.history-mission-card, .task-row.task-mission-entry.task-pending-clean, .task-row.stats-mission-row) {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%) !important;
+}
+
+body[data-background-theme="edge"] :is(.history-mission-card, .task-row.task-mission-entry.task-pending-clean, .task-row.stats-mission-row) {
+  background: linear-gradient(90deg, rgba(5, 66, 126, 0.4) 0%, rgba(5, 66, 126, 0) 100%) !important;
+}
+
+.task-row.task-mission-entry.task-delay-soft {
+  background: linear-gradient(90deg, rgba(var(--delay-soft-rgb, 255, 219, 120), 0.4) 0%, rgba(var(--delay-soft-rgb, 255, 219, 120), 0) 100%) !important;
+}
+
+.task-row.task-mission-entry.task-delay-yellow {
+  background: linear-gradient(90deg, rgba(255, 214, 61, 0.4) 0%, rgba(255, 214, 61, 0) 100%) !important;
+}
+
+.task-row.task-mission-entry.task-delay-orange {
+  background: linear-gradient(90deg, rgba(255, 151, 45, 0.4) 0%, rgba(255, 151, 45, 0) 100%) !important;
+}
+
+.task-row.task-mission-entry.task-delay-red {
+  background: linear-gradient(90deg, rgba(226, 59, 59, 0.4) 0%, rgba(226, 59, 59, 0) 100%) !important;
+}
+
+.task-row.task-mission-entry.task-delay-black {
+  background: linear-gradient(90deg, rgba(26, 26, 26, 0.4) 0%, rgba(26, 26, 26, 0) 100%) !important;
+}
+
+/* Light surfaces use charcoal typography; colored action buttons keep white labels. */
+body[data-background-theme="light"],
+body[data-background-theme="white"] {
+  --white: #343a40;
+  --soft: rgba(52, 58, 64, 0.82);
+  --muted: rgba(52, 58, 64, 0.66);
+  color: #343a40;
+}
+
+body[data-background-theme="light"] :is(h1, h2, h3, h4, h5, h6, p, span, strong, small, label, li, dt, dd, a, button, input, textarea, select, [class*="title"], [class*="label"], [class*="status"], [class*="time"], [class*="copy"], [class*="text"], [class*="message"], [class*="note"], [class*="meta"], [class*="assignee"], [class*="percent"], [class*="value"]),
+body[data-background-theme="white"] :is(h1, h2, h3, h4, h5, h6, p, span, strong, small, label, li, dt, dd, a, button, input, textarea, select, [class*="title"], [class*="label"], [class*="status"], [class*="time"], [class*="copy"], [class*="text"], [class*="message"], [class*="note"], [class*="meta"], [class*="assignee"], [class*="percent"], [class*="value"]) {
+  color: #343a40 !important;
+}
+
+body[data-background-theme="light"] :is(.primary-btn, .decision-btn, .history-mission-footer-icon, .history-mission-add-large, .history-mission-add-small, .history-mission-card-add, .history-mission-quick-slot, .history-mission-sign-btn.active, .history-mission-run-complete, .history-mission-run-finish-button, .history-mission-run-restart-button, .running-task-footer-btn, .profile-delete-btn, .mission-progress-confirm-btn, .social-card-action, .social-modal-plus-button, .sleep-modal-start-button, .running-music-list-default-btn, .mission-variant-unit-tabs button.active),
+body[data-background-theme="white"] :is(.primary-btn, .decision-btn, .history-mission-footer-icon, .history-mission-add-large, .history-mission-add-small, .history-mission-card-add, .history-mission-quick-slot, .history-mission-sign-btn.active, .history-mission-run-complete, .history-mission-run-finish-button, .history-mission-run-restart-button, .running-task-footer-btn, .profile-delete-btn, .mission-progress-confirm-btn, .social-card-action, .social-modal-plus-button, .sleep-modal-start-button, .running-music-list-default-btn, .mission-variant-unit-tabs button.active),
+body[data-background-theme="light"] :is(.primary-btn, .decision-btn, .history-mission-quick-slot, .history-mission-run-complete, .history-mission-run-finish-button, .history-mission-run-restart-button, .social-card-action) *,
+body[data-background-theme="white"] :is(.primary-btn, .decision-btn, .history-mission-quick-slot, .history-mission-run-complete, .history-mission-run-finish-button, .history-mission-run-restart-button, .social-card-action) * {
+  color: #fff !important;
 }
 
 @media (min-width: 960px) {

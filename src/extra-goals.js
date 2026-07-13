@@ -351,7 +351,7 @@ export async function createExtraGoalVariant(userId, profileName, goalId, payloa
   const title = normalizeExtraGoalTitle(payload?.title);
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
-  if (!title) throw new Error("Informe o nome da variacao.");
+  if (!title) throw new Error("Informe o nome da micro-tarefa.");
   const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
   if (!goal) throw new Error("Missao nao encontrada.");
   await query(`
@@ -367,12 +367,12 @@ export async function updateExtraGoalVariant(userId, profileName, goalId, varian
   const title = normalizeExtraGoalTitle(payload?.title);
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
-  if (!title) throw new Error("Informe o nome da variacao.");
+  if (!title) throw new Error("Informe o nome da micro-tarefa.");
   const result = await query(`
     update extra_goal_variants set title = $5, interval_value = $6, interval_unit = $7, updated_at = now()
     where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2
   `, [userId, normalizedProfile, goalId, variantId, title, intervalValue, intervalUnit]);
-  if (!result.rowCount) throw new Error("Variacao nao encontrada.");
+  if (!result.rowCount) throw new Error("Micro-tarefa nao encontrada.");
   return listExtraGoalVariants(userId, normalizedProfile, goalId);
 }
 

@@ -11986,8 +11986,11 @@ const server = http.createServer(async (request, response) => {
 
       sendJson(response, 201, { ok: true, actions });
     } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel salvar a acao."
+      const isOverlap = error?.code === "ACTION_OVERLAP";
+      sendJson(response, isOverlap ? 409 : 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar a acao.",
+        code: isOverlap ? "ACTION_OVERLAP" : undefined,
+        overlaps: isOverlap && Array.isArray(error?.overlaps) ? error.overlaps : undefined
       });
     }
     return;
@@ -12053,8 +12056,11 @@ const server = http.createServer(async (request, response) => {
         action
       });
     } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel atualizar a acao."
+      const isOverlap = error?.code === "ACTION_OVERLAP";
+      sendJson(response, isOverlap ? 409 : 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel atualizar a acao.",
+        code: isOverlap ? "ACTION_OVERLAP" : undefined,
+        overlaps: isOverlap && Array.isArray(error?.overlaps) ? error.overlaps : undefined
       });
     }
     return;

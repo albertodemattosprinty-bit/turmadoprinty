@@ -4391,7 +4391,10 @@ async function apiRequest(path, options = {}) {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(payload?.error || "Falha na requisicao.");
+      const requestError = new Error(payload?.error || "Falha na requisicao.");
+      requestError.code = String(payload?.code || "").trim();
+      requestError.overlaps = Array.isArray(payload?.overlaps) ? payload.overlaps : [];
+      throw requestError;
     }
 
     return payload;
@@ -7482,10 +7485,11 @@ async function saveAction() {
         repeatRule,
         repeatDays,
         applyTo,
-        replaceOverlaps: Boolean(state.wizard.replaceOverlaps),
+        replaceOverlaps: Boolean(state.wizard.replaceOverlaps || state.wizard.forceReplaceOverlaps),
         occurrences: occurrences
       })
     });
+    state.wizard.forceReplaceOverlaps = false;
     const updatedActionId = String(payload?.action?.id || payload?.actions?.[0]?.id || state.wizard.editingActionId || "").trim();
 
     state.activeOffset = state.wizard.dateOffset;
@@ -7500,6 +7504,35 @@ async function saveAction() {
       reopenStartDecisionForAction(reopenStartDecisionActionId);
     }
   } catch (error) {
+    if (error?.code === "ACTION_OVERLAP" && Array.isArray(error?.overlaps) && error.overlaps.length) {
+      const occurrences = buildOccurrences();
+      const decision = await openOverlapWizard(error.overlaps, occurrences);
+      if (decision?.type === "replace") {
+        state.wizard.forceReplaceOverlaps = true;
+        wizardMessage.textContent = "";
+        return saveAction();
+      }
+      if (decision?.type === "change_time") {
+        state.wizard.step = 3;
+        renderWizard();
+        return;
+      }
+      if (decision?.type === "use_free" && decision.startAt) {
+        const start = new Date(decision.startAt);
+        const firstOccurrence = occurrences[0];
+        const durationMs = firstOccurrence ? Math.max(60000, new Date(firstOccurrence.endAt).getTime() - new Date(firstOccurrence.startAt).getTime()) : 900000;
+        const end = new Date(start.getTime() + durationMs);
+        state.wizard.startHour = start.getHours();
+        state.wizard.startMinute = start.getMinutes();
+        state.wizard.endHour = end.getHours();
+        state.wizard.endMinute = end.getMinutes();
+        state.wizard.forceReplaceOverlaps = false;
+        return saveAction();
+      }
+      wizardMessage.textContent = "Ajuste o horário para continuar.";
+      return;
+    }
+    state.wizard.forceReplaceOverlaps = false;
     wizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar.";
   }
 }
@@ -9898,12 +9931,37 @@ async function saveTaskComposer() {
         repeatDays,
         occurrences,
         applyTo,
-        replaceOverlaps: Boolean(state.wizard.replaceOverlaps)
+        replaceOverlaps: Boolean(state.wizard.replaceOverlaps || state.wizard.forceReplaceOverlaps)
       })
     });
+    state.wizard.forceReplaceOverlaps = false;
     closeStartDecisionModalWith(editingAction ? "edit" : "create");
     await loadActions();
   } catch (error) {
+    if (error?.code === "ACTION_OVERLAP" && Array.isArray(error?.overlaps) && error.overlaps.length) {
+      const occurrences = buildOccurrences();
+      const decision = await openOverlapWizard(error.overlaps, occurrences);
+      if (decision?.type === "replace") {
+        state.wizard.forceReplaceOverlaps = true;
+        if (startDecisionMessage) startDecisionMessage.textContent = "";
+        return saveTaskComposer();
+      }
+      if (decision?.type === "use_free" && decision.startAt) {
+        const start = new Date(decision.startAt);
+        const firstOccurrence = occurrences[0];
+        const durationMs = firstOccurrence ? Math.max(60000, new Date(firstOccurrence.endAt).getTime() - new Date(firstOccurrence.startAt).getTime()) : 900000;
+        const end = new Date(start.getTime() + durationMs);
+        state.wizard.startHour = start.getHours();
+        state.wizard.startMinute = start.getMinutes();
+        state.wizard.endHour = end.getHours();
+        state.wizard.endMinute = end.getMinutes();
+        state.wizard.forceReplaceOverlaps = false;
+        return saveTaskComposer();
+      }
+      if (startDecisionMessage) startDecisionMessage.textContent = decision?.type === "change_time" ? "Escolha outro horário." : "Ajuste o horário para continuar.";
+      return;
+    }
+    state.wizard.forceReplaceOverlaps = false;
     if (startDecisionMessage) {
       startDecisionMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar.";
     }
@@ -10389,8 +10447,8 @@ function formatMissionVariantRemaining(variant, remainingMs) {
 function renderMissionVariants() {
   const editorOpen = Boolean(state.missionVariants.editorOpen);
   const chooseMode = state.missionVariants.mode === "choose";
-  if (missionVariantsKicker) missionVariantsKicker.textContent = chooseMode ? "Antes de iniciar" : "Variações da missão";
-  if (missionVariantsTitle) missionVariantsTitle.textContent = chooseMode ? "Qual atividade você vai fazer?" : (getMissionRunGoalById(state.missionVariants.goalId)?.title || "Lista de atividades");
+  if (missionVariantsKicker) missionVariantsKicker.textContent = chooseMode ? "Antes de iniciar" : "Micro-tarefas da missão";
+  if (missionVariantsTitle) missionVariantsTitle.textContent = chooseMode ? "Qual micro-tarefa você vai fazer?" : (getMissionRunGoalById(state.missionVariants.goalId)?.title || "Lista de micro-tarefas");
   if (missionVariantAddButton) missionVariantAddButton.hidden = chooseMode || editorOpen;
   if (missionVariantEditor) missionVariantEditor.hidden = !editorOpen;
   if (missionVariantDeadlineValue) missionVariantDeadlineValue.textContent = String(state.missionVariants.intervalValue || 1);
@@ -10408,7 +10466,7 @@ function renderMissionVariants() {
       ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${timing.percent.toFixed(2)}%"></span></div>
     </article>`;
-  }).join("") : '<div class="empty-state">Adicione atividades diferentes para controlar seus prazos.</div>';
+  }).join("") : '<div class="empty-state">Adicione micro-tarefas diferentes para controlar seus prazos.</div>';
 }
 
 async function loadMissionVariants(goalId) {
@@ -12739,7 +12797,7 @@ missionVariantHoursButton?.addEventListener("click", () => { state.missionVarian
 missionVariantDaysButton?.addEventListener("click", () => { state.missionVariants.intervalUnit = "days"; renderMissionVariants(); });
 missionVariantEditorSave?.addEventListener("click", async () => {
   const title = String(missionVariantTitleInput?.value || "").trim();
-  if (!title) { if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da atividade."; return; }
+  if (!title) { if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa."; return; }
   const goalId = state.missionVariants.goalId;
   const editingId = state.missionVariants.editingId;
   try {

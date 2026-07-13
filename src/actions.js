@@ -129,6 +129,15 @@ function normalizeAction(row) {
   };
 }
 
+function createActionOverlapError(overlaps = []) {
+  const safeOverlaps = (Array.isArray(overlaps) ? overlaps : []).filter(Boolean);
+  const busyTitle = String(safeOverlaps[0]?.title || "outra tarefa").trim();
+  const error = new Error(`Horario indisponivel por sobrepor "${busyTitle}".`);
+  error.code = "ACTION_OVERLAP";
+  error.overlaps = safeOverlaps;
+  return error;
+}
+
 function getActionDurationMinutesFromRange(startAt, endAt) {
   const startMs = startAt instanceof Date ? startAt.getTime() : new Date(startAt).getTime();
   const endMs = endAt instanceof Date ? endAt.getTime() : new Date(endAt).getTime();
@@ -646,6 +655,7 @@ export async function createUserAction(userId, payload) {
   const svgIconLabel = String(payload?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
+  const replaceOverlaps = Boolean(payload?.replaceOverlaps);
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
     ? payload.occurrences
     : [{ startAt: payload?.startAt, endAt: payload?.endAt }];
@@ -671,10 +681,14 @@ export async function createUserAction(userId, payload) {
     return { startAt, endAt };
   });
 
+  if (replaceOverlaps) {
+    await deleteOverlappingActions(userId, assignee, occurrences);
+  }
+
   for (const occurrence of occurrences) {
     const overlap = await query(
       `
-        select title, start_at, end_at
+        select id, user_id, title, assignee, start_at, end_at
         from actions
         where user_id = $1
           and assignee = $2
@@ -687,7 +701,7 @@ export async function createUserAction(userId, payload) {
 
     if (overlap.rows[0]) {
       const busy = normalizeAction(overlap.rows[0]);
-      throw new Error(`Horario indisponivel por sobrepor "${busy.title}".`);
+      throw createActionOverlapError([busy]);
     }
   }
 
@@ -749,7 +763,7 @@ async function assertActionOverlaps(userId, assignee, occurrences, excludeIds = 
 
     if (overlap.rows[0]) {
       const busy = normalizeAction(overlap.rows[0]);
-      throw new Error(`Horario indisponivel por sobrepor "${busy.title}".`);
+      throw createActionOverlapError([busy]);
     }
   }
 }
