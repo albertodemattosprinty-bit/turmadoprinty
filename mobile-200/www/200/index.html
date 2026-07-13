@@ -101,9 +101,9 @@
     <div class="finance-content running-task-content">
       <div class="running-task-title-row">
         <img class="running-task-category-icon" id="runningTaskCategoryIcon" src="/200/category-icons/trabalho.svg" alt="Categoria atual" hidden />
-        <div class="running-task-name" id="runningTaskName">Sem tarefa em execução.</div>
+        <div class="running-task-name" id="runningTaskName"></div>
       </div>
-      <div class="running-task-minutes" id="runningTaskMinutesLeft">0 minutos restantes</div>
+      <div class="running-task-minutes" id="runningTaskMinutesLeft"></div>
       <div class="running-circle-wrap">
         <button class="running-circle-toggle running-circle-toggle-left" id="runningModePercentBtn" type="button" aria-label="Mostrar porcentagem">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h3V9H4zm6 0h3V5h-3zm6 0h3V12h-3z"/></svg>
@@ -112,17 +112,17 @@
           <circle class="running-progress-ring-bg" cx="60" cy="60" r="48"></circle>
           <circle class="running-progress-ring-fill" id="runningTaskProgressRing" cx="60" cy="60" r="48"></circle>
         </svg>
-        <div class="running-task-percent" id="runningTaskPercent">0%</div>
+        <div class="running-task-percent" id="runningTaskPercent"></div>
         <button class="running-circle-toggle running-circle-toggle-right" id="runningModeTimeBtn" type="button" aria-label="Mostrar tempo">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
         </button>
       </div>
       <div class="running-completion-label" id="runningCompletionLabel"></div>
       <div class="running-next-panel" id="runningNextPanel">
-        <div class="running-task-next-label">Próxima tarefa</div>
+        <div class="running-task-next-label"></div>
         <div class="running-task-next-row">
-          <div class="running-task-next" id="runningTaskNextName">Tarefa</div>
-          <div class="running-task-next-time" id="runningTaskNextTime">Tempo</div>
+          <div class="running-task-next" id="runningTaskNextName"></div>
+          <div class="running-task-next-time" id="runningTaskNextTime"></div>
         </div>
         <button class="ghost-btn running-task-start-btn" type="button" id="runningTaskStartNextButton" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg><span>Iniciar tarefa</span></button>
       </div>
@@ -135,6 +135,28 @@
         <button class="running-task-circle-btn running-task-music-btn" type="button" id="runningTaskMusicButton" aria-label="Música"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg></button>
         <button class="running-task-circle-btn running-task-mission-btn" type="button" id="runningTaskMissionButton" aria-label="Missões rápidas"><img src="/200/icons/target.svg" alt="" aria-hidden="true" /></button>
       </div>
+      <section class="project-hub running-idle-hub" id="runningIdleHub" aria-label="Projeto 200" hidden>
+        <button class="hub-action" type="button" data-switch-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
+          <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Ações</span>
+        </button>
+        <button class="hub-action" type="button" data-switch-modal="historyModal" data-loading-icon="/200/icons/target.svg" aria-label="Missões">
+          <img class="hub-icon-image" src="/200/icons/target.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Missões</span>
+        </button>
+        <button class="hub-action" type="button" data-switch-modal="statsModal" data-loading-icon="/200/icons/stats.svg" aria-label="Estatísticas">
+          <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Estat.</span>
+        </button>
+        <button class="hub-action" type="button" data-switch-modal="optionsModal" data-loading-icon="/200/icons/options.svg" aria-label="Opções">
+          <img class="hub-icon-image" src="/200/icons/options.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Opções</span>
+        </button>
+        <button class="hub-action" type="button" aria-label="Andamento atual" aria-current="page">
+          <img class="hub-icon-image" src="/200/icons/home-running-surface-idle-ilife.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Andam.</span>
+        </button>
+      </section>
       <div class="running-player" id="runningMiniPlayer">
         <button type="button" class="running-player-control running-player-control-left" id="runningPlayerList" aria-label="Mostrar lista da estação">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M3 6h.01M3 12h.01M3 18h.01" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -915,26 +937,19 @@
       <div class="actions-list stats-actions-list">
         <div id="statsMissionsList"></div>
       </div>
-      <section class="project-hub stats-footer-hub" aria-label="Projeto 200">
-        <button class="hub-action" type="button" data-switch-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
-          <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Ações</span>
+      <section class="actions-side-actions history-footer-actions history-missions-footer stats-scope-footer" aria-label="Período das estatísticas">
+        <button class="icon-action-btn history-mission-footer-btn" type="button" aria-label="Estatísticas atuais" aria-current="page">
+          <img src="/200/icons/stats.svg" alt="" aria-hidden="true" />
         </button>
-        <button class="hub-action" type="button" data-switch-modal="historyModal" data-loading-icon="/200/icons/target.svg" aria-label="Missões">
-          <img class="hub-icon-image" src="/200/icons/target.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Missões</span>
+        <button class="icon-action-btn history-mission-footer-btn history-mission-scope-btn" type="button" id="statsScopePrevButton" aria-label="Período anterior">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 5.3 8 12l6.7 6.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <button class="hub-action" type="button" aria-label="Estatísticas atuais" aria-current="page">
-          <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Estatísticas</span>
+        <div class="date-title history-mission-footer-spacer history-mission-scope-label" id="statsScopeLabel" aria-live="polite">Hoje</div>
+        <button class="icon-action-btn history-mission-footer-btn history-mission-scope-btn" type="button" id="statsScopeNextButton" aria-label="Próximo período">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 5.3 16 12l-6.7 6.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <button class="hub-action" type="button" data-switch-modal="optionsModal" data-loading-icon="/200/icons/options.svg" aria-label="Opções">
-          <img class="hub-icon-image" src="/200/icons/options.svg" alt="" aria-hidden="true" />
-        <span class="hub-action-label">Opções</span>
-      </button>
-      <button class="hub-action" type="button" id="statsRunningSurfaceButton" aria-label="Abrir andamento">
-          <img class="hub-icon-image" id="statsRunningSurfaceIcon" src="/200/icons/home-running-surface-idle-ilife.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Andam.</span>
+        <button class="icon-action-btn history-mission-footer-btn" type="button" data-close-modal aria-label="Voltar para a home">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.4 12 4l9 7.4v8.1a1.5 1.5 0 0 1-1.5 1.5h-4.8v-6.2H9.3V21H4.5A1.5 1.5 0 0 1 3 19.5z" fill="currentColor"/></svg>
         </button>
       </section>
     </div>
@@ -1254,8 +1269,8 @@
         <p class="finance-status" id="missionRunStatus" aria-live="polite"></p>
       </div>
       <div class="history-mission-run-footer">
-        <div class="history-mission-run-player-slot" id="missionRunPlayerSlot"></div>
         <button class="primary-btn history-mission-run-complete" type="button" id="missionRunCompleteButton">Concluir</button>
+        <div class="history-mission-run-player-slot" id="missionRunPlayerSlot"></div>
       </div>
       <div class="history-mission-run-confirm" id="missionRunConfirm" hidden>
         <div class="history-mission-run-confirm-card">

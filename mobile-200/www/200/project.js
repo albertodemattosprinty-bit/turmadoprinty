@@ -33,23 +33,10 @@ const missionHistoryScopes = [
 ];
 const defaultProjectProfileName = "Usuario";
 const statsScopes = [
-  { key: "points", label: "Pontos" },
   { key: "today", label: "Hoje" },
-  { key: "week", label: "Esta semana" },
-  { key: "last15", label: "Ultimos 15 dias" },
-  { key: "last30", label: "Ultimos 30 dias" },
-  { key: "month-01", label: "Janeiro" },
-  { key: "month-02", label: "Fevereiro" },
-  { key: "month-03", label: "Marco" },
-  { key: "month-04", label: "Abril" },
-  { key: "month-05", label: "Maio" },
-  { key: "month-06", label: "Junho" },
-  { key: "month-07", label: "Julho" },
-  { key: "month-08", label: "Agosto" },
-  { key: "month-09", label: "Setembro" },
-  { key: "month-10", label: "Outubro" },
-  { key: "month-11", label: "Novembro" },
-  { key: "month-12", label: "Dezembro" }
+  { key: "last7", label: "7 dias" },
+  { key: "last15", label: "15 dias" },
+  { key: "last30", label: "30 dias" }
 ];
 const statsPointCategories = [
   { id: "sono", name: "Sono", targetPoints: 420 },
@@ -217,6 +204,8 @@ const platformValueInput = document.getElementById("platformValue");
 const platformCategoryRow = document.getElementById("platformCategoryRow");
 const platformRecurrenceDayLabel = document.getElementById("platformRecurrenceDayLabel");
 const statsScopeLabel = document.getElementById("statsScopeLabel");
+const statsScopePrevButton = document.getElementById("statsScopePrevButton");
+const statsScopeNextButton = document.getElementById("statsScopeNextButton");
 const statsMissionSummary = document.getElementById("statsMissionSummary");
 const statsMissionTotal = document.getElementById("statsMissionTotal");
 const statsMissionCompleted = document.getElementById("statsMissionCompleted");
@@ -493,6 +482,7 @@ const runningConfirmName = document.getElementById("runningConfirmName");
 const runningConfirmPrimaryButton = document.getElementById("runningConfirmPrimaryButton");
 const runningConfirmBackButton = document.getElementById("runningConfirmBackButton");
 const runningTaskActionsWrap = runningTaskModalElement?.querySelector(".running-task-actions");
+const runningIdleHub = document.getElementById("runningIdleHub");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
 const runningPlayerTitleButton = document.getElementById("runningPlayerTitleButton");
@@ -867,6 +857,7 @@ const state = {
   statsRanking: [],
   statsPointsOverview: null,
   statsMissions: [],
+  statsScopeMissions: [],
   statsAspectConfig: {},
   statsAspectModal: {
     categoryId: "",
@@ -1050,7 +1041,7 @@ const state = {
   },
   runtimeState: null,
   runningCenterMode: "auto",
-  runningIdleTopMode: "hint",
+  runningIdleCenterMode: "time",
   runningLocalStarts: {},
   quickTaskAutoFinalizing: false
 };
@@ -1939,6 +1930,13 @@ function formatRunningClockMarkup(date = new Date()) {
   return `${String(parts.hour).padStart(2, "0")}<span class="running-task-decimal">:${String(parts.minute).padStart(2, "0")}</span>`;
 }
 
+function getRunningIdleGreeting(date = new Date()) {
+  const hour = Number(getProjectDateTimeParts(date).hour || 0);
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 function getDayElapsedPercent(date = new Date()) {
   const parts = getProjectDateTimeParts(date);
   const totalMinutes = (parts.hour * 60) + parts.minute;
@@ -2720,39 +2718,40 @@ function renderHomeRunningTask() {
     state.runningPlayer.defaultAppliedActionId = "";
     const now = new Date(getServerNowMs());
     const dayElapsedPercent = getDayElapsedPercent(now);
-    const homeCenterMarkup = formatRunningClockMarkup(now);
-    runningTaskName.innerHTML = formatRunningTaskTitleMarkup(formatRunningDateTitle(now));
+    const showIdlePercent = state.runningIdleCenterMode === "percent";
+    const homeCenterMarkup = showIdlePercent
+      ? formatRunningPercentMarkup(dayElapsedPercent)
+      : formatRunningClockMarkup(now);
+    runningTaskName.textContent = "";
     if (runningTaskCategoryIcon) {
       runningTaskCategoryIcon.hidden = true;
     }
     setRunningRingPercent(dayElapsedPercent);
     runningTaskPercent.innerHTML = homeCenterMarkup;
-    runningTaskMinutesLeft.textContent = "Toque aqui para abrir em andamento";
+    runningTaskMinutesLeft.textContent = "";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     setRunningIdleVisualState(true);
-    updateRunningCenterModeButtons("time");
+    updateRunningCenterModeButtons(showIdlePercent ? "percent" : "time");
     if (runningTaskNextLabel) {
       runningTaskNextLabel.classList.add("running-fade");
       runningTaskNextLabel.classList.remove("is-hidden");
     }
-    const nextPending = getEarliestPendingAction();
-    setRunningNextDisplay(
-      nextPending ? formatActionTitleForDisplay(nextPending.title) : "Sem próxima tarefa",
-      nextPending ? getActionDurationMinutes(nextPending) : 0
-    );
-    if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = false;
-    if (runningTaskHomeButton) runningTaskHomeButton.hidden = false;
-    if (runningTaskQuickButton) runningTaskQuickButton.hidden = false;
+    if (runningTaskNextName) runningTaskNextName.textContent = getRunningIdleGreeting(now);
+    if (runningTaskNextTime) runningTaskNextTime.textContent = "";
+    if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
+    if (runningIdleHub) runningIdleHub.hidden = false;
+    if (runningMiniPlayer) runningMiniPlayer.hidden = true;
+    if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
+    if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
     if (runningTaskListButton) runningTaskListButton.hidden = true;
-    if (runningTaskMissionButton) runningTaskMissionButton.hidden = false;
+    if (runningTaskMissionButton) runningTaskMissionButton.hidden = true;
     if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
     if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
     if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
     if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
     if (runningTaskStartNextButton) {
-      runningTaskStartNextButton.hidden = !nextPending;
-      runningTaskStartNextButton.dataset.actionId = String(nextPending?.id || "");
-      runningTaskStartNextButton.dataset.kind = "action";
+      runningTaskStartNextButton.hidden = true;
+      runningTaskStartNextButton.dataset.actionId = "";
     }
     setHomeTaskTitle("", false);
     if (homeRunningActions) {
@@ -2774,6 +2773,8 @@ function renderHomeRunningTask() {
   }
   applyRunningStationForCategory(action.categoryId);
   setRunningIdleVisualState(false);
+  if (runningIdleHub) runningIdleHub.hidden = true;
+  if (runningMiniPlayer) runningMiniPlayer.hidden = false;
   if (runningTaskNextLabel) {
     runningTaskNextLabel.classList.add("running-fade");
     runningTaskNextLabel.classList.remove("is-hidden");
@@ -4369,6 +4370,9 @@ function openModal(id) {
   }
 
   if (id === "runningTaskModal") {
+    if (!getRunningActionForSelectedProfile()) {
+      state.runningIdleCenterMode = "time";
+    }
     setRunningHomeVisibility(false);
     void loadMissions();
     startRunningTaskTicker();
@@ -7868,14 +7872,29 @@ function getActiveStatsScope() {
   return statsScopes[state.statsScopeIndex] || statsScopes[0];
 }
 
-function isPointsStatsScope(scope = getActiveStatsScope()) {
-  return String(scope?.key || "").trim() === "points";
+function getStatsScopeDays(scope = getActiveStatsScope()) {
+  const key = String(scope?.key || "today").trim();
+  if (key === "last30") return 30;
+  if (key === "last15") return 15;
+  if (key === "last7") return 7;
+  return 1;
+}
+
+function renderStatsScopeControls() {
+  const scope = getActiveStatsScope();
+  if (statsScopeLabel) statsScopeLabel.textContent = scope.label;
+  if (statsScopePrevButton) statsScopePrevButton.disabled = state.statsScopeIndex <= 0;
+  if (statsScopeNextButton) statsScopeNextButton.disabled = state.statsScopeIndex >= statsScopes.length - 1;
 }
 
 function moveStatsScope(amount) {
-  const total = statsScopes.length;
-  state.statsScopeIndex = (state.statsScopeIndex + amount + total) % total;
-  statsScopeLabel.textContent = getActiveStatsScope().label;
+  const nextIndex = Math.max(0, Math.min(statsScopes.length - 1, state.statsScopeIndex + amount));
+  if (nextIndex === state.statsScopeIndex) {
+    renderStatsScopeControls();
+    return;
+  }
+  state.statsScopeIndex = nextIndex;
+  renderStatsScopeControls();
   void loadStatsSummary();
 }
 
@@ -8028,16 +8047,18 @@ function formatMissionTimePromptLabel(title) {
 
 function buildStatsPointEntry(category, byCategory = {}) {
   const config = getStatsAspectConfigEntry(category.id);
-  const missionGoals = isSleepStatsCategory(category.id) ? [] : getCurrentMissionGoalsByIds(config.missionGoalIds);
-  const taskMinutes = isSleepStatsCategory(category.id)
-    ? Math.max(0, Number(byCategory?.[category.id] || 0))
-    : getVisibleCategoryTaskMinutes(category.id);
+  const selectedGoalIds = new Set((Array.isArray(config.missionGoalIds) ? config.missionGoalIds : []).map((id) => String(id || "").trim()).filter(Boolean));
+  const scopedMissions = Array.isArray(state.statsScopeMissions) ? state.statsScopeMissions : [];
+  const missionGoals = isSleepStatsCategory(category.id)
+    ? []
+    : scopedMissions.filter((goal) => selectedGoalIds.has(String(goal.id || "").trim()));
+  const taskMinutes = Math.max(0, Number(byCategory?.[category.id] || 0));
   const points = missionGoals.length
     ? missionGoals.reduce((sum, goal) => sum + (Math.max(0, Number(goal.progressValue || 0)) * getMissionUnitDurationMinutes(goal)), 0)
     : Math.max(0, Number(byCategory?.[category.id] || 0));
   const targetPoints = missionGoals.length
     ? missionGoals.reduce((sum, goal) => sum + (Math.max(1, Number(goal.targetValue || 1)) * getMissionUnitDurationMinutes(goal)), 0)
-    : Math.max(1, Number(config.targetMinutes || category.targetPoints || 1));
+    : Math.max(1, Number(config.targetMinutes || category.targetPoints || 1)) * getStatsScopeDays();
   const percent = targetPoints > 0 ? Math.max(0, Math.min(100, Math.round((points / targetPoints) * 100))) : 0;
   return {
     id: category.id,
@@ -8261,6 +8282,7 @@ async function loadStatsSummary() {
   }
 
   try {
+    renderStatsScopeControls();
     if (statsMissionsList) {
       statsMissionsList.hidden = false;
       showDbLoadingState(statsMissionsList, 220);
@@ -8276,11 +8298,19 @@ async function loadStatsSummary() {
       force: true,
       skipGlobalLoading: true
     });
-    const todaySummary = await apiRequest("/api/stats/summary?scope=today", {
-      skipGlobalLoading: true
-    });
-    const summary = todaySummary?.summary || {};
+    const scope = getActiveStatsScope();
+    const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+    const [summaryPayload, goalsPayload] = await Promise.all([
+      apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`, {
+        skipGlobalLoading: true
+      }),
+      apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`, {
+        skipGlobalLoading: true
+      }).catch(() => ({ goals: state.missions }))
+    ]);
+    const summary = summaryPayload?.summary || {};
     const byCategory = summary?.byCategory || {};
+    state.statsScopeMissions = Array.isArray(goalsPayload?.goals) ? goalsPayload.goals : [];
     state.statsSummary = summary;
     state.statsGlobalProfiles = Array.isArray(summary?.globalProfiles) ? summary.globalProfiles : [];
     state.statsRanking = [];
@@ -10977,6 +11007,8 @@ document.querySelectorAll("[data-finance-day-nav]").forEach((button) => {
 document.querySelectorAll("[data-stats-scope-nav]").forEach((button) => {
   button.addEventListener("click", () => moveStatsScope(Number(button.dataset.statsScopeNav)));
 });
+statsScopePrevButton?.addEventListener("click", () => moveStatsScope(-1));
+statsScopeNextButton?.addEventListener("click", () => moveStatsScope(1));
 document.querySelectorAll("[data-constitution-nav]").forEach((button) => {
   button.addEventListener("click", () => moveConstitutionVersion(Number(button.dataset.constitutionNav)));
 });
@@ -12746,11 +12778,11 @@ runningModeTimeBtn?.addEventListener("click", () => {
   state.runningCenterMode = state.runningCenterMode === "time" ? "auto" : "time";
   renderHomeRunningTask();
 });
-runningTaskMinutesLeft?.addEventListener("click", () => {
+runningTaskPercent?.addEventListener("click", () => {
   if (getRunningActionForSelectedProfile()) {
     return;
   }
-  state.runningIdleTopMode = state.runningIdleTopMode === "percent" ? "hint" : "percent";
+  state.runningIdleCenterMode = state.runningIdleCenterMode === "percent" ? "time" : "percent";
   renderHomeRunningTask();
 });
 if (runningAudio) {

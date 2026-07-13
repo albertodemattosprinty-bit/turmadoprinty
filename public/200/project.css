@@ -1769,7 +1769,49 @@ body.screen-locked .project-login-overlay.active {
 }
 
 #runningTaskModal .running-task-content.is-idle-layout .running-task-actions {
-  display: flex;
+  display: none;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout {
+  grid-template-rows: 0 minmax(0, 1fr) auto 0 0 clamp(56px, 10dvh, 74px);
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-title-row,
+#runningTaskModal .running-task-content.is-idle-layout .running-task-minutes,
+#runningTaskModal .running-task-content.is-idle-layout .running-progress-ring,
+#runningTaskModal .running-task-content.is-idle-layout .running-circle-toggle,
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next-label,
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next-time {
+  display: none;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-circle-wrap {
+  grid-row: 2;
+  cursor: pointer;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-percent {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-next-panel {
+  grid-row: 3;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next {
+  font-size: clamp(1.35rem, 4.8vw, 2rem);
+}
+
+.running-idle-hub {
+  grid-row: 6;
+  order: initial;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0 2px;
+  align-self: stretch;
 }
 
 .running-quick-task-content {
@@ -1799,6 +1841,16 @@ body.running-player-overlay-open #runningTaskModal .running-task-content {
   filter: none;
   opacity: 0;
   transform: scale(0.985);
+}
+
+body.running-player-overlay-open #missionRunModal .history-mission-run-shell {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#runningMusicDefaultModal,
+#runningMusicDefaultChoiceModal {
+  z-index: 190;
 }
 
 body.running-music-list-open #actionsModal .actions-app,
@@ -2949,7 +3001,7 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
 }
 
 #statsModal .actions-app.stats-actions-app {
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) 8dvh;
   padding-top: 0;
   padding-bottom: 0;
   overflow: hidden;
@@ -2962,21 +3014,13 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   box-sizing: border-box;
   padding-top: 12px;
   padding-right: 12px;
-  padding-bottom: 10px;
+  padding-bottom: calc(8dvh + 22px);
   padding-left: 12px;
   overflow-x: hidden;
 }
 
-.stats-footer-hub {
-  align-self: end;
-  width: 100%;
-  max-width: 100%;
-  margin-top: auto;
-  padding-top: 12px;
-  padding-right: 2px;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  padding-left: 2px;
-  box-sizing: border-box;
+.stats-scope-footer {
+  z-index: 27;
 }
 
 #calendarModal .actions-list {
@@ -4363,11 +4407,6 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
     padding-inline: 0;
   }
 
-  #statsModal .stats-footer-hub {
-    width: 100%;
-    padding-inline: 2px;
-  }
-
   .home-profile-hero {
     padding-top: 18px;
   }
@@ -4472,7 +4511,8 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   }
 
   #actionsModal .actions-footer-label,
-  #historyModal .history-mission-scope-label {
+  #historyModal .history-mission-scope-label,
+  #statsModal .history-mission-scope-label {
     font-size: clamp(0.96rem, 4.2vw, 1.35rem);
   }
 
@@ -6399,12 +6439,66 @@ body[data-background-theme="white"] .social-scope-chip.active {
 .history-mission-run-shell {
   width: 100vw;
   min-height: 100dvh;
-  background: #000;
-  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  background: transparent;
+  color: var(--white);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 20px;
+  gap: 12px;
   position: relative;
+  transition: opacity 180ms ease;
+}
+
+body[data-background-theme="black"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top, rgba(120, 126, 153, 0.18), transparent 36%),
+    linear-gradient(145deg, #05070f 0%, #101729 45%, #070b15 100%);
+}
+
+body[data-background-theme="orange"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top left, rgba(255, 233, 151, 0.3), transparent 34%),
+    linear-gradient(145deg, #ff7a18 0%, #ff4d2d 46%, #c21807 100%);
+}
+
+body[data-background-theme="bluevivid"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top left, rgba(149, 234, 255, 0.3), transparent 34%),
+    linear-gradient(145deg, #16a3ff 0%, #0b63ff 52%, #0037c4 100%);
+}
+
+body[data-background-theme="pinkstrong"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top left, rgba(255, 190, 216, 0.28), transparent 36%),
+    linear-gradient(145deg, #ff2f92 0%, #ff1660 48%, #b10c53 100%);
+}
+
+body[data-background-theme="bluedark"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top left, rgba(125, 187, 255, 0.22), transparent 36%),
+    linear-gradient(145deg, #0d2d8f 0%, #09206b 44%, #020d37 100%);
+}
+
+body[data-background-theme="brown"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top left, rgba(244, 197, 139, 0.24), transparent 34%),
+    linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%);
+}
+
+body[data-background-theme="edge"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
+    linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
+}
+
+body[data-background-theme="light"] #missionRunModal.workspace-modal {
+  background: url("/200/background-light.png") center center / cover no-repeat;
+}
+
+body[data-background-theme="white"] #missionRunModal.workspace-modal {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 38%),
+    linear-gradient(145deg, #f8f8f5 0%, #f2f2ed 48%, #ecece7 100%);
 }
 
 .history-mission-run-head {
@@ -6493,19 +6587,32 @@ body[data-background-theme="white"] .social-scope-chip.active {
 
 .history-mission-run-footer {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .history-mission-run-player-slot {
-  min-height: 66px;
+  width: min(680px, calc(100vw - 32px));
+  height: clamp(56px, 10dvh, 74px);
+  min-height: 56px;
+  justify-self: center;
 }
 
 .history-mission-run-player-slot .running-player {
   grid-row: auto;
-  min-height: 66px;
-  height: 66px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .history-mission-run-shell {
+    padding-inline: 12px;
+  }
+
+  .history-mission-run-player-slot {
+    width: min(100%, calc(100vw - 24px));
+  }
 }
 
 .history-mission-run-complete {
