@@ -1297,6 +1297,15 @@
       pointer-events: auto;
       transform: scale(1);
     }
+    body.ilife-reader-embed #coursesFooterMidia,
+    body.ilife-reader-embed #coursesFooterCriar,
+    body.ilife-reader-embed #coursesFooterAulas {
+      display: none;
+    }
+    body.ilife-reader-embed .courses-app-footer {
+      justify-content: center;
+      gap: clamp(32px, 16vw, 120px);
+    }
     .courses-shell {
       height: 100dvh;
       display: grid;
@@ -4982,6 +4991,8 @@
     let currentAiPlanId = "";
     let savedMiniPlans = [];
     let miniCourses = [];
+    const miniReaderParams = new URLSearchParams(window.location.search || "");
+    const isIlifeReaderEmbed = String(miniReaderParams.get("reader") || "").trim().toLowerCase() === "ilife";
     let currentMiniCourse = null;
     let currentMiniCoursePage = 1;
     let currentMiniCourseViewMode = "preview";
@@ -5176,6 +5187,20 @@
     }
     function page(list, idx){ return list.slice(idx*pageSize, idx*pageSize+pageSize); }
     function getMiniToken(){ return window.localStorage.getItem(miniSessionKey) || ""; }
+    function postIlifeReaderMessage(type, detail = {}) {
+      if (!isIlifeReaderEmbed || window.parent === window) {
+        return;
+      }
+      window.parent.postMessage({ type, ...detail }, "*");
+    }
+    function requestIlifeReaderClose() {
+      postIlifeReaderMessage("ilife-reader-close");
+    }
+    function notifyIlifeReadingPoints() {
+      postIlifeReaderMessage("ilife-reading-points-updated", {
+        points: Math.max(0, Number(miniCourseSummary?.totalPoints || 0) || 0)
+      });
+    }
     function setMiniStatus(text){ $("miniChatStatus").textContent = text || ""; }
     function scrollMiniChatToBottom(){ const thread = $("miniChatThread"); if (thread) thread.scrollTop = thread.scrollHeight; }
     function setCourseFooterStatus(text) {
@@ -8944,6 +8969,12 @@
       if (target === "cursos") {
         return;
       }
+      if (isIlifeReaderEmbed) {
+        if (target === "home") {
+          requestIlifeReaderClose();
+        }
+        return;
+      }
       closeMiniCoursesModal();
       if (target === "home") {
         return;
@@ -10258,6 +10289,9 @@
 
     async function apiMini(path, options = {}) {
       const headers = Object.assign({}, options.headers || {});
+      if (isIlifeReaderEmbed) {
+        headers["X-Mini-Course-Catalog"] = "ilife";
+      }
       const token = getMiniToken();
       if (token) {
         headers.Authorization = `Bearer ${token}`;
@@ -11335,7 +11369,7 @@
       }
 
       if (!miniCourses.length) {
-        listView.innerHTML = `<div class="courses-empty">Não há cursos.</div>`;
+        listView.innerHTML = `<div class="courses-empty">${isIlifeReaderEmbed ? "Não há leituras disponíveis no iLife." : "Não há cursos."}</div>`;
         updateMiniCoursesHeader();
         updateMiniCoursesFooter();
         return;
@@ -11659,7 +11693,7 @@
       miniCourses = Array.isArray(payload?.courses) ? payload.courses : miniCourses;
       miniCourseUser = Object.prototype.hasOwnProperty.call(payload || {}, "user") ? (payload?.user || null) : miniCourseUser;
       miniCourseSummary = payload?.summary || (miniCourseUser ? miniCourseSummary : { completedCourses: 0, startedCourses: 0, totalPoints: 0 });
-      isMiniCourseAdmin = isMiniAdminUser(miniCourseUser);
+      isMiniCourseAdmin = !isIlifeReaderEmbed && isMiniAdminUser(miniCourseUser);
       if (!isMiniCourseAdmin) {
         setMiniCourseAdminPanelVisible(false);
       }
@@ -11676,6 +11710,7 @@
           throw new Error(payload.error || "Falha ao carregar os pontos.");
         }
         applyMiniCoursesPayload(payload || {});
+        notifyIlifeReadingPoints();
       } catch (error) {
         if (!miniCourseUser) {
           miniCourseSummary = { completedCourses: 0, startedCourses: 0, totalPoints: 0 };
@@ -11689,7 +11724,7 @@
       miniCoursesError = "";
       renderMiniCoursesList();
       try {
-        const response = await apiMini("/api/mini/courses");
+        const response = await apiMini(isIlifeReaderEmbed ? "/api/mini/courses?catalog=ilife" : "/api/mini/courses");
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(payload.error || "Falha ao carregar cursos.");
@@ -11725,6 +11760,10 @@
     }
 
     function closeMiniCoursesModal() {
+      if (isIlifeReaderEmbed) {
+        requestIlifeReaderClose();
+        return;
+      }
       clearMiniCourseAnimationTimers();
       clearMiniCourseAdminRevealTimer();
       setMiniCourseAdminPanelVisible(false);
@@ -11740,6 +11779,43 @@
       currentMiniCoursePage = 1;
       currentMiniCourseViewMode = "preview";
       applyMiniCourseReaderTheme();
+    }
+
+    function initializeIlifeReaderEmbed() {
+      if (!isIlifeReaderEmbed) {
+        return;
+      }
+
+      document.body.classList.add("ilife-reader-embed");
+      window.addEventListener("message", (event) => {
+        if (event.source !== window.parent) {
+          return;
+        }
+        const message = event.data && typeof event.data === "object" ? event.data : {};
+        if (message.type === "ilife-reader-session") {
+          const token = String(message.token || "").trim();
+          if (token) {
+            window.localStorage.setItem(miniSessionKey, token);
+          }
+          void loadMiniCourseHomeSummary();
+          if (!currentMiniCourse) {
+            void loadMiniCourses();
+          }
+          return;
+        }
+        if (message.type === "ilife-reader-open") {
+          if ($("coursesModal")?.getAttribute("aria-hidden") !== "false") {
+            openMiniCoursesModal();
+          } else {
+            void loadMiniCourseHomeSummary();
+            if (!currentMiniCourse) {
+              void loadMiniCourses();
+            }
+          }
+        }
+      });
+      openMiniCoursesModal();
+      postIlifeReaderMessage("ilife-reader-ready");
     }
 
     function openMiniCoursesUserModal() {
@@ -11904,8 +11980,9 @@
         }
         if (payload?.summary) {
           miniCourseSummary = payload.summary;
+          notifyIlifeReadingPoints();
         }
-        isMiniCourseAdmin = isMiniAdminUser(miniCourseUser);
+        isMiniCourseAdmin = !isIlifeReaderEmbed && isMiniAdminUser(miniCourseUser);
         updateMiniCourseAdminButton();
         updateMiniCoursesUserCard();
         currentMiniCourse = payload.course || null;
@@ -12300,6 +12377,7 @@
         }
         if (payload?.summary) {
           miniCourseSummary = payload.summary;
+          notifyIlifeReadingPoints();
         }
         if (Math.max(0, Number(payload?.course?.pointsAwarded || 0) || 0) > 0) {
           await showMiniCoursePointsAward(payload.course.pointsAwarded, payload.course.totalPoints);
@@ -12882,6 +12960,10 @@
       jumpToMiniCourseUnlockedLimit();
     };
     $("closeCourses").onclick = () => {
+      if (isIlifeReaderEmbed) {
+        requestIlifeReaderClose();
+        return;
+      }
       closeMiniCoursesModal();
     };
     $("openCoursesUser").onclick = () => {
@@ -13230,6 +13312,7 @@
     });
 
     void loadMiniCourseHomeSummary();
+    initializeIlifeReaderEmbed();
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
         void loadMiniCourseHomeSummary();

@@ -347,10 +347,13 @@ export async function ensureMiniCoursesSchema() {
   await query("create index if not exists idx_mini_course_jobs_status_created_at on mini_course_jobs(status, created_at asc);");
 }
 
-export async function listMiniCourses(userId = "", { includeHidden = false } = {}) {
+export async function listMiniCourses(userId = "", { includeHidden = false, visibility = "" } = {}) {
   await ensureMiniCoursesSchema();
   const safeUserId = String(userId || "").trim();
-  const visibilityClause = includeHidden ? "" : "where c.is_visible = true";
+  const normalizedVisibility = String(visibility || "").trim().toLowerCase();
+  const visibilityClause = normalizedVisibility === "hidden"
+    ? "where c.is_visible = false"
+    : (includeHidden || normalizedVisibility === "all" ? "" : "where c.is_visible = true");
   const result = safeUserId
     ? await query(
       `

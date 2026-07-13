@@ -195,7 +195,7 @@ function applyCorsHeaders(request, response) {
   response.setHeader("Access-Control-Allow-Origin", origin);
   response.setHeader("Vary", "Origin");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-File-Name, X-Track-Title, X-Track-Order, X-Page-Order, X-Model");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-File-Name, X-Track-Title, X-Track-Order, X-Page-Order, X-Model, X-Mini-Course-Catalog");
   response.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Type, Content-Disposition");
 }
 
@@ -5278,13 +5278,31 @@ async function bootstrapMiniCourseJobsQueue() {
   }
 }
 
+function getMiniCourseCatalog(request) {
+  const headerCatalog = String(request?.headers?.["x-mini-course-catalog"] || "").trim().toLowerCase();
+  if (headerCatalog === "ilife") {
+    return "ilife";
+  }
+
+  try {
+    const requestUrl = new URL(String(request?.url || "/"), "http://localhost");
+    return String(requestUrl.searchParams.get("catalog") || "").trim().toLowerCase() === "ilife" ? "ilife" : "mini";
+  } catch {
+    return "mini";
+  }
+}
+
 async function handleMiniCoursesListRequest(request, response) {
   const user = await getOptionalAuthUser(request);
+  const catalog = getMiniCourseCatalog(request);
   const includeHidden = Boolean(user && isAdminUser(user));
 
   try {
     const [courses, summary] = await Promise.all([
-      listMiniCourses(user?.id || "", { includeHidden }),
+      listMiniCourses(user?.id || "", {
+        includeHidden: catalog === "mini" && includeHidden,
+        visibility: catalog === "ilife" ? "hidden" : "visible"
+      }),
       user ? getMiniCourseUserSummary(user.id) : Promise.resolve({ completedCourses: 0, startedCourses: 0, totalPoints: 0 })
     ]);
     const courseSummaries = courses.map((course) => ({
@@ -6770,10 +6788,14 @@ async function handleMiniMediaAlbumCoverGenerateRequest(request, response, album
 
 async function handleMiniCourseDetailRequest(request, response, courseId) {
   const user = await getOptionalAuthUser(request);
+  const catalog = getMiniCourseCatalog(request);
 
   try {
     const course = await getMiniCourseById(courseId, user?.id || "");
-    if (!course || (course.isVisible === false && !isAdminUser(user))) {
+    const isUnavailableForCatalog = catalog === "ilife"
+      ? course?.isVisible !== false
+      : (course?.isVisible === false && !isAdminUser(user));
+    if (!course || isUnavailableForCatalog) {
       sendJson(response, 404, { error: "Curso nao encontrado." });
       return;
     }

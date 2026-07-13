@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260710-home-ilife-stats-theme" />
+  <link rel="stylesheet" href="/200/project.css?v=20260713-ilife-reader" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -1417,7 +1417,16 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260708-remove-global-loading-1"></script>
+  <section class="ilife-reader-overlay" id="ilifeReaderOverlay" aria-hidden="true" hidden>
+    <iframe
+      class="ilife-reader-frame"
+      id="ilifeReaderFrame"
+      title="Leitor de livros do iLife"
+      allow="autoplay"
+    ></iframe>
+  </section>
+
+  <script type="module" src="/200/project.js?v=20260713-ilife-reader"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

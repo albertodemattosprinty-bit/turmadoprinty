@@ -505,6 +505,8 @@ const runningTaskNextLabel = runningTaskModalElement?.querySelector(".running-ta
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskNextTime = document.getElementById("runningTaskNextTime");
 const runningNextPanel = document.getElementById("runningNextPanel");
+const ilifeReaderOverlay = document.getElementById("ilifeReaderOverlay");
+const ilifeReaderFrame = document.getElementById("ilifeReaderFrame");
 const runningTaskHomeButton = document.getElementById("runningTaskHomeButton");
 const runningTaskQuickButton = document.getElementById("runningTaskQuickButton");
 const runningTaskListButton = document.getElementById("runningTaskListButton");
@@ -746,6 +748,8 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
+let ilifeReadingPoints = 0;
+let ilifeReadingCycleStartedAt = Date.now();
 let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
@@ -2163,6 +2167,78 @@ function getRunningIdleGreeting(date = new Date()) {
   return "Boa noite";
 }
 
+function isIlifeReadingPointsTurn() {
+  const elapsedMs = Math.max(0, Date.now() - ilifeReadingCycleStartedAt);
+  return Math.floor(elapsedMs / 3000) % 2 === 1;
+}
+
+async function loadIlifeReadingPoints() {
+  if (!getToken()) {
+    return;
+  }
+  try {
+    const payload = await apiRequest("/api/mini/courses/summary", {
+      skipGlobalLoading: true
+    });
+    ilifeReadingPoints = Math.max(0, Number(payload?.summary?.totalPoints || 0) || 0);
+    if (runningTaskModalElement?.classList.contains("active") && !getRunningActionForSelectedProfile()) {
+      renderHomeRunningTask();
+    }
+  } catch {
+    // Keep the last known reading score when the summary is temporarily unavailable.
+  }
+}
+
+function postIlifeReaderSession(type = "ilife-reader-session") {
+  if (!ilifeReaderFrame?.contentWindow) {
+    return;
+  }
+  let targetOrigin = "*";
+  try {
+    targetOrigin = new URL(getApiUrl("/mini")).origin;
+  } catch {}
+  ilifeReaderFrame.contentWindow.postMessage({
+    type,
+    token: getToken()
+  }, targetOrigin);
+}
+
+function openIlifeReader() {
+  if (!getToken()) {
+    redirectToProject200Login();
+    return;
+  }
+  if (!ilifeReaderOverlay || !ilifeReaderFrame) {
+    return;
+  }
+
+  const readerUrl = getApiUrl("/mini?reader=ilife");
+  ilifeReaderOverlay.hidden = false;
+  ilifeReaderOverlay.setAttribute("aria-hidden", "false");
+  document.body.classList.add("ilife-reader-open");
+  window.requestAnimationFrame(() => ilifeReaderOverlay.classList.add("active"));
+  if (ilifeReaderFrame.getAttribute("src") !== readerUrl) {
+    ilifeReaderFrame.setAttribute("src", readerUrl);
+  } else {
+    postIlifeReaderSession("ilife-reader-open");
+  }
+}
+
+function closeIlifeReader() {
+  if (!ilifeReaderOverlay) {
+    return;
+  }
+  ilifeReaderOverlay.classList.remove("active");
+  ilifeReaderOverlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("ilife-reader-open");
+  window.setTimeout(() => {
+    if (!ilifeReaderOverlay.classList.contains("active")) {
+      ilifeReaderOverlay.hidden = true;
+    }
+  }, 190);
+  void loadIlifeReadingPoints();
+}
+
 function getDayElapsedPercent(date = new Date()) {
   const parts = getProjectDateTimeParts(date);
   const totalMinutes = (parts.hour * 60) + parts.minute;
@@ -2962,7 +3038,12 @@ function renderHomeRunningTask() {
       runningTaskNextLabel.classList.add("running-fade");
       runningTaskNextLabel.classList.remove("is-hidden");
     }
-    if (runningTaskNextName) runningTaskNextName.textContent = getRunningIdleGreeting(now);
+    if (runningTaskNextName) {
+      const showReadingPoints = isIlifeReadingPointsTurn();
+      runningTaskNextName.textContent = showReadingPoints ? `${ilifeReadingPoints} pontos` : getRunningIdleGreeting(now);
+      runningTaskNextName.classList.toggle("is-reading-points", showReadingPoints);
+      runningTaskNextName.setAttribute("aria-label", showReadingPoints ? `Abrir leituras. ${ilifeReadingPoints} pontos` : getRunningIdleGreeting(now));
+    }
     if (runningTaskNextTime) runningTaskNextTime.textContent = "";
     if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
     if (runningIdleHub) runningIdleHub.hidden = false;
@@ -2999,6 +3080,7 @@ function renderHomeRunningTask() {
   }
   applyRunningStationForCategory(action.categoryId);
   setRunningIdleVisualState(false);
+  runningTaskNextName.classList.remove("is-reading-points");
   if (runningIdleHub) runningIdleHub.hidden = true;
   if (runningMiniPlayer) runningMiniPlayer.hidden = false;
   if (runningTaskNextLabel) {
@@ -4605,6 +4687,8 @@ function openModal(id) {
   if (id === "runningTaskModal") {
     if (!getRunningActionForSelectedProfile()) {
       state.runningIdleCenterMode = "time";
+      ilifeReadingCycleStartedAt = Date.now();
+      void loadIlifeReadingPoints();
     }
     setRunningHomeVisibility(false);
     void loadMissions();
@@ -11736,6 +11820,10 @@ function registerNativeBackButtonHandler() {
     return;
   }
   appPlugin.addListener("backButton", async () => {
+    if (ilifeReaderOverlay?.classList.contains("active")) {
+      closeIlifeReader();
+      return;
+    }
     if (!isProjectHomeVisible()) {
       navigateToProjectHome();
       return;
@@ -11804,6 +11892,7 @@ async function bootstrapProject200App() {
       redirectToProject200Login();
       return;
     }
+    void loadIlifeReadingPoints();
 
     const sessionOk = await ensureProject200Session();
     if (sessionOk) {
@@ -14123,6 +14212,41 @@ runningTaskPercent?.addEventListener("click", () => {
   }
   state.runningIdleCenterMode = state.runningIdleCenterMode === "percent" ? "time" : "percent";
   renderHomeRunningTask();
+});
+runningTaskNextName?.addEventListener("click", () => {
+  if (getRunningActionForSelectedProfile() || !isIlifeReadingPointsTurn()) {
+    return;
+  }
+  openIlifeReader();
+});
+ilifeReaderFrame?.addEventListener("load", () => {
+  postIlifeReaderSession();
+});
+window.addEventListener("message", (event) => {
+  if (!ilifeReaderFrame || event.source !== ilifeReaderFrame.contentWindow) {
+    return;
+  }
+  const message = event.data && typeof event.data === "object" ? event.data : {};
+  if (message.type === "ilife-reader-ready") {
+    postIlifeReaderSession();
+    return;
+  }
+  if (message.type === "ilife-reader-close") {
+    closeIlifeReader();
+    return;
+  }
+  if (message.type === "ilife-reading-points-updated") {
+    ilifeReadingPoints = Math.max(0, Number(message.points || 0) || 0);
+    if (!getRunningActionForSelectedProfile()) {
+      renderHomeRunningTask();
+    }
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && ilifeReaderOverlay?.classList.contains("active")) {
+    event.preventDefault();
+    closeIlifeReader();
+  }
 });
 if (runningAudio) {
   runningAudio.addEventListener("ended", () => {
