@@ -1239,17 +1239,22 @@
       <div class="history-mission-run-body">
         <div class="running-task-name history-mission-run-title" id="missionRunTitle">Missão</div>
         <div class="history-mission-run-ring-wrap">
+          <button class="running-circle-toggle running-circle-toggle-left" id="missionRunModePercentBtn" type="button" aria-label="Mostrar porcentagem">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h3V9H4zm6 0h3V5h-3zm6 0h3V12h-3z"/></svg>
+          </button>
           <svg class="history-mission-run-ring" viewBox="0 0 120 120" aria-hidden="true">
             <circle class="history-mission-run-ring-bg" cx="60" cy="60" r="48"></circle>
             <circle class="history-mission-run-ring-fill" id="missionRunRingFill" cx="60" cy="60" r="48"></circle>
           </svg>
-          <div class="history-mission-run-icon-wrap">
-            <img class="history-mission-run-icon" id="missionRunIcon" src="/200/icons/target.svg" alt="" aria-hidden="true" />
-          </div>
+          <div class="running-task-percent history-mission-run-clock" id="missionRunClock">0<span class="running-task-decimal">:00</span></div>
+          <button class="running-circle-toggle running-circle-toggle-right" id="missionRunModeTimeBtn" type="button" aria-label="Mostrar tempo">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
+          </button>
         </div>
         <p class="finance-status" id="missionRunStatus" aria-live="polite"></p>
       </div>
       <div class="history-mission-run-footer">
+        <div class="history-mission-run-player-slot" id="missionRunPlayerSlot"></div>
         <button class="primary-btn history-mission-run-complete" type="button" id="missionRunCompleteButton">Concluir</button>
       </div>
       <div class="history-mission-run-confirm" id="missionRunConfirm" hidden>

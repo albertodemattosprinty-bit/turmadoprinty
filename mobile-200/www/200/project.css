@@ -6424,7 +6424,7 @@ body[data-background-theme="white"] .social-scope-chip.active {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 28px;
+  gap: 18px;
 }
 
 .history-mission-run-title {
@@ -6435,6 +6435,23 @@ body[data-background-theme="white"] .social-scope-chip.active {
   position: relative;
   width: min(72vw, 320px);
   aspect-ratio: 1;
+}
+
+.history-mission-run-ring-wrap .running-circle-toggle-left {
+  top: 12%;
+}
+
+.history-mission-run-ring-wrap .running-circle-toggle-right {
+  bottom: 10%;
+}
+
+.history-mission-run-clock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .history-mission-run-ring {
@@ -6476,6 +6493,19 @@ body[data-background-theme="white"] .social-scope-chip.active {
 
 .history-mission-run-footer {
   display: grid;
+  gap: 14px;
+}
+
+.history-mission-run-player-slot {
+  min-height: 66px;
+}
+
+.history-mission-run-player-slot .running-player {
+  grid-row: auto;
+  min-height: 66px;
+  height: 66px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .history-mission-run-complete {

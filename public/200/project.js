@@ -419,8 +419,11 @@ const missionTimeStatus = document.getElementById("missionTimeStatus");
 const missionTimeConfirmButton = document.getElementById("missionTimeConfirmButton");
 const missionRunBackButton = document.getElementById("missionRunBackButton");
 const missionRunTitle = document.getElementById("missionRunTitle");
-const missionRunIcon = document.getElementById("missionRunIcon");
 const missionRunRingFill = document.getElementById("missionRunRingFill");
+const missionRunClock = document.getElementById("missionRunClock");
+const missionRunModePercentBtn = document.getElementById("missionRunModePercentBtn");
+const missionRunModeTimeBtn = document.getElementById("missionRunModeTimeBtn");
+const missionRunPlayerSlot = document.getElementById("missionRunPlayerSlot");
 const missionRunStatus = document.getElementById("missionRunStatus");
 const missionRunCompleteButton = document.getElementById("missionRunCompleteButton");
 const missionRunConfirm = document.getElementById("missionRunConfirm");
@@ -925,7 +928,9 @@ const state = {
   missionRun: {
     goalId: "",
     startedAtMs: 0,
-    durationMs: 0
+    durationMs: 0,
+    centerMode: "time",
+    previousTaskTitle: ""
   },
   missionQuickSlots: [],
   runningMissionQuick: {
@@ -4447,9 +4452,13 @@ function closeModal(modal) {
   }
   if (modal.id === "missionRunModal") {
     stopMissionRunTicker();
+    restoreRunningPlayerAfterMission();
+    state.runningPlayer.currentTaskTitle = String(state.missionRun.previousTaskTitle || "").trim();
     state.missionRun.goalId = "";
     state.missionRun.startedAtMs = 0;
     state.missionRun.durationMs = 0;
+    state.missionRun.centerMode = "time";
+    state.missionRun.previousTaskTitle = "";
     if (missionRunConfirm) {
       missionRunConfirm.hidden = true;
     }
@@ -9892,26 +9901,44 @@ function stopMissionRunTicker() {
   }
 }
 
+function mountRunningPlayerForMission() {
+  if (!runningMiniPlayer || !missionRunPlayerSlot) return;
+  if (!runningMiniPlayer.dataset.originalParentId) {
+    runningMiniPlayer.dataset.originalParentId = String(runningMiniPlayer.parentElement?.id || "runningTaskModal");
+  }
+  missionRunPlayerSlot.appendChild(runningMiniPlayer);
+}
+
+function restoreRunningPlayerAfterMission() {
+  if (!runningMiniPlayer || runningMiniPlayer.parentElement !== missionRunPlayerSlot) return;
+  const runningContent = document.querySelector("#runningTaskModal .running-task-content");
+  runningContent?.appendChild(runningMiniPlayer);
+}
+
 function renderMissionRunState() {
   const goalId = String(state.missionRun?.goalId || "").trim();
   const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId) || null;
   if (!goal) {
     return;
   }
-  const icon = getMissionDisplayIcon(goal);
   const durationMs = Math.max(0, Number(state.missionRun?.durationMs || 0));
   const elapsedMs = Math.max(0, Date.now() - Math.max(0, Number(state.missionRun?.startedAtMs || 0)));
-  const percent = durationMs > 0 ? Math.max(0, Math.min(100, Math.round((elapsedMs / durationMs) * 100))) : 100;
+  const remainingMs = Math.max(0, durationMs - elapsedMs);
+  const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const percentPrecise = durationMs > 0 ? clampPercent((elapsedMs / durationMs) * 100) : 0;
+  const percent = Math.round(percentPrecise);
   const circumference = 301.59;
   if (missionRunTitle) {
     missionRunTitle.textContent = String(goal.title || "Missão");
   }
-  if (missionRunIcon) {
-    missionRunIcon.src = icon.src;
-    missionRunIcon.alt = icon.alt;
-  }
   if (missionRunRingFill) {
-    missionRunRingFill.style.strokeDashoffset = String(circumference - ((percent / 100) * circumference));
+    missionRunRingFill.style.strokeDashoffset = String(circumference - ((percentPrecise / 100) * circumference));
+  }
+  const centerMode = state.missionRun?.centerMode === "percent" ? "percent" : "time";
+  missionRunModePercentBtn?.classList.toggle("active", centerMode === "percent");
+  missionRunModeTimeBtn?.classList.toggle("active", centerMode === "time");
+  if (missionRunClock) {
+    missionRunClock.innerHTML = formatRunningCenter(percent, percentPrecise, remainingSeconds / 60, remainingSeconds, centerMode === "percent");
   }
   if (missionRunStatus) {
     missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missão não tem tempo definido.";
@@ -9926,10 +9953,15 @@ function openMissionRunModal(goalId) {
   state.missionRun.goalId = String(goal.id || "");
   state.missionRun.startedAtMs = Date.now();
   state.missionRun.durationMs = Math.max(0, getMissionUnitDurationMinutes(goal) * 60 * 1000);
+  state.missionRun.centerMode = "time";
+  state.missionRun.previousTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+  state.runningPlayer.currentTaskTitle = String(goal.title || "Missão").trim();
   if (missionRunConfirm) {
     missionRunConfirm.hidden = true;
   }
   renderMissionRunState();
+  mountRunningPlayerForMission();
+  void loadRunningMusicStations().then(() => autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "Missão") }));
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
   openModal("missionRunModal");
@@ -12086,6 +12118,14 @@ missionRunBackButton?.addEventListener("click", () => {
   if (missionRunConfirm) {
     missionRunConfirm.hidden = false;
   }
+});
+missionRunModePercentBtn?.addEventListener("click", () => {
+  state.missionRun.centerMode = "percent";
+  renderMissionRunState();
+});
+missionRunModeTimeBtn?.addEventListener("click", () => {
+  state.missionRun.centerMode = "time";
+  renderMissionRunState();
 });
 missionRunCancelDiscardButton?.addEventListener("click", () => {
   closeModal("missionRunModal");
