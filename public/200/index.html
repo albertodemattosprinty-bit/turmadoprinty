@@ -374,9 +374,15 @@
         </div>
       </footer>
       <div class="actions-side-actions">
-        <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openActionWizard" aria-label="Adicionar tarefa">
-          <span class="actions-side-plus" aria-hidden="true">+</span>
-        </button>
+        <div class="actions-footer-primary">
+          <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openActionWizard" aria-label="Adicionar tarefa">
+            <span class="actions-side-plus" aria-hidden="true">+</span>
+          </button>
+          <button class="icon-action-btn actions-mission-filter-btn" type="button" id="actionsMissionFilterButton" aria-label="Mostrar somente missões">
+            <span id="actionsMissionRemainingCount">0</span>
+            <svg id="actionsMissionListIcon" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M5 6h14v2H5V6Zm0 5h14v2H5v-2Zm0 5h14v2H5v-2Z"/></svg>
+          </button>
+        </div>
         <button class="icon-action-btn actions-side-btn actions-footer-nav" type="button" data-day-nav="-1" aria-label="Data anterior">
           <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
         </button>
@@ -669,6 +675,11 @@
         <span class="running-music-default-top">Adicionar um novo usuário local do /200</span>
         <strong>Criar usuario</strong>
         <span class="running-music-default-bottom">Cada usuário terá as próprias tarefas e persona</span>
+      </button>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="toggleMissionActionsOption">
+        <span class="running-music-default-top">Escolher onde as missões do dia aparecem</span>
+        <strong>Missões</strong>
+        <span class="running-music-default-bottom" id="toggleMissionActionsHint">Mostrar</span>
       </button>
       <button class="running-music-default-option" type="button" id="openProfileAvatarModalFromOptions">
         <span class="running-music-default-top">Escolher, enviar ou gerar a foto circular do usuário atual</span>

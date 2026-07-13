@@ -4512,7 +4512,7 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   }
 
   #actionsModal .actions-side-actions {
-    grid-template-columns: 62px 48px minmax(0, 1fr) 48px 62px;
+    grid-template-columns: 96px 44px minmax(0, 1fr) 44px 54px;
     min-height: 68px;
     padding-left: 10px;
     padding-right: 10px;
@@ -4641,7 +4641,7 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   min-height: 72px;
   max-height: 92px;
   display: grid;
-  grid-template-columns: 72px 56px minmax(0, 1fr) 56px 72px;
+  grid-template-columns: 112px 52px minmax(0, 1fr) 52px 64px;
   align-items: center;
   gap: 10px;
   padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 6px);
@@ -4667,6 +4667,67 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
 #actionsModal .actions-side-btn-left,
 #actionsModal .actions-side-btn-right {
   justify-self: center;
+}
+
+#actionsModal .actions-footer-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+#actionsModal .actions-mission-filter-btn {
+  position: static;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #63c9f5;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(42, 163, 218, 0.28);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+#actionsModal .actions-mission-filter-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+#actionsModal .actions-mission-filter-btn.is-filtering {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+
+.task-row.task-mission-entry .task-time {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  #actionsModal .actions-side-actions {
+    grid-template-columns: 92px 40px minmax(44px, 1fr) 40px 50px;
+    gap: 5px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  #actionsModal .actions-footer-primary {
+    gap: 7px;
+  }
+
+  #actionsModal .actions-mission-filter-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    font-size: 0.92rem;
+  }
 }
 
 #actionsModal .actions-footer-nav {

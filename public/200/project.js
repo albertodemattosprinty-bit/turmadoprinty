@@ -6,6 +6,12 @@ const optionsConfigKey = "project_200_options_v1";
 const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
 const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
+const missionActionsModes = ["show", "hide", "separate"];
+const missionActionsModeLabels = new Map([
+  ["show", "Mostrar"],
+  ["hide", "Não mostrar"],
+  ["separate", "Janela separada"]
+]);
 const taskBeepOptionLabels = new Map([
   [0, "Nenhum"],
   [3, "Três vezes"],
@@ -170,6 +176,9 @@ const actionsProgress = document.getElementById("actionsProgress");
 const actionsProgressLabel = document.getElementById("actionsProgressLabel");
 const actionsProgressMinutes = document.getElementById("actionsProgressMinutes");
 const actionsProgressFill = document.getElementById("actionsProgressFill");
+const actionsMissionFilterButton = document.getElementById("actionsMissionFilterButton");
+const actionsMissionRemainingCount = document.getElementById("actionsMissionRemainingCount");
+const actionsMissionListIcon = document.getElementById("actionsMissionListIcon");
 const financeDateLabel = document.getElementById("financeDateLabel");
 const platformEntriesList = document.getElementById("platformEntriesList");
 const financeEntryConfirmWizard = document.getElementById("financeEntryConfirmWizard");
@@ -308,6 +317,8 @@ const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
 const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption");
 const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
+const toggleMissionActionsOptionButton = document.getElementById("toggleMissionActionsOption");
+const toggleMissionActionsHint = document.getElementById("toggleMissionActionsHint");
 const toggleScreenLockOptionButton = document.getElementById("toggleScreenLockOption");
 const toggleScreenLockHint = document.getElementById("toggleScreenLockHint");
 const openProject200ExportModalButton = document.getElementById("openProject200ExportModal");
@@ -890,6 +901,8 @@ const state = {
     friends: []
   },
   missions: [],
+  actionMissions: [],
+  actionsMissionOnly: false,
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -950,6 +963,7 @@ const state = {
   wizard: buildInitialWizardState(),
   options: {
     showFreeTime: true,
+    missionActionsMode: "show",
     completionBeepCycles: 0,
     backgroundTheme: "edge",
     screenLockEnabled: false,
@@ -1613,6 +1627,100 @@ function buildActionTimelineEntries() {
     .filter((entry) => state.options.showFreeTime || entry.kind !== "free")
     .filter((entry) => getActionDurationMinutes(entry) > 0)
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+}
+
+function normalizeMissionActionsMode(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return missionActionsModes.includes(normalized) ? normalized : "show";
+}
+
+function buildPendingActionMissionUnits() {
+  if (state.activeOffset !== 0) return [];
+  const units = [];
+  (Array.isArray(state.actionMissions) ? state.actionMissions : []).forEach((goal) => {
+    const targetValue = Math.max(1, Math.trunc(Number(goal?.targetValue || 1) || 1));
+    const progressValue = Math.max(0, Math.trunc(Number(goal?.progressValue || 0) || 0));
+    const remainingValue = Math.max(0, targetValue - progressValue);
+    for (let index = 0; index < remainingValue; index += 1) {
+      units.push({ goal, unitIndex: progressValue + index + 1 });
+    }
+  });
+  return units;
+}
+
+function getActionMissionScheduleBounds() {
+  const scheduled = getVisibleActions()
+    .map((action) => ({
+      startMs: new Date(action?.startAt).getTime(),
+      endMs: new Date(action?.endAt).getTime()
+    }))
+    .filter((entry) => Number.isFinite(entry.startMs))
+    .sort((left, right) => left.startMs - right.startMs);
+  if (scheduled.length >= 2) {
+    const startMs = scheduled[0].startMs;
+    const last = scheduled[scheduled.length - 1];
+    const endMs = last.startMs > startMs
+      ? last.startMs
+      : (Number.isFinite(last.endMs) && last.endMs > startMs ? last.endMs : startMs + (60 * 60 * 1000));
+    return { startMs, endMs };
+  }
+  if (scheduled.length === 1) {
+    const startMs = scheduled[0].startMs;
+    const endMs = Number.isFinite(scheduled[0].endMs) && scheduled[0].endMs > startMs
+      ? scheduled[0].endMs
+      : startMs + (60 * 60 * 1000);
+    return { startMs, endMs };
+  }
+  const selectedDate = dateFromOffset(state.activeOffset);
+  const startMs = projectDateKeyToDate(getProjectDateKey(selectedDate), 8, 0).getTime();
+  return { startMs, endMs: projectDateKeyToDate(getProjectDateKey(selectedDate), 20, 0).getTime() };
+}
+
+function buildActionMissionTimelineEntries() {
+  const units = buildPendingActionMissionUnits();
+  if (!units.length) return [];
+  const { startMs, endMs } = getActionMissionScheduleBounds();
+  const rangeMs = Math.max(0, endMs - startMs);
+  return units.map(({ goal, unitIndex }, index) => {
+    const ratio = (index + 1) / (units.length + 1);
+    const scheduledMs = startMs + (rangeMs * ratio);
+    const durationSeconds = Math.max(1, getMissionUnitDurationSeconds(goal));
+    return {
+      kind: "mission",
+      id: `mission-${String(goal?.id || "")}-${unitIndex}`,
+      goalId: String(goal?.id || ""),
+      goal,
+      unitIndex,
+      status: actionStatuses.pending,
+      title: String(goal?.title || "Missão"),
+      startAt: new Date(scheduledMs).toISOString(),
+      endAt: new Date(scheduledMs + (durationSeconds * 1000)).toISOString()
+    };
+  });
+}
+
+function formatActionMissionDuration(goal) {
+  const seconds = getMissionUnitDurationSeconds(goal);
+  return seconds === 60 ? "1 minuto" : `${seconds} segundos`;
+}
+
+function renderActionsMissionFilter() {
+  if (!actionsMissionFilterButton) return;
+  const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  const isAvailable = Boolean(getToken()) && state.activeOffset === 0 && mode !== "hide";
+  const remainingCount = buildPendingActionMissionUnits().length;
+  actionsMissionFilterButton.hidden = !isAvailable;
+  actionsMissionFilterButton.classList.toggle("is-filtering", state.actionsMissionOnly);
+  actionsMissionFilterButton.setAttribute("aria-label", state.actionsMissionOnly
+    ? "Voltar para a lista de ações"
+    : `Mostrar somente missões: ${remainingCount} restantes`);
+  if (actionsMissionRemainingCount) {
+    actionsMissionRemainingCount.hidden = state.actionsMissionOnly;
+    actionsMissionRemainingCount.textContent = String(remainingCount);
+  }
+  if (actionsMissionListIcon) {
+    actionsMissionListIcon.hidden = !state.actionsMissionOnly;
+  }
 }
 
 function getRunningActionProgressState(action) {
@@ -4316,7 +4424,9 @@ function openModal(id) {
     const runningAction = getRunningActionForSelectedProfile();
     const latestDone = getLatestCompletedActionForSelectedProfile();
     pendingActionsAnchorId = runningAction?.id || latestDone?.id || "";
+    state.actionsMissionOnly = false;
     void loadActions();
+    void loadActionMissions();
     window.setTimeout(() => {
       anchorToCurrentActionOnce();
     }, 1000);
@@ -4815,6 +4925,7 @@ function renderDateHeader() {
 function renderActions() {
   actionsList.innerHTML = "";
   actionsAuthAlert.hidden = Boolean(getToken());
+  renderActionsMissionFilter();
 
   if (!getToken()) {
     actionsProgress.hidden = true;
@@ -4822,15 +4933,46 @@ function renderActions() {
     return;
   }
 
-  const timelineEntries = buildActionTimelineEntries();
+  const missionMode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  const missionEntries = buildActionMissionTimelineEntries();
+  const actionEntries = buildActionTimelineEntries();
+  const timelineEntries = (state.actionsMissionOnly
+    ? missionEntries
+    : missionMode === "show" ? [...actionEntries, ...missionEntries] : actionEntries)
+    .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
 
   if (!timelineEntries.length) {
-    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse dia.</div>';
+    actionsList.innerHTML = state.actionsMissionOnly
+      ? '<div class="empty-state">Todas as missões do dia foram concluídas.</div>'
+      : '<div class="empty-state">Sem tarefas nesse dia.</div>';
   }
 
   timelineEntries.forEach((action) => {
     const slotOwner = state.selectedProfile;
     const slotAvatar = getActionAvatarPath(slotOwner);
+    if (action.kind === "mission") {
+      const delayMinutes = getPendingDelayMinutes(action);
+      const cleanPendingClass = delayMinutes <= 0 ? " task-pending-clean" : "";
+      const row = document.createElement("article");
+      row.className = `task-row task-mission-entry${getDelayClassByMinutes(delayMinutes)}${cleanPendingClass}`;
+      if (delayMinutes > 0 && delayMinutes <= 15) {
+        row.style.setProperty("--delay-soft-rgb", getDelaySoftRgbByMinutes(delayMinutes));
+      }
+      row.dataset.actionMissionGoalId = String(action.goalId || "");
+      row.setAttribute("role", "button");
+      row.tabIndex = 0;
+      const missionIcon = getMissionDisplayIcon(action.goal);
+      row.innerHTML = `
+        ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: true })}
+        <div class="task-main">
+          <div class="task-title">${buildActionTitleMarkup(action.title, getActionThemeDotColor(action, { delayMinutes }), false)}</div>
+          <div class="task-assignee task-duration">${escapeHtml(formatActionMissionDuration(action.goal))}</div>
+        </div>
+        <div class="task-time" aria-hidden="true"></div>
+      `;
+      actionsList.appendChild(row);
+      return;
+    }
     if (action.kind === "free") {
       const duration = getActionDurationMinutes(action);
       const ended = getServerNowMs() >= new Date(action.endAt).getTime();
@@ -5143,7 +5285,9 @@ async function toggleActionStatus(actionId, options = {}) {
 
 function moveActiveDate(amount) {
   state.activeOffset += amount;
+  state.actionsMissionOnly = false;
   void loadActions();
+  void loadActionMissions();
 }
 
 function openWizard(action = null, options = {}) {
@@ -8542,6 +8686,26 @@ async function loadMissions() {
   }
 }
 
+async function loadActionMissions() {
+  if (!getToken() || state.activeOffset !== 0) {
+    state.actionMissions = [];
+    renderActionsMissionFilter();
+    return;
+  }
+  const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+  try {
+    const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=today`, { skipGlobalLoading: true });
+    state.actionMissions = Array.isArray(payload?.goals) ? payload.goals : [];
+  } catch {
+    state.actionMissions = [];
+  }
+  if (actionsModal?.classList.contains("active")) {
+    renderActions();
+  } else {
+    renderActionsMissionFilter();
+  }
+}
+
 function buildDefaultMissionQuickSlots() {
   return missionQuickDefinitions.map((definition) => ({
     key: definition.key,
@@ -10021,9 +10185,18 @@ function restoreRunningPlayerAfterMission() {
   runningContent?.appendChild(runningMiniPlayer);
 }
 
+function getMissionRunGoalById(goalId) {
+  const normalizedGoalId = String(goalId || "").trim();
+  if (!normalizedGoalId) return null;
+  return [
+    ...(Array.isArray(state.actionMissions) ? state.actionMissions : []),
+    ...(Array.isArray(state.missions) ? state.missions : [])
+  ].find((item) => String(item?.id || "") === normalizedGoalId) || null;
+}
+
 function renderMissionRunState() {
   const goalId = String(state.missionRun?.goalId || "").trim();
-  const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId) || null;
+  const goal = getMissionRunGoalById(goalId);
   if (!goal) {
     return;
   }
@@ -10060,7 +10233,7 @@ function renderMissionRunState() {
 }
 
 function openMissionRunModal(goalId) {
-  const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === String(goalId || ""));
+  const goal = getMissionRunGoalById(goalId);
   if (!goal) {
     return;
   }
@@ -10113,11 +10286,12 @@ async function finalizeMissionRun({ restart = false } = {}) {
     });
     stopMissionRunAlarm();
     playMissionProgressSound();
-    await loadMissions();
+    await Promise.all([loadMissions(), loadActionMissions()]);
     renderMissions();
+    renderActions();
     renderRunningMissionQuickButtons();
     if (restart) {
-      const refreshedGoal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId) || null;
+      const refreshedGoal = getMissionRunGoalById(goalId);
       state.missionRun.goalId = goalId;
       state.missionRun.startedAtMs = Date.now();
       state.missionRun.durationMs = refreshedGoal
@@ -10893,6 +11067,7 @@ function loadOptionsConfig() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(optionsConfigKey) || "{}");
     state.options.showFreeTime = parsed.showFreeTime !== false;
+    state.options.missionActionsMode = normalizeMissionActionsMode(parsed.missionActionsMode);
     state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
       ? Number(parsed.completionBeepCycles)
       : 0;
@@ -10901,6 +11076,7 @@ function loadOptionsConfig() {
     state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
   } catch {
     state.options.showFreeTime = true;
+    state.options.missionActionsMode = "show";
     state.options.completionBeepCycles = 0;
     state.options.backgroundTheme = "edge";
     state.options.screenLockEnabled = false;
@@ -10913,6 +11089,7 @@ function saveOptionsConfig() {
   try {
     window.localStorage.setItem(optionsConfigKey, JSON.stringify({
       showFreeTime: Boolean(state.options.showFreeTime),
+      missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
       completionBeepCycles: Number(state.options.completionBeepCycles || 0),
       backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
       screenLockEnabled: Boolean(state.options.screenLockEnabled),
@@ -11033,6 +11210,11 @@ function renderOptionsModal() {
     toggleFreeTimeHint.textContent = state.options.showFreeTime ? "Mostrando" : "Ocultando";
   }
   toggleFreeTimeOptionButton?.classList.toggle("is-off", !state.options.showFreeTime);
+  const missionActionsMode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  if (toggleMissionActionsHint) {
+    toggleMissionActionsHint.textContent = missionActionsModeLabels.get(missionActionsMode) || "Mostrar";
+  }
+  toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode === "hide");
   if (toggleTaskBeepHint) {
     toggleTaskBeepHint.textContent = taskBeepOptionLabels.get(Number(state.options.completionBeepCycles || 0)) || "Nenhum";
   }
@@ -11510,6 +11692,11 @@ actionsList.addEventListener("pointerleave", endActionLongPress);
 actionsList.addEventListener("pointercancel", endActionLongPress);
 
 actionsList.addEventListener("click", async (event) => {
+  const missionRow = event.target.closest("[data-action-mission-goal-id]");
+  if (missionRow) {
+    openMissionRunModal(String(missionRow.dataset.actionMissionGoalId || ""));
+    return;
+  }
   const row = event.target.closest("[data-action-id]");
   if (!row) {
     return;
@@ -11601,6 +11788,13 @@ platformEntriesList?.addEventListener("click", async (event) => {
 
 actionsList.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+
+  const missionRow = event.target.closest("[data-action-mission-goal-id]");
+  if (missionRow) {
+    event.preventDefault();
+    openMissionRunModal(String(missionRow.dataset.actionMissionGoalId || ""));
     return;
   }
 
@@ -12591,6 +12785,12 @@ runningMusicDefaultExecuteButton?.addEventListener("click", () => {
 runningMusicListDefaultButton?.addEventListener("click", () => {
   void saveRunningTaskDefault("track");
 });
+actionsMissionFilterButton?.addEventListener("click", () => {
+  if (normalizeMissionActionsMode(state.options.missionActionsMode) === "hide") return;
+  state.actionsMissionOnly = !state.actionsMissionOnly;
+  renderActions();
+  window.requestAnimationFrame(() => actionsList?.scrollTo({ top: 0, behavior: "smooth" }));
+});
 toggleFreeTimeOptionButton?.addEventListener("click", () => {
   state.options.showFreeTime = !state.options.showFreeTime;
   saveOptionsConfig();
@@ -12716,6 +12916,17 @@ logoutProject200Button?.addEventListener("click", () => {
   clearProject200SessionState();
   closeModal("optionsModal");
   redirectToProject200Login();
+});
+toggleMissionActionsOptionButton?.addEventListener("click", () => {
+  const currentMode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  const currentIndex = Math.max(0, missionActionsModes.indexOf(currentMode));
+  state.options.missionActionsMode = missionActionsModes[(currentIndex + 1) % missionActionsModes.length];
+  if (state.options.missionActionsMode === "hide") {
+    state.actionsMissionOnly = false;
+  }
+  saveOptionsConfig();
+  renderOptionsModal();
+  renderActions();
 });
 homeRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();
