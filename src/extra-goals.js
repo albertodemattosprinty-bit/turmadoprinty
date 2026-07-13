@@ -3,6 +3,7 @@ import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME }
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
 const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
+const EXTRA_GOAL_MAX_CYCLES = 12;
 export const EXTRA_GOAL_HISTORY_SCOPES = [
   { key: "today", label: "Hoje", days: 1 },
   { key: "last7", label: "Ultimos 7 dias", days: 7 },
@@ -635,7 +636,7 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   const safeVariantIds = [...new Set([
     ...(Array.isArray(variantIds) ? variantIds : []),
     variantId
-  ].map((value) => String(value || "").trim()).filter(Boolean))].slice(0, 5);
+  ].map((value) => String(value || "").trim()).filter(Boolean))].slice(0, EXTRA_GOAL_MAX_CYCLES);
   if (safeDelta > 0 && safeVariantIds.length) {
     await query(`
       update extra_goal_variants set last_completed_at = now(), updated_at = now()

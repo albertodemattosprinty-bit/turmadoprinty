@@ -422,6 +422,8 @@ const missionRunTitle = document.getElementById("missionRunTitle");
 const missionRunTitleIcon = document.getElementById("missionRunTitleIcon");
 const missionRunRingFill = document.getElementById("missionRunRingFill");
 const missionRunClock = document.getElementById("missionRunClock");
+const missionRunCycleSpotlight = document.getElementById("missionRunCycleSpotlight");
+const missionRunCycleSpotlightValue = document.getElementById("missionRunCycleSpotlightValue");
 const missionRunModePercentBtn = document.getElementById("missionRunModePercentBtn");
 const missionRunModeTimeBtn = document.getElementById("missionRunModeTimeBtn");
 const missionRunCycleCount = document.getElementById("missionRunCycleCount");
@@ -815,6 +817,9 @@ const RUNNING_RING_FULL_OFFSET = -0.8;
 const RUNNING_COMPLETION_ANIMATION_MS = 1200;
 const RUNNING_COMPLETION_HOLD_MS = 1000;
 const RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS = 2000;
+const MISSION_RUN_MUSIC_FADE_OUT_MS = 2000;
+const MISSION_RUN_MAX_CYCLES = 12;
+const MISSION_RUN_CUE_PRIORITY_RADIUS_SECONDS = 15;
 const SLEEP_FREQUENCY_STATION_NAME = "Frequency";
 const SLEEP_FREQUENCY_FADE_MS = 15 * 60 * 1000;
 const SLEEP_DIRECT_TRACK_URL = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/trilhas/videoplayback%20(3).m4a";
@@ -877,12 +882,19 @@ let missionVariantsTicker = null;
 let missionRunCueAudio = null;
 let missionRunCycleAudio = null;
 let missionRunCycleAudioQueue = Promise.resolve();
+let missionRunMusicFadeTimer = null;
+let missionRunMusicFadeToken = 0;
+let missionRunMusicFadeRestoreVolume = null;
 let missionRunVariantSelectionTimer = null;
 let missionRunCycleSwipeStartX = null;
 const missionVariantsCache = new Map();
 const missionRunAlarmNodes = new Set();
 const missionRunCueMap = new Map([[180, "3-min.mp3"], [120, "2-min.mp3"], [60, "1-min.mp3"], [30, "30-sec.mp3"], [15, "15-sec.mp3"]]);
-const missionRunCycleCueMap = new Map([[2, "2.mp3"], [3, "3.mp3"], [4, "4.mp3"], [5, "5.mp3"]]);
+const missionRunCycleCueMap = new Map([
+  [2, "2.mp3"], [3, "3.mp3"], [4, "4.mp3"], [5, "5.mp3"],
+  [6, "6.mp3"], [7, "7.mp3"], [8, "8.mp3"], [9, "9.mp3"],
+  [10, "10.mp3"], [11, "11.mp3"], [12, "12.mp3"]
+]);
 let sleepFrequencyMonitorTicker = null;
 let sleepFrequencyFadeToken = 0;
 let sleepMusicHoldTimer = null;
@@ -1002,6 +1014,7 @@ const state = {
     editingId: "",
     cycleSelectionTarget: 1,
     cycleSelections: [],
+    cycleSelectionResumeMode: "preserve",
     intervalValue: 1,
     intervalUnit: "days"
   },
@@ -3514,6 +3527,7 @@ async function playRunningTrack(trackUrl = "") {
   const targetUrl = String(trackUrl || orderedUrls[state.runningPlayer.playOrderIndex] || orderedUrls[0] || "").trim();
   const track = station?.tracks?.find((item) => String(item?.url || "").trim() === targetUrl) || null;
   if (!runningAudio || !track?.url) return;
+  cancelMissionRunMusicFade();
 
   const nextIndex = orderedUrls.findIndex((url) => url === targetUrl);
   if (nextIndex >= 0) {
@@ -3540,6 +3554,7 @@ async function toggleRunningPlayPause() {
   }
   if (runningAudio.paused) {
     try {
+      cancelMissionRunMusicFade();
       ensureRunningAudioLoopState();
       await runningAudio.play();
       state.runningPlayer.isPlaying = true;
@@ -4610,6 +4625,7 @@ function closeModal(modal) {
   if (!modal) {
     return;
   }
+  const wasActive = modal.classList.contains("active");
   modal.classList.remove("active");
   modal.setAttribute("aria-hidden", "true");
   if (modal.id === "actionWizard") {
@@ -4676,6 +4692,9 @@ function closeModal(modal) {
     }
   }
   if (modal.id === "missionRunModal") {
+    if (wasActive) {
+      fadeOutRunningMusicAfterMissionClose();
+    }
     stopMissionRunTicker();
     stopMissionRunAlarm();
     stopMissionRunCueAudio();
@@ -10582,38 +10601,17 @@ function stopMissionRunCycleAudio() {
   missionRunCycleAudio = null;
 }
 
-function waitForMissionRunTimeCue() {
-  const activeAudio = missionRunCueAudio;
-  if (!activeAudio || activeAudio.paused || activeAudio.ended) {
-    return Promise.resolve();
-  }
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      activeAudio.removeEventListener("ended", finish);
-      activeAudio.removeEventListener("error", finish);
-      resolve();
-    };
-    const timeoutId = window.setTimeout(finish, 15000);
-    activeAudio.addEventListener("ended", finish, { once: true });
-    activeAudio.addEventListener("error", finish, { once: true });
-  });
-}
-
 function playMissionRunCycleCue(cycleNumber) {
-  const safeCycleNumber = Math.max(2, Math.min(5, Math.trunc(Number(cycleNumber || 0) || 0)));
+  const safeCycleNumber = Math.max(2, Math.min(MISSION_RUN_MAX_CYCLES, Math.trunc(Number(cycleNumber || 0) || 0)));
   const fileName = missionRunCycleCueMap.get(safeCycleNumber);
   if (!fileName) return;
   missionRunCycleAudioQueue = missionRunCycleAudioQueue
     .catch(() => {})
     .then(async () => {
-      await waitForMissionRunTimeCue();
       if (!isMissionRunModalOpen() || Number(state.missionRun?.cycleIndex || 1) !== safeCycleNumber) {
         return;
       }
+      stopMissionRunCueAudio();
       stopMissionRunCycleAudio();
       const audio = new Audio(`/200/mission-cycles/${fileName}`);
       missionRunCycleAudio = audio;
@@ -10640,17 +10638,11 @@ function playMissionRunCycleCue(cycleNumber) {
 function playMissionRunRemainingCue(seconds) {
   const fileName = missionRunCueMap.get(seconds);
   if (!fileName || !isMissionRunModalOpen()) return;
-  const interruptedCycle = missionRunCycleAudio && !missionRunCycleAudio.paused
-    ? Math.max(2, Number(state.missionRun?.cycleIndex || 0))
-    : 0;
-  stopMissionRunCycleAudio();
+  if (missionRunCycleAudio && !missionRunCycleAudio.paused && !missionRunCycleAudio.ended) return;
   stopMissionRunCueAudio();
   missionRunCueAudio = new Audio(`/200/mission-cues/${fileName}`);
   missionRunCueAudio.volume = 1;
   missionRunCueAudio.play().catch(() => {});
-  if (interruptedCycle) {
-    playMissionRunCycleCue(interruptedCycle);
-  }
 }
 
 async function playMissionRunAlarmBurst() {
@@ -10709,6 +10701,58 @@ function mountRunningPlayerForMission() {
   renderRunningMusicPlayer();
 }
 
+function cancelMissionRunMusicFade({ restoreVolume = true } = {}) {
+  missionRunMusicFadeToken += 1;
+  if (missionRunMusicFadeTimer) {
+    window.clearInterval(missionRunMusicFadeTimer);
+    missionRunMusicFadeTimer = null;
+  }
+  if (restoreVolume && runningAudio && missionRunMusicFadeRestoreVolume !== null) {
+    runningAudio.volume = Math.max(0, Math.min(1, missionRunMusicFadeRestoreVolume));
+  }
+  missionRunMusicFadeRestoreVolume = null;
+}
+
+function fadeOutRunningMusicAfterMissionClose() {
+  cancelMissionRunMusicFade();
+  if (!runningAudio || runningAudio.paused || runningAudio.ended) return;
+
+  const audio = runningAudio;
+  const fadeToken = missionRunMusicFadeToken;
+  const startVolume = Math.max(0, Math.min(1, Number(audio.volume ?? 1)));
+  const startedAt = Date.now();
+  missionRunMusicFadeRestoreVolume = startVolume;
+
+  if (startVolume <= 0.001) {
+    audio.pause();
+    state.runningPlayer.isPlaying = false;
+    missionRunMusicFadeRestoreVolume = null;
+    renderRunningMusicPlayer();
+    return;
+  }
+
+  const timer = window.setInterval(() => {
+    if (fadeToken !== missionRunMusicFadeToken) {
+      window.clearInterval(timer);
+      if (missionRunMusicFadeTimer === timer) missionRunMusicFadeTimer = null;
+      return;
+    }
+
+    const ratio = Math.max(0, Math.min(1, (Date.now() - startedAt) / MISSION_RUN_MUSIC_FADE_OUT_MS));
+    audio.volume = Math.max(0, startVolume * (1 - ratio));
+    if (ratio < 1) return;
+
+    window.clearInterval(timer);
+    if (missionRunMusicFadeTimer === timer) missionRunMusicFadeTimer = null;
+    audio.pause();
+    audio.volume = startVolume;
+    missionRunMusicFadeRestoreVolume = null;
+    state.runningPlayer.isPlaying = false;
+    renderRunningMusicPlayer();
+  }, 40);
+  missionRunMusicFadeTimer = timer;
+}
+
 function restoreRunningPlayerAfterMission() {
   if (!runningMiniPlayer || runningMiniPlayer.parentElement !== missionRunPlayerSlot) return;
   const runningContent = document.querySelector("#runningTaskModal .running-task-content");
@@ -10724,7 +10768,7 @@ function setMissionRunLoading(isLoading) {
 }
 
 function normalizeMissionRunCycleTarget(value) {
-  return Math.max(1, Math.min(5, Math.trunc(Number(value || 1) || 1)));
+  return Math.max(1, Math.min(MISSION_RUN_MAX_CYCLES, Math.trunc(Number(value || 1) || 1)));
 }
 
 function renderMissionRunCycleCount() {
@@ -10734,6 +10778,13 @@ function renderMissionRunCycleCount() {
     missionRunCycleCount.textContent = `${target}X`;
     missionRunCycleCount.setAttribute("aria-label", `Quantidade de ciclos: ${target}. Ciclo atual: ${current}. Deslize para alterar`);
   }
+  if (missionRunCycleSpotlightValue) {
+    missionRunCycleSpotlightValue.textContent = String(current);
+  }
+  if (missionRunCycleSpotlight) {
+    missionRunCycleSpotlight.hidden = target < 2;
+  }
+  missionRunClock?.classList.toggle("has-cycle-spotlight", target >= 2);
 }
 
 function getMissionRunVariantIdForCycle(cycleNumber = state.missionRun?.cycleIndex) {
@@ -10792,7 +10843,7 @@ function completeMissionRunCycle() {
   if (missionRunFinishChoice) missionRunFinishChoice.hidden = false;
 }
 
-function scheduleMissionRunVariantCycleSelection({ preserveCompleted = false } = {}) {
+function scheduleMissionRunVariantCycleSelection({ preserveCompleted = false, resumeMode = "preserve" } = {}) {
   if (missionRunVariantSelectionTimer) {
     window.clearTimeout(missionRunVariantSelectionTimer);
     missionRunVariantSelectionTimer = null;
@@ -10806,29 +10857,40 @@ function scheduleMissionRunVariantCycleSelection({ preserveCompleted = false } =
       items: variants,
       cycleTarget,
       initialSelections: preserveCompleted
-        ? (state.missionRun.selectedVariantIds || []).slice(0, Math.max(0, Number(state.missionRun.completedCycles || 0)))
-        : []
+        ? (state.missionRun.selectedVariantIds || []).slice(0, cycleTarget)
+        : [],
+      resumeMode
     });
   }, 1000);
 }
 
 function setMissionRunCycleTarget(value) {
   if (!state.missionRun?.goalId || state.missionRun.finalizing) return;
-  const nextTarget = normalizeMissionRunCycleTarget(value);
+  const previousTarget = normalizeMissionRunCycleTarget(state.missionRun.cycleTarget);
+  const currentCycle = normalizeMissionRunCycleTarget(state.missionRun.cycleIndex);
+  const nextTarget = Math.max(currentCycle, normalizeMissionRunCycleTarget(value));
+  if (nextTarget === previousTarget) {
+    renderMissionRunCycleCount();
+    return;
+  }
   state.missionRun.cycleTarget = nextTarget;
-  state.missionRun.cycleIndex = 1;
-  state.missionRun.completedCycles = 0;
-  const firstVariantId = String(state.missionRun.selectedVariantIds?.[0] || state.missionRun.selectedVariantId || "").trim();
-  state.missionRun.selectedVariantIds = firstVariantId ? [firstVariantId] : [];
-  resetMissionRunCycleTimer(1);
-  scheduleMissionRunVariantCycleSelection();
+  if (nextTarget < previousTarget) {
+    state.missionRun.selectedVariantIds = (state.missionRun.selectedVariantIds || []).slice(0, nextTarget);
+  }
+  if (nextTarget > previousTarget
+    && Array.isArray(state.missionRun.availableVariants)
+    && state.missionRun.availableVariants.length >= 2
+    && (state.missionRun.selectedVariantIds || []).length < nextTarget) {
+    scheduleMissionRunVariantCycleSelection({ preserveCompleted: true, resumeMode: "preserve" });
+  }
+  renderMissionRunState();
 }
 
 function restartMissionRunLocally() {
   if (state.missionRun.finalizing) return;
   const completed = Math.max(1, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1));
-  if (completed >= 5) {
-    if (missionRunStatus) missionRunStatus.textContent = "O máximo é de 5 ciclos. Toque em Finalizar para receber os pontos.";
+  if (completed >= MISSION_RUN_MAX_CYCLES) {
+    if (missionRunStatus) missionRunStatus.textContent = `O máximo é de ${MISSION_RUN_MAX_CYCLES} ciclos. Toque em Finalizar para receber os pontos.`;
     return;
   }
   state.missionRun.completedCycles = completed;
@@ -10837,7 +10899,7 @@ function restartMissionRunLocally() {
   if (Array.isArray(state.missionRun.availableVariants) && state.missionRun.availableVariants.length >= 2
     && !state.missionRun.selectedVariantIds[completed]) {
     if (missionRunFinishChoice) missionRunFinishChoice.hidden = true;
-    scheduleMissionRunVariantCycleSelection({ preserveCompleted: true });
+    scheduleMissionRunVariantCycleSelection({ preserveCompleted: true, resumeMode: "advance" });
     return;
   }
   advanceMissionRunCycle();
@@ -10850,6 +10912,16 @@ function getMissionRunGoalById(goalId) {
     ...(Array.isArray(state.actionMissions) ? state.actionMissions : []),
     ...(Array.isArray(state.missions) ? state.missions : [])
   ].find((item) => String(item?.id || "") === normalizedGoalId) || null;
+}
+
+function shouldSuppressMissionRunTimeCueNearCycle(cueSeconds, totalSeconds) {
+  const currentCycle = normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex);
+  const targetCycles = normalizeMissionRunCycleTarget(state.missionRun?.cycleTarget);
+  const nearPreviousCycleStart = currentCycle > 1
+    && Math.abs(Number(totalSeconds || 0) - Number(cueSeconds || 0)) <= MISSION_RUN_CUE_PRIORITY_RADIUS_SECONDS;
+  const nearNextCycleStart = currentCycle < targetCycles
+    && Number(cueSeconds || 0) <= MISSION_RUN_CUE_PRIORITY_RADIUS_SECONDS;
+  return nearPreviousCycleStart || nearNextCycleStart;
 }
 
 function renderMissionRunState() {
@@ -10891,6 +10963,9 @@ function renderMissionRunState() {
   for (const cueSeconds of missionRunCueMap.keys()) {
     if (totalSeconds >= cueSeconds && remainingSeconds <= cueSeconds && !announced.has(cueSeconds) && isMissionRunModalOpen()) {
       announced.add(cueSeconds);
+      if (shouldSuppressMissionRunTimeCueNearCycle(cueSeconds, totalSeconds)) {
+        continue;
+      }
       playMissionRunRemainingCue(cueSeconds);
       break;
     }
@@ -10988,7 +11063,8 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
     editorOpen: false,
     editingId: "",
     cycleSelectionTarget: normalizeMissionRunCycleTarget(options?.cycleTarget || 1),
-    cycleSelections: Array.isArray(options?.initialSelections) ? options.initialSelections.slice(0, 5) : [],
+    cycleSelections: Array.isArray(options?.initialSelections) ? options.initialSelections.slice(0, MISSION_RUN_MAX_CYCLES) : [],
+    cycleSelectionResumeMode: options?.resumeMode === "advance" ? "advance" : "preserve",
     intervalValue: 1,
     intervalUnit: "days"
   };
@@ -11007,6 +11083,7 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
 
 function beginMissionRun(goal, selectedVariant = null) {
   if (!goal) return;
+  cancelMissionRunMusicFade();
   state.missionRun.goalId = String(goal.id || "");
   state.missionRun.startedAtMs = Date.now();
   state.missionRun.durationMs = Math.max(0, getMissionUnitDurationSeconds(goal) * 1000);
@@ -11037,7 +11114,11 @@ function beginMissionRun(goal, selectedVariant = null) {
   }
   renderMissionRunState();
   mountRunningPlayerForMission();
-  void loadRunningMusicStations().then(() => autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "Missão") }));
+  const missionGoalId = String(goal.id || "");
+  void loadRunningMusicStations().then(() => {
+    if (!isMissionRunModalOpen() || String(state.missionRun.goalId || "") !== missionGoalId) return;
+    return autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "Missão") });
+  });
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
   openModal("missionRunModal");
@@ -11072,7 +11153,7 @@ async function finalizeMissionRun() {
   if (!goalId || state.missionRun.finalizing) {
     return;
   }
-  const completedCycles = Math.max(1, Math.min(5, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1)));
+  const completedCycles = Math.max(1, Math.min(MISSION_RUN_MAX_CYCLES, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1)));
   const preloadedDailyRanking = state.missionRun.preloadedDailyRanking;
   state.missionRun.finalizing = true;
   if (missionRunFinishButton) missionRunFinishButton.disabled = true;
@@ -13281,7 +13362,7 @@ missionRunCycleCount?.addEventListener("pointerup", (event) => {
     setMissionRunCycleTarget(deltaX < 0 ? current + 1 : current - 1);
     return;
   }
-  setMissionRunCycleTarget(current >= 5 ? 1 : current + 1);
+  setMissionRunCycleTarget(current >= MISSION_RUN_MAX_CYCLES ? 1 : current + 1);
 });
 missionRunCycleCount?.addEventListener("pointercancel", () => {
   missionRunCycleSwipeStartX = null;
@@ -13381,17 +13462,21 @@ missionVariantsList?.addEventListener("click", async (event) => {
     state.missionVariants.cycleSelections = [...(state.missionVariants.cycleSelections || []), id];
     const target = normalizeMissionRunCycleTarget(state.missionVariants.cycleSelectionTarget);
     if (state.missionVariants.cycleSelections.length >= target) {
-      const completedBeforeSelection = Math.max(0, Math.min(4, Math.trunc(Number(state.missionRun.completedCycles || 0) || 0)));
+      const resumeMode = state.missionVariants.cycleSelectionResumeMode === "advance" ? "advance" : "preserve";
+      const completedBeforeSelection = Math.max(0, Math.min(MISSION_RUN_MAX_CYCLES - 1, Math.trunc(Number(state.missionRun.completedCycles || 0) || 0)));
       state.missionRun.selectedVariantIds = state.missionVariants.cycleSelections.slice(0, target);
-      state.missionRun.selectedVariantId = String(state.missionRun.selectedVariantIds[0] || "");
+      state.missionRun.selectedVariantId = getMissionRunVariantIdForCycle(state.missionRun.cycleIndex);
       closeModal("missionVariantsModal");
-      if (completedBeforeSelection > 0) {
+      if (resumeMode === "advance" && completedBeforeSelection > 0) {
         state.missionRun.cycleIndex = completedBeforeSelection;
         state.missionRun.completedCycles = completedBeforeSelection;
         advanceMissionRunCycle();
-      } else {
+      } else if (resumeMode === "advance") {
         state.missionRun.completedCycles = 0;
         resetMissionRunCycleTimer(1);
+      } else {
+        renderMissionRunCycleCount();
+        renderMissionRunState();
       }
       return;
     }

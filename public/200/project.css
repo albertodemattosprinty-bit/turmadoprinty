@@ -6530,6 +6530,7 @@ body[data-background-theme="white"] .social-scope-chip.active {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
   position: relative;
+  isolation: isolate;
   transition: opacity 180ms ease;
 }
 
@@ -6712,6 +6713,53 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
   pointer-events: none;
 }
 
+.history-mission-run-clock.has-cycle-spotlight {
+  animation: mission-run-center-progress 4s linear 4s infinite;
+}
+
+.mission-run-cycle-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #fff;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mission-run-cycle-spotlight:not([hidden]) {
+  display: flex;
+  animation: mission-run-center-cycle 4s linear 4s infinite;
+}
+
+.mission-run-cycle-spotlight strong {
+  font-size: clamp(5.85rem, 15.6vw, 8.19rem);
+  font-weight: 700;
+  line-height: 0.78;
+}
+
+.mission-run-cycle-spotlight small {
+  margin-top: clamp(12px, 2vw, 18px);
+  font-size: clamp(0.82rem, 2.8vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: lowercase;
+}
+
+@keyframes mission-run-center-progress {
+  0%, 24.999% { opacity: 0; visibility: hidden; }
+  25%, 100% { opacity: 1; visibility: visible; }
+}
+
+@keyframes mission-run-center-cycle {
+  0%, 24.999% { opacity: 1; visibility: visible; }
+  25%, 100% { opacity: 0; visibility: hidden; }
+}
+
 .history-mission-run-ring {
   width: 100%;
   height: 100%;
@@ -6798,6 +6846,7 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
 .history-mission-run-confirm {
   position: absolute;
   inset: 0;
+  z-index: 50;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(14px);
   display: grid;
