@@ -53,7 +53,7 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
-import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
+import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession } from "./src/project200-sleep.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
@@ -65,7 +65,7 @@ import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject
 import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, ensureExtraGoalsSchema, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
-import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, rejectProject200FriendInvite } from "./src/project200-friends.js";
+import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints } from "./src/project200-friends.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3497,6 +3497,41 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
       error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."
     });
   }
+}
+
+async function syncProject200ActionPoints(userId, beforeAction, afterAction, { restore = false } = {}) {
+  const beforeStatus = String(beforeAction?.status || "PENDING").trim().toUpperCase();
+  const afterStatus = String(afterAction?.status || "PENDING").trim().toUpperCase();
+  const actionId = String(afterAction?.id || beforeAction?.id || "").trim();
+  if (!actionId) {
+    return { pointsAwarded: 0, pointsUpdate: null };
+  }
+  if (restore || (beforeStatus === "COMPLETED" && afterStatus !== "COMPLETED")) {
+    await removeProject200ActionPoints(userId, actionId);
+    return { pointsAwarded: 0, pointsUpdate: null };
+  }
+  if (beforeStatus === "COMPLETED" || afterStatus !== "COMPLETED") {
+    return { pointsAwarded: 0, pointsUpdate: null };
+  }
+
+  let dailyRankingBefore = null;
+  try {
+    dailyRankingBefore = await getProject200FriendsSnapshot(userId, "today");
+  } catch {}
+  const award = await recordProject200ActionPoints(userId, afterAction, afterAction?.completedAt || new Date());
+  if (!award?.created || Number(award?.points || 0) <= 0) {
+    return { pointsAwarded: 0, pointsUpdate: null };
+  }
+  let dailyRankingAfter = null;
+  try {
+    dailyRankingAfter = await getProject200FriendsSnapshot(userId, "today");
+  } catch {}
+  return {
+    pointsAwarded: Math.max(0, Math.trunc(Number(award.points || 0) || 0)),
+    pointsUpdate: dailyRankingBefore && dailyRankingAfter
+      ? { before: dailyRankingBefore, after: dailyRankingAfter }
+      : null
+  };
 }
 
 async function handleExtraGoalUpdateRequest(request, response, goalId) {
@@ -12105,11 +12140,15 @@ const server = http.createServer(async (request, response) => {
       }
 
       const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)\/status$/, "$1"));
+      const beforeAction = await getUserActionById(user.id, actionId);
       const action = await updateUserActionStatus(user.id, actionId);
+      const pointsResult = await syncProject200ActionPoints(user.id, beforeAction, action);
 
       sendJson(response, action ? 200 : 404, {
         ok: Boolean(action),
-        action
+        action,
+        pointsAwarded: pointsResult.pointsAwarded,
+        pointsUpdate: pointsResult.pointsUpdate
       });
     } catch (error) {
       sendJson(response, 400, {
@@ -12129,11 +12168,17 @@ const server = http.createServer(async (request, response) => {
 
       const actionId = decodeURIComponent(pathname.replace(/^\/api\/actions\/([^/]+)\/status\/manual$/, "$1"));
       const body = await readJsonBody(request);
+      const beforeAction = await getUserActionById(user.id, actionId);
       const action = await updateUserActionStatusManual(user.id, actionId, body);
+      const pointsResult = await syncProject200ActionPoints(user.id, beforeAction, action, {
+        restore: String(body?.mode || "").trim().toLowerCase() === "restore"
+      });
 
       sendJson(response, 200, {
         ok: true,
-        action
+        action,
+        pointsAwarded: pointsResult.pointsAwarded,
+        pointsUpdate: pointsResult.pointsUpdate
       });
     } catch (error) {
       sendJson(response, 400, {

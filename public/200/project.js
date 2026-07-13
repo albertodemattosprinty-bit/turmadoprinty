@@ -5400,6 +5400,10 @@ async function toggleActionStatus(actionId, options = {}) {
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
       delete state.runningLocalStarts[String(targetId)];
       pendingActionsAnchorId = updated?.id || "";
+      enqueueActionPointsUpdateFeedback(
+        payload?.pointsUpdate,
+        RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS + 120
+      );
     }
     startRunningTaskTicker();
     renderActions();
@@ -7697,6 +7701,7 @@ async function manualFinishAction(actionId) {
   if (updated) {
     state.actions = state.actions.map((item) => (item.id === actionId ? updated : item));
   }
+  enqueueActionPointsUpdateFeedback(payload?.pointsUpdate, 250);
   renderActions();
   await loadStatsSummary();
 }
@@ -9465,6 +9470,13 @@ function enqueuePointsUpdateFeedback(pointsUpdate) {
   pointsUpdateFeedbackQueue = pointsUpdateFeedbackQueue
     .catch(() => {})
     .then(() => showPointsUpdateFeedback(pointsUpdate));
+}
+
+function enqueueActionPointsUpdateFeedback(pointsUpdate, delayMs = 0) {
+  if (!pointsUpdate?.before || !pointsUpdate?.after) {
+    return;
+  }
+  window.setTimeout(() => enqueuePointsUpdateFeedback(pointsUpdate), Math.max(0, Number(delayMs || 0)));
 }
 
 async function loadSocialSnapshot(options = {}) {

@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import { db, query } from "./db.js";
 import { ensureProject200ProfilesSchema, PROJECT200_DEFAULT_PROFILE_AVATAR, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
@@ -15,6 +17,10 @@ function normalizeScope(scopeKey = "today") {
 }
 
 function toDateKey(value = new Date()) {
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
   const date = value instanceof Date ? value : new Date(value);
   const target = Number.isNaN(date.getTime()) ? new Date() : date;
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -110,6 +116,108 @@ async function getUserCardMap(userIds = []) {
   return new Map(result.rows.map((row) => [String(row.id || "").trim(), row]));
 }
 
+export async function ensureProject200PointsSchema() {
+  await query(`
+    create table if not exists project200_point_events (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references users(id) on delete cascade,
+      source_type text not null,
+      source_key text not null,
+      points integer not null default 0,
+      scope_date date not null,
+      metadata jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (user_id, source_type, source_key)
+    );
+  `);
+  await query("create index if not exists idx_project200_point_events_user_date on project200_point_events(user_id, scope_date desc);");
+}
+
+function getActionPointValue(action) {
+  const startAtMs = new Date(action?.startAt || "").getTime();
+  const endAtMs = new Date(action?.endAt || "").getTime();
+  if (!Number.isFinite(startAtMs) || !Number.isFinite(endAtMs) || endAtMs <= startAtMs) {
+    return 0;
+  }
+  return Math.max(0, Math.round((endAtMs - startAtMs) / 60000));
+}
+
+export async function recordProject200ActionPoints(userId, action, completedAt = new Date()) {
+  await ensureProject200PointsSchema();
+  const normalizedUserId = String(userId || "").trim();
+  const actionId = String(action?.id || "").trim();
+  const points = getActionPointValue(action);
+  if (!normalizedUserId || !actionId || points <= 0) {
+    return { points: 0, created: false };
+  }
+  const scopeDate = toDateKey(completedAt);
+  const result = await query(
+    `
+      insert into project200_point_events (
+        user_id, source_type, source_key, points, scope_date, metadata, created_at, updated_at
+      )
+      values ($1, 'action', $2, $3, $4::date, $5::jsonb, now(), now())
+      on conflict (user_id, source_type, source_key) do nothing
+      returning id, points, scope_date
+    `,
+    [
+      normalizedUserId,
+      actionId,
+      points,
+      scopeDate,
+      JSON.stringify({ title: String(action?.title || "").trim(), durationMinutes: points })
+    ]
+  );
+  return {
+    points: result.rows[0] ? points : 0,
+    created: Boolean(result.rows[0]),
+    scopeDate
+  };
+}
+
+export async function removeProject200ActionPoints(userId, actionId) {
+  await ensureProject200PointsSchema();
+  const result = await query(
+    `
+      delete from project200_point_events
+      where user_id = $1
+        and source_type = 'action'
+        and source_key = $2
+      returning points, scope_date
+    `,
+    [String(userId || "").trim(), String(actionId || "").trim()]
+  );
+  return result.rows[0] || null;
+}
+
+export async function addProject200ManualPoints(userId, points, scopeDate = new Date(), sourceKey = "") {
+  await ensureProject200PointsSchema();
+  const normalizedUserId = String(userId || "").trim();
+  const safePoints = Math.max(0, Math.trunc(Number(points || 0) || 0));
+  const normalizedSourceKey = String(sourceKey || `manual-${crypto.randomUUID()}`).trim();
+  if (!normalizedUserId || !safePoints || !normalizedSourceKey) {
+    throw new Error("Ajuste de pontos invalido.");
+  }
+  const dateKey = toDateKey(scopeDate);
+  const result = await query(
+    `
+      insert into project200_point_events (
+        user_id, source_type, source_key, points, scope_date, metadata, created_at, updated_at
+      )
+      values ($1, 'manual', $2, $3, $4::date, '{}'::jsonb, now(), now())
+      on conflict (user_id, source_type, source_key) do nothing
+      returning id, points, scope_date
+    `,
+    [normalizedUserId, normalizedSourceKey, safePoints, dateKey]
+  );
+  return {
+    points: result.rows[0] ? safePoints : 0,
+    created: Boolean(result.rows[0]),
+    scopeDate: dateKey
+  };
+}
+
 async function getPointsByUserIds(userIds = [], scopeKey = "today") {
   const normalizedIds = [...new Set((Array.isArray(userIds) ? userIds : []).map((value) => String(value || "").trim()).filter(Boolean))];
   if (!normalizedIds.length) {
@@ -120,18 +228,36 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
     const todayKey = toDateKey();
     const result = await query(
       `
+        with requested_users as (
+          select unnest($1::uuid[]) as user_id
+        ),
+        mission_points as (
+          select
+            user_id,
+            coalesce(sum(
+              case
+                when progress_date = $2::date then progress_value * coalesce(nullif(unit_duration_seconds, 0), unit_duration_minutes * 60) / 60.0
+                else 0
+              end
+            ), 0)::bigint as points
+          from extra_goals
+          where user_id = any($1::uuid[])
+            and assigned_profile = $3
+          group by user_id
+        ),
+        event_points as (
+          select user_id, coalesce(sum(points), 0)::bigint as points
+          from project200_point_events
+          where user_id = any($1::uuid[])
+            and scope_date = $2::date
+          group by user_id
+        )
         select
-          user_id,
-          coalesce(sum(
-            case
-              when progress_date = $2::date then progress_value * coalesce(nullif(unit_duration_seconds, 0), unit_duration_minutes * 60) / 60.0
-              else 0
-            end
-          ), 0)::bigint as points
-        from extra_goals
-        where user_id = any($1::uuid[])
-          and assigned_profile = $3
-        group by user_id
+          requested_users.user_id,
+          (coalesce(mission_points.points, 0) + coalesce(event_points.points, 0))::bigint as points
+        from requested_users
+        left join mission_points using (user_id)
+        left join event_points using (user_id)
       `,
       [normalizedIds, todayKey, PROJECT200_DEFAULT_PROFILE_NAME]
     );
@@ -142,18 +268,37 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
   const startDateKey = addDateDays(endDateKey, -(scope.days - 1));
   const result = await query(
     `
+      with requested_users as (
+        select unnest($1::uuid[]) as user_id
+      ),
+      mission_points as (
+        select
+          h.user_id,
+          coalesce(sum(h.progress_value * coalesce(nullif(g.unit_duration_seconds, 0), g.unit_duration_minutes * 60)) / 60.0, 0)::bigint as points
+        from extra_goal_progress_history h
+        join extra_goals g
+          on g.id = h.goal_id
+         and g.user_id = h.user_id
+        where h.user_id = any($1::uuid[])
+          and h.assigned_profile = $2
+          and h.scope_date >= $3::date
+          and h.scope_date <= $4::date
+        group by h.user_id
+      ),
+      event_points as (
+        select user_id, coalesce(sum(points), 0)::bigint as points
+        from project200_point_events
+        where user_id = any($1::uuid[])
+          and scope_date >= $3::date
+          and scope_date <= $4::date
+        group by user_id
+      )
       select
-        h.user_id,
-        coalesce(sum(h.progress_value * coalesce(nullif(g.unit_duration_seconds, 0), g.unit_duration_minutes * 60)) / 60.0, 0)::bigint as points
-      from extra_goal_progress_history h
-      join extra_goals g
-        on g.id = h.goal_id
-       and g.user_id = h.user_id
-      where h.user_id = any($1::uuid[])
-        and h.assigned_profile = $2
-        and h.scope_date >= $3::date
-        and h.scope_date <= $4::date
-      group by h.user_id
+        requested_users.user_id,
+        (coalesce(mission_points.points, 0) + coalesce(event_points.points, 0))::bigint as points
+      from requested_users
+      left join mission_points using (user_id)
+      left join event_points using (user_id)
     `,
     [normalizedIds, PROJECT200_DEFAULT_PROFILE_NAME, startDateKey, endDateKey]
   );
@@ -161,6 +306,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
 }
 
 export async function ensureProject200FriendsSchema() {
+  await ensureProject200PointsSchema();
   await query(`
     create table if not exists project200_friendships (
       id uuid primary key default gen_random_uuid(),
