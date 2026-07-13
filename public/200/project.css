@@ -1885,6 +1885,14 @@ body.running-music-standalone #actionsModal .actions-list {
   opacity: 1;
 }
 
+.running-music-list-modal.active .running-music-list-panel {
+  display: grid !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative;
+  z-index: 1;
+}
+
 .running-music-list-panel {
   width: min(980px, 100%);
   height: min(90vh, 900px);
@@ -6518,53 +6526,62 @@ body[data-background-theme="white"] .social-scope-chip.active {
   transition: opacity 180ms ease;
 }
 
-body[data-background-theme="black"] #missionRunModal.workspace-modal {
+body[data-background-theme="black"] #missionRunModal.workspace-modal,
+body[data-background-theme="black"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top, rgba(120, 126, 153, 0.18), transparent 36%),
     linear-gradient(145deg, #05070f 0%, #101729 45%, #070b15 100%);
 }
 
-body[data-background-theme="orange"] #missionRunModal.workspace-modal {
+body[data-background-theme="orange"] #missionRunModal.workspace-modal,
+body[data-background-theme="orange"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(255, 233, 151, 0.3), transparent 34%),
     linear-gradient(145deg, #ff7a18 0%, #ff4d2d 46%, #c21807 100%);
 }
 
-body[data-background-theme="bluevivid"] #missionRunModal.workspace-modal {
+body[data-background-theme="bluevivid"] #missionRunModal.workspace-modal,
+body[data-background-theme="bluevivid"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(149, 234, 255, 0.3), transparent 34%),
     linear-gradient(145deg, #16a3ff 0%, #0b63ff 52%, #0037c4 100%);
 }
 
-body[data-background-theme="pinkstrong"] #missionRunModal.workspace-modal {
+body[data-background-theme="pinkstrong"] #missionRunModal.workspace-modal,
+body[data-background-theme="pinkstrong"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(255, 190, 216, 0.28), transparent 36%),
     linear-gradient(145deg, #ff2f92 0%, #ff1660 48%, #b10c53 100%);
 }
 
-body[data-background-theme="bluedark"] #missionRunModal.workspace-modal {
+body[data-background-theme="bluedark"] #missionRunModal.workspace-modal,
+body[data-background-theme="bluedark"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(125, 187, 255, 0.22), transparent 36%),
     linear-gradient(145deg, #0d2d8f 0%, #09206b 44%, #020d37 100%);
 }
 
-body[data-background-theme="brown"] #missionRunModal.workspace-modal {
+body[data-background-theme="brown"] #missionRunModal.workspace-modal,
+body[data-background-theme="brown"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(244, 197, 139, 0.24), transparent 34%),
     linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%);
 }
 
-body[data-background-theme="edge"] #missionRunModal.workspace-modal {
+body[data-background-theme="edge"] #missionRunModal.workspace-modal,
+body[data-background-theme="edge"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
     linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
 }
 
-body[data-background-theme="light"] #missionRunModal.workspace-modal {
+body[data-background-theme="light"] #missionRunModal.workspace-modal,
+body[data-background-theme="light"] #missionVariantsModal.workspace-modal {
   background: url("/200/background-light.png") center center / cover no-repeat;
 }
 
-body[data-background-theme="white"] #missionRunModal.workspace-modal {
+body[data-background-theme="white"] #missionRunModal.workspace-modal,
+body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 38%),
     linear-gradient(145deg, #f8f8f5 0%, #f2f2ed 48%, #ecece7 100%);
@@ -6602,12 +6619,61 @@ body[data-background-theme="white"] #missionRunModal.workspace-modal {
 }
 
 .history-mission-run-title-row {
-  width: min(100%, 680px);
+  width: fit-content;
+  max-width: min(100%, 680px);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(10px, 3vw, 18px);
+  gap: clamp(4px, 1.2vw, 8px);
 }
+
+.mission-variants-modal {
+  z-index: 2300;
+  padding: clamp(14px, 3vw, 30px);
+  background-size: cover;
+  background-position: center;
+}
+
+.mission-variants-panel {
+  width: min(720px, 100%);
+  max-height: min(900px, 94dvh);
+  margin: auto;
+  padding: clamp(18px, 4vw, 34px);
+  border-radius: 28px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(3, 9, 22, .9);
+  color: #fff;
+  display: grid;
+  gap: 18px;
+  overflow: auto;
+}
+
+.mission-variants-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.mission-variants-kicker { color:#67a8ff; font-weight:900; font-size:.78rem; letter-spacing:.12em; text-transform:uppercase; margin-bottom:5px; }
+.mission-variants-title { font-size:clamp(1.35rem, 4vw, 2rem); }
+.mission-variants-list { display:grid; gap:12px; }
+.mission-variant-card { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.13); border-radius:18px; overflow:hidden; }
+.mission-variant-main { min-width:0; border:0; background:transparent; color:#fff; padding:16px; text-align:left; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.mission-variant-main span:first-child { display:grid; gap:3px; min-width:0; }
+.mission-variant-main strong { font-size:1.05rem; overflow:hidden; text-overflow:ellipsis; }
+.mission-variant-main small { color:rgba(255,255,255,.68); }
+.mission-variant-play { color:#54e78d; font-weight:900; }
+.mission-variant-delete { width:48px; border:0; background:transparent; color:#ff7180; font-size:1.65rem; }
+.mission-variant-bar { grid-column:1/-1; height:7px; background:rgba(255,255,255,.1); }
+.mission-variant-bar span { display:block; height:100%; transition:width .5s linear; }
+.mission-variant-bar .green { background:#22c55e; }.mission-variant-bar .orange { background:#f59e0b; }.mission-variant-bar .red { background:#ef4444; }
+.mission-variant-add { justify-self:center; }
+.mission-variant-editor { display:grid; gap:16px; }
+.mission-variant-deadline-selector { display:grid; grid-template-columns:58px 1fr 58px; align-items:center; gap:12px; }
+.mission-variant-deadline-selector button { aspect-ratio:1; border:1px solid rgba(255,255,255,.18); border-radius:50%; background:rgba(255,255,255,.08); color:#fff; }
+.mission-variant-deadline-selector svg { width:24px; }
+.mission-variant-deadline-selector div { display:grid; place-items:center; }
+.mission-variant-deadline-selector strong { font-size:clamp(2.6rem, 10vw, 4.5rem); line-height:1; }
+.mission-variant-deadline-selector span { color:rgba(255,255,255,.65); font-weight:800; }
+.mission-variant-unit-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.mission-variant-unit-tabs button { border:1px solid rgba(255,255,255,.18); border-radius:14px; padding:13px; background:rgba(255,255,255,.07); color:#fff; font-weight:900; }
+.mission-variant-unit-tabs button.active { background:#1765d8; border-color:#5ea0ff; }
+.mission-variant-editor-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 
 .history-mission-run-title-icon {
   width: clamp(48px, 13vw, 72px);

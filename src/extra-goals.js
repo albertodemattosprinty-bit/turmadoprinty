@@ -28,6 +28,23 @@ function normalizeExtraGoalProfile(value) {
   return normalizeStoredProject200ProfileName(value || PROJECT200_DEFAULT_PROFILE_NAME);
 }
 
+function normalizeExtraGoalVariantUnit(value) {
+  return String(value || "days").trim().toLowerCase() === "hours" ? "hours" : "days";
+}
+
+function normalizeExtraGoalVariantRow(row) {
+  return {
+    id: row.id,
+    goalId: row.goal_id,
+    title: normalizeExtraGoalTitle(row.title),
+    intervalValue: Math.max(1, Math.trunc(Number(row.interval_value || 1))),
+    intervalUnit: normalizeExtraGoalVariantUnit(row.interval_unit),
+    lastCompletedAt: row.last_completed_at ? new Date(row.last_completed_at).toISOString() : null,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null
+  };
+}
+
 function toDateKey(value = new Date()) {
   const raw = String(value || "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
@@ -296,6 +313,75 @@ export async function ensureExtraGoalsSchema() {
     );
   `);
   await query("create index if not exists idx_extra_goal_svg_defaults_user_profile on extra_goal_svg_defaults(user_id, assigned_profile, updated_at desc);");
+  await query(`
+    create table if not exists extra_goal_variants (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references users(id) on delete cascade,
+      goal_id uuid not null references extra_goals(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      title text not null,
+      interval_value integer not null default 1,
+      interval_unit text not null default 'days',
+      last_completed_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  `);
+  await query("create index if not exists idx_extra_goal_variants_owner on extra_goal_variants(user_id, goal_id, assigned_profile, updated_at desc);");
+}
+
+export async function listExtraGoalVariants(userId, profileName, goalId) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeGoalId = String(goalId || "").trim();
+  const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
+  if (!goal) throw new Error("Missao nao encontrada.");
+  const result = await query(`
+    select id, goal_id, title, interval_value, interval_unit, last_completed_at, created_at, updated_at
+    from extra_goal_variants
+    where user_id = $1 and assigned_profile = $2 and goal_id = $3
+    order by updated_at desc, created_at asc
+  `, [userId, normalizedProfile, safeGoalId]);
+  return result.rows.map(normalizeExtraGoalVariantRow);
+}
+
+export async function createExtraGoalVariant(userId, profileName, goalId, payload = {}) {
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeGoalId = String(goalId || "").trim();
+  const title = normalizeExtraGoalTitle(payload?.title);
+  const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
+  const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
+  if (!title) throw new Error("Informe o nome da variacao.");
+  const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
+  if (!goal) throw new Error("Missao nao encontrada.");
+  await query(`
+    insert into extra_goal_variants (user_id, goal_id, assigned_profile, title, interval_value, interval_unit)
+    values ($1, $2, $3, $4, $5, $6)
+  `, [userId, safeGoalId, normalizedProfile, title, intervalValue, intervalUnit]);
+  return listExtraGoalVariants(userId, normalizedProfile, safeGoalId);
+}
+
+export async function updateExtraGoalVariant(userId, profileName, goalId, variantId, payload = {}) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const title = normalizeExtraGoalTitle(payload?.title);
+  const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
+  const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
+  if (!title) throw new Error("Informe o nome da variacao.");
+  const result = await query(`
+    update extra_goal_variants set title = $5, interval_value = $6, interval_unit = $7, updated_at = now()
+    where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2
+  `, [userId, normalizedProfile, goalId, variantId, title, intervalValue, intervalUnit]);
+  if (!result.rowCount) throw new Error("Variacao nao encontrada.");
+  return listExtraGoalVariants(userId, normalizedProfile, goalId);
+}
+
+export async function deleteExtraGoalVariant(userId, profileName, goalId, variantId) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  await query(`delete from extra_goal_variants where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2`,
+    [userId, normalizedProfile, goalId, variantId]);
+  return listExtraGoalVariants(userId, normalizedProfile, goalId);
 }
 
 async function syncExtraGoalProgressHistory(userId, goal, dateKey = toDateKey()) {
@@ -499,7 +585,7 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   return listExtraGoals(userId, normalizedProfile);
 }
 
-export async function updateExtraGoalProgress(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, delta, date = new Date()) {
+export async function updateExtraGoalProgress(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, delta, date = new Date(), variantId = "") {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
   const safeGoalId = String(goalId || "").trim();
@@ -546,6 +632,13 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
     `,
     [safeGoalId, userId, normalizedProfile, nextProgress, dateKey]
   );
+  const safeVariantId = String(variantId || "").trim();
+  if (safeDelta > 0 && safeVariantId) {
+    await query(`
+      update extra_goal_variants set last_completed_at = now(), updated_at = now()
+      where id = $4 and goal_id = $1 and user_id = $2 and assigned_profile = $3
+    `, [safeGoalId, userId, normalizedProfile, safeVariantId]);
+  }
   const goals = await listExtraGoals(userId, normalizedProfile, dateKey);
   const updatedGoal = goals.find((goal) => String(goal.id || "").trim() === safeGoalId) || null;
   if (updatedGoal) {

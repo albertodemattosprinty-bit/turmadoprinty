@@ -62,7 +62,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createExtraGoal, deleteExtraGoal, ensureExtraGoalsSchema, listExtraGoalsByScope, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress } from "./src/extra-goals.js";
+import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, ensureExtraGoalsSchema, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, rejectProject200FriendInvite } from "./src/project200-friends.js";
@@ -3459,7 +3459,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
 
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
-    const goals = await updateExtraGoalProgress(user.id, selectedProfile, goalId, body?.delta);
+    const goals = await updateExtraGoalProgress(user.id, selectedProfile, goalId, body?.delta, new Date(), body?.variantId);
     const summary = summarizeExtraGoals(goals);
     sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
   } catch (error) {
@@ -8160,6 +8160,26 @@ async function handleCreateTerm(request, response) {
   }
 }
 
+async function handleExtraGoalVariantsRequest(request, response, goalId, variantId = "") {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const requestUrl = new URL(request.url || "/api/200/extra-goals", `http://${request.headers.host || "localhost"}`);
+    let body = {};
+    if (request.method !== "GET" && request.method !== "DELETE") body = await readJsonBody(request);
+    const profileValue = body?.profile || requestUrl.searchParams.get("profile");
+    const selectedProfile = await resolveProject200ProfileName(user.id, profileValue, { fallbackToDefault: true });
+    let variants;
+    if (request.method === "POST") variants = await createExtraGoalVariant(user.id, selectedProfile, goalId, body);
+    else if (request.method === "PATCH") variants = await updateExtraGoalVariant(user.id, selectedProfile, goalId, variantId, body);
+    else if (request.method === "DELETE") variants = await deleteExtraGoalVariant(user.id, selectedProfile, goalId, variantId);
+    else variants = await listExtraGoalVariants(user.id, selectedProfile, goalId);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, variants });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar as variacoes." });
+  }
+}
+
 async function handleGetContractorPanel(request, response) {
   const authUser = await requireAuth(request, response);
   if (!authUser) {
@@ -10917,6 +10937,18 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/terms") {
     await handleCreateTerm(request, response);
+    return;
+  }
+
+  if ((request.method === "GET" || request.method === "POST") && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/variants$/)) {
+    const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)\/variants$/, "$1");
+    await handleExtraGoalVariantsRequest(request, response, goalId);
+    return;
+  }
+
+  if ((request.method === "PATCH" || request.method === "DELETE") && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/variants\/[^/]+$/)) {
+    const match = pathname.match(/^\/api\/200\/extra-goals\/([^/]+)\/variants\/([^/]+)$/);
+    await handleExtraGoalVariantsRequest(request, response, match[1], match[2]);
     return;
   }
 
