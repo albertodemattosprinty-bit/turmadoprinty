@@ -1874,12 +1874,15 @@ body.running-music-standalone #actionsModal .actions-list {
   display: none;
   background: rgba(3, 6, 18, 0.98);
   backdrop-filter: none;
-  z-index: 170;
+  z-index: 220;
   padding: 20px;
 }
 
 .running-music-list-modal.active {
-  display: grid;
+  display: grid !important;
+  place-items: center;
+  visibility: visible;
+  opacity: 1;
 }
 
 .running-music-list-panel {
@@ -3476,6 +3479,11 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   gap: 14px;
+  position: relative;
+  z-index: 1;
+  visibility: visible;
+  opacity: 1;
+  color: #fff;
   align-items: center;
   width: 100%;
   max-width: 100%;
@@ -6523,6 +6531,28 @@ body[data-background-theme="white"] #missionRunModal.workspace-modal {
 
 .history-mission-run-title {
   text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  max-width: min(68vw, 520px);
+  font-size: clamp(1.88rem, 5.2vw, 2.84rem) !important;
+  line-height: 0.94;
+}
+
+.history-mission-run-title-row {
+  width: min(100%, 680px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 3vw, 18px);
+}
+
+.history-mission-run-title-icon {
+  width: clamp(48px, 13vw, 72px);
+  height: clamp(48px, 13vw, 72px);
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .history-mission-run-ring-wrap {
@@ -6532,11 +6562,11 @@ body[data-background-theme="white"] #missionRunModal.workspace-modal {
 }
 
 .history-mission-run-ring-wrap .running-circle-toggle-left {
-  top: 12%;
+  top: 20%;
 }
 
 .history-mission-run-ring-wrap .running-circle-toggle-right {
-  bottom: 10%;
+  bottom: 18%;
 }
 
 .history-mission-run-clock {
@@ -6586,12 +6616,15 @@ body[data-background-theme="white"] #missionRunModal.workspace-modal {
 }
 
 .history-mission-run-footer {
+  width: 100%;
   display: grid;
   gap: 10px;
+  justify-items: stretch;
 }
 
 .history-mission-run-player-slot {
-  width: min(680px, calc(100vw - 32px));
+  width: 100%;
+  max-width: none;
   height: clamp(56px, 10dvh, 74px);
   min-height: 56px;
   justify-self: center;
@@ -6603,6 +6636,12 @@ body[data-background-theme="white"] #missionRunModal.workspace-modal {
   height: 100%;
   min-height: 0;
   border: 0;
+  grid-template-columns: minmax(0, 12%) minmax(0, 12%) minmax(0, 52%) minmax(0, 12%) minmax(0, 12%);
+}
+
+.history-mission-run-complete {
+  width: min(42vw, 180px);
+  justify-self: center;
 }
 
 @media (max-width: 720px) {
@@ -6611,7 +6650,7 @@ body[data-background-theme="white"] #missionRunModal.workspace-modal {
   }
 
   .history-mission-run-player-slot {
-    width: min(100%, calc(100vw - 24px));
+    width: 100%;
   }
 }
 

@@ -1232,10 +1232,10 @@
         <p class="history-mission-time-prompt" id="missionTimePrompt">Quanto tempo leva 1 missão?</p>
         <div class="history-mission-adjust-stage">
           <button class="history-mission-sign-btn" type="button" id="missionTimeMinus">-</button>
-          <div class="history-mission-adjust-value" id="missionTimeValue">0</div>
+          <div class="history-mission-adjust-value" id="missionTimeValue">30</div>
           <button class="history-mission-sign-btn active" type="button" id="missionTimePlus">+</button>
         </div>
-        <div class="history-mission-time-unit-label" id="missionTimeUnitLabel">0 min por unidade</div>
+        <div class="history-mission-time-unit-label" id="missionTimeUnitLabel">30 segundos por unidade</div>
         <p class="finance-status" id="missionTimeStatus" aria-live="polite"></p>
       </div>
       <div class="history-mission-modal-footer history-mission-modal-footer-one">
@@ -1252,7 +1252,10 @@
         <button class="history-mission-run-back" type="button" id="missionRunBackButton" aria-label="Voltar">Voltar</button>
       </div>
       <div class="history-mission-run-body">
-        <div class="running-task-name history-mission-run-title" id="missionRunTitle">Missão</div>
+        <div class="history-mission-run-title-row">
+          <img class="history-mission-run-title-icon" id="missionRunTitleIcon" src="/200/icons/target.svg" alt="" aria-hidden="true" />
+          <div class="running-task-name history-mission-run-title" id="missionRunTitle">Missão</div>
+        </div>
         <div class="history-mission-run-ring-wrap">
           <button class="running-circle-toggle running-circle-toggle-left" id="missionRunModePercentBtn" type="button" aria-label="Mostrar porcentagem">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h3V9H4zm6 0h3V5h-3zm6 0h3V12h-3z"/></svg>
@@ -1278,6 +1281,15 @@
           <div class="history-mission-run-confirm-actions">
             <button class="ghost-btn" type="button" id="missionRunCancelDiscardButton">Cancelar</button>
             <button class="primary-btn" type="button" id="missionRunCancelFinishButton">Finalizar</button>
+          </div>
+        </div>
+      </div>
+      <div class="history-mission-run-confirm" id="missionRunFinishChoice" hidden>
+        <div class="history-mission-run-confirm-card">
+          <div class="history-mission-run-confirm-title">Missão concluída</div>
+          <div class="history-mission-run-confirm-actions">
+            <button class="ghost-btn" type="button" id="missionRunFinishButton">Finalizar</button>
+            <button class="primary-btn" type="button" id="missionRunRestartButton">Iniciar outro</button>
           </div>
         </div>
       </div>

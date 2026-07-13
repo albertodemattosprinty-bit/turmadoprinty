@@ -124,7 +124,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
           user_id,
           coalesce(sum(
             case
-              when progress_date = $2::date then progress_value * unit_duration_minutes
+              when progress_date = $2::date then progress_value * coalesce(nullif(unit_duration_seconds, 0), unit_duration_minutes * 60) / 60.0
               else 0
             end
           ), 0)::bigint as points
@@ -144,7 +144,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
     `
       select
         h.user_id,
-        coalesce(sum(h.progress_value * g.unit_duration_minutes), 0)::bigint as points
+        coalesce(sum(h.progress_value * coalesce(nullif(g.unit_duration_seconds, 0), g.unit_duration_minutes * 60)) / 60.0, 0)::bigint as points
       from extra_goal_progress_history h
       join extra_goals g
         on g.id = h.goal_id

@@ -408,6 +408,7 @@ const missionTimeStatus = document.getElementById("missionTimeStatus");
 const missionTimeConfirmButton = document.getElementById("missionTimeConfirmButton");
 const missionRunBackButton = document.getElementById("missionRunBackButton");
 const missionRunTitle = document.getElementById("missionRunTitle");
+const missionRunTitleIcon = document.getElementById("missionRunTitleIcon");
 const missionRunRingFill = document.getElementById("missionRunRingFill");
 const missionRunClock = document.getElementById("missionRunClock");
 const missionRunModePercentBtn = document.getElementById("missionRunModePercentBtn");
@@ -418,6 +419,9 @@ const missionRunCompleteButton = document.getElementById("missionRunCompleteButt
 const missionRunConfirm = document.getElementById("missionRunConfirm");
 const missionRunCancelDiscardButton = document.getElementById("missionRunCancelDiscardButton");
 const missionRunCancelFinishButton = document.getElementById("missionRunCancelFinishButton");
+const missionRunFinishChoice = document.getElementById("missionRunFinishChoice");
+const missionRunFinishButton = document.getElementById("missionRunFinishButton");
+const missionRunRestartButton = document.getElementById("missionRunRestartButton");
 const runningTaskMissionButton = document.getElementById("runningTaskMissionButton");
 const runningMissionQuickModal = document.getElementById("runningMissionQuickModal");
 const closeRunningMissionQuickModalButton = document.getElementById("closeRunningMissionQuickModal");
@@ -827,6 +831,7 @@ let missionCardHoldGoalId = "";
 let missionCardPressedGoalId = "";
 let missionCardHoldTriggered = false;
 let missionRunTicker = null;
+let missionRunAlarmTicker = null;
 let sleepFrequencyMonitorTicker = null;
 let sleepFrequencyFadeToken = 0;
 let sleepMusicHoldTimer = null;
@@ -900,11 +905,11 @@ const state = {
   missionAdjust: {
     goalId: "",
     targetValue: 1,
-    unitDurationMinutes: 0
+    unitDurationSeconds: 30
   },
   missionCreate: {
-    unitDurationMinutes: 0,
-    timeConfigured: false
+    unitDurationSeconds: 30,
+    timeConfigured: true
   },
   missionProgress: {
     goalId: "",
@@ -921,7 +926,9 @@ const state = {
     startedAtMs: 0,
     durationMs: 0,
     centerMode: "time",
-    previousTaskTitle: ""
+    previousTaskTitle: "",
+    alarmStarted: false,
+    finalizing: false
   },
   missionQuickSlots: [],
   runningMissionQuick: {
@@ -3478,10 +3485,14 @@ async function openRunningMusicListModal() {
   if (!runningMusicListModal) {
     return;
   }
+  runningMusicListModal.classList.add("active");
+  runningMusicListModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("running-music-list-open");
+  if (!runningTaskModalElement?.classList.contains("active") && !document.getElementById("missionRunModal")?.classList.contains("active")) {
+    document.body.classList.add("running-music-standalone");
+  }
+  updateRunningPlayerOverlayState();
   if (!Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) {
-    runningMusicListModal.classList.add("active");
-    runningMusicListModal.setAttribute("aria-hidden", "false");
-    document.body.classList.add("running-music-list-open");
     runningMusicListItems.innerHTML = '<div class="empty-state">Carregando estações...</div>';
     try {
       await loadRunningMusicStations();
@@ -3490,14 +3501,8 @@ async function openRunningMusicListModal() {
     }
   }
   ensureRunningStationHasTracks();
-  if (!runningTaskModalElement?.classList.contains("active")) {
-    document.body.classList.add("running-music-standalone");
-  }
   renderRunningMusicPlayer();
   renderRunningMusicList();
-  runningMusicListModal.classList.add("active");
-  runningMusicListModal.setAttribute("aria-hidden", "false");
-  document.body.classList.add("running-music-list-open");
   updateRunningPlayerOverlayState();
 }
 
@@ -4456,6 +4461,7 @@ function closeModal(modal) {
   }
   if (modal.id === "missionRunModal") {
     stopMissionRunTicker();
+    stopMissionRunAlarm();
     restoreRunningPlayerAfterMission();
     state.runningPlayer.currentTaskTitle = String(state.missionRun.previousTaskTitle || "").trim();
     state.missionRun.goalId = "";
@@ -4463,8 +4469,13 @@ function closeModal(modal) {
     state.missionRun.durationMs = 0;
     state.missionRun.centerMode = "time";
     state.missionRun.previousTaskTitle = "";
+    state.missionRun.alarmStarted = false;
+    state.missionRun.finalizing = false;
     if (missionRunConfirm) {
       missionRunConfirm.hidden = true;
+    }
+    if (missionRunFinishChoice) {
+      missionRunFinishChoice.hidden = true;
     }
     if (missionRunStatus) {
       missionRunStatus.textContent = "";
@@ -8031,13 +8042,36 @@ function getVisibleCategoryTaskMinutes(categoryId) {
     .reduce((sum, action) => sum + getActionDurationMinutes(action), 0);
 }
 
-function getMissionUnitDurationMinutes(goal) {
-  return Math.max(0, Math.trunc(Number(goal?.unitDurationMinutes || 0) || 0));
+const MISSION_DURATION_OPTIONS_SECONDS = Object.freeze([5, 10, 15, 30, 45, 60]);
+const DEFAULT_MISSION_DURATION_SECONDS = 30;
+
+function getMissionUnitDurationSeconds(goal) {
+  const storedSeconds = Math.max(0, Math.trunc(Number(goal?.unitDurationSeconds || 0) || 0));
+  if (storedSeconds > 0) return storedSeconds;
+  return Math.max(0, Math.trunc(Number(goal?.unitDurationMinutes || 0) * 60 || 0));
 }
 
-function formatMissionUnitDurationLabel(minutes) {
-  const safeMinutes = Math.max(0, Math.trunc(Number(minutes || 0) || 0));
-  return safeMinutes === 1 ? "1 min por unidade" : `${safeMinutes} min por unidade`;
+function getMissionUnitDurationMinutes(goal) {
+  return getMissionUnitDurationSeconds(goal) / 60;
+}
+
+function normalizeMissionDurationOption(seconds, fallback = DEFAULT_MISSION_DURATION_SECONDS) {
+  const numeric = Math.max(0, Math.trunc(Number(seconds || 0) || 0));
+  if (MISSION_DURATION_OPTIONS_SECONDS.includes(numeric)) return numeric;
+  if (!numeric) return fallback;
+  return MISSION_DURATION_OPTIONS_SECONDS.reduce((closest, option) => (
+    Math.abs(option - numeric) < Math.abs(closest - numeric) ? option : closest
+  ), MISSION_DURATION_OPTIONS_SECONDS[0]);
+}
+
+function formatMissionUnitDurationLabel(seconds) {
+  const safeSeconds = Math.max(0, Math.trunc(Number(seconds || 0) || 0));
+  if (safeSeconds === 60) return "1 minuto por unidade";
+  if (safeSeconds > 60 && safeSeconds % 60 === 0) {
+    const minutes = safeSeconds / 60;
+    return `${minutes} min por unidade`;
+  }
+  return `${safeSeconds} segundos por unidade`;
 }
 
 function formatMissionTimePromptLabel(title) {
@@ -9826,7 +9860,7 @@ function renderMissionAdjustState() {
     missionAdjustHint.textContent = `Meta diária ${targetValue}x`;
   }
   if (missionAdjustTimeSummary) {
-    missionAdjustTimeSummary.textContent = `Tempo por unidade: ${formatMissionUnitDurationLabel(state.missionAdjust?.unitDurationMinutes || 0)}`;
+    missionAdjustTimeSummary.textContent = `Tempo por unidade: ${formatMissionUnitDurationLabel(state.missionAdjust?.unitDurationSeconds || DEFAULT_MISSION_DURATION_SECONDS)}`;
   }
   missionAdjustMinusButton?.classList.remove("active");
   missionAdjustPlusButton?.classList.add("active");
@@ -9843,11 +9877,11 @@ function openMissionCreateModal() {
     missionCreateStatus.textContent = "";
   }
   state.missionCreate = {
-    unitDurationMinutes: 0,
-    timeConfigured: false
+    unitDurationSeconds: DEFAULT_MISSION_DURATION_SECONDS,
+    timeConfigured: true
   };
   if (missionCreateTimeSummary) {
-    missionCreateTimeSummary.textContent = "Tempo por unidade: pendente";
+    missionCreateTimeSummary.textContent = `Tempo por unidade: ${formatMissionUnitDurationLabel(DEFAULT_MISSION_DURATION_SECONDS)}`;
   }
   openModal("missionCreateModal");
   window.setTimeout(() => missionTitleInput?.focus(), 60);
@@ -9861,7 +9895,7 @@ function openMissionAdjustModal(goalId) {
   state.missionAdjust = {
     goalId: String(goal.id),
     targetValue: Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1)),
-    unitDurationMinutes: getMissionUnitDurationMinutes(goal)
+    unitDurationSeconds: getMissionUnitDurationSeconds(goal)
   };
   if (missionAdjustTitle) {
     missionAdjustTitle.textContent = String(goal.title || "Missão");
@@ -9888,7 +9922,7 @@ function renderMissionProgressState() {
 }
 
 function renderMissionTimeState() {
-  const safeValue = Math.max(0, Math.trunc(Number(state.missionTime?.value || 0) || 0));
+  const safeValue = normalizeMissionDurationOption(state.missionTime?.value);
   state.missionTime.value = safeValue;
   if (missionTimePrompt) {
     missionTimePrompt.textContent = formatMissionTimePromptLabel(state.missionTime?.title || "");
@@ -9907,14 +9941,14 @@ function openMissionTimeModal(mode) {
     state.missionTime = {
       mode: "create",
       title: String(missionTitleInput?.value || "").trim() || "esta missão",
-      value: Math.max(0, Math.trunc(Number(state.missionCreate?.unitDurationMinutes || 0) || 0))
+      value: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds)
     };
   } else {
     const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === String(state.missionAdjust?.goalId || ""));
     state.missionTime = {
       mode: "adjust",
       title: String(goal?.title || missionAdjustTitle?.textContent || "esta missão").trim(),
-      value: Math.max(0, Math.trunc(Number(state.missionAdjust?.unitDurationMinutes || 0) || 0))
+      value: normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds)
     };
   }
   if (missionTimeStatus) {
@@ -9929,6 +9963,48 @@ function stopMissionRunTicker() {
     window.clearInterval(missionRunTicker);
     missionRunTicker = null;
   }
+}
+
+function stopMissionRunAlarm() {
+  if (missionRunAlarmTicker) {
+    window.clearInterval(missionRunAlarmTicker);
+    missionRunAlarmTicker = null;
+  }
+  state.missionRun.alarmStarted = false;
+}
+
+async function playMissionRunAlarmBurst() {
+  const audioContext = getTaskBeepAudioContext();
+  if (!audioContext) return;
+  try {
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+  } catch {}
+  const baseAt = Math.max(audioContext.currentTime + 0.02, audioContext.currentTime);
+  for (let index = 0; index < 10; index += 1) {
+    const startAt = baseAt + (index * 0.14);
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(2680, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.98, startAt + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.1);
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + 0.105);
+  }
+}
+
+function startMissionRunAlarm() {
+  if (state.missionRun.alarmStarted) return;
+  state.missionRun.alarmStarted = true;
+  void playMissionRunAlarmBurst();
+  missionRunAlarmTicker = window.setInterval(() => {
+    void playMissionRunAlarmBurst();
+  }, 30000);
 }
 
 function mountRunningPlayerForMission() {
@@ -9961,6 +10037,11 @@ function renderMissionRunState() {
   if (missionRunTitle) {
     missionRunTitle.textContent = String(goal.title || "Missão");
   }
+  if (missionRunTitleIcon) {
+    const icon = getMissionDisplayIcon(goal);
+    missionRunTitleIcon.src = icon.src;
+    missionRunTitleIcon.alt = icon.alt;
+  }
   if (missionRunRingFill) {
     missionRunRingFill.style.strokeDashoffset = String(circumference - ((percentPrecise / 100) * circumference));
   }
@@ -9973,6 +10054,9 @@ function renderMissionRunState() {
   if (missionRunStatus) {
     missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missão não tem tempo definido.";
   }
+  if (durationMs > 0 && remainingSeconds <= 0 && missionRunFinishChoice?.hidden !== false) {
+    startMissionRunAlarm();
+  }
 }
 
 function openMissionRunModal(goalId) {
@@ -9982,12 +10066,21 @@ function openMissionRunModal(goalId) {
   }
   state.missionRun.goalId = String(goal.id || "");
   state.missionRun.startedAtMs = Date.now();
-  state.missionRun.durationMs = Math.max(0, getMissionUnitDurationMinutes(goal) * 60 * 1000);
+  state.missionRun.durationMs = Math.max(0, getMissionUnitDurationSeconds(goal) * 1000);
   state.missionRun.centerMode = "time";
+  state.missionRun.alarmStarted = false;
+  state.missionRun.finalizing = false;
   state.missionRun.previousTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
   state.runningPlayer.currentTaskTitle = String(goal.title || "Missão").trim();
   if (missionRunConfirm) {
     missionRunConfirm.hidden = true;
+  }
+  if (missionRunFinishChoice) {
+    missionRunFinishChoice.hidden = true;
+  }
+  const alarmContext = getTaskBeepAudioContext();
+  if (alarmContext?.state === "suspended") {
+    void alarmContext.resume().catch(() => {});
   }
   renderMissionRunState();
   mountRunningPlayerForMission();
@@ -9997,11 +10090,15 @@ function openMissionRunModal(goalId) {
   openModal("missionRunModal");
 }
 
-async function finalizeMissionRun() {
+async function finalizeMissionRun({ restart = false } = {}) {
   const goalId = String(state.missionRun?.goalId || "").trim();
-  if (!goalId) {
+  if (!goalId || state.missionRun.finalizing) {
     return;
   }
+  const previousDurationMs = Math.max(0, Number(state.missionRun.durationMs || 0));
+  state.missionRun.finalizing = true;
+  if (missionRunFinishButton) missionRunFinishButton.disabled = true;
+  if (missionRunRestartButton) missionRunRestartButton.disabled = true;
   if (missionRunStatus) {
     missionRunStatus.textContent = "Concluindo...";
   }
@@ -10014,15 +10111,36 @@ async function finalizeMissionRun() {
         delta: 1
       })
     });
+    stopMissionRunAlarm();
     playMissionProgressSound();
-    closeModal("missionRunModal");
     await loadMissions();
     renderMissions();
     renderRunningMissionQuickButtons();
+    if (restart) {
+      const refreshedGoal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId) || null;
+      state.missionRun.goalId = goalId;
+      state.missionRun.startedAtMs = Date.now();
+      state.missionRun.durationMs = refreshedGoal
+        ? Math.max(0, getMissionUnitDurationSeconds(refreshedGoal) * 1000)
+        : previousDurationMs;
+      state.missionRun.centerMode = "time";
+      state.missionRun.alarmStarted = false;
+      state.missionRun.finalizing = false;
+      if (missionRunFinishChoice) missionRunFinishChoice.hidden = true;
+      if (missionRunConfirm) missionRunConfirm.hidden = true;
+      if (missionRunStatus) missionRunStatus.textContent = "";
+      renderMissionRunState();
+      return;
+    }
+    closeModal("missionRunModal");
   } catch (error) {
+    state.missionRun.finalizing = false;
     if (missionRunStatus) {
       missionRunStatus.textContent = error instanceof Error ? error.message : "Falha ao concluir missão.";
     }
+  } finally {
+    if (missionRunFinishButton) missionRunFinishButton.disabled = false;
+    if (missionRunRestartButton) missionRunRestartButton.disabled = false;
   }
 }
 
@@ -11661,7 +11779,7 @@ missionCreateConfirmButton?.addEventListener("click", () => {
           title,
           targetValue,
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          unitDurationMinutes: Math.max(0, Math.trunc(Number(state.missionCreate?.unitDurationMinutes || 0) || 0)),
+          unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
           svgIconUrl: "",
           svgIconLabel: ""
         })
@@ -11999,7 +12117,7 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
         body: JSON.stringify({
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
           targetValue,
-          unitDurationMinutes: Math.max(0, Math.trunc(Number(state.missionAdjust?.unitDurationMinutes || 0) || 0)),
+          unitDurationSeconds: normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
           svgIconUrl: String(goal?.svgIconUrl || "").trim(),
           svgIconLabel: String(goal?.svgIconLabel || "").trim()
         })
@@ -12119,17 +12237,19 @@ missionTimeCloseButton?.addEventListener("click", () => {
   closeModal("missionTimeModal");
 });
 missionTimeMinusButton?.addEventListener("click", () => {
-  state.missionTime.value = Math.max(0, Math.trunc(Number(state.missionTime?.value || 0) || 0) - 1);
+  const currentIndex = MISSION_DURATION_OPTIONS_SECONDS.indexOf(normalizeMissionDurationOption(state.missionTime?.value));
+  state.missionTime.value = MISSION_DURATION_OPTIONS_SECONDS[Math.max(0, currentIndex - 1)];
   renderMissionTimeState();
 });
 missionTimePlusButton?.addEventListener("click", () => {
-  state.missionTime.value = Math.max(0, Math.trunc(Number(state.missionTime?.value || 0) || 0) + 1);
+  const currentIndex = MISSION_DURATION_OPTIONS_SECONDS.indexOf(normalizeMissionDurationOption(state.missionTime?.value));
+  state.missionTime.value = MISSION_DURATION_OPTIONS_SECONDS[Math.min(MISSION_DURATION_OPTIONS_SECONDS.length - 1, currentIndex + 1)];
   renderMissionTimeState();
 });
 missionTimeConfirmButton?.addEventListener("click", () => {
-  const safeValue = Math.max(0, Math.trunc(Number(state.missionTime?.value || 0) || 0));
+  const safeValue = normalizeMissionDurationOption(state.missionTime?.value);
   if (state.missionTime?.mode === "create") {
-    state.missionCreate.unitDurationMinutes = safeValue;
+    state.missionCreate.unitDurationSeconds = safeValue;
     state.missionCreate.timeConfigured = true;
     if (missionCreateTimeSummary) {
       missionCreateTimeSummary.textContent = `Tempo por unidade: ${formatMissionUnitDurationLabel(safeValue)}`;
@@ -12138,7 +12258,7 @@ missionTimeConfirmButton?.addEventListener("click", () => {
       missionCreateStatus.textContent = `Tempo definido: ${formatMissionUnitDurationLabel(safeValue)}.`;
     }
   } else {
-    state.missionAdjust.unitDurationMinutes = safeValue;
+    state.missionAdjust.unitDurationSeconds = safeValue;
     renderMissionAdjustState();
     if (missionAdjustStatus) {
       missionAdjustStatus.textContent = `Tempo definido: ${formatMissionUnitDurationLabel(safeValue)}.`;
@@ -12166,7 +12286,16 @@ missionRunCancelFinishButton?.addEventListener("click", () => {
   void finalizeMissionRun();
 });
 missionRunCompleteButton?.addEventListener("click", () => {
+  stopMissionRunAlarm();
+  if (missionRunFinishChoice) {
+    missionRunFinishChoice.hidden = false;
+  }
+});
+missionRunFinishButton?.addEventListener("click", () => {
   void finalizeMissionRun();
+});
+missionRunRestartButton?.addEventListener("click", () => {
+  void finalizeMissionRun({ restart: true });
 });
 
 runningMissionQuickGrid?.addEventListener("click", (event) => {
