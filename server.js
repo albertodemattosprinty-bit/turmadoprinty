@@ -3459,9 +3459,30 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
 
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const shouldTrackPointsUpdate = Math.trunc(Number(body?.delta || 0) || 0) > 0;
+    let dailyRankingBefore = null;
+    if (shouldTrackPointsUpdate) {
+      try {
+        dailyRankingBefore = await getProject200FriendsSnapshot(user.id, "today");
+      } catch {}
+    }
     const goals = await updateExtraGoalProgress(user.id, selectedProfile, goalId, body?.delta, new Date(), body?.variantId);
     const summary = summarizeExtraGoals(goals);
-    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+    let dailyRankingAfter = null;
+    if (shouldTrackPointsUpdate) {
+      try {
+        dailyRankingAfter = await getProject200FriendsSnapshot(user.id, "today");
+      } catch {}
+    }
+    sendJson(response, 200, {
+      ok: true,
+      profile: selectedProfile,
+      goals,
+      summary,
+      pointsUpdate: dailyRankingBefore && dailyRankingAfter
+        ? { before: dailyRankingBefore, after: dailyRankingAfter }
+        : null
+    });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."

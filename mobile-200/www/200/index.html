@@ -1068,6 +1068,18 @@
       </div>
     </section>
 
+  <section class="workspace-modal points-update-modal" id="pointsUpdateModal" aria-hidden="true" aria-label="Atualização da pontuação diária">
+    <div class="points-update-shell" role="status" aria-live="polite">
+      <div class="points-update-kicker">Pontuação diária</div>
+      <div class="points-update-total" id="pointsUpdateTotal">0</div>
+      <div class="points-update-delta" id="pointsUpdateDelta">+0 pontos</div>
+      <div class="points-update-ranking" id="pointsUpdateRanking">
+        <h2>Ranking de amigos hoje</h2>
+        <div class="points-update-ranking-list" id="pointsUpdateRankingList"></div>
+      </div>
+    </div>
+  </section>
+
   <div class="action-wizard" id="financeEntryConfirmWizard" aria-hidden="true">
       <div class="wizard-panel">
         <header class="wizard-head">
@@ -1115,25 +1127,44 @@
   </section>
 
   <section class="workspace-modal simple-modal" id="missionCreateModal" aria-hidden="true" aria-label="Nova missão">
-    <div class="finance-content history-mission-modal-content history-mission-modal-shell">
+    <div class="finance-content history-mission-modal-content history-mission-modal-shell mission-guide-shell">
       <div class="history-mission-modal-head">
-        <div class="running-task-name">Nova missão</div>
+        <div class="mission-modal-heading">
+          <span class="mission-modal-eyebrow">Organize uma nova rotina</span>
+          <h1 class="mission-modal-title">Nova missão</h1>
+        </div>
         <button class="history-mission-modal-close" type="button" id="missionCreateCloseButton" aria-label="Fechar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
         </button>
       </div>
-      <div class="history-mission-modal-body">
-        <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" placeholder="Nome da missão" />
-        <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Unidade diária" />
-        <div class="history-mission-time-summary" id="missionCreateTimeSummary">Tempo por unidade: pendente</div>
+      <div class="history-mission-modal-body mission-guide-body">
+        <section class="mission-guide-step" aria-labelledby="missionCreateNameStep">
+          <span class="mission-guide-number">1</span>
+          <h2 id="missionCreateNameStep">Qual é o nome da missão?</h2>
+          <p>Use um nome simples para reconhecer rapidamente o que você quer cumprir.</p>
+          <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" placeholder="Ex.: Beber água" />
+        </section>
+        <section class="mission-guide-step" aria-labelledby="missionCreateTargetStep">
+          <span class="mission-guide-number">2</span>
+          <h2 id="missionCreateTargetStep">Quantas vezes por dia?</h2>
+          <p>Defina a meta diária que mostrará o seu progresso nessa missão.</p>
+          <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Ex.: 8 vezes por dia" />
+        </section>
+        <section class="mission-guide-step" aria-labelledby="missionCreateTimeStep">
+          <span class="mission-guide-number">3</span>
+          <h2 id="missionCreateTimeStep">Quanto tempo leva uma vez?</h2>
+          <p>Escolha a duração de uma execução para o relógio acompanhar cada atividade.</p>
+          <button class="mission-guide-time-button" type="button" id="openMissionCreateTimeButton" aria-label="Definir quanto tempo leva uma missão">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1 1 0 0 1 1 1v3.3l2.5 1.5a1 1 0 1 1-1 1.8l-3-1.8a1 1 0 0 1-.5-.86V8.2a1 1 0 0 1 1-1Zm0-5.2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z" fill="currentColor"/></svg>
+            <span class="history-mission-time-summary" id="missionCreateTimeSummary">Definir tempo por missão</span>
+          </button>
+        </section>
         <p class="finance-status" id="missionCreateStatus" aria-live="polite"></p>
       </div>
-      <div class="history-mission-modal-footer history-mission-modal-footer-two">
-        <button class="history-mission-footer-icon history-mission-footer-icon-blue" type="button" id="openMissionCreateTimeButton" aria-label="Definir tempo">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1 1 0 0 1 1 1v3.3l2.5 1.5a1 1 0 1 1-1 1.8l-3-1.8a1 1 0 0 1-.5-.86V8.2a1 1 0 0 1 1-1Zm0-5.2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z" fill="currentColor"/></svg>
-        </button>
-        <button class="history-mission-footer-icon history-mission-footer-icon-green" type="button" id="missionCreateConfirm" aria-label="Criar missão">
+      <div class="history-mission-modal-footer history-mission-modal-footer-one">
+        <button class="primary-btn mission-guide-submit" type="button" id="missionCreateConfirm" aria-label="Criar missão">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z" fill="currentColor"/></svg>
+          <span>Criar missão</span>
         </button>
       </div>
     </div>
@@ -1142,12 +1173,19 @@
   <section class="workspace-modal simple-modal" id="missionAdjustModal" aria-hidden="true" aria-label="Atualizar missão">
     <div class="finance-content history-mission-modal-content history-mission-modal-shell">
       <div class="history-mission-modal-head">
-        <div class="running-task-name" id="missionAdjustTitle">Missão</div>
+        <div class="mission-modal-heading">
+          <span class="mission-modal-eyebrow">Editar missão</span>
+          <h1 class="mission-modal-title" id="missionAdjustTitle">Missão</h1>
+        </div>
         <button class="history-mission-modal-close" type="button" id="missionAdjustCloseButton" aria-label="Fechar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
         </button>
       </div>
       <div class="history-mission-modal-body">
+        <div class="mission-modal-explainer">
+          <h2>Qual será a meta diária?</h2>
+          <p>Ajuste o número com os botões ou escolha um atalho abaixo.</p>
+        </div>
         <div class="history-mission-adjust-stage">
           <button class="history-mission-sign-btn" type="button" id="missionAdjustMinus">-</button>
           <div class="history-mission-adjust-value" id="missionAdjustValue">1</div>
@@ -1205,12 +1243,19 @@
   <section class="workspace-modal simple-modal" id="missionProgressModal" aria-hidden="true" aria-label="Adicionar progresso da missão">
     <div class="finance-content history-mission-modal-content mission-progress-modal-content history-mission-modal-shell">
       <div class="history-mission-modal-head">
-        <div class="running-task-name" id="missionProgressTitle">Missão</div>
+        <div class="mission-modal-heading">
+          <span class="mission-modal-eyebrow">Adicionar progresso</span>
+          <h1 class="mission-modal-title" id="missionProgressTitle">Missão</h1>
+        </div>
         <button class="history-mission-modal-close" type="button" id="missionProgressCloseButton" aria-label="Fechar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
         </button>
       </div>
       <div class="history-mission-modal-body">
+        <div class="mission-modal-explainer">
+          <h2>Quanto você concluiu agora?</h2>
+          <p>Este painel abre ao manter a missão pressionada. Informe o avanço e confirme.</p>
+        </div>
         <div class="history-mission-adjust-stage">
           <button class="history-mission-sign-btn" type="button" id="missionProgressMinus">-</button>
           <div class="history-mission-adjust-value" id="missionProgressValue">1</div>
@@ -1256,13 +1301,19 @@
   <section class="workspace-modal simple-modal" id="missionTimeModal" aria-hidden="true" aria-label="Definir tempo da missão">
     <div class="finance-content history-mission-modal-content history-mission-modal-shell">
       <div class="history-mission-modal-head">
-        <div class="running-task-name">Tempo por unidade</div>
+        <div class="mission-modal-heading">
+          <span class="mission-modal-eyebrow">Duração da atividade</span>
+          <h1 class="mission-modal-title">Tempo por missão</h1>
+        </div>
         <button class="history-mission-modal-close" type="button" id="missionTimeCloseButton" aria-label="Fechar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
         </button>
       </div>
       <div class="history-mission-modal-body">
-        <p class="history-mission-time-prompt" id="missionTimePrompt">Quanto tempo leva 1 missão?</p>
+        <div class="mission-modal-explainer">
+          <h2 class="history-mission-time-prompt" id="missionTimePrompt">Quanto tempo leva uma missão?</h2>
+          <p>Use os controles para escolher segundos ou minutos por execução.</p>
+        </div>
         <div class="history-mission-adjust-stage">
           <button class="history-mission-sign-btn" type="button" id="missionTimeMinus">-</button>
           <div class="history-mission-adjust-value" id="missionTimeValue">30</div>

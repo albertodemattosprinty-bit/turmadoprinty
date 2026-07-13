@@ -7163,3 +7163,405 @@ body[data-background-theme="white"] :is(.primary-btn, .decision-btn, .history-mi
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
+
+/* Mission setup and progress flows are full-screen, themed and self-explanatory. */
+.history-mission-modal-content {
+  background: transparent !important;
+}
+
+.history-mission-modal-head {
+  position: relative;
+  min-height: 66px;
+  justify-content: center;
+  text-align: center;
+}
+
+.history-mission-modal-head .history-mission-modal-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.mission-modal-heading {
+  width: min(100%, 720px);
+  padding-inline: 62px;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+
+.mission-modal-eyebrow {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: clamp(0.78rem, 2.4vw, 0.94rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.simple-modal h1.mission-modal-title {
+  margin: 0;
+  max-width: 100%;
+  font-size: clamp(2rem, 6.4vw, 3.7rem);
+  font-weight: 950;
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+}
+
+.history-mission-modal-body {
+  width: min(100%, 720px);
+  justify-self: center;
+  align-content: center;
+  justify-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 2px;
+  text-align: center;
+}
+
+.mission-guide-body {
+  align-content: start;
+  gap: 14px;
+}
+
+.mission-guide-step {
+  width: 100%;
+  padding: clamp(16px, 3.5vw, 24px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 26px;
+  background: rgba(4, 16, 39, 0.2);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+  backdrop-filter: blur(9px);
+}
+
+.mission-guide-number {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #27a6ff, #1749cf);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 950;
+  box-shadow: 0 9px 22px rgba(8, 55, 155, 0.32);
+}
+
+.mission-guide-step h2,
+.mission-modal-explainer h2 {
+  margin: 0;
+  font-size: clamp(1.34rem, 4.5vw, 2.15rem);
+  font-weight: 950;
+  line-height: 1.08;
+}
+
+.mission-guide-step p,
+.mission-modal-explainer p {
+  margin: 0;
+  max-width: 580px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: clamp(0.95rem, 2.8vw, 1.12rem);
+  font-weight: 650;
+  line-height: 1.42;
+}
+
+.mission-guide-step .text-field.options-text-field {
+  width: min(100%, 560px);
+  min-height: 62px;
+  margin-top: 4px;
+  padding-inline: 20px;
+  text-align: center;
+  font-size: clamp(1.03rem, 3vw, 1.2rem);
+  font-weight: 800;
+}
+
+.mission-guide-time-button {
+  width: min(100%, 560px);
+  min-height: 62px;
+  margin-top: 4px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #2d9aff 0%, #1551d0 100%);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(10, 50, 150, 0.3);
+}
+
+.mission-guide-time-button svg {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+.mission-guide-time-button .history-mission-time-summary {
+  color: #fff;
+  font-size: clamp(1rem, 3vw, 1.15rem);
+  font-weight: 900;
+}
+
+.mission-guide-submit {
+  width: min(100%, 360px);
+  min-height: 62px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 1.08rem;
+  font-weight: 950;
+}
+
+.mission-guide-submit svg {
+  width: 27px;
+  height: 27px;
+}
+
+.mission-modal-explainer {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  margin-bottom: 4px;
+}
+
+.history-mission-adjust-stage {
+  max-width: 560px;
+}
+
+.history-mission-adjust-value {
+  min-height: 82px;
+  font-size: clamp(2.5rem, 9vw, 4.8rem);
+  line-height: 1;
+}
+
+.history-mission-sign-btn {
+  height: 76px;
+  font-size: 2.4rem;
+}
+
+.history-mission-adjust-presets {
+  max-width: 560px;
+}
+
+.history-mission-time-unit-label,
+.history-mission-time-summary,
+.history-mission-modal-shell .finance-status {
+  font-size: clamp(1rem, 3.2vw, 1.18rem);
+}
+
+body[data-background-theme="light"] :is(.mission-guide-step p, .mission-modal-explainer p, .mission-modal-eyebrow),
+body[data-background-theme="white"] :is(.mission-guide-step p, .mission-modal-explainer p, .mission-modal-eyebrow) {
+  color: rgba(52, 58, 64, 0.76) !important;
+}
+
+body[data-background-theme="light"] .mission-guide-step,
+body[data-background-theme="white"] .mission-guide-step {
+  border-color: rgba(52, 58, 64, 0.12);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+body[data-background-theme="light"] :is(.mission-guide-number, .mission-guide-time-button, .mission-guide-time-button *, .mission-guide-submit, .mission-guide-submit *),
+body[data-background-theme="white"] :is(.mission-guide-number, .mission-guide-time-button, .mission-guide-time-button *, .mission-guide-submit, .mission-guide-submit *) {
+  color: #fff !important;
+}
+
+@media (max-height: 760px) {
+  .history-mission-modal-shell {
+    gap: 10px;
+    padding-top: 12px;
+  }
+
+  .mission-guide-step {
+    padding-block: 13px;
+  }
+
+  .mission-guide-step p {
+    font-size: 0.9rem;
+  }
+}
+
+#pointsUpdateModal.workspace-modal {
+  z-index: 2400;
+  place-items: center;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+
+#pointsUpdateModal.workspace-modal.active {
+  display: grid;
+}
+
+#pointsUpdateModal.is-leaving {
+  opacity: 0;
+}
+
+.points-update-shell {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: clamp(24px, 6vw, 54px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: clamp(28px, 7vw, 52px);
+  background: rgba(4, 15, 40, 0.18);
+  display: grid;
+  justify-items: center;
+  gap: clamp(10px, 2.5vh, 20px);
+  text-align: center;
+  overflow: hidden auto;
+  backdrop-filter: blur(12px);
+  animation: points-update-shell-in 320ms cubic-bezier(0.2, 0.82, 0.28, 1) both;
+}
+
+.points-update-kicker {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(0.82rem, 2.8vw, 1rem);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.points-update-total {
+  font-size: clamp(5.2rem, 24vw, 10rem);
+  font-weight: 950;
+  line-height: 0.8;
+  letter-spacing: -0.08em;
+  text-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+}
+
+.points-update-delta {
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #38d978, #13984a);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: clamp(1.04rem, 3.8vw, 1.35rem);
+  font-weight: 950;
+  box-shadow: 0 14px 30px rgba(11, 121, 58, 0.32);
+}
+
+.points-update-ranking {
+  width: min(100%, 560px);
+  display: grid;
+  gap: 10px;
+}
+
+.points-update-ranking[hidden] {
+  display: none;
+}
+
+.points-update-ranking h2 {
+  margin: 0;
+  font-size: clamp(1.15rem, 4vw, 1.65rem);
+  font-weight: 950;
+}
+
+.points-update-ranking-list {
+  display: grid;
+  gap: 8px;
+}
+
+.points-update-ranking-row {
+  min-height: 54px;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.09);
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) minmax(48px, auto);
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  will-change: transform;
+}
+
+.points-update-ranking-row.is-self {
+  border-color: rgba(121, 226, 255, 0.72);
+  background: linear-gradient(135deg, rgba(27, 149, 255, 0.9), rgba(20, 86, 210, 0.9));
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(7, 54, 150, 0.28);
+}
+
+.points-update-rank,
+.points-update-row-points {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.points-update-row-points {
+  text-align: right;
+}
+
+.points-update-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(0.98rem, 3.4vw, 1.16rem);
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#pointsUpdateModal.is-overtaking .points-update-ranking-row.is-self {
+  animation: points-update-self-overtake 620ms ease both;
+}
+
+body[data-background-theme="light"] .points-update-shell,
+body[data-background-theme="white"] .points-update-shell {
+  border-color: rgba(52, 58, 64, 0.13);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+body[data-background-theme="light"] .points-update-ranking-row,
+body[data-background-theme="white"] .points-update-ranking-row {
+  border-color: rgba(52, 58, 64, 0.12);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+body[data-background-theme="light"] :is(.points-update-delta, .points-update-delta *, .points-update-ranking-row.is-self, .points-update-ranking-row.is-self *),
+body[data-background-theme="white"] :is(.points-update-delta, .points-update-delta *, .points-update-ranking-row.is-self, .points-update-ranking-row.is-self *) {
+  color: #fff !important;
+}
+
+@keyframes points-update-shell-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes points-update-self-overtake {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  48% {
+    filter: brightness(1.28);
+    box-shadow: 0 0 0 5px rgba(120, 238, 255, 0.2), 0 18px 36px rgba(7, 54, 150, 0.4);
+  }
+}
+
+@media (max-height: 680px) {
+  .points-update-shell {
+    padding-block: 20px;
+    gap: 9px;
+  }
+
+  .points-update-total {
+    font-size: clamp(4.4rem, 19vh, 7rem);
+  }
+
+  .points-update-ranking-row {
+    min-height: 46px;
+    padding-block: 7px;
+  }
+}

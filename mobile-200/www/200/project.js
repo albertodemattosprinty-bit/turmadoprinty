@@ -643,6 +643,11 @@ const socialInviteInput = document.getElementById("socialInviteInput");
 const socialInviteSubmitButton = document.getElementById("socialInviteSubmitButton");
 const socialModalStatus = document.getElementById("socialModalStatus");
 const socialModalList = document.getElementById("socialModalList");
+const pointsUpdateModal = document.getElementById("pointsUpdateModal");
+const pointsUpdateTotal = document.getElementById("pointsUpdateTotal");
+const pointsUpdateDelta = document.getElementById("pointsUpdateDelta");
+const pointsUpdateRanking = document.getElementById("pointsUpdateRanking");
+const pointsUpdateRankingList = document.getElementById("pointsUpdateRankingList");
 const socialScopePrevButton = document.getElementById("socialScopePrevButton");
 const socialScopeNextButton = document.getElementById("socialScopeNextButton");
 const statsRunningSurfaceButton = document.getElementById("statsRunningSurfaceButton");
@@ -797,6 +802,9 @@ const touchClickAudioPool = typeof Audio !== "undefined"
 const missionProgressAudioPool = typeof Audio !== "undefined"
   ? [new Audio(missionProgressSoundUrl), new Audio(missionProgressSoundUrl)]
   : [];
+const pointsRankOvertakeAudio = typeof Audio !== "undefined"
+  ? new Audio("/200/sfx/mododesbloqueado.mp3")
+  : null;
 const RUNNING_RING_RADIUS = 48;
 const RUNNING_RING_CIRCUMFERENCE = 2 * Math.PI * RUNNING_RING_RADIUS;
 const RUNNING_RING_FULL_OFFSET = -0.8;
@@ -853,6 +861,7 @@ let postponeFeedbackCarouselTimer = null;
 let runningMissionQuickFeedbackTimer = null;
 let runningMissionQuickFocusTimer = null;
 let runningMissionQuickRequestChain = Promise.resolve();
+let pointsUpdateFeedbackQueue = Promise.resolve();
 let runningMissionQuickSpotlightTimer = null;
 let missionCardHoldTimer = null;
 let missionCardHoldGoalId = "";
@@ -4564,6 +4573,9 @@ function openModal(id) {
     }
     setRunningHomeVisibility(false);
     void loadMissions();
+    if (!state.homeSnapshotReady) {
+      void ensureRunningSurfaceSnapshot();
+    }
     startRunningTaskTicker();
     renderHomeRunningTask();
   }
@@ -6592,6 +6604,19 @@ async function refreshHomeSnapshot(options = {}) {
     }
   })();
   return homeSnapshotHydrationPromise;
+}
+
+async function ensureRunningSurfaceSnapshot() {
+  if (state.homeSnapshotReady) {
+    return;
+  }
+  if (homeSnapshotHydrationPromise) {
+    await homeSnapshotHydrationPromise;
+  }
+  if (!state.homeSnapshotReady) {
+    await loadActions({ silent: true });
+  }
+  renderHomeRunningTask();
 }
 
 async function createProject200ProfileFromModal() {
@@ -9208,6 +9233,200 @@ function renderSocialModal() {
   }
 }
 
+function getPointsUpdateRankingEntries(snapshot) {
+  const entries = [];
+  if (snapshot?.self) {
+    entries.push({ ...snapshot.self, isSelf: true });
+  }
+  for (const friend of Array.isArray(snapshot?.friends) ? snapshot.friends : []) {
+    entries.push({ ...friend, isSelf: false });
+  }
+  entries.sort((left, right) => {
+    const pointsDelta = Number(right?.points || 0) - Number(left?.points || 0);
+    if (pointsDelta !== 0) {
+      return pointsDelta;
+    }
+    return String(left?.name || "").localeCompare(String(right?.name || ""), "pt-BR");
+  });
+  return entries.map((entry, index) => ({
+    ...entry,
+    points: Math.max(0, Math.trunc(Number(entry?.points || 0) || 0)),
+    rank: index + 1
+  }));
+}
+
+function getPointsUpdateEntryKey(entry) {
+  const userId = String(entry?.userId || "").trim();
+  if (userId) {
+    return userId;
+  }
+  return entry?.isSelf ? "self" : `friend:${String(entry?.name || "usuario").trim().toLowerCase()}`;
+}
+
+function getPointsUpdateVisibleRanking(entries) {
+  const selfIndex = entries.findIndex((entry) => entry.isSelf);
+  if (selfIndex < 0) {
+    return [];
+  }
+  return entries.slice(Math.max(0, selfIndex - 2), selfIndex + 3);
+}
+
+function playPointsRankOvertakeSound() {
+  if (!pointsRankOvertakeAudio) {
+    return;
+  }
+  try {
+    pointsRankOvertakeAudio.pause();
+    pointsRankOvertakeAudio.currentTime = 0;
+    pointsRankOvertakeAudio.volume = 1;
+    void pointsRankOvertakeAudio.play().catch(() => {});
+  } catch {}
+}
+
+function animatePointsUpdateTotal(fromPoints, toPoints) {
+  if (!pointsUpdateTotal) {
+    return;
+  }
+  const startedAt = performance.now();
+  const durationMs = 900;
+  const tick = (now) => {
+    const progress = Math.min(1, Math.max(0, (now - startedAt) / durationMs));
+    const eased = 1 - Math.pow(1 - progress, 3);
+    pointsUpdateTotal.textContent = String(Math.round(fromPoints + ((toPoints - fromPoints) * eased)));
+    if (progress < 1 && pointsUpdateModal?.classList.contains("active")) {
+      window.requestAnimationFrame(tick);
+    }
+  };
+  window.requestAnimationFrame(tick);
+}
+
+function renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake) {
+  if (!pointsUpdateRanking || !pointsUpdateRankingList) {
+    return;
+  }
+  const beforeEntries = getPointsUpdateRankingEntries(beforeSnapshot);
+  const afterEntries = getPointsUpdateRankingEntries(afterSnapshot);
+  const hasFriends = (Array.isArray(afterSnapshot?.friends) ? afterSnapshot.friends : []).length > 0;
+  pointsUpdateRanking.hidden = !hasFriends;
+  if (!hasFriends) {
+    pointsUpdateRankingList.innerHTML = "";
+    return;
+  }
+
+  const visibleAfter = getPointsUpdateVisibleRanking(afterEntries);
+  const beforeByKey = new Map(beforeEntries.map((entry) => [getPointsUpdateEntryKey(entry), entry]));
+  const beforeRankByKey = new Map(beforeEntries.map((entry) => [getPointsUpdateEntryKey(entry), entry.rank]));
+  const initialEntries = didOvertake
+    ? [...visibleAfter].sort((left, right) => {
+        const leftRank = beforeRankByKey.get(getPointsUpdateEntryKey(left)) || Number.MAX_SAFE_INTEGER;
+        const rightRank = beforeRankByKey.get(getPointsUpdateEntryKey(right)) || Number.MAX_SAFE_INTEGER;
+        return leftRank - rightRank;
+      })
+    : visibleAfter;
+
+  pointsUpdateRankingList.innerHTML = initialEntries.map((entry) => {
+    const key = getPointsUpdateEntryKey(entry);
+    const initialEntry = didOvertake ? (beforeByKey.get(key) || entry) : entry;
+    return `
+      <div class="points-update-ranking-row${entry.isSelf ? " is-self" : ""}" data-points-ranking-user="${escapeHtml(key)}">
+        <span class="points-update-rank">${escapeHtml(`${initialEntry.rank || entry.rank}º`)}</span>
+        <strong class="points-update-name">${escapeHtml(String(entry?.name || (entry.isSelf ? "Você" : "Usuário")))}</strong>
+        <span class="points-update-row-points">${escapeHtml(String(initialEntry.points ?? entry.points))}</span>
+      </div>
+    `;
+  }).join("");
+
+  if (!didOvertake) {
+    return;
+  }
+
+  window.setTimeout(() => {
+    if (!pointsUpdateModal?.classList.contains("active")) {
+      return;
+    }
+    const nodes = new Map([...pointsUpdateRankingList.querySelectorAll("[data-points-ranking-user]")]
+      .map((node) => [String(node.dataset.pointsRankingUser || ""), node]));
+    const firstPositions = new Map([...nodes].map(([key, node]) => [key, node.getBoundingClientRect().top]));
+    visibleAfter.forEach((entry) => {
+      const node = nodes.get(getPointsUpdateEntryKey(entry));
+      if (node) {
+        pointsUpdateRankingList.appendChild(node);
+      }
+    });
+    const lastPositions = new Map([...nodes].map(([key, node]) => [key, node.getBoundingClientRect().top]));
+    visibleAfter.forEach((entry) => {
+      const key = getPointsUpdateEntryKey(entry);
+      const node = nodes.get(key);
+      if (!node) {
+        return;
+      }
+      const translateY = Number(firstPositions.get(key) || 0) - Number(lastPositions.get(key) || 0);
+      node.style.transition = "none";
+      node.style.transform = `translateY(${translateY}px)`;
+      const rankNode = node.querySelector(".points-update-rank");
+      const pointsNode = node.querySelector(".points-update-row-points");
+      if (rankNode) rankNode.textContent = `${entry.rank}º`;
+      if (pointsNode) pointsNode.textContent = String(entry.points);
+    });
+    void pointsUpdateRankingList.offsetHeight;
+    window.requestAnimationFrame(() => {
+      nodes.forEach((node) => {
+        node.style.transition = "transform 620ms cubic-bezier(0.2, 0.84, 0.28, 1)";
+        node.style.transform = "translateY(0)";
+      });
+      pointsUpdateModal.classList.add("is-overtaking");
+      playPointsRankOvertakeSound();
+    });
+  }, 170);
+}
+
+async function showPointsUpdateFeedback(pointsUpdate) {
+  const beforeSnapshot = pointsUpdate?.before || null;
+  const afterSnapshot = pointsUpdate?.after || null;
+  const beforePoints = Math.max(0, Math.trunc(Number(beforeSnapshot?.self?.points || 0) || 0));
+  const afterPoints = Math.max(0, Math.trunc(Number(afterSnapshot?.self?.points || 0) || 0));
+  const gainedPoints = afterPoints - beforePoints;
+  if (!pointsUpdateModal || !afterSnapshot || gainedPoints <= 0) {
+    return;
+  }
+
+  const beforeEntries = getPointsUpdateRankingEntries(beforeSnapshot);
+  const afterEntries = getPointsUpdateRankingEntries(afterSnapshot);
+  const beforePosition = beforeEntries.findIndex((entry) => entry.isSelf);
+  const afterPosition = afterEntries.findIndex((entry) => entry.isSelf);
+  const didOvertake = beforePosition >= 0 && afterPosition >= 0 && afterPosition < beforePosition;
+
+  if (String(state.social?.scopeKey || "today") === "today") {
+    state.social.pendingCount = Math.max(0, Number(afterSnapshot?.pendingCount || 0) || 0);
+    state.social.self = afterSnapshot?.self || null;
+    state.social.incomingInvites = Array.isArray(afterSnapshot?.incomingInvites) ? afterSnapshot.incomingInvites : [];
+    state.social.friends = Array.isArray(afterSnapshot?.friends) ? afterSnapshot.friends : [];
+    renderSocialModal();
+  }
+
+  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking");
+  if (pointsUpdateTotal) pointsUpdateTotal.textContent = String(beforePoints);
+  if (pointsUpdateDelta) pointsUpdateDelta.textContent = `+${gainedPoints} ${gainedPoints === 1 ? "ponto" : "pontos"}`;
+  renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake);
+  openModal("pointsUpdateModal");
+  animatePointsUpdateTotal(beforePoints, afterPoints);
+
+  await new Promise((resolve) => window.setTimeout(resolve, 1350));
+  pointsUpdateModal.classList.add("is-leaving");
+  await new Promise((resolve) => window.setTimeout(resolve, 150));
+  closeModal("pointsUpdateModal");
+  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking");
+}
+
+function enqueuePointsUpdateFeedback(pointsUpdate) {
+  if (!pointsUpdate?.before || !pointsUpdate?.after) {
+    return;
+  }
+  pointsUpdateFeedbackQueue = pointsUpdateFeedbackQueue
+    .catch(() => {})
+    .then(() => showPointsUpdateFeedback(pointsUpdate));
+}
+
 async function loadSocialSnapshot(options = {}) {
   if (!getToken()) {
     state.social.pendingCount = 0;
@@ -9756,6 +9975,7 @@ function queueRunningMissionQuickIncrement(goal) {
             showRunningMissionQuickFeedback(updatedGoal);
           }
         }
+        enqueuePointsUpdateFeedback(payload?.pointsUpdate);
       } catch (error) {
         await loadMissions();
         renderMissions();
@@ -10172,7 +10392,7 @@ function renderMissionAdjustState() {
     missionAdjustHint.textContent = `Meta diária ${targetValue}x`;
   }
   if (missionAdjustTimeSummary) {
-    missionAdjustTimeSummary.textContent = `Tempo por unidade: ${formatMissionUnitDurationLabel(state.missionAdjust?.unitDurationSeconds || DEFAULT_MISSION_DURATION_SECONDS)}`;
+    missionAdjustTimeSummary.textContent = `1 missão leva ${formatMissionDurationValue(state.missionAdjust?.unitDurationSeconds || DEFAULT_MISSION_DURATION_SECONDS)}`;
   }
   missionAdjustMinusButton?.classList.remove("active");
   missionAdjustPlusButton?.classList.add("active");
@@ -10193,7 +10413,7 @@ function openMissionCreateModal() {
     timeConfigured: true
   };
   if (missionCreateTimeSummary) {
-    missionCreateTimeSummary.textContent = `Tempo por unidade: ${formatMissionUnitDurationLabel(DEFAULT_MISSION_DURATION_SECONDS)}`;
+    missionCreateTimeSummary.textContent = `1 missão leva ${formatMissionDurationValue(DEFAULT_MISSION_DURATION_SECONDS)}`;
   }
   openModal("missionCreateModal");
   window.setTimeout(() => missionTitleInput?.focus(), 60);
@@ -10549,7 +10769,7 @@ async function finalizeMissionRun({ restart = false } = {}) {
     missionRunStatus.textContent = "Concluindo...";
   }
   try {
-    await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
+    const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -10558,6 +10778,7 @@ async function finalizeMissionRun({ restart = false } = {}) {
         variantId: String(state.missionRun.selectedVariantId || "")
       })
     });
+    enqueuePointsUpdateFeedback(payload?.pointsUpdate);
     stopMissionRunAlarm();
     playMissionProgressSound();
     await Promise.all([loadMissions(), loadActionMissions()]);
@@ -12614,7 +12835,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
       missionProgressStatus.textContent = deltaValue < 0 ? "Subtraindo..." : "Adicionando...";
     }
     try {
-      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
+      const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -12622,6 +12843,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
           delta: deltaValue
         })
       });
+      enqueuePointsUpdateFeedback(payload?.pointsUpdate);
       if (deltaValue > 0) {
         playMissionProgressSound();
       }
@@ -12719,7 +12941,7 @@ missionTimeConfirmButton?.addEventListener("click", () => {
     state.missionCreate.unitDurationSeconds = safeValue;
     state.missionCreate.timeConfigured = true;
     if (missionCreateTimeSummary) {
-      missionCreateTimeSummary.textContent = `Tempo por unidade: ${formatMissionUnitDurationLabel(safeValue)}`;
+      missionCreateTimeSummary.textContent = `1 missão leva ${formatMissionDurationValue(safeValue)}`;
     }
     if (missionCreateStatus) {
       missionCreateStatus.textContent = `Tempo definido: ${formatMissionUnitDurationLabel(safeValue)}.`;
