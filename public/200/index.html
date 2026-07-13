@@ -1296,11 +1296,14 @@
         </div>
       </div>
       <div class="history-mission-run-confirm" id="missionRunFinishChoice" hidden>
-        <div class="history-mission-run-confirm-card">
+        <div class="history-mission-run-confirm-card history-mission-run-finish-card">
+          <button class="history-mission-run-finish-close" type="button" id="missionRunFinishCloseButton" aria-label="Fechar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </button>
           <div class="history-mission-run-confirm-title">Missão concluída</div>
-          <div class="history-mission-run-confirm-actions">
-            <button class="ghost-btn" type="button" id="missionRunFinishButton">Finalizar</button>
-            <button class="primary-btn" type="button" id="missionRunRestartButton">Iniciar outro</button>
+          <div class="history-mission-run-confirm-actions history-mission-run-finish-actions">
+            <button class="history-mission-run-finish-button" type="button" id="missionRunFinishButton">Finalizar</button>
+            <button class="history-mission-run-restart-button" type="button" id="missionRunRestartButton">Fazer denovo</button>
           </div>
         </div>
       </div>

@@ -6755,6 +6755,53 @@ body[data-background-theme="white"] #missionRunModal.workspace-modal {
   gap: 12px;
 }
 
+.history-mission-run-finish-card {
+  position: relative;
+  padding-top: 54px;
+}
+
+.history-mission-run-finish-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.history-mission-run-finish-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.history-mission-run-finish-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.history-mission-run-finish-button,
+.history-mission-run-restart-button {
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  border-radius: 16px;
+  color: #fff;
+  font: inherit;
+  font-weight: 900;
+}
+
+.history-mission-run-finish-button {
+  background: linear-gradient(145deg, #31c56d 0%, #12783d 100%);
+}
+
+.history-mission-run-restart-button {
+  background: linear-gradient(135deg, #2fc66d 0%, #17a98a 48%, #1976df 100%);
+}
+
 .history-mission-card {
   user-select: none;
   -webkit-user-select: none;

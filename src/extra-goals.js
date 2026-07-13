@@ -2,6 +2,7 @@ import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
+const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
 export const EXTRA_GOAL_HISTORY_SCOPES = [
   { key: "today", label: "Hoje", days: 1 },
   { key: "last7", label: "Ultimos 7 dias", days: 7 },
@@ -479,9 +480,9 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   if (!targetValue) {
     throw new Error("Informe a unidade diaria da missao.");
   }
-  const unitDurationSeconds = Math.max(0, Math.trunc(Number(
+  const unitDurationSeconds = Math.min(EXTRA_GOAL_MAX_DURATION_SECONDS, Math.max(0, Math.trunc(Number(
     payload?.unitDurationSeconds ?? (Number(payload?.unitDurationMinutes || 0) * 60)
-  ) || 0));
+  ) || 0)));
   const unitDurationMinutes = Math.max(0, Math.trunc(unitDurationSeconds / 60));
   await query(
     `
@@ -566,11 +567,11 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   const storedSvgDefault = await getStoredExtraGoalSvgDefault(userId, normalizedProfile, currentTitle);
   const svgIconUrl = String(payload?.svgIconUrl || currentGoal?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
   const svgIconLabel = String(payload?.svgIconLabel || currentGoal?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
-  const nextUnitDurationSeconds = Math.max(0, Math.trunc(Number(
+  const nextUnitDurationSeconds = Math.min(EXTRA_GOAL_MAX_DURATION_SECONDS, Math.max(0, Math.trunc(Number(
     payload?.unitDurationSeconds
       ?? (payload?.unitDurationMinutes !== undefined ? Number(payload.unitDurationMinutes || 0) * 60 : currentGoal?.unitDurationSeconds)
       ?? 0
-  ) || 0));
+  ) || 0)));
   const nextUnitDurationMinutes = Math.max(0, Math.trunc(nextUnitDurationSeconds / 60));
   if (!nextTargetValue) {
     throw new Error("Informe a unidade diaria da missao.");

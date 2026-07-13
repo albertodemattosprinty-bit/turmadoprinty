@@ -431,6 +431,7 @@ const missionRunConfirm = document.getElementById("missionRunConfirm");
 const missionRunCancelDiscardButton = document.getElementById("missionRunCancelDiscardButton");
 const missionRunCancelFinishButton = document.getElementById("missionRunCancelFinishButton");
 const missionRunFinishChoice = document.getElementById("missionRunFinishChoice");
+const missionRunFinishCloseButton = document.getElementById("missionRunFinishCloseButton");
 const missionRunFinishButton = document.getElementById("missionRunFinishButton");
 const missionRunRestartButton = document.getElementById("missionRunRestartButton");
 const runningTaskMissionButton = document.getElementById("runningTaskMissionButton");
@@ -1636,15 +1637,52 @@ function normalizeMissionActionsMode(value) {
 
 function buildPendingActionMissionUnits() {
   if (state.activeOffset !== 0) return [];
-  const units = [];
-  (Array.isArray(state.actionMissions) ? state.actionMissions : []).forEach((goal) => {
+  const weightedGoals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).map((goal, goalIndex) => {
     const targetValue = Math.max(1, Math.trunc(Number(goal?.targetValue || 1) || 1));
     const progressValue = Math.max(0, Math.trunc(Number(goal?.progressValue || 0) || 0));
     const remainingValue = Math.max(0, targetValue - progressValue);
-    for (let index = 0; index < remainingValue; index += 1) {
-      units.push({ goal, unitIndex: progressValue + index + 1 });
+    return {
+      goal,
+      goalIndex,
+      progressValue,
+      remainingValue,
+      emittedValue: 0,
+      currentWeight: 0
+    };
+  }).filter((entry) => entry.remainingValue > 0);
+  const totalWeight = weightedGoals.reduce((sum, entry) => sum + entry.remainingValue, 0);
+  const units = [];
+  let lastGoalIndex = -1;
+  while (units.length < totalWeight) {
+    weightedGoals.forEach((entry) => {
+      if (entry.emittedValue < entry.remainingValue) {
+        entry.currentWeight += entry.remainingValue;
+      }
+    });
+    const available = weightedGoals.filter((entry) => entry.emittedValue < entry.remainingValue);
+    if (!available.length) break;
+    available.sort((left, right) => (
+      right.currentWeight - left.currentWeight
+      || left.goalIndex - right.goalIndex
+    ));
+    let selected = available[0];
+    if (selected.goalIndex === lastGoalIndex && available.length > 1) {
+      const selectedRemaining = selected.remainingValue - selected.emittedValue;
+      const otherRemaining = available.reduce((sum, entry) => (
+        entry.goalIndex === selected.goalIndex ? sum : sum + (entry.remainingValue - entry.emittedValue)
+      ), 0);
+      if (selectedRemaining <= otherRemaining + 1) {
+        selected = available.find((entry) => entry.goalIndex !== lastGoalIndex) || selected;
+      }
     }
-  });
+    selected.currentWeight -= totalWeight;
+    selected.emittedValue += 1;
+    lastGoalIndex = selected.goalIndex;
+    units.push({
+      goal: selected.goal,
+      unitIndex: selected.progressValue + selected.emittedValue
+    });
+  }
   return units;
 }
 
@@ -1700,8 +1738,7 @@ function buildActionMissionTimelineEntries() {
 }
 
 function formatActionMissionDuration(goal) {
-  const seconds = getMissionUnitDurationSeconds(goal);
-  return seconds === 60 ? "1 minuto" : `${seconds} segundos`;
+  return formatMissionDurationValue(getMissionUnitDurationSeconds(goal));
 }
 
 function renderActionsMissionFilter() {
@@ -8186,7 +8223,15 @@ function getVisibleCategoryTaskMinutes(categoryId) {
     .reduce((sum, action) => sum + getActionDurationMinutes(action), 0);
 }
 
-const MISSION_DURATION_OPTIONS_SECONDS = Object.freeze([5, 10, 15, 30, 45, 60]);
+const MISSION_MAX_DURATION_MINUTES = 180;
+const MISSION_DURATION_OPTIONS_SECONDS = Object.freeze([
+  5,
+  10,
+  15,
+  30,
+  45,
+  ...Array.from({ length: MISSION_MAX_DURATION_MINUTES }, (_, index) => (index + 1) * 60)
+]);
 const DEFAULT_MISSION_DURATION_SECONDS = 30;
 
 function getMissionUnitDurationSeconds(goal) {
@@ -8208,14 +8253,17 @@ function normalizeMissionDurationOption(seconds, fallback = DEFAULT_MISSION_DURA
   ), MISSION_DURATION_OPTIONS_SECONDS[0]);
 }
 
-function formatMissionUnitDurationLabel(seconds) {
+function formatMissionDurationValue(seconds) {
   const safeSeconds = Math.max(0, Math.trunc(Number(seconds || 0) || 0));
-  if (safeSeconds === 60) return "1 minuto por unidade";
-  if (safeSeconds > 60 && safeSeconds % 60 === 0) {
+  if (safeSeconds >= 60 && safeSeconds % 60 === 0) {
     const minutes = safeSeconds / 60;
-    return `${minutes} min por unidade`;
+    return minutes === 1 ? "1 minuto" : `${minutes} minutos`;
   }
-  return `${safeSeconds} segundos por unidade`;
+  return safeSeconds === 1 ? "1 segundo" : `${safeSeconds} segundos`;
+}
+
+function formatMissionUnitDurationLabel(seconds) {
+  return `${formatMissionDurationValue(seconds)} por unidade`;
 }
 
 function formatMissionTimePromptLabel(title) {
@@ -10092,7 +10140,9 @@ function renderMissionTimeState() {
     missionTimePrompt.textContent = formatMissionTimePromptLabel(state.missionTime?.title || "");
   }
   if (missionTimeValue) {
-    missionTimeValue.textContent = String(safeValue);
+    missionTimeValue.textContent = safeValue >= 60 && safeValue % 60 === 0
+      ? String(safeValue / 60)
+      : String(safeValue);
   }
   if (missionTimeUnitLabel) {
     missionTimeUnitLabel.textContent = formatMissionUnitDurationLabel(safeValue);
@@ -12487,6 +12537,11 @@ missionRunCompleteButton?.addEventListener("click", () => {
 });
 missionRunFinishButton?.addEventListener("click", () => {
   void finalizeMissionRun();
+});
+missionRunFinishCloseButton?.addEventListener("click", () => {
+  if (missionRunFinishChoice) {
+    missionRunFinishChoice.hidden = true;
+  }
 });
 missionRunRestartButton?.addEventListener("click", () => {
   void finalizeMissionRun({ restart: true });
