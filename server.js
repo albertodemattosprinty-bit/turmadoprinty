@@ -3460,13 +3460,22 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const shouldTrackPointsUpdate = Math.trunc(Number(body?.delta || 0) || 0) > 0;
+    const pointsSnapshotPrepared = body?.pointsSnapshotPrepared === true;
     let dailyRankingBefore = null;
-    if (shouldTrackPointsUpdate) {
+    if (shouldTrackPointsUpdate && !pointsSnapshotPrepared) {
       try {
         dailyRankingBefore = await getProject200FriendsSnapshot(user.id, "today");
       } catch {}
     }
-    const goals = await updateExtraGoalProgress(user.id, selectedProfile, goalId, body?.delta, new Date(), body?.variantId);
+    const goals = await updateExtraGoalProgress(
+      user.id,
+      selectedProfile,
+      goalId,
+      body?.delta,
+      new Date(),
+      body?.variantId,
+      body?.variantIds
+    );
     const summary = summarizeExtraGoals(goals);
     let dailyRankingAfter = null;
     if (shouldTrackPointsUpdate) {
@@ -3479,7 +3488,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
       profile: selectedProfile,
       goals,
       summary,
-      pointsUpdate: dailyRankingBefore && dailyRankingAfter
+      pointsUpdate: dailyRankingAfter
         ? { before: dailyRankingBefore, after: dailyRankingAfter }
         : null
     });

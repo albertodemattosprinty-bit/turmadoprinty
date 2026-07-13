@@ -1077,6 +1077,7 @@
         <h2>Ranking de amigos hoje</h2>
         <div class="points-update-ranking-list" id="pointsUpdateRankingList"></div>
       </div>
+      <div class="points-update-continue" id="pointsUpdateContinue" hidden>Toque para continuar</div>
     </div>
   </section>
 
@@ -1224,6 +1225,7 @@
         <div><div class="mission-variants-kicker" id="missionVariantsKicker">Micro-tarefas</div><div class="running-task-name mission-variants-title" id="missionVariantsTitle">Escolha uma micro-tarefa</div></div>
         <button class="history-mission-modal-close" type="button" id="missionVariantsCloseButton" aria-label="Fechar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg></button>
       </header>
+      <div class="mission-variant-cycle-selection" id="missionVariantCycleSelection" hidden></div>
       <div class="mission-variants-list" id="missionVariantsList" aria-live="polite"></div>
       <button class="primary-btn mission-variant-add" type="button" id="missionVariantAddButton">+ Adicionar micro-tarefa</button>
       <div class="mission-variant-editor" id="missionVariantEditor" hidden>
@@ -1330,6 +1332,11 @@
     </div>
   </section>
 
+  <section class="mission-run-loading-overlay" id="missionRunLoadingOverlay" aria-hidden="true" aria-label="Carregando missão">
+    <div class="mission-run-loading-spinner" aria-hidden="true"></div>
+    <div class="mission-run-loading-copy">Preparando missão...</div>
+  </section>
+
   <section class="workspace-modal simple-modal" id="missionRunModal" aria-hidden="true" aria-label="Executar missão">
     <div class="finance-content history-mission-run-shell">
       <div class="history-mission-run-head">
@@ -1353,6 +1360,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
           </button>
         </div>
+        <button class="mission-run-cycle-count" type="button" id="missionRunCycleCount" aria-label="Quantidade de ciclos: 1. Deslize para alterar">1X</button>
         <p class="finance-status" id="missionRunStatus" aria-live="polite"></p>
       </div>
       <div class="history-mission-run-footer">

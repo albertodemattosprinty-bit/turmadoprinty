@@ -585,7 +585,7 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   return listExtraGoals(userId, normalizedProfile);
 }
 
-export async function updateExtraGoalProgress(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, delta, date = new Date(), variantId = "") {
+export async function updateExtraGoalProgress(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, delta, date = new Date(), variantId = "", variantIds = []) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
   const safeGoalId = String(goalId || "").trim();
@@ -632,12 +632,15 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
     `,
     [safeGoalId, userId, normalizedProfile, nextProgress, dateKey]
   );
-  const safeVariantId = String(variantId || "").trim();
-  if (safeDelta > 0 && safeVariantId) {
+  const safeVariantIds = [...new Set([
+    ...(Array.isArray(variantIds) ? variantIds : []),
+    variantId
+  ].map((value) => String(value || "").trim()).filter(Boolean))].slice(0, 5);
+  if (safeDelta > 0 && safeVariantIds.length) {
     await query(`
       update extra_goal_variants set last_completed_at = now(), updated_at = now()
-      where id = $4 and goal_id = $1 and user_id = $2 and assigned_profile = $3
-    `, [safeGoalId, userId, normalizedProfile, safeVariantId]);
+      where id = any($4::uuid[]) and goal_id = $1 and user_id = $2 and assigned_profile = $3
+    `, [safeGoalId, userId, normalizedProfile, safeVariantIds]);
   }
   const goals = await listExtraGoals(userId, normalizedProfile, dateKey);
   const updatedGoal = goals.find((goal) => String(goal.id || "").trim() === safeGoalId) || null;
