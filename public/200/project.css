@@ -2694,6 +2694,11 @@ body.running-music-standalone #actionsModal .actions-list {
   z-index: 2000;
 }
 
+body.running-confirm-from-actions #actionsModal.workspace-modal {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 #svgSelectorModal.workspace-modal {
   display: none;
   place-items: stretch;

@@ -4870,7 +4870,7 @@ function closeModal(modal) {
     state.runningConfirm.action = null;
     state.runningConfirm.pauseAction = null;
     if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
-    document.body.classList.remove("running-confirm-open");
+    document.body.classList.remove("running-confirm-open", "running-confirm-from-actions");
   }
   if (modal.id === "quickTaskModal") {
     document.body.classList.remove("quick-task-open");
@@ -4927,7 +4927,7 @@ function navigateToProjectHome() {
   } finally {
     modalBackNavigationActive = false;
     modalNavigationStack.length = 0;
-    document.body.classList.remove("modal-open", "start-decision-open", "task-starting", "running-confirm-open", "quick-task-open");
+    document.body.classList.remove("modal-open", "start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   }
 }
 
@@ -5522,7 +5522,7 @@ async function toggleActionStatus(actionId, options = {}) {
     return;
   }
 
-  const targetAction = state.actions.find((item) => item.id === targetId);
+  const targetAction = state.actions.find((item) => String(item?.id || "") === targetId);
 
   if (!targetAction) {
     return;
@@ -5688,7 +5688,7 @@ function closeWizard() {
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
-  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open", "quick-task-open");
+  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
   }
@@ -5961,7 +5961,7 @@ function closeRunningConfirmModal() {
   state.runningConfirm.action = null;
   state.runningConfirm.pauseAction = null;
   if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
-  document.body.classList.remove("running-confirm-open");
+  document.body.classList.remove("running-confirm-open", "running-confirm-from-actions");
   if (runningConfirmModal) {
     closeModal(runningConfirmModal);
   }
@@ -6002,6 +6002,9 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
   if (runningConfirmPauseButton) {
     runningConfirmPauseButton.hidden = !(kind === "abort" && state.runningConfirm.pauseAction);
   }
+  const openedFromActions = Boolean(actionsModal?.classList.contains("active"));
+  document.body.classList.toggle("running-confirm-from-actions", openedFromActions);
+  document.body.appendChild(runningConfirmModal);
   document.body.classList.add("running-confirm-open");
   openModal("runningConfirmModal");
 }
