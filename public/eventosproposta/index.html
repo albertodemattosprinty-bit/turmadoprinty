@@ -1888,6 +1888,12 @@
         }
       });
 
+      document.addEventListener("selectstart", function (event) {
+        if (isAdmin && event.target instanceof Element && event.target.closest("[data-proposal-key]")) {
+          event.preventDefault();
+        }
+      });
+
       cancelButton.addEventListener("click", closeEditor);
       modal.addEventListener("click", function (event) {
         if (event.target === modal) closeEditor();

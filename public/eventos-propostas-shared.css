@@ -148,3 +148,138 @@
     font-size: 34px;
   }
 }
+
+/* Editor global compartilhado pelas propostas. */
+body.proposal-admin-ready [data-proposal-key] {
+  cursor: text;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.proposal-admin-ready [data-proposal-key]:hover {
+  outline: 1px dashed rgba(255, 255, 255, 0.58);
+  outline-offset: 5px;
+  border-radius: 4px;
+}
+
+body.proposal-admin-ready [data-proposal-key].is-holding {
+  outline: 2px solid var(--gold);
+  outline-offset: 6px;
+}
+
+.proposal-editor-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(4, 14, 32, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.proposal-editor-modal[hidden] {
+  display: none;
+}
+
+.proposal-editor-dialog {
+  width: min(620px, 100%);
+  padding: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 24px;
+  background: #fffdf8;
+  color: var(--ink);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+}
+
+.proposal-editor-dialog h2 {
+  margin: 0 0 6px;
+  color: #23406a;
+  font-size: 25px;
+}
+
+.proposal-editor-dialog p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.proposal-editor-dialog textarea {
+  width: 100%;
+  min-height: 190px;
+  resize: vertical;
+  padding: 15px 16px;
+  border: 1px solid rgba(35, 64, 106, 0.22);
+  border-radius: 15px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.proposal-editor-dialog textarea:focus {
+  outline: 3px solid rgba(54, 99, 154, 0.18);
+  border-color: var(--hero-mid);
+}
+
+.proposal-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.proposal-editor-actions button {
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.proposal-editor-cancel {
+  background: #e9edf3;
+  color: #33445d;
+}
+
+.proposal-editor-save {
+  background: var(--hero-deep);
+  color: #fff;
+}
+
+.proposal-editor-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.proposal-editor-feedback {
+  min-height: 20px;
+  margin-top: 10px !important;
+  color: #9a3412 !important;
+}
+
+.proposal-admin-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1100;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: #fffdf8;
+  color: #23406a;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.proposal-admin-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

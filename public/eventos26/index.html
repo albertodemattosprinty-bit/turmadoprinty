@@ -1285,6 +1285,20 @@
     </section>
   </main>
 
+  <div class="proposal-editor-modal" id="proposalEditorModal" hidden>
+    <div class="proposal-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="proposalEditorTitle">
+      <h2 id="proposalEditorTitle">Editar texto da proposta</h2>
+      <p>A alteração será salva globalmente e aparecerá para todas as pessoas que abrirem esta página.</p>
+      <textarea id="proposalEditorText" maxlength="4000" aria-label="Novo texto"></textarea>
+      <p class="proposal-editor-feedback" id="proposalEditorFeedback" role="status"></p>
+      <div class="proposal-editor-actions">
+        <button class="proposal-editor-cancel" id="proposalEditorCancel" type="button">Cancelar</button>
+        <button class="proposal-editor-save" id="proposalEditorSave" type="button">Salvar globalmente</button>
+      </div>
+    </div>
+  </div>
+  <div class="proposal-admin-toast" id="proposalAdminToast" role="status"></div>
+
   <script>
     (function () {
       const videoUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Capas/Release%20Alberto%20de%20Mattos.mp4";
@@ -1371,6 +1385,214 @@
       });
 
       warmupVideo();
+    })();
+  </script>
+  <script>
+    (function () {
+      const storageKey = "turma_do_printy_token";
+      const editableSelector = "h1, h2, h3, h4, p, li, span, strong, .section-copy, .price-highlight";
+      const modal = document.getElementById("proposalEditorModal");
+      const textarea = document.getElementById("proposalEditorText");
+      const feedback = document.getElementById("proposalEditorFeedback");
+      const cancelButton = document.getElementById("proposalEditorCancel");
+      const saveButton = document.getElementById("proposalEditorSave");
+      const toast = document.getElementById("proposalAdminToast");
+      let isAdmin = false;
+      let activeElement = null;
+      let holdTimer = 0;
+      let holdTarget = null;
+      let holdStartX = 0;
+      let holdStartY = 0;
+      let toastTimer = 0;
+
+      function getToken() {
+        return window.localStorage.getItem(storageKey) || "";
+      }
+
+      function prepareTextKeys() {
+        document.querySelectorAll(".sheet").forEach(function (section, sectionIndex) {
+          let textIndex = 0;
+          section.querySelectorAll(editableSelector).forEach(function (element) {
+            if (element.closest(".video-loading, .hero-cta") || element.querySelector(editableSelector)) {
+              return;
+            }
+
+            const text = element.textContent.trim();
+            if (!text) return;
+            textIndex += 1;
+            if (!element.dataset.proposalKey) {
+              element.dataset.proposalKey = "section-" + (sectionIndex + 1) + ".text-" + textIndex;
+            }
+            if (!element.dataset.proposalDefault) {
+              element.dataset.proposalDefault = text;
+            }
+          });
+        });
+      }
+
+      function applyTextOverrides(overrides) {
+        document.querySelectorAll("[data-proposal-key]").forEach(function (element) {
+          const key = "eventos26." + element.dataset.proposalKey;
+          const fallback = element.dataset.proposalDefault || element.textContent.trim();
+          const override = typeof overrides[key] === "string" ? overrides[key].trim() : "";
+          element.textContent = override || fallback;
+        });
+      }
+
+      function showToast(message, duration) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        toastTimer = window.setTimeout(function () {
+          toast.classList.remove("is-visible");
+        }, duration || 2400);
+      }
+
+      function openEditor(element) {
+        if (!isAdmin || !element) return;
+        activeElement = element;
+        feedback.textContent = "";
+        textarea.value = element.textContent.trim();
+        modal.hidden = false;
+        document.body.style.overflow = "hidden";
+        window.setTimeout(function () {
+          textarea.focus();
+          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        }, 0);
+      }
+
+      function closeEditor() {
+        modal.hidden = true;
+        document.body.style.overflow = "";
+        feedback.textContent = "";
+        activeElement = null;
+      }
+
+      function cancelHold() {
+        window.clearTimeout(holdTimer);
+        holdTimer = 0;
+        if (holdTarget) holdTarget.classList.remove("is-holding");
+        holdTarget = null;
+      }
+
+      document.addEventListener("pointerdown", function (event) {
+        if (!isAdmin || event.button > 0 || !modal.hidden) return;
+        const element = event.target instanceof Element ? event.target.closest("[data-proposal-key]") : null;
+        if (!element) return;
+
+        cancelHold();
+        holdTarget = element;
+        holdStartX = event.clientX;
+        holdStartY = event.clientY;
+        element.classList.add("is-holding");
+        holdTimer = window.setTimeout(function () {
+          const selectedElement = holdTarget;
+          cancelHold();
+          if (window.navigator.vibrate) window.navigator.vibrate(35);
+          openEditor(selectedElement);
+        }, 1000);
+      });
+
+      document.addEventListener("pointermove", function (event) {
+        if (!holdTimer) return;
+        if (Math.hypot(event.clientX - holdStartX, event.clientY - holdStartY) > 12) {
+          cancelHold();
+        }
+      });
+
+      document.addEventListener("pointerup", cancelHold);
+      document.addEventListener("pointercancel", cancelHold);
+      window.addEventListener("blur", cancelHold);
+
+      document.addEventListener("contextmenu", function (event) {
+        if (isAdmin && event.target instanceof Element && event.target.closest("[data-proposal-key]")) {
+          event.preventDefault();
+        }
+      });
+
+      document.addEventListener("selectstart", function (event) {
+        if (isAdmin && event.target instanceof Element && event.target.closest("[data-proposal-key]")) {
+          event.preventDefault();
+        }
+      });
+
+      cancelButton.addEventListener("click", closeEditor);
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) closeEditor();
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !modal.hidden) closeEditor();
+      });
+
+      saveButton.addEventListener("click", async function () {
+        if (!activeElement) return;
+        const text = textarea.value.trim();
+        if (!text) {
+          feedback.textContent = "Escreva o texto antes de salvar.";
+          return;
+        }
+
+        const token = getToken();
+        if (!token) {
+          feedback.textContent = "Sua sessão expirou. Entre novamente para salvar.";
+          return;
+        }
+
+        saveButton.disabled = true;
+        cancelButton.disabled = true;
+        feedback.textContent = "Salvando...";
+
+        try {
+          const key = "eventos26." + activeElement.dataset.proposalKey;
+          const response = await fetch("/api/admin/site/text", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + token
+            },
+            body: JSON.stringify({ key: key, text: text })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Não foi possível salvar o texto.");
+
+          activeElement.textContent = text;
+          closeEditor();
+          showToast("Texto salvo globalmente.");
+        } catch (error) {
+          feedback.textContent = error instanceof Error ? error.message : "Erro ao salvar o texto.";
+        } finally {
+          saveButton.disabled = false;
+          cancelButton.disabled = false;
+        }
+      });
+
+      async function initializeContent() {
+        prepareTextKeys();
+
+        const configRequest = fetch("/api/site/config")
+          .then(function (response) { return response.ok ? response.json() : {}; })
+          .catch(function () { return {}; });
+        const token = getToken();
+        const userRequest = token
+          ? fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } })
+              .then(function (response) { return response.ok ? response.json() : {}; })
+              .catch(function () { return {}; })
+          : Promise.resolve({});
+
+        const results = await Promise.all([configRequest, userRequest]);
+        applyTextOverrides(results[0].textOverrides || {});
+        isAdmin = Boolean(results[1].user && results[1].user.isAdmin);
+
+        if (isAdmin) {
+          document.body.classList.add("proposal-admin-ready");
+          document.querySelectorAll("[data-proposal-key]").forEach(function (element) {
+            element.title = "Toque e segure por 1 segundo para editar";
+          });
+          showToast("Modo administrador: segure um texto por 1 segundo para editar.", 4200);
+        }
+      }
+
+      initializeContent();
     })();
   </script>
 </body>
