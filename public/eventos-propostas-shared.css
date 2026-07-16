@@ -1,0 +1,150 @@
+/* Tipografia compartilhada por /eventos26 e /eventosproposta. */
+.document {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.document h1,
+.document h2,
+.document h3,
+.document h4 {
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.08;
+}
+
+.document h1 {
+  font-family: var(--font-display);
+  font-size: 46px;
+  letter-spacing: -0.035em;
+}
+
+.document .lead {
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.document .button {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.document .hero-card strong,
+.document .quote-card strong {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.document .hero-card span,
+.document .quote-card span {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.document .video-copy h2,
+.document .closing-note h3 {
+  font-size: 30px;
+}
+
+.document .section-header h2 {
+  font-family: var(--font-display);
+  font-size: 29px;
+  letter-spacing: normal;
+}
+
+.document .section-copy {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.document .stat strong {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.document .stat span,
+.document .card p,
+.document .theme-card p,
+.document .logistics-card p,
+.document .media-card p,
+.document .price-card p,
+.document .fit-list li,
+.document .flow-step p,
+.document .quote-band span,
+.document .timeline-copy p {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.document .card h3,
+.document .theme-card h3,
+.document .logistics-card h3,
+.document .media-card h3,
+.document .price-card h3,
+.document .fit-list h3,
+.document .timeline-copy h3 {
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.document .flow-step strong,
+.document .flow-step h4 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.document .quote-band p {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.document .price-highlight {
+  font-family: var(--font-display);
+  font-size: 46px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.document .footer-note {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+@media (max-width: 960px) {
+  .document h1 {
+    font-size: 34px;
+  }
+}
+
+@media (max-width: 640px) {
+  .document h1 {
+    font-size: 30px;
+  }
+
+  .document h2,
+  .document .closing-note h3,
+  .document .video-copy h2 {
+    font-size: 24px;
+  }
+
+  .document .price-highlight,
+  .document .video-loading-card strong {
+    font-size: 34px;
+  }
+}

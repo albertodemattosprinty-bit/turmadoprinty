@@ -585,8 +585,9 @@ const startConflictFinalizeButton = document.getElementById("startConflictFinali
 const startConflictAbortButton = document.getElementById("startConflictAbortButton");
 const startConflictBackButton = document.getElementById("startConflictBackButton");
 const partialTaskModal = document.getElementById("partialTaskModal");
-const partialTaskTitle = document.getElementById("partialTaskTitle");
 const partialTaskPercent = document.getElementById("partialTaskPercent");
+const partialTaskDecreaseButton = document.getElementById("partialTaskDecreaseButton");
+const partialTaskIncreaseButton = document.getElementById("partialTaskIncreaseButton");
 const partialTaskContinueButton = document.getElementById("partialTaskContinueButton");
 const postponeTaskModal = document.getElementById("postponeTaskModal");
 const closePostponeTaskModal = document.getElementById("closePostponeTaskModal");
@@ -902,6 +903,9 @@ let missionRunMusicFadeRestoreVolume = null;
 let missionRunVariantSelectionTimer = null;
 let missionRunCycleSwipeStartX = null;
 let partialTaskResolver = null;
+let partialTaskPercentValue = 0;
+let partialTaskHoldTimeout = null;
+let partialTaskHoldInterval = null;
 const modalNavigationStack = [];
 let modalBackNavigationActive = false;
 const missionVariantsCache = new Map();
@@ -4656,7 +4660,8 @@ function openModal(id) {
     const latestDone = getLatestCompletedActionForSelectedProfile();
     pendingActionsAnchorId = runningAction?.id || latestDone?.id || "";
     state.actionsMissionOnly = false;
-    void loadActions();
+    renderActions();
+    void loadActions({ silent: true });
     void loadActionMissions();
     window.setTimeout(() => {
       anchorToCurrentActionOnce();
@@ -5560,9 +5565,9 @@ async function toggleActionStatus(actionId, options = {}) {
         await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
         await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
       } else if (conflictChoice === "partial_and_start") {
-        const pausedResult = await pauseActionPartially(runningAction.id);
+        const pausedResult = await pauseActionWithSelectedProgress(runningAction);
+        if (!pausedResult) return;
         delete state.runningLocalStarts[String(runningAction.id || "")];
-        await showPartialTaskFeedback(pausedResult);
         await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
       }
       return;
@@ -7863,11 +7868,96 @@ function parseTimeToIso(baseIso, hhmm) {
   return base.toISOString();
 }
 
-async function pauseActionPartially(actionId) {
+function normalizePartialTaskPercent(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(100, Math.round(numeric / 10) * 10));
+}
+
+function getSuggestedPartialTaskPercent(action) {
+  const storedPercent = getActionStoredCompletionPercent(action);
+  const plannedSeconds = Math.max(1, getActionDurationMinutes(action) * 60);
+  const accumulatedSeconds = Math.max(0, Number(action?.accumulatedSeconds || 0));
+  const startedAtMs = new Date(action?.startedAt || "").getTime();
+  const runningSeconds = normalizeActionStatus(action?.status) === actionStatuses.inProgress && Number.isFinite(startedAtMs)
+    ? Math.max(0, (getServerNowMs() - startedAtMs) / 1000)
+    : 0;
+  const elapsedPercent = Math.floor(((accumulatedSeconds + runningSeconds) / plannedSeconds) * 100);
+  return normalizePartialTaskPercent(Math.max(storedPercent, elapsedPercent));
+}
+
+function renderPartialTaskPercent() {
+  if (!partialTaskPercent) return;
+  partialTaskPercent.textContent = `${partialTaskPercentValue}%`;
+  partialTaskPercent.setAttribute("aria-valuenow", String(partialTaskPercentValue));
+}
+
+function adjustPartialTaskPercent(direction) {
+  partialTaskPercentValue = normalizePartialTaskPercent(partialTaskPercentValue + (Number(direction || 0) * 10));
+  renderPartialTaskPercent();
+}
+
+function stopPartialTaskPercentHold() {
+  if (partialTaskHoldTimeout) {
+    window.clearTimeout(partialTaskHoldTimeout);
+    partialTaskHoldTimeout = null;
+  }
+  if (partialTaskHoldInterval) {
+    window.clearInterval(partialTaskHoldInterval);
+    partialTaskHoldInterval = null;
+  }
+  partialTaskDecreaseButton?.classList.remove("is-holding");
+  partialTaskIncreaseButton?.classList.remove("is-holding");
+}
+
+function bindPartialTaskPercentButton(button, direction) {
+  if (!button) return;
+  button.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && Number(event.button) !== 0) return;
+    event.preventDefault();
+    stopPartialTaskPercentHold();
+    adjustPartialTaskPercent(direction);
+    partialTaskHoldTimeout = window.setTimeout(() => {
+      button.classList.add("is-holding");
+      adjustPartialTaskPercent(direction);
+      partialTaskHoldInterval = window.setInterval(() => {
+        adjustPartialTaskPercent(direction);
+      }, 300);
+    }, 300);
+    try {
+      button.setPointerCapture(event.pointerId);
+    } catch {}
+  });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((eventName) => {
+    button.addEventListener(eventName, stopPartialTaskPercentHold);
+  });
+  button.addEventListener("click", (event) => {
+    if (event.detail === 0) adjustPartialTaskPercent(direction);
+  });
+}
+
+function requestPartialTaskPercent(action) {
+  stopPartialTaskPercentHold();
+  if (partialTaskResolver) {
+    partialTaskResolver(null);
+    partialTaskResolver = null;
+  }
+  partialTaskPercentValue = getSuggestedPartialTaskPercent(action);
+  renderPartialTaskPercent();
+  openModal("partialTaskModal");
+  return new Promise((resolve) => {
+    partialTaskResolver = resolve;
+  });
+}
+
+async function pauseActionPartially(actionId, completionPercent) {
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "pause" })
+    body: JSON.stringify({
+      mode: "pause",
+      completionPercent: normalizePartialTaskPercent(completionPercent)
+    })
   });
   const updated = payload?.action || null;
   if (!updated) {
@@ -7880,17 +7970,12 @@ async function pauseActionPartially(actionId) {
   return { action: updated, pointsUpdate: payload?.pointsUpdate || null };
 }
 
-function showPartialTaskFeedback(result) {
-  const action = result?.action || result || null;
-  if (partialTaskTitle) partialTaskTitle.textContent = String(action?.title || "Tarefa pausada");
-  if (partialTaskPercent) partialTaskPercent.textContent = `${getActionStoredCompletionPercent(action)}%`;
-  openModal("partialTaskModal");
-  return new Promise((resolve) => {
-    partialTaskResolver = () => {
-      enqueueActionPointsUpdateFeedback(result?.pointsUpdate, 100);
-      resolve(action);
-    };
-  });
+async function pauseActionWithSelectedProgress(action) {
+  const completionPercent = await requestPartialTaskPercent(action);
+  if (completionPercent == null) return null;
+  const result = await pauseActionPartially(String(action?.id || ""), completionPercent);
+  enqueueActionPointsUpdateFeedback(result?.pointsUpdate, 100);
+  return result;
 }
 
 async function restoreActionToPending(actionId) {
@@ -12177,7 +12262,12 @@ function navigateBackOneProjectLayer() {
     } else if (topModal.id === "runningConfirmModal") {
       closeRunningConfirmModal();
     } else {
-      if (topModal.id === "partialTaskModal") partialTaskResolver = null;
+      if (topModal.id === "partialTaskModal") {
+        stopPartialTaskPercentHold();
+        const resolve = partialTaskResolver;
+        partialTaskResolver = null;
+        if (resolve) resolve(null);
+      }
       closeModal(topModal);
     }
     const previousId = modalNavigationStack[modalNavigationStack.length - 1] || "";
@@ -14288,11 +14378,14 @@ async function performRunningRestore(runningAction) {
 
 async function performRunningPause(runningAction) {
   try {
-    const result = await pauseActionPartially(String(runningAction.id || ""));
+    const result = await pauseActionWithSelectedProgress(runningAction);
+    if (!result) return;
     startRunningTaskTicker();
-    await showPartialTaskFeedback(result);
     closeRunningTaskModalWithFade();
-    window.setTimeout(() => openModal("actionsModal"), 500);
+    window.setTimeout(() => {
+      openModal("actionsModal");
+      renderActions();
+    }, 500);
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Falha ao pausar tarefa.");
   }
@@ -14499,8 +14592,8 @@ quickTaskStartButton?.addEventListener("click", () => {
       return;
     }
     if (choice === "partial_and_start") {
-      const pausedResult = await pauseActionPartially(runningAction.id);
-      await showPartialTaskFeedback(pausedResult);
+      const pausedResult = await pauseActionWithSelectedProgress(runningAction);
+      if (!pausedResult) return;
       await submitQuickTaskStart();
       return;
     }
@@ -14703,11 +14796,14 @@ startDecisionDateInput?.addEventListener("change", () => {
 startConflictFinalizeButton?.addEventListener("click", () => closeStartConflictModal("finalize_and_start"));
 startConflictAbortButton?.addEventListener("click", () => closeStartConflictModal("partial_and_start"));
 startConflictBackButton?.addEventListener("click", () => closeStartConflictModal("cancel"));
+bindPartialTaskPercentButton(partialTaskDecreaseButton, -1);
+bindPartialTaskPercentButton(partialTaskIncreaseButton, 1);
 partialTaskContinueButton?.addEventListener("click", () => {
+  stopPartialTaskPercentHold();
   closeModal("partialTaskModal");
   const resolve = partialTaskResolver;
   partialTaskResolver = null;
-  if (resolve) resolve();
+  if (resolve) resolve(partialTaskPercentValue);
 });
 runningConfirmPrimaryButton?.addEventListener("click", () => {
   const action = state.runningConfirm.action;

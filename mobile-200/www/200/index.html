@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260716-apk-touch-loading" />
+  <link rel="stylesheet" href="/200/project.css?v=20260716-progress-selector" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -324,9 +324,15 @@
   </section>
   <section class="workspace-modal simple-modal" id="partialTaskModal" aria-hidden="true" aria-label="Progresso parcial da tarefa">
     <div class="finance-content running-task-content partial-task-content">
-      <div class="running-task-name" id="partialTaskTitle">Tarefa pausada</div>
-      <div class="partial-task-label">Progresso salvo</div>
-      <div class="running-task-percent partial-task-percent" id="partialTaskPercent">0%</div>
+      <div class="partial-task-selector" role="group" aria-label="Definir porcentagem concluída">
+        <button class="partial-task-arrow" type="button" id="partialTaskDecreaseButton" aria-label="Diminuir porcentagem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.7 5.3-1.4-1.4L5.2 12l8.1 8.1 1.4-1.4L8 12l6.7-6.7Z" fill="currentColor"/></svg>
+        </button>
+        <div class="running-task-percent partial-task-percent" id="partialTaskPercent" role="spinbutton" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+        <button class="partial-task-arrow" type="button" id="partialTaskIncreaseButton" aria-label="Aumentar porcentagem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.3 18.7 1.4 1.4 8.1-8.1-8.1-8.1-1.4 1.4L16 12l-6.7 6.7Z" fill="currentColor"/></svg>
+        </button>
+      </div>
       <button class="primary-btn partial-task-continue" type="button" id="partialTaskContinueButton">Continuar</button>
     </div>
   </section>
@@ -1444,7 +1450,7 @@
     ></iframe>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260716-apk-touch-loading"></script>
+  <script type="module" src="/200/project.js?v=20260716-progress-selector"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>
