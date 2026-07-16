@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260716-modal-content-restore" />
+  <link rel="stylesheet" href="/200/project.css?v=20260716-aspectos-sono-musica" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -100,7 +100,7 @@
   <section class="workspace-modal simple-modal" id="runningTaskModal" aria-hidden="true" aria-label="Tarefa em execução">
     <div class="finance-content running-task-content">
       <div class="running-task-title-row">
-        <img class="running-task-category-icon" id="runningTaskCategoryIcon" src="/200/category-icons/trabalho.svg" alt="Categoria atual" hidden />
+        <img class="running-task-category-icon" id="runningTaskCategoryIcon" src="/200/aspect-icons/trabalho.svg" alt="Aspecto atual" hidden />
         <div class="running-task-name" id="runningTaskName"></div>
       </div>
       <div class="running-task-minutes" id="runningTaskMinutesLeft"></div>
@@ -300,6 +300,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg>
           <span>Definir música</span>
         </button>
+        <button class="start-decision-task-meta start-decision-meta-btn start-decision-aspect-btn" type="button" id="startDecisionAspectLabel">
+          <img src="/200/aspect-icons/aspecto.svg" alt="" aria-hidden="true" />
+          <span>Aspecto</span>
+        </button>
       </div>
       <div class="start-decision-bottom">
         <div class="start-decision-actions" id="startDecisionActions"></div>
@@ -431,7 +435,7 @@
             <input id="taskTitle" class="text-field" name="title" autocomplete="off" maxlength="80" />
             <button class="category-picker-trigger" type="button" id="actionCategoryTrigger" aria-label="Selecionar categoria">
               <img class="task-avatar" id="actionCategoryPreviewIcon" src="/200/avatars/rose.png" alt="Categoria da tarefa" />
-              <span id="actionCategoryPreviewLabel">Categoria automática</span>
+              <span id="actionCategoryPreviewLabel">Aspecto</span>
             </button>
             <div class="action-voice-tools">
               <button class="history-icon-btn mic-idle" type="button" id="actionMicButton" aria-label="Falar tarefa">
@@ -517,18 +521,16 @@
         </form>
       </div>
     </div>
-    <div class="action-wizard" id="actionCategoryModal" aria-hidden="true">
-      <div class="wizard-panel">
+    <div class="action-wizard aspect-selector-modal" id="actionCategoryModal" aria-hidden="true">
+      <div class="wizard-panel aspect-selector-panel">
         <header class="wizard-head">
-          <span>Escolher categoria</span>
+          <span>Escolher aspecto</span>
           <button class="wizard-close" type="button" id="closeActionCategoryModal" aria-label="Fechar">
             <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
           </button>
         </header>
         <div class="category-grid" id="actionCategoryGrid"></div>
-        <div class="wizard-actions">
-          <button class="primary-btn" type="button" id="confirmActionCategoryModal">Confirmar categoria</button>
-        </div>
+        <button type="button" id="confirmActionCategoryModal" hidden>Confirmar aspecto</button>
       </div>
     </div>
 
@@ -997,7 +999,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
         </button>
         <div class="running-task-name" id="statsAspectTitle">Hidratação</div>
-        <img class="stats-aspect-modal-icon" id="statsAspectIcon" src="/200/category-icons/hidratacao.svg" alt="" aria-hidden="true" />
+        <img class="stats-aspect-modal-icon" id="statsAspectIcon" src="/200/aspect-icons/hidratacao.svg" alt="" aria-hidden="true" />
         <div class="stats-aspect-meta">
           <div class="stats-aspect-meta-label">Meta atual</div>
           <div class="history-mission-adjust-stage">
@@ -1059,6 +1061,18 @@
         </div>
       </div>
     </section>
+
+  <section class="workspace-modal sleep-history-modal" id="sleepHistoryModal" aria-hidden="true" aria-label="Editar últimos registros de sono">
+    <div class="sleep-history-shell">
+      <header class="sleep-history-header">
+        <h2>Últimos 7 registros de sono</h2>
+        <button class="sleep-history-close" type="button" id="sleepHistoryCloseButton" aria-label="Fechar">×</button>
+      </header>
+      <p class="sleep-history-copy">Edite as horas e os minutos registrados em cada dia.</p>
+      <div class="sleep-history-list" id="sleepHistoryList"></div>
+      <p class="finance-status" id="sleepHistoryStatus" aria-live="polite"></p>
+    </div>
+  </section>
 
   <section class="workspace-modal" id="socialModal" aria-hidden="true" aria-label="Amizades">
       <div class="social-modal-shell" id="socialModalShell">
@@ -1460,7 +1474,7 @@
     ></iframe>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260716-ptbr-minute-cues"></script>
+  <script type="module" src="/200/project.js?v=20260716-aspectos-sono-musica"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

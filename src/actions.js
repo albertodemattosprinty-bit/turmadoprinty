@@ -9,9 +9,8 @@ const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_PAUSED = "PAUSED";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
 const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
-const DEFAULT_CATEGORY_ID = "";
+const DEFAULT_CATEGORY_ID = "aspecto";
 const QUICK_TASK_CATEGORY_ID = "quick_task";
-const SLEEP_ACTION_CATEGORY_ID = "sono";
 const ACTIONS_TIME_ZONE = "America/Sao_Paulo";
 
 function toIso(value) {
@@ -55,7 +54,15 @@ function normalizeAssignee(value) {
 function normalizeCategoryId(value) {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw) return DEFAULT_CATEGORY_ID;
-  if (raw === SLEEP_ACTION_CATEGORY_ID) return DEFAULT_CATEGORY_ID;
+  const legacyMap = {
+    estudo: "aprendizado",
+    financeiro: "aprendizado",
+    familia: "planejamento",
+    fe_espiritualidade: "aspecto",
+    saude: "aspecto",
+    digital: "aspecto"
+  };
+  if (legacyMap[raw]) return legacyMap[raw];
   return raw.replace(/[^a-z0-9_]/g, "");
 }
 
@@ -222,6 +229,9 @@ export async function ensureActionsSchema() {
   await query("alter table actions add column if not exists sleep_tracked_minutes integer not null default 0;");
   await query("alter table actions add column if not exists svg_icon_url text not null default '';");
   await query("alter table actions add column if not exists svg_icon_label text not null default '';");
+  await query(`update actions set category_id = 'aprendizado' where lower(category_id) in ('estudo', 'financeiro');`);
+  await query(`update actions set category_id = 'planejamento' where lower(category_id) = 'familia';`);
+  await query(`update actions set category_id = 'aspecto' where coalesce(btrim(category_id), '') = '' or lower(category_id) in ('fe_espiritualidade', 'saude', 'digital');`);
 
   await query("create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);");
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");
@@ -660,7 +670,6 @@ export async function listUserActions(userId, { from, to }) {
         on o.user_id = a.user_id
        and o.action_id = a.id
       where a.user_id = $1
-        and lower(coalesce(a.category_id, '')) <> '${SLEEP_ACTION_CATEGORY_ID}'
         and a.start_at < $3
         and a.end_at > $2
       order by a.start_at asc, a.created_at asc

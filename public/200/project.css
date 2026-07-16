@@ -95,6 +95,28 @@ body[data-background-theme="black"] {
   --ink: #d9e4ff;
 }
 
+/* Seletor unificado dos 12 aspectos e histórico editável de sono. */
+.start-decision-aspect-btn img { width: 24px; height: 24px; object-fit: contain; flex: 0 0 auto; }
+.aspect-selector-modal { z-index: 2900; padding: 0; background: inherit; color: var(--white); }
+.aspect-selector-modal.active { display: block; }
+.aspect-selector-panel { width: 100%; max-width: none; height: 100dvh; max-height: none; border: 0; border-radius: 0; padding: max(16px, env(safe-area-inset-top)) 18px max(14px, env(safe-area-inset-bottom)); background: transparent; overflow: hidden; }
+.aspect-selector-panel .wizard-head { height: 10dvh; min-height: 54px; padding: 0; }
+.aspect-selector-panel .category-grid { display: grid; grid-template-columns: 1fr; gap: 0; height: 84dvh; padding: 0; overflow-y: auto; }
+.aspect-selector-panel .category-item-btn { min-height: 7dvh; height: 7dvh; width: 100%; display: flex; align-items: center; justify-content: flex-start; gap: 16px; padding: 0 14px; border: 0; border-radius: 0; background: transparent; color: inherit; font-size: clamp(.95rem, 2.2dvh, 1.12rem); text-align: left; }
+.aspect-selector-panel .category-item-btn.active { background: rgba(255, 255, 255, .1); }
+.aspect-selector-panel .category-item-btn img { width: 5dvh; height: 5dvh; max-width: 42px; max-height: 42px; object-fit: contain; }
+.sleep-history-modal { z-index: 2950; background: inherit; overflow-y: auto; }
+.sleep-history-shell { width: min(100%, 620px); min-height: 100dvh; margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom)); color: #fff; }
+.sleep-history-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sleep-history-header h2 { margin: 0; font-size: 1.3rem; }
+.sleep-history-close { width: 42px; height: 42px; border: 0; background: transparent; color: inherit; font-size: 2rem; }
+.sleep-history-copy { margin: 12px 0 22px; opacity: .78; }
+.sleep-history-list { display: grid; gap: 12px; }
+.sleep-history-row { display: grid; grid-template-columns: minmax(0, 1fr) 78px auto 78px auto; align-items: center; gap: 8px; min-height: 64px; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, .1); }
+.sleep-history-row input { width: 100%; min-width: 0; padding: 9px 7px; border: 1px solid rgba(255, 255, 255, .28); border-radius: 10px; background: rgba(0, 0, 0, .16); color: inherit; text-align: center; }
+.sleep-history-save { grid-column: 1 / -1; justify-self: end; border: 0; border-radius: 999px; padding: 9px 18px; background: #1683ff; color: #fff; font-weight: 800; }
+@media (max-width: 520px) { .sleep-history-row { grid-template-columns: minmax(0, 1fr) 62px auto 62px auto; font-size: .88rem; } }
+
 body[data-background-theme="orange"] {
   background:
     radial-gradient(circle at top left, rgba(255, 233, 151, 0.3), transparent 34%),
@@ -3647,6 +3669,9 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   display: grid;
   place-items: center;
   justify-self: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .stats-point-icon {

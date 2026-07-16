@@ -55,18 +55,18 @@ const statsScopes = [
   { key: "last30", label: "30 dias" }
 ];
 const statsPointCategories = [
-  { id: "sono", name: "Sono", targetPoints: 420 },
-  { id: "alimentacao", name: "Alimentação", targetPoints: 30 },
-  { id: "hidratacao", name: "Hidratação", targetPoints: 15 },
-  { id: "estudo", name: "Estudo", targetPoints: 30 },
-  { id: "financeiro", name: "Habilidades", targetPoints: 30 },
-  { id: "trabalho", name: "Trabalho", targetPoints: 360 },
-  { id: "casa", name: "Casa", targetPoints: 120 },
-  { id: "exercicios", name: "Exercícios", targetPoints: 30 },
-  { id: "social", name: "Social", targetPoints: 30 },
-  { id: "familia", name: "Propósito", targetPoints: 30 },
-  { id: "higiene", name: "Higiene", targetPoints: 15 },
-  { id: "lazer", name: "Lazer", targetPoints: 90 }
+  { id: "sono", name: "Sono", targetPoints: 420, icon: "/200/aspect-icons/sono.svg" },
+  { id: "alimentacao", name: "Alimentação", targetPoints: 30, icon: "/200/aspect-icons/alimentacao.svg" },
+  { id: "hidratacao", name: "Hidratação", targetPoints: 15, icon: "/200/aspect-icons/hidratacao.svg" },
+  { id: "aprendizado", name: "Aprendizado", targetPoints: 60, icon: "/200/aspect-icons/aprendizado.svg" },
+  { id: "trabalho", name: "Trabalho", targetPoints: 360, icon: "/200/aspect-icons/trabalho.svg" },
+  { id: "casa", name: "Casa", targetPoints: 120, icon: "/200/aspect-icons/casa.svg" },
+  { id: "exercicios", name: "Exercícios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
+  { id: "social", name: "Social", targetPoints: 30, icon: "/200/aspect-icons/social.svg" },
+  { id: "planejamento", name: "Planejamento", targetPoints: 30, icon: "/200/aspect-icons/planejamento.svg" },
+  { id: "higiene", name: "Higiene", targetPoints: 15, icon: "/200/aspect-icons/higiene.svg" },
+  { id: "lazer", name: "Lazer", targetPoints: 90, icon: "/200/aspect-icons/lazer.svg" },
+  { id: "aspecto", name: "Aspecto", targetPoints: 30, icon: "/200/aspect-icons/aspecto.svg" }
 ];
 const sleepDelayOptions = [0, 5, 15, 30, 60];
 const avatarPresetToPath = {
@@ -77,22 +77,15 @@ const avatarPresetToPath = {
   wilton: "/200/avatars/wilton.png",
   "default-user": ""
 };
-const taskCategoryDefinitions = [
-  { id: "fe_espiritualidade", name: "Fé" },
-  { id: "alimentacao", name: "Alimentação" },
-  { id: "hidratacao", name: "Hidratação" },
-  { id: "estudo", name: "Estudo" },
-  { id: "financeiro", name: "Habilidades" },
-  { id: "trabalho", name: "Trabalho" },
-  { id: "casa", name: "Casa" },
-  { id: "lazer", name: "Lazer" },
-  { id: "exercicios", name: "Exercícios" },
-  { id: "saude", name: "Saúde" },
-  { id: "social", name: "Social" },
-  { id: "familia", name: "Propósito" },
-  { id: "higiene", name: "Higiene" },
-  { id: "digital", name: "Digital" }
-];
+const taskCategoryDefinitions = statsPointCategories.map(({ id, name, icon }) => ({ id, name, icon }));
+const legacyTaskCategoryMap = new Map([
+  ["estudo", "aprendizado"],
+  ["financeiro", "aprendizado"],
+  ["familia", "planejamento"],
+  ["fe_espiritualidade", "aspecto"],
+  ["saude", "aspecto"],
+  ["digital", "aspecto"]
+]);
 const projectTimeZone = "America/Sao_Paulo";
 const taskCategoryMap = new Map(taskCategoryDefinitions.map((item) => [item.id, item]));
 const platformIncomeCategories = ["Eventos", "Inscricoes", "Apoiadores", "Site", "Venda de ativo", "Direitos autorais"];
@@ -273,6 +266,10 @@ const sleepContinueButton = document.getElementById("sleepContinueButton");
 const sleepFinishButton = document.getElementById("sleepFinishButton");
 const sleepAbortButton = document.getElementById("sleepAbortButton");
 const sleepMusicToggleButton = document.getElementById("sleepMusicToggleButton");
+const sleepHistoryModal = document.getElementById("sleepHistoryModal");
+const sleepHistoryCloseButton = document.getElementById("sleepHistoryCloseButton");
+const sleepHistoryList = document.getElementById("sleepHistoryList");
+const sleepHistoryStatus = document.getElementById("sleepHistoryStatus");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
@@ -580,6 +577,7 @@ const startDecisionStartAt = document.getElementById("startDecisionStartAt");
 const startDecisionEndAt = document.getElementById("startDecisionEndAt");
 const startDecisionRepeatLabel = document.getElementById("startDecisionRepeatLabel");
 const startDecisionMusicLabel = document.getElementById("startDecisionMusicLabel");
+const startDecisionAspectLabel = document.getElementById("startDecisionAspectLabel");
 const startDecisionActions = document.getElementById("startDecisionActions");
 const startDecisionMessage = document.getElementById("startDecisionMessage");
 const startDecisionStartInput = document.getElementById("startDecisionStartInput");
@@ -1119,6 +1117,8 @@ const state = {
     hiddenTrackUrls: new Set(),
     defaultPreferenceByTaskTitle: new Map(),
     currentTaskTitle: "",
+    configurationTaskTitle: "",
+    configurationMode: false,
     defaultAppliedActionId: ""
   },
   runningMinuteCue: {
@@ -3589,7 +3589,14 @@ function getRunningDefaultPreferenceForTaskTitle(taskTitle = "") {
 }
 
 function getRunningDefaultPreferenceForCurrentTask() {
-  return getRunningDefaultPreferenceForTaskTitle(state.runningPlayer.currentTaskTitle);
+  return getRunningDefaultPreferenceForTaskTitle(getRunningMusicTargetTaskTitle());
+}
+
+function getRunningMusicTargetTaskTitle() {
+  if (state.runningPlayer.configurationMode) {
+    return String(state.runningPlayer.configurationTaskTitle || "").trim();
+  }
+  return String(state.runningPlayer.currentTaskTitle || "").trim();
 }
 
 function applyRunningTaskDefaultSelection(action = getRunningActionForSelectedProfile()) {
@@ -3814,7 +3821,7 @@ function renderRunningMusicPlayer() {
   runningPlayerDefault?.classList.toggle("active", hasAnyDefault);
   runningPlayerDefault?.classList.toggle("is-default", hasAnyDefault);
   runningPlayerFavorite?.classList.toggle("is-disabled", !track?.url);
-  runningPlayerDefault?.classList.toggle("is-disabled", !station?.name || !String(state.runningPlayer.currentTaskTitle || "").trim());
+  runningPlayerDefault?.classList.toggle("is-disabled", !station?.name || !getRunningMusicTargetTaskTitle());
   runningPlayerPrev?.classList.toggle("is-disabled", !hasTrackNavigation);
   runningPlayerNext?.classList.toggle("is-disabled", !hasTrackNavigation);
 
@@ -4140,7 +4147,7 @@ async function toggleRunningTrackLoop(trackUrl = "") {
 function openRunningMusicDefaultModal() {
   const track = getCurrentRunningTrack();
   const station = getCurrentRunningStation();
-  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+  const taskTitle = getRunningMusicTargetTaskTitle();
 
   if (!station?.name) {
     return;
@@ -4171,7 +4178,7 @@ function openRunningMusicDefaultModal() {
 function openRunningMusicDefaultChoiceModal() {
   const station = getCurrentRunningStation();
   const preference = getRunningDefaultPreferenceForCurrentTask();
-  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+  const taskTitle = getRunningMusicTargetTaskTitle();
 
   if (!station?.name || !preference || !taskTitle) {
     openRunningMusicDefaultModal();
@@ -4245,7 +4252,7 @@ async function autoPlayRunningTaskDefaultPreference(action) {
 async function saveRunningTaskDefault(mode = "track") {
   const track = getCurrentRunningTrack();
   const station = getCurrentRunningStation();
-  const taskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
+  const taskTitle = getRunningMusicTargetTaskTitle();
 
   if (!station?.name) {
     return;
@@ -4276,11 +4283,14 @@ async function saveRunningTaskDefault(mode = "track") {
     });
 
     state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
+    if (state.runningPlayer.configurationMode && isTaskComposerMode()) renderTaskComposerModal();
     renderRunningMusicPlayer();
     renderRunningMusicList();
     closeRunningMusicListModal();
     closeModal("runningMusicDefaultModal");
     closeModal("runningMusicDefaultChoiceModal");
+    state.runningPlayer.configurationMode = false;
+    state.runningPlayer.configurationTaskTitle = "";
     showFloatingNotice(safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão.");
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
@@ -4596,9 +4606,8 @@ function getMissionDisplayIcon(goal) {
 }
 
 function getTaskCategoryIconPath(categoryId) {
-  const normalized = String(categoryId || "").trim().toLowerCase();
-  if (!normalized) return "";
-  return `/200/category-icons/${normalized}.svg`;
+  const normalized = normalizeTaskCategoryId(categoryId);
+  return taskCategoryMap.get(normalized)?.icon || taskCategoryMap.get("aspecto")?.icon || "";
 }
 
 function buildTaskAvatarMarkup(src, alt, options = {}) {
@@ -4609,8 +4618,14 @@ function buildTaskAvatarMarkup(src, alt, options = {}) {
 }
 
 function getTaskCategoryName(categoryId) {
+  const normalized = normalizeTaskCategoryId(categoryId);
+  return taskCategoryMap.get(normalized)?.name || "Aspecto";
+}
+
+function normalizeTaskCategoryId(categoryId) {
   const normalized = String(categoryId || "").trim().toLowerCase();
-  return taskCategoryMap.get(normalized)?.name || "";
+  if (taskCategoryMap.has(normalized)) return normalized;
+  return legacyTaskCategoryMap.get(normalized) || "aspecto";
 }
 
 function getActionThemeDotColor(action, options = {}) {
@@ -4618,20 +4633,18 @@ function getActionThemeDotColor(action, options = {}) {
   const status = normalizeActionStatus(action?.status);
   const categoryId = String(action?.categoryId || "").trim().toLowerCase();
   const categoryColors = {
-    fe_espiritualidade: "#7c4dff",
+    sono: "#6d5dfc",
     alimentacao: "#d97706",
     hidratacao: "#1683ff",
-    estudo: "#4f46e5",
-    financeiro: "#8b5e3c",
+    aprendizado: "#4f46e5",
     trabalho: "#0f766e",
     casa: "#059669",
     lazer: "#ec4899",
     exercicios: "#ef4444",
-    saude: "#14b8a6",
     social: "#f97316",
-    familia: "#db2777",
+    planejamento: "#db2777",
     higiene: "#0ea5e9",
-    digital: "#475569"
+    aspecto: "#64748b"
   };
 
   if (status === actionStatuses.inProgress) return "#19bf5d";
@@ -4656,7 +4669,7 @@ function buildActionTitleMarkup(title, dotColor = "", isBlinking = false) {
 
 function getStationNameForCategory(categoryId) {
   const id = String(categoryId || "").trim().toLowerCase();
-  if (id === "fe_espiritualidade" || id === "saude") {
+  if (id === "sono") {
     return "Frequency";
   }
   if (id === "exercicios" || id === "casa") {
@@ -4708,8 +4721,8 @@ function buildInitialWizardState() {
     startMinute: rounded.getMinutes() % 60,
     endHour: end.getHours(),
     endMinute: end.getMinutes(),
-    categoryId: "",
-    categoryName: "",
+    categoryId: "aspecto",
+    categoryName: "Aspecto",
     svgIconUrl: "",
     svgIconLabel: "",
     editingActionId: null,
@@ -5863,7 +5876,7 @@ function openWizard(action = null, options = {}) {
     state.wizard.startMinute = startAt.getMinutes();
     state.wizard.endHour = endAt.getHours();
     state.wizard.endMinute = endAt.getMinutes();
-    state.wizard.categoryId = String(action.categoryId || "").trim().toLowerCase();
+    state.wizard.categoryId = normalizeTaskCategoryId(action.categoryId);
     state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
     state.wizard.editingActionId = action.id;
     taskTitle.value = action.title || "";
@@ -5924,7 +5937,7 @@ function closeWizard() {
 }
 
 function renderActionCategoryPicker() {
-  const selectedId = String(state.wizard.categoryId || "").trim().toLowerCase();
+  const selectedId = normalizeTaskCategoryId(state.wizard.categoryId);
   const selectedName = getTaskCategoryName(selectedId);
   const selectedIcon = String(state.wizard.svgIconUrl || "").trim() || getTaskCategoryIconPath(selectedId);
   const profileAvatar = getActionAvatarPath(getWizardAssigneeName());
@@ -5933,13 +5946,13 @@ function renderActionCategoryPicker() {
     actionCategoryPreviewIcon.alt = String(state.wizard.svgIconLabel || "").trim() || selectedName || "Avatar do usuário";
   }
   if (actionCategoryPreviewLabel) {
-    actionCategoryPreviewLabel.textContent = selectedName || "Categoria automática";
+    actionCategoryPreviewLabel.textContent = selectedName || "Aspecto";
   }
 }
 
 function renderActionCategoryModal() {
   if (!actionCategoryGrid) return;
-  const selectedId = String(actionCategorySelectionId || state.wizard.categoryId || "").trim().toLowerCase();
+  const selectedId = normalizeTaskCategoryId(actionCategorySelectionId || state.wizard.categoryId);
   actionCategoryGrid.innerHTML = "";
   taskCategoryDefinitions.forEach((category) => {
     const button = document.createElement("button");
@@ -5961,7 +5974,7 @@ async function interpretActionCategoryFromTitle(titleText) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title })
     });
-    const categoryId = String(payload?.category?.id || "").trim().toLowerCase();
+    const categoryId = normalizeTaskCategoryId(payload?.category?.id);
     if (!categoryId || taskTitle.value.trim() !== title) return;
     state.wizard.categoryId = categoryId;
     state.wizard.categoryName = String(payload?.category?.name || getTaskCategoryName(categoryId));
@@ -6261,6 +6274,8 @@ function getCurrentTimelineEntry(nowMs, exceptId = "") {
 }
 
 function closeStartDecisionModalWith(value) {
+  state.runningPlayer.configurationMode = false;
+  state.runningPlayer.configurationTaskTitle = "";
   closeModal(startDecisionModal);
   if (startDecisionContent) {
     startDecisionContent.id = "startDecisionContent";
@@ -6378,6 +6393,12 @@ function renderTaskComposerModal() {
     formatActionMusicInlineLabel(findActionById(state.startDecisionContext.actionId)) || "Definir música",
     false
   );
+  renderTaskComposerMeta(
+    startDecisionAspectLabel,
+    `<img src="${getTaskCategoryIconPath(state.wizard.categoryId)}" alt="" aria-hidden="true" />`,
+    getTaskCategoryName(state.wizard.categoryId),
+    false
+  );
 
   if (startDecisionActions) {
     startDecisionActions.innerHTML = "";
@@ -6442,7 +6463,7 @@ function openTaskComposer(action = null, options = {}) {
     state.wizard.startMinute = startAt.getMinutes();
     state.wizard.endHour = endAt.getHours();
     state.wizard.endMinute = endAt.getMinutes();
-    state.wizard.categoryId = String(action.categoryId || "").trim().toLowerCase();
+    state.wizard.categoryId = normalizeTaskCategoryId(action.categoryId);
     state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
     state.wizard.svgIconUrl = String(action.svgIconUrl || "").trim();
     state.wizard.svgIconLabel = String(action.svgIconLabel || "").trim();
@@ -6476,6 +6497,7 @@ function openTaskComposerFieldEditor(field) {
     }
     markTaskComposerDirty();
     renderTaskComposerModal();
+    void interpretActionCategoryFromTitle(taskTitle?.value || "");
     return;
   }
   if (field === "start" || field === "end") {
@@ -6658,6 +6680,9 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     }
     if (startDecisionMusicLabel) {
       startDecisionMusicLabel.innerHTML = `${startDecisionMusicLabel.querySelector("svg")?.outerHTML || ""}<span>${escapeHtml(formatActionMusicInlineLabel(targetAction))}</span>`;
+    }
+    if (startDecisionAspectLabel) {
+      startDecisionAspectLabel.innerHTML = `<img src="${getTaskCategoryIconPath(targetAction?.categoryId)}" alt="" aria-hidden="true" /><span>${escapeHtml(getTaskCategoryName(targetAction?.categoryId))}</span>`;
     }
     if (startDecisionActions) {
       startDecisionActions.innerHTML = "";
@@ -8685,9 +8710,11 @@ function formatRepeatLabel(repeatRule, repeatDays) {
 }
 
 function formatActionMusicDecisionLabel(action) {
-  const mode = String(action?.musicDefaultMode || "").trim().toLowerCase();
-  const stationName = String(action?.musicStationName || "").trim();
-  const trackName = String(action?.musicTrackName || "").trim();
+  const title = String(action?.title || taskTitle?.value || "").trim();
+  const preference = getRunningDefaultPreferenceForTaskTitle(title);
+  const mode = String(action?.musicDefaultMode || preference?.mode || "").trim().toLowerCase();
+  const stationName = String(action?.musicStationName || preference?.stationName || "").trim();
+  const trackName = String(action?.musicTrackName || preference?.trackName || "").trim();
   if (mode === "station" && stationName) {
     return `Música padrão da atividade: ${stationName}`;
   }
@@ -9475,6 +9502,41 @@ async function loadHistoryFromApi() {
   state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
 }
 
+function formatSleepHistoryDate(dateKey) {
+  const date = new Date(`${String(dateKey || "").slice(0, 10)}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? String(dateKey || "") : new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).format(date);
+}
+
+function renderSleepHistoryEntries(entries = []) {
+  if (!sleepHistoryList) return;
+  if (!entries.length) {
+    sleepHistoryList.innerHTML = '<div class="empty-state">Ainda não há registros de sono.</div>';
+    return;
+  }
+  sleepHistoryList.innerHTML = entries.map((entry) => {
+    const totalMinutes = Math.max(0, Math.min(720, Math.trunc(Number(entry?.totalMinutes || 0) || 0)));
+    return `<div class="sleep-history-row" data-sleep-date="${escapeHtml(entry.sleepDate)}">
+      <strong>${escapeHtml(formatSleepHistoryDate(entry.sleepDate))}</strong>
+      <input type="number" min="0" max="12" value="${Math.floor(totalMinutes / 60)}" data-sleep-hours aria-label="Horas" /><span>h</span>
+      <input type="number" min="0" max="59" value="${totalMinutes % 60}" data-sleep-minutes aria-label="Minutos" /><span>min</span>
+      <button class="sleep-history-save" type="button" data-save-sleep>Salvar</button>
+    </div>`;
+  }).join("");
+}
+
+async function openSleepHistoryEditor() {
+  openModal("sleepHistoryModal");
+  if (sleepHistoryStatus) sleepHistoryStatus.textContent = "";
+  if (sleepHistoryList) sleepHistoryList.innerHTML = '<div class="empty-state">Carregando...</div>';
+  try {
+    const profile = encodeURIComponent(getSelectedProfileName());
+    const payload = await apiRequest(`/api/200/sleep-history?profile=${profile}`);
+    renderSleepHistoryEntries(Array.isArray(payload?.entries) ? payload.entries : []);
+  } catch (error) {
+    if (sleepHistoryList) sleepHistoryList.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha ao carregar.")}</div>`;
+  }
+}
+
 function cacheLoadedMissionVariants(goals) {
   (Array.isArray(goals) ? goals : []).forEach((goal) => {
     if (!Array.isArray(goal?.variants)) return;
@@ -9611,7 +9673,14 @@ function buildDefaultStatsAspectConfig() {
 
 function normalizeStatsAspectConfigMap(rawConfig = {}) {
   return Object.fromEntries(statsPointCategories.map((category) => {
-    const entry = rawConfig?.[category.id] || {};
+    const legacyEntry = category.id === "aprendizado"
+      ? (rawConfig?.estudo || rawConfig?.financeiro)
+      : category.id === "planejamento"
+        ? rawConfig?.familia
+        : category.id === "aspecto"
+          ? (rawConfig?.fe_espiritualidade || rawConfig?.saude || rawConfig?.digital)
+          : null;
+    const entry = rawConfig?.[category.id] || legacyEntry || {};
     const missionGoalIds = Array.isArray(entry.missionGoalIds)
       ? [...new Set(entry.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
       : (String(entry.missionGoalId || "").trim() ? [String(entry.missionGoalId || "").trim()] : []);
@@ -10862,7 +10931,7 @@ async function saveTaskComposer() {
       body: JSON.stringify({
         title,
         assignee: getWizardAssigneeName(),
-        categoryId: String(state.wizard.categoryId || "").trim().toLowerCase(),
+        categoryId: normalizeTaskCategoryId(state.wizard.categoryId),
         repeatRule,
         repeatDays,
         occurrences,
@@ -13175,17 +13244,26 @@ actionCategoryTrigger?.addEventListener("click", () => {
   actionCategoryTargetActionId = "";
   actionCategorySelectionId = String(state.wizard.categoryId || "").trim().toLowerCase();
   renderActionCategoryModal();
+  if (actionCategoryModal?.parentElement !== document.body) document.body.appendChild(actionCategoryModal);
   openModal("actionCategoryModal");
 });
 actionCategoryGrid?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-category-id]");
   if (!button) return;
-  actionCategorySelectionId = String(button.dataset.categoryId || "").trim().toLowerCase();
-  renderActionCategoryModal();
+  actionCategorySelectionId = normalizeTaskCategoryId(button.dataset.categoryId);
+  state.wizard.categoryId = actionCategorySelectionId;
+  state.wizard.categoryName = getTaskCategoryName(actionCategorySelectionId);
+  renderActionCategoryPicker();
+  if (isTaskComposerMode()) renderTaskComposerModal();
+  closeModal(actionCategoryModal);
+  if (actionCategoryTargetActionId) {
+    void saveActionCategory(actionCategoryTargetActionId, actionCategorySelectionId);
+    actionCategoryTargetActionId = "";
+  }
 });
 confirmActionCategoryModal?.addEventListener("click", () => {
   if (!actionCategorySelectionId) return;
-  state.wizard.categoryId = String(actionCategorySelectionId || "").trim().toLowerCase();
+  state.wizard.categoryId = normalizeTaskCategoryId(actionCategorySelectionId);
   state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
   renderActionCategoryPicker();
   closeModal(actionCategoryModal);
@@ -13200,8 +13278,8 @@ taskTitle?.addEventListener("input", () => {
   }
   const title = taskTitle.value.trim();
   if (!title) {
-    state.wizard.categoryId = "";
-    state.wizard.categoryName = "";
+    state.wizard.categoryId = "aspecto";
+    state.wizard.categoryName = "Aspecto";
     state.wizard.svgIconUrl = "";
     state.wizard.svgIconLabel = "";
     renderActionCategoryPicker();
@@ -13765,9 +13843,31 @@ missionList?.addEventListener("pointerdown", (event) => {
   });
 });
 
+let sleepStatsHoldTimer = 0;
+let sleepStatsHoldTriggered = false;
+statsMissionsList?.addEventListener("pointerdown", (event) => {
+  const row = event.target.closest('[data-stats-aspect-id="sono"]');
+  if (!row) return;
+  sleepStatsHoldTriggered = false;
+  window.clearTimeout(sleepStatsHoldTimer);
+  sleepStatsHoldTimer = window.setTimeout(() => {
+    sleepStatsHoldTriggered = true;
+    void openSleepHistoryEditor();
+  }, 500);
+});
+["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
+  statsMissionsList?.addEventListener(eventName, () => {
+    window.clearTimeout(sleepStatsHoldTimer);
+    sleepStatsHoldTimer = 0;
+  });
+});
 statsMissionsList?.addEventListener("click", (event) => {
   const row = event.target.closest("[data-stats-aspect-id]");
   if (!row) {
+    return;
+  }
+  if (sleepStatsHoldTriggered && String(row.dataset.statsAspectId || "") === "sono") {
+    sleepStatsHoldTriggered = false;
     return;
   }
   openStatsAspectModal(String(row.dataset.statsAspectId || ""));
@@ -14087,6 +14187,31 @@ sleepMusicToggleButton?.addEventListener("pointerdown", () => {
 
 sleepModalCloseButton?.addEventListener("click", () => {
   closeModal("sleepModal");
+});
+
+sleepHistoryCloseButton?.addEventListener("click", () => closeModal("sleepHistoryModal"));
+sleepHistoryList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-save-sleep]");
+  const row = button?.closest("[data-sleep-date]");
+  if (!button || !row) return;
+  const hours = Math.max(0, Math.min(12, Math.trunc(Number(row.querySelector("[data-sleep-hours]")?.value || 0) || 0)));
+  const minutes = Math.max(0, Math.min(59, Math.trunc(Number(row.querySelector("[data-sleep-minutes]")?.value || 0) || 0)));
+  const totalMinutes = Math.min(720, (hours * 60) + minutes);
+  button.disabled = true;
+  button.textContent = "Salvando...";
+  void apiRequest(`/api/200/sleep-history/${encodeURIComponent(row.dataset.sleepDate || "")}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ profile: getSelectedProfileName(), totalMinutes })
+  }).then(async () => {
+    button.textContent = "Salvo";
+    if (sleepHistoryStatus) sleepHistoryStatus.textContent = "Registro atualizado.";
+    await loadStatsSummary();
+  }).catch((error) => {
+    button.disabled = false;
+    button.textContent = "Salvar";
+    if (sleepHistoryStatus) sleepHistoryStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar.";
+  });
 });
 
 sleepContinueButton?.addEventListener("click", () => {
@@ -14778,6 +14903,8 @@ homeRunningMissionButton?.addEventListener("click", () => {
 });
 runningPlayerList?.addEventListener("click", () => {
   state.startDecisionContext.actionId = "";
+  state.runningPlayer.configurationMode = false;
+  state.runningPlayer.configurationTaskTitle = "";
   openRunningMusicListModal();
 });
 runningPlayerPrev?.addEventListener("click", () => {
@@ -14788,7 +14915,10 @@ runningPlayerNext?.addEventListener("click", () => {
 });
 runningMusicListBack?.addEventListener("click", () => {
   closeRunningMusicListModal();
-  if (state.startDecisionContext.actionId && !runningTaskModalElement?.classList.contains("active")) {
+  const wasConfiguration = state.runningPlayer.configurationMode;
+  state.runningPlayer.configurationMode = false;
+  state.runningPlayer.configurationTaskTitle = "";
+  if (!wasConfiguration && state.startDecisionContext.actionId && !startDecisionModal?.classList.contains("active") && !runningTaskModalElement?.classList.contains("active")) {
     reopenStartDecisionForAction(state.startDecisionContext.actionId);
   }
 });
@@ -15105,14 +15235,13 @@ startDecisionRepeatLabel?.addEventListener("click", () => {
 });
 startDecisionMusicLabel?.addEventListener("click", () => {
   const action = findActionById(state.startDecisionContext.actionId);
-  if (!action) {
-    if (isTaskComposerMode()) {
-      window.alert("Defina a música depois de criar a tarefa.");
-    }
+  const targetTitle = String(action?.title || taskTitle?.value || "").trim();
+  if (!targetTitle) {
+    window.alert("Defina primeiro o nome da tarefa.");
     return;
   }
-  state.runningPlayer.currentTaskTitle = String(action.title || "").trim();
-  closeStartDecisionModalWith("cancel");
+  state.runningPlayer.configurationMode = true;
+  state.runningPlayer.configurationTaskTitle = targetTitle;
   openRunningMusicListModal();
 });
 startDecisionMicButton?.addEventListener("click", () => {
@@ -15162,6 +15291,16 @@ partialTaskContinueButton?.addEventListener("click", () => {
   const resolve = partialTaskResolver;
   partialTaskResolver = null;
   if (resolve) resolve(partialTaskPercentValue);
+});
+startDecisionAspectLabel?.addEventListener("click", () => {
+  const action = findActionById(state.startDecisionContext.actionId);
+  actionCategoryTargetActionId = isTaskComposerMode() ? "" : String(action?.id || "");
+  actionCategorySelectionId = normalizeTaskCategoryId(isTaskComposerMode() ? state.wizard.categoryId : action?.categoryId);
+  state.wizard.categoryId = actionCategorySelectionId;
+  state.wizard.categoryName = getTaskCategoryName(actionCategorySelectionId);
+  renderActionCategoryModal();
+  if (actionCategoryModal?.parentElement !== document.body) document.body.appendChild(actionCategoryModal);
+  openModal("actionCategoryModal");
 });
 runningConfirmPrimaryButton?.addEventListener("click", () => {
   const action = state.runningConfirm.action;
