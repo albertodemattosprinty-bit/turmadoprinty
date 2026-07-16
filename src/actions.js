@@ -1118,7 +1118,11 @@ export async function updateUserActionStatus(userId, actionId) {
     );
 
     if (inProgressConflict.rows[0]) {
-      throw new Error("Voce ja esta em outra tarefa.");
+      const conflictRow = inProgressConflict.rows[0];
+      const conflictError = new Error("Voce ja esta em outra tarefa.");
+      conflictError.code = "ACTION_IN_PROGRESS_CONFLICT";
+      conflictError.runningAction = await getUserActionById(userId, conflictRow.id);
+      throw conflictError;
     }
 
     startedAt = action.status === ACTION_STATUS_PAUSED ? nowIso : (startedAt || nowIso);

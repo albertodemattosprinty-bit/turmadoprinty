@@ -4551,6 +4551,7 @@ async function apiRequest(path, options = {}) {
       const requestError = new Error(payload?.error || "Falha na requisicao.");
       requestError.code = String(payload?.code || "").trim();
       requestError.overlaps = Array.isArray(payload?.overlaps) ? payload.overlaps : [];
+      requestError.runningAction = payload?.runningAction || null;
       throw requestError;
     }
 
@@ -4870,7 +4871,7 @@ function closeModal(modal) {
     state.runningConfirm.action = null;
     state.runningConfirm.pauseAction = null;
     if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
-    document.body.classList.remove("running-confirm-open");
+    document.body.classList.remove("running-confirm-open", "running-confirm-from-actions");
   }
   if (modal.id === "quickTaskModal") {
     document.body.classList.remove("quick-task-open");
@@ -4927,7 +4928,7 @@ function navigateToProjectHome() {
   } finally {
     modalBackNavigationActive = false;
     modalNavigationStack.length = 0;
-    document.body.classList.remove("modal-open", "start-decision-open", "task-starting", "running-confirm-open", "quick-task-open");
+    document.body.classList.remove("modal-open", "start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   }
 }
 
@@ -5522,7 +5523,7 @@ async function toggleActionStatus(actionId, options = {}) {
     return;
   }
 
-  const targetAction = state.actions.find((item) => item.id === targetId);
+  const targetAction = state.actions.find((item) => String(item?.id || "") === targetId);
 
   if (!targetAction) {
     return;
@@ -5558,18 +5559,9 @@ async function toggleActionStatus(actionId, options = {}) {
     }
   }
   if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && !options.ignoreRunningConflict) {
-    const runningAction = getRunningActionExcept(targetAction.id);
+    const runningAction = await resolveRunningActionConflict(targetAction.id, targetAction);
     if (runningAction) {
-      const conflictChoice = await openStartConflictModalForActions(runningAction, targetAction);
-      if (conflictChoice === "finalize_and_start") {
-        await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
-        await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
-      } else if (conflictChoice === "partial_and_start") {
-        const pausedResult = await pauseActionWithSelectedProgress(runningAction);
-        if (!pausedResult) return;
-        delete state.runningLocalStarts[String(runningAction.id || "")];
-        await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
-      }
+      await handleRunningActionConflict(runningAction, targetAction);
       return;
     }
   }
@@ -5610,6 +5602,24 @@ async function toggleActionStatus(actionId, options = {}) {
     startRunningTaskTicker();
     renderActions();
   } catch (error) {
+    const normalizedErrorMessage = String(error?.message || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const isRunningConflict = error?.code === "ACTION_IN_PROGRESS_CONFLICT"
+      || normalizedErrorMessage.includes("ja esta em outra tarefa");
+    if (isRunningConflict && !options.ignoreRunningConflict) {
+      const runningFromError = error?.runningAction || null;
+      if (runningFromError) {
+        state.actions = [...state.actions.filter((item) => String(item?.id || "") !== String(runningFromError?.id || "")), runningFromError];
+      }
+      const runningAction = runningFromError
+        || await resolveRunningActionConflict(targetAction.id, targetAction, true);
+      if (runningAction) {
+        await handleRunningActionConflict(runningAction, targetAction);
+        return;
+      }
+    }
     document.body.classList.remove("task-starting");
     window.alert(error instanceof Error ? error.message : "Nao foi possivel atualizar a tarefa.");
     renderActions();
@@ -5688,7 +5698,7 @@ function closeWizard() {
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
-  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open", "quick-task-open");
+  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
   }
@@ -5961,7 +5971,7 @@ function closeRunningConfirmModal() {
   state.runningConfirm.action = null;
   state.runningConfirm.pauseAction = null;
   if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
-  document.body.classList.remove("running-confirm-open");
+  document.body.classList.remove("running-confirm-open", "running-confirm-from-actions");
   if (runningConfirmModal) {
     closeModal(runningConfirmModal);
   }
@@ -5978,21 +5988,24 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     abort: "Abortar ou pausar?",
     finalize: "Concluir?",
     restore: "Restaurar tarefa",
-    delete: "Excluir microtarefa?"
+    delete: "Excluir microtarefa?",
+    delete_mission: "Excluir missão inteira?"
   };
   const buttonMap = {
     giveup: "Desistir",
     abort: "Abortar",
     finalize: "Concluir",
     restore: "Restaurar tarefa",
-    delete: "Excluir"
+    delete: "Excluir",
+    delete_mission: "Excluir missão"
   };
   const classMap = {
     giveup: "is-desistir",
     abort: "is-abortar",
     finalize: "is-concluir",
     restore: "is-restaurar",
-    delete: "is-excluir"
+    delete: "is-excluir",
+    delete_mission: "is-excluir"
   };
   runningConfirmTitle.textContent = titleMap[kind] || "Desistir?";
   runningConfirmName.textContent = String(action?.title || "Nome da tarefa");
@@ -6002,6 +6015,9 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
   if (runningConfirmPauseButton) {
     runningConfirmPauseButton.hidden = !(kind === "abort" && state.runningConfirm.pauseAction);
   }
+  const openedFromActions = Boolean(actionsModal?.classList.contains("active"));
+  document.body.classList.toggle("running-confirm-from-actions", openedFromActions);
+  document.body.appendChild(runningConfirmModal);
   document.body.classList.add("running-confirm-open");
   openModal("runningConfirmModal");
 }
@@ -6274,6 +6290,72 @@ function getRunningActionExcept(actionId) {
   ) || null;
 }
 
+async function resolveRunningActionConflict(actionId, targetAction = null, forceRuntimeRefresh = false) {
+  const localRunning = getRunningActionExcept(actionId);
+  if (localRunning) return localRunning;
+
+  let runtimeState = state.runtimeState;
+  if (forceRuntimeRefresh || !runtimeState) {
+    try {
+      const runtimePayload = await apiRequestWithTimeout(runtimeStateEndpoint, { skipGlobalLoading: true }, 5000);
+      runtimeState = runtimePayload?.runtimeState || null;
+      state.runtimeState = runtimeState;
+    } catch {
+      runtimeState = null;
+    }
+  }
+
+  const runtimeActionId = String(runtimeState?.actionId || "").trim();
+  const refreshedEventType = String(runtimeState?.eventType || "").trim().toLowerCase();
+  if (!runtimeActionId || runtimeActionId === String(actionId || "") || !["start", "resume"].includes(refreshedEventType)) {
+    return null;
+  }
+
+  const cachedRuntimeAction = state.actions.find((item) => String(item?.id || "") === runtimeActionId);
+  if (normalizeActionStatus(cachedRuntimeAction?.status) === actionStatuses.inProgress) {
+    return cachedRuntimeAction;
+  }
+
+  const runtimeStartedAt = new Date(runtimeState?.startedAt || runtimeState?.occurredAt || new Date());
+  if (!Number.isNaN(runtimeStartedAt.getTime())) {
+    const fromDate = new Date(runtimeStartedAt);
+    const toDate = new Date(runtimeStartedAt);
+    fromDate.setDate(fromDate.getDate() - 7);
+    toDate.setDate(toDate.getDate() + 8);
+    try {
+      const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(fromDate))}&to=${encodeURIComponent(startOfDayIso(toDate))}`, {
+        skipGlobalLoading: true
+      }, 7000);
+      const fetchedActions = Array.isArray(payload?.actions) ? payload.actions : [];
+      const fetchedRuntimeAction = fetchedActions.find((item) => String(item?.id || "") === runtimeActionId);
+      if (fetchedRuntimeAction) {
+        const merged = new Map(state.actions.map((item) => [String(item?.id || ""), item]));
+        merged.set(runtimeActionId, fetchedRuntimeAction);
+        state.actions = [...merged.values()];
+        if (normalizeActionStatus(fetchedRuntimeAction?.status) === actionStatuses.inProgress) {
+          return fetchedRuntimeAction;
+        }
+      }
+    } catch {}
+  }
+
+  const fallbackStart = Number.isNaN(runtimeStartedAt.getTime()) ? new Date() : runtimeStartedAt;
+  const fallbackDurationMinutes = Math.max(1, getActionDurationMinutes(targetAction) || 10);
+  const fallbackAction = {
+    id: runtimeActionId,
+    title: String(runtimeState?.actionTitle || "Tarefa em andamento"),
+    assignee: targetAction?.assignee || state.selectedProfile,
+    status: actionStatuses.inProgress,
+    startedAt: fallbackStart.toISOString(),
+    startAt: fallbackStart.toISOString(),
+    endAt: new Date(fallbackStart.getTime() + (fallbackDurationMinutes * 60 * 1000)).toISOString(),
+    completionPercent: 0,
+    accumulatedSeconds: 0
+  };
+  state.actions = [...state.actions.filter((item) => String(item?.id || "") !== runtimeActionId), fallbackAction];
+  return fallbackAction;
+}
+
 function reopenStartDecisionForAction(actionId) {
   const action = findActionById(actionId);
   if (!action) {
@@ -6302,6 +6384,23 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   return new Promise((resolve) => {
     state.startConflict.resolve = resolve;
   });
+}
+
+async function handleRunningActionConflict(currentAction, nextAction) {
+  const conflictChoice = await openStartConflictModalForActions(currentAction, nextAction);
+  if (conflictChoice === "finalize_and_start") {
+    await toggleActionStatus(currentAction.id, { skipEndConfirm: true });
+    await toggleActionStatus(nextAction.id, { skipDecision: true, ignoreRunningConflict: true });
+    return true;
+  }
+  if (conflictChoice === "partial_and_start") {
+    const pausedResult = await pauseActionWithSelectedProgress(currentAction);
+    if (!pausedResult) return true;
+    delete state.runningLocalStarts[String(currentAction.id || "")];
+    await toggleActionStatus(nextAction.id, { skipDecision: true, ignoreRunningConflict: true });
+    return true;
+  }
+  return conflictChoice === "cancel";
 }
 
 function openStartDecisionModal(targetAction, currentEntry, buttons) {
@@ -13884,39 +13983,41 @@ missionProgressConfirmButton?.addEventListener("click", () => {
 });
 
 missionAdjustDeleteButton?.addEventListener("click", () => {
-  void (async () => {
-    const goalId = String(state.missionAdjust?.goalId || "").trim();
-    if (!goalId) {
-      return;
-    }
-    const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
-    if (!finishLoading) return;
-    if (missionAdjustStatus) {
-      missionAdjustStatus.textContent = "Excluindo...";
-    }
-    try {
-      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
-        method: "DELETE"
-      });
-      state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
-        const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
-        return String(slot.goalId || "") === goalId
-          ? { key: definition.key, title: definition.defaultTitle, goalId: "" }
-          : slot;
-      });
-      persistMissionQuickSlots();
-      closeModal("missionAdjustModal");
-      await loadMissions();
-      renderMissions();
-      renderRunningMissionQuickButtons();
-    } catch (error) {
+  const goalId = String(state.missionAdjust?.goalId || "").trim();
+  if (!goalId) return;
+  const goal = (Array.isArray(state.missions) ? state.missions : [])
+    .find((item) => String(item?.id || "") === goalId) || { title: "Missão" };
+  openRunningConfirmModal("delete_mission", goal, () => {
+    void (async () => {
+      const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
+      if (!finishLoading) return;
       if (missionAdjustStatus) {
-        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+        missionAdjustStatus.textContent = "Excluindo...";
       }
-    } finally {
-      finishLoading();
-    }
-  })();
+      try {
+        await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
+          method: "DELETE"
+        });
+        state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
+          const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
+          return String(slot.goalId || "") === goalId
+            ? { key: definition.key, title: definition.defaultTitle, goalId: "" }
+            : slot;
+        });
+        persistMissionQuickSlots();
+        closeModal("missionAdjustModal");
+        await loadMissions();
+        renderMissions();
+        renderRunningMissionQuickButtons();
+      } catch (error) {
+        if (missionAdjustStatus) {
+          missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+        }
+      } finally {
+        finishLoading();
+      }
+    })();
+  });
 });
 
 missionQuickAssignGrid?.addEventListener("click", (event) => {
