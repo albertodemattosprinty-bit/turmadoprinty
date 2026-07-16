@@ -878,7 +878,7 @@ let runningMusicProgressTicker = null;
 let runningNextMetricTimer = null;
 let taskBeepAudioContext = null;
 let runningMinuteCuePlayers = [];
-const runningMinuteCueWorker = typeof Worker !== "undefined" && !isNativeCapacitorApp()
+const runningMinuteCueWorker = typeof Worker !== "undefined"
   ? new Worker("/200/minute-cue-worker.js?v=20260716-ptbr-minute-cues")
   : null;
 let postponeNavHoldTimer = null;
@@ -913,7 +913,9 @@ const modalNavigationStack = [];
 let modalBackNavigationActive = false;
 const missionVariantsCache = new Map();
 const missionRunAlarmNodes = new Set();
-const missionRunCueMap = new Map([[180, "3-min.mp3"], [120, "2-min.mp3"], [60, "1-min.mp3"], [30, "30-sec.mp3"], [15, "15-sec.mp3"]]);
+// Minute announcements use the shared Portuguese R2 catalog. Keep only the
+// sub-minute mission cues here so the 1/3/5/10-minute schedule never overlaps.
+const missionRunCueMap = new Map([[30, "30-sec.mp3"], [15, "15-sec.mp3"]]);
 const missionRunCycleCueMap = new Map([
   [2, "2.mp3"], [3, "3.mp3"], [4, "4.mp3"], [5, "5.mp3"],
   [6, "6.mp3"], [7, "7.mp3"], [8, "8.mp3"], [9, "9.mp3"],
@@ -1128,10 +1130,7 @@ const state = {
     preparedKey: "",
     playTimer: 0,
     preloadTimer: 0,
-    workerCue: null,
-    nativeActive: false,
-    nativeEndAtMs: 0,
-    nativeOptionKey: ""
+    workerCue: null
   },
   runningEndBell: {
     actionId: "",
@@ -2911,24 +2910,11 @@ function resetRunningMinuteCueState(actionId = "", optionKey = "") {
   state.runningMinuteCue.preparedKey = "";
 }
 
-function setMinuteCueMediaMetadata(minute, taskTitle) {
-  if (!("mediaSession" in navigator) || typeof window.MediaMetadata !== "function") return;
-  try {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: `${minute} ${minute === 1 ? "minuto restante" : "minutos restantes"}`,
-      artist: String(taskTitle || "Tarefa em andamento"),
-      album: "iLife Mindset"
-    });
-    navigator.mediaSession.playbackState = "playing";
-  } catch {}
-}
-
 async function playRunningMinuteCuePlayers(minute, taskTitle) {
   const players = [...runningMinuteCuePlayers];
   if (!players.length) return;
   const baseVolume = runningAudio ? Number(runningAudio.volume || 1) : 1;
   const shouldRestoreMusic = Boolean(runningAudio && !runningAudio.paused);
-  setMinuteCueMediaMetadata(minute, taskTitle);
   try {
     if (shouldRestoreMusic) {
       await fadeAudioVolume(runningAudio, Math.max(0.1, baseVolume * 0.25), 700);
@@ -3018,40 +3004,8 @@ if (runningMinuteCueWorker) {
   });
 }
 
-function stopNativeMinuteCueService() {
-  if (!state.runningMinuteCue.nativeActive) return;
-  state.runningMinuteCue.nativeActive = false;
-  state.runningMinuteCue.nativeEndAtMs = 0;
-  state.runningMinuteCue.nativeOptionKey = "";
-  try { void getCapacitorPlugin("MinuteCue")?.stop?.(); } catch {}
-}
-
-function syncNativeMinuteCueService(actionId, taskTitle, remainingSeconds, optionKey) {
-  const plugin = getCapacitorPlugin("MinuteCue");
-  if (!plugin?.start) return false;
-  const endAtMs = Date.now() + (Math.max(0, Number(remainingSeconds || 0)) * 1000);
-  const sameSchedule = state.runningMinuteCue.nativeActive
-    && state.runningMinuteCue.actionId === actionId
-    && state.runningMinuteCue.nativeOptionKey === optionKey
-    && Math.abs(state.runningMinuteCue.nativeEndAtMs - endAtMs) < 3000;
-  if (!sameSchedule) {
-    state.runningMinuteCue.nativeActive = true;
-    state.runningMinuteCue.nativeEndAtMs = endAtMs;
-    state.runningMinuteCue.nativeOptionKey = optionKey;
-    void plugin.start({
-      sessionId: actionId,
-      taskTitle: String(taskTitle || "Tarefa em andamento"),
-      remainingSeconds: Math.max(0, Math.ceil(Number(remainingSeconds || 0))),
-      intervalMinutes: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
-      finalMinutesEnabled: Boolean(state.options.finalMinuteNotificationsEnabled)
-    }).catch(() => {});
-  }
-  return true;
-}
-
 function stopRunningMinuteCueSchedule() {
   resetRunningMinuteCueState();
-  stopNativeMinuteCueService();
 }
 
 function syncRunningMinuteCueSchedule(actionId, taskTitle, remainingSeconds) {
@@ -3065,10 +3019,6 @@ function syncRunningMinuteCueSchedule(actionId, taskTitle, remainingSeconds) {
   if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.optionKey !== optionKey) {
     resetRunningMinuteCueState(actionId, optionKey);
   }
-  if (isNativeCapacitorApp() && syncNativeMinuteCueService(actionId, taskTitle, remainingSeconds, optionKey)) {
-    return;
-  }
-
   const nextEntry = buildMinuteCueSchedule(remainingSeconds, interval, finalMinutesEnabled)
     .find((entry) => !state.runningMinuteCue.played.has(entry.minute));
   if (!nextEntry) return;
@@ -3085,7 +3035,11 @@ function syncRunningMinuteCueSchedule(actionId, taskTitle, remainingSeconds) {
     if (!state.runningMinuteCue.preloadTimer) {
       state.runningMinuteCue.preloadTimer = window.setTimeout(() => {
         state.runningMinuteCue.preloadTimer = 0;
-        renderHomeRunningTask();
+        if (isMissionRunModalOpen() && state.missionRun?.goalId) {
+          renderMissionRunState();
+        } else {
+          renderHomeRunningTask();
+        }
       }, Math.max(250, Math.round((secondsUntilCue - MINUTE_CUE_PRELOAD_SECONDS) * 1000)));
     }
     return;
@@ -3159,6 +3113,7 @@ function anchorToCurrentAction() {
 }
 
 function renderHomeRunningTask() {
+  const missionOwnsMinuteCueSchedule = isMissionRunModalOpen() && Boolean(state.missionRun?.goalId);
   const setHomeRunningSurfaceState = (isRunning) => {
     if (homeRunningSurfaceIcon) {
       homeRunningSurfaceIcon.src = isRunning ? homeRunningSurfaceActiveIconPath : homeRunningSurfaceIdleIconPath;
@@ -3245,7 +3200,9 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
-    stopRunningMinuteCueSchedule();
+    if (!missionOwnsMinuteCueSchedule) {
+      stopRunningMinuteCueSchedule();
+    }
     setHomeRunningSurfaceState(false);
     state.runningPlayer.defaultAppliedActionId = "";
     const now = new Date(getServerNowMs());
@@ -3333,7 +3290,9 @@ function renderHomeRunningTask() {
   const runningCenterMarkup = formatRunningCenter(percent, percentPrecise, estimatedRemaining, remainingSeconds, showPercent);
   runningTaskPercent.innerHTML = runningCenterMarkup;
   updateRunningCenterModeButtons(showPercent ? "percent" : "time");
-  syncRunningMinuteCueSchedule(String(action.id || ""), action.title, remainingSeconds);
+  if (!missionOwnsMinuteCueSchedule) {
+    syncRunningMinuteCueSchedule(String(action.id || ""), action.title, remainingSeconds);
+  }
   if (remainingSeconds <= 0) {
     void playRunningEndBellCue(runningActionId);
     if (isQuickTaskAction(action) && !state.quickTaskAutoFinalizing) {
@@ -5052,6 +5011,7 @@ function closeModal(modal) {
     stopMissionRunAlarm();
     stopMissionRunCueAudio();
     stopMissionRunCycleAudio();
+    stopRunningMinuteCueSchedule();
     if (missionRunVariantSelectionTimer) {
       window.clearTimeout(missionRunVariantSelectionTimer);
       missionRunVariantSelectionTimer = null;
@@ -11729,6 +11689,11 @@ function renderMissionRunState() {
   if (missionRunStatus) {
     missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missão não tem tempo definido.";
   }
+  syncRunningMinuteCueSchedule(
+    `mission:${goalId}:cycle:${normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex)}`,
+    String(goal.title || "Missão"),
+    remainingSeconds
+  );
   renderMissionRunCycleCount();
   const announced = new Set(Array.isArray(state.missionRun.announcedCueSeconds) ? state.missionRun.announcedCueSeconds : []);
   const totalSeconds = Math.ceil(durationMs / 1000);
@@ -14976,18 +14941,12 @@ toggleMinuteNotificationsOptionButton?.addEventListener("click", () => {
   const currentInterval = normalizeMinuteCueInterval(state.options.minuteNotificationInterval);
   const currentIndex = Math.max(0, MINUTE_CUE_INTERVALS.indexOf(currentInterval));
   state.options.minuteNotificationInterval = MINUTE_CUE_INTERVALS[(currentIndex + 1) % MINUTE_CUE_INTERVALS.length];
-  if (state.options.minuteNotificationInterval > 0) {
-    try { void getCapacitorPlugin("MinuteCue")?.requestNotificationPermission?.(); } catch {}
-  }
   saveOptionsConfig();
   renderOptionsModal();
   renderHomeRunningTask();
 });
 toggleFinalMinuteNotificationsOptionButton?.addEventListener("click", () => {
   state.options.finalMinuteNotificationsEnabled = !state.options.finalMinuteNotificationsEnabled;
-  if (state.options.finalMinuteNotificationsEnabled) {
-    try { void getCapacitorPlugin("MinuteCue")?.requestNotificationPermission?.(); } catch {}
-  }
   saveOptionsConfig();
   renderOptionsModal();
   renderHomeRunningTask();
