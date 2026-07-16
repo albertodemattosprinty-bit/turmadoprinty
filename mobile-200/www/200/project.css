@@ -7032,6 +7032,79 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
   font-weight: 900;
 }
 
+.mission-action-loading-content {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  transition: gap 500ms ease, opacity 500ms ease;
+}
+
+.mission-action-loading-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mission-action-loading-spinner {
+  width: 0;
+  height: 20px;
+  flex: 0 0 auto;
+  opacity: 0;
+  overflow: visible;
+  transform: scale(0.62);
+  transition: width 500ms ease, opacity 500ms ease, transform 500ms ease;
+  animation: mission-action-loading-spin 760ms linear infinite;
+}
+
+.mission-action-loading-spinner-track,
+.mission-action-loading-spinner-arc {
+  fill: none;
+  stroke-width: 2.4;
+}
+
+.mission-action-loading-spinner-track {
+  stroke: rgba(255, 255, 255, 0.28);
+}
+
+.mission-action-loading-spinner-arc {
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-dasharray: 25 16;
+}
+
+button.is-mission-action-loading,
+button.is-mission-action-loading:disabled {
+  opacity: 1;
+  cursor: wait;
+  pointer-events: none;
+}
+
+button.is-mission-action-loading .mission-action-loading-content {
+  gap: 10px;
+}
+
+button.is-mission-action-loading .mission-action-loading-text {
+  animation: mission-action-text-dissolve 500ms ease both;
+}
+
+button.is-mission-action-loading .mission-action-loading-spinner {
+  width: 20px;
+  opacity: 1;
+  transform: scale(1);
+}
+
+@keyframes mission-action-loading-spin {
+  to { rotate: 360deg; }
+}
+
+@keyframes mission-action-text-dissolve {
+  0% { opacity: 1; }
+  48% { opacity: 0.38; }
+  100% { opacity: 1; }
+}
+
 .history-mission-run-finish-button {
   background: linear-gradient(145deg, #31c56d 0%, #12783d 100%);
 }

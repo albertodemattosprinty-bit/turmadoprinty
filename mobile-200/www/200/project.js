@@ -4896,12 +4896,42 @@ function closeModal(modal) {
 }
 
 function navigateToProjectHome() {
-  Array.from(document.querySelectorAll(".workspace-modal.active")).forEach((modal) => {
-    closeModal(modal);
-  });
-  closeProfileManageOverlay();
-  modalNavigationStack.length = 0;
-  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open");
+  modalBackNavigationActive = true;
+  try {
+    if (ilifeReaderOverlay?.classList.contains("active")) closeIlifeReader();
+    if (actionCategoryModal?.classList.contains("active")) {
+      actionCategoryModal.classList.remove("active");
+      actionCategoryModal.setAttribute("aria-hidden", "true");
+    }
+    if (actionWizard?.classList.contains("active")) closeWizard();
+    if (platformWizard?.classList.contains("active")) closePlatformWizard();
+    if (actionStatusWizard?.classList.contains("active")) closeActionStatusWizard();
+    if (profileManageOverlay?.classList.contains("active")) closeProfileManageOverlay();
+    const activeModals = [...document.querySelectorAll(".workspace-modal.active")].reverse();
+    activeModals.forEach((modal) => {
+      if (modal.id === "startConflictModal") {
+        closeStartConflictModal("cancel");
+      } else if (modal.id === "startDecisionModal") {
+        closeStartDecisionModalWith("cancel");
+      } else if (modal.id === "runningConfirmModal") {
+        closeRunningConfirmModal();
+      } else {
+        closeModal(modal);
+      }
+    });
+  } finally {
+    modalBackNavigationActive = false;
+    modalNavigationStack.length = 0;
+    document.body.classList.remove("modal-open", "start-decision-open", "task-starting", "running-confirm-open", "quick-task-open");
+  }
+}
+
+function isDirectProjectHomeButton(button) {
+  if (!button) return false;
+  const label = String(button.getAttribute("aria-label") || "").trim().toLowerCase();
+  if (label.includes("home")) return true;
+  const homePath = button.querySelector('svg path[d^="M3 11"]');
+  return Boolean(homePath);
 }
 
 function isProjectHomeVisible() {
@@ -10986,6 +11016,53 @@ function setMissionRunLoading(isLoading) {
   document.body.classList.toggle("mission-run-loading", active);
 }
 
+function ensureMissionActionLoadingContent(button) {
+  if (!button || button.dataset.missionLoadingReady === "1") return;
+  const originalContent = button.innerHTML;
+  button.innerHTML = `<span class="mission-action-loading-content"><span class="mission-action-loading-text">${originalContent}</span><svg class="mission-action-loading-spinner" viewBox="0 0 24 24" aria-hidden="true"><circle class="mission-action-loading-spinner-track" cx="12" cy="12" r="9"></circle><circle class="mission-action-loading-spinner-arc" cx="12" cy="12" r="9"></circle></svg></span>`;
+  button.dataset.missionLoadingReady = "1";
+}
+
+function beginMissionActionLoading(button, options = {}) {
+  if (!button || button.dataset.missionActionBusy === "1") return null;
+  ensureMissionActionLoadingContent(button);
+  const scope = options?.scope || button.closest(".workspace-modal, .history-mission-run-confirm") || button.parentElement;
+  const scopedButtons = scope
+    ? [...scope.querySelectorAll("button")]
+    : [button];
+  const disabledState = scopedButtons.map((item) => ({ item, disabled: Boolean(item.disabled) }));
+  button.dataset.missionActionBusy = "1";
+  button.setAttribute("aria-busy", "true");
+  disabledState.forEach(({ item }) => { item.disabled = true; });
+  void button.offsetWidth;
+  button.classList.add("is-mission-action-loading");
+  let finished = false;
+  return () => {
+    if (finished) return;
+    finished = true;
+    button.classList.remove("is-mission-action-loading");
+    button.removeAttribute("aria-busy");
+    window.setTimeout(() => {
+      disabledState.forEach(({ item, disabled }) => { item.disabled = disabled; });
+      delete button.dataset.missionActionBusy;
+    }, 500);
+  };
+}
+
+async function runMissionActionWithLoading(button, action, options = {}) {
+  const finishLoading = beginMissionActionLoading(button, options);
+  if (!finishLoading) return undefined;
+  try {
+    return await action();
+  } finally {
+    finishLoading();
+  }
+}
+
+function waitForMissionActionTransition() {
+  return new Promise((resolve) => window.setTimeout(resolve, 500));
+}
+
 function normalizeMissionRunCycleTarget(value) {
   return Math.max(1, Math.min(MISSION_RUN_MAX_CYCLES, Math.trunc(Number(value || 1) || 1)));
 }
@@ -11482,11 +11559,14 @@ async function openMissionRunModal(goalId) {
   }
 }
 
-async function finalizeMissionRun() {
+async function finalizeMissionRun(triggerButton = null) {
   const goalId = String(state.missionRun?.goalId || "").trim();
   if (!goalId || state.missionRun.finalizing) {
     return;
   }
+  const finishLoading = beginMissionActionLoading(triggerButton, {
+    scope: document.getElementById("missionRunModal")
+  });
   const completedCycles = Math.max(1, Math.min(MISSION_RUN_MAX_CYCLES, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1)));
   const preloadedDailyRanking = state.missionRun.preloadedDailyRanking;
   state.missionRun.finalizing = true;
@@ -11524,12 +11604,16 @@ async function finalizeMissionRun() {
     closeModal("missionRunModal");
   } catch (error) {
     state.missionRun.finalizing = false;
+    showFloatingNotice(error instanceof Error ? error.message : "Falha ao concluir missão.");
     if (missionRunStatus) {
       missionRunStatus.textContent = error instanceof Error ? error.message : "Falha ao concluir missão.";
     }
   } finally {
-    if (missionRunFinishButton) missionRunFinishButton.disabled = false;
-    if (missionRunRestartButton) missionRunRestartButton.disabled = false;
+    finishLoading?.();
+    if (!finishLoading) {
+      if (missionRunFinishButton) missionRunFinishButton.disabled = false;
+      if (missionRunRestartButton) missionRunRestartButton.disabled = false;
+    }
   }
 }
 
@@ -12115,12 +12199,30 @@ function preventEdgeSwipeNavigation() {
   let startY = 0;
   let fromEdge = false;
   let shouldGoHome = false;
+  let activeTouchId = null;
+
+  const resetEdgeSwipe = () => {
+    fromEdge = false;
+    shouldGoHome = false;
+    activeTouchId = null;
+  };
+
+  const getActiveTouch = (touchList) => {
+    const touches = Array.from(touchList || []);
+    if (activeTouchId === null) return touches[0] || null;
+    return touches.find((touch) => touch.identifier === activeTouchId) || null;
+  };
 
   document.addEventListener("touchstart", (event) => {
-    const touch = event.changedTouches?.[0];
-    startX = Number(touch?.clientX || 0);
-    startY = Number(touch?.clientY || 0);
-    fromEdge = startX <= 28;
+    resetEdgeSwipe();
+    if (event.touches?.length !== 1 || event.target?.closest?.("button, a, input, textarea, select, [role='button'], [contenteditable='true']")) {
+      return;
+    }
+    const touch = event.touches[0];
+    startX = Number(touch.clientX);
+    startY = Number(touch.clientY);
+    activeTouchId = touch.identifier;
+    fromEdge = Number.isFinite(startX) && startX >= 0 && startX <= 20;
     shouldGoHome = false;
   }, { passive: true });
 
@@ -12128,30 +12230,38 @@ function preventEdgeSwipeNavigation() {
     if (!fromEdge) {
       return;
     }
-    const touch = event.changedTouches?.[0];
-    const deltaX = Number(touch?.clientX || 0) - startX;
-    const deltaY = Number(touch?.clientY || 0) - startY;
-    if (deltaX > Math.abs(deltaY) && deltaX > 10) {
+    const touch = getActiveTouch(event.touches);
+    if (!touch) {
+      resetEdgeSwipe();
+      return;
+    }
+    const deltaX = Number(touch.clientX) - startX;
+    const deltaY = Number(touch.clientY) - startY;
+    if (Math.abs(deltaY) > 24 && Math.abs(deltaY) >= deltaX) {
+      resetEdgeSwipe();
+      return;
+    }
+    if (deltaX >= 36 && deltaX >= Math.abs(deltaY) * 1.5) {
       shouldGoHome = true;
       event.preventDefault();
     }
   }, { passive: false });
 
   document.addEventListener("touchend", (event) => {
-    const touch = event.changedTouches?.[0];
-    const endX = Number(touch?.clientX || 0);
+    const touch = getActiveTouch(event.changedTouches);
+    if (!touch) {
+      resetEdgeSwipe();
+      return;
+    }
+    const endX = Number(touch.clientX);
     const deltaX = endX - startX;
-    if (fromEdge && shouldGoHome && deltaX >= 42) {
+    if (fromEdge && shouldGoHome && deltaX >= 64) {
       navigateBackOneProjectLayer();
     }
-    fromEdge = false;
-    shouldGoHome = false;
+    resetEdgeSwipe();
   }, { passive: true });
 
-  document.addEventListener("touchcancel", () => {
-    fromEdge = false;
-    shouldGoHome = false;
-  }, { passive: true });
+  document.addEventListener("touchcancel", resetEdgeSwipe, { passive: true });
 }
 
 function registerNativeBackButtonHandler() {
@@ -12594,7 +12704,13 @@ async function submitProject200Export() {
 }
 
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
-  button.addEventListener("click", () => closeModal(button.closest(".workspace-modal")));
+  button.addEventListener("click", () => {
+    if (isDirectProjectHomeButton(button)) {
+      navigateToProjectHome();
+      return;
+    }
+    closeModal(button.closest(".workspace-modal"));
+  });
 });
 
 document.querySelectorAll("[data-day-nav]").forEach((button) => {
@@ -13267,31 +13383,33 @@ missionCreateConfirmButton?.addEventListener("click", () => {
       openMissionTimeModal("create");
       return;
     }
-    if (missionCreateStatus) {
-      missionCreateStatus.textContent = "Criando missão...";
-    }
-    try {
-      await apiRequest("/api/200/extra-goals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          targetValue,
-          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
-          svgIconUrl: "",
-          svgIconLabel: ""
-        })
-      });
-      closeModal("missionCreateModal");
-      await loadMissions();
-      renderMissions();
-      renderRunningMissionQuickButtons();
-    } catch (error) {
+    await runMissionActionWithLoading(missionCreateConfirmButton, async () => {
       if (missionCreateStatus) {
-        missionCreateStatus.textContent = error instanceof Error ? error.message : "Falha ao criar missão.";
+        missionCreateStatus.textContent = "Criando missão...";
       }
-    }
+      try {
+        await apiRequest("/api/200/extra-goals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            targetValue,
+            profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+            unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
+            svgIconUrl: "",
+            svgIconLabel: ""
+          })
+        });
+        closeModal("missionCreateModal");
+        await loadMissions();
+        renderMissions();
+        renderRunningMissionQuickButtons();
+      } catch (error) {
+        if (missionCreateStatus) {
+          missionCreateStatus.textContent = error instanceof Error ? error.message : "Falha ao criar missão.";
+        }
+      }
+    });
   })();
 });
 
@@ -13606,6 +13724,8 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
     if (!goalId) {
       return;
     }
+    const finishLoading = beginMissionActionLoading(missionAdjustConfirmButton);
+    if (!finishLoading) return;
     if (missionAdjustStatus) {
       missionAdjustStatus.textContent = "Salvando...";
     }
@@ -13628,6 +13748,8 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
       if (missionAdjustStatus) {
         missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
       }
+    } finally {
+      finishLoading();
     }
   })();
 });
@@ -13639,6 +13761,8 @@ missionProgressConfirmButton?.addEventListener("click", () => {
     if (!goalId || deltaValue === 0) {
       return;
     }
+    const finishLoading = beginMissionActionLoading(missionProgressConfirmButton);
+    if (!finishLoading) return;
     if (missionProgressStatus) {
       missionProgressStatus.textContent = deltaValue < 0 ? "Subtraindo..." : "Adicionando...";
     }
@@ -13663,6 +13787,8 @@ missionProgressConfirmButton?.addEventListener("click", () => {
       if (missionProgressStatus) {
         missionProgressStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar progresso.";
       }
+    } finally {
+      finishLoading();
     }
   })();
 });
@@ -13673,6 +13799,8 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
     if (!goalId) {
       return;
     }
+    const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
+    if (!finishLoading) return;
     if (missionAdjustStatus) {
       missionAdjustStatus.textContent = "Excluindo...";
     }
@@ -13695,6 +13823,8 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
       if (missionAdjustStatus) {
         missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
       }
+    } finally {
+      finishLoading();
     }
   })();
 });
@@ -13796,16 +13926,19 @@ missionRunCycleCount?.addEventListener("pointercancel", () => {
   missionRunCycleSwipeStartX = null;
 });
 missionRunCancelDiscardButton?.addEventListener("click", () => {
-  closeModal("missionRunModal");
+  void runMissionActionWithLoading(missionRunCancelDiscardButton, async () => {
+    await waitForMissionActionTransition();
+    closeModal("missionRunModal");
+  }, { scope: missionRunConfirm });
 });
 missionRunCancelFinishButton?.addEventListener("click", () => {
-  void finalizeMissionRun();
+  void finalizeMissionRun(missionRunCancelFinishButton);
 });
 missionRunCompleteButton?.addEventListener("click", () => {
   completeMissionRunCycle();
 });
 missionRunFinishButton?.addEventListener("click", () => {
-  void finalizeMissionRun();
+  void finalizeMissionRun(missionRunFinishButton);
 });
 missionRunFinishCloseButton?.addEventListener("click", () => {
   if (missionRunFinishChoice) {
@@ -13813,7 +13946,10 @@ missionRunFinishCloseButton?.addEventListener("click", () => {
   }
 });
 missionRunRestartButton?.addEventListener("click", () => {
-  restartMissionRunLocally();
+  void runMissionActionWithLoading(missionRunRestartButton, async () => {
+    await waitForMissionActionTransition();
+    restartMissionRunLocally();
+  }, { scope: missionRunFinishChoice });
 });
 
 missionVariantsCloseButton?.addEventListener("click", () => {
@@ -13861,8 +13997,9 @@ missionVariantEditorSave?.addEventListener("click", async () => {
   if (!title) { if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa."; return; }
   const goalId = state.missionVariants.goalId;
   const editingId = state.missionVariants.editingId;
+  const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
+  if (!finishLoading) return;
   try {
-    missionVariantEditorSave.disabled = true;
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/variants${editingId ? `/${encodeURIComponent(editingId)}` : ""}`, {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -13876,7 +14013,9 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     renderMissions();
   } catch (error) {
     if (missionVariantStatus) missionVariantStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar.";
-  } finally { missionVariantEditorSave.disabled = false; }
+  } finally {
+    finishLoading();
+  }
 });
 missionVariantsList?.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-mission-variant-delete]");
@@ -14174,7 +14313,7 @@ runningTaskListButton?.addEventListener("click", () => {
   window.setTimeout(() => openModal("actionsModal"), 500);
 });
 runningTaskHomeButton?.addEventListener("click", () => {
-  closeRunningTaskModalWithFade();
+  navigateToProjectHome();
 });
 runningTaskQuickButton?.addEventListener("click", () => {
   openQuickTaskModal();

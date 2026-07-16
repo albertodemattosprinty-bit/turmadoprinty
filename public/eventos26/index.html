@@ -719,6 +719,88 @@
       }
     }
 
+    @media screen {
+      /* O mesmo palco visual e o mesmo fundo fixo no desktop e no mobile. */
+      html {
+        background: #041428;
+      }
+
+      body {
+        position: relative;
+        min-height: 100vh;
+        background: transparent;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(to top, rgba(3, 15, 34, 0.92) 0%, rgba(4, 20, 40, 0.72) 38%, rgba(4, 20, 40, 0.22) 100%),
+          url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/mobile-stage-background.png") center top / cover no-repeat;
+      }
+
+      .document {
+        position: relative;
+        z-index: 1;
+      }
+
+      .sheet,
+      .hero,
+      .video-hero,
+      .stat,
+      .card,
+      .hero-card,
+      .quote-card,
+      .theme-card,
+      .logistics-card,
+      .media-card,
+      .price-card,
+      .fit-list,
+      .flow-step,
+      .quote-band,
+      .timeline-item,
+      .closing-note,
+      .video-stage {
+        background: transparent;
+        background-image: none;
+        border-color: transparent;
+        box-shadow: none;
+        backdrop-filter: none;
+      }
+
+      .hero::after,
+      .theme-card::after {
+        display: none;
+      }
+
+      .sheet,
+      .sheet h1,
+      .sheet h2,
+      .sheet h3,
+      .sheet h4,
+      .sheet p,
+      .sheet li,
+      .sheet strong,
+      .sheet span,
+      .sheet .section-copy,
+      .sheet .lead,
+      .sheet .footer-note,
+      .sheet .price-highlight {
+        color: #ffffff;
+      }
+
+      .timeline-year,
+      .theme-badge,
+      .tag,
+      .flow-step strong {
+        background: transparent;
+        border-color: transparent;
+      }
+    }
+
     @media print {
       @page {
         size: A4;

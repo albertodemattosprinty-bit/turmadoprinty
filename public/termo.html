@@ -27,16 +27,26 @@
       min-height: 100vh;
       font-family: "Exo 2", sans-serif;
       color: var(--text);
-      background-image: linear-gradient(145deg, rgba(11, 61, 168, 0.72), rgba(31, 126, 231, 0.72)), url("/termo-bg-desktop.jpg");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
+      position: relative;
+      background: #041428;
       overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(to top, rgba(3, 15, 34, 0.92) 0%, rgba(4, 20, 40, 0.72) 38%, rgba(4, 20, 40, 0.22) 100%),
+        url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/mobile-stage-background.png") center top / cover no-repeat;
     }
 
     .screen {
       position: fixed;
       inset: 0;
+      z-index: 1;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -63,11 +73,28 @@
 
     .card {
       width: min(760px, 100%);
-      background: var(--glass);
-      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: transparent;
+      border: 1px solid transparent;
       border-radius: 24px;
-      backdrop-filter: blur(6px);
+      backdrop-filter: none;
+      box-shadow: none;
       padding: 28px 22px;
+    }
+
+    body.term-admin-ready [data-term-key] {
+      cursor: text;
+      -webkit-touch-callout: none;
+    }
+
+    body.term-admin-ready [data-term-key]:hover {
+      outline: 1px dashed rgba(255, 255, 255, 0.58);
+      outline-offset: 5px;
+      border-radius: 4px;
+    }
+
+    body.term-admin-ready [data-term-key].is-holding {
+      outline: 2px solid #f1c86c;
+      outline-offset: 6px;
     }
 
     .question-head {
@@ -250,6 +277,7 @@
       bottom: 0;
       height: 10px;
       background: rgba(255, 255, 255, 0.24);
+      z-index: 3;
     }
 
     .progress-bar {
@@ -266,6 +294,7 @@
       font-size: 0.9rem;
       font-weight: 300;
       color: rgba(255,255,255,0.92);
+      z-index: 3;
     }
 
     .button-link {
@@ -282,8 +311,8 @@
       align-items: center;
       justify-content: center;
       padding: 24px;
-      background: rgba(4, 24, 66, 0.64);
-      backdrop-filter: blur(6px);
+      background: transparent;
+      backdrop-filter: none;
       z-index: 20;
       transition: opacity 0.25s ease, visibility 0.25s ease;
     }
@@ -299,6 +328,90 @@
       text-align: center;
     }
 
+    .term-editor-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background: rgba(3, 13, 30, 0.8);
+      backdrop-filter: blur(8px);
+    }
+
+    .term-editor-modal[hidden] { display: none; }
+
+    .term-editor-dialog {
+      width: min(620px, 100%);
+      padding: 26px;
+      border-radius: 24px;
+      background: #fffdf8;
+      color: #1d2430;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+    }
+
+    .term-editor-dialog h2 {
+      color: #23406a;
+      margin-bottom: 6px;
+    }
+
+    .term-editor-dialog p {
+      color: #5f6b7c;
+      font-size: 0.9rem;
+    }
+
+    .term-editor-dialog textarea {
+      width: 100%;
+      min-height: 210px;
+      margin-top: 16px;
+      resize: vertical;
+      padding: 15px 16px;
+      border: 1px solid rgba(35, 64, 106, 0.24);
+      border-radius: 15px;
+      background: #fff;
+      color: #1d2430;
+      font: inherit;
+      line-height: 1.5;
+    }
+
+    .term-editor-feedback {
+      min-height: 22px;
+      margin-top: 8px !important;
+      color: #9a3412 !important;
+    }
+
+    .term-editor-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .term-editor-cancel { background: #e9edf3; color: #33445d; }
+    .term-editor-save { background: #23406a; color: #fff; font-weight: 600; }
+    .term-editor-actions button:disabled { cursor: wait; opacity: 0.6; }
+
+    .term-admin-toast {
+      position: fixed;
+      right: 18px;
+      bottom: 28px;
+      z-index: 45;
+      max-width: min(380px, calc(100vw - 36px));
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: #fffdf8;
+      color: #23406a;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .term-admin-toast.is-visible { opacity: 1; transform: translateY(0); }
+
     @media (max-width: 560px) {
       .card { padding: 24px 16px; border-radius: 18px; }
       .picker { grid-template-columns: 48px 1fr 48px; }
@@ -309,8 +422,8 @@
 <body>
   <section class="auth-overlay" id="authOverlay">
     <div class="card auth-overlay-card">
-      <h1>Validando seu acesso</h1>
-      <p class="intro-copy" id="authOverlayMessage">Conferindo seu login para liberar o termo do evento.</p>
+      <h1 data-term-key="access.title">Validando seu acesso</h1>
+      <p class="intro-copy" id="authOverlayMessage" data-term-key="access.copy">Conferindo seu login para liberar o termo do evento.</p>
       <div class="actions">
         <a class="btn-primary button-link" id="authOverlayLink" href="/auth.html?next=/termo" hidden>Entrar agora</a>
       </div>
@@ -319,8 +432,8 @@
 
   <section class="screen active" data-screen="intro">
     <div class="card">
-      <h1>Formulário do Evento</h1>
-      <p class="intro-copy">Leva cerca de 5 minutos. Preencha com calma e avance no seu ritmo.</p>
+      <h1 data-term-key="intro.title">Formulário do Evento</h1>
+      <p class="intro-copy" data-term-key="intro.copy">Leva cerca de 5 minutos. Preencha com calma e avance no seu ritmo.</p>
       <div class="actions">
         <button class="btn-primary" id="startBtn" type="button">Iniciar</button>
       </div>
@@ -331,7 +444,7 @@
     <div class="card">
       <div class="agreement-title">
         <svg class="agreement-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 16c3-4 7-7 12-9l4 4c-2 5-5 9-9 12H4v-7z" stroke="white" stroke-width="1.8"/></svg>
-        <h1>Assinatura</h1>
+        <h1 data-term-key="signature.title">Assinatura</h1>
       </div>
       <h2 class="agreement-copy">Eu <u id="signatureName">contratante</u> concordo com os termos desse documento.</h2>
       <input id="signatureCpf" class="input" type="text" inputmode="numeric" maxlength="11" placeholder="Digite o CPF (11 dígitos)" />
@@ -402,8 +515,8 @@
 
   <section class="screen" data-screen="success">
     <div class="card">
-      <h1>Tudo certo!</h1>
-      <p class="success-copy" id="successCopy">Seu formulário foi preenchido com sucesso.</p>
+      <h1 data-term-key="success.title">Tudo certo!</h1>
+      <p class="success-copy" id="successCopy" data-term-key="success.copy">Seu formulário foi preenchido com sucesso.</p>
       <div class="actions">
         <button class="btn-secondary" id="downloadPdfBtn" type="button" style="display:none;">Baixar PDF</button>
         <a class="btn-secondary button-link" id="contractorPanelBtn" href="/painel-do-contratante">Abrir painel</a>
@@ -414,6 +527,20 @@
 
   <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
   <div class="progress-label" id="progressLabel">Etapa 0/29</div>
+
+  <div class="term-editor-modal" id="termEditorModal" hidden>
+    <div class="term-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="termEditorTitle">
+      <h2 id="termEditorTitle">Editar texto global do termo</h2>
+      <p>A alteração será exibida para todos os usuários que abrirem este termo.</p>
+      <textarea id="termEditorText" maxlength="5000" aria-label="Novo texto do termo"></textarea>
+      <p class="term-editor-feedback" id="termEditorFeedback" role="status"></p>
+      <div class="term-editor-actions">
+        <button class="term-editor-cancel" id="termEditorCancel" type="button">Cancelar</button>
+        <button class="term-editor-save" id="termEditorSave" type="button">Salvar globalmente</button>
+      </div>
+    </div>
+  </div>
+  <div class="term-admin-toast" id="termAdminToast" role="status"></div>
 
   <script>
     const sessionStorageKey = "turma_do_printy_token";
@@ -432,18 +559,195 @@
         ]
       },
       eventosproposta: {
-        financeAgreementText: "O valor de uma (1) apresentação: R$ 5.100,00\nO valor das demais apresentações: R$ 2.500,00\n\nO transporte para a cidade de São Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor será definido mediante orçamento prévio.",
+        financeAgreementText: "O valor de uma (1) apresentação: R$ 3.400,00\nO valor das demais apresentações: R$ 2.500,00\n\nO transporte para a cidade de São Paulo possui custo fixo de R$ 350,00.\n\nPara demais localidades, o valor será definido mediante orçamento prévio.",
         paymentOptions: [
-          { key: "one", label: "Uma (1) apresentação", priceLabel: "R$ 5.100,00", amountCents: 510000, itemName: "Turma do Printy - Uma (1) apresentação" },
+          { key: "one", label: "Uma (1) apresentação", priceLabel: "R$ 3.400,00", amountCents: 340000, itemName: "Turma do Printy - Uma (1) apresentação" },
           { key: "two", label: "Demais apresentações", priceLabel: "R$ 2.500,00", amountCents: 250000, itemName: "Turma do Printy - Demais apresentações" }
         ]
       }
     };
     const currentTermConfig = termVariantConfigs[termVariantKey] || termVariantConfigs.default;
+    const termEditorModal = document.getElementById("termEditorModal");
+    const termEditorText = document.getElementById("termEditorText");
+    const termEditorFeedback = document.getElementById("termEditorFeedback");
+    const termEditorCancel = document.getElementById("termEditorCancel");
+    const termEditorSave = document.getElementById("termEditorSave");
+    const termAdminToast = document.getElementById("termAdminToast");
+    let termTextOverrides = {};
+    let termAdminEnabled = false;
+    let activeTermElement = null;
+    let termHoldTimer = 0;
+    let termHoldTarget = null;
+    let termHoldStartX = 0;
+    let termHoldStartY = 0;
+    let termToastTimer = 0;
 
     function getToken() {
       return window.localStorage.getItem(sessionStorageKey) || "";
     }
+
+    function getTermOverrideKey(key) {
+      return `termo.${key}`;
+    }
+
+    function getTermText(key, fallback = "") {
+      const override = termTextOverrides[getTermOverrideKey(key)];
+      return typeof override === "string" && override.trim() ? override.trim() : fallback;
+    }
+
+    function prepareTermTextElement(element, key, fallback) {
+      if (!element || !key) return;
+      if (element.dataset.termKey !== key) {
+        element.dataset.termKey = key;
+        element.dataset.termDefault = String(fallback || "").trim();
+      } else if (!element.dataset.termDefault) {
+        element.dataset.termDefault = String(fallback || element.textContent || "").trim();
+      }
+      element.textContent = getTermText(key, element.dataset.termDefault || fallback || "");
+      if (termAdminEnabled) {
+        element.title = "Toque e segure por 1 segundo para editar";
+      }
+    }
+
+    function applyStaticTermTexts() {
+      document.querySelectorAll("[data-term-key]").forEach((element) => {
+        const fallback = element.dataset.termDefault || element.textContent.trim();
+        prepareTermTextElement(element, element.dataset.termKey, fallback);
+      });
+    }
+
+    async function loadTermContentConfig() {
+      try {
+        const response = await fetch("/api/site/config");
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+          termTextOverrides = data.textOverrides || {};
+        }
+      } catch (_error) {
+        termTextOverrides = {};
+      }
+      applyStaticTermTexts();
+    }
+
+    function showTermAdminToast(message, duration = 2400) {
+      window.clearTimeout(termToastTimer);
+      termAdminToast.textContent = message;
+      termAdminToast.classList.add("is-visible");
+      termToastTimer = window.setTimeout(() => {
+        termAdminToast.classList.remove("is-visible");
+      }, duration);
+    }
+
+    function openTermEditor(element) {
+      if (!termAdminEnabled || !element) return;
+      activeTermElement = element;
+      termEditorFeedback.textContent = "";
+      termEditorText.value = element.textContent.trim();
+      termEditorModal.hidden = false;
+      window.setTimeout(() => {
+        termEditorText.focus();
+        termEditorText.setSelectionRange(termEditorText.value.length, termEditorText.value.length);
+      }, 0);
+    }
+
+    function closeTermEditor() {
+      termEditorModal.hidden = true;
+      termEditorFeedback.textContent = "";
+      activeTermElement = null;
+    }
+
+    function cancelTermHold() {
+      window.clearTimeout(termHoldTimer);
+      termHoldTimer = 0;
+      termHoldTarget?.classList.remove("is-holding");
+      termHoldTarget = null;
+    }
+
+    function enableTermAdminEditing() {
+      if (termAdminEnabled) return;
+      termAdminEnabled = true;
+      document.body.classList.add("term-admin-ready");
+      applyStaticTermTexts();
+      showTermAdminToast("Modo administrador: segure um texto por 1 segundo para editar.", 4200);
+    }
+
+    document.addEventListener("pointerdown", (event) => {
+      if (!termAdminEnabled || event.button > 0 || !termEditorModal.hidden) return;
+      const element = event.target instanceof Element ? event.target.closest("[data-term-key]") : null;
+      if (!element) return;
+      cancelTermHold();
+      termHoldTarget = element;
+      termHoldStartX = event.clientX;
+      termHoldStartY = event.clientY;
+      element.classList.add("is-holding");
+      termHoldTimer = window.setTimeout(() => {
+        const selectedElement = termHoldTarget;
+        cancelTermHold();
+        if (window.navigator.vibrate) window.navigator.vibrate(35);
+        openTermEditor(selectedElement);
+      }, 1000);
+    });
+
+    document.addEventListener("pointermove", (event) => {
+      if (!termHoldTimer) return;
+      if (Math.hypot(event.clientX - termHoldStartX, event.clientY - termHoldStartY) > 12) {
+        cancelTermHold();
+      }
+    });
+
+    document.addEventListener("pointerup", cancelTermHold);
+    document.addEventListener("pointercancel", cancelTermHold);
+    window.addEventListener("blur", cancelTermHold);
+    document.addEventListener("contextmenu", (event) => {
+      if (termAdminEnabled && event.target instanceof Element && event.target.closest("[data-term-key]")) {
+        event.preventDefault();
+      }
+    });
+
+    termEditorCancel.addEventListener("click", closeTermEditor);
+    termEditorModal.addEventListener("click", (event) => {
+      if (event.target === termEditorModal) closeTermEditor();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !termEditorModal.hidden) closeTermEditor();
+    });
+
+    termEditorSave.addEventListener("click", async () => {
+      if (!activeTermElement) return;
+      const text = termEditorText.value.trim();
+      if (!text) {
+        termEditorFeedback.textContent = "Escreva o texto antes de salvar.";
+        return;
+      }
+      const token = getToken();
+      if (!token) {
+        termEditorFeedback.textContent = "Sua sessão expirou. Entre novamente para salvar.";
+        return;
+      }
+
+      termEditorSave.disabled = true;
+      termEditorCancel.disabled = true;
+      termEditorFeedback.textContent = "Salvando...";
+      try {
+        const key = getTermOverrideKey(activeTermElement.dataset.termKey);
+        const response = await fetch("/api/admin/site/text", {
+          method: "PUT",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ key, text })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || "Não foi possível salvar o texto.");
+        termTextOverrides = data.textOverrides || { ...termTextOverrides, [key]: text };
+        activeTermElement.textContent = text;
+        closeTermEditor();
+        showTermAdminToast("Texto do termo salvo globalmente.");
+      } catch (error) {
+        termEditorFeedback.textContent = error instanceof Error ? error.message : "Erro ao salvar o texto.";
+      } finally {
+        termEditorSave.disabled = false;
+        termEditorCancel.disabled = false;
+      }
+    });
 
     function getAuthHeaders(extraHeaders = {}) {
       const token = getToken();
@@ -475,7 +779,7 @@
         authOverlayMessage.textContent = "Entre com login e senha para preencher o termo do seu evento.";
         authOverlayLink.hidden = false;
         window.setTimeout(redirectToLogin, 500);
-        return false;
+        return null;
       }
 
       try {
@@ -489,15 +793,15 @@
           authOverlayMessage.textContent = data?.error || "Sua sessao expirou. Entre novamente para continuar.";
           authOverlayLink.hidden = false;
           window.setTimeout(redirectToLogin, 700);
-          return false;
+          return null;
         }
 
         authOverlay.classList.add("hidden");
-        return true;
+        return data.user;
       } catch (error) {
         authOverlayMessage.textContent = error instanceof Error ? error.message : "Nao foi possivel validar seu acesso.";
         authOverlayLink.hidden = false;
-        return false;
+        return null;
       }
     }
 
@@ -688,8 +992,8 @@
 
     function renderAgreement() {
       const step = agreementSteps[agreementIndex];
-      agreementH1.textContent = step.h1;
-      agreementH2.textContent = step.h2 || "";
+      prepareTermTextElement(agreementH1, `agreement.${agreementIndex}.title`, step.h1);
+      prepareTermTextElement(agreementH2, `agreement.${agreementIndex}.copy`, step.h2 || "");
       agreementIcon.innerHTML = step.icon;
       showScreen("agreement");
       updateProgress();
@@ -703,8 +1007,8 @@
 
       if (paymentStage === 0) {
         paymentIcon.innerHTML = `<path d="M3 8h18v8H3z" stroke="white" stroke-width="1.8"/><path d="M3 12h18" stroke="white" stroke-width="1.8"/>`;
-        paymentH1.textContent = "Escolha da apresentação";
-        paymentH2.textContent = "";
+        prepareTermTextElement(paymentH1, "payment.choice.title", "Escolha da apresentação");
+        prepareTermTextElement(paymentH2, "payment.choice.copy", "");
         paymentBody.innerHTML = `
           ${paymentOptions.map((opt) => `<button type="button" class="payment-choice ${answers.pagamentoOpcao === opt.key ? "active" : ""}" data-option="${opt.key}">${opt.label} - ${opt.priceLabel}</button>`).join("")}
         `;
@@ -723,8 +1027,8 @@
       } else if (paymentStage === 1) {
         const dueDates = getDueDateOptions();
         paymentIcon.innerHTML = `<rect x="4" y="5" width="16" height="15" rx="2" stroke="white" stroke-width="1.8"/><path d="M4 9h16" stroke="white" stroke-width="1.8"/>`;
-        paymentH1.textContent = "Dia do pagamento";
-        paymentH2.textContent = "Escolha um dia";
+        prepareTermTextElement(paymentH1, "payment.date.title", "Dia do pagamento");
+        prepareTermTextElement(paymentH2, "payment.date.copy", "Escolha um dia");
         paymentBody.innerHTML = dueDates.map((d, idx) => {
           const dateLabel = formatDateBr(d);
           const dayLabel = idx === 0 ? "Amanhã" : `<strong>${getWeekdayPt(d)}</strong>`;
@@ -743,8 +1047,8 @@
         });
       } else {
         paymentIcon.innerHTML = `<rect x="4" y="5" width="16" height="15" rx="2" stroke="white" stroke-width="1.8"/><path d="M8 3v4M16 3v4" stroke="white" stroke-width="1.8"/>`;
-        paymentH1.textContent = "Sua data foi reservada";
-        paymentH2.textContent = "Pague até o vencimento em até 12x";
+        prepareTermTextElement(paymentH1, "payment.reserved.title", "Sua data foi reservada");
+        prepareTermTextElement(paymentH2, "payment.reserved.copy", "Pague até o vencimento em até 12x");
         paymentBody.style.textAlign = "center";
         paymentBody.innerHTML = `
           <div class="countdown" id="countdownBox">00d : 00h : 00min</div>
@@ -814,7 +1118,7 @@
 
     function renderStep() {
       const step = steps[currentStep];
-      questionTitle.textContent = step.title;
+      prepareTermTextElement(questionTitle, `question.${step.key}.title`, step.title);
       errorBox.textContent = "";
 
       if (step.type === "text") {
@@ -983,7 +1287,7 @@
       clearCountdown();
       signatureCpf.value = "";
       signatureError.textContent = "";
-      successCopy.textContent = "Seu formulário foi preenchido com sucesso.";
+      successCopy.textContent = getTermText("success.copy", "Seu formulário foi preenchido com sucesso.");
       downloadPdfBtn.style.display = "none";
       contractorPanelBtn.style.display = "inline-flex";
       showScreen("intro");
@@ -1057,8 +1361,16 @@
       submitTerm();
     });
 
+    async function initializeTermPage() {
+      await loadTermContentConfig();
+      const user = await ensureAuthenticatedAccess();
+      if (user?.isAdmin) {
+        enableTermAdminEditing();
+      }
+    }
+
     updateProgress();
-    void ensureAuthenticatedAccess();
+    void initializeTermPage();
   </script>
 </body>
 </html>

@@ -221,17 +221,6 @@
       background: linear-gradient(to top, rgba(6, 20, 46, 0.96) 0%, rgba(11, 37, 82, 0.82) 44%, rgba(17, 54, 112, 0.26) 100%);
     }
 
-    .proposal-bg-1 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-08.jpg"); }
-    .proposal-bg-2 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-04.jpg"); }
-    .proposal-bg-3 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-03.png"); }
-    .proposal-bg-4 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-04.jpg"); }
-    .proposal-bg-5 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-05.png"); }
-    .proposal-bg-6 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-06.png"); }
-    .proposal-bg-7 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-07.png"); }
-    .proposal-bg-8 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-08.jpg"); }
-    .proposal-bg-9 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-01.jpg"); }
-    .proposal-bg-10 { background-image: url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/imagem-02.png"); }
-
     .proposal-photo-section,
     .proposal-photo-section h1,
     .proposal-photo-section h2,
@@ -1006,31 +995,6 @@
     }
 
     @media (max-width: 640px) {
-      html {
-        background: #041428 !important;
-      }
-
-      body {
-        position: relative;
-        background: transparent !important;
-      }
-
-      body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        background:
-          linear-gradient(to top, rgba(3, 15, 34, 0.92) 0%, rgba(4, 20, 40, 0.72) 38%, rgba(4, 20, 40, 0.22) 100%),
-          url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/mobile-stage-background.png") center top / cover no-repeat;
-        z-index: 0;
-        pointer-events: none;
-      }
-
-      .document {
-        position: relative;
-        z-index: 1;
-      }
-
       .proposal-photo-section,
       .proposal-photo-section h1,
       .proposal-photo-section h2,
@@ -1121,6 +1085,81 @@
 
       .sheet-inner {
         padding: 24px 16px;
+      }
+    }
+
+    @media screen {
+      /* O mesmo palco visual e o mesmo fundo fixo no desktop e no mobile. */
+      html {
+        background: #041428 !important;
+      }
+
+      body {
+        position: relative;
+        min-height: 100vh;
+        background: transparent !important;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(to top, rgba(3, 15, 34, 0.92) 0%, rgba(4, 20, 40, 0.72) 38%, rgba(4, 20, 40, 0.22) 100%),
+          url("https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/mobile-stage-background.png") center top / cover no-repeat;
+      }
+
+      .document {
+        position: relative;
+        z-index: 1;
+      }
+
+      .sheet,
+      .hero,
+      .video-hero,
+      .proposal-photo-section {
+        background: transparent !important;
+        background-image: none !important;
+        border: 0 !important;
+        box-shadow: none !important;
+      }
+
+      .proposal-photo-section::before,
+      .hero::after,
+      .theme-card::after {
+        display: none !important;
+      }
+
+      .proposal-photo-section .stat,
+      .proposal-photo-section .card,
+      .proposal-photo-section .theme-card,
+      .proposal-photo-section .logistics-card,
+      .proposal-photo-section .media-card,
+      .proposal-photo-section .price-card,
+      .proposal-photo-section .fit-list,
+      .proposal-photo-section .flow-step,
+      .proposal-photo-section .timeline-item,
+      .proposal-photo-section .quote-band,
+      .proposal-photo-section .closing-note,
+      .proposal-photo-section .hero-card,
+      .proposal-photo-section .quote-card,
+      .custom-story-card,
+      .video-stage,
+      .video-loading,
+      .video-loading-card {
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+      }
+
+      .proposal-photo-section .timeline-year,
+      .proposal-photo-section .theme-badge,
+      .proposal-photo-section .tag,
+      .proposal-photo-section .flow-step strong {
+        background: transparent !important;
       }
     }
 
