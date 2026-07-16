@@ -5988,21 +5988,24 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     abort: "Abortar ou pausar?",
     finalize: "Concluir?",
     restore: "Restaurar tarefa",
-    delete: "Excluir microtarefa?"
+    delete: "Excluir microtarefa?",
+    delete_mission: "Excluir missão inteira?"
   };
   const buttonMap = {
     giveup: "Desistir",
     abort: "Abortar",
     finalize: "Concluir",
     restore: "Restaurar tarefa",
-    delete: "Excluir"
+    delete: "Excluir",
+    delete_mission: "Excluir missão"
   };
   const classMap = {
     giveup: "is-desistir",
     abort: "is-abortar",
     finalize: "is-concluir",
     restore: "is-restaurar",
-    delete: "is-excluir"
+    delete: "is-excluir",
+    delete_mission: "is-excluir"
   };
   runningConfirmTitle.textContent = titleMap[kind] || "Desistir?";
   runningConfirmName.textContent = String(action?.title || "Nome da tarefa");
@@ -13980,39 +13983,41 @@ missionProgressConfirmButton?.addEventListener("click", () => {
 });
 
 missionAdjustDeleteButton?.addEventListener("click", () => {
-  void (async () => {
-    const goalId = String(state.missionAdjust?.goalId || "").trim();
-    if (!goalId) {
-      return;
-    }
-    const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
-    if (!finishLoading) return;
-    if (missionAdjustStatus) {
-      missionAdjustStatus.textContent = "Excluindo...";
-    }
-    try {
-      await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
-        method: "DELETE"
-      });
-      state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
-        const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
-        return String(slot.goalId || "") === goalId
-          ? { key: definition.key, title: definition.defaultTitle, goalId: "" }
-          : slot;
-      });
-      persistMissionQuickSlots();
-      closeModal("missionAdjustModal");
-      await loadMissions();
-      renderMissions();
-      renderRunningMissionQuickButtons();
-    } catch (error) {
+  const goalId = String(state.missionAdjust?.goalId || "").trim();
+  if (!goalId) return;
+  const goal = (Array.isArray(state.missions) ? state.missions : [])
+    .find((item) => String(item?.id || "") === goalId) || { title: "Missão" };
+  openRunningConfirmModal("delete_mission", goal, () => {
+    void (async () => {
+      const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
+      if (!finishLoading) return;
       if (missionAdjustStatus) {
-        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+        missionAdjustStatus.textContent = "Excluindo...";
       }
-    } finally {
-      finishLoading();
-    }
-  })();
+      try {
+        await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}?profile=${encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim())}`, {
+          method: "DELETE"
+        });
+        state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
+          const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
+          return String(slot.goalId || "") === goalId
+            ? { key: definition.key, title: definition.defaultTitle, goalId: "" }
+            : slot;
+        });
+        persistMissionQuickSlots();
+        closeModal("missionAdjustModal");
+        await loadMissions();
+        renderMissions();
+        renderRunningMissionQuickButtons();
+      } catch (error) {
+        if (missionAdjustStatus) {
+          missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+        }
+      } finally {
+        finishLoading();
+      }
+    })();
+  });
 });
 
 missionQuickAssignGrid?.addEventListener("click", (event) => {

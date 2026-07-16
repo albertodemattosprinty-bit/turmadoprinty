@@ -2691,7 +2691,7 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 #runningConfirmModal.workspace-modal {
-  z-index: 2000;
+  z-index: 2800;
 }
 
 body.running-confirm-from-actions #actionsModal.workspace-modal {
