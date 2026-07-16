@@ -1585,15 +1585,52 @@ body.screen-locked .project-login-overlay.active {
   justify-items: center;
   text-align: center;
   background: transparent;
+  gap: clamp(28px, 7vh, 54px);
 }
 
-.partial-task-label {
-  color: var(--soft);
-  font-weight: 800;
+.partial-task-selector {
+  width: min(390px, 100%);
+  display: grid;
+  grid-template-columns: 64px minmax(130px, 1fr) 64px;
+  align-items: center;
+  justify-items: center;
+  gap: clamp(10px, 4vw, 24px);
 }
 
 .partial-task-percent {
   font-variant-numeric: tabular-nums;
+  min-width: 2.7em;
+  font-size: clamp(3.8rem, 17vw, 7rem);
+  line-height: 1;
+  color: var(--white);
+}
+
+.partial-task-arrow {
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border: 1px solid rgba(130, 185, 255, 0.34);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(39, 112, 211, 0.14);
+  color: #83b9ff;
+  transition: transform 180ms ease, background-color 180ms ease, color 180ms ease;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.partial-task-arrow:active,
+.partial-task-arrow.is-holding {
+  transform: scale(0.92);
+  background: rgba(39, 112, 211, 0.3);
+  color: #cfe5ff;
+}
+
+.partial-task-arrow svg {
+  width: 30px;
+  height: 30px;
 }
 
 .partial-task-continue {

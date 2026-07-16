@@ -1242,8 +1242,18 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
       ? Math.max(0, Math.floor((now.getTime() - startedAtMs) / 1000))
       : 0;
     const plannedSeconds = Math.max(1, Math.round((new Date(action.endAt).getTime() - new Date(action.startAt).getTime()) / 1000));
-    const accumulatedSeconds = Math.min(plannedSeconds, Math.max(0, Math.trunc(Number(action.accumulatedSeconds || 0) || 0)) + sessionSeconds);
-    const completionPercent = Math.max(0, Math.min(100, Math.floor((accumulatedSeconds / plannedSeconds) * 100)));
+    const automaticSeconds = Math.min(plannedSeconds, Math.max(0, Math.trunc(Number(action.accumulatedSeconds || 0) || 0)) + sessionSeconds);
+    const automaticPercent = Math.max(0, Math.min(100, Math.floor((automaticSeconds / plannedSeconds) * 100)));
+    const requestedPercent = Number(payload?.completionPercent);
+    const completionPercent = Number.isFinite(requestedPercent)
+      ? Math.max(0, Math.min(100, Math.round(requestedPercent / 10) * 10))
+      : automaticPercent;
+    const accumulatedSeconds = Number.isFinite(requestedPercent)
+      ? Math.min(plannedSeconds, Math.round((plannedSeconds * completionPercent) / 100))
+      : automaticSeconds;
+    const completed = completionPercent >= 100;
+    const nextStatus = completed ? ACTION_STATUS_COMPLETED : ACTION_STATUS_PAUSED;
+    const completedAt = completed ? now.toISOString() : null;
     await query(
       `
         insert into action_status_overrides (
@@ -1256,22 +1266,31 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
           completion_percent,
           accumulated_seconds
         )
-        values ($1, $2, $3, $4, null, null, $5, $6)
+        values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8)
         on conflict (user_id, action_id) do update
           set status = excluded.status,
-              started_at = null,
-              completed_at = null,
+              started_at = excluded.started_at,
+              completed_at = excluded.completed_at,
               completion_percent = excluded.completion_percent,
               accumulated_seconds = excluded.accumulated_seconds,
               updated_at = now()
       `,
-      [userId, action.id, action.repeatGroupId, ACTION_STATUS_PAUSED, completionPercent, accumulatedSeconds]
+      [
+        userId,
+        action.id,
+        action.repeatGroupId,
+        nextStatus,
+        completed ? (action.startedAt || now.toISOString()) : null,
+        completedAt,
+        completionPercent,
+        accumulatedSeconds
+      ]
     );
     await upsertProject200RuntimeState(userId, {
       actionId: action.id,
       actionTitle: action.title,
-      eventType: "pause",
-      startedAt: action.startedAt || null,
+      eventType: completed ? "complete" : "pause",
+      startedAt: completed ? (action.startedAt || now.toISOString()) : null,
       occurredAt: now.toISOString()
     });
     return getUserActionById(userId, action.id);
