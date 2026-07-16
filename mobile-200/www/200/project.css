@@ -2690,6 +2690,10 @@ body.running-music-standalone #actionsModal .actions-list {
   display: block;
 }
 
+#runningConfirmModal.workspace-modal {
+  z-index: 2000;
+}
+
 #svgSelectorModal.workspace-modal {
   display: none;
   place-items: stretch;
