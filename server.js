@@ -3459,10 +3459,10 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
 
   try {
     const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
-    const shouldTrackPointsUpdate = Math.trunc(Number(body?.delta || 0) || 0) > 0;
+    const shouldTrackPointsUpdate = Math.trunc(Number(body?.delta || 0) || 0) !== 0;
     const pointsSnapshotPrepared = body?.pointsSnapshotPrepared === true;
     let dailyRankingBefore = null;
-    if (shouldTrackPointsUpdate && !pointsSnapshotPrepared) {
+    if (shouldTrackPointsUpdate && (!pointsSnapshotPrepared || Math.trunc(Number(body?.delta || 0) || 0) < 0)) {
       try {
         dailyRankingBefore = await getProject200FriendsSnapshot(user.id, "today");
       } catch {}
@@ -3507,10 +3507,31 @@ async function syncProject200ActionPoints(userId, beforeAction, afterAction, { r
     return { pointsAwarded: 0, pointsUpdate: null };
   }
   if (restore || (beforeStatus === "COMPLETED" && afterStatus !== "COMPLETED")) {
-    await removeProject200ActionPoints(userId, actionId);
-    return { pointsAwarded: 0, pointsUpdate: null };
+    let dailyRankingBefore = null;
+    try {
+      dailyRankingBefore = await getProject200FriendsSnapshot(userId, "today");
+    } catch {}
+    const removed = await removeProject200ActionPoints(userId, actionId);
+    let dailyRankingAfter = null;
+    if (removed) {
+      try {
+        dailyRankingAfter = await getProject200FriendsSnapshot(userId, "today");
+      } catch {}
+    }
+    return {
+      pointsAwarded: -Math.max(0, Math.trunc(Number(removed?.points || 0) || 0)),
+      pointsUpdate: removed && dailyRankingBefore && dailyRankingAfter
+        ? { before: dailyRankingBefore, after: dailyRankingAfter }
+        : null
+    };
   }
-  if (beforeStatus === "COMPLETED" || afterStatus !== "COMPLETED") {
+  const afterPercent = afterStatus === "COMPLETED"
+    ? 100
+    : Math.max(0, Math.min(100, Math.trunc(Number(afterAction?.completionPercent || 0) || 0)));
+  const beforePercent = beforeStatus === "COMPLETED"
+    ? 100
+    : Math.max(0, Math.min(100, Math.trunc(Number(beforeAction?.completionPercent || 0) || 0)));
+  if (!(["PAUSED", "COMPLETED"].includes(afterStatus)) || afterPercent <= 0 || (beforeStatus === afterStatus && beforePercent === afterPercent)) {
     return { pointsAwarded: 0, pointsUpdate: null };
   }
 
@@ -3518,8 +3539,9 @@ async function syncProject200ActionPoints(userId, beforeAction, afterAction, { r
   try {
     dailyRankingBefore = await getProject200FriendsSnapshot(userId, "today");
   } catch {}
-  const award = await recordProject200ActionPoints(userId, afterAction, afterAction?.completedAt || new Date());
-  if (!award?.created || Number(award?.points || 0) <= 0) {
+  const award = await recordProject200ActionPoints(userId, afterAction, afterAction?.completedAt || afterAction?.statusUpdatedAt || new Date());
+  const pointsDelta = Math.trunc(Number(award?.deltaPoints || 0) || 0);
+  if (!pointsDelta) {
     return { pointsAwarded: 0, pointsUpdate: null };
   }
   let dailyRankingAfter = null;
@@ -3527,7 +3549,7 @@ async function syncProject200ActionPoints(userId, beforeAction, afterAction, { r
     dailyRankingAfter = await getProject200FriendsSnapshot(userId, "today");
   } catch {}
   return {
-    pointsAwarded: Math.max(0, Math.trunc(Number(award.points || 0) || 0)),
+    pointsAwarded: pointsDelta,
     pointsUpdate: dailyRankingBefore && dailyRankingAfter
       ? { before: dailyRankingBefore, after: dailyRankingAfter }
       : null

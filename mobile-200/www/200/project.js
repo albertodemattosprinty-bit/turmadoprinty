@@ -4,6 +4,7 @@ const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
 const optionsConfigKey = "project_200_options_v1";
 const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
+const missionVariantSortKey = "project_200_mission_variant_sort_v1";
 const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
 const missionActionsModes = ["show", "hide", "separate"];
@@ -22,6 +23,7 @@ const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 const actionStatuses = {
   pending: "PENDING",
   inProgress: "IN_PROGRESS",
+  paused: "PAUSED",
   completed: "COMPLETED"
 };
 const missionQuickDefinitions = [
@@ -440,6 +442,8 @@ const missionRunFinishButton = document.getElementById("missionRunFinishButton")
 const missionRunRestartButton = document.getElementById("missionRunRestartButton");
 const missionVariantsModal = document.getElementById("missionVariantsModal");
 const missionVariantsCloseButton = document.getElementById("missionVariantsCloseButton");
+const missionVariantSortButton = document.getElementById("missionVariantSortButton");
+const missionVariantSortMenu = document.getElementById("missionVariantSortMenu");
 const missionVariantsKicker = document.getElementById("missionVariantsKicker");
 const missionVariantsTitle = document.getElementById("missionVariantsTitle");
 const missionVariantCycleSelection = document.getElementById("missionVariantCycleSelection");
@@ -519,6 +523,7 @@ const runningConfirmModal = document.getElementById("runningConfirmModal");
 const runningConfirmTitle = document.getElementById("runningConfirmTitle");
 const runningConfirmName = document.getElementById("runningConfirmName");
 const runningConfirmPrimaryButton = document.getElementById("runningConfirmPrimaryButton");
+const runningConfirmPauseButton = document.getElementById("runningConfirmPauseButton");
 const runningConfirmBackButton = document.getElementById("runningConfirmBackButton");
 const runningTaskActionsWrap = runningTaskModalElement?.querySelector(".running-task-actions");
 const runningIdleHub = document.getElementById("runningIdleHub");
@@ -574,10 +579,15 @@ const startDecisionEndInput = document.getElementById("startDecisionEndInput");
 const startDecisionDateInput = document.getElementById("startDecisionDateInput");
 const startConflictModal = document.getElementById("startConflictModal");
 const startConflictCurrentTitle = document.getElementById("startConflictCurrentTitle");
+const startConflictQuestion = document.getElementById("startConflictQuestion");
 const startConflictNextTitle = document.getElementById("startConflictNextTitle");
 const startConflictFinalizeButton = document.getElementById("startConflictFinalizeButton");
 const startConflictAbortButton = document.getElementById("startConflictAbortButton");
 const startConflictBackButton = document.getElementById("startConflictBackButton");
+const partialTaskModal = document.getElementById("partialTaskModal");
+const partialTaskTitle = document.getElementById("partialTaskTitle");
+const partialTaskPercent = document.getElementById("partialTaskPercent");
+const partialTaskContinueButton = document.getElementById("partialTaskContinueButton");
 const postponeTaskModal = document.getElementById("postponeTaskModal");
 const closePostponeTaskModal = document.getElementById("closePostponeTaskModal");
 const postponeTaskTitle = document.getElementById("postponeTaskTitle");
@@ -891,6 +901,9 @@ let missionRunMusicFadeToken = 0;
 let missionRunMusicFadeRestoreVolume = null;
 let missionRunVariantSelectionTimer = null;
 let missionRunCycleSwipeStartX = null;
+let partialTaskResolver = null;
+const modalNavigationStack = [];
+let modalBackNavigationActive = false;
 const missionVariantsCache = new Map();
 const missionRunAlarmNodes = new Set();
 const missionRunCueMap = new Map([[180, "3-min.mp3"], [120, "2-min.mp3"], [60, "1-min.mp3"], [30, "30-sec.mp3"], [15, "15-sec.mp3"]]);
@@ -998,6 +1011,7 @@ const state = {
     previousTaskTitle: "",
     alarmStarted: false,
     finalizing: false,
+    completedSuccessfully: false,
     selectedVariantId: "",
     selectedVariantIds: [],
     availableVariants: [],
@@ -1019,6 +1033,8 @@ const state = {
     cycleSelectionTarget: 1,
     cycleSelections: [],
     cycleSelectionResumeMode: "preserve",
+    sortMode: "user",
+    sortMenuOpen: false,
     intervalValue: 1,
     intervalUnit: "days"
   },
@@ -1123,7 +1139,8 @@ const state = {
     rafId: 0
   },
   runningConfirm: {
-    action: null
+    action: null,
+    pauseAction: null
   },
   startConflict: {
     currentActionId: "",
@@ -1862,7 +1879,8 @@ function getRunningActionProgressState(action) {
   if (!Number.isFinite(startedAtMs)) {
     return { percent: 0, remainingMinutes: durationMinutes };
   }
-  const elapsedMinutes = Math.max(0, (getServerNowMs() - startedAtMs) / (60 * 1000));
+  const accumulatedMinutes = Math.max(0, Number(action?.accumulatedSeconds || 0) / 60);
+  const elapsedMinutes = accumulatedMinutes + Math.max(0, (getServerNowMs() - startedAtMs) / (60 * 1000));
   const totalBudget = durationMinutes + Math.max(0, Number(runningCarryOverMinutes || 0));
   const remainingBudget = Math.max(0, Math.ceil(totalBudget - elapsedMinutes));
   const percent = totalBudget > 0 ? Math.max(0, Math.min(100, Math.round((elapsedMinutes / totalBudget) * 100))) : 0;
@@ -4057,14 +4075,21 @@ async function saveRunningTaskDefault(mode = "track") {
   }
 }
 
+function getActionStoredCompletionPercent(action) {
+  const status = normalizeActionStatus(action?.status);
+  if (status === actionStatuses.completed) return 100;
+  if (status !== actionStatuses.paused) return 0;
+  return Math.max(0, Math.min(100, Math.trunc(Number(action?.completionPercent || 0) || 0)));
+}
+
 function getCompletionSummaryForSelectedProfile() {
   const list = getVisibleActions();
   const totalMinutes = list.reduce((sum, item) => sum + getActionDurationMinutes(item), 0);
   const completedMinutes = list.reduce((sum, item) => {
-    if (normalizeActionStatus(item.status) !== actionStatuses.completed || isGivenUpAction(item)) {
+    if (isGivenUpAction(item)) {
       return sum;
     }
-    return sum + getActionDurationMinutes(item);
+    return sum + (getActionDurationMinutes(item) * (getActionStoredCompletionPercent(item) / 100));
   }, 0);
   const percentPrecise = totalMinutes > 0 ? clampPercent((completedMinutes / totalMinutes) * 100) : 0;
   const percent = Math.round(percentPrecise);
@@ -4078,10 +4103,7 @@ function getCompletionSummaryForSelectedProfile() {
   });
   const expectedDueMinutes = dueActions.reduce((sum, item) => sum + getActionDurationMinutes(item), 0);
   const completedDueMinutes = dueActions.reduce((sum, item) => {
-    if (normalizeActionStatus(item.status) !== actionStatuses.completed) {
-      return sum;
-    }
-    return sum + getActionDurationMinutes(item);
+    return sum + (getActionDurationMinutes(item) * (getActionStoredCompletionPercent(item) / 100));
   }, 0);
   const late = Math.max(0, expectedDueMinutes - completedDueMinutes);
   const punctualityPrecise = expectedDueMinutes > 0
@@ -4269,6 +4291,10 @@ function normalizeActionStatus(status) {
     return actionStatuses.inProgress;
   }
 
+  if (normalized === actionStatuses.paused) {
+    return actionStatuses.paused;
+  }
+
   if (normalized === actionStatuses.completed) {
     return actionStatuses.completed;
   }
@@ -4397,6 +4423,7 @@ function getActionThemeDotColor(action, options = {}) {
   };
 
   if (status === actionStatuses.inProgress) return "#19bf5d";
+  if (status === actionStatuses.paused) return "#2f7dff";
   if (status === actionStatuses.completed) return "#16a34a";
   if (isGivenUpAction(action)) return "#4b5563";
   if (delayMinutes >= 60) return "#dc2626";
@@ -4615,6 +4642,10 @@ function openModal(id) {
     return;
   }
 
+  if (modalNavigationStack[modalNavigationStack.length - 1] !== id) {
+    modalNavigationStack.push(id);
+  }
+
   modal.classList.add("active");
   modal.classList.remove("is-fading-out");
   modal.setAttribute("aria-hidden", "false");
@@ -4709,9 +4740,14 @@ function closeModal(modal) {
   if (!modal) {
     return;
   }
+
   const wasActive = modal.classList.contains("active");
   modal.classList.remove("active");
   modal.setAttribute("aria-hidden", "true");
+  const stackIndex = modalNavigationStack.lastIndexOf(modal.id);
+  if (stackIndex === modalNavigationStack.length - 1) {
+    modalNavigationStack.pop();
+  }
   if (modal.id === "actionWizard") {
     closeWizard();
     return;
@@ -4776,7 +4812,7 @@ function closeModal(modal) {
     }
   }
   if (modal.id === "missionRunModal") {
-    if (wasActive) {
+    if (wasActive && (!state.missionRun.completedSuccessfully || state.options.stopMusicOnFinish)) {
       fadeOutRunningMusicAfterMissionClose();
     }
     stopMissionRunTicker();
@@ -4796,6 +4832,7 @@ function closeModal(modal) {
     state.missionRun.previousTaskTitle = "";
     state.missionRun.alarmStarted = false;
     state.missionRun.finalizing = false;
+    state.missionRun.completedSuccessfully = false;
     state.missionRun.selectedVariantId = "";
     state.missionRun.selectedVariantIds = [];
     state.missionRun.availableVariants = [];
@@ -4826,6 +4863,8 @@ function closeModal(modal) {
   }
   if (modal.id === "runningConfirmModal") {
     state.runningConfirm.action = null;
+    state.runningConfirm.pauseAction = null;
+    if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
     document.body.classList.remove("running-confirm-open");
   }
   if (modal.id === "quickTaskModal") {
@@ -4849,6 +4888,9 @@ function closeModal(modal) {
   }
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
+    if (!modalBackNavigationActive) {
+      modalNavigationStack.length = 0;
+    }
   }
   updateRunningPlayerOverlayState();
 }
@@ -4858,6 +4900,7 @@ function navigateToProjectHome() {
     closeModal(modal);
   });
   closeProfileManageOverlay();
+  modalNavigationStack.length = 0;
   document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open");
 }
 
@@ -5228,7 +5271,9 @@ function renderActions() {
     const actionIcon = getActionDisplayIcon(action);
     const stateClass = status === actionStatuses.inProgress
       ? " task-in-progress"
-      : (status === actionStatuses.completed ? " task-completed" : "");
+      : status === actionStatuses.paused
+        ? " task-paused"
+        : (status === actionStatuses.completed ? " task-completed" : "");
     const gaveUpClass = isGivenUpAction(action) ? " task-gave-up" : "";
     const delayMinutes = getPendingDelayMinutes(action);
     const row = document.createElement("article");
@@ -5240,6 +5285,9 @@ function renderActions() {
       row.style.removeProperty("--delay-soft-rgb");
     }
     row.dataset.actionId = action.id;
+    if (status === actionStatuses.paused) {
+      row.style.setProperty("--task-pause-progress", `${getActionStoredCompletionPercent(action)}%`);
+    }
     row.setAttribute("role", "button");
     row.tabIndex = 0;
     const dotColor = getActionThemeDotColor(action, { delayMinutes });
@@ -5248,7 +5296,7 @@ function renderActions() {
       ${buildTaskAvatarMarkup(actionIcon.src, actionIcon.alt, { categoryIcon: actionIcon.categoryIcon })}
       <div class="task-main">
         <div class="task-title">${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
-        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}</div>
+        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}${status === actionStatuses.paused ? ` · ${getActionStoredCompletionPercent(action)}%` : ""}</div>
       </div>
       <div class="task-time">${formatHourChip(action.startAt)}</div>
     `;
@@ -5409,7 +5457,11 @@ async function loadActions(options = {}) {
       state.runtimeState = runtimePayload?.runtimeState || null;
       const runtimeActionId = String(state.runtimeState?.actionId || "").trim();
       const runtimeStartedAt = new Date(state.runtimeState?.startedAt || "").getTime();
-      if (runtimeActionId && Number.isFinite(runtimeStartedAt) && runtimeStartedAt > 0) {
+      const runtimeEventType = String(state.runtimeState?.eventType || "").trim().toLowerCase();
+      const runtimeAction = state.actions.find((action) => String(action?.id || "") === runtimeActionId);
+      if (runtimeActionId && ["start", "resume"].includes(runtimeEventType)
+        && normalizeActionStatus(runtimeAction?.status) === actionStatuses.inProgress
+        && Number.isFinite(runtimeStartedAt) && runtimeStartedAt > 0) {
         state.runningLocalStarts[runtimeActionId] = runtimeStartedAt;
         state.actions = state.actions.map((action) => String(action?.id || "") === runtimeActionId
           ? { ...action, startedAt: state.runtimeState?.startedAt || action.startedAt }
@@ -5442,6 +5494,19 @@ async function toggleActionStatus(actionId, options = {}) {
   }
 
   const currentStatus = normalizeActionStatus(targetAction.status);
+  if (currentStatus === actionStatuses.completed) {
+    openRunningConfirmModal("restore", targetAction, () => {
+      void (async () => {
+        try {
+          await restoreActionToPending(targetAction.id);
+          await loadStatsSummary();
+        } catch (error) {
+          showFloatingNotice(error instanceof Error ? error.message : "Falha ao restaurar tarefa.");
+        }
+      })();
+    });
+    return;
+  }
   if (currentStatus === actionStatuses.pending && !options.skipDecision) {
     const rootChoice = await openStartDecisionModal(targetAction, null, buildPendingStartActionButtons(targetAction));
     if (!rootChoice || rootChoice === "cancel") {
@@ -5457,19 +5522,18 @@ async function toggleActionStatus(actionId, options = {}) {
       return;
     }
   }
-  if (currentStatus === actionStatuses.pending && !options.ignoreRunningConflict) {
+  if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && !options.ignoreRunningConflict) {
     const runningAction = getRunningActionExcept(targetAction.id);
     if (runningAction) {
       const conflictChoice = await openStartConflictModalForActions(runningAction, targetAction);
       if (conflictChoice === "finalize_and_start") {
         await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
         await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
-      } else if (conflictChoice === "abort_and_start") {
-        await restoreActionToPending(runningAction.id);
+      } else if (conflictChoice === "partial_and_start") {
+        const pausedResult = await pauseActionPartially(runningAction.id);
         delete state.runningLocalStarts[String(runningAction.id || "")];
+        await showPartialTaskFeedback(pausedResult);
         await toggleActionStatus(targetAction.id, { skipDecision: true, ignoreRunningConflict: true });
-      } else {
-        reopenStartDecisionForAction(targetAction.id);
       }
       return;
     }
@@ -5493,7 +5557,7 @@ async function toggleActionStatus(actionId, options = {}) {
     state.actions = state.actions.map((item) => (item.id === targetId ? updated : item));
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
-    if (currentStatus === actionStatuses.pending && nextStatus === actionStatuses.inProgress) {
+    if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && nextStatus === actionStatuses.inProgress) {
       resetRunningCompletionState();
       state.runningLocalStarts[String(targetId)] = getServerNowMs();
       await autoPlayRunningTaskDefaultPreference(updated);
@@ -5860,37 +5924,49 @@ function closeRunningTaskModalWithFade() {
 
 function closeRunningConfirmModal() {
   state.runningConfirm.action = null;
+  state.runningConfirm.pauseAction = null;
+  if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
   document.body.classList.remove("running-confirm-open");
   if (runningConfirmModal) {
     closeModal(runningConfirmModal);
   }
 }
 
-function openRunningConfirmModal(kind, action, onConfirm) {
+function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
   if (!runningConfirmModal || !runningConfirmTitle || !runningConfirmName || !runningConfirmPrimaryButton || !runningConfirmBackButton) {
     return;
   }
   state.runningConfirm.action = typeof onConfirm === "function" ? onConfirm : null;
+  state.runningConfirm.pauseAction = typeof options?.onPause === "function" ? options.onPause : null;
   const titleMap = {
     giveup: "Desistir?",
-    abort: "Abortar?",
-    finalize: "Concluir?"
+    abort: "Abortar ou pausar?",
+    finalize: "Concluir?",
+    restore: "Restaurar tarefa",
+    delete: "Excluir microtarefa?"
   };
   const buttonMap = {
     giveup: "Desistir",
     abort: "Abortar",
-    finalize: "Concluir"
+    finalize: "Concluir",
+    restore: "Restaurar tarefa",
+    delete: "Excluir"
   };
   const classMap = {
     giveup: "is-desistir",
     abort: "is-abortar",
-    finalize: "is-concluir"
+    finalize: "is-concluir",
+    restore: "is-restaurar",
+    delete: "is-excluir"
   };
   runningConfirmTitle.textContent = titleMap[kind] || "Desistir?";
   runningConfirmName.textContent = String(action?.title || "Nome da tarefa");
   runningConfirmPrimaryButton.textContent = buttonMap[kind] || "Desistir";
   runningConfirmPrimaryButton.className = `primary-btn running-confirm-primary ${classMap[kind] || "is-desistir"}`;
   runningConfirmBackButton.textContent = "Voltar";
+  if (runningConfirmPauseButton) {
+    runningConfirmPauseButton.hidden = !(kind === "abort" && state.runningConfirm.pauseAction);
+  }
   document.body.classList.add("running-confirm-open");
   openModal("runningConfirmModal");
 }
@@ -5917,8 +5993,7 @@ function getCurrentTimelineEntry(nowMs, exceptId = "") {
 }
 
 function closeStartDecisionModalWith(value) {
-  startDecisionModal?.classList.remove("active");
-  startDecisionModal?.setAttribute("aria-hidden", "true");
+  closeModal(startDecisionModal);
   if (startDecisionContent) {
     startDecisionContent.id = "startDecisionContent";
   }
@@ -5946,8 +6021,7 @@ function closeStartDecisionModalWith(value) {
 
 function closeStartConflictModal(value = "cancel") {
   if (startConflictModal) {
-    startConflictModal.classList.remove("active");
-    startConflictModal.setAttribute("aria-hidden", "true");
+    closeModal(startConflictModal);
   }
   const resolver = state.startConflict.resolve;
   state.startConflict.resolve = null;
@@ -6114,8 +6188,7 @@ function openTaskComposer(action = null, options = {}) {
     taskTitle.value = "";
   }
   renderTaskComposerModal();
-  startDecisionModal?.classList.add("active");
-  startDecisionModal?.setAttribute("aria-hidden", "false");
+  openModal("startDecisionModal");
   document.body.classList.add("start-decision-open", "modal-open");
   if (state.startDecisionContext.fieldToFocus) {
     window.setTimeout(() => openTaskComposerFieldEditor(state.startDecisionContext.fieldToFocus), 40);
@@ -6180,14 +6253,17 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   }
   state.startConflict.currentActionId = String(currentAction?.id || "");
   state.startConflict.nextActionId = String(nextAction?.id || "");
+  const currentTitle = formatActionTitleForDisplay(currentAction?.title || "Tarefa");
   if (startConflictCurrentTitle) {
-    startConflictCurrentTitle.textContent = formatActionTitleForDisplay(currentAction?.title || "Tarefa");
+    startConflictCurrentTitle.textContent = `${currentTitle} está em andamento`;
+  }
+  if (startConflictQuestion) {
+    startConflictQuestion.textContent = `Você concluiu ${currentTitle}?`;
   }
   if (startConflictNextTitle) {
-    startConflictNextTitle.textContent = `Iniciar ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
+    startConflictNextTitle.textContent = `Próxima: ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
   }
-  startConflictModal.classList.add("active");
-  startConflictModal.setAttribute("aria-hidden", "false");
+  openModal("startConflictModal");
   return new Promise((resolve) => {
     state.startConflict.resolve = resolve;
   });
@@ -6257,8 +6333,7 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
         startDecisionActions.appendChild(btn);
       });
     }
-    startDecisionModal?.classList.add("active");
-    startDecisionModal?.setAttribute("aria-hidden", "false");
+    openModal("startDecisionModal");
     document.body.classList.add("start-decision-open");
     document.body.classList.add("modal-open");
   });
@@ -7758,6 +7833,36 @@ function parseTimeToIso(baseIso, hhmm) {
   return base.toISOString();
 }
 
+async function pauseActionPartially(actionId) {
+  const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "pause" })
+  });
+  const updated = payload?.action || null;
+  if (!updated) {
+    throw new Error("Nao foi possivel pausar a tarefa.");
+  }
+  state.actions = state.actions.map((item) => (String(item.id) === String(actionId) ? updated : item));
+  delete state.runningLocalStarts[String(actionId || "")];
+  renderActions();
+  renderHomeRunningTask();
+  return { action: updated, pointsUpdate: payload?.pointsUpdate || null };
+}
+
+function showPartialTaskFeedback(result) {
+  const action = result?.action || result || null;
+  if (partialTaskTitle) partialTaskTitle.textContent = String(action?.title || "Tarefa pausada");
+  if (partialTaskPercent) partialTaskPercent.textContent = `${getActionStoredCompletionPercent(action)}%`;
+  openModal("partialTaskModal");
+  return new Promise((resolve) => {
+    partialTaskResolver = () => {
+      enqueueActionPointsUpdateFeedback(result?.pointsUpdate, 100);
+      resolve(action);
+    };
+  });
+}
+
 async function restoreActionToPending(actionId) {
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
     method: "PATCH",
@@ -7776,8 +7881,10 @@ async function restoreActionToPending(actionId) {
   if (target?.id) {
     state.historySystem = state.historySystem.filter((item) => item.id !== target.id);
   }
+  enqueueActionPointsUpdateFeedback(payload?.pointsUpdate, 100);
   renderActions();
   renderMissions();
+  return payload;
 }
 
 async function manualFinishAction(actionId) {
@@ -8931,6 +9038,16 @@ async function loadHistoryFromApi() {
   state.historyTexts = Array.isArray(payload.texts) ? payload.texts : [];
 }
 
+function cacheLoadedMissionVariants(goals) {
+  (Array.isArray(goals) ? goals : []).forEach((goal) => {
+    if (!Array.isArray(goal?.variants)) return;
+    missionVariantsCache.set(String(goal.id || ""), {
+      loadedAt: Date.now(),
+      items: goal.variants
+    });
+  });
+}
+
 async function loadMissions() {
   if (!getToken()) {
     state.missions = [];
@@ -8944,6 +9061,7 @@ async function loadMissions() {
   try {
     const payload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`);
     state.missions = Array.isArray(payload?.goals) ? payload.goals : [];
+    cacheLoadedMissionVariants(state.missions);
     if (missionStatus) {
       missionStatus.textContent = "";
     }
@@ -8956,6 +9074,7 @@ async function loadMissions() {
         const retryScope = getMissionHistoryScope();
         const retryPayload = await apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(getDefaultProfileName())}&scope=${encodeURIComponent(retryScope.key)}`);
         state.missions = Array.isArray(retryPayload?.goals) ? retryPayload.goals : [];
+        cacheLoadedMissionVariants(state.missions);
         if (missionStatus) {
           missionStatus.textContent = "";
         }
@@ -9526,8 +9645,9 @@ async function showPointsUpdateFeedback(pointsUpdate) {
   const afterSnapshot = pointsUpdate?.after || null;
   const beforePoints = Math.max(0, Math.trunc(Number(beforeSnapshot?.self?.points || 0) || 0));
   const afterPoints = Math.max(0, Math.trunc(Number(afterSnapshot?.self?.points || 0) || 0));
-  const gainedPoints = afterPoints - beforePoints;
-  if (!pointsUpdateModal || !afterSnapshot || gainedPoints <= 0) {
+  const pointsDelta = afterPoints - beforePoints;
+  const isLoss = pointsDelta < 0;
+  if (!pointsUpdateModal || !afterSnapshot || pointsDelta === 0) {
     return;
   }
 
@@ -9535,7 +9655,7 @@ async function showPointsUpdateFeedback(pointsUpdate) {
   const afterEntries = getPointsUpdateRankingEntries(afterSnapshot);
   const beforePosition = beforeEntries.findIndex((entry) => entry.isSelf);
   const afterPosition = afterEntries.findIndex((entry) => entry.isSelf);
-  const didOvertake = beforePosition >= 0 && afterPosition >= 0 && afterPosition < beforePosition;
+  const didOvertake = !isLoss && beforePosition >= 0 && afterPosition >= 0 && afterPosition < beforePosition;
 
   if (String(state.social?.scopeKey || "today") === "today") {
     state.social.pendingCount = Math.max(0, Number(afterSnapshot?.pendingCount || 0) || 0);
@@ -9545,10 +9665,14 @@ async function showPointsUpdateFeedback(pointsUpdate) {
     renderSocialModal();
   }
 
-  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking");
+  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-loss");
+  pointsUpdateModal.classList.toggle("is-loss", isLoss);
   if (pointsUpdateContinue) pointsUpdateContinue.hidden = true;
   if (pointsUpdateTotal) pointsUpdateTotal.textContent = String(beforePoints);
-  if (pointsUpdateDelta) pointsUpdateDelta.textContent = `+${gainedPoints} ${gainedPoints === 1 ? "ponto" : "pontos"}`;
+  if (pointsUpdateDelta) {
+    const absoluteDelta = Math.abs(pointsDelta);
+    pointsUpdateDelta.textContent = `${pointsDelta > 0 ? "+" : "-"}${absoluteDelta} ${absoluteDelta === 1 ? "ponto" : "pontos"}`;
+  }
   renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake);
   openModal("pointsUpdateModal");
   animatePointsUpdateTotal(beforePoints, afterPoints);
@@ -9562,7 +9686,7 @@ async function showPointsUpdateFeedback(pointsUpdate) {
   pointsUpdateModal.classList.add("is-leaving");
   await new Promise((resolve) => window.setTimeout(resolve, 150));
   closeModal("pointsUpdateModal");
-  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-ready-to-continue");
+  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-ready-to-continue", "is-loss");
   if (pointsUpdateContinue) pointsUpdateContinue.hidden = true;
 }
 
@@ -10837,6 +10961,17 @@ function fadeOutRunningMusicAfterMissionClose() {
   missionRunMusicFadeTimer = timer;
 }
 
+function stopRunningMusicAfterFinishedActivity() {
+  cancelMissionRunMusicFade({ restoreVolume: false });
+  if (!runningAudio) return;
+  try {
+    runningAudio.pause();
+    runningAudio.currentTime = 0;
+  } catch {}
+  state.runningPlayer.isPlaying = false;
+  renderRunningMusicPlayer();
+}
+
 function restoreRunningPlayerAfterMission() {
   if (!runningMiniPlayer || runningMiniPlayer.parentElement !== missionRunPlayerSlot) return;
   const runningContent = document.querySelector("#runningTaskModal .running-task-content");
@@ -11070,18 +11205,112 @@ function renderMissionRunState() {
   }
 }
 
-function getMissionVariantTiming(variant) {
-  const intervalMs = Math.max(1, Number(variant?.intervalValue || 1)) * (variant?.intervalUnit === "hours" ? 3600000 : 86400000);
-  const referenceMs = new Date(variant?.lastCompletedAt || variant?.createdAt || Date.now()).getTime();
-  const remainingMs = Math.max(0, intervalMs - Math.max(0, Date.now() - referenceMs));
-  return { percent: Math.max(0, Math.min(100, (remainingMs / intervalMs) * 100)), remainingMs };
+function normalizeMissionVariantSortMode(value) {
+  return String(value || "").trim().toLowerCase() === "priority" ? "priority" : "user";
 }
 
-function formatMissionVariantRemaining(variant, remainingMs) {
-  if (remainingMs <= 0) return "Prazo vencido";
-  const hours = Math.ceil(remainingMs / 3600000);
-  if (variant?.intervalUnit === "hours" || hours < 48) return `${hours}h restantes`;
-  return `${Math.ceil(hours / 24)} dias restantes`;
+function loadMissionVariantSortMode() {
+  try {
+    return normalizeMissionVariantSortMode(window.localStorage.getItem(missionVariantSortKey));
+  } catch {
+    return "user";
+  }
+}
+
+function saveMissionVariantSortMode(value) {
+  const normalized = normalizeMissionVariantSortMode(value);
+  try {
+    window.localStorage.setItem(missionVariantSortKey, normalized);
+  } catch {}
+  return normalized;
+}
+
+function getMissionVariantTiming(variant, nowMs = getServerNowMs()) {
+  const intervalMs = Math.max(1, Number(variant?.intervalValue || 1)) * (variant?.intervalUnit === "hours" ? 3600000 : 86400000);
+  const rawReferenceMs = new Date(variant?.lastCompletedAt || variant?.createdAt || nowMs).getTime();
+  const referenceMs = Number.isFinite(rawReferenceMs) ? rawReferenceMs : nowMs;
+  const dueAtMs = referenceMs + intervalMs;
+  const signedRemainingMs = dueAtMs - nowMs;
+  const remainingMs = Math.max(0, signedRemainingMs);
+  const overdueMs = Math.max(0, -signedRemainingMs);
+  const completedCycle = Boolean(variant?.lastCompletedAt) && signedRemainingMs > 0;
+  return {
+    intervalMs,
+    referenceMs,
+    dueAtMs,
+    signedRemainingMs,
+    remainingMs,
+    overdueMs,
+    completedCycle,
+    percent: Math.max(0, Math.min(100, (remainingMs / intervalMs) * 100))
+  };
+}
+
+function formatMissionVariantDuration(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor(Number(durationMs || 0) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function formatMissionVariantRemaining(timing) {
+  if (timing.overdueMs > 0) {
+    return `Atraso: ${formatMissionVariantDuration(timing.overdueMs)}`;
+  }
+  return `Restam: ${formatMissionVariantDuration(timing.remainingMs)}`;
+}
+
+function sortMissionVariants(items, sortMode = "user") {
+  const normalizedMode = normalizeMissionVariantSortMode(sortMode);
+  const nowMs = getServerNowMs();
+  return [...(Array.isArray(items) ? items : [])].sort((left, right) => {
+    if (normalizedMode === "priority") {
+      const leftTiming = getMissionVariantTiming(left, nowMs);
+      const rightTiming = getMissionVariantTiming(right, nowMs);
+      if (leftTiming.overdueMs > 0 || rightTiming.overdueMs > 0) {
+        if (leftTiming.overdueMs !== rightTiming.overdueMs) return rightTiming.overdueMs - leftTiming.overdueMs;
+      }
+      const timingDifference = leftTiming.percent - rightTiming.percent;
+      if (timingDifference) return timingDifference;
+    }
+    const leftCreatedAt = new Date(left?.createdAt || 0).getTime();
+    const rightCreatedAt = new Date(right?.createdAt || 0).getTime();
+    const creationDifference = (Number.isFinite(leftCreatedAt) ? leftCreatedAt : 0) - (Number.isFinite(rightCreatedAt) ? rightCreatedAt : 0);
+    return creationDifference || String(left?.id || "").localeCompare(String(right?.id || ""));
+  });
+}
+
+function getMissionVariantsDailyProgress(variants, nowMs = getServerNowMs()) {
+  const items = Array.isArray(variants) ? variants : [];
+  const todayKey = getProjectDateKey(new Date(nowMs));
+  const tomorrowStartMs = projectDateKeyToDate(addDaysToDateKey(todayKey, 1)).getTime();
+  const assignedToday = items.filter((variant) => {
+    const timing = getMissionVariantTiming(variant, nowMs);
+    const completedToday = Boolean(variant?.lastCompletedAt) && getProjectDateKey(new Date(variant.lastCompletedAt)) === todayKey;
+    return completedToday || timing.dueAtMs < tomorrowStartMs;
+  });
+  const completedToday = assignedToday.filter((variant) => {
+    if (!variant?.lastCompletedAt || getProjectDateKey(new Date(variant.lastCompletedAt)) !== todayKey) return false;
+    return getMissionVariantTiming(variant, nowMs).signedRemainingMs > 0;
+  });
+  const total = assignedToday.length;
+  const completed = completedToday.length;
+  return {
+    total,
+    completed,
+    percent: total > 0 ? Math.max(0, Math.min(100, Math.round((completed / total) * 100))) : 100,
+    label: total > 0 ? `${completed} de ${total}` : "Completo hoje"
+  };
+}
+
+function syncMissionVariantsIntoMissionState(goalId, items) {
+  const variants = Array.isArray(items) ? items : [];
+  state.missions = (Array.isArray(state.missions) ? state.missions : []).map((goal) => (
+    String(goal?.id || "") === String(goalId || "")
+      ? { ...goal, variants, variantCount: variants.length }
+      : goal
+  ));
 }
 
 function renderMissionVariants() {
@@ -11106,20 +11335,38 @@ function renderMissionVariants() {
   }
   if (missionVariantAddButton) missionVariantAddButton.hidden = chooseMode || editorOpen;
   if (missionVariantEditor) missionVariantEditor.hidden = !editorOpen;
+  if (missionVariantSortButton) {
+    const sortModeLabel = state.missionVariants.sortMode === "priority" ? "Prioridade" : "Usuário";
+    missionVariantSortButton.hidden = editorOpen;
+    missionVariantSortButton.setAttribute("aria-expanded", state.missionVariants.sortMenuOpen ? "true" : "false");
+    missionVariantSortButton.setAttribute("aria-label", `Ordenar por: ${sortModeLabel}`);
+    missionVariantSortButton.title = `Ordenar por: ${sortModeLabel}`;
+  }
+  if (missionVariantSortMenu) {
+    missionVariantSortMenu.hidden = editorOpen || !state.missionVariants.sortMenuOpen;
+    missionVariantSortMenu.querySelectorAll("[data-mission-variant-sort]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.missionVariantSort === state.missionVariants.sortMode);
+    });
+  }
   if (missionVariantDeadlineValue) missionVariantDeadlineValue.textContent = String(state.missionVariants.intervalValue || 1);
   missionVariantHoursButton?.classList.toggle("active", state.missionVariants.intervalUnit === "hours");
   missionVariantDaysButton?.classList.toggle("active", state.missionVariants.intervalUnit === "days");
   if (!missionVariantsList) return;
-  const items = [...(state.missionVariants.items || [])].sort((a, b) => getMissionVariantTiming(a).percent - getMissionVariantTiming(b).percent);
+  const items = sortMissionVariants(state.missionVariants.items, state.missionVariants.sortMode);
   missionVariantsList.hidden = editorOpen;
   missionVariantsList.innerHTML = items.length ? items.map((variant) => {
     const timing = getMissionVariantTiming(variant);
-    const tone = timing.percent <= 10 ? "red" : timing.percent <= 30 ? "orange" : "green";
+    const tone = timing.overdueMs > 0 ? "red" : timing.percent <= 10 ? "red" : timing.percent <= 30 ? "orange" : "green";
+    const barPercent = timing.completedCycle
+      ? 100
+      : timing.overdueMs > 0
+        ? Math.max(2, Math.min(100, (timing.overdueMs / timing.intervalMs) * 100))
+        : timing.percent;
     const unitLabel = variant.intervalUnit === "hours" ? `${variant.intervalValue}h` : `${variant.intervalValue} ${variant.intervalValue === 1 ? "dia" : "dias"}`;
-    return `<article class="mission-variant-card" data-mission-variant-id="${escapeHtml(variant.id)}">
-      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>${unitLabel} · ${formatMissionVariantRemaining(variant, timing.remainingMs)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
+    return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
+      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} · ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
       ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
-      <div class="mission-variant-bar"><span class="${tone}" style="width:${timing.percent.toFixed(2)}%"></span></div>
+      <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
   }).join("") : '<div class="empty-state">Adicione micro-tarefas diferentes para controlar seus prazos.</div>';
 }
@@ -11149,6 +11396,8 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
     cycleSelectionTarget: normalizeMissionRunCycleTarget(options?.cycleTarget || 1),
     cycleSelections: Array.isArray(options?.initialSelections) ? options.initialSelections.slice(0, MISSION_RUN_MAX_CYCLES) : [],
     cycleSelectionResumeMode: options?.resumeMode === "advance" ? "advance" : "preserve",
+    sortMode: loadMissionVariantSortMode(),
+    sortMenuOpen: false,
     intervalValue: 1,
     intervalUnit: "days"
   };
@@ -11162,7 +11411,7 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
   }
   renderMissionVariants();
   if (missionVariantsTicker) window.clearInterval(missionVariantsTicker);
-  missionVariantsTicker = window.setInterval(renderMissionVariants, 30000);
+  missionVariantsTicker = window.setInterval(renderMissionVariants, 1000);
 }
 
 function beginMissionRun(goal, selectedVariant = null) {
@@ -11174,6 +11423,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   state.missionRun.centerMode = "time";
   state.missionRun.alarmStarted = false;
   state.missionRun.finalizing = false;
+  state.missionRun.completedSuccessfully = false;
   state.missionRun.selectedVariantId = String(selectedVariant?.id || "");
   state.missionRun.selectedVariantIds = selectedVariant?.id ? [String(selectedVariant.id)] : [];
   state.missionRun.cycleTarget = 1;
@@ -11267,6 +11517,10 @@ async function finalizeMissionRun() {
     renderMissions();
     renderActions();
     renderRunningMissionQuickButtons();
+    state.missionRun.completedSuccessfully = true;
+    if (state.options.stopMusicOnFinish) {
+      stopRunningMusicAfterFinishedActivity();
+    }
     closeModal("missionRunModal");
   } catch (error) {
     state.missionRun.finalizing = false;
@@ -11300,14 +11554,23 @@ function openMissionProgressModal(goalId) {
 }
 
 function createMissionCard(goal) {
-  const progress = Math.max(0, Number(goal.progressValue || 0));
-  const target = Math.max(1, Number(goal.targetValue || 1));
-  const percent = Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
   const goalIcon = getMissionDisplayIcon(goal);
   const historyRangeActive = isMissionHistoryRangeActive();
-  const progressLabel = `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
+  const variants = Array.isArray(goal?.variants) ? goal.variants : [];
+  const hasMicrotasks = variants.length > 0 || Number(goal?.variantCount || 0) > 0;
+  const dailyVariantProgress = !historyRangeActive && variants.length > 0
+    ? getMissionVariantsDailyProgress(variants)
+    : null;
+  const progress = dailyVariantProgress ? dailyVariantProgress.completed : Math.max(0, Number(goal.progressValue || 0));
+  const target = dailyVariantProgress ? dailyVariantProgress.total : Math.max(1, Number(goal.targetValue || 1));
+  const percent = dailyVariantProgress
+    ? dailyVariantProgress.percent
+    : Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+  const progressLabel = dailyVariantProgress
+    ? dailyVariantProgress.label
+    : `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
   const card = document.createElement("article");
-  card.className = "history-mission-card";
+  card.className = `history-mission-card${hasMicrotasks ? " has-microtasks" : ""}`;
   card.dataset.goalId = String(goal.id || "");
   card.dataset.historyRangeActive = historyRangeActive ? "true" : "false";
   card.innerHTML = `
@@ -11315,7 +11578,7 @@ function createMissionCard(goal) {
       <div class="history-mission-card-info">
         ${goalIcon ? buildTaskAvatarMarkup(goalIcon.src, goalIcon.alt, { categoryIcon: goalIcon.categoryIcon }) : ""}
         <div>
-        <h3 class="history-mission-card-title">${escapeHtml(String(goal.title || "Missão"))}</h3>
+        <h3 class="history-mission-card-title">${escapeHtml(String(goal.title || "Missão"))}${hasMicrotasks ? '<svg class="history-mission-folder-icon" viewBox="0 0 24 24" aria-label="Missão com microtarefas" role="img"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg>' : ""}</h3>
         <div class="history-mission-card-progress">${escapeHtml(progressLabel)}</div>
         </div>
       </div>
@@ -11354,6 +11617,7 @@ function renderMissions() {
 function moveHistoryDate(amount) {
   state.historyOffset += amount;
   renderMissions();
+  return payload;
 }
 
 async function shiftMissionHistoryScope(direction) {
@@ -11766,6 +12030,86 @@ function handleSwipe(element, callback) {
   }, { passive: true });
 }
 
+function getTopProjectModal() {
+  for (let index = modalNavigationStack.length - 1; index >= 0; index -= 1) {
+    const modal = document.getElementById(modalNavigationStack[index]);
+    if (modal?.classList.contains("active")) return modal;
+  }
+  const activeModals = [...document.querySelectorAll(".workspace-modal.active")];
+  return activeModals[activeModals.length - 1] || null;
+}
+
+function navigateBackOneProjectLayer() {
+  if (ilifeReaderOverlay?.classList.contains("active")) {
+    closeIlifeReader();
+    return true;
+  }
+  if (actionCategoryModal?.classList.contains("active")) {
+    actionCategoryModal.classList.remove("active");
+    actionCategoryModal.setAttribute("aria-hidden", "true");
+    return true;
+  }
+  if (actionWizard?.classList.contains("active")) {
+    if (state.wizard.inlineEditStep || Number(state.wizard.step || 1) > 1) {
+      stepWizardBack();
+    } else {
+      closeWizard();
+    }
+    return true;
+  }
+  if (platformWizard?.classList.contains("active")) {
+    if (Number(state.platformWizard?.step || 1) > 1) {
+      state.platformWizard.step = Math.max(1, Number(state.platformWizard.step) - 1);
+      renderPlatformWizard();
+    } else {
+      closePlatformWizard();
+    }
+    return true;
+  }
+  if (actionStatusWizard?.classList.contains("active")) {
+    closeActionStatusWizard();
+    return true;
+  }
+  if (profileManageOverlay?.classList.contains("active")) {
+    closeProfileManageOverlay();
+    return true;
+  }
+  if (missionRunFinishChoice?.hidden === false) {
+    missionRunFinishChoice.hidden = true;
+    return true;
+  }
+  if (missionRunConfirm?.hidden === false) {
+    missionRunConfirm.hidden = true;
+    return true;
+  }
+  const topModal = getTopProjectModal();
+  if (!topModal) return false;
+  modalBackNavigationActive = true;
+  try {
+    if (topModal.id === "startConflictModal") {
+      closeStartConflictModal("cancel");
+    } else if (topModal.id === "startDecisionModal") {
+      closeStartDecisionModalWith("cancel");
+    } else if (topModal.id === "runningConfirmModal") {
+      closeRunningConfirmModal();
+    } else {
+      if (topModal.id === "partialTaskModal") partialTaskResolver = null;
+      closeModal(topModal);
+    }
+    const previousId = modalNavigationStack[modalNavigationStack.length - 1] || "";
+    const previousModal = previousId ? document.getElementById(previousId) : null;
+    if (previousModal && !previousModal.classList.contains("active")) {
+      openModal(previousId);
+    }
+  } finally {
+    modalBackNavigationActive = false;
+    if (!document.querySelector(".workspace-modal.active")) {
+      modalNavigationStack.length = 0;
+    }
+  }
+  return true;
+}
+
 function preventEdgeSwipeNavigation() {
   let startX = 0;
   let startY = 0;
@@ -11776,8 +12120,7 @@ function preventEdgeSwipeNavigation() {
     const touch = event.changedTouches?.[0];
     startX = Number(touch?.clientX || 0);
     startY = Number(touch?.clientY || 0);
-    const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
-    fromEdge = startX <= 28 || (viewportWidth > 0 && startX >= viewportWidth - 28);
+    fromEdge = startX <= 28;
     shouldGoHome = false;
   }, { passive: true });
 
@@ -11788,7 +12131,7 @@ function preventEdgeSwipeNavigation() {
     const touch = event.changedTouches?.[0];
     const deltaX = Number(touch?.clientX || 0) - startX;
     const deltaY = Number(touch?.clientY || 0) - startY;
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+    if (deltaX > Math.abs(deltaY) && deltaX > 10) {
       shouldGoHome = true;
       event.preventDefault();
     }
@@ -11798,8 +12141,8 @@ function preventEdgeSwipeNavigation() {
     const touch = event.changedTouches?.[0];
     const endX = Number(touch?.clientX || 0);
     const deltaX = endX - startX;
-    if (fromEdge && shouldGoHome && Math.abs(deltaX) >= 42) {
-      navigateToProjectHome();
+    if (fromEdge && shouldGoHome && deltaX >= 42) {
+      navigateBackOneProjectLayer();
     }
     fromEdge = false;
     shouldGoHome = false;
@@ -11820,12 +12163,7 @@ function registerNativeBackButtonHandler() {
     return;
   }
   appPlugin.addListener("backButton", async () => {
-    if (ilifeReaderOverlay?.classList.contains("active")) {
-      closeIlifeReader();
-      return;
-    }
-    if (!isProjectHomeVisible()) {
-      navigateToProjectHome();
+    if (navigateBackOneProjectLayer()) {
       return;
     }
     const shouldExit = window.confirm("Deseja fechar o Projeto 200?");
@@ -11976,6 +12314,7 @@ if (window.history && typeof window.history.pushState === "function") {
   try {
     window.history.pushState({ project200Guard: true }, "", window.location.href);
     window.addEventListener("popstate", () => {
+      navigateBackOneProjectLayer();
       try {
         window.history.pushState({ project200Guard: true }, "", window.location.href);
       } catch {}
@@ -13477,9 +13816,24 @@ missionRunRestartButton?.addEventListener("click", () => {
   restartMissionRunLocally();
 });
 
-missionVariantsCloseButton?.addEventListener("click", () => closeModal("missionVariantsModal"));
+missionVariantsCloseButton?.addEventListener("click", () => {
+  state.missionVariants.sortMenuOpen = false;
+  closeModal("missionVariantsModal");
+});
+missionVariantSortButton?.addEventListener("click", () => {
+  state.missionVariants.sortMenuOpen = !state.missionVariants.sortMenuOpen;
+  renderMissionVariants();
+});
+missionVariantSortMenu?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-mission-variant-sort]");
+  if (!button) return;
+  state.missionVariants.sortMode = saveMissionVariantSortMode(button.dataset.missionVariantSort);
+  state.missionVariants.sortMenuOpen = false;
+  renderMissionVariants();
+});
 missionVariantAddButton?.addEventListener("click", () => {
   state.missionVariants.editorOpen = true;
+  state.missionVariants.sortMenuOpen = false;
   state.missionVariants.editingId = "";
   state.missionVariants.intervalValue = 1;
   state.missionVariants.intervalUnit = "days";
@@ -13516,8 +13870,10 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     });
     state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
     missionVariantsCache.set(String(goalId || ""), { loadedAt: Date.now(), items: state.missionVariants.items });
+    syncMissionVariantsIntoMissionState(goalId, state.missionVariants.items);
     state.missionVariants.editorOpen = false;
     renderMissionVariants();
+    renderMissions();
   } catch (error) {
     if (missionVariantStatus) missionVariantStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar.";
   } finally { missionVariantEditorSave.disabled = false; }
@@ -13530,13 +13886,21 @@ missionVariantsList?.addEventListener("click", async (event) => {
   const variant = (state.missionVariants.items || []).find((item) => String(item.id) === id);
   if (!variant) return;
   if (deleteButton) {
-    try {
-      const profile = encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim());
-      const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(state.missionVariants.goalId)}/variants/${encodeURIComponent(id)}?profile=${profile}`, { method: "DELETE" });
-      state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
-      missionVariantsCache.set(String(state.missionVariants.goalId || ""), { loadedAt: Date.now(), items: state.missionVariants.items });
-      renderMissionVariants();
-    } catch {}
+    openRunningConfirmModal("delete", variant, () => {
+      void (async () => {
+        try {
+          const profile = encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim());
+          const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(state.missionVariants.goalId)}/variants/${encodeURIComponent(id)}?profile=${profile}`, { method: "DELETE" });
+          state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
+          missionVariantsCache.set(String(state.missionVariants.goalId || ""), { loadedAt: Date.now(), items: state.missionVariants.items });
+          syncMissionVariantsIntoMissionState(state.missionVariants.goalId, state.missionVariants.items);
+          renderMissionVariants();
+          renderMissions();
+        } catch (error) {
+          showFloatingNotice(error instanceof Error ? error.message : "Falha ao excluir microtarefa.");
+        }
+      })();
+    });
     return;
   }
   if (state.missionVariants.mode === "choose") {
@@ -13573,6 +13937,7 @@ missionVariantsList?.addEventListener("click", async (event) => {
     return;
   }
   state.missionVariants.editorOpen = true;
+  state.missionVariants.sortMenuOpen = false;
   state.missionVariants.editingId = id;
   state.missionVariants.intervalValue = variant.intervalValue;
   state.missionVariants.intervalUnit = variant.intervalUnit;
@@ -13710,7 +14075,9 @@ async function performRunningFinalize(runningAction) {
   const beforeSummary = getCompletionSummaryForSelectedProfile();
   const duration = getActionDurationMinutes(runningAction);
   const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
-  const elapsed = Number.isFinite(startedAtMs) ? Math.max(0, (getServerNowMs() - startedAtMs) / (60 * 1000)) : duration;
+  const accumulatedMinutes = Math.max(0, Number(runningAction?.accumulatedSeconds || 0) / 60);
+  const elapsed = accumulatedMinutes
+    + (Number.isFinite(startedAtMs) ? Math.max(0, (getServerNowMs() - startedAtMs) / (60 * 1000)) : duration);
   const bonusBefore = Math.max(0, Number(runningCarryOverMinutes || 0));
   const remainingAfterBonus = Math.max(0, elapsed - bonusBefore);
   const savedMinutes = Math.max(0, Math.floor(duration - remainingAfterBonus));
@@ -13727,11 +14094,7 @@ async function performRunningFinalize(runningAction) {
   const after = state.actions.find((item) => item.id === runningAction.id);
   if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
     if (state.options.stopMusicOnFinish && runningAudio) {
-      try {
-        runningAudio.pause();
-        runningAudio.currentTime = 0;
-      } catch {}
-      renderRunningPlayerUi();
+      stopRunningMusicAfterFinishedActivity();
     }
     const nextAction = getNextTimelineEntryForRunning(runningAction);
     const nextOfNext = nextAction ? getNextTimelineEntryForRunning(nextAction) : null;
@@ -13784,11 +14147,25 @@ async function performRunningRestore(runningAction) {
   } catch {}
 }
 
+async function performRunningPause(runningAction) {
+  try {
+    const result = await pauseActionPartially(String(runningAction.id || ""));
+    startRunningTaskTicker();
+    await showPartialTaskFeedback(result);
+    closeRunningTaskModalWithFade();
+    window.setTimeout(() => openModal("actionsModal"), 500);
+  } catch (error) {
+    showFloatingNotice(error instanceof Error ? error.message : "Falha ao pausar tarefa.");
+  }
+}
+
 runningTaskRestoreButton?.addEventListener("click", () => {
   const runningAction = getRunningActionForSelectedProfile();
   if (!runningAction) return;
   openRunningConfirmModal("abort", runningAction, () => {
     void performRunningRestore(runningAction);
+  }, {
+    onPause: () => void performRunningPause(runningAction)
   });
 });
 
@@ -13814,6 +14191,8 @@ homeRunningRestoreButton?.addEventListener("click", () => {
   if (!runningAction) return;
   openRunningConfirmModal("abort", runningAction, () => {
     void performRunningRestore(runningAction);
+  }, {
+    onPause: () => void performRunningPause(runningAction)
   });
 });
 homeRunningFinalizeButton?.addEventListener("click", () => {
@@ -13974,23 +14353,19 @@ quickTaskStartButton?.addEventListener("click", () => {
       await submitQuickTaskStart();
       return;
     }
-    if (startConflictCurrentTitle) {
-      startConflictCurrentTitle.textContent = formatActionTitleForDisplay(runningAction.title);
-    }
-    if (startConflictNextTitle) {
-      startConflictNextTitle.textContent = `Iniciar ${String(quickTaskTitleInput?.value || "Tarefa Rápida").trim() || "Tarefa Rápida"}`;
-    }
-    if (startConflictModal) {
-      startConflictModal.classList.add("active");
-      startConflictModal.setAttribute("aria-hidden", "false");
-    }
-    const choice = await new Promise((resolve) => {
-      state.startConflict.resolve = resolve;
+    const choice = await openStartConflictModalForActions(runningAction, {
+      title: String(quickTaskTitleInput?.value || "Tarefa Rápida").trim() || "Tarefa Rápida"
     });
     if (!choice || choice === "cancel") {
       return;
     }
-    await submitQuickTaskStart(choice === "finalize_and_start" ? "finalize" : "abort");
+    if (choice === "partial_and_start") {
+      const pausedResult = await pauseActionPartially(runningAction.id);
+      await showPartialTaskFeedback(pausedResult);
+      await submitQuickTaskStart();
+      return;
+    }
+    await submitQuickTaskStart("finalize");
   })();
 });
 profileRenameConfirmButton?.addEventListener("click", () => {
@@ -14187,8 +14562,14 @@ startDecisionDateInput?.addEventListener("change", () => {
   renderTaskComposerModal();
 });
 startConflictFinalizeButton?.addEventListener("click", () => closeStartConflictModal("finalize_and_start"));
-startConflictAbortButton?.addEventListener("click", () => closeStartConflictModal("abort_and_start"));
+startConflictAbortButton?.addEventListener("click", () => closeStartConflictModal("partial_and_start"));
 startConflictBackButton?.addEventListener("click", () => closeStartConflictModal("cancel"));
+partialTaskContinueButton?.addEventListener("click", () => {
+  closeModal("partialTaskModal");
+  const resolve = partialTaskResolver;
+  partialTaskResolver = null;
+  if (resolve) resolve();
+});
 runningConfirmPrimaryButton?.addEventListener("click", () => {
   const action = state.runningConfirm.action;
   const callback = action;
@@ -14241,6 +14622,11 @@ window.addEventListener("message", (event) => {
       renderHomeRunningTask();
     }
   }
+});
+runningConfirmPauseButton?.addEventListener("click", () => {
+  const callback = state.runningConfirm.pauseAction;
+  closeRunningConfirmModal();
+  if (typeof callback === "function") callback();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && ilifeReaderOverlay?.classList.contains("active")) {

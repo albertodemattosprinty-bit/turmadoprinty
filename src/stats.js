@@ -372,6 +372,7 @@ async function buildStatsSummary(userId, range) {
             a.assignee,
             extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
             coalesce(o.status, 'PENDING') as status,
+            case when upper(coalesce(o.status, 'PENDING')) = 'COMPLETED' then 100 else coalesce(o.completion_percent, 0) end as completion_percent,
             o.started_at,
             a.start_at
           from actions a
@@ -386,7 +387,7 @@ async function buildStatsSummary(userId, range) {
         select
           assignee,
           coalesce(sum(minutes), 0)::bigint as total_minutes,
-          coalesce(sum(case when upper(status) = 'COMPLETED' then minutes else 0 end), 0)::bigint as completed_minutes,
+          coalesce(sum(minutes * greatest(0, least(100, completion_percent)) / 100.0), 0)::bigint as completed_minutes,
           coalesce(sum(
             case
               when started_at is null then 0
@@ -406,7 +407,8 @@ async function buildStatsSummary(userId, range) {
             a.id,
             a.category_id,
             extract(epoch from (a.end_at - a.start_at)) / 60.0 as minutes,
-            coalesce(o.status, 'PENDING') as status
+            coalesce(o.status, 'PENDING') as status,
+            case when upper(coalesce(o.status, 'PENDING')) = 'COMPLETED' then 100 else coalesce(o.completion_percent, 0) end as completion_percent
           from actions a
           left join action_status_overrides o
             on o.user_id = a.user_id
@@ -418,7 +420,7 @@ async function buildStatsSummary(userId, range) {
         )
         select
           coalesce(nullif(trim(category_id), ''), 'sem_categoria') as category_id,
-          coalesce(sum(case when upper(status) = 'COMPLETED' then minutes else 0 end), 0)::bigint as completed_minutes
+          coalesce(sum(minutes * greatest(0, least(100, completion_percent)) / 100.0), 0)::bigint as completed_minutes
         from action_status
         group by coalesce(nullif(trim(category_id), ''), 'sem_categoria')
       `,

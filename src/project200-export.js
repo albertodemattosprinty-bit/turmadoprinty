@@ -146,10 +146,12 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
             status,
             started_at,
             completed_at,
+            completion_percent,
+            accumulated_seconds,
             created_at,
             updated_at
           )
-          values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7::timestamptz, $8::timestamptz)
+          values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8, $9::timestamptz, $10::timestamptz)
         `,
         [
           toUserId,
@@ -158,6 +160,8 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
           row.status || "PENDING",
           row.started_at || null,
           row.completed_at || null,
+          Math.max(0, Math.min(100, Math.trunc(Number(row.completion_percent || 0) || 0))),
+          Math.max(0, Math.trunc(Number(row.accumulated_seconds || 0) || 0)),
           row.created_at || new Date().toISOString(),
           row.updated_at || row.created_at || new Date().toISOString()
         ]

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260713-ilife-reader" />
+  <link rel="stylesheet" href="/200/project.css?v=20260716-actions-pause" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -223,6 +223,7 @@
       <div class="running-confirm-name" id="runningConfirmName">Nome da tarefa</div>
       <div class="running-confirm-buttons">
         <button class="primary-btn running-confirm-primary" type="button" id="runningConfirmPrimaryButton">Desistir</button>
+        <button class="primary-btn running-confirm-pause" type="button" id="runningConfirmPauseButton" hidden>Pausar</button>
         <button class="ghost-btn running-confirm-back" type="button" id="runningConfirmBackButton">Voltar</button>
       </div>
     </div>
@@ -311,14 +312,22 @@
   </section>
   <section class="workspace-modal simple-modal" id="startConflictModal" aria-hidden="true" aria-label="Conflito de tarefa em andamento">
     <div class="finance-content running-task-content start-conflict-content">
-      <div class="start-conflict-current" id="startConflictCurrentTitle">Tarefa X</div>
-      <div class="start-conflict-current-status">em andamento</div>
-      <div class="start-conflict-next" id="startConflictNextTitle">Iniciar tarefa Y</div>
+      <div class="start-conflict-current" id="startConflictCurrentTitle">Tarefa X está em andamento</div>
+      <div class="start-conflict-current-status" id="startConflictQuestion">Você concluiu Tarefa X?</div>
+      <div class="start-conflict-next" id="startConflictNextTitle">Próxima: Tarefa Y</div>
       <div class="start-conflict-actions">
-        <button class="primary-btn" type="button" id="startConflictFinalizeButton">Finalizar tarefa atual e iniciar</button>
-        <button class="ghost-btn" type="button" id="startConflictAbortButton">Abortar tarefa atual e iniciar</button>
-        <button class="ghost-btn" type="button" id="startConflictBackButton">Voltar</button>
+        <button class="primary-btn" type="button" id="startConflictFinalizeButton">Concluí</button>
+        <button class="ghost-btn start-conflict-partial-btn" type="button" id="startConflictAbortButton">Parcialmente</button>
+        <button class="ghost-btn" type="button" id="startConflictBackButton">Ainda não</button>
       </div>
+    </div>
+  </section>
+  <section class="workspace-modal simple-modal" id="partialTaskModal" aria-hidden="true" aria-label="Progresso parcial da tarefa">
+    <div class="finance-content running-task-content partial-task-content">
+      <div class="running-task-name" id="partialTaskTitle">Tarefa pausada</div>
+      <div class="partial-task-label">Progresso salvo</div>
+      <div class="running-task-percent partial-task-percent" id="partialTaskPercent">0%</div>
+      <button class="primary-btn partial-task-continue" type="button" id="partialTaskContinueButton">Continuar</button>
     </div>
   </section>
   <section class="workspace-modal simple-modal" id="postponeTaskModal" aria-hidden="true" aria-label="Adiar tarefa">
@@ -1223,7 +1232,16 @@
     <div class="mission-variants-panel">
       <header class="mission-variants-head">
         <div><div class="mission-variants-kicker" id="missionVariantsKicker">Micro-tarefas</div><div class="running-task-name mission-variants-title" id="missionVariantsTitle">Escolha uma micro-tarefa</div></div>
-        <button class="history-mission-modal-close" type="button" id="missionVariantsCloseButton" aria-label="Fechar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg></button>
+        <div class="mission-variants-head-actions">
+          <div class="mission-variant-sort-wrap">
+            <button class="history-mission-modal-close mission-variant-sort-button" type="button" id="missionVariantSortButton" aria-label="Ordenar micro-tarefas" aria-expanded="false" aria-controls="missionVariantSortMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11v2H4V7Zm0 4h8v2H4v-2Zm0 4h5v2H4v-2Zm13.6-5.4L20 12l2.4-2.4L24 11.2l-4 4-4-4 1.6-1.6Z" fill="currentColor"/></svg></button>
+            <div class="mission-variant-sort-menu" id="missionVariantSortMenu" hidden>
+              <button type="button" data-mission-variant-sort="user"><span>Usuário</span><small>Ordem de criação</small></button>
+              <button type="button" data-mission-variant-sort="priority"><span>Prioridade</span><small>Prazo mais urgente</small></button>
+            </div>
+          </div>
+          <button class="history-mission-modal-close" type="button" id="missionVariantsCloseButton" aria-label="Fechar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg></button>
+        </div>
       </header>
       <div class="mission-variant-cycle-selection" id="missionVariantCycleSelection" hidden></div>
       <div class="mission-variants-list" id="missionVariantsList" aria-live="polite"></div>
@@ -1426,7 +1444,7 @@
     ></iframe>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260713-ilife-reader"></script>
+  <script type="module" src="/200/project.js?v=20260716-actions-pause"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

@@ -147,18 +147,35 @@ export async function recordProject200ActionPoints(userId, action, completedAt =
   await ensureProject200PointsSchema();
   const normalizedUserId = String(userId || "").trim();
   const actionId = String(action?.id || "").trim();
-  const points = getActionPointValue(action);
+  const completionPercent = String(action?.status || "").trim().toUpperCase() === "COMPLETED"
+    ? 100
+    : Math.max(0, Math.min(100, Math.trunc(Number(action?.completionPercent || 0) || 0)));
+  const points = Math.max(0, Math.floor((getActionPointValue(action) * completionPercent) / 100));
   if (!normalizedUserId || !actionId || points <= 0) {
-    return { points: 0, created: false };
+    return { points: 0, previousPoints: 0, deltaPoints: 0, created: false };
   }
   const scopeDate = toDateKey(completedAt);
+  const existingResult = await query(
+    `
+      select points
+      from project200_point_events
+      where user_id = $1 and source_type = 'action' and source_key = $2
+      limit 1
+    `,
+    [normalizedUserId, actionId]
+  );
+  const previousPoints = Math.max(0, Math.trunc(Number(existingResult.rows[0]?.points || 0) || 0));
   const result = await query(
     `
       insert into project200_point_events (
         user_id, source_type, source_key, points, scope_date, metadata, created_at, updated_at
       )
       values ($1, 'action', $2, $3, $4::date, $5::jsonb, now(), now())
-      on conflict (user_id, source_type, source_key) do nothing
+      on conflict (user_id, source_type, source_key) do update
+        set points = excluded.points,
+            scope_date = excluded.scope_date,
+            metadata = excluded.metadata,
+            updated_at = now()
       returning id, points, scope_date
     `,
     [
@@ -166,12 +183,19 @@ export async function recordProject200ActionPoints(userId, action, completedAt =
       actionId,
       points,
       scopeDate,
-      JSON.stringify({ title: String(action?.title || "").trim(), durationMinutes: points })
+      JSON.stringify({
+        title: String(action?.title || "").trim(),
+        durationMinutes: getActionPointValue(action),
+        completionPercent
+      })
     ]
   );
+  const deltaPoints = points - previousPoints;
   return {
-    points: result.rows[0] ? points : 0,
-    created: Boolean(result.rows[0]),
+    points: result.rows[0] ? points : previousPoints,
+    previousPoints,
+    deltaPoints,
+    created: Boolean(result.rows[0]) && deltaPoints > 0,
     scopeDate
   };
 }

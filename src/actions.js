@@ -6,6 +6,7 @@ import { PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName } from ".
 const MAX_OCCURRENCES = 370;
 const ACTION_STATUS_PENDING = "PENDING";
 const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
+const ACTION_STATUS_PAUSED = "PAUSED";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
 const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
 const DEFAULT_CATEGORY_ID = "";
@@ -26,6 +27,10 @@ function normalizeActionStatus(value) {
 
   if (normalized === ACTION_STATUS_IN_PROGRESS) {
     return ACTION_STATUS_IN_PROGRESS;
+  }
+
+  if (normalized === ACTION_STATUS_PAUSED) {
+    return ACTION_STATUS_PAUSED;
   }
 
   if (normalized === ACTION_STATUS_COMPLETED) {
@@ -93,6 +98,10 @@ function getNextActionStatus(currentStatus) {
     return ACTION_STATUS_COMPLETED;
   }
 
+  if (normalized === ACTION_STATUS_PAUSED) {
+    return ACTION_STATUS_IN_PROGRESS;
+  }
+
   return ACTION_STATUS_COMPLETED;
 }
 
@@ -124,6 +133,10 @@ function normalizeAction(row) {
     startedAt: toIso(row.status_started_at),
     completedAt: toIso(row.status_completed_at),
     statusUpdatedAt: toIso(row.status_updated_at),
+    completionPercent: normalizeActionStatus(row.status_override) === ACTION_STATUS_COMPLETED
+      ? 100
+      : Math.max(0, Math.min(100, Math.trunc(Number(row.completion_percent || 0) || 0))),
+    accumulatedSeconds: Math.max(0, Math.trunc(Number(row.accumulated_seconds || 0) || 0)),
     createdAt: toIso(row.created_at),
     lateStartMinutes
   };
@@ -242,6 +255,9 @@ export async function ensureActionsSchema() {
   `);
   await query("create index if not exists idx_action_status_overrides_repeat_group on action_status_overrides(user_id, repeat_group_id);");
   await query("create index if not exists idx_action_status_overrides_status on action_status_overrides(user_id, status);");
+  await query("alter table action_status_overrides add column if not exists completion_percent integer not null default 0;");
+  await query("alter table action_status_overrides add column if not exists accumulated_seconds integer not null default 0;");
+  await query("update action_status_overrides set completion_percent = 100 where upper(status) = 'COMPLETED' and completion_percent <> 100;");
 
   await query(`
     create table if not exists project200_runtime_state (
@@ -401,6 +417,8 @@ export async function getUserActionById(userId, actionId) {
         o.status as status_override,
         o.started_at as status_started_at,
         o.completed_at as status_completed_at,
+        o.completion_percent,
+        o.accumulated_seconds,
         o.updated_at as status_updated_at
       from actions a
       left join action_status_overrides o
@@ -452,16 +470,21 @@ async function setActionCompletedAt(userId, action, completedAt) {
         repeat_group_id,
         status,
         started_at,
-        completed_at
+        completed_at,
+        completion_percent,
+        accumulated_seconds
       )
-      values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+      values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, 100, $7)
       on conflict (user_id, action_id) do update
         set status = excluded.status,
             started_at = excluded.started_at,
             completed_at = excluded.completed_at,
+            completion_percent = 100,
+            accumulated_seconds = excluded.accumulated_seconds,
             updated_at = now()
     `,
-    [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedIso, completedIso]
+    [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedIso, completedIso,
+      Math.max(0, Math.round((new Date(action.endAt).getTime() - new Date(action.startAt).getTime()) / 1000))]
   );
   await upsertProject200RuntimeState(userId, {
     actionId: action.id,
@@ -546,6 +569,8 @@ async function reshapeActionsForQuickTask(userId, assignee, rangeStartAt, rangeE
         o.status as status_override,
         o.started_at as status_started_at,
         o.completed_at as status_completed_at,
+        o.completion_percent,
+        o.accumulated_seconds,
         o.updated_at as status_updated_at
       from actions a
       left join action_status_overrides o
@@ -627,6 +652,8 @@ export async function listUserActions(userId, { from, to }) {
         o.status as status_override,
         o.started_at as status_started_at,
         o.completed_at as status_completed_at,
+        o.completion_percent,
+        o.accumulated_seconds,
         o.updated_at as status_updated_at
       from actions a
       left join action_status_overrides o
@@ -1069,6 +1096,9 @@ export async function updateUserActionStatus(userId, actionId) {
   const nowIso = new Date().toISOString();
   let startedAt = action.startedAt;
   let completedAt = action.completedAt;
+  let completionPercent = Math.max(0, Math.min(100, Math.trunc(Number(action.completionPercent || 0) || 0)));
+  let accumulatedSeconds = Math.max(0, Math.trunc(Number(action.accumulatedSeconds || 0) || 0));
+  const plannedSeconds = Math.max(1, Math.round((new Date(action.endAt).getTime() - new Date(action.startAt).getTime()) / 1000));
 
   if (nextStatus === ACTION_STATUS_IN_PROGRESS) {
     const inProgressConflict = await query(
@@ -1091,7 +1121,7 @@ export async function updateUserActionStatus(userId, actionId) {
       throw new Error("Voce ja esta em outra tarefa.");
     }
 
-    startedAt = startedAt || nowIso;
+    startedAt = action.status === ACTION_STATUS_PAUSED ? nowIso : (startedAt || nowIso);
     completedAt = null;
     await upsertProject200RuntimeState(userId, {
       actionId: action.id,
@@ -1103,6 +1133,8 @@ export async function updateUserActionStatus(userId, actionId) {
   } else if (nextStatus === ACTION_STATUS_COMPLETED) {
     startedAt = startedAt || nowIso;
     completedAt = completedAt || nowIso;
+    completionPercent = 100;
+    accumulatedSeconds = plannedSeconds;
     await upsertProject200RuntimeState(userId, {
       actionId: action.id,
       actionTitle: action.title,
@@ -1120,14 +1152,18 @@ export async function updateUserActionStatus(userId, actionId) {
         repeat_group_id,
         status,
         started_at,
-        completed_at
+        completed_at,
+        completion_percent,
+        accumulated_seconds
       )
-      values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+      values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8)
       on conflict (user_id, action_id) do update
         set repeat_group_id = excluded.repeat_group_id,
             status = excluded.status,
             started_at = excluded.started_at,
             completed_at = excluded.completed_at,
+            completion_percent = excluded.completion_percent,
+            accumulated_seconds = excluded.accumulated_seconds,
             updated_at = now()
     `,
     [
@@ -1136,7 +1172,9 @@ export async function updateUserActionStatus(userId, actionId) {
       action.repeatGroupId,
       nextStatus,
       startedAt || null,
-      completedAt || null
+      completedAt || null,
+      completionPercent,
+      accumulatedSeconds
     ]
   );
 
@@ -1169,13 +1207,17 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
           repeat_group_id,
           status,
           started_at,
-          completed_at
+          completed_at,
+          completion_percent,
+          accumulated_seconds
         )
-        values ($1, $2, $3, $4, null, null)
+        values ($1, $2, $3, $4, null, null, 0, 0)
         on conflict (user_id, action_id) do update
           set status = excluded.status,
               started_at = null,
               completed_at = null,
+              completion_percent = 0,
+              accumulated_seconds = 0,
               updated_at = now()
       `,
       [userId, action.id, action.repeatGroupId, ACTION_STATUS_PENDING]
@@ -1186,6 +1228,51 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
       eventType: "abort",
       startedAt: null,
       occurredAt: new Date().toISOString()
+    });
+    return getUserActionById(userId, action.id);
+  }
+
+  if (mode === "pause") {
+    if (normalizeActionStatus(action.status) !== ACTION_STATUS_IN_PROGRESS) {
+      throw new Error("Somente uma tarefa em andamento pode ser pausada.");
+    }
+    const now = new Date();
+    const startedAtMs = new Date(action.startedAt || now).getTime();
+    const sessionSeconds = Number.isFinite(startedAtMs)
+      ? Math.max(0, Math.floor((now.getTime() - startedAtMs) / 1000))
+      : 0;
+    const plannedSeconds = Math.max(1, Math.round((new Date(action.endAt).getTime() - new Date(action.startAt).getTime()) / 1000));
+    const accumulatedSeconds = Math.min(plannedSeconds, Math.max(0, Math.trunc(Number(action.accumulatedSeconds || 0) || 0)) + sessionSeconds);
+    const completionPercent = Math.max(0, Math.min(100, Math.floor((accumulatedSeconds / plannedSeconds) * 100)));
+    await query(
+      `
+        insert into action_status_overrides (
+          user_id,
+          action_id,
+          repeat_group_id,
+          status,
+          started_at,
+          completed_at,
+          completion_percent,
+          accumulated_seconds
+        )
+        values ($1, $2, $3, $4, null, null, $5, $6)
+        on conflict (user_id, action_id) do update
+          set status = excluded.status,
+              started_at = null,
+              completed_at = null,
+              completion_percent = excluded.completion_percent,
+              accumulated_seconds = excluded.accumulated_seconds,
+              updated_at = now()
+      `,
+      [userId, action.id, action.repeatGroupId, ACTION_STATUS_PAUSED, completionPercent, accumulatedSeconds]
+    );
+    await upsertProject200RuntimeState(userId, {
+      actionId: action.id,
+      actionTitle: action.title,
+      eventType: "pause",
+      startedAt: action.startedAt || null,
+      occurredAt: now.toISOString()
     });
     return getUserActionById(userId, action.id);
   }
@@ -1212,16 +1299,21 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
           repeat_group_id,
           status,
           started_at,
-          completed_at
+          completed_at,
+          completion_percent,
+          accumulated_seconds
         )
-        values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz)
+        values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, 100, $7)
         on conflict (user_id, action_id) do update
           set status = excluded.status,
               started_at = excluded.started_at,
               completed_at = excluded.completed_at,
+              completion_percent = 100,
+              accumulated_seconds = excluded.accumulated_seconds,
               updated_at = now()
       `,
-      [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedAt, completedAt]
+      [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedAt, completedAt,
+        Math.max(1, Math.round((new Date(action.endAt).getTime() - new Date(action.startAt).getTime()) / 1000))]
     );
     await upsertProject200RuntimeState(userId, {
       actionId: action.id,

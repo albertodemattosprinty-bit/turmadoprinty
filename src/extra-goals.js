@@ -457,8 +457,30 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
       }
       return String(left.title || "").localeCompare(String(right.title || ""), "pt-BR");
     });
-  await syncCurrentExtraGoalHistory(userId, goals, dateKey);
-  return goals;
+  const variantsResult = await query(`
+    select id, goal_id, title, interval_value, interval_unit, last_completed_at, created_at, updated_at
+    from extra_goal_variants
+    where user_id = $1 and assigned_profile = $2
+    order by created_at asc, id asc
+  `, [userId, normalizedProfile]);
+  const variantsByGoalId = new Map();
+  for (const row of variantsResult.rows) {
+    const goalId = String(row.goal_id || "").trim();
+    if (!variantsByGoalId.has(goalId)) {
+      variantsByGoalId.set(goalId, []);
+    }
+    variantsByGoalId.get(goalId).push(normalizeExtraGoalVariantRow(row));
+  }
+  const goalsWithVariants = goals.map((goal) => {
+    const variants = variantsByGoalId.get(String(goal.id || "").trim()) || [];
+    return {
+      ...goal,
+      variantCount: variants.length,
+      variants
+    };
+  });
+  await syncCurrentExtraGoalHistory(userId, goalsWithVariants, dateKey);
+  return goalsWithVariants;
 }
 
 export async function listExtraGoalsByScope(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, scopeKey = "today") {
