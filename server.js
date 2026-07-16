@@ -55,7 +55,7 @@ import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugify
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
-import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession } from "./src/project200-sleep.js";
+import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
@@ -3711,20 +3711,18 @@ async function handleProject200ActionInterpret(request, response) {
 }
 
 const PROJECT200_TASK_CATEGORIES = [
-  { id: "fe_espiritualidade", name: "Fé" },
+  { id: "sono", name: "Sono" },
   { id: "alimentacao", name: "Alimentação" },
   { id: "hidratacao", name: "Hidratação" },
-  { id: "estudo", name: "Estudo" },
-  { id: "financeiro", name: "Financeiro" },
+  { id: "aprendizado", name: "Aprendizado" },
   { id: "trabalho", name: "Trabalho" },
   { id: "casa", name: "Casa" },
-  { id: "lazer", name: "Lazer" },
   { id: "exercicios", name: "Exercícios" },
-  { id: "saude", name: "Saúde" },
   { id: "social", name: "Social" },
-  { id: "familia", name: "Família" },
+  { id: "planejamento", name: "Planejamento" },
   { id: "higiene", name: "Higiene" },
-  { id: "digital", name: "Digital" }
+  { id: "lazer", name: "Lazer" },
+  { id: "aspecto", name: "Aspecto" }
 ];
 
 function inferProject200CategoryLocally(title) {
@@ -3735,19 +3733,17 @@ function inferProject200CategoryLocally(title) {
   const pick = (id) => PROJECT200_TASK_CATEGORIES.find((item) => item.id === id) || PROJECT200_TASK_CATEGORIES[0];
   if (/\b(agua|hidrata|garrafa|beber)\b/.test(normalized)) return pick("hidratacao");
   if (/\b(cafe|almoco|jantar|comida|refeicao|lanche|cozinhar)\b/.test(normalized)) return pick("alimentacao");
-  if (/\b(estudar|estudo|ler|leitura|curso|aula|revisao)\b/.test(normalized)) return pick("estudo");
-  if (/\b(fatura|conta|pix|pagar|orcamento|invest|finance|dinheiro)\b/.test(normalized)) return pick("financeiro");
+  if (/\b(dormir|sono|cochilo|descansar)\b/.test(normalized)) return pick("sono");
+  if (/\b(estudar|estudo|ler|leitura|curso|aula|revisao|aprender|habilidade|treinar idioma)\b/.test(normalized)) return pick("aprendizado");
+  if (/\b(planejar|planejamento|agenda|meta|organizar|orcamento|fatura|conta|pix|pagar|invest|finance|dinheiro)\b/.test(normalized)) return pick("planejamento");
   if (/\b(reuniao|projeto|cliente|entrega|trabalho|task)\b/.test(normalized)) return pick("trabalho");
   if (/\b(arrumar|limpar|lavar|cozinha|quarto|banheiro|casa)\b/.test(normalized)) return pick("casa");
   if (/\b(filme|serie|jogo|lazer|passeio)\b/.test(normalized)) return pick("lazer");
   if (/\b(treino|academia|corrida|caminhada|alongamento|exercicio)\b/.test(normalized)) return pick("exercicios");
-  if (/\b(medico|consulta|exame|remedio|saude|terapia)\b/.test(normalized)) return pick("saude");
   if (/\b(amigo|social|evento|encontro)\b/.test(normalized)) return pick("social");
-  if (/\b(familia|filho|filha|pai|mae|esposa|marido)\b/.test(normalized)) return pick("familia");
+  if (/\b(familia|filho|filha|pai|mae|esposa|marido)\b/.test(normalized)) return pick("planejamento");
   if (/\b(escovar|banho|higiene|barba|cabelo|dente)\b/.test(normalized)) return pick("higiene");
-  if (/\b(celular|email|digital|backup|senha|app|notificacao)\b/.test(normalized)) return pick("digital");
-  if (/\b(orar|oracao|biblia|espiritual|igreja)\b/.test(normalized)) return pick("fe_espiritualidade");
-  return pick("trabalho");
+  return pick("aspecto");
 }
 
 async function suggestProject200SvgAsset(text, options = {}) {
@@ -3833,14 +3829,14 @@ async function handleProject200ActionCategorize(request, response) {
   }
 
   try {
-    const model = OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
+    const model = "gpt-4.1-nano";
     const completion = await createChatCompletion(apiKey, {
       model,
       temperature: 0,
       messages: [
         {
           role: "system",
-          content: `Classifique o título de tarefa em UMA categoria. Responda JSON puro: {"categoryId":"...","categoryName":"..."}. Categorias válidas: ${PROJECT200_TASK_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
+          content: `Classifique o título de tarefa em UM dos 12 aspectos. Responda JSON puro: {"categoryId":"...","categoryName":"..."}. Use Aspecto apenas quando nenhum conceito for claramente provável. Aspectos válidos: ${PROJECT200_TASK_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
         },
         { role: "user", content: title.slice(0, 180) }
       ]
@@ -11858,6 +11854,38 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar as configuracoes das metricas."
       });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/sleep-history") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const entries = await listProject200SleepHistory(user.id, {
+        profileName: requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME,
+        limit: 7
+      });
+      sendJson(response, 200, { ok: true, entries });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar o histórico de sono." });
+    }
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/sleep-history\/\d{4}-\d{2}-\d{2}$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const entry = await updateProject200SleepHistoryEntry(user.id, {
+        profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME,
+        sleepDate: pathname.split("/").pop(),
+        totalMinutes: body?.totalMinutes
+      });
+      sendJson(response, 200, { ok: true, entry });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o sono." });
     }
     return;
   }

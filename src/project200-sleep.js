@@ -311,3 +311,44 @@ export async function getProject200SleepTotalMinutesForRange(userId, range = {})
   );
   return Math.max(0, Math.trunc(Number(result.rows[0]?.total_minutes || 0) || 0));
 }
+
+export async function listProject200SleepHistory(userId, payload = {}) {
+  await ensureProject200SleepSchema();
+  const profileName = normalizeProfileName(payload?.profileName);
+  const limit = Math.max(1, Math.min(7, Math.trunc(Number(payload?.limit || 7) || 7)));
+  const result = await query(
+    `select sleep_date::text as sleep_date, total_minutes
+       from "sono-user"
+      where user_id = $1 and assigned_profile = $2
+      order by sleep_date desc
+      limit $3`,
+    [userId, profileName, limit]
+  );
+  return result.rows.map((row) => ({
+    sleepDate: String(row.sleep_date || "").slice(0, 10),
+    totalMinutes: clampSavedMinutes(row.total_minutes)
+  }));
+}
+
+export async function updateProject200SleepHistoryEntry(userId, payload = {}) {
+  await ensureProject200SleepSchema();
+  const profileName = normalizeProfileName(payload?.profileName);
+  const sleepDate = String(payload?.sleepDate || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sleepDate)) {
+    throw new Error("Data do sono inválida.");
+  }
+  const totalMinutes = clampSavedMinutes(payload?.totalMinutes);
+  const result = await query(
+    `insert into "sono-user" as sleep_user
+       (user_id, assigned_profile, sleep_date, total_minutes, source_session_id, created_at, updated_at)
+     values ($1, $2, $3::date, $4, null, now(), now())
+     on conflict (user_id, assigned_profile, sleep_date) do update
+       set total_minutes = excluded.total_minutes, updated_at = now()
+     returning sleep_date::text as sleep_date, total_minutes`,
+    [userId, profileName, sleepDate, totalMinutes]
+  );
+  return {
+    sleepDate: String(result.rows[0]?.sleep_date || sleepDate).slice(0, 10),
+    totalMinutes: clampSavedMinutes(result.rows[0]?.total_minutes)
+  };
+}

@@ -9,15 +9,15 @@ const PROJECT200_STATS_ASPECT_CATEGORIES = new Set([
   PROJECT200_SLEEP_CATEGORY_ID,
   "alimentacao",
   "hidratacao",
-  "estudo",
-  "financeiro",
+  "aprendizado",
   "trabalho",
   "casa",
   "exercicios",
   "social",
-  "familia",
+  "planejamento",
   "higiene",
-  "lazer"
+  "lazer",
+  "aspecto"
 ]);
 
 function normalizeProject200StatsProfile(value) {
@@ -26,7 +26,16 @@ function normalizeProject200StatsProfile(value) {
 
 function normalizeProject200StatsCategoryId(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  return PROJECT200_STATS_ASPECT_CATEGORIES.has(normalized) ? normalized : "";
+  const legacyMap = {
+    estudo: "aprendizado",
+    financeiro: "aprendizado",
+    familia: "planejamento",
+    fe_espiritualidade: "aspecto",
+    saude: "aspecto",
+    digital: "aspecto"
+  };
+  const mapped = legacyMap[normalized] || normalized;
+  return PROJECT200_STATS_ASPECT_CATEGORIES.has(mapped) ? mapped : "";
 }
 
 function normalizeProject200MissionGoalIds(value) {
