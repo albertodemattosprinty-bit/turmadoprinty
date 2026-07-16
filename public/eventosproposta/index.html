@@ -44,6 +44,138 @@
       padding: 0 0 72px;
     }
 
+    body.proposal-admin-ready [data-proposal-key] {
+      cursor: text;
+      -webkit-touch-callout: none;
+    }
+
+    body.proposal-admin-ready [data-proposal-key]:hover {
+      outline: 1px dashed rgba(255, 255, 255, 0.58);
+      outline-offset: 5px;
+      border-radius: 4px;
+    }
+
+    body.proposal-admin-ready [data-proposal-key].is-holding {
+      outline: 2px solid var(--gold);
+      outline-offset: 6px;
+    }
+
+    .proposal-editor-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background: rgba(4, 14, 32, 0.78);
+      backdrop-filter: blur(8px);
+    }
+
+    .proposal-editor-modal[hidden] {
+      display: none;
+    }
+
+    .proposal-editor-dialog {
+      width: min(620px, 100%);
+      padding: 26px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 24px;
+      background: #fffdf8;
+      color: var(--ink);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+    }
+
+    .proposal-editor-dialog h2 {
+      margin: 0 0 6px;
+      color: #23406a;
+      font-size: 25px;
+    }
+
+    .proposal-editor-dialog p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .proposal-editor-dialog textarea {
+      width: 100%;
+      min-height: 190px;
+      resize: vertical;
+      padding: 15px 16px;
+      border: 1px solid rgba(35, 64, 106, 0.22);
+      border-radius: 15px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      line-height: 1.5;
+    }
+
+    .proposal-editor-dialog textarea:focus {
+      outline: 3px solid rgba(54, 99, 154, 0.18);
+      border-color: var(--hero-mid);
+    }
+
+    .proposal-editor-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .proposal-editor-actions button {
+      padding: 11px 18px;
+      border: 0;
+      border-radius: 999px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .proposal-editor-cancel {
+      background: #e9edf3;
+      color: #33445d;
+    }
+
+    .proposal-editor-save {
+      background: var(--hero-deep);
+      color: #fff;
+    }
+
+    .proposal-editor-actions button:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+
+    .proposal-editor-feedback {
+      min-height: 20px;
+      margin-top: 10px !important;
+      color: #9a3412 !important;
+    }
+
+    .proposal-admin-toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 1100;
+      max-width: min(360px, calc(100vw - 36px));
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: #fffdf8;
+      color: #23406a;
+      font-size: 14px;
+      font-weight: 800;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .proposal-admin-toast.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
     .document {
       max-width: none;
       margin: 0;
@@ -1036,10 +1168,10 @@
       <div class="sheet-inner">
         <div class="hero-grid">
           <div>
-            <h1>Proposta de Evento 2026</h1>
-            <p class="lead">
-              Teatro, música, personagens, fantoches e mensagem bíblica em uma experiência infantil pensada
-              para igrejas que desejam um evento marcante, organizado e cheio da presença de Deus.
+            <h1 data-proposal-key="hero.title">Um dia que as crianças vão levar no coração</h1>
+            <p class="lead" data-proposal-key="hero.lead">
+              A Turma do Printy chega à sua igreja com música, teatro, personagens, fantoches e uma mensagem bíblica
+              que ganha vida diante dos olhos das crianças. Tudo preparado para elas participarem, se alegrarem e lembrarem do que Deus falou.
             </p>
             <div class="hero-cta">
               <a class="button button-primary" href="https://wa.me/551233515318" target="_blank" rel="noreferrer">Solicitar data no WhatsApp</a>
@@ -1047,16 +1179,16 @@
           </div>
           <div class="hero-side">
             <div class="hero-card">
-              <strong>Missão</strong>
-              <span>Imprimir o Evangelho no coração da criança com linguagem lúdica, bíblica e profundamente memorável.</span>
+              <strong data-proposal-key="hero.mission.label">Nossa missão</strong>
+              <span data-proposal-key="hero.mission.copy">Imprimir o Evangelho no coração da criança com uma linguagem lúdica, bíblica e cheia de significado.</span>
             </div>
             <div class="hero-card">
-              <strong>Formato</strong>
-              <span>Apresentação de cerca de 1h15 com abertura musical, oração, teatro, humor, personagens e ministração da Palavra e apelo.</span>
+              <strong data-proposal-key="hero.format.label">Como acontece</strong>
+              <span data-proposal-key="hero.format.copy">Em cerca de 1h15, música, oração, humor, personagens e Palavra se encontram em uma apresentação viva e participativa.</span>
             </div>
             <div class="hero-card">
-              <strong>Contratação</strong>
-              <span>Ideal para congressos infantis, cultos especiais, escolas bíblicas, retiros, celebrações e eventos temáticos em 2026.</span>
+              <strong data-proposal-key="hero.audience.label">Feito para a sua programação</strong>
+              <span data-proposal-key="hero.audience.copy">Congressos infantis, cultos especiais, escolas bíblicas, retiros, celebrações e encontros temáticos ganham uma experiência completa.</span>
             </div>
           </div>
         </div>
@@ -1067,7 +1199,7 @@
       <div class="sheet-inner">
         <div class="video-shell">
           <div class="video-copy">
-            <h2>Turma do Printy e Alberto de Mattos</h2>
+            <h2 data-proposal-key="video.title">Conheça de perto a história que chega ao seu palco</h2>
           </div>
           <div class="video-stage">
             <video id="releaseVideo" playsinline muted controls preload="metadata"></video>
@@ -1088,30 +1220,29 @@
     <section class="sheet proposal-photo-section proposal-bg-3">
       <div class="sheet-inner">
         <div class="section-header">
-          <h2>Mais de quatro décadas usando arte, fé e criatividade para alcançar crianças.</h2>
-          <div class="section-copy">
-            Somos gratos ao Senhor por cada porta aberta. A Turma do Printy existe para servir a igreja com
-            apresentações que unem excelência, leveza, humor, beleza visual e uma mensagem cristã clara,
-            conduzindo as crianças da atenção para a escuta, e da escuta para a Palavra.
+          <h2 data-proposal-key="credibility.title">Uma história construída com crianças, fé e muita criatividade.</h2>
+          <div class="section-copy" data-proposal-key="credibility.copy">
+            Há mais de quatro décadas, a Turma do Printy transforma palcos, salas e igrejas em lugares de encontro com a Palavra.
+            Servimos com alegria, preparo e sensibilidade para que cada criança se sinta parte da história — e não apenas alguém assistindo de longe.
           </div>
         </div>
 
         <div class="stats">
           <div class="stat">
             <strong>1h15</strong>
-            <span>Duração média com ritmo pensado para prender a atenção da criança do início ao fim.</span>
+            <span data-proposal-key="credibility.duration">Uma experiência completa, com ritmo, variedade e espaço para cada momento acontecer.</span>
           </div>
           <div class="stat">
             <strong>1989+</strong>
-            <span>Trajetória construída ao longo de décadas em projetos, espetáculos e ações com crianças.</span>
+            <span data-proposal-key="credibility.history">Uma caminhada que começou em 1989 e continua se renovando a cada encontro.</span>
           </div>
           <div class="stat">
             <strong>Temas</strong>
-            <span>Histórias bíblicas e espetáculos prontos para diferentes contextos da programação infantil.</span>
+            <span data-proposal-key="credibility.themes">Histórias bíblicas que conversam com diferentes temas, idades e momentos da igreja.</span>
           </div>
           <div class="stat">
             <strong>3 a 6</strong>
-            <span>Equipe em cena conforme o espetáculo, a estrutura disponível e a proposta contratada.</span>
+            <span data-proposal-key="credibility.team">A equipe certa para dar vida ao tema escolhido e à dimensão do seu evento.</span>
           </div>
         </div>
       </div>
@@ -1120,10 +1251,10 @@
     <section class="sheet proposal-photo-section proposal-bg-4">
       <div class="sheet-inner">
         <div class="section-header">
-          <h2>Uma experiência em capítulos, não apenas uma peça infantil.</h2>
-          <div class="section-copy">
-            A proposta foi pensada para ajudar a igreja a enxergar o valor do evento inteiro: o impacto
-            espiritual, a preparação, a atmosfera e a forma como a mensagem é construída diante das crianças.
+          <h2 data-proposal-key="experience.title">Do primeiro acorde à Palavra, cada momento conduz ao próximo.</h2>
+          <div class="section-copy" data-proposal-key="experience.copy">
+            A apresentação cresce junto com as crianças: primeiro desperta a curiosidade, depois convida à participação
+            e, com o coração aberto, conduz todos a uma verdade bíblica simples, clara e inesquecível.
           </div>
         </div>
 
@@ -1132,50 +1263,50 @@
             <article class="flow-step">
               <strong>01</strong>
               <div>
-                <h4>Música de abertura</h4>
-                <p>Começamos com uma música interativa e animada, com personagens de palco, iluminação e movimento, criando o ambiente ideal para a programação.</p>
+                <h4 data-proposal-key="experience.step1.title">A alegria toma o ambiente</h4>
+                <p data-proposal-key="experience.step1.copy">Música, personagens, luz e movimento convidam as crianças a entrar na história desde o primeiro minuto.</p>
               </div>
             </article>
             <article class="flow-step">
               <strong>02</strong>
               <div>
-                <h4>Momento de oração</h4>
-                <p>Criamos um início sensível, alinhado ao propósito espiritual da programação infantil.</p>
+                <h4 data-proposal-key="experience.step2.title">Todo mundo se conecta</h4>
+                <p data-proposal-key="experience.step2.copy">Com leveza e sensibilidade, fazemos a transição da animação para um momento de oração e presença de Deus.</p>
               </div>
             </article>
             <article class="flow-step">
               <strong>03</strong>
               <div>
-                <h4>Bonecos e fantoches</h4>
-                <p>Entramos com humor, descontração e identificação para preparar o coração da criança.</p>
+                <h4 data-proposal-key="experience.step3.title">O riso abre espaço</h4>
+                <p data-proposal-key="experience.step3.copy">Bonecos, fantoches e humor aproximam a mensagem do universo infantil e mantêm cada olhar ligado no palco.</p>
               </div>
             </article>
             <article class="flow-step">
               <strong>04</strong>
               <div>
-                <h4>Pregação da Palavra</h4>
-                <p>A história bíblica chega com clareza, emoção, beleza visual, aplicação prática e um convite real para a criança responder à Palavra.</p>
+                <h4 data-proposal-key="experience.step4.title">A verdade encontra o coração</h4>
+                <p data-proposal-key="experience.step4.copy">A história bíblica chega com clareza, emoção e aplicação prática, convidando cada criança a responder à Palavra.</p>
               </div>
             </article>
           </div>
 
           <div>
             <div class="quote-band">
-              <p>Uma experiência cristã bem conduzida abre o coração da criança para ouvir, sentir e lembrar da verdade bíblica com mais profundidade.</p>
-              <span>Quando a mensagem é vivida com beleza, participação e presença de Deus, o Evangelho não passa apenas pela atenção: ele encontra espaço para permanecer na memória e no coração.</span>
+              <p data-proposal-key="experience.quote.title">A criança não recebe apenas uma mensagem. Ela vive uma história da qual se torna parte.</p>
+              <span data-proposal-key="experience.quote.copy">Quando fé, beleza e participação caminham juntas, o Evangelho deixa de ser apenas ouvido e ganha um lugar especial na memória e no coração.</span>
             </div>
             <div class="pillars" style="margin-top: 18px;">
               <article class="card">
                 <h3>Teatro com propósito</h3>
-                <p>Personagens, figurinos e encenação a serviço de uma mensagem cristã viva e compreensível.</p>
+                <p data-proposal-key="experience.pillar1">Personagens, figurinos e encenação tornam a mensagem cristã próxima, viva e fácil de compreender.</p>
               </article>
               <article class="card">
                 <h3>Música e participação</h3>
-                <p>A trilha da apresentação ajuda a envolver as crianças e sustentar a memória do que foi vivido.</p>
+                <p data-proposal-key="experience.pillar2">Canções e movimentos fazem as crianças participarem e ajudam a guardar o que viveram.</p>
               </article>
               <article class="card">
                 <h3>Equipe coesa</h3>
-                <p>Revezamento entre atores e fantoches para manter dinamismo, ritmo e variedade em cena.</p>
+                <p data-proposal-key="experience.pillar3">Atores, personagens e fantoches se revezam para criar surpresa, ritmo e movimento em cena.</p>
               </article>
             </div>
           </div>
@@ -1186,17 +1317,17 @@
     <section class="sheet proposal-photo-section proposal-bg-5">
       <div class="sheet-inner">
         <div class="section-header">
-          <h2>Temas bíblicos que podem ser escolhidos para o seu evento.</h2>
-          <div class="section-copy">
-            Cada tema foi pensado para comunicar verdades eternas com a linguagem da infância. A depender da
-            estrutura e da proposta da igreja, ajudamos na escolha do espetáculo mais adequado.
+          <h2 data-proposal-key="themes.title">Qual verdade bíblica Deus colocou no coração da sua igreja?</h2>
+          <div class="section-copy" data-proposal-key="themes.copy">
+            Você pode escolher uma de nossas histórias ou conversar conosco sobre o tema da sua programação.
+            Juntos, encontramos o espetáculo que melhor conversa com as crianças e com o propósito desse dia.
           </div>
         </div>
 
         <div class="theme-grid">
           <article class="theme-card theme-card--naama">
             <h3>Fé em Deus | Naamã</h3>
-            <p>Uma história sobre confiança, obediência e o agir de Deus mesmo quando a solução parece improvável.</p>
+            <p data-proposal-key="themes.naama">Uma aventura sobre confiar, obedecer e descobrir que Deus continua agindo mesmo quando o caminho parece improvável.</p>
             <div class="theme-meta">
               <span class="tag">5 pessoas</span>
               <span class="tag">Fé</span>
@@ -1204,7 +1335,7 @@
           </article>
           <article class="theme-card theme-card--jonas">
             <h3>Obediência e missões | Jonas</h3>
-            <p>Uma narrativa forte sobre ouvir o chamado de Deus, vencer resistências e obedecer ao propósito.</p>
+            <p data-proposal-key="themes.jonas">Com humor e emoção, Jonas mostra que ouvir o chamado de Deus pode mudar nossa rota — e também a vida de muita gente.</p>
             <div class="theme-meta">
               <span class="tag">4 pessoas</span>
               <span class="tag">Missões</span>
@@ -1212,7 +1343,7 @@
           </article>
           <article class="theme-card theme-card--samuel">
             <h3>Ouvir a voz de Deus | Samuel</h3>
-            <p>Espetáculo sensível sobre escuta, prontidão e resposta à voz do Senhor.</p>
+            <p data-proposal-key="themes.samuel">Uma história sensível que convida as crianças a reconhecer a voz de Deus e responder com o coração disponível.</p>
             <div class="theme-meta">
               <span class="tag">3 pessoas</span>
               <span class="tag">Chamado</span>
@@ -1220,7 +1351,7 @@
           </article>
           <article class="theme-card theme-card--davi">
             <h3>Desafios e fé | Davi e Golias</h3>
-            <p>Uma apresentação que mostra coragem, dependência de Deus e vitória em meio aos gigantes da vida.</p>
+            <p data-proposal-key="themes.davi">Uma experiência cheia de coragem para lembrar que nenhum gigante é maior do que o Deus em quem confiamos.</p>
             <div class="theme-meta">
               <span class="tag">3 ou 4 pessoas</span>
               <span class="tag">Coragem</span>
@@ -1228,7 +1359,7 @@
           </article>
           <article class="theme-card theme-card--criacao">
             <h3>Amor de Deus | Criação</h3>
-            <p>Uma história cheia de encanto para falar da origem de tudo e do cuidado amoroso do Criador.</p>
+            <p data-proposal-key="themes.creation">Cores, encanto e descobertas apresentam o começo de tudo e o cuidado amoroso do Criador por cada criança.</p>
             <div class="theme-meta">
               <span class="tag">5 pessoas</span>
               <span class="tag">Criação</span>
@@ -1237,7 +1368,7 @@
           <article class="theme-card theme-card--heroes">
             <span class="theme-badge">Novo</span>
             <h3>Fábrica de Heróis</h3>
-            <p>Espetáculo com humor, ação e identidade forte, ideal para grandes encontros infantis.</p>
+            <p data-proposal-key="themes.heroes">Humor, ação e identidade se encontram em um espetáculo que mostra onde nasce um herói de verdade.</p>
             <div class="theme-meta">
               <span class="tag">4 a 6 pessoas</span>
               <span class="tag">Especial 2026</span>
@@ -1250,15 +1381,15 @@
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-07.jpg" alt="Alberto de Mattos apresentando proposta personalizada para congresso infantil">
           </article>
           <article class="custom-story-card custom-story-copy">
-            <span class="tag">Do seu jeito</span>
-            <h3>Programamos o roteiro e a direção do cronograma para o tema do seu congresso.</h3>
-            <p>
-              Quando a igreja já tem um tema, uma campanha ou um direcionamento ministerial, ajustamos a condução
-              do evento para que a apresentação converse com esse contexto de forma coerente e especial.
+            <span class="tag" data-proposal-key="themes.custom.badge">Uma história com a identidade do seu evento</span>
+            <h3 data-proposal-key="themes.custom.title">O tema da sua igreja também pode ganhar vida no palco.</h3>
+            <p data-proposal-key="themes.custom.copy1">
+              Se já existe um tema, uma campanha ou um direcionamento ministerial, construímos a condução do evento
+              para que cada momento converse com aquilo que Deus colocou no coração da liderança.
             </p>
-            <p>
-              A ideia é que cada momento faça sentido dentro da proposta do seu congresso, desde a abertura até o
-              apelo, valorizando o que Deus já colocou no coração da liderança para aquele dia.
+            <p data-proposal-key="themes.custom.copy2">
+              Da abertura ao momento final, música, personagens e Palavra caminham na mesma direção para que a programação
+              tenha unidade, personalidade e um significado especial para as crianças.
             </p>
           </article>
         </div>
@@ -1268,10 +1399,10 @@
     <section class="sheet proposal-photo-section proposal-bg-6">
       <div class="sheet-inner">
         <div class="section-header">
-          <h2>Bastidores, estrada e história para a igreja contratar com tranquilidade.</h2>
-          <div class="section-copy">
-            A proposta original já deixava clara a logística. Aqui, ela aparece no lugar certo: depois que a
-            igreja entende o valor espiritual e artístico do que será entregue.
+          <h2 data-proposal-key="behind.title">A magia aparece no palco. O cuidado começa muito antes.</h2>
+          <div class="section-copy" data-proposal-key="behind.copy">
+            Cada chegada carrega ensaio, figurino, cenário, organização e uma equipe atenta aos detalhes.
+            Cuidamos dos bastidores com carinho para que a igreja receba uma experiência tranquila e as crianças vivam algo extraordinário.
           </div>
         </div>
 
@@ -1279,22 +1410,22 @@
           <article class="media-card">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-06.jpg" alt="Palco da Turma do Printy em apresentação ao vivo">
             <div class="media-copy">
-              <h3>Palco que ganha vida</h3>
-              <p>Figurinos, personagens e dinâmica visual para transformar o ambiente da programação infantil.</p>
+              <h3 data-proposal-key="behind.stage.title">Um palco que ganha vida</h3>
+              <p data-proposal-key="behind.stage.copy">Figurinos, personagens e movimento transformam o ambiente e despertam a imaginação desde a primeira cena.</p>
             </div>
           </article>
           <article class="media-card">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-02.png" alt="Crianças participando de apresentação musical">
             <div class="media-copy">
-              <h3>Crianças realmente envolvidas</h3>
-              <p>A apresentação não fica distante do público: ela convida, aproxima e cria memória afetiva.</p>
+              <h3 data-proposal-key="behind.children.title">Crianças dentro da história</h3>
+              <p data-proposal-key="behind.children.copy">Elas cantam, respondem, riem e participam. A experiência acontece com as crianças, não apenas diante delas.</p>
             </div>
           </article>
           <article class="media-card">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-05.jpg" alt="Alberto de Mattos ministrando para grande público infantil">
             <div class="media-copy">
-              <h3>Experiência acumulada</h3>
-              <p>Décadas de atuação fortalecem o preparo, a sensibilidade e a consistência do trabalho entregue.</p>
+              <h3 data-proposal-key="behind.experience.title">Experiência que traz segurança</h3>
+              <p data-proposal-key="behind.experience.copy">Décadas de palco nos ensinaram a ler o ambiente, acolher imprevistos e servir cada igreja com sensibilidade.</p>
             </div>
           </article>
         </div>
@@ -1304,10 +1435,10 @@
     <section class="sheet proposal-photo-section proposal-bg-7">
       <div class="sheet-inner">
         <div class="section-header">
-          <h2>Marcos que mostram constância, repertório e credibilidade.</h2>
-          <div class="section-copy">
-            A linha do tempo reforça algo muito importante para 2026: não se trata de uma iniciativa improvisada,
-            mas de um ministério artístico com caminhada, produção e presença contínua junto à infância.
+          <h2 data-proposal-key="history.title">Uma história que começou há décadas e continua encontrando novos corações.</h2>
+          <div class="section-copy" data-proposal-key="history.copy">
+            Mudaram os palcos, os recursos e as gerações. Permaneceu o mesmo chamado: falar de Deus com verdade,
+            criatividade e uma linguagem que faça sentido para a infância.
           </div>
         </div>
 
@@ -1316,48 +1447,48 @@
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-03.png" alt="Personagem e fantoche em cena durante apresentação">
             <div class="timeline-copy">
               <div class="timeline-year">1989</div>
-              <h3>Início documentado da trajetória</h3>
-              <p>Projetos com crianças em ambiente escolar e comunitário já registravam a essência do trabalho: arte, participação e formação.</p>
+              <h3 data-proposal-key="history.1989.title">Onde a jornada começou</h3>
+              <p data-proposal-key="history.1989.copy">Em escolas e comunidades, arte e participação já mostravam o caminho de um trabalho inteiramente dedicado às crianças.</p>
             </div>
           </article>
           <article class="timeline-item">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-04.png" alt="Cena teatral com personagens da Turma do Printy">
             <div class="timeline-copy">
               <div class="timeline-year">2005</div>
-              <h3>Produção audiovisual infantil</h3>
-              <p>Música e vídeo ampliaram o alcance da mensagem e mostraram capacidade de comunicar além do palco.</p>
+              <h3 data-proposal-key="history.2005.title">A mensagem ganhou novas telas</h3>
+              <p data-proposal-key="history.2005.copy">Música e vídeo levaram os personagens além do palco e fizeram a mensagem chegar a ainda mais famílias.</p>
             </div>
           </article>
           <article class="timeline-item">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-06.jpg" alt="Espetáculo visual com cenário tecnológico em palco">
             <div class="timeline-copy">
               <div class="timeline-year">2019</div>
-              <h3>Atuação em eventos e encontros</h3>
-              <p>Programações com famílias e infância reforçaram a adaptabilidade da Turma do Printy para diferentes contextos cristãos.</p>
+              <h3 data-proposal-key="history.2019.title">Novos encontros, a mesma missão</h3>
+              <p data-proposal-key="history.2019.copy">Igrejas e eventos de diferentes tamanhos abriram espaço para experiências feitas sob medida para cada comunidade.</p>
             </div>
           </article>
           <article class="timeline-item">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-07.jpg" alt="Alberto de Mattos apresentando o tema Fábrica de Heróis">
             <div class="timeline-copy">
               <div class="timeline-year">2023</div>
-              <h3>Lançamento de espetáculo marcante</h3>
-              <p>Fábrica de Heróis consolidou a força de um formato moderno, visualmente rico e com alto potencial para grandes programações.</p>
+              <h3 data-proposal-key="history.2023.title">Nasce Fábrica de Heróis</h3>
+              <p data-proposal-key="history.2023.copy">Um espetáculo moderno, vibrante e cheio de identidade para conversar com grandes encontros infantis.</p>
             </div>
           </article>
           <article class="timeline-item">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-08.png" alt="Continuidade das apresentações com crianças e comunidade">
             <div class="timeline-copy">
               <div class="timeline-year">2025</div>
-              <h3>Continuidade com crianças e comunidade</h3>
-              <p>A caminhada segue viva, atual e conectada com a realidade das igrejas, famílias e territórios onde as crianças estão.</p>
+              <h3 data-proposal-key="history.2025.title">Sempre perto das crianças</h3>
+              <p data-proposal-key="history.2025.copy">A caminhada segue viva nas igrejas, nas famílias e nos lugares onde uma criança precisa ouvir uma palavra de esperança.</p>
             </div>
           </article>
           <article class="timeline-item">
             <img src="https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Proposta/inline-05.jpg" alt="Público reunido em grande apresentação infantil cristã">
             <div class="timeline-copy">
               <div class="timeline-year">2026</div>
-              <h3>Preparação para a agenda do ano</h3>
-              <p>Eventos, treinamentos e apresentações seguem fortalecendo a agenda 2026 com base em experiência real e entrega consistente.</p>
+              <h3 data-proposal-key="history.2026.title">Prontos para viver novas histórias</h3>
+              <p data-proposal-key="history.2026.copy">Em 2026, levamos toda essa bagagem para criar encontros novos, atuais e inesquecíveis com a sua igreja.</p>
             </div>
           </article>
         </div>
@@ -1367,43 +1498,44 @@
     <section class="sheet proposal-photo-section proposal-bg-8">
       <div class="sheet-inner">
         <div class="section-header">
-          <h2>O que a igreja precisa disponibilizar para receber a equipe.</h2>
-          <div class="section-copy">
-            Organizamos esta parte com clareza para facilitar a conversa com a liderança, equipe técnica e responsáveis pela programação.
+          <h2 data-proposal-key="logistics.title">Para o grande dia acontecer com leveza.</h2>
+          <div class="section-copy" data-proposal-key="logistics.copy">
+            A estrutura é simples e combinada com antecedência. Com alguns cuidados práticos da igreja, nossa equipe consegue chegar,
+            preparar tudo com calma e entregar o melhor para as crianças.
           </div>
         </div>
 
         <div class="logistics-grid">
           <article class="logistics-card">
-            <h3>Som e apoio técnico</h3>
+            <h3 data-proposal-key="logistics.sound.title">Som e apoio técnico</h3>
             <ul>
-              <li>O mesmo equipamento usado nos cultos normalmente já atende a apresentação.</li>
-              <li>Precisamos de 1 microfone, de preferência sem fio, já carregado.</li>
-              <li>Pedimos o técnico da igreja conosco pelo menos 40 minutos antes para a passagem de som.</li>
+              <li data-proposal-key="logistics.sound.1">O equipamento usado normalmente nos cultos costuma atender muito bem à apresentação.</li>
+              <li data-proposal-key="logistics.sound.2">Precisamos de um microfone, preferencialmente sem fio e já carregado.</li>
+              <li data-proposal-key="logistics.sound.3">A presença do técnico da igreja 40 minutos antes nos ajuda a deixar cada detalhe do som pronto.</li>
             </ul>
           </article>
           <article class="logistics-card">
-            <h3>Camarim ou sala de apoio</h3>
+            <h3 data-proposal-key="logistics.room.title">Um cantinho para a equipe</h3>
             <ul>
-              <li>Sala próxima ao púlpito ou palco, com cadeiras e pelo menos duas mesas ou aparadores.</li>
-              <li>Uso exclusivo da Turma do Printy durante o evento para figurinos, acessórios e pertences da equipe.</li>
-              <li>Sugestão prática: sinalizar a porta para evitar entrada durante a preparação.</li>
+              <li data-proposal-key="logistics.room.1">Uma sala próxima ao palco, com cadeiras e pelo menos duas mesas ou aparadores.</li>
+              <li data-proposal-key="logistics.room.2">O espaço fica reservado à Turma do Printy durante o evento para figurinos, acessórios e pertences.</li>
+              <li data-proposal-key="logistics.room.3">Uma sinalização simples na porta ajuda a preservar o momento de preparação.</li>
             </ul>
           </article>
           <article class="logistics-card">
-            <h3>Alimentação e estacionamento</h3>
+            <h3 data-proposal-key="logistics.care.title">Alimentação e estacionamento</h3>
             <ul>
-              <li>Muitas vezes a equipe sai muito cedo ou vem de outro compromisso, então a alimentação ajuda bastante.</li>
-              <li>Se não houver estacionamento, uma vaga próxima facilita a descarga de cenário, iluminação e materiais.</li>
+              <li data-proposal-key="logistics.care.1">Como muitas viagens começam cedo, uma alimentação para a equipe faz toda a diferença no dia.</li>
+              <li data-proposal-key="logistics.care.2">Uma vaga próxima ao local facilita a descarga do cenário, da iluminação e dos materiais.</li>
             </ul>
           </article>
           <article class="logistics-card">
-            <h3>Chegada, hospedagem e logística</h3>
+            <h3 data-proposal-key="logistics.travel.title">Chegada e viagem</h3>
             <ul>
-              <li>Costumamos chegar com 1h30 de antecedência para montagem, som e organização.</li>
-              <li>Hospedagem é isenta em São Paulo.</li>
-              <li>Quando a distância ultrapassa 200 km ida e volta e o evento é à noite, a hospedagem passa a ser necessária.</li>
-              <li>Em cidades mais distantes, a equipe pode chegar no dia anterior para preservar a pontualidade do compromisso.</li>
+              <li data-proposal-key="logistics.travel.1">Chegamos com 1h30 de antecedência para montar, organizar e passar o som sem correria.</li>
+              <li data-proposal-key="logistics.travel.2">Na cidade de São Paulo, não é necessário oferecer hospedagem.</li>
+              <li data-proposal-key="logistics.travel.3">Em viagens acima de 200 km, considerando ida e volta, eventos noturnos podem exigir hospedagem.</li>
+              <li data-proposal-key="logistics.travel.4">Para destinos mais distantes, combinamos a chegada no dia anterior e protegemos a pontualidade do evento.</li>
             </ul>
           </article>
         </div>
@@ -1413,31 +1545,30 @@
     <section class="sheet proposal-photo-section proposal-bg-9" id="investimento">
       <div class="sheet-inner">
         <div class="section-header">
-          <h2>Contexto, valor e condições para fechamento da data.</h2>
-          <div class="section-copy">
-            Em vez de mostrar apenas um número, esta seção ajuda a liderança a enxergar o que está sendo contratado:
-            equipe, cenário, personagens, teatro, música, logística e uma apresentação cristã com identidade própria.
+          <h2 data-proposal-key="investment.title">Um investimento em uma experiência completa.</h2>
+          <div class="section-copy" data-proposal-key="investment.copy">
+            O valor reúne equipe, cenário, personagens, figurinos, teatro, música e toda a preparação necessária
+            para que a sua igreja receba uma apresentação cristã com identidade, cuidado e excelência.
           </div>
         </div>
 
         <div class="price-layout">
           <article class="price-card">
-            <h3>Valor da apresentação</h3>
-            <div class="price-highlight">R$ 4.200,00</div>
-            <p>
-              Investimento por apresentação, não incluindo transporte. Para cidade de São Paulo e região,
-              o transporte é fixado em R$ 350,00, considerando a sede da equipe em Jacareí - SP.
+            <h3 data-proposal-key="investment.price.title">Valor da apresentação</h3>
+            <div class="price-highlight" data-proposal-key="investment.price.value">R$ 4.200,00</div>
+            <p data-proposal-key="investment.price.copy">
+              Esse é o investimento por apresentação. O transporte é calculado à parte; para São Paulo e região,
+              o valor é fixo em R$ 350,00, considerando a saída da equipe de Jacareí - SP.
             </p>
           </article>
           <article class="price-card">
-            <h3>Fechamento da data</h3>
-            <p>
-              A reserva acontece com depósito de 50% do cachê, no valor de R$ 2.100,00. O restante do valor,
-              junto com o transporte, deve ser depositado na semana que antecede o evento.
+            <h3 data-proposal-key="investment.booking.title">Como reservar a data</h3>
+            <p data-proposal-key="investment.booking.copy1">
+              A data fica reservada com o depósito de 50% do cachê, no valor de R$ 2.100,00. O restante,
+              junto com o transporte, é acertado na semana que antecede o evento.
             </p>
-            <p style="margin-top: 14px;">
-              Para outras cidades e estados, o transporte é informado após a prévia de custo e pode ser
-              confirmado mais próximo da viagem.
+            <p style="margin-top: 14px;" data-proposal-key="investment.booking.copy2">
+              Para outras cidades e estados, fazemos uma prévia do transporte e confirmamos o valor mais perto da viagem.
             </p>
           </article>
         </div>
@@ -1445,15 +1576,15 @@
         <div class="pillars" style="margin-top: 18px;">
           <article class="card">
             <h3>Remarcações</h3>
-            <p>Em casos extremos, como impedimentos graves ou choques de agenda, a proposta prevê remarcação conforme disponibilidade.</p>
+            <p data-proposal-key="investment.reschedule">Se algo realmente excepcional acontecer, conversamos sobre uma nova data conforme a disponibilidade da agenda.</p>
           </article>
           <article class="card">
             <h3>Desistência após reserva</h3>
-            <p>Após a aprovação e o pagamento dos 50%, o valor não é ressarcido em caso de cancelamento por parte da igreja.</p>
+            <p data-proposal-key="investment.cancel">Como a equipe e a agenda ficam reservadas para a igreja, o sinal de 50% não é devolvido em caso de cancelamento.</p>
           </article>
           <article class="card">
             <h3>Formalização</h3>
-            <p>Depois do fechamento da data, a equipe envia o termo de compromisso consolidando todos os pontos tratados.</p>
+            <p data-proposal-key="investment.formalization">Depois da reserva, enviamos o termo de compromisso com tudo o que foi combinado, de forma clara e segura para todos.</p>
           </article>
         </div>
       </div>
@@ -1463,22 +1594,21 @@
       <div class="sheet-inner">
         <div class="closing-grid">
           <div class="closing-note">
-            <h3>Vamos viver esse dia juntos?</h3>
-            <p>
-              Se a sua igreja está buscando um evento infantil cristão com beleza, organização, mensagem bíblica
-              e impacto real nas crianças, a Turma do Printy está pronta para servir em 2026.
+            <h3 data-proposal-key="closing.title">Vamos criar uma memória linda juntos?</h3>
+            <p data-proposal-key="closing.copy">
+              Conte para nós o que a sua igreja está preparando. Vamos escolher o tema, cuidar dos detalhes e construir
+              um dia de alegria, Palavra e presença de Deus que as crianças vão querer contar quando chegarem em casa.
             </p>
             <div class="hero-cta">
               <a class="button button-primary" href="https://wa.me/551233515318" target="_blank" rel="noreferrer">Falar no WhatsApp</a>
               <a class="button button-secondary" href="https://www.turmadoprinty.com.br/termo?source=eventosproposta" target="_blank" rel="noreferrer">Reservar agora</a>
             </div>
             <div class="footer-note">
-              Contato informado na proposta: WhatsApp 12 3351-5318.
-              Proposta válida de janeiro a dezembro de 2026.
+              <span data-proposal-key="closing.footer">WhatsApp: 12 3351-5318 · Condições válidas de janeiro a dezembro de 2026.</span>
             </div>
           </div>
           <div class="fit-list">
-            <h3>Ideal para contratação em</h3>
+            <h3 data-proposal-key="closing.ideal.title">Essa experiência combina com</h3>
             <ul>
               <li>Congressos e conferências infantis</li>
               <li>Cultos especiais com crianças</li>
@@ -1492,6 +1622,20 @@
       </div>
     </section>
   </main>
+
+  <div class="proposal-editor-modal" id="proposalEditorModal" hidden>
+    <div class="proposal-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="proposalEditorTitle">
+      <h2 id="proposalEditorTitle">Editar texto da proposta</h2>
+      <p>A alteração será salva globalmente e aparecerá para todas as pessoas que abrirem esta página.</p>
+      <textarea id="proposalEditorText" maxlength="4000" aria-label="Novo texto"></textarea>
+      <p class="proposal-editor-feedback" id="proposalEditorFeedback" role="status"></p>
+      <div class="proposal-editor-actions">
+        <button class="proposal-editor-cancel" id="proposalEditorCancel" type="button">Cancelar</button>
+        <button class="proposal-editor-save" id="proposalEditorSave" type="button">Salvar globalmente</button>
+      </div>
+    </div>
+  </div>
+  <div class="proposal-admin-toast" id="proposalAdminToast" role="status"></div>
 
   <script>
     (function () {
@@ -1579,6 +1723,208 @@
       });
 
       warmupVideo();
+    })();
+  </script>
+  <script>
+    (function () {
+      const storageKey = "turma_do_printy_token";
+      const editableSelector = "h1, h2, h3, h4, p, li, span, strong, .section-copy, .price-highlight";
+      const modal = document.getElementById("proposalEditorModal");
+      const textarea = document.getElementById("proposalEditorText");
+      const feedback = document.getElementById("proposalEditorFeedback");
+      const cancelButton = document.getElementById("proposalEditorCancel");
+      const saveButton = document.getElementById("proposalEditorSave");
+      const toast = document.getElementById("proposalAdminToast");
+      let isAdmin = false;
+      let activeElement = null;
+      let holdTimer = 0;
+      let holdTarget = null;
+      let holdStartX = 0;
+      let holdStartY = 0;
+      let toastTimer = 0;
+
+      function getToken() {
+        return window.localStorage.getItem(storageKey) || "";
+      }
+
+      function prepareTextKeys() {
+        document.querySelectorAll(".sheet").forEach(function (section, sectionIndex) {
+          let textIndex = 0;
+          section.querySelectorAll(editableSelector).forEach(function (element) {
+            if (element.closest(".video-loading, .hero-cta") || element.querySelector(editableSelector)) {
+              return;
+            }
+
+            const text = element.textContent.trim();
+            if (!text) return;
+            textIndex += 1;
+            if (!element.dataset.proposalKey) {
+              element.dataset.proposalKey = "section-" + (sectionIndex + 1) + ".text-" + textIndex;
+            }
+            if (!element.dataset.proposalDefault) {
+              element.dataset.proposalDefault = text;
+            }
+          });
+        });
+      }
+
+      function applyTextOverrides(overrides) {
+        document.querySelectorAll("[data-proposal-key]").forEach(function (element) {
+          const key = "eventosproposta." + element.dataset.proposalKey;
+          const fallback = element.dataset.proposalDefault || element.textContent.trim();
+          const override = typeof overrides[key] === "string" ? overrides[key].trim() : "";
+          element.textContent = override || fallback;
+        });
+      }
+
+      function showToast(message, duration) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        toastTimer = window.setTimeout(function () {
+          toast.classList.remove("is-visible");
+        }, duration || 2400);
+      }
+
+      function openEditor(element) {
+        if (!isAdmin || !element) return;
+        activeElement = element;
+        feedback.textContent = "";
+        textarea.value = element.textContent.trim();
+        modal.hidden = false;
+        document.body.style.overflow = "hidden";
+        window.setTimeout(function () {
+          textarea.focus();
+          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        }, 0);
+      }
+
+      function closeEditor() {
+        modal.hidden = true;
+        document.body.style.overflow = "";
+        feedback.textContent = "";
+        activeElement = null;
+      }
+
+      function cancelHold() {
+        window.clearTimeout(holdTimer);
+        holdTimer = 0;
+        if (holdTarget) holdTarget.classList.remove("is-holding");
+        holdTarget = null;
+      }
+
+      document.addEventListener("pointerdown", function (event) {
+        if (!isAdmin || event.button > 0 || !modal.hidden) return;
+        const element = event.target instanceof Element ? event.target.closest("[data-proposal-key]") : null;
+        if (!element) return;
+
+        cancelHold();
+        holdTarget = element;
+        holdStartX = event.clientX;
+        holdStartY = event.clientY;
+        element.classList.add("is-holding");
+        holdTimer = window.setTimeout(function () {
+          const selectedElement = holdTarget;
+          cancelHold();
+          if (window.navigator.vibrate) window.navigator.vibrate(35);
+          openEditor(selectedElement);
+        }, 1000);
+      });
+
+      document.addEventListener("pointermove", function (event) {
+        if (!holdTimer) return;
+        if (Math.hypot(event.clientX - holdStartX, event.clientY - holdStartY) > 12) {
+          cancelHold();
+        }
+      });
+
+      document.addEventListener("pointerup", cancelHold);
+      document.addEventListener("pointercancel", cancelHold);
+      window.addEventListener("blur", cancelHold);
+
+      document.addEventListener("contextmenu", function (event) {
+        if (isAdmin && event.target instanceof Element && event.target.closest("[data-proposal-key]")) {
+          event.preventDefault();
+        }
+      });
+
+      cancelButton.addEventListener("click", closeEditor);
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) closeEditor();
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !modal.hidden) closeEditor();
+      });
+
+      saveButton.addEventListener("click", async function () {
+        if (!activeElement) return;
+        const text = textarea.value.trim();
+        if (!text) {
+          feedback.textContent = "Escreva o texto antes de salvar.";
+          return;
+        }
+
+        const token = getToken();
+        if (!token) {
+          feedback.textContent = "Sua sessão expirou. Entre novamente para salvar.";
+          return;
+        }
+
+        saveButton.disabled = true;
+        cancelButton.disabled = true;
+        feedback.textContent = "Salvando...";
+
+        try {
+          const key = "eventosproposta." + activeElement.dataset.proposalKey;
+          const response = await fetch("/api/admin/site/text", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + token
+            },
+            body: JSON.stringify({ key: key, text: text })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Não foi possível salvar o texto.");
+
+          activeElement.textContent = text;
+          closeEditor();
+          showToast("Texto salvo globalmente.");
+        } catch (error) {
+          feedback.textContent = error instanceof Error ? error.message : "Erro ao salvar o texto.";
+        } finally {
+          saveButton.disabled = false;
+          cancelButton.disabled = false;
+        }
+      });
+
+      async function initializeContent() {
+        prepareTextKeys();
+
+        const configRequest = fetch("/api/site/config")
+          .then(function (response) { return response.ok ? response.json() : {}; })
+          .catch(function () { return {}; });
+        const token = getToken();
+        const userRequest = token
+          ? fetch("/api/auth/me", { headers: { Authorization: "Bearer " + token } })
+              .then(function (response) { return response.ok ? response.json() : {}; })
+              .catch(function () { return {}; })
+          : Promise.resolve({});
+
+        const results = await Promise.all([configRequest, userRequest]);
+        applyTextOverrides(results[0].textOverrides || {});
+        isAdmin = Boolean(results[1].user && results[1].user.isAdmin);
+
+        if (isAdmin) {
+          document.body.classList.add("proposal-admin-ready");
+          document.querySelectorAll("[data-proposal-key]").forEach(function (element) {
+            element.title = "Toque e segure por 1 segundo para editar";
+          });
+          showToast("Modo administrador: segure um texto por 1 segundo para editar.", 4200);
+        }
+      }
+
+      initializeContent();
     })();
   </script>
 </body>
