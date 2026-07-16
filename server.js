@@ -12196,7 +12196,9 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel atualizar o status da tarefa."
+        error: error instanceof Error ? error.message : "Nao foi possivel atualizar o status da tarefa.",
+        code: String(error?.code || "").trim(),
+        runningAction: error?.runningAction || null
       });
     }
     return;
