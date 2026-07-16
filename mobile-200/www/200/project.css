@@ -600,8 +600,7 @@ body.start-decision-open #actionsModal .actions-app {
   pointer-events: none;
 }
 
-body.task-starting #actionsModal .actions-app,
-body.running-confirm-open #runningTaskModal .running-task-content {
+body.task-starting #actionsModal .actions-app {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -2694,7 +2693,16 @@ body.running-music-standalone #actionsModal .actions-list {
   z-index: 2800;
 }
 
+#startConflictModal.workspace-modal {
+  z-index: 2700;
+}
+
 body.running-confirm-from-actions #actionsModal.workspace-modal {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.start-conflict-open #actionsModal.workspace-modal {
   visibility: hidden !important;
   pointer-events: none !important;
 }

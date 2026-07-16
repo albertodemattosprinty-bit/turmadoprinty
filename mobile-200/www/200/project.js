@@ -4641,6 +4641,12 @@ function inferFinanceEntryLocally(text) {
 }
 
 function openModal(id) {
+  if (id !== "runningConfirmModal" && runningConfirmModal?.classList.contains("active")) {
+    closeRunningConfirmModal();
+  }
+  if (["runningTaskModal", "actionsModal"].includes(id) && startConflictModal?.classList.contains("active")) {
+    closeStartConflictModal("cancel");
+  }
   const modal = document.getElementById(id);
 
   if (!modal) {
@@ -4873,6 +4879,9 @@ function closeModal(modal) {
     if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
     document.body.classList.remove("running-confirm-open", "running-confirm-from-actions");
   }
+  if (modal.id === "startConflictModal") {
+    document.body.classList.remove("start-conflict-open", "task-starting");
+  }
   if (modal.id === "quickTaskModal") {
     document.body.classList.remove("quick-task-open");
   }
@@ -4928,7 +4937,7 @@ function navigateToProjectHome() {
   } finally {
     modalBackNavigationActive = false;
     modalNavigationStack.length = 0;
-    document.body.classList.remove("modal-open", "start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
+    document.body.classList.remove("modal-open", "start-decision-open", "start-conflict-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   }
 }
 
@@ -5698,7 +5707,7 @@ function closeWizard() {
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
-  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
+  document.body.classList.remove("start-decision-open", "start-conflict-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
   }
@@ -6071,6 +6080,7 @@ function closeStartDecisionModalWith(value) {
 }
 
 function closeStartConflictModal(value = "cancel") {
+  document.body.classList.remove("start-conflict-open", "task-starting");
   if (startConflictModal) {
     closeModal(startConflictModal);
   }
@@ -6368,6 +6378,9 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   if (!startConflictModal) {
     return Promise.resolve("cancel");
   }
+  if (runningConfirmModal?.classList.contains("active")) {
+    closeRunningConfirmModal();
+  }
   state.startConflict.currentActionId = String(currentAction?.id || "");
   state.startConflict.nextActionId = String(nextAction?.id || "");
   const currentTitle = formatActionTitleForDisplay(currentAction?.title || "Tarefa");
@@ -6380,6 +6393,8 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   if (startConflictNextTitle) {
     startConflictNextTitle.textContent = `Próxima: ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
   }
+  document.body.appendChild(startConflictModal);
+  document.body.classList.add("start-conflict-open");
   openModal("startConflictModal");
   return new Promise((resolve) => {
     state.startConflict.resolve = resolve;
