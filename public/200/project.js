@@ -1,5 +1,13 @@
 ﻿import { getApiUrl } from "../api.js";
 
+import {
+  MINUTE_CUE_INTERVALS,
+  MINUTE_CUE_PRELOAD_SECONDS,
+  buildMinuteCueSchedule,
+  getMinuteCueIntervalLabel,
+  normalizeMinuteCueInterval
+} from "./minute-cues.js?v=20260716-ptbr-minute-cues";
+
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
 const optionsConfigKey = "project_200_options_v1";
@@ -677,6 +685,10 @@ const profileRenameMessage = document.getElementById("profileRenameMessage");
 const profileRenameConfirmButton = document.getElementById("profileRenameConfirmButton");
 const toggleTaskBeepOptionButton = document.getElementById("toggleTaskBeepOption");
 const toggleTaskBeepHint = document.getElementById("toggleTaskBeepHint");
+const toggleMinuteNotificationsOptionButton = document.getElementById("toggleMinuteNotificationsOption");
+const toggleMinuteNotificationsHint = document.getElementById("toggleMinuteNotificationsHint");
+const toggleFinalMinuteNotificationsOptionButton = document.getElementById("toggleFinalMinuteNotificationsOption");
+const toggleFinalMinuteNotificationsHint = document.getElementById("toggleFinalMinuteNotificationsHint");
 const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
 const toggleBackgroundThemeHint = document.getElementById("toggleBackgroundThemeHint");
 const toggleStopMusicOnFinishOptionButton = document.getElementById("toggleStopMusicOnFinishOption");
@@ -792,7 +804,6 @@ let profileAvatarBusy = false;
 let profileSvgSuggestBusy = false;
 let startDecisionResolver = null;
 const runningAudio = typeof Audio !== "undefined" ? new Audio() : null;
-const runningMinuteCueAudio = typeof Audio !== "undefined" ? new Audio() : null;
 const runningSuccessAudio = typeof Audio !== "undefined" ? new Audio("/200/5star.mp3") : null;
 const runningEndBellAudio = typeof Audio !== "undefined" ? new Audio("/200/bicycleBell.ogg") : null;
 const runningPunctualityUpAudio = typeof Audio !== "undefined" ? new Audio("/200/coin-punctuality.mp3") : null;
@@ -868,16 +879,10 @@ missionProgressAudioPool.forEach((audio) => {
 let runningMusicProgressTicker = null;
 let runningNextMetricTimer = null;
 let taskBeepAudioContext = null;
-const runningMinuteCueMap = new Map([
-  [180, "0001.mp3"], [175, "0002.mp3"], [170, "0003.mp3"], [165, "0004.mp3"], [160, "0005.mp3"],
-  [155, "0006.mp3"], [150, "0007.mp3"], [145, "0008.mp3"], [140, "0009.mp3"], [135, "0010.mp3"],
-  [130, "0011.mp3"], [125, "0012.mp3"], [120, "0013.mp3"], [115, "0014.mp3"], [110, "0015.mp3"],
-  [105, "0016.mp3"], [100, "0017.mp3"], [95, "0018.mp3"], [90, "0019.mp3"], [85, "0020.mp3"],
-  [80, "0021.mp3"], [75, "0022.mp3"], [70, "0023.mp3"], [65, "0024.mp3"], [60, "0025.mp3"],
-  [55, "0026.mp3"], [50, "0027.mp3"], [45, "0028.mp3"], [40, "0029.mp3"], [35, "0030.mp3"],
-  [30, "0031.mp3"], [25, "0032.mp3"], [20, "0033.mp3"], [15, "0034.mp3"], [10, "0035.mp3"],
-  [5, "0036.mp3"], [3, "0037.mp3"], [1, "0038.mp3"]
-]);
+let runningMinuteCuePlayers = [];
+const runningMinuteCueWorker = typeof Worker !== "undefined" && !isNativeCapacitorApp()
+  ? new Worker("/200/minute-cue-worker.js?v=20260716-ptbr-minute-cues")
+  : null;
 let postponeNavHoldTimer = null;
 let postponeNavHoldInterval = null;
 let postponeNavLongPressHandled = false;
@@ -1064,6 +1069,8 @@ const state = {
     showFreeTime: true,
     missionActionsMode: "show",
     completionBeepCycles: 0,
+    minuteNotificationInterval: 0,
+    finalMinuteNotificationsEnabled: true,
     backgroundTheme: "edge",
     screenLockEnabled: false,
     stopMusicOnFinish: false
@@ -1116,7 +1123,15 @@ const state = {
   },
   runningMinuteCue: {
     actionId: "",
-    played: new Set()
+    optionKey: "",
+    played: new Set(),
+    preparedKey: "",
+    playTimer: 0,
+    preloadTimer: 0,
+    workerCue: null,
+    nativeActive: false,
+    nativeEndAtMs: 0,
+    nativeOptionKey: ""
   },
   runningEndBell: {
     actionId: "",
@@ -2863,31 +2878,223 @@ if (sleepFrequencyAudio) {
   });
 }
 
-async function tryPlayRunningMinuteCue(actionId, remainingMinutes) {
-  if (!runningMinuteCueAudio || !actionId) return;
-  const minuteKey = Math.ceil(Number(remainingMinutes || 0));
-  const file = runningMinuteCueMap.get(minuteKey);
-  if (!file) return;
-  if (state.runningMinuteCue.actionId !== actionId) {
-    state.runningMinuteCue.actionId = actionId;
-    state.runningMinuteCue.played = new Set();
+function clearRunningMinuteCuePlayers() {
+  runningMinuteCuePlayers.forEach((audio) => {
+    try {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    } catch {}
+  });
+  runningMinuteCuePlayers = [];
+}
+
+function clearRunningMinuteCueTimers() {
+  if (state.runningMinuteCue.playTimer) {
+    window.clearTimeout(state.runningMinuteCue.playTimer);
+    state.runningMinuteCue.playTimer = 0;
   }
-  if (state.runningMinuteCue.played.has(minuteKey)) return;
-  state.runningMinuteCue.played.add(minuteKey);
-  const baseVolume = runningAudio ? Number(runningAudio.volume || 1) : 1;
+  if (state.runningMinuteCue.preloadTimer) {
+    window.clearTimeout(state.runningMinuteCue.preloadTimer);
+    state.runningMinuteCue.preloadTimer = 0;
+  }
+  state.runningMinuteCue.workerCue = null;
+  try { runningMinuteCueWorker?.postMessage({ type: "cancel" }); } catch {}
+}
+
+function resetRunningMinuteCueState(actionId = "", optionKey = "") {
+  clearRunningMinuteCueTimers();
+  clearRunningMinuteCuePlayers();
+  state.runningMinuteCue.actionId = String(actionId || "");
+  state.runningMinuteCue.optionKey = String(optionKey || "");
+  state.runningMinuteCue.played = new Set();
+  state.runningMinuteCue.preparedKey = "";
+}
+
+function setMinuteCueMediaMetadata(minute, taskTitle) {
+  if (!("mediaSession" in navigator) || typeof window.MediaMetadata !== "function") return;
   try {
-    if (runningAudio && !runningAudio.paused) {
-      await fadeAudioVolume(runningAudio, Math.max(0.1, baseVolume * 0.25), 1500);
-    }
-    runningMinuteCueAudio.src = `/200/minutes/${file}`;
-    runningMinuteCueAudio.currentTime = 0;
-    await runningMinuteCueAudio.play();
-    runningMinuteCueAudio.onended = async () => {
-      if (runningAudio && !runningAudio.paused) {
-        await fadeAudioVolume(runningAudio, baseVolume, 1500);
-      }
-    };
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: `${minute} ${minute === 1 ? "minuto restante" : "minutos restantes"}`,
+      artist: String(taskTitle || "Tarefa em andamento"),
+      album: "iLife Mindset"
+    });
+    navigator.mediaSession.playbackState = "playing";
   } catch {}
+}
+
+async function playRunningMinuteCuePlayers(minute, taskTitle) {
+  const players = [...runningMinuteCuePlayers];
+  if (!players.length) return;
+  const baseVolume = runningAudio ? Number(runningAudio.volume || 1) : 1;
+  const shouldRestoreMusic = Boolean(runningAudio && !runningAudio.paused);
+  setMinuteCueMediaMetadata(minute, taskTitle);
+  try {
+    if (shouldRestoreMusic) {
+      await fadeAudioVolume(runningAudio, Math.max(0.1, baseVolume * 0.25), 700);
+    }
+    for (const audio of players) {
+      if (state.runningMinuteCue.actionId === "") break;
+      audio.currentTime = 0;
+      await new Promise((resolve) => {
+        const finish = () => resolve();
+        audio.addEventListener("ended", finish, { once: true });
+        audio.addEventListener("error", finish, { once: true });
+        audio.play().catch(finish);
+      });
+    }
+  } finally {
+    if (shouldRestoreMusic && runningAudio && !runningAudio.paused) {
+      await fadeAudioVolume(runningAudio, baseVolume, 700);
+    }
+    if ("mediaSession" in navigator) {
+      try { navigator.mediaSession.playbackState = runningAudio && !runningAudio.paused ? "playing" : "none"; } catch {}
+    }
+    clearRunningMinuteCuePlayers();
+    state.runningMinuteCue.preparedKey = "";
+  }
+}
+
+function prepareRunningMinuteCue(entry, actionId, taskTitle, secondsUntilCue) {
+  const cueKey = `${actionId}:${entry.minute}`;
+  if (state.runningMinuteCue.preparedKey !== cueKey) {
+    clearRunningMinuteCuePlayers();
+    runningMinuteCuePlayers = entry.urls.map((url) => {
+      const audio = new Audio(url);
+      audio.preload = "auto";
+      audio.load();
+      return audio;
+    });
+    state.runningMinuteCue.preparedKey = cueKey;
+  }
+  if (state.runningMinuteCue.playTimer) return;
+  state.runningMinuteCue.playTimer = window.setTimeout(() => {
+    state.runningMinuteCue.playTimer = 0;
+    if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.played.has(entry.minute)) return;
+    state.runningMinuteCue.played.add(entry.minute);
+    void playRunningMinuteCuePlayers(entry.minute, taskTitle);
+  }, Math.max(0, Math.round(secondsUntilCue * 1000)));
+}
+
+function scheduleRunningMinuteCueWorker(entry, actionId, taskTitle, secondsUntilCue) {
+  if (!runningMinuteCueWorker) return false;
+  const cueKey = `${actionId}:${entry.minute}`;
+  if (state.runningMinuteCue.workerCue?.key === cueKey) return true;
+  state.runningMinuteCue.workerCue = { key: cueKey, entry, actionId, taskTitle };
+  runningMinuteCueWorker.postMessage({
+    type: "schedule",
+    key: cueKey,
+    urls: entry.urls,
+    preloadDelayMs: Math.max(0, Math.round((secondsUntilCue - MINUTE_CUE_PRELOAD_SECONDS) * 1000)),
+    playDelayMs: Math.max(0, Math.round(Math.min(MINUTE_CUE_PRELOAD_SECONDS, secondsUntilCue) * 1000))
+  });
+  return true;
+}
+
+if (runningMinuteCueWorker) {
+  runningMinuteCueWorker.addEventListener("message", (event) => {
+    const payload = event.data || {};
+    const workerCue = state.runningMinuteCue.workerCue;
+    if (!workerCue || payload.key !== workerCue.key || state.runningMinuteCue.actionId !== workerCue.actionId) return;
+    if (payload.type === "preload") {
+      if (state.runningMinuteCue.preparedKey !== workerCue.key) {
+        clearRunningMinuteCuePlayers();
+        runningMinuteCuePlayers = workerCue.entry.urls.map((url) => {
+          const audio = new Audio(url);
+          audio.preload = "auto";
+          audio.load();
+          return audio;
+        });
+        state.runningMinuteCue.preparedKey = workerCue.key;
+      }
+      return;
+    }
+    if (payload.type === "play") {
+      state.runningMinuteCue.workerCue = null;
+      if (state.runningMinuteCue.played.has(workerCue.entry.minute)) return;
+      state.runningMinuteCue.played.add(workerCue.entry.minute);
+      void playRunningMinuteCuePlayers(workerCue.entry.minute, workerCue.taskTitle);
+    }
+  });
+}
+
+function stopNativeMinuteCueService() {
+  if (!state.runningMinuteCue.nativeActive) return;
+  state.runningMinuteCue.nativeActive = false;
+  state.runningMinuteCue.nativeEndAtMs = 0;
+  state.runningMinuteCue.nativeOptionKey = "";
+  try { void getCapacitorPlugin("MinuteCue")?.stop?.(); } catch {}
+}
+
+function syncNativeMinuteCueService(actionId, taskTitle, remainingSeconds, optionKey) {
+  const plugin = getCapacitorPlugin("MinuteCue");
+  if (!plugin?.start) return false;
+  const endAtMs = Date.now() + (Math.max(0, Number(remainingSeconds || 0)) * 1000);
+  const sameSchedule = state.runningMinuteCue.nativeActive
+    && state.runningMinuteCue.actionId === actionId
+    && state.runningMinuteCue.nativeOptionKey === optionKey
+    && Math.abs(state.runningMinuteCue.nativeEndAtMs - endAtMs) < 3000;
+  if (!sameSchedule) {
+    state.runningMinuteCue.nativeActive = true;
+    state.runningMinuteCue.nativeEndAtMs = endAtMs;
+    state.runningMinuteCue.nativeOptionKey = optionKey;
+    void plugin.start({
+      sessionId: actionId,
+      taskTitle: String(taskTitle || "Tarefa em andamento"),
+      remainingSeconds: Math.max(0, Math.ceil(Number(remainingSeconds || 0))),
+      intervalMinutes: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
+      finalMinutesEnabled: Boolean(state.options.finalMinuteNotificationsEnabled)
+    }).catch(() => {});
+  }
+  return true;
+}
+
+function stopRunningMinuteCueSchedule() {
+  resetRunningMinuteCueState();
+  stopNativeMinuteCueService();
+}
+
+function syncRunningMinuteCueSchedule(actionId, taskTitle, remainingSeconds) {
+  const interval = normalizeMinuteCueInterval(state.options.minuteNotificationInterval);
+  const finalMinutesEnabled = Boolean(state.options.finalMinuteNotificationsEnabled);
+  const optionKey = `${interval}:${finalMinutesEnabled ? 1 : 0}`;
+  if (!actionId || (!interval && !finalMinutesEnabled)) {
+    stopRunningMinuteCueSchedule();
+    return;
+  }
+  if (state.runningMinuteCue.actionId !== actionId || state.runningMinuteCue.optionKey !== optionKey) {
+    resetRunningMinuteCueState(actionId, optionKey);
+  }
+  if (isNativeCapacitorApp() && syncNativeMinuteCueService(actionId, taskTitle, remainingSeconds, optionKey)) {
+    return;
+  }
+
+  const nextEntry = buildMinuteCueSchedule(remainingSeconds, interval, finalMinutesEnabled)
+    .find((entry) => !state.runningMinuteCue.played.has(entry.minute));
+  if (!nextEntry) return;
+  const secondsUntilCue = Math.max(0, Number(remainingSeconds || 0) - nextEntry.remainingSeconds);
+  const cueKey = `${actionId}:${nextEntry.minute}`;
+  if (scheduleRunningMinuteCueWorker(nextEntry, actionId, taskTitle, secondsUntilCue)) {
+    return;
+  }
+  if (secondsUntilCue > MINUTE_CUE_PRELOAD_SECONDS) {
+    if (state.runningMinuteCue.preparedKey && state.runningMinuteCue.preparedKey !== cueKey) {
+      clearRunningMinuteCuePlayers();
+      state.runningMinuteCue.preparedKey = "";
+    }
+    if (!state.runningMinuteCue.preloadTimer) {
+      state.runningMinuteCue.preloadTimer = window.setTimeout(() => {
+        state.runningMinuteCue.preloadTimer = 0;
+        renderHomeRunningTask();
+      }, Math.max(250, Math.round((secondsUntilCue - MINUTE_CUE_PRELOAD_SECONDS) * 1000)));
+    }
+    return;
+  }
+  if (state.runningMinuteCue.preloadTimer) {
+    window.clearTimeout(state.runningMinuteCue.preloadTimer);
+    state.runningMinuteCue.preloadTimer = 0;
+  }
+  prepareRunningMinuteCue(nextEntry, actionId, taskTitle, secondsUntilCue);
 }
 
 function getEarliestPendingAction() {
@@ -3038,6 +3245,7 @@ function renderHomeRunningTask() {
     return;
   }
   if (!hasRunning) {
+    stopRunningMinuteCueSchedule();
     setHomeRunningSurfaceState(false);
     state.runningPlayer.defaultAppliedActionId = "";
     const now = new Date(getServerNowMs());
@@ -3125,7 +3333,7 @@ function renderHomeRunningTask() {
   const runningCenterMarkup = formatRunningCenter(percent, percentPrecise, estimatedRemaining, remainingSeconds, showPercent);
   runningTaskPercent.innerHTML = runningCenterMarkup;
   updateRunningCenterModeButtons(showPercent ? "percent" : "time");
-  void tryPlayRunningMinuteCue(String(action.id || ""), estimatedRemaining);
+  syncRunningMinuteCueSchedule(String(action.id || ""), action.title, remainingSeconds);
   if (remainingSeconds <= 0) {
     void playRunningEndBellCue(runningActionId);
     if (isQuickTaskAction(action) && !state.quickTaskAutoFinalizing) {
@@ -4641,6 +4849,12 @@ function inferFinanceEntryLocally(text) {
 }
 
 function openModal(id) {
+  if (id !== "runningConfirmModal" && runningConfirmModal?.classList.contains("active")) {
+    closeRunningConfirmModal();
+  }
+  if (["runningTaskModal", "actionsModal"].includes(id) && startConflictModal?.classList.contains("active")) {
+    closeStartConflictModal("cancel");
+  }
   const modal = document.getElementById(id);
 
   if (!modal) {
@@ -4873,6 +5087,9 @@ function closeModal(modal) {
     if (runningConfirmPauseButton) runningConfirmPauseButton.hidden = true;
     document.body.classList.remove("running-confirm-open", "running-confirm-from-actions");
   }
+  if (modal.id === "startConflictModal") {
+    document.body.classList.remove("start-conflict-open", "task-starting");
+  }
   if (modal.id === "quickTaskModal") {
     document.body.classList.remove("quick-task-open");
   }
@@ -4928,7 +5145,7 @@ function navigateToProjectHome() {
   } finally {
     modalBackNavigationActive = false;
     modalNavigationStack.length = 0;
-    document.body.classList.remove("modal-open", "start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
+    document.body.classList.remove("modal-open", "start-decision-open", "start-conflict-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   }
 }
 
@@ -5698,7 +5915,7 @@ function closeWizard() {
   if (actionVoiceStatus) {
     actionVoiceStatus.textContent = "Toque no microfone para criar por voz.";
   }
-  document.body.classList.remove("start-decision-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
+  document.body.classList.remove("start-decision-open", "start-conflict-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   if (!document.querySelector(".workspace-modal.active")) {
     document.body.classList.remove("modal-open");
   }
@@ -6071,6 +6288,7 @@ function closeStartDecisionModalWith(value) {
 }
 
 function closeStartConflictModal(value = "cancel") {
+  document.body.classList.remove("start-conflict-open", "task-starting");
   if (startConflictModal) {
     closeModal(startConflictModal);
   }
@@ -6368,6 +6586,9 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   if (!startConflictModal) {
     return Promise.resolve("cancel");
   }
+  if (runningConfirmModal?.classList.contains("active")) {
+    closeRunningConfirmModal();
+  }
   state.startConflict.currentActionId = String(currentAction?.id || "");
   state.startConflict.nextActionId = String(nextAction?.id || "");
   const currentTitle = formatActionTitleForDisplay(currentAction?.title || "Tarefa");
@@ -6380,6 +6601,8 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   if (startConflictNextTitle) {
     startConflictNextTitle.textContent = `Próxima: ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
   }
+  document.body.appendChild(startConflictModal);
+  document.body.classList.add("start-conflict-open");
   openModal("startConflictModal");
   return new Promise((resolve) => {
     state.startConflict.resolve = resolve;
@@ -12675,6 +12898,8 @@ function loadOptionsConfig() {
     state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
       ? Number(parsed.completionBeepCycles)
       : 0;
+    state.options.minuteNotificationInterval = normalizeMinuteCueInterval(parsed.minuteNotificationInterval);
+    state.options.finalMinuteNotificationsEnabled = parsed.finalMinuteNotificationsEnabled !== false;
     state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
     state.options.screenLockEnabled = parsed.screenLockEnabled === true;
     state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
@@ -12682,6 +12907,8 @@ function loadOptionsConfig() {
     state.options.showFreeTime = true;
     state.options.missionActionsMode = "show";
     state.options.completionBeepCycles = 0;
+    state.options.minuteNotificationInterval = 0;
+    state.options.finalMinuteNotificationsEnabled = true;
     state.options.backgroundTheme = "edge";
     state.options.screenLockEnabled = false;
     state.options.stopMusicOnFinish = false;
@@ -12695,6 +12922,8 @@ function saveOptionsConfig() {
       showFreeTime: Boolean(state.options.showFreeTime),
       missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
       completionBeepCycles: Number(state.options.completionBeepCycles || 0),
+      minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
+      finalMinuteNotificationsEnabled: Boolean(state.options.finalMinuteNotificationsEnabled),
       backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
       screenLockEnabled: Boolean(state.options.screenLockEnabled),
       stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish)
@@ -12822,6 +13051,14 @@ function renderOptionsModal() {
   if (toggleTaskBeepHint) {
     toggleTaskBeepHint.textContent = taskBeepOptionLabels.get(Number(state.options.completionBeepCycles || 0)) || "Nenhum";
   }
+  if (toggleMinuteNotificationsHint) {
+    toggleMinuteNotificationsHint.textContent = getMinuteCueIntervalLabel(state.options.minuteNotificationInterval);
+  }
+  toggleMinuteNotificationsOptionButton?.classList.toggle("is-off", !normalizeMinuteCueInterval(state.options.minuteNotificationInterval));
+  if (toggleFinalMinuteNotificationsHint) {
+    toggleFinalMinuteNotificationsHint.textContent = state.options.finalMinuteNotificationsEnabled ? "Ligadas: 5, 3 e 1 minuto" : "Desligadas";
+  }
+  toggleFinalMinuteNotificationsOptionButton?.classList.toggle("is-off", !state.options.finalMinuteNotificationsEnabled);
   if (toggleBackgroundThemeHint) {
     toggleBackgroundThemeHint.textContent = getBackgroundThemeMode(state.options.backgroundTheme).label;
   }
@@ -14604,6 +14841,26 @@ toggleTaskBeepOptionButton?.addEventListener("click", () => {
   state.options.completionBeepCycles = taskBeepOptionCycles[nextIndex];
   saveOptionsConfig();
   renderOptionsModal();
+});
+toggleMinuteNotificationsOptionButton?.addEventListener("click", () => {
+  const currentInterval = normalizeMinuteCueInterval(state.options.minuteNotificationInterval);
+  const currentIndex = Math.max(0, MINUTE_CUE_INTERVALS.indexOf(currentInterval));
+  state.options.minuteNotificationInterval = MINUTE_CUE_INTERVALS[(currentIndex + 1) % MINUTE_CUE_INTERVALS.length];
+  if (state.options.minuteNotificationInterval > 0) {
+    try { void getCapacitorPlugin("MinuteCue")?.requestNotificationPermission?.(); } catch {}
+  }
+  saveOptionsConfig();
+  renderOptionsModal();
+  renderHomeRunningTask();
+});
+toggleFinalMinuteNotificationsOptionButton?.addEventListener("click", () => {
+  state.options.finalMinuteNotificationsEnabled = !state.options.finalMinuteNotificationsEnabled;
+  if (state.options.finalMinuteNotificationsEnabled) {
+    try { void getCapacitorPlugin("MinuteCue")?.requestNotificationPermission?.(); } catch {}
+  }
+  saveOptionsConfig();
+  renderOptionsModal();
+  renderHomeRunningTask();
 });
 toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
   const currentIndex = Math.max(0, backgroundThemeModes.findIndex((item) => item.key === getBackgroundThemeMode(state.options.backgroundTheme).key));

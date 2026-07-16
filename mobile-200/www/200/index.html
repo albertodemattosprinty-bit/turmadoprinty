@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260716-mission-delete-confirm" />
+  <link rel="stylesheet" href="/200/project.css?v=20260716-modal-content-restore" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -665,6 +665,16 @@
         <span class="running-music-default-top">Quantas sequências de beep tocar ao concluir a tarefa</span>
         <strong>Beep final</strong>
         <span class="running-music-default-bottom" id="toggleTaskBeepHint">Nenhum</span>
+      </button>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="toggleMinuteNotificationsOption">
+        <span class="running-music-default-top">Escolha o intervalo dos avisos durante a contagem</span>
+        <strong>Notificação minutos</strong>
+        <span class="running-music-default-bottom" id="toggleMinuteNotificationsHint">Desativada</span>
+      </button>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="toggleFinalMinuteNotificationsOption">
+        <span class="running-music-default-top">Avisos independentes quando faltarem 5, 3 e 1 minuto</span>
+        <strong>Notificação minutos finais</strong>
+        <span class="running-music-default-bottom" id="toggleFinalMinuteNotificationsHint">Ligadas: 5, 3 e 1 minuto</span>
       </button>
       <button class="running-music-default-option" type="button" id="toggleBackgroundThemeOption">
         <span class="running-music-default-top">Alternar entre fundos vivos em degrade com leitura forte no branco</span>
@@ -1450,7 +1460,7 @@
     ></iframe>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260716-mission-delete-confirm"></script>
+  <script type="module" src="/200/project.js?v=20260716-ptbr-minute-cues"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>
