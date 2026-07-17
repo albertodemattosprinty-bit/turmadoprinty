@@ -1100,6 +1100,7 @@ const state = {
   serverNowMs: 0,
   serverNowCapturedAtMs: 0,
   homeSnapshotReady: false,
+  homeClockReady: false,
   postpone: {
     actionId: "",
     dayOffset: 0,
@@ -1109,13 +1110,8 @@ const state = {
     onlyFree: false
   },
   runningPlayer: {
-    stations: [{
-      name: "Calm",
-      tracks: [{
-        name: "About space",
-        url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/About%20space.mp3"
-      }]
-    }],
+    stations: [],
+    stationsLoaded: false,
     stationIndex: 0,
     playOrderUrls: [],
     playOrderIndex: 0,
@@ -1466,26 +1462,49 @@ async function runWithGlobalLoading(task, options = {}) {
 }
 
 function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
-  if (startupLoadingActive) {
-    return;
-  }
+  if (startupLoadingActive) return;
   startupLoadingActive = true;
-  if (projectShell) {
-    projectShell.hidden = false;
+  state.homeClockReady = false;
+  if (projectShell) projectShell.hidden = true;
+  if (globalLoadingIcon && iconSrc) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
+  if (globalLoadingOverlay) {
+    globalLoadingOverlay.hidden = false;
+    globalLoadingOverlay.classList.remove("is-leaving");
+    globalLoadingOverlay.setAttribute("aria-hidden", "false");
   }
-  void iconSrc;
 }
 
 function endStartupLoading() {
-  if (!startupLoadingActive) {
-    return;
-  }
+  if (!startupLoadingActive) return;
   startupLoadingActive = false;
-  if (projectShell) {
-    projectShell.hidden = false;
+  if (projectShell) projectShell.hidden = false;
+  if (globalLoadingOverlay) {
+    globalLoadingOverlay.classList.add("is-leaving");
+    globalLoadingOverlay.setAttribute("aria-hidden", "true");
+    window.setTimeout(() => {
+      if (!startupLoadingActive) {
+        globalLoadingOverlay.hidden = true;
+        globalLoadingOverlay.classList.remove("is-leaving");
+      }
+    }, 260);
   }
 }
 
+function revealInitialHomeIfReady() {
+  if (!startupLoadingActive
+    || !state.homeSnapshotReady
+    || !state.runningPlayer.stationsLoaded
+    || !Array.isArray(state.runningPlayer.stations)
+    || state.runningPlayer.stations.length < 2) return false;
+  state.runningIdleCenterMode = "time";
+  renderHomeRunningTask();
+  syncHomeDeviceClock();
+  state.homeClockReady = Boolean(String(runningTaskPercent?.textContent || "").trim());
+  if (!state.homeClockReady) return false;
+  if (!runningTaskModalElement?.classList.contains("active")) openPrimaryRunningSurface();
+  window.requestAnimationFrame(() => endStartupLoading());
+  return true;
+}
 function readSelectedProfile() {
   const saved = String(window.localStorage.getItem(projectProfileKey) || "");
   const matched = getProfileByName(saved);
@@ -3319,8 +3338,14 @@ async function loadRunningMusicStations() {
   });
 
   state.runningPlayer.stations = fallbackStations;
+  state.runningPlayer.stationsLoaded = true;
   state.runningPlayer.favoriteTrackUrls = new Set();
   state.runningPlayer.defaultPreferenceByTaskTitle = new Map();
+  ensureRunningStationHasTracks(previousStationName);
+  syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
+  renderRunningMusicPlayer();
+  if (runningMusicListModal?.classList.contains("active")) renderRunningMusicList();
+  revealInitialHomeIfReady();
   try {
     const radioResponse = await fetch("/200/radio-stations.json", { cache: "no-store" });
     if (radioResponse.ok) {
@@ -3686,7 +3711,7 @@ function renderRunningMusicPlayer() {
   const isPlaying = Boolean(runningAudio && !runningAudio.paused && track?.url && normalizeRunningTrackUrl(runningAudio.currentSrc || runningAudio.src || "") === normalizeRunningTrackUrl(track.url));
 
   if (runningPlayerStation) {
-    runningPlayerStation.textContent = String(station?.name || "Estação");
+    runningPlayerStation.textContent = String(station?.name || "Carregando rádios");
   }
 
   if (runningPlayerTrack) {
@@ -3928,7 +3953,9 @@ async function openRunningMusicListModal() {
     document.body.classList.add("running-music-standalone");
   }
   updateRunningPlayerOverlayState();
-  if (!Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) {
+  if (!state.runningPlayer.stationsLoaded
+    || !Array.isArray(state.runningPlayer.stations)
+    || state.runningPlayer.stations.length < 2) {
     runningMusicListItems.innerHTML = '<div class="empty-state">Carregando estações...</div>';
     try {
       await loadRunningMusicStations();
@@ -7079,9 +7106,7 @@ async function refreshHomeSnapshot(options = {}) {
         throw new Error("HOME_SNAPSHOT_PENDING");
       }
       lastHomeSnapshotHydratedAtMs = Date.now();
-      if (startupLoadingActive) {
-        endStartupLoading();
-      }
+      revealInitialHomeIfReady();
     } catch {
       if (startupLoadingActive && getToken() && !homeBootstrapRetryTimer) {
         homeBootstrapRetryTimer = window.setTimeout(() => {
@@ -12720,50 +12745,34 @@ async function bootstrapProject200App() {
       redirectToProject200Login();
       return;
     }
-    const sessionOk = await ensureProject200Session();
-    if (sessionOk) {
-      openPrimaryRunningSurface();
-      try {
-        await refreshHomeSnapshot({ force: true });
-        return;
-      } catch (error) {
-        if (isAuthErrorMessage(error?.message)) {
-          clearProject200SessionState();
-          redirectToProject200Login();
-          return;
-        }
-      }
+    await ensureProject200Session();
+    const musicStationsPromise = loadRunningMusicStations().catch(() => {});
+    await refreshHomeSnapshot({ force: true });
+    project200LoginOverlay?.classList.remove("active");
+    project200LoginOverlay?.setAttribute("aria-hidden", "true");
+    revealInitialHomeIfReady();
+    void musicStationsPromise.then(() => revealInitialHomeIfReady());
+  } catch (error) {
+    if (isAuthErrorMessage(error?.message)) {
+      clearProject200SessionState();
+      redirectToProject200Login();
+      return;
     }
-
-    try {
-      await refreshHomeSnapshot({ force: true });
-      project200LoginOverlay?.classList.remove("active");
-      project200LoginOverlay?.setAttribute("aria-hidden", "true");
-      openPrimaryRunningSurface();
-    } catch (error) {
-      if (isAuthErrorMessage(error?.message)) {
-        clearProject200SessionState();
-        redirectToProject200Login();
-      } else {
-        renderHomeRunningTask();
-      }
-    }
+    renderHomeRunningTask();
   } finally {
     if (homeBootstrapRetryTimer) {
       window.clearTimeout(homeBootstrapRetryTimer);
       homeBootstrapRetryTimer = null;
     }
-    if (getToken() && !state.homeSnapshotReady) {
+    if (getToken() && !revealInitialHomeIfReady()) {
       homeBootstrapRetryTimer = window.setTimeout(() => {
         homeBootstrapRetryTimer = null;
-        void refreshHomeSnapshot({ force: true });
+        if (!state.runningPlayer.stationsLoaded) void loadRunningMusicStations().then(() => revealInitialHomeIfReady());
+        void refreshHomeSnapshot({ force: true }).then(() => revealInitialHomeIfReady());
       }, 600);
-      return;
     }
-    endStartupLoading();
   }
 }
-
 function openPrimaryRunningSurface() {
   if (!getToken()) {
     redirectToProject200Login();
@@ -15793,8 +15802,6 @@ document.addEventListener("resume", () => {
   void refreshHomeSnapshot();
 });
 startRunningTaskTicker();
-void refreshHomeSnapshot({ force: true });
-void loadRunningMusicStations();
 if (runningMusicProgressTicker) {
   window.clearInterval(runningMusicProgressTicker);
 }

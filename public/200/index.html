@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260716-home-inicial-relogio-player" />
+  <link rel="stylesheet" href="/200/project.css?v=20260716-home-pronta-seis-radios" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -34,6 +34,13 @@
       } catch {}
     })();
   </script>
+  <section class="global-loading-overlay" id="globalLoadingOverlay" aria-hidden="false" aria-label="Preparando a página inicial">
+    <div class="global-loading-card" role="status" aria-live="polite">
+      <img class="global-loading-icon global-loading-brand" id="globalLoadingIcon" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" />
+      <div class="global-loading-bar" aria-hidden="true"><span class="global-loading-bar-loop"></span></div>
+      <span class="global-loading-copy">Preparando sua home...</span>
+    </div>
+  </section>
   <section class="project-login-overlay" id="profileManageOverlay" aria-hidden="true">
     <div class="project-login-card">
       <h2 id="profileManageTitle">Gerenciar usuário</h2>
@@ -179,8 +186,8 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <div class="running-player-title-copy">
-              <span class="running-player-station" id="runningPlayerStation">Calm</span>
-              <span class="running-player-track" id="runningPlayerTrack">About space</span>
+              <span class="running-player-station" id="runningPlayerStation">Carregando rádios</span>
+              <span class="running-player-track" id="runningPlayerTrack"></span>
           </div>
           <button type="button" class="running-player-track-nav" id="runningPlayerNext" aria-label="Próxima música">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1475,7 +1482,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260716-home-inicial-relogio-player"></script>
+  <script type="module" src="/200/project.js?v=20260716-home-pronta-seis-radios"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>
