@@ -634,6 +634,7 @@ const project200RegisterPanel = document.getElementById("project200RegisterPanel
 const project200LoginMessage = document.getElementById("project200LoginMessage");
 const globalLoadingOverlay = document.getElementById("globalLoadingOverlay");
 const globalLoadingIcon = document.getElementById("globalLoadingIcon");
+const globalLoadingCopy = document.getElementById("globalLoadingCopy");
 const profileManageOverlay = document.getElementById("profileManageOverlay");
 const profileManageTitle = document.getElementById("profileManageTitle");
 const profileManageTargetLabel = document.getElementById("profileManageTargetLabel");
@@ -723,6 +724,9 @@ const loadingIconByArea = {
 let globalLoadingCount = 0;
 let globalLoadingPreferredIcon = loadingIconByArea.actions;
 let startupLoadingActive = false;
+let startupLoadingFallbackTimer = null;
+let globalLoadingFallbackTimer = null;
+let globalLoadingTimedOut = false;
 let homeSnapshotHydrationPromise = null;
 let lastHomeSnapshotHydratedAtMs = 0;
 let homeBootstrapRetryTimer = null;
@@ -1440,24 +1444,61 @@ function resolveLoadingIconForPath(path = "", preferredIcon = "") {
 }
 
 function beginGlobalLoading(iconSrc = "") {
-  globalLoadingCount = 0;
+  if (startupLoadingActive) return false;
+  globalLoadingCount += 1;
+  if (globalLoadingCount === 1) {
+    globalLoadingTimedOut = false;
+    if (globalLoadingIcon) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
+    if (globalLoadingCopy) globalLoadingCopy.textContent = "Carregando informações...";
+    if (globalLoadingOverlay) {
+      globalLoadingOverlay.hidden = false;
+      globalLoadingOverlay.classList.remove("is-leaving");
+      globalLoadingOverlay.setAttribute("aria-hidden", "false");
+    }
+    if (globalLoadingFallbackTimer) window.clearTimeout(globalLoadingFallbackTimer);
+    globalLoadingFallbackTimer = window.setTimeout(() => {
+      globalLoadingFallbackTimer = null;
+      globalLoadingTimedOut = true;
+      hideGlobalLoadingOverlay();
+    }, 6000);
+  }
   void iconSrc;
+  return true;
 }
 
-function endGlobalLoading() {
-  globalLoadingCount = 0;
+function hideGlobalLoadingOverlay() {
+  if (!globalLoadingOverlay) return;
+  globalLoadingOverlay.classList.add("is-leaving");
+  globalLoadingOverlay.setAttribute("aria-hidden", "true");
+  window.setTimeout(() => {
+    if (!startupLoadingActive && (globalLoadingCount === 0 || globalLoadingTimedOut)) {
+      globalLoadingOverlay.hidden = true;
+      globalLoadingOverlay.classList.remove("is-leaving");
+    }
+  }, 260);
 }
 
+function endGlobalLoading(wasTracked = true) {
+  if (!wasTracked) return;
+  globalLoadingCount = Math.max(0, globalLoadingCount - 1);
+  if (globalLoadingCount > 0) return;
+  if (globalLoadingFallbackTimer) {
+    window.clearTimeout(globalLoadingFallbackTimer);
+    globalLoadingFallbackTimer = null;
+  }
+  globalLoadingTimedOut = false;
+  hideGlobalLoadingOverlay();
+}
 async function runWithGlobalLoading(task, options = {}) {
   if (options.skipGlobalLoading) {
     return task();
   }
   const iconSrc = resolveLoadingIconForPath(options.path || "", options.iconSrc || "");
-  beginGlobalLoading(iconSrc);
+  const wasTracked = beginGlobalLoading(iconSrc);
   try {
     return await task();
   } finally {
-    endGlobalLoading();
+    endGlobalLoading(wasTracked);
   }
 }
 
@@ -1467,40 +1508,50 @@ function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
   state.homeClockReady = false;
   if (projectShell) projectShell.hidden = true;
   if (globalLoadingIcon && iconSrc) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
+  if (globalLoadingCopy) globalLoadingCopy.textContent = "Preparando sua home...";
   if (globalLoadingOverlay) {
     globalLoadingOverlay.hidden = false;
     globalLoadingOverlay.classList.remove("is-leaving");
     globalLoadingOverlay.setAttribute("aria-hidden", "false");
   }
+  if (startupLoadingFallbackTimer) window.clearTimeout(startupLoadingFallbackTimer);
+  startupLoadingFallbackTimer = window.setTimeout(() => {
+    startupLoadingFallbackTimer = null;
+    if (!startupLoadingActive) return;
+    state.runningIdleCenterMode = "time";
+    renderHomeRunningTask();
+    if (!runningTaskModalElement?.classList.contains("active")) openPrimaryRunningSurface();
+    endStartupLoading();
+  }, 6000);
 }
 
 function endStartupLoading() {
   if (!startupLoadingActive) return;
   startupLoadingActive = false;
-  if (projectShell) projectShell.hidden = false;
-  if (globalLoadingOverlay) {
-    globalLoadingOverlay.classList.add("is-leaving");
-    globalLoadingOverlay.setAttribute("aria-hidden", "true");
-    window.setTimeout(() => {
-      if (!startupLoadingActive) {
-        globalLoadingOverlay.hidden = true;
-        globalLoadingOverlay.classList.remove("is-leaving");
-      }
-    }, 260);
+  if (startupLoadingFallbackTimer) {
+    window.clearTimeout(startupLoadingFallbackTimer);
+    startupLoadingFallbackTimer = null;
   }
+  if (projectShell) projectShell.hidden = false;
+  hideGlobalLoadingOverlay();
 }
 
 function revealInitialHomeIfReady() {
   if (!startupLoadingActive
-    || !state.homeSnapshotReady
     || !state.runningPlayer.stationsLoaded
     || !Array.isArray(state.runningPlayer.stations)
     || state.runningPlayer.stations.length < 2) return false;
   state.runningIdleCenterMode = "time";
   renderHomeRunningTask();
   syncHomeDeviceClock();
-  state.homeClockReady = Boolean(String(runningTaskPercent?.textContent || "").trim());
-  if (!state.homeClockReady) return false;
+  const clockText = String(runningTaskPercent?.textContent || "").trim();
+  const stationText = String(runningPlayerStation?.textContent || "").trim();
+  const trackText = String(runningPlayerTrack?.textContent || "").trim();
+  const greetingText = String(runningTaskNextName?.textContent || "").trim();
+  state.homeClockReady = /\d{1,2}[:h]\d{2}/.test(clockText);
+  const playerReady = Boolean(stationText && trackText && !/^carregando/i.test(stationText));
+  const greetingReady = /^(bom dia|boa tarde|boa noite)$/i.test(greetingText);
+  if (!state.homeClockReady || !playerReady || !greetingReady) return false;
   if (!runningTaskModalElement?.classList.contains("active")) openPrimaryRunningSurface();
   window.requestAnimationFrame(() => endStartupLoading());
   return true;
@@ -4810,7 +4861,7 @@ function openModal(id) {
     pendingActionsAnchorId = runningAction?.id || latestDone?.id || "";
     state.actionsMissionOnly = false;
     renderActions();
-    void loadActions({ silent: true });
+    void loadActions();
     void loadActionMissions();
     window.setTimeout(() => {
       anchorToCurrentActionOnce();
@@ -9253,16 +9304,16 @@ async function loadStatsSummary() {
     await loadMissions();
     await hydrateStatsAspectConfig(state.selectedProfile || getDefaultProfileName(), {
       force: true,
-      skipGlobalLoading: true
+      skipGlobalLoading: false
     });
     const scope = getActiveStatsScope();
     const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
     const [summaryPayload, goalsPayload] = await Promise.all([
       apiRequest(`/api/stats/summary?scope=${encodeURIComponent(scope.key)}`, {
-        skipGlobalLoading: true
+        skipGlobalLoading: false
       }),
       apiRequest(`/api/200/extra-goals?profile=${encodeURIComponent(profile)}&scope=${encodeURIComponent(scope.key)}`, {
-        skipGlobalLoading: true
+        skipGlobalLoading: false
       }).catch(() => ({ goals: state.missions }))
     ]);
     const summary = summaryPayload?.summary || {};
@@ -10185,7 +10236,7 @@ async function openSocialModal() {
   openModal("socialModal");
   await loadSocialSnapshot({
     force: true,
-    skipGlobalLoading: true,
+    skipGlobalLoading: false,
     silent: true,
     showLoading: true
   });
@@ -10205,7 +10256,7 @@ async function submitSocialInvite() {
       socialModalStatus.textContent = "Procurando amigo...";
     }
     const lookup = await apiRequest(`/api/200/users/lookup?username=${encodeURIComponent(rawInput)}`, {
-      skipGlobalLoading: true
+      skipGlobalLoading: false
     });
     const targetUserId = String(lookup?.user?.id || "").trim();
     if (!targetUserId) {
@@ -10218,7 +10269,7 @@ async function submitSocialInvite() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ targetUserId }),
-      skipGlobalLoading: true
+      skipGlobalLoading: false
     });
     if (socialInviteInput) {
       socialInviteInput.value = "";
@@ -10227,7 +10278,7 @@ async function submitSocialInvite() {
     if (socialModalStatus) {
       socialModalStatus.textContent = `Convite enviado para ${String(lookup?.user?.name || lookup?.user?.username || "o amigo")}.`;
     }
-    await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+    await loadSocialSnapshot({ force: true, skipGlobalLoading: false, silent: true });
   } catch (error) {
     if (socialModalStatus) {
       socialModalStatus.textContent = error instanceof Error ? error.message : "Falha ao enviar convite.";
@@ -10249,12 +10300,12 @@ async function respondToSocialInvite(friendshipId, action) {
     }
     await apiRequest(`/api/200/friends/${encodeURIComponent(normalizedId)}/${normalizedAction === "accept" ? "accept" : "reject"}`, {
       method: "POST",
-      skipGlobalLoading: true
+      skipGlobalLoading: false
     });
     if (socialModalStatus) {
       socialModalStatus.textContent = normalizedAction === "accept" ? "Amizade confirmada." : "Convite recusado.";
     }
-    await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+    await loadSocialSnapshot({ force: true, skipGlobalLoading: false, silent: true });
   } catch (error) {
     if (socialModalStatus) {
       socialModalStatus.textContent = error instanceof Error ? error.message : "Falha ao responder convite.";
@@ -10278,7 +10329,7 @@ async function startSleepSessionFlow() {
         profile: normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName,
         delayMinutes: getCurrentSleepDelayMinutes()
       }),
-      skipGlobalLoading: true
+      skipGlobalLoading: false
     });
     state.sleepModal.session = payload?.session || null;
     state.sleepModal.controlsVisible = false;
@@ -10303,7 +10354,7 @@ async function finishSleepSessionFlow() {
       body: JSON.stringify({
         profile: normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName
       }),
-      skipGlobalLoading: true
+      skipGlobalLoading: false
     });
     state.sleepModal.session = null;
     state.sleepModal.controlsVisible = false;
@@ -10329,7 +10380,7 @@ async function abortSleepSessionFlow() {
       body: JSON.stringify({
         profile: normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName
       }),
-      skipGlobalLoading: true
+      skipGlobalLoading: false
     });
     state.sleepModal.session = null;
     state.sleepModal.controlsVisible = false;
@@ -11507,7 +11558,7 @@ async function preloadMissionRunDailyRanking() {
   if (state.missionRun.rankingPreloadStarted || !getToken()) return;
   state.missionRun.rankingPreloadStarted = true;
   try {
-    state.missionRun.preloadedDailyRanking = await apiRequest("/api/200/friends?scope=today", { skipGlobalLoading: true });
+    state.missionRun.preloadedDailyRanking = await apiRequest("/api/200/friends?scope=today", { skipGlobalLoading: false });
   } catch {
     state.missionRun.preloadedDailyRanking = null;
   }
@@ -15073,7 +15124,7 @@ document.querySelectorAll("[data-social-scope]").forEach((button) => {
     }
     state.social.scopeKey = nextScope;
     renderSocialScopeFooter();
-    void loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+    void loadSocialSnapshot({ force: true, skipGlobalLoading: false, silent: true });
   });
 });
 statsRunningSurfaceButton?.addEventListener("click", () => {
