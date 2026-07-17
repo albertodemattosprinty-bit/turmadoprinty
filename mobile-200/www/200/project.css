@@ -1892,7 +1892,8 @@ body.screen-locked .project-login-overlay.active {
   margin-top: 0;
 }
 
-#runningTaskModal .running-task-content.is-idle-layout .running-task-actions {
+#runningTaskModal .running-task-content.is-idle-layout .running-task-actions,
+#runningTaskModal .running-task-content.is-idle-layout .running-completion-label {
   display: none;
 }
 
@@ -8139,3 +8140,161 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
 }
 
 
+
+/* Novo fluxo financeiro do iLife: shell inicial */
+.ilife-finance-modal {
+  overflow: auto;
+}
+
+.ilife-finance-shell {
+  width: min(980px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 56px) 0 88px;
+}
+
+.ilife-finance-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.ilife-finance-header > img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+.ilife-finance-kicker,
+.ilife-finance-guidance-label {
+  display: block;
+  color: var(--soft);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.ilife-finance-header h1 {
+  margin: 2px 0 4px;
+  font-size: clamp(2rem, 7vw, 4.2rem);
+}
+
+.ilife-finance-header p,
+.ilife-finance-empty-state p,
+.ilife-finance-guidance p {
+  margin: 0;
+  color: var(--soft);
+}
+
+.ilife-finance-snapshot {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ilife-finance-card,
+.ilife-finance-guidance,
+.ilife-finance-empty-state {
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .12);
+}
+
+.ilife-finance-card {
+  min-height: 142px;
+  padding: 18px;
+}
+
+.ilife-finance-card span,
+.ilife-finance-card small {
+  display: block;
+  color: var(--soft);
+}
+
+.ilife-finance-card strong {
+  display: block;
+  margin: 12px 0 6px;
+  font-size: clamp(1.45rem, 4vw, 2.35rem);
+}
+
+.ilife-finance-card-primary {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.ilife-finance-guidance {
+  margin-top: 14px;
+  padding: 18px 20px;
+}
+
+.ilife-finance-guidance p {
+  margin-top: 7px;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.ilife-finance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.ilife-finance-action {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ilife-finance-action:hover,
+.ilife-finance-action:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.ilife-finance-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 34px 20px;
+  text-align: center;
+}
+
+.ilife-finance-empty-state img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.ilife-finance-empty-state h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.15rem, 3vw, 1.65rem);
+}
+
+.ilife-finance-status {
+  min-height: 1.3em;
+  margin: 14px 0 0;
+  color: var(--soft);
+  text-align: center;
+}
+
+@media (max-width: 680px) {
+  .ilife-finance-shell {
+    width: min(100% - 22px, 520px);
+    padding-top: 26px;
+  }
+
+  .ilife-finance-snapshot {
+    grid-template-columns: 1fr;
+  }
+
+  .ilife-finance-card {
+    min-height: auto;
+  }
+}

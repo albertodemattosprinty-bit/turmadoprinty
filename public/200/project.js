@@ -1,4 +1,4 @@
-﻿import { getApiUrl } from "../api.js";
+import { getApiUrl } from "../api.js";
 
 import {
   MINUTE_CUE_INTERVALS,
@@ -1510,6 +1510,7 @@ function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
   window.__project200LoadingShownAt = Date.now();
   state.homeClockReady = false;
   if (projectShell) projectShell.hidden = true;
+  primeRunningIdleHomeShell();
   if (globalLoadingIcon && iconSrc) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
   if (globalLoadingCopy) globalLoadingCopy.textContent = "Preparando sua home...";
   if (globalLoadingOverlay) {
@@ -2338,6 +2339,52 @@ function setRunningCompletionVisualState(isCompletion) {
 
 function setRunningIdleVisualState(isIdle) {
   runningTaskContent?.classList.toggle("is-idle-layout", isIdle);
+}
+
+function primeRunningIdleHomeShell() {
+  const now = new Date(getServerNowMs());
+  const dayElapsedPercent = getDayElapsedPercent(now);
+  const showIdlePercent = state.runningIdleCenterMode === "percent";
+  const homeCenterMarkup = showIdlePercent
+    ? formatRunningPercentMarkup(dayElapsedPercent)
+    : formatRunningClockMarkup(now);
+  setRunningCompletionVisualState(false);
+  setRunningIdleVisualState(true);
+  if (runningTaskName) runningTaskName.textContent = "";
+  if (runningTaskCategoryIcon) runningTaskCategoryIcon.hidden = true;
+  setRunningRingPercent(dayElapsedPercent);
+  if (runningTaskPercent) runningTaskPercent.innerHTML = homeCenterMarkup;
+  if (runningTaskMinutesLeft) {
+    runningTaskMinutesLeft.textContent = "";
+    runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
+  }
+  updateRunningCenterModeButtons(showIdlePercent ? "percent" : "time");
+  if (runningTaskNextLabel) {
+    runningTaskNextLabel.classList.add("running-fade");
+    runningTaskNextLabel.classList.remove("is-hidden");
+  }
+  if (runningTaskNextName) {
+    const greeting = getRunningIdleGreeting(now);
+    runningTaskNextName.textContent = greeting;
+    runningTaskNextName.setAttribute("aria-label", greeting);
+  }
+  if (runningTaskNextTime) runningTaskNextTime.textContent = "";
+  if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
+  if (runningIdleHub) runningIdleHub.hidden = false;
+  if (runningMiniPlayer) runningMiniPlayer.hidden = false;
+  if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
+  if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
+  if (runningTaskListButton) runningTaskListButton.hidden = true;
+  if (runningTaskMissionButton) runningTaskMissionButton.hidden = true;
+  if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
+  if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
+  if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
+  if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
+  if (runningTaskStartNextButton) {
+    runningTaskStartNextButton.hidden = true;
+    runningTaskStartNextButton.dataset.actionId = "";
+  }
+  renderRunningMusicPlayer();
 }
 
 function setRunningHomeVisibility(isVisible) {
@@ -3259,33 +3306,7 @@ function renderHomeRunningTask() {
     runningTaskPercent.innerHTML = homeCenterMarkup;
     runningTaskMinutesLeft.textContent = "";
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
-    setRunningIdleVisualState(true);
-    updateRunningCenterModeButtons(showIdlePercent ? "percent" : "time");
-    if (runningTaskNextLabel) {
-      runningTaskNextLabel.classList.add("running-fade");
-      runningTaskNextLabel.classList.remove("is-hidden");
-    }
-    if (runningTaskNextName) {
-      const greeting = getRunningIdleGreeting(now);
-      runningTaskNextName.textContent = greeting;
-      runningTaskNextName.setAttribute("aria-label", greeting);
-    }
-    if (runningTaskNextTime) runningTaskNextTime.textContent = "";
-    if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
-    if (runningIdleHub) runningIdleHub.hidden = false;
-    if (runningMiniPlayer) runningMiniPlayer.hidden = false;
-    if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
-    if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
-    if (runningTaskListButton) runningTaskListButton.hidden = true;
-    if (runningTaskMissionButton) runningTaskMissionButton.hidden = true;
-    if (runningTaskMusicButton) runningTaskMusicButton.hidden = true;
-    if (runningTaskFinalizeButton) runningTaskFinalizeButton.hidden = true;
-    if (runningTaskRestoreButton) runningTaskRestoreButton.hidden = true;
-    if (runningTaskGiveUpButton) runningTaskGiveUpButton.hidden = true;
-    if (runningTaskStartNextButton) {
-      runningTaskStartNextButton.hidden = true;
-      runningTaskStartNextButton.dataset.actionId = "";
-    }
+    primeRunningIdleHomeShell();
     setHomeTaskTitle("", false);
     if (homeRunningActions) {
       homeRunningActions.hidden = true;
@@ -12863,6 +12884,11 @@ function openPrimaryRunningSurface() {
     redirectToProject200Login();
     return;
   }
+  if (state.homeSnapshotReady) {
+    renderHomeRunningTask();
+  } else {
+    primeRunningIdleHomeShell();
+  }
   openModal("runningTaskModal");
 }
 
@@ -12874,6 +12900,16 @@ document.querySelectorAll("[data-open-modal]").forEach((button) => {
     }
     openModal(button.dataset.openModal);
   });
+
+document.querySelectorAll("[data-ilife-finance-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const action = String(button.dataset.ilifeFinanceAction || "").trim();
+    const status = document.getElementById("ilifeFinanceStatus");
+    if (!status) return;
+    const labels = { income: "Recebi", expense: "Gastei", account: "Minhas contas" };
+    status.textContent = `${labels[action] || "Finanças"}: este novo fluxo será construído a partir desta base.`;
+  });
+});
 });
 
 document.querySelectorAll("[data-switch-modal]").forEach((button) => {
@@ -13205,14 +13241,6 @@ document.querySelectorAll("[data-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveActiveDate(Number(button.dataset.dayNav)));
 });
 
-financePeriodPrev?.addEventListener("click", () => moveFinancePeriod(-1));
-financePeriodNext?.addEventListener("click", () => moveFinancePeriod(1));
-saveFinanceNotesButton?.addEventListener("click", () => {
-  void saveFinanceNotes();
-});
-document.querySelectorAll("[data-finance-day-nav]").forEach((button) => {
-  button.addEventListener("click", () => movePlatformDate(Number(button.dataset.financeDayNav)));
-});
 document.querySelectorAll("[data-stats-scope-nav]").forEach((button) => {
   button.addEventListener("click", () => moveStatsScope(Number(button.dataset.statsScopeNav)));
 });
@@ -13730,10 +13758,6 @@ actionsList.addEventListener("keydown", async (event) => {
 });
 
 handleSwipe(activeDateLabel, moveActiveDate);
-handleSwipe(financePeriodLabel, moveFinancePeriod);
-handleSwipe(financePeriodPicker, moveFinancePeriod);
-handleSwipe(financeDateLabel, movePlatformDate);
-renderFinancePeriod();
 renderDateHeader();
 
 openPlatformWizardButton?.addEventListener("click", () => {

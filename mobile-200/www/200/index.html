@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
@@ -115,10 +115,6 @@
       <img class="home-hero-image" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" />
     </section>
     <section class="project-hub" aria-label="Projeto 200">
-      <button class="hub-action" type="button" id="homeRunningSurfaceButton" aria-label="Abrir andamento">
-        <img class="hub-icon-image" id="homeRunningSurfaceIcon" src="/200/icons/home-running-surface-idle-ilife.svg" alt="" aria-hidden="true" />
-        <span class="hub-action-label">Andam.</span>
-      </button>
       <button class="hub-action" type="button" data-open-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
         <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Ações</span>
@@ -126,8 +122,10 @@
       <button class="hub-action" type="button" data-open-modal="historyModal" data-loading-icon="/200/icons/target.svg" aria-label="Missões">
         <img class="hub-icon-image" src="/200/icons/target.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Missões</span>
-      </button>
-      <button class="hub-action" type="button" data-open-modal="statsModal" data-loading-icon="/200/icons/stats.svg" aria-label="Estatísticas">
+      </button>      <button class="hub-action" type="button" data-open-modal="ilifeFinanceModal" data-loading-icon="/200/icons/financas.svg" aria-label="Finanças">
+        <img class="hub-icon-image" src="/200/icons/financas.svg" alt="" aria-hidden="true" />
+        <span class="hub-action-label">Finanças</span>
+      </button><button class="hub-action" type="button" data-open-modal="statsModal" data-loading-icon="/200/icons/stats.svg" aria-label="Estatísticas">
         <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Estat.</span>
       </button>
@@ -148,7 +146,7 @@
   </div>
 
   <section class="workspace-modal simple-modal" id="runningTaskModal" aria-hidden="true" aria-label="Tarefa em execução">
-    <div class="finance-content running-task-content">
+    <div class="finance-content running-task-content is-idle-layout">
       <div class="running-home-corner-actions" aria-label="Atalhos da página inicial">
         <button class="running-home-corner-button running-home-social-button" type="button" id="runningHomeSocialButton" aria-label="Abrir amizades">
           <span class="home-social-float-badge" id="runningHomeSocialBadge" hidden>0</span>
@@ -186,7 +184,7 @@
         </div>
         <button class="ghost-btn running-task-start-btn" type="button" id="runningTaskStartNextButton" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg><span>Iniciar tarefa</span></button>
       </div>
-      <div class="running-task-actions">
+      <div class="running-task-actions" hidden>
         <button class="running-task-circle-btn running-task-home-btn" type="button" id="runningTaskHomeButton" aria-label="Voltar para a home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z" fill="currentColor"/></svg></button>
         <button class="running-task-circle-btn running-task-quick-btn" type="button" id="runningTaskQuickButton" aria-label="Iniciar tarefa rápida"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg></button>
         <button class="running-task-circle-btn running-task-list-btn" type="button" id="runningTaskListButton" aria-label="Abrir lista de tarefas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
@@ -195,11 +193,7 @@
         <button class="running-task-circle-btn running-task-music-btn" type="button" id="runningTaskMusicButton" aria-label="Música"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg></button>
         <button class="running-task-circle-btn running-task-mission-btn" type="button" id="runningTaskMissionButton" aria-label="Missões rápidas"><img src="/200/icons/target.svg" alt="" aria-hidden="true" /></button>
       </div>
-      <section class="project-hub running-idle-hub" id="runningIdleHub" aria-label="Projeto 200" hidden>
-        <button class="hub-action" type="button" aria-label="Andamento atual" aria-current="page">
-          <img class="hub-icon-image" src="/200/icons/home-running-surface-idle-ilife.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Andam.</span>
-        </button>
+      <section class="project-hub running-idle-hub" id="runningIdleHub" aria-label="Projeto 200">
         <button class="hub-action" type="button" data-open-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
           <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
           <span class="hub-action-label">Ações</span>
@@ -207,8 +201,10 @@
         <button class="hub-action" type="button" data-open-modal="historyModal" data-loading-icon="/200/icons/target.svg" aria-label="Missões">
           <img class="hub-icon-image" src="/200/icons/target.svg" alt="" aria-hidden="true" />
           <span class="hub-action-label">Missões</span>
-        </button>
-        <button class="hub-action" type="button" data-open-modal="statsModal" data-loading-icon="/200/icons/stats.svg" aria-label="Estatísticas">
+        </button>      <button class="hub-action" type="button" data-open-modal="ilifeFinanceModal" data-loading-icon="/200/icons/financas.svg" aria-label="Finanças">
+        <img class="hub-icon-image" src="/200/icons/financas.svg" alt="" aria-hidden="true" />
+        <span class="hub-action-label">Finanças</span>
+      </button><button class="hub-action" type="button" data-open-modal="statsModal" data-loading-icon="/200/icons/stats.svg" aria-label="Estatísticas">
           <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
           <span class="hub-action-label">Estat.</span>
         </button>
@@ -895,140 +891,56 @@
     </div>
   </section>
 
-  <section class="workspace-modal simple-modal finance-modal" id="financeModal" aria-hidden="true" aria-label="Plataforma">
-    <button class="modal-close" type="button" data-close-modal aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg></button>
-    <div class="finance-content">
-      <h1 id="financeIntroTitle">Financeiro</h1>
-      <div class="finance-period-picker" id="financePeriodPicker" hidden>
-        <button class="circle-nav" type="button" id="financePeriodPrev" aria-label="Periodo anterior">‹</button>
-        <span class="finance-period-label" id="financePeriodLabel">Total</span>
-        <button class="circle-nav" type="button" id="financePeriodNext" aria-label="Proximo periodo">›</button>
-      </div>
-      <div class="finance-dashboard" id="financeDashboard" hidden>
-        <article class="finance-metric">
-          <span id="financeSalesLabel">Entradas</span>
-          <strong id="financeTotalSales">R$ 0,00</strong>
-        </article>
-        <article class="finance-metric">
-          <span id="financeEntriesLabel">Lancamentos</span>
-          <strong id="financeSubscribers">0</strong>
-        </article>
-        <article class="finance-metric">
-          <span id="financeBalanceLabel">Saldo atual</span>
-          <strong id="financeMonthlyRevenue">R$ 0,00</strong>
-        </article>
-      </div>
-      <textarea class="text-field options-text-field finance-notes-field" id="financeNotesInput" maxlength="12000" placeholder="Suas anotacoes financeiras pessoais..."></textarea>
-      <button class="primary-btn" type="button" id="saveFinanceNotesButton">Salvar anotacoes</button>
-      <p class="finance-status" id="financeStatus" aria-live="polite"></p>
-    </div>
-  </section>
-
-  <section class="workspace-modal" id="calendarModal" aria-hidden="true" aria-label="Finanças">
-    <div class="actions-app">
-      <header class="actions-head">
-        <button class="circle-nav" type="button" data-finance-day-nav="-1" aria-label="Data anterior">
-          <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
-        </button>
-        <button class="date-title" type="button" id="financeDateLabel">Hoje</button>
-        <button class="circle-nav" type="button" data-finance-day-nav="1" aria-label="Próxima data">
-          <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
-        </button>
-        <div class="finance-head-balance">
-          <button class="balance-visibility" type="button" id="togglePlatformBalance" aria-label="Ocultar saldo">*</button>
-          <strong id="platformBalanceValue">R$ 0,00</strong>
-          <button class="ghost-btn" type="button" id="addPlatformBalance">+</button>
+    <section class="workspace-modal simple-modal ilife-finance-modal" id="ilifeFinanceModal" aria-hidden="true" aria-label="Finanças">
+    <button class="modal-close" type="button" data-close-modal aria-label="Fechar Finanças">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z" /></svg>
+    </button>
+    <div class="ilife-finance-shell">
+      <header class="ilife-finance-header">
+        <img src="/200/icons/financas.svg" alt="" aria-hidden="true" />
+        <div>
+          <span class="ilife-finance-kicker">iLife</span>
+          <h1>Finanças</h1>
+          <p>Uma carteira simples para orientar sua vida real.</p>
         </div>
       </header>
-
-      <div class="finance-overview">
-        <article class="finance-metric finance-rotating-card" id="platformExpenseCard">
-          <span class="finance-metric-title"><img src="/200/icons/saidas.svg" alt="" aria-hidden="true" />Saídas</span>
-          <strong id="platformMonthlyExpense">R$ 0,00</strong>
+      <section class="ilife-finance-snapshot" aria-label="Resumo financeiro">
+        <article class="ilife-finance-card ilife-finance-card-primary">
+          <span>Nas suas contas</span>
+          <strong id="ilifeFinanceCurrentBalance">R$ 0,00</strong>
+          <small>Dinheiro que existe agora</small>
         </article>
-        <article class="finance-metric finance-rotating-card" id="platformIncomeCard" hidden>
-          <span class="finance-metric-title"><img src="/200/icons/entradas.svg" alt="" aria-hidden="true" />Entradas</span>
-          <strong id="platformMonthlyIncome">R$ 0,00</strong>
+        <article class="ilife-finance-card">
+          <span>Já comprometido</span>
+          <strong id="ilifeFinanceCommitted">R$ 0,00</strong>
+          <small>Contas e dívidas com destino</small>
         </article>
-        <article class="finance-metric finance-rotating-card" id="platformSaldoCard" hidden>
-          <span class="finance-metric-title"><img src="/200/icons/plataforma.svg" alt="" aria-hidden="true" />Saldo</span>
-          <strong id="platformRealizedBalance">R$ 0,00</strong>
+        <article class="ilife-finance-card">
+          <span>Livre para usar</span>
+          <strong id="ilifeFinanceFreeToUse">R$ 0,00</strong>
+          <small>Até sua próxima entrada</small>
         </article>
-      </div>
-
-      <div class="actions-list" id="platformEntriesList" aria-live="polite"></div>
-      <div class="finance-bottom-actions">
-        <button class="icon-action-btn" type="button" id="openPlatformWizard" aria-label="Adicionar lançamento">
-          <img src="/200/icons/add.svg" alt="" aria-hidden="true" />
-        </button>
-        <button class="icon-action-btn" type="button" data-close-modal aria-label="Fechar finanças">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z"/></svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="action-wizard" id="platformWizard" aria-hidden="true">
-      <div class="wizard-panel">
-        <header class="wizard-head">
-          <span id="platformWizardStepLabel">1 de 4</span>
-          <button class="wizard-close" type="button" id="closePlatformWizard" aria-label="Fechar etapa">
-            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
-          </button>
-        </header>
-
-        <form id="platformForm">
-          <section class="wizard-step active" data-platform-step="1">
-            <label class="step-label" for="platformName">Nome</label>
-            <div class="platform-name-field-wrap">
-              <input id="platformName" class="text-field platform-name-field" name="name" autocomplete="off" maxlength="90" />
-              <button type="button" class="platform-name-mic-btn" id="platformNameMicButton" aria-label="Falar nome do lançamento">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 1 0-8 0v4a4 4 0 0 0 4 4m6-4a1 1 0 0 1 2 0 8 8 0 0 1-7 7.94V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.06A8 8 0 0 1 4 11a1 1 0 1 1 2 0 6 6 0 0 0 12 0"/></svg>
-              </button>
-            </div>
-            <div class="repeat-presets">
-              <button type="button" data-platform-kind="INCOME" class="active">Entrada</button>
-              <button type="button" data-platform-kind="EXPENSE">Saída</button>
-            </div>
-            <div class="repeat-presets" id="platformCategoryRow"></div>
-          </section>
-
-          <section class="wizard-step" data-platform-step="2">
-            <span class="step-label">Valor</span>
-            <input id="platformValue" class="text-field" name="value" autocomplete="off" inputmode="decimal" placeholder="0,00" />
-          </section>
-
-          <section class="wizard-step" data-platform-step="3">
-            <span class="step-label">Simples ou Recorrente</span>
-            <div class="repeat-presets">
-              <button type="button" data-platform-recurrence="SIMPLE" class="active">Simples</button>
-              <button type="button" data-platform-recurrence="RECURRING">Recorrente</button>
-            </div>
-          </section>
-
-          <section class="wizard-step" data-platform-step="4">
-            <span class="step-label">Dia do mês</span>
-            <div class="date-picker">
-              <button class="circle-nav" type="button" data-platform-day="-1" aria-label="Dia anterior">
-                <svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
-              </button>
-              <strong id="platformRecurrenceDayLabel">1</strong>
-              <button class="circle-nav" type="button" data-platform-day="1" aria-label="Próximo dia">
-                <svg viewBox="0 0 24 24"><path d="M8.6 18.6 10 20l8-8-8-8-1.4 1.4 6.6 6.6z"/></svg>
-              </button>
-            </div>
-          </section>
-
-          <p class="wizard-message" id="platformWizardMessage" role="status"></p>
-
-          <footer class="wizard-actions">
-            <button class="ghost-btn" type="button" id="platformWizardBack">Voltar</button>
-            <button class="primary-btn" type="button" id="platformWizardAiCreate">Criar</button>
-            <button class="primary-btn" type="button" id="platformWizardNext">Continuar</button>
-          </footer>
-        </form>
-      </div>
+      </section>
+      <section class="ilife-finance-guidance" aria-live="polite">
+        <span class="ilife-finance-guidance-label">Orientação financeira</span>
+        <p id="ilifeFinanceGuidance">Registre sua primeira conta para o iLife começar a enxergar seu dinheiro.</p>
+      </section>
+      <section class="ilife-finance-actions" aria-label="Ações financeiras">
+        <button type="button" class="ilife-finance-action" data-ilife-finance-action="income">Recebi</button>
+        <button type="button" class="ilife-finance-action" data-ilife-finance-action="expense">Gastei</button>
+        <button type="button" class="ilife-finance-action" data-ilife-finance-action="account">Minhas contas</button>
+      </section>
+      <section class="ilife-finance-empty-state">
+        <img src="/200/icons/carteira.svg" alt="" aria-hidden="true" onerror="this.src='/200/icons/financas.svg'" />
+        <h2>Seu painel financeiro começa aqui</h2>
+        <p>Primeiro vamos organizar o dinheiro que existe. Depois entram compromissos, cartões e projeções.</p>
+      </section>
+      <p class="ilife-finance-status" id="ilifeFinanceStatus" aria-live="polite"></p>
     </div>
   </section>
+
+
+
 
   <section class="workspace-modal" id="statsModal" aria-hidden="true" aria-label="Estatísticas">
     <div class="actions-app stats-actions-app">
@@ -1180,26 +1092,6 @@
     </div>
   </section>
 
-  <div class="action-wizard" id="financeEntryConfirmWizard" aria-hidden="true">
-      <div class="wizard-panel">
-        <header class="wizard-head">
-          <span>Confirmar lançamento</span>
-          <button class="wizard-close" type="button" id="closeFinanceEntryConfirm" aria-label="Fechar">
-            <svg viewBox="0 0 24 24"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z"/></svg>
-          </button>
-        </header>
-        <div class="task-row platform-entry-row" id="financeEntryConfirmCard">
-          <div class="task-title" id="financeEntryConfirmName">-</div>
-          <div class="platform-entry-value" id="financeEntryConfirmValue">R$ 0,00</div>
-        </div>
-        <p class="wizard-message" id="financeEntryConfirmMeta">-</p>
-        <div class="wizard-actions">
-          <button class="ghost-btn" type="button" id="financeEntryConfirmCancel">Cancelar</button>
-          <button class="primary-btn" type="button" id="financeEntryConfirmApply">Confirmar</button>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <section class="workspace-modal" id="historyModal" aria-hidden="true" aria-label="Missões">
     <div class="actions-app history-app missions-app">
