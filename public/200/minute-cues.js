@@ -1,4 +1,4 @@
-export const MINUTE_CUE_MAX_MINUTES = 6 * 60;
+﻿export const MINUTE_CUE_MAX_MINUTES = 6 * 60;
 export const MINUTE_CUE_PRELOAD_SECONDS = 6;
 export const MINUTE_CUE_INTERVALS = [0, 1, 3, 5, 10];
 export const MINUTE_CUE_FINAL_MINUTES = [5, 3, 1];

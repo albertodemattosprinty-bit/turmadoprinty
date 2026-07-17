@@ -1,17 +1,13 @@
-import "../src/load-env.js";
+﻿import "../src/load-env.js";
 
-import fs from "node:fs/promises";
-import path from "node:path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-const sourceDir = "C:/Users/Lucas/Pictures/FlashCards Capa/Nova pasta/Nova pasta";
-const existingCueDir = path.resolve("public/200/mission-cues");
 const prefix = "project200/audio/pt-BR/minutos-restantes/v1";
-const shouldUpload = process.argv.includes("--upload");
+const shouldUploadManifest = process.argv.includes("--upload-manifest");
 
 function requiredEnv(name) {
   const value = String(process.env[name] || "").trim();
-  if (!value) throw new Error(`Variável obrigatória ausente: ${name}`);
+  if (!value) throw new Error(`Variavel obrigatoria ausente: ${name}`);
   return value;
 }
 
@@ -27,68 +23,69 @@ function buildClient() {
   });
 }
 
-function sourceIndexToMinutes(index) {
-  return index <= 56 ? index + 3 : 60 + ((index - 57) * 5);
+function getMinuteFileName(minutes) {
+  return `${String(minutes).padStart(3, "0")}-minutos.mp3`;
 }
 
-async function buildEntries() {
-  const entries = [
-    { minutes: 1, sourcePath: path.join(existingCueDir, "1-min.mp3"), originalName: "1-min.mp3" },
-    { minutes: 2, sourcePath: path.join(existingCueDir, "2-min.mp3"), originalName: "2-min.mp3" },
-    { minutes: 3, sourcePath: path.join(existingCueDir, "3-min.mp3"), originalName: "3-min.mp3" }
-  ];
-
-  for (let index = 1; index <= 117; index += 1) {
-    const originalName = `${String(index).padStart(4, "0")}.mp3`;
-    entries.push({
-      minutes: sourceIndexToMinutes(index),
-      sourcePath: path.join(sourceDir, originalName),
-      originalName
-    });
-  }
-
-  for (const entry of entries) {
-    await fs.access(entry.sourcePath);
-    entry.fileName = `${String(entry.minutes).padStart(3, "0")}-minutos.mp3`;
-    entry.key = `${prefix}/${entry.fileName}`;
-  }
-  return entries;
+function hasExactMinuteCue(minutes) {
+  return minutes >= 1 && minutes <= 360 && (minutes <= 60 || minutes % 5 === 0);
 }
 
-async function uploadInBatches(client, bucket, entries, batchSize = 8) {
-  for (let index = 0; index < entries.length; index += batchSize) {
-    const batch = entries.slice(index, index + batchSize);
-    await Promise.all(batch.map(async (entry) => {
-      const body = await fs.readFile(entry.sourcePath);
-      await client.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: entry.key,
-        Body: body,
-        ContentType: "audio/mpeg",
-        CacheControl: "public, max-age=31536000, immutable"
-      }));
-    }));
-    console.log(`Enviados ${Math.min(index + batch.length, entries.length)}/${entries.length}`);
+function buildEntry(minutes) {
+  const exact = hasExactMinuteCue(minutes);
+  if (exact) {
+    return {
+      minutes,
+      fileName: getMinuteFileName(minutes),
+      text: minutes === 1 ? "1 minuto" : `${minutes} minutos`,
+      mode: "single",
+      parts: [getMinuteFileName(minutes)]
+    };
   }
+
+  const hourMinutes = Math.floor(minutes / 60) * 60;
+  const remainingMinutes = minutes % 60;
+  return {
+    minutes,
+    fileName: getMinuteFileName(minutes),
+    text: `${minutes} minutos`,
+    mode: "combo",
+    parts: [getMinuteFileName(hourMinutes), getMinuteFileName(remainingMinutes)]
+  };
+}
+
+function buildManifest() {
+  return {
+    version: 3,
+    language: "pt-BR",
+    maxMinutes: 360,
+    coverage: "natural-combo-from-120-base-files",
+    generatedAt: new Date().toISOString(),
+    baseFiles: 120,
+    entries: Array.from({ length: 360 }, (_, index) => buildEntry(index + 1))
+  };
 }
 
 async function main() {
-  const entries = await buildEntries();
-  const manifest = {
-    version: 1,
-    language: "pt-BR",
-    maxMinutes: 360,
-    entries: entries.map(({ minutes, fileName, originalName }) => ({ minutes, fileName, originalName }))
-  };
+  const manifest = buildManifest();
 
-  if (!shouldUpload) {
-    console.log(JSON.stringify({ mode: "dry-run", prefix, total: entries.length, first: entries[0], last: entries.at(-1) }, null, 2));
+  if (!shouldUploadManifest) {
+    const comboEntries = manifest.entries.filter((entry) => entry.mode === "combo");
+    console.log(JSON.stringify({
+      mode: "dry-run",
+      prefix,
+      totalEntries: manifest.entries.length,
+      baseFiles: manifest.baseFiles,
+      comboEntries: comboEntries.length,
+      sampleCombo: comboEntries[0],
+      lastCombo: comboEntries.at(-1),
+      coverage: manifest.coverage
+    }, null, 2));
     return;
   }
 
-  const bucket = requiredEnv("R2_BUCKET_NAME");
   const client = buildClient();
-  await uploadInBatches(client, bucket, entries);
+  const bucket = requiredEnv("R2_BUCKET_NAME");
   await client.send(new PutObjectCommand({
     Bucket: bucket,
     Key: `${prefix}/manifest.json`,
@@ -96,7 +93,7 @@ async function main() {
     ContentType: "application/json; charset=utf-8",
     CacheControl: "public, max-age=300"
   }));
-  console.log(`Catálogo publicado: ${prefix}/manifest.json`);
+  console.log(`Manifest publicado em ${prefix}/manifest.json`);
 }
 
 main().catch((error) => {

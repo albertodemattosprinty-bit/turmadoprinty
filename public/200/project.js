@@ -6,7 +6,7 @@ import {
   buildMinuteCueSchedule,
   getMinuteCueIntervalLabel,
   normalizeMinuteCueInterval
-} from "./minute-cues.js?v=20260716-ptbr-minute-cues";
+} from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
@@ -1074,7 +1074,7 @@ const state = {
     showFreeTime: true,
     missionActionsMode: "show",
     completionBeepCycles: 0,
-    minuteNotificationInterval: 0,
+    minuteNotificationInterval: 1,
     finalMinuteNotificationsEnabled: true,
     backgroundTheme: "edge",
     screenLockEnabled: false,
@@ -1447,10 +1447,12 @@ function beginGlobalLoading(iconSrc = "") {
   if (startupLoadingActive) return false;
   globalLoadingCount += 1;
   if (globalLoadingCount === 1) {
+    window.__project200LoadingShownAt = Date.now();
     globalLoadingTimedOut = false;
     if (globalLoadingIcon) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
     if (globalLoadingCopy) globalLoadingCopy.textContent = "Carregando informações...";
     if (globalLoadingOverlay) {
+      globalLoadingOverlay.style.removeProperty("display");
       globalLoadingOverlay.hidden = false;
       globalLoadingOverlay.classList.remove("is-leaving");
       globalLoadingOverlay.setAttribute("aria-hidden", "false");
@@ -1505,24 +1507,31 @@ async function runWithGlobalLoading(task, options = {}) {
 function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
   if (startupLoadingActive) return;
   startupLoadingActive = true;
+  window.__project200LoadingShownAt = Date.now();
   state.homeClockReady = false;
   if (projectShell) projectShell.hidden = true;
   if (globalLoadingIcon && iconSrc) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
   if (globalLoadingCopy) globalLoadingCopy.textContent = "Preparando sua home...";
   if (globalLoadingOverlay) {
+    globalLoadingOverlay.style.removeProperty("display");
     globalLoadingOverlay.hidden = false;
     globalLoadingOverlay.classList.remove("is-leaving");
     globalLoadingOverlay.setAttribute("aria-hidden", "false");
   }
   if (startupLoadingFallbackTimer) window.clearTimeout(startupLoadingFallbackTimer);
-  startupLoadingFallbackTimer = window.setTimeout(() => {
-    startupLoadingFallbackTimer = null;
-    if (!startupLoadingActive) return;
+  startupLoadingFallbackTimer = window.setTimeout(forceEndStartupLoading, 6000);
+}
+
+function forceEndStartupLoading() {
+  try {
     state.runningIdleCenterMode = "time";
     renderHomeRunningTask();
     if (!runningTaskModalElement?.classList.contains("active")) openPrimaryRunningSurface();
+  } catch {
+    // The hard timeout must still release the screen if home rendering fails.
+  } finally {
     endStartupLoading();
-  }, 6000);
+  }
 }
 
 function endStartupLoading() {
@@ -1532,10 +1541,35 @@ function endStartupLoading() {
     window.clearTimeout(startupLoadingFallbackTimer);
     startupLoadingFallbackTimer = null;
   }
+  if (window.__project200HomeLoadingFailsafe) {
+    window.clearTimeout(window.__project200HomeLoadingFailsafe);
+    window.__project200HomeLoadingFailsafe = null;
+  }
   if (projectShell) projectShell.hidden = false;
-  hideGlobalLoadingOverlay();
+  if (globalLoadingOverlay) {
+    globalLoadingOverlay.classList.add("is-leaving");
+    globalLoadingOverlay.setAttribute("aria-hidden", "true");
+    window.setTimeout(() => {
+      if (!startupLoadingActive) {
+        globalLoadingOverlay.hidden = true;
+        globalLoadingOverlay.classList.remove("is-leaving");
+      }
+    }, 260);
+  }
 }
 
+window.__project200ForceEndStartupLoading = forceEndStartupLoading;
+window.__project200DismissCurrentLoading = () => {
+  const shownAt = Number(window.__project200LoadingShownAt || 0);
+  if (!shownAt || (Date.now() - shownAt) < 3000) return false;
+  if (startupLoadingActive) {
+    forceEndStartupLoading();
+    return true;
+  }
+  globalLoadingTimedOut = true;
+  hideGlobalLoadingOverlay();
+  return true;
+};
 function revealInitialHomeIfReady() {
   if (!startupLoadingActive
     || !state.runningPlayer.stationsLoaded
@@ -12935,7 +12969,7 @@ function loadOptionsConfig() {
     state.options.showFreeTime = true;
     state.options.missionActionsMode = "show";
     state.options.completionBeepCycles = 0;
-    state.options.minuteNotificationInterval = 0;
+    state.options.minuteNotificationInterval = 1;
     state.options.finalMinuteNotificationsEnabled = true;
     state.options.backgroundTheme = "edge";
     state.options.screenLockEnabled = false;
@@ -15856,6 +15890,9 @@ startRunningTaskTicker();
 if (runningMusicProgressTicker) {
   window.clearInterval(runningMusicProgressTicker);
 }
+
+
+
 
 
 

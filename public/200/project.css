@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg-a: #0b3da8;
   --bg-b: #1f7ee7;
   --white: #ffffff;
@@ -96,7 +96,7 @@ body[data-background-theme="black"] {
   --ink: #d9e4ff;
 }
 
-/* Seletor unificado dos 12 aspectos e histórico editável de sono. */
+/* Seletor unificado dos 12 aspectos e histÃ³rico editÃ¡vel de sono. */
 .start-decision-aspect-btn img { width: 24px; height: 24px; object-fit: contain; flex: 0 0 auto; }
 .aspect-selector-modal { z-index: 2900; padding: 0; background: inherit; color: var(--white); }
 .aspect-selector-modal.active { display: block; }
@@ -2008,7 +2008,7 @@ body.screen-locked .project-login-overlay.active {
 }
 
 #runningTaskModal .running-task-content.is-idle-layout .running-player {
-  grid-row: 2;
+  grid-row: 3;
   width: min(680px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
   height: clamp(58px, 9dvh, 70px);
@@ -2016,7 +2016,8 @@ body.screen-locked .project-login-overlay.active {
   margin-inline: auto;
   justify-self: center;
   align-self: center;
-  transform: translateY(clamp(74px, 10dvh, 96px));
+  margin-top: clamp(8px, 1.6dvh, 14px);
+  transform: none;
   z-index: 2;
 }
 
@@ -8136,3 +8137,5 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
     min-height: 40px;
   }
 }
+
+

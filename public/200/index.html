@@ -41,6 +41,49 @@
       <span class="global-loading-copy" id="globalLoadingCopy">Preparando sua home...</span>
     </div>
   </section>
+  <script>
+    (function installProject200HomeLoadingFailsafe() {
+      var overlay = document.getElementById("globalLoadingOverlay");
+      var shell = document.querySelector(".project-shell");
+      window.__project200LoadingShownAt = Date.now();
+
+      function hideLoadingElement() {
+        if (shell) shell.hidden = false;
+        if (!overlay) return;
+        overlay.classList.add("is-leaving");
+        overlay.setAttribute("aria-hidden", "true");
+        window.setTimeout(function removeHomeLoadingOverlay() {
+          overlay.hidden = true;
+          overlay.style.display = "none";
+          overlay.classList.remove("is-leaving");
+        }, 300);
+      }
+
+      function releaseHomeLoading() {
+        try {
+          if (typeof window.__project200ForceEndStartupLoading === "function") {
+            window.__project200ForceEndStartupLoading();
+          }
+        } catch {}
+        hideLoadingElement();
+      }
+
+      if (overlay) {
+        overlay.addEventListener("pointerdown", function dismissLoadingAfterThreeSeconds() {
+          var shownAt = Number(window.__project200LoadingShownAt || 0);
+          if (!shownAt || (Date.now() - shownAt) < 3000) return;
+          try {
+            if (typeof window.__project200DismissCurrentLoading === "function") {
+              window.__project200DismissCurrentLoading();
+            }
+          } catch {}
+          hideLoadingElement();
+        });
+      }
+
+      window.__project200HomeLoadingFailsafe = window.setTimeout(releaseHomeLoading, 6000);
+    })();
+  </script>
   <section class="project-login-overlay" id="profileManageOverlay" aria-hidden="true">
     <div class="project-login-card">
       <h2 id="profileManageTitle">Gerenciar usuário</h2>
@@ -688,7 +731,7 @@
       <button class="running-music-default-option options-toggle-btn" type="button" id="toggleMinuteNotificationsOption">
         <span class="running-music-default-top">Escolha de quanto em quanto tempo o MP3 será reproduzido durante a contagem</span>
         <strong>Avisos de tempo em áudio</strong>
-        <span class="running-music-default-bottom" id="toggleMinuteNotificationsHint">Desativada</span>
+        <span class="running-music-default-bottom" id="toggleMinuteNotificationsHint">De 1 em 1 minuto</span>
       </button>
       <button class="running-music-default-option options-toggle-btn" type="button" id="toggleFinalMinuteNotificationsOption">
         <span class="running-music-default-top">Reproduzir os MP3 quando faltarem 5, 3 e 1 minuto</span>
@@ -1482,10 +1525,11 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260716-loading-6s-backend"></script>
+  <script type="module" src="/200/project.js?v=20260716-loading-tap-3s"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>
+
 
 
 
