@@ -140,12 +140,14 @@ const recurrenceDays = {
 };
 const runningMusicStationSeeds = {
   Calm: [
-    "Untitled (1).mp3", "Untitled (2).mp3", "Untitled (16).mp3", "Untitled (17).mp3",
-    "Untitled (18).mp3", "Untitled (19).mp3", "Untitled (20).mp3", "Untitled (21).mp3",
-    "Untitled (22).mp3", "Untitled (23).mp3", "Untitled (24).mp3", "Untitled (25).mp3",
-    "Untitled (26).mp3", "Untitled (27).mp3", "Untitled (28).mp3", "Untitled (29).mp3",
-    "Untitled (30).mp3", "Untitled (31).mp3", "Untitled (32).mp3", "Untitled (33).mp3",
-    "Untitled (34).mp3", "Untitled (35).mp3"
+    "About space.mp3", "Good morning.mp3", "I feel joy.mp3", "I get up at 7.mp3",
+    "I have seen.mp3", "I play chess.mp3", "I say yes.mp3", "It's good.mp3",
+    "Memories.mp3", "My alarm.mp3", "This time tomorrow.mp3", "This time.mp3",
+    "You didn't call me.mp3"
+  ],
+  Pop: [
+    "99 (1).mp3", "99 (2).mp3", "99 (3).mp3", "99 (4).mp3",
+    "99 (5).mp3", "99 (6).mp3", "99 (7).mp3", "99 (8).mp3"
   ],
   Frequency: [
     "432Hz Tides.mp3", "432Hz Tides (1).mp3", "Bamboo Breathing.mp3", "Bamboo Breathing (1).mp3",
@@ -514,8 +516,6 @@ const runningTaskNextLabel = runningTaskModalElement?.querySelector(".running-ta
 const runningTaskNextName = document.getElementById("runningTaskNextName");
 const runningTaskNextTime = document.getElementById("runningTaskNextTime");
 const runningNextPanel = document.getElementById("runningNextPanel");
-const ilifeReaderOverlay = document.getElementById("ilifeReaderOverlay");
-const ilifeReaderFrame = document.getElementById("ilifeReaderFrame");
 const runningTaskHomeButton = document.getElementById("runningTaskHomeButton");
 const runningTaskQuickButton = document.getElementById("runningTaskQuickButton");
 const runningTaskListButton = document.getElementById("runningTaskListButton");
@@ -657,6 +657,9 @@ const homeRunningSurfaceIcon = document.getElementById("homeRunningSurfaceIcon")
 const homeSocialButton = document.getElementById("homeSocialButton");
 const homeSocialBadge = document.getElementById("homeSocialBadge");
 const homeSleepButton = document.getElementById("homeSleepButton");
+const runningHomeSocialButton = document.getElementById("runningHomeSocialButton");
+const runningHomeSocialBadge = document.getElementById("runningHomeSocialBadge");
+const runningHomeSleepButton = document.getElementById("runningHomeSleepButton");
 const socialModal = document.getElementById("socialModal");
 const socialModalShell = document.getElementById("socialModalShell");
 const socialModalLoading = document.getElementById("socialModalLoading");
@@ -769,8 +772,6 @@ let actionLastSpeechAt = 0;
 let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
-let ilifeReadingPoints = 0;
-let ilifeReadingCycleStartedAt = Date.now();
 let pendingActionsAnchorId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
@@ -1108,7 +1109,13 @@ const state = {
     onlyFree: false
   },
   runningPlayer: {
-    stations: [],
+    stations: [{
+      name: "Calm",
+      tracks: [{
+        name: "About space",
+        url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/About%20space.mp3"
+      }]
+    }],
     stationIndex: 0,
     playOrderUrls: [],
     playOrderIndex: 0,
@@ -2203,77 +2210,6 @@ function getRunningIdleGreeting(date = new Date()) {
   return "Boa noite";
 }
 
-function isIlifeReadingPointsTurn() {
-  const elapsedMs = Math.max(0, Date.now() - ilifeReadingCycleStartedAt);
-  return Math.floor(elapsedMs / 3000) % 2 === 1;
-}
-
-async function loadIlifeReadingPoints() {
-  if (!getToken()) {
-    return;
-  }
-  try {
-    const payload = await apiRequest("/api/mini/courses/summary", {
-      skipGlobalLoading: true
-    });
-    ilifeReadingPoints = Math.max(0, Number(payload?.summary?.totalPoints || 0) || 0);
-    if (runningTaskModalElement?.classList.contains("active") && !getRunningActionForSelectedProfile()) {
-      renderHomeRunningTask();
-    }
-  } catch {
-    // Keep the last known reading score when the summary is temporarily unavailable.
-  }
-}
-
-function postIlifeReaderSession(type = "ilife-reader-session") {
-  if (!ilifeReaderFrame?.contentWindow) {
-    return;
-  }
-  let targetOrigin = "*";
-  try {
-    targetOrigin = new URL(getApiUrl("/mini")).origin;
-  } catch {}
-  ilifeReaderFrame.contentWindow.postMessage({
-    type,
-    token: getToken()
-  }, targetOrigin);
-}
-
-function openIlifeReader() {
-  if (!getToken()) {
-    redirectToProject200Login();
-    return;
-  }
-  if (!ilifeReaderOverlay || !ilifeReaderFrame) {
-    return;
-  }
-
-  const readerUrl = getApiUrl("/mini?reader=ilife");
-  ilifeReaderOverlay.hidden = false;
-  ilifeReaderOverlay.setAttribute("aria-hidden", "false");
-  document.body.classList.add("ilife-reader-open");
-  window.requestAnimationFrame(() => ilifeReaderOverlay.classList.add("active"));
-  if (ilifeReaderFrame.getAttribute("src") !== readerUrl) {
-    ilifeReaderFrame.setAttribute("src", readerUrl);
-  } else {
-    postIlifeReaderSession("ilife-reader-open");
-  }
-}
-
-function closeIlifeReader() {
-  if (!ilifeReaderOverlay) {
-    return;
-  }
-  ilifeReaderOverlay.classList.remove("active");
-  ilifeReaderOverlay.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("ilife-reader-open");
-  window.setTimeout(() => {
-    if (!ilifeReaderOverlay.classList.contains("active")) {
-      ilifeReaderOverlay.hidden = true;
-    }
-  }, 190);
-  void loadIlifeReadingPoints();
-}
 
 function getDayElapsedPercent(date = new Date()) {
   const parts = getProjectDateTimeParts(date);
@@ -3226,15 +3162,14 @@ function renderHomeRunningTask() {
       runningTaskNextLabel.classList.remove("is-hidden");
     }
     if (runningTaskNextName) {
-      const showReadingPoints = isIlifeReadingPointsTurn();
-      runningTaskNextName.textContent = showReadingPoints ? `${ilifeReadingPoints} pontos` : getRunningIdleGreeting(now);
-      runningTaskNextName.classList.toggle("is-reading-points", showReadingPoints);
-      runningTaskNextName.setAttribute("aria-label", showReadingPoints ? `Abrir leituras. ${ilifeReadingPoints} pontos` : getRunningIdleGreeting(now));
+      const greeting = getRunningIdleGreeting(now);
+      runningTaskNextName.textContent = greeting;
+      runningTaskNextName.setAttribute("aria-label", greeting);
     }
     if (runningTaskNextTime) runningTaskNextTime.textContent = "";
     if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
     if (runningIdleHub) runningIdleHub.hidden = false;
-    if (runningMiniPlayer) runningMiniPlayer.hidden = true;
+    if (runningMiniPlayer) runningMiniPlayer.hidden = false;
     if (runningTaskHomeButton) runningTaskHomeButton.hidden = true;
     if (runningTaskQuickButton) runningTaskQuickButton.hidden = true;
     if (runningTaskListButton) runningTaskListButton.hidden = true;
@@ -3267,7 +3202,7 @@ function renderHomeRunningTask() {
   }
   applyRunningStationForCategory(action.categoryId);
   setRunningIdleVisualState(false);
-  runningTaskNextName.classList.remove("is-reading-points");
+
   if (runningIdleHub) runningIdleHub.hidden = true;
   if (runningMiniPlayer) runningMiniPlayer.hidden = false;
   if (runningTaskNextLabel) {
@@ -4910,8 +4845,6 @@ function openModal(id) {
   if (id === "runningTaskModal") {
     if (!getRunningActionForSelectedProfile()) {
       state.runningIdleCenterMode = "time";
-      ilifeReadingCycleStartedAt = Date.now();
-      void loadIlifeReadingPoints();
     }
     setRunningHomeVisibility(false);
     void loadMissions();
@@ -5094,7 +5027,7 @@ function closeModal(modal) {
 function navigateToProjectHome() {
   modalBackNavigationActive = true;
   try {
-    if (ilifeReaderOverlay?.classList.contains("active")) closeIlifeReader();
+
     if (actionCategoryModal?.classList.contains("active")) {
       actionCategoryModal.classList.remove("active");
       actionCategoryModal.setAttribute("aria-hidden", "true");
@@ -5120,6 +5053,7 @@ function navigateToProjectHome() {
     modalNavigationStack.length = 0;
     document.body.classList.remove("modal-open", "start-decision-open", "start-conflict-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   }
+  openPrimaryRunningSurface();
 }
 
 function isDirectProjectHomeButton(button) {
@@ -9864,11 +9798,11 @@ async function openSleepModal() {
 
 function renderSocialBadge() {
   const count = Math.max(0, Math.trunc(Number(state.social?.pendingCount || 0) || 0));
-  if (!homeSocialBadge) {
-    return;
-  }
-  homeSocialBadge.hidden = count <= 0;
-  homeSocialBadge.textContent = String(count);
+  [homeSocialBadge, runningHomeSocialBadge].forEach((badge) => {
+    if (!badge) return;
+    badge.hidden = count <= 0;
+    badge.textContent = String(count);
+  });
 }
 
 function renderSocialScopeFooter() {
@@ -12565,10 +12499,6 @@ function getTopProjectModal() {
 }
 
 function navigateBackOneProjectLayer() {
-  if (ilifeReaderOverlay?.classList.contains("active")) {
-    closeIlifeReader();
-    return true;
-  }
   if (actionCategoryModal?.classList.contains("active")) {
     actionCategoryModal.classList.remove("active");
     actionCategoryModal.setAttribute("aria-hidden", "true");
@@ -12609,6 +12539,10 @@ function navigateBackOneProjectLayer() {
   }
   const topModal = getTopProjectModal();
   if (!topModal) return false;
+  const activeWorkspaceModals = [...document.querySelectorAll(".workspace-modal.active")];
+  if (topModal.id === "runningTaskModal" && activeWorkspaceModals.length === 1) {
+    return false;
+  }
   modalBackNavigationActive = true;
   try {
     if (topModal.id === "startConflictModal") {
@@ -12786,10 +12720,9 @@ async function bootstrapProject200App() {
       redirectToProject200Login();
       return;
     }
-    void loadIlifeReadingPoints();
-
     const sessionOk = await ensureProject200Session();
     if (sessionOk) {
+      openPrimaryRunningSurface();
       try {
         await refreshHomeSnapshot({ force: true });
         return;
@@ -12806,6 +12739,7 @@ async function bootstrapProject200App() {
       await refreshHomeSnapshot({ force: true });
       project200LoginOverlay?.classList.remove("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
+      openPrimaryRunningSurface();
     } catch (error) {
       if (isAuthErrorMessage(error?.message)) {
         clearProject200SessionState();
@@ -15076,7 +15010,16 @@ homeRunningSurfaceButton?.addEventListener("click", () => {
 homeSocialButton?.addEventListener("click", () => {
   void openSocialModal();
 });
+runningHomeSocialButton?.addEventListener("click", () => {
+  void openSocialModal();
+});
 homeSleepButton?.addEventListener("click", () => {
+  if (sleepModalFeedback) {
+    sleepModalFeedback.textContent = "";
+  }
+  void openSleepModal();
+});
+runningHomeSleepButton?.addEventListener("click", () => {
   if (sleepModalFeedback) {
     sleepModalFeedback.textContent = "";
   }
@@ -15285,46 +15228,13 @@ runningTaskPercent?.addEventListener("click", () => {
   state.runningIdleCenterMode = state.runningIdleCenterMode === "percent" ? "time" : "percent";
   renderHomeRunningTask();
 });
-runningTaskNextName?.addEventListener("click", () => {
-  if (getRunningActionForSelectedProfile() || !isIlifeReadingPointsTurn()) {
-    return;
-  }
-  openIlifeReader();
-});
-ilifeReaderFrame?.addEventListener("load", () => {
-  postIlifeReaderSession();
-});
-window.addEventListener("message", (event) => {
-  if (!ilifeReaderFrame || event.source !== ilifeReaderFrame.contentWindow) {
-    return;
-  }
-  const message = event.data && typeof event.data === "object" ? event.data : {};
-  if (message.type === "ilife-reader-ready") {
-    postIlifeReaderSession();
-    return;
-  }
-  if (message.type === "ilife-reader-close") {
-    closeIlifeReader();
-    return;
-  }
-  if (message.type === "ilife-reading-points-updated") {
-    ilifeReadingPoints = Math.max(0, Number(message.points || 0) || 0);
-    if (!getRunningActionForSelectedProfile()) {
-      renderHomeRunningTask();
-    }
-  }
-});
+
 runningConfirmPauseButton?.addEventListener("click", () => {
   const callback = state.runningConfirm.pauseAction;
   closeRunningConfirmModal();
   if (typeof callback === "function") callback();
 });
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && ilifeReaderOverlay?.classList.contains("active")) {
-    event.preventDefault();
-    closeIlifeReader();
-  }
-});
+
 if (runningAudio) {
   runningAudio.addEventListener("ended", () => {
     if (state.runningPlayer.repeatEnabled) {
@@ -15753,6 +15663,7 @@ project200LoginForm?.addEventListener("submit", (event) => {
       await loadProject200Profiles();
       await loadActions();
       await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+      openPrimaryRunningSurface();
       scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {
@@ -15829,6 +15740,7 @@ project200RegisterForm?.addEventListener("submit", (event) => {
       await loadProject200Profiles();
       await loadActions();
       await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+      openPrimaryRunningSurface();
       scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {

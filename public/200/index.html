@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260716-aspectos-sono-musica" />
+  <link rel="stylesheet" href="/200/project.css?v=20260716-home-inicial-relogio-player" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -65,6 +65,10 @@
       <img class="home-hero-image" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" />
     </section>
     <section class="project-hub" aria-label="Projeto 200">
+      <button class="hub-action" type="button" id="homeRunningSurfaceButton" aria-label="Abrir andamento">
+        <img class="hub-icon-image" id="homeRunningSurfaceIcon" src="/200/icons/home-running-surface-idle-ilife.svg" alt="" aria-hidden="true" />
+        <span class="hub-action-label">Andam.</span>
+      </button>
       <button class="hub-action" type="button" data-open-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
         <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Ações</span>
@@ -81,10 +85,6 @@
         <img class="hub-icon-image" src="/200/icons/options.svg" alt="" aria-hidden="true" />
         <span class="hub-action-label">Opções</span>
       </button>
-      <button class="hub-action" type="button" id="homeRunningSurfaceButton" aria-label="Abrir andamento">
-        <img class="hub-icon-image" id="homeRunningSurfaceIcon" src="/200/icons/home-running-surface-idle-ilife.svg" alt="" aria-hidden="true" />
-        <span class="hub-action-label">Andam.</span>
-      </button>
     </section>
   </main>
   <div class="screen-lock-overlay" id="screenLockOverlay" aria-hidden="true" hidden>
@@ -99,6 +99,16 @@
 
   <section class="workspace-modal simple-modal" id="runningTaskModal" aria-hidden="true" aria-label="Tarefa em execução">
     <div class="finance-content running-task-content">
+      <div class="running-home-corner-actions" aria-label="Atalhos da página inicial">
+        <button class="running-home-corner-button running-home-social-button" type="button" id="runningHomeSocialButton" aria-label="Abrir amizades">
+          <span class="home-social-float-badge" id="runningHomeSocialBadge" hidden>0</span>
+          <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.2a4.1 4.1 0 1 0-4.1-4.1 4.1 4.1 0 0 0 4.1 4.1zm0 2c-4 0-7.2 2-7.2 4.5 0 .7.6 1.3 1.3 1.3h11.8c.7 0 1.3-.6 1.3-1.3 0-2.5-3.2-4.5-7.2-4.5z" fill="currentColor"/></svg>
+        </button>
+        <button class="running-home-corner-button running-home-sleep-button" type="button" id="runningHomeSleepButton" aria-label="Abrir sono">
+          <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.4A8.8 8.8 0 0 1 9.6 3.8a9.2 9.2 0 1 0 10.6 10.6z" fill="currentColor"/></svg>
+        </button>
+      </div>
+      <img class="running-home-logo" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" />
       <div class="running-task-title-row">
         <img class="running-task-category-icon" id="runningTaskCategoryIcon" src="/200/aspect-icons/trabalho.svg" alt="Aspecto atual" hidden />
         <div class="running-task-name" id="runningTaskName"></div>
@@ -136,25 +146,25 @@
         <button class="running-task-circle-btn running-task-mission-btn" type="button" id="runningTaskMissionButton" aria-label="Missões rápidas"><img src="/200/icons/target.svg" alt="" aria-hidden="true" /></button>
       </div>
       <section class="project-hub running-idle-hub" id="runningIdleHub" aria-label="Projeto 200" hidden>
-        <button class="hub-action" type="button" data-switch-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
-          <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Ações</span>
-        </button>
-        <button class="hub-action" type="button" data-switch-modal="historyModal" data-loading-icon="/200/icons/target.svg" aria-label="Missões">
-          <img class="hub-icon-image" src="/200/icons/target.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Missões</span>
-        </button>
-        <button class="hub-action" type="button" data-switch-modal="statsModal" data-loading-icon="/200/icons/stats.svg" aria-label="Estatísticas">
-          <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Estat.</span>
-        </button>
-        <button class="hub-action" type="button" data-switch-modal="optionsModal" data-loading-icon="/200/icons/options.svg" aria-label="Opções">
-          <img class="hub-icon-image" src="/200/icons/options.svg" alt="" aria-hidden="true" />
-          <span class="hub-action-label">Opções</span>
-        </button>
         <button class="hub-action" type="button" aria-label="Andamento atual" aria-current="page">
           <img class="hub-icon-image" src="/200/icons/home-running-surface-idle-ilife.svg" alt="" aria-hidden="true" />
           <span class="hub-action-label">Andam.</span>
+        </button>
+        <button class="hub-action" type="button" data-open-modal="actionsModal" data-loading-icon="/200/icons/acts.svg" aria-label="Ações">
+          <img class="hub-icon-image" src="/200/icons/acts.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Ações</span>
+        </button>
+        <button class="hub-action" type="button" data-open-modal="historyModal" data-loading-icon="/200/icons/target.svg" aria-label="Missões">
+          <img class="hub-icon-image" src="/200/icons/target.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Missões</span>
+        </button>
+        <button class="hub-action" type="button" data-open-modal="statsModal" data-loading-icon="/200/icons/stats.svg" aria-label="Estatísticas">
+          <img class="hub-icon-image" src="/200/icons/stats.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Estat.</span>
+        </button>
+        <button class="hub-action" type="button" data-open-modal="optionsModal" data-loading-icon="/200/icons/options.svg" aria-label="Opções">
+          <img class="hub-icon-image" src="/200/icons/options.svg" alt="" aria-hidden="true" />
+          <span class="hub-action-label">Opções</span>
         </button>
       </section>
       <div class="running-player" id="runningMiniPlayer">
@@ -169,8 +179,8 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <div class="running-player-title-copy">
-            <span class="running-player-station" id="runningPlayerStation">Estação 1</span>
-            <span class="running-player-track" id="runningPlayerTrack"></span>
+              <span class="running-player-station" id="runningPlayerStation">Calm</span>
+              <span class="running-player-track" id="runningPlayerTrack">About space</span>
           </div>
           <button type="button" class="running-player-track-nav" id="runningPlayerNext" aria-label="Próxima música">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1465,16 +1475,7 @@
     </div>
   </section>
 
-  <section class="ilife-reader-overlay" id="ilifeReaderOverlay" aria-hidden="true" hidden>
-    <iframe
-      class="ilife-reader-frame"
-      id="ilifeReaderFrame"
-      title="Leitor de livros do iLife"
-      allow="autoplay"
-    ></iframe>
-  </section>
-
-  <script type="module" src="/200/project.js?v=20260716-aspectos-sono-musica"></script>
+  <script type="module" src="/200/project.js?v=20260716-home-inicial-relogio-player"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

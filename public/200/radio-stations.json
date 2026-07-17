@@ -4,92 +4,93 @@
       "name": "Calm",
       "tracks": [
         {
-          "name": "Quiet Place",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(1).mp3"
+          "name": "About space",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/About%20space.mp3"
         },
         {
-          "name": "Soft Breeze",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(2).mp3"
+          "name": "Good morning",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Good%20morning.mp3"
         },
         {
-          "name": "Silent River",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(16).mp3"
+          "name": "I feel joy",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/I%20feel%20joy.mp3"
         },
         {
-          "name": "Warm Horizon",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(17).mp3"
+          "name": "I get up at 7",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/I%20get%20up%20at%207.mp3"
         },
         {
-          "name": "Gentle Light",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(18).mp3"
+          "name": "I have seen",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/I%20have%20seen.mp3"
         },
         {
-          "name": "Velvet Sky",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(19).mp3"
+          "name": "I play chess",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/I%20play%20chess.mp3"
         },
         {
-          "name": "Ocean Whisper",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(20).mp3"
+          "name": "I say yes",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/I%20say%20yes.mp3"
         },
         {
-          "name": "Still Morning",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(21).mp3"
+          "name": "It's good",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/It's%20good.mp3"
         },
         {
-          "name": "Calm Valley",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(22).mp3"
+          "name": "Memories",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Memories.mp3"
         },
         {
-          "name": "Peaceful Path",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(23).mp3"
+          "name": "My alarm",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/My%20alarm.mp3"
         },
         {
-          "name": "Blue Serenity",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(24).mp3"
+          "name": "This time tomorrow",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/This%20time%20tomorrow.mp3"
         },
         {
-          "name": "Moon Garden",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(25).mp3"
+          "name": "This time",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/This%20time.mp3"
         },
         {
-          "name": "Tender Clouds",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(26).mp3"
+          "name": "You didn't call me",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/You%20didn't%20call%20me.mp3"
+        }
+      ]
+    },
+    {
+      "name": "Pop",
+      "tracks": [
+        {
+          "name": "Neon Boulevard",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(1).mp3"
         },
         {
-          "name": "Mellow Tide",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(27).mp3"
+          "name": "City Lights",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(2).mp3"
         },
         {
-          "name": "Dream Meadow",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(28).mp3"
+          "name": "Midnight Motion",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(3).mp3"
         },
         {
-          "name": "Luna Flow",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(29).mp3"
+          "name": "Electric Daydream",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(4).mp3"
         },
         {
-          "name": "Sweet Silence",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(30).mp3"
+          "name": "Skyline Rhythm",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(5).mp3"
         },
         {
-          "name": "Zen Harbor",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(31).mp3"
+          "name": "Velvet Drive",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(6).mp3"
         },
         {
-          "name": "Cozy Dusk",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(32).mp3"
+          "name": "Golden Frequency",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(7).mp3"
         },
         {
-          "name": "Golden Rest",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(33).mp3"
-        },
-        {
-          "name": "Pure Tranquility",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(34).mp3"
-        },
-        {
-          "name": "Harmony Field",
-          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Calm/Untitled%20(35).mp3"
+          "name": "Weekend Horizon",
+          "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Pop/99%20(8).mp3"
         }
       ]
     },
