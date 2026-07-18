@@ -150,6 +150,17 @@ function getProject200TodayKey() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function getProject200AttentionEndKey(todayKey) {
+  const today = dateOnlyToUtc(todayKey);
+  const nextThreeDaysEnd = addUtcDays(today, 2);
+  const daysUntilSunday = today.getUTCDay() === 0 ? 0 : 7 - today.getUTCDay();
+  const weekEnd = addUtcDays(today, daysUntilSunday);
+  const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
+  return new Date(Math.max(nextThreeDaysEnd.getTime(), weekEnd.getTime(), monthEnd.getTime()))
+    .toISOString()
+    .slice(0, 10);
+}
+
 function normalizeItemRow(row) {
   return {
     id: row.id,
@@ -294,16 +305,20 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     scheduleFrequency: row.schedule_frequency
   }));
   const today = getProject200TodayKey();
-  await materializeRange(userId, today, today);
-  const todayResult = await query(`
+  const attentionEnd = getProject200AttentionEndKey(today);
+  await materializeRange(userId, today, attentionEnd);
+  const attentionResult = await query(`
     select o.id, o.item_id, i.title, o.kind, o.amount_cents, o.due_on, o.status,
            i.settlement_type, i.schedule_mode, i.schedule_frequency
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
-    where o.user_id = $1 and o.due_on = $2::date and o.status <> 'CANCELLED'
-    order by o.created_at asc
-  `, [userId, today]);
-  const todayEntries = todayResult.rows.map((row) => ({
+    where o.user_id = $1
+      and o.due_on between $2::date and $3::date
+      and o.status = 'SCHEDULED'
+      and i.settlement_type = 'FUTURE'
+    order by o.due_on asc, o.created_at asc
+  `, [userId, today, attentionEnd]);
+  const attentionEntries = attentionResult.rows.map((row) => ({
     id: row.id,
     itemId: row.item_id,
     title: row.title,
@@ -315,9 +330,11 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     scheduleMode: row.schedule_mode,
     scheduleFrequency: row.schedule_frequency
   }));
+  const todayEntries = attentionEntries.filter((entry) => entry.dueOn === today);
 
-  const incomeCents = entries.filter((entry) => entry.kind === "INCOME").reduce((sum, entry) => sum + entry.amountCents, 0);
-  const expenseCents = entries.filter((entry) => entry.kind === "EXPENSE").reduce((sum, entry) => sum + entry.amountCents, 0);
+  const forecastEntries = entries.filter((entry) => entry.settlementType === "FUTURE" && entry.status === "SCHEDULED");
+  const incomeCents = forecastEntries.filter((entry) => entry.kind === "INCOME").reduce((sum, entry) => sum + entry.amountCents, 0);
+  const expenseCents = forecastEntries.filter((entry) => entry.kind === "EXPENSE").reduce((sum, entry) => sum + entry.amountCents, 0);
   const balanceResult = await query(`
     select coalesce(sum(case when kind = 'INCOME' then amount_cents else -amount_cents end), 0)::bigint as balance_cents
     from project200_finance_occurrences
@@ -330,6 +347,7 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     expenseCents,
     balanceCents: Number(balanceResult.rows[0]?.balance_cents || 0),
     hasAny: Number(countResult.rows[0]?.total || 0) > 0,
+    attentionEntries,
     todayEntries,
     entries
   };

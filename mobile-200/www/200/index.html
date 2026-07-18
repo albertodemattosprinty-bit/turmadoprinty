@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260718-finance-ledger-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260718-finance-attention-v2" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -933,9 +933,16 @@
         </section>
 
         <section class="ilife-finance-guidance" aria-live="polite">
-          <span class="ilife-finance-guidance-label">Hoje</span>
+          <div class="ilife-finance-attention-head">
+            <button class="ilife-finance-attention-cycle" type="button" id="ilifeFinanceAttentionCycle" aria-label="Mostrar próximos 3 dias">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h9.2l-2.6-2.6L15 3l5 5-5 5-1.4-1.4L16.2 9H7a3 3 0 0 0-3 3v1H2v-1a5 5 0 0 1 5-5Zm10 10H7.8l2.6 2.6L9 21l-5-5 5-5 1.4 1.4L7.8 15H17a3 3 0 0 0 3-3v-1h2v1a5 5 0 0 1-5 5Z" fill="currentColor"/></svg>
+            </button>
+            <div>
+              <span class="ilife-finance-guidance-label">Agenda financeira</span>
+              <h2 id="ilifeFinanceAttentionTitle">Seu painel financeiro começa aqui</h2>
+            </div>
+          </div>
           <div id="ilifeFinanceTodayContent">
-            <h2>Seu painel financeiro começa aqui</h2>
             <p>Primeiro vamos registrar uma entrada ou saída.</p>
           </div>
         </section>
@@ -1487,7 +1494,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260718-finance-ledger-v1"></script>
+  <script type="module" src="/200/project.js?v=20260718-finance-attention-v2"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

@@ -326,6 +326,8 @@ const ilifeFinanceExpectedIncome = document.getElementById("ilifeFinanceExpected
 const ilifeFinanceExpectedExpense = document.getElementById("ilifeFinanceExpectedExpense");
 const ilifeFinanceIncomeMonth = document.getElementById("ilifeFinanceIncomeMonth");
 const ilifeFinanceExpenseMonth = document.getElementById("ilifeFinanceExpenseMonth");
+const ilifeFinanceAttentionCycle = document.getElementById("ilifeFinanceAttentionCycle");
+const ilifeFinanceAttentionTitle = document.getElementById("ilifeFinanceAttentionTitle");
 const ilifeFinanceTodayContent = document.getElementById("ilifeFinanceTodayContent");
 const ilifeFinanceStatus = document.getElementById("ilifeFinanceStatus");
 const ilifeFinanceMonthPrev = document.getElementById("ilifeFinanceMonthPrev");
@@ -1007,6 +1009,7 @@ const state = {
     monthCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     summary: null,
     addMenuOpen: false,
+    attentionScopeIndex: 0,
     wizard: null
   },
   statsSummary: null,
@@ -4948,6 +4951,12 @@ function inferFinanceEntryLocally(text) {
 }
 
 const ilifeFinanceScheduleModes = ["ONCE", "RECURRING", "FINITE"];
+const ilifeFinanceAttentionScopes = [
+  { key: "today", label: "Pendências para hoje", empty: "Nenhuma pendência para hoje" },
+  { key: "next3", label: "Próximos 3 dias", empty: "Nenhuma pendência nos próximos 3 dias" },
+  { key: "week", label: "Esta semana", empty: "Nenhuma pendência nesta semana" },
+  { key: "month", label: "Este mês", empty: "Nenhuma pendência neste mês" }
+];
 const ilifeFinanceScheduleModeLabels = {
   ONCE: ["Uma vez", "Define uma data única"],
   RECURRING: ["Recorrente", "Continua sem data final"],
@@ -4988,10 +4997,10 @@ function getIlifeFinanceMonthName() {
 }
 
 function parseIlifeFinanceAmount(value) {
-  const raw = String(value || "").trim().replace(/s/g, "");
+  const raw = String(value || "").trim().replace(/\s/g, "");
   if (!raw) return 0;
   let normalized = raw;
-  if (raw.includes(",")) normalized = raw.replace(/./g, "").replace(",", ".");
+  if (raw.includes(",")) normalized = raw.replace(/\./g, "").replace(",", ".");
   const amount = Number(normalized.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) : 0;
 }
@@ -5000,6 +5009,37 @@ function formatIlifeFinanceDate(dateKey) {
   if (!dateKey) return "";
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
     .format(new Date(`${dateKey}T12:00:00Z`));
+}
+
+function getActiveIlifeFinanceAttentionScope() {
+  return ilifeFinanceAttentionScopes[state.ilifeFinance.attentionScopeIndex] || ilifeFinanceAttentionScopes[0];
+}
+
+function getIlifeFinanceAttentionEndKey(scopeKey, todayKey) {
+  if (scopeKey === "next3") return addDaysToDateKey(todayKey, 2);
+  if (scopeKey === "week") {
+    const weekday = projectDateKeyToDate(todayKey, 12).getDay();
+    return addDaysToDateKey(todayKey, weekday === 0 ? 0 : 7 - weekday);
+  }
+  if (scopeKey === "month") {
+    const [year, month] = todayKey.split("-").map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  }
+  return todayKey;
+}
+
+function getIlifeFinanceAttentionEntries(summary) {
+  const scope = getActiveIlifeFinanceAttentionScope();
+  const today = getProjectTodayDateKey();
+  const end = getIlifeFinanceAttentionEndKey(scope.key, today);
+  return (Array.isArray(summary?.attentionEntries) ? summary.attentionEntries : [])
+    .filter((entry) => entry.dueOn >= today && entry.dueOn <= end);
+}
+
+function moveIlifeFinanceAttentionScope() {
+  state.ilifeFinance.attentionScopeIndex = (state.ilifeFinance.attentionScopeIndex + 1) % ilifeFinanceAttentionScopes.length;
+  renderIlifeFinanceSummary();
 }
 
 function renderIlifeFinanceSummary() {
@@ -5011,20 +5051,27 @@ function renderIlifeFinanceSummary() {
   if (ilifeFinanceCurrentBalance) ilifeFinanceCurrentBalance.textContent = formatMoney(summary.balanceCents || 0);
   if (ilifeFinanceExpectedIncome) ilifeFinanceExpectedIncome.textContent = formatMoney(summary.incomeCents || 0);
   if (ilifeFinanceExpectedExpense) ilifeFinanceExpectedExpense.textContent = formatMoney(summary.expenseCents || 0);
-  if (!ilifeFinanceTodayContent) return;
+  if (!ilifeFinanceTodayContent || !ilifeFinanceAttentionTitle) return;
 
-  const todayEntries = Array.isArray(summary.todayEntries) ? summary.todayEntries : [];
+  const scope = getActiveIlifeFinanceAttentionScope();
+  const attentionEntries = getIlifeFinanceAttentionEntries(summary);
+  const nextScope = ilifeFinanceAttentionScopes[(state.ilifeFinance.attentionScopeIndex + 1) % ilifeFinanceAttentionScopes.length];
+  if (ilifeFinanceAttentionCycle) ilifeFinanceAttentionCycle.setAttribute("aria-label", `Mostrar ${nextScope.label.toLowerCase()}`);
   if (!summary.hasAny) {
-    ilifeFinanceTodayContent.innerHTML = '<h2>Seu painel financeiro começa aqui</h2><p>Primeiro vamos registrar uma entrada ou saída.</p>';
+    ilifeFinanceAttentionTitle.textContent = "Seu painel financeiro começa aqui";
+    ilifeFinanceTodayContent.innerHTML = '<p>Primeiro vamos registrar uma entrada ou saída.</p>';
     return;
   }
-  if (!todayEntries.length) {
-    ilifeFinanceTodayContent.innerHTML = '<h2>Nenhuma pendência para hoje</h2><p>Os próximos compromissos continuam organizados no mês selecionado.</p>';
+  if (!attentionEntries.length) {
+    ilifeFinanceAttentionTitle.textContent = scope.empty;
+    ilifeFinanceTodayContent.innerHTML = '<p>Os próximos compromissos continuam organizados na sua agenda financeira.</p>';
     return;
   }
-  ilifeFinanceTodayContent.innerHTML = `<h2>Pendências para hoje</h2><div class="ilife-finance-today-list">${todayEntries.map((entry) => {
+  ilifeFinanceAttentionTitle.textContent = scope.label;
+  ilifeFinanceTodayContent.innerHTML = `<div class="ilife-finance-today-list">${attentionEntries.map((entry) => {
     const income = entry.kind === "INCOME";
-    return `<article class="ilife-finance-today-item ${income ? "income" : "expense"}"><span><b>${escapeHtml(entry.title)}</b><small>${income ? "Entrada" : "Saída"} prevista</small></span><strong>${income ? "+" : "−"} ${escapeHtml(formatMoney(entry.amountCents || 0))}</strong></article>`;
+    const dateMeta = scope.key === "today" ? "" : ` · ${formatIlifeFinanceDate(entry.dueOn)}`;
+    return `<article class="ilife-finance-today-item ${income ? "income" : "expense"}"><span><b>${escapeHtml(entry.title)}</b><small>${income ? "Entrada" : "Saída"} prevista${escapeHtml(dateMeta)}</small></span><strong>${income ? "+" : "−"} ${escapeHtml(formatMoney(entry.amountCents || 0))}</strong></article>`;
   }).join("")}</div>`;
 }
 
@@ -13265,6 +13312,7 @@ ilifeFinanceAddMenu?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-ilife-finance-kind]");
   if (button) openIlifeFinanceWizard(button.dataset.ilifeFinanceKind);
 });
+ilifeFinanceAttentionCycle?.addEventListener("click", moveIlifeFinanceAttentionScope);
 ilifeFinanceMonthPrev?.addEventListener("click", () => moveIlifeFinanceMonth(-1));
 ilifeFinanceMonthNext?.addEventListener("click", () => moveIlifeFinanceMonth(1));
 ilifeFinanceWizardClose?.addEventListener("click", closeIlifeFinanceWizard);

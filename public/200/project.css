@@ -8310,9 +8310,14 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
 .ilife-finance-add { width:52px; height:52px; border:0; border-radius:50%; background:#20b86a; color:#fff; box-shadow:0 12px 28px rgba(32,184,106,.34); font:900 2rem/1 system-ui; cursor:pointer; }
 .ilife-finance-add:hover,.ilife-finance-add:focus-visible { transform:scale(1.04); outline:2px solid rgba(255,255,255,.72); }
 .ilife-finance-add-menu { top:calc(100% + 10px); right:auto; left:0; z-index:12; }
-.ilife-finance-card-income { border-color:rgba(48,210,119,.6); background:linear-gradient(145deg,rgba(17,112,68,.42),rgba(8,34,27,.72)); }
+.ilife-finance-card-primary { border-color:rgba(48,210,119,.68); background:linear-gradient(145deg,rgba(17,112,68,.5),rgba(8,34,27,.76)); }
+.ilife-finance-card-income { border-color:rgba(74,151,255,.68); background:linear-gradient(145deg,rgba(24,87,170,.5),rgba(9,29,68,.78)); }
 .ilife-finance-card-expense { border-color:rgba(255,89,104,.62); background:linear-gradient(145deg,rgba(136,28,45,.44),rgba(40,12,23,.72)); }
 .ilife-finance-guidance h2 { margin:7px 0 6px; font-size:clamp(1.1rem,3vw,1.5rem); }
+.ilife-finance-attention-head { display:flex; align-items:center; gap:13px; }
+.ilife-finance-attention-cycle { flex:0 0 auto; width:46px; height:46px; display:grid; place-items:center; border:1px solid rgba(120,180,255,.42); border-radius:50%; background:rgba(51,123,220,.16); color:#78b4ff; cursor:pointer; }
+.ilife-finance-attention-cycle svg { width:24px; height:24px; }
+.ilife-finance-attention-cycle:hover,.ilife-finance-attention-cycle:focus-visible { border-color:#78b4ff; background:rgba(51,123,220,.3); outline:none; }
 .ilife-finance-today-list { display:grid; gap:8px; margin-top:12px; }
 .ilife-finance-today-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-radius:15px; background:rgba(255,255,255,.065); }
 .ilife-finance-today-item span { display:grid; gap:2px; }
