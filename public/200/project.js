@@ -318,6 +318,59 @@ const financeSubscribers = document.getElementById("financeSubscribers");
 const financeMonthlyRevenue = document.getElementById("financeMonthlyRevenue");
 const financeNotesInput = document.getElementById("financeNotesInput");
 const saveFinanceNotesButton = document.getElementById("saveFinanceNotesButton");
+const ilifeFinanceModal = document.getElementById("ilifeFinanceModal");
+const ilifeFinanceAddButton = document.getElementById("ilifeFinanceAddButton");
+const ilifeFinanceAddMenu = document.getElementById("ilifeFinanceAddMenu");
+const ilifeFinanceCurrentBalance = document.getElementById("ilifeFinanceCurrentBalance");
+const ilifeFinanceExpectedIncome = document.getElementById("ilifeFinanceExpectedIncome");
+const ilifeFinanceExpectedExpense = document.getElementById("ilifeFinanceExpectedExpense");
+const ilifeFinanceIncomeMonth = document.getElementById("ilifeFinanceIncomeMonth");
+const ilifeFinanceExpenseMonth = document.getElementById("ilifeFinanceExpenseMonth");
+const ilifeFinanceTodayContent = document.getElementById("ilifeFinanceTodayContent");
+const ilifeFinanceStatus = document.getElementById("ilifeFinanceStatus");
+const ilifeFinanceMonthPrev = document.getElementById("ilifeFinanceMonthPrev");
+const ilifeFinanceMonthNext = document.getElementById("ilifeFinanceMonthNext");
+const ilifeFinanceMonthLabel = document.getElementById("ilifeFinanceMonthLabel");
+const ilifeFinanceEntryWizard = document.getElementById("ilifeFinanceEntryWizard");
+const ilifeFinanceWizardClose = document.getElementById("ilifeFinanceWizardClose");
+const ilifeFinanceWizardKicker = document.getElementById("ilifeFinanceWizardKicker");
+const ilifeFinanceWizardTitle = document.getElementById("ilifeFinanceWizardTitle");
+const ilifeFinanceDetailsStep = document.getElementById("ilifeFinanceDetailsStep");
+const ilifeFinanceScheduleStep = document.getElementById("ilifeFinanceScheduleStep");
+const ilifeFinanceTitleInput = document.getElementById("ilifeFinanceTitleInput");
+const ilifeFinanceAmountInput = document.getElementById("ilifeFinanceAmountInput");
+const ilifeFinanceFutureHint = document.getElementById("ilifeFinanceFutureHint");
+const ilifeFinanceDetailsStatus = document.getElementById("ilifeFinanceDetailsStatus");
+const ilifeFinanceDetailsNext = document.getElementById("ilifeFinanceDetailsNext");
+const ilifeFinanceScheduleQuestion = document.getElementById("ilifeFinanceScheduleQuestion");
+const ilifeFinanceModeLabel = document.getElementById("ilifeFinanceModeLabel");
+const ilifeFinanceModeHint = document.getElementById("ilifeFinanceModeHint");
+const ilifeFinanceFrequencyRow = document.getElementById("ilifeFinanceFrequencyRow");
+const ilifeFinanceFrequencyLabel = document.getElementById("ilifeFinanceFrequencyLabel");
+const ilifeFinanceValueRow = document.getElementById("ilifeFinanceValueRow");
+const ilifeFinanceValueLabel = document.getElementById("ilifeFinanceValueLabel");
+const ilifeFinanceValueHint = document.getElementById("ilifeFinanceValueHint");
+const ilifeFinanceOnceDateWrap = document.getElementById("ilifeFinanceOnceDateWrap");
+const ilifeFinanceOnceDate = document.getElementById("ilifeFinanceOnceDate");
+const ilifeFinanceEndDateWrap = document.getElementById("ilifeFinanceEndDateWrap");
+const ilifeFinanceEndDate = document.getElementById("ilifeFinanceEndDate");
+const ilifeFinanceCustomOpen = document.getElementById("ilifeFinanceCustomOpen");
+const ilifeFinanceWizardStatus = document.getElementById("ilifeFinanceWizardStatus");
+const ilifeFinanceScheduleBack = document.getElementById("ilifeFinanceScheduleBack");
+const ilifeFinanceSave = document.getElementById("ilifeFinanceSave");
+const ilifeFinanceCustomModal = document.getElementById("ilifeFinanceCustomModal");
+const ilifeFinanceCustomTitle = document.getElementById("ilifeFinanceCustomTitle");
+const ilifeFinanceCustomMonthly = document.getElementById("ilifeFinanceCustomMonthly");
+const ilifeFinanceCustomWeekly = document.getElementById("ilifeFinanceCustomWeekly");
+const ilifeFinanceCustomDaily = document.getElementById("ilifeFinanceCustomDaily");
+const ilifeFinanceMonthDays = document.getElementById("ilifeFinanceMonthDays");
+const ilifeFinanceWeekDays = document.getElementById("ilifeFinanceWeekDays");
+const ilifeFinanceCustomDateInput = document.getElementById("ilifeFinanceCustomDateInput");
+const ilifeFinanceCustomDateAdd = document.getElementById("ilifeFinanceCustomDateAdd");
+const ilifeFinanceCustomDates = document.getElementById("ilifeFinanceCustomDates");
+const ilifeFinanceCustomStatus = document.getElementById("ilifeFinanceCustomStatus");
+const ilifeFinanceCustomCancel = document.getElementById("ilifeFinanceCustomCancel");
+const ilifeFinanceCustomApply = document.getElementById("ilifeFinanceCustomApply");
 const constitutionVersionLabel = document.getElementById("constitutionVersionLabel");
 const constitutionAuthAlert = document.getElementById("constitutionAuthAlert");
 const constitutionTextView = document.getElementById("constitutionTextView");
@@ -950,6 +1003,12 @@ const state = {
   platformBalanceHidden: false,
   platformMetricIndex: 0,
   platformBaseIncomeCents: 0,
+  ilifeFinance: {
+    monthCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    summary: null,
+    addMenuOpen: false,
+    wizard: null
+  },
   statsSummary: null,
   statsGoals: null,
   statsGlobalProfiles: [],
@@ -4888,6 +4947,296 @@ function inferFinanceEntryLocally(text) {
   };
 }
 
+const ilifeFinanceScheduleModes = ["ONCE", "RECURRING", "FINITE"];
+const ilifeFinanceScheduleModeLabels = {
+  ONCE: ["Uma vez", "Define uma data única"],
+  RECURRING: ["Recorrente", "Continua sem data final"],
+  FINITE: ["Finito", "Repete até a data definida"]
+};
+const ilifeFinanceFrequencies = ["MONTHLY", "WEEKLY", "CUSTOM"];
+const ilifeFinanceFrequencyLabels = { MONTHLY: "Mensal", WEEKLY: "Semanal", CUSTOM: "Personalizado" };
+const ilifeFinanceCustomModes = ["MONTHLY", "WEEKLY", "DAILY"];
+const ilifeFinanceCustomModeLabels = { MONTHLY: "Mensal", WEEKLY: "Semanal", DAILY: "Diário" };
+const ilifeFinanceWeekdayNames = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+
+function buildIlifeFinanceWizard(kind) {
+  const today = getProjectTodayDateKey();
+  return {
+    kind: kind === "EXPENSE" ? "EXPENSE" : "INCOME",
+    step: "details",
+    settlementType: "CASH",
+    scheduleMode: "ONCE",
+    scheduleFrequency: "MONTHLY",
+    dayOfMonth: Number(today.slice(8, 10)),
+    weekday: projectDateKeyToDate(today).getDay(),
+    startsOn: addDaysToDateKey(today, 1),
+    endsOn: addDaysToDateKey(today, 30),
+    customMode: "MONTHLY",
+    customDaysOfMonth: [],
+    customWeekdays: [],
+    customDates: []
+  };
+}
+
+function getIlifeFinanceMonthKey() {
+  const date = state.ilifeFinance.monthCursor;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getIlifeFinanceMonthName() {
+  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(state.ilifeFinance.monthCursor);
+}
+
+function parseIlifeFinanceAmount(value) {
+  const raw = String(value || "").trim().replace(/s/g, "");
+  if (!raw) return 0;
+  let normalized = raw;
+  if (raw.includes(",")) normalized = raw.replace(/./g, "").replace(",", ".");
+  const amount = Number(normalized.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) : 0;
+}
+
+function formatIlifeFinanceDate(dateKey) {
+  if (!dateKey) return "";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
+    .format(new Date(`${dateKey}T12:00:00Z`));
+}
+
+function renderIlifeFinanceSummary() {
+  const summary = state.ilifeFinance.summary || {};
+  const monthName = getIlifeFinanceMonthName();
+  if (ilifeFinanceMonthLabel) ilifeFinanceMonthLabel.textContent = monthName;
+  if (ilifeFinanceIncomeMonth) ilifeFinanceIncomeMonth.textContent = monthName;
+  if (ilifeFinanceExpenseMonth) ilifeFinanceExpenseMonth.textContent = monthName;
+  if (ilifeFinanceCurrentBalance) ilifeFinanceCurrentBalance.textContent = formatMoney(summary.balanceCents || 0);
+  if (ilifeFinanceExpectedIncome) ilifeFinanceExpectedIncome.textContent = formatMoney(summary.incomeCents || 0);
+  if (ilifeFinanceExpectedExpense) ilifeFinanceExpectedExpense.textContent = formatMoney(summary.expenseCents || 0);
+  if (!ilifeFinanceTodayContent) return;
+
+  const todayEntries = Array.isArray(summary.todayEntries) ? summary.todayEntries : [];
+  if (!summary.hasAny) {
+    ilifeFinanceTodayContent.innerHTML = '<h2>Seu painel financeiro começa aqui</h2><p>Primeiro vamos registrar uma entrada ou saída.</p>';
+    return;
+  }
+  if (!todayEntries.length) {
+    ilifeFinanceTodayContent.innerHTML = '<h2>Nenhuma pendência para hoje</h2><p>Os próximos compromissos continuam organizados no mês selecionado.</p>';
+    return;
+  }
+  ilifeFinanceTodayContent.innerHTML = `<h2>Pendências para hoje</h2><div class="ilife-finance-today-list">${todayEntries.map((entry) => {
+    const income = entry.kind === "INCOME";
+    return `<article class="ilife-finance-today-item ${income ? "income" : "expense"}"><span><b>${escapeHtml(entry.title)}</b><small>${income ? "Entrada" : "Saída"} prevista</small></span><strong>${income ? "+" : "−"} ${escapeHtml(formatMoney(entry.amountCents || 0))}</strong></article>`;
+  }).join("")}</div>`;
+}
+
+async function loadIlifeFinanceLedger() {
+  if (ilifeFinanceMonthLabel) ilifeFinanceMonthLabel.textContent = getIlifeFinanceMonthName();
+  if (!getToken()) {
+    if (ilifeFinanceStatus) ilifeFinanceStatus.innerHTML = 'Entre para salvar e consultar sua carteira. <a href="/log?next=/200">Entrar</a>';
+    return;
+  }
+  if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "Carregando seu mês...";
+  try {
+    const payload = await apiRequest(`/api/200/finance/ledger?month=${encodeURIComponent(getIlifeFinanceMonthKey())}`);
+    state.ilifeFinance.summary = payload?.summary || null;
+    renderIlifeFinanceSummary();
+    if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "";
+  } catch (error) {
+    if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar sua carteira.";
+  }
+}
+
+function moveIlifeFinanceMonth(direction) {
+  const current = state.ilifeFinance.monthCursor;
+  state.ilifeFinance.monthCursor = new Date(current.getFullYear(), current.getMonth() + direction, 1);
+  renderIlifeFinanceSummary();
+  void loadIlifeFinanceLedger();
+}
+
+function setIlifeFinanceAddMenu(open) {
+  state.ilifeFinance.addMenuOpen = Boolean(open);
+  if (ilifeFinanceAddMenu) ilifeFinanceAddMenu.hidden = !state.ilifeFinance.addMenuOpen;
+  if (ilifeFinanceAddButton) ilifeFinanceAddButton.setAttribute("aria-expanded", state.ilifeFinance.addMenuOpen ? "true" : "false");
+}
+
+function openIlifeFinanceWizard(kind) {
+  state.ilifeFinance.wizard = buildIlifeFinanceWizard(kind);
+  setIlifeFinanceAddMenu(false);
+  if (ilifeFinanceTitleInput) ilifeFinanceTitleInput.value = "";
+  if (ilifeFinanceAmountInput) ilifeFinanceAmountInput.value = "";
+  if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "";
+  if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "";
+  if (ilifeFinanceEntryWizard) {
+    ilifeFinanceEntryWizard.hidden = false;
+    ilifeFinanceEntryWizard.setAttribute("aria-hidden", "false");
+  }
+  renderIlifeFinanceWizard();
+  window.setTimeout(() => ilifeFinanceTitleInput?.focus(), 50);
+}
+
+function closeIlifeFinanceWizard() {
+  if (ilifeFinanceCustomModal) {
+    ilifeFinanceCustomModal.hidden = true;
+    ilifeFinanceCustomModal.setAttribute("aria-hidden", "true");
+  }
+  if (ilifeFinanceEntryWizard) {
+    ilifeFinanceEntryWizard.hidden = true;
+    ilifeFinanceEntryWizard.setAttribute("aria-hidden", "true");
+  }
+  state.ilifeFinance.wizard = null;
+}
+
+function renderIlifeFinanceWizard() {
+  const wizard = state.ilifeFinance.wizard;
+  if (!wizard) return;
+  const income = wizard.kind === "INCOME";
+  if (ilifeFinanceWizardKicker) ilifeFinanceWizardKicker.textContent = income ? "Entrada" : "Saída";
+  if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = income ? "Adicionar dinheiro" : "Crédito ou débito";
+  if (ilifeFinanceFutureHint) ilifeFinanceFutureHint.textContent = income ? "Dinheiro ainda não caiu" : "Crédito ou dívida";
+  if (ilifeFinanceDetailsStep) ilifeFinanceDetailsStep.hidden = wizard.step !== "details";
+  if (ilifeFinanceScheduleStep) ilifeFinanceScheduleStep.hidden = wizard.step !== "schedule";
+  document.querySelectorAll("[data-ilife-settlement]").forEach((button) => button.classList.toggle("active", button.dataset.ilifeSettlement === wizard.settlementType));
+  if (wizard.step !== "schedule") return;
+
+  if (ilifeFinanceScheduleQuestion) ilifeFinanceScheduleQuestion.textContent = income ? "Que dia é o recebimento?" : "Que dia será o pagamento?";
+  const [modeLabel, modeHint] = ilifeFinanceScheduleModeLabels[wizard.scheduleMode];
+  if (ilifeFinanceModeLabel) ilifeFinanceModeLabel.textContent = modeLabel;
+  if (ilifeFinanceModeHint) ilifeFinanceModeHint.textContent = modeHint;
+  if (ilifeFinanceFrequencyLabel) ilifeFinanceFrequencyLabel.textContent = ilifeFinanceFrequencyLabels[wizard.scheduleFrequency];
+  const once = wizard.scheduleMode === "ONCE";
+  if (ilifeFinanceFrequencyRow) ilifeFinanceFrequencyRow.classList.toggle("is-disabled", once);
+  if (ilifeFinanceValueRow) ilifeFinanceValueRow.classList.toggle("is-disabled", once || wizard.scheduleFrequency === "CUSTOM");
+  if (ilifeFinanceOnceDateWrap) ilifeFinanceOnceDateWrap.hidden = !once;
+  if (ilifeFinanceOnceDate) ilifeFinanceOnceDate.value = wizard.startsOn;
+  if (ilifeFinanceEndDateWrap) ilifeFinanceEndDateWrap.hidden = wizard.scheduleMode !== "FINITE";
+  if (ilifeFinanceEndDate) ilifeFinanceEndDate.value = wizard.endsOn;
+  if (ilifeFinanceCustomOpen) ilifeFinanceCustomOpen.hidden = once || wizard.scheduleFrequency !== "CUSTOM";
+
+  if (wizard.scheduleFrequency === "WEEKLY") {
+    if (ilifeFinanceValueLabel) ilifeFinanceValueLabel.textContent = ilifeFinanceWeekdayNames[wizard.weekday];
+    if (ilifeFinanceValueHint) ilifeFinanceValueHint.textContent = "Toda semana";
+  } else if (wizard.scheduleFrequency === "CUSTOM") {
+    if (ilifeFinanceValueLabel) ilifeFinanceValueLabel.textContent = "Dias escolhidos";
+    if (ilifeFinanceValueHint) ilifeFinanceValueHint.textContent = ilifeFinanceCustomModeLabels[wizard.customMode];
+  } else {
+    if (ilifeFinanceValueLabel) ilifeFinanceValueLabel.textContent = `Dia ${wizard.dayOfMonth}`;
+    if (ilifeFinanceValueHint) ilifeFinanceValueHint.textContent = "Todo mês";
+  }
+}
+
+function cycleIlifeFinanceOption(type, direction) {
+  const wizard = state.ilifeFinance.wizard;
+  if (!wizard) return;
+  if (type === "mode") {
+    const index = ilifeFinanceScheduleModes.indexOf(wizard.scheduleMode);
+    wizard.scheduleMode = ilifeFinanceScheduleModes[(index + direction + ilifeFinanceScheduleModes.length) % ilifeFinanceScheduleModes.length];
+  } else if (type === "frequency" && wizard.scheduleMode !== "ONCE") {
+    const index = ilifeFinanceFrequencies.indexOf(wizard.scheduleFrequency);
+    wizard.scheduleFrequency = ilifeFinanceFrequencies[(index + direction + ilifeFinanceFrequencies.length) % ilifeFinanceFrequencies.length];
+  } else if (type === "value" && wizard.scheduleMode !== "ONCE") {
+    if (wizard.scheduleFrequency === "MONTHLY") wizard.dayOfMonth = ((wizard.dayOfMonth - 1 + direction + 31) % 31) + 1;
+    if (wizard.scheduleFrequency === "WEEKLY") wizard.weekday = (wizard.weekday + direction + 7) % 7;
+  }
+  renderIlifeFinanceWizard();
+}
+
+function renderIlifeFinanceCustom() {
+  const wizard = state.ilifeFinance.wizard;
+  if (!wizard) return;
+  if (ilifeFinanceCustomTitle) ilifeFinanceCustomTitle.textContent = ilifeFinanceCustomModeLabels[wizard.customMode];
+  if (ilifeFinanceCustomMonthly) ilifeFinanceCustomMonthly.hidden = wizard.customMode !== "MONTHLY";
+  if (ilifeFinanceCustomWeekly) ilifeFinanceCustomWeekly.hidden = wizard.customMode !== "WEEKLY";
+  if (ilifeFinanceCustomDaily) ilifeFinanceCustomDaily.hidden = wizard.customMode !== "DAILY";
+  if (ilifeFinanceMonthDays) ilifeFinanceMonthDays.innerHTML = Array.from({ length: 31 }, (_, index) => {
+    const day = index + 1;
+    return `<button type="button" class="${wizard.customDaysOfMonth.includes(day) ? "active" : ""}" data-ilife-month-day="${day}">${day}</button>`;
+  }).join("");
+  if (ilifeFinanceWeekDays) ilifeFinanceWeekDays.innerHTML = ilifeFinanceWeekdayNames.map((label, day) => `<button type="button" class="${wizard.customWeekdays.includes(day) ? "active" : ""}" data-ilife-weekday="${day}">${label}</button>`).join("");
+  if (ilifeFinanceCustomDates) ilifeFinanceCustomDates.innerHTML = wizard.customDates.map((date) => `<button type="button" data-ilife-remove-date="${escapeHtml(date)}">${escapeHtml(formatIlifeFinanceDate(date))} ×</button>`).join("");
+}
+
+function openIlifeFinanceCustom() {
+  if (!state.ilifeFinance.wizard || !ilifeFinanceCustomModal) return;
+  ilifeFinanceCustomModal.hidden = false;
+  ilifeFinanceCustomModal.setAttribute("aria-hidden", "false");
+  if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "";
+  renderIlifeFinanceCustom();
+}
+
+function closeIlifeFinanceCustom() {
+  if (!ilifeFinanceCustomModal) return;
+  ilifeFinanceCustomModal.hidden = true;
+  ilifeFinanceCustomModal.setAttribute("aria-hidden", "true");
+}
+
+function buildIlifeFinancePayload() {
+  const wizard = state.ilifeFinance.wizard;
+  const payload = {
+    title: String(ilifeFinanceTitleInput?.value || "").trim(),
+    amountCents: parseIlifeFinanceAmount(ilifeFinanceAmountInput?.value),
+    kind: wizard.kind,
+    settlementType: wizard.settlementType,
+    scheduleMode: wizard.settlementType === "CASH" ? "ONCE" : wizard.scheduleMode,
+    scheduleFrequency: wizard.scheduleMode === "ONCE" ? "NONE" : wizard.scheduleFrequency,
+    startsOn: wizard.settlementType === "CASH" ? getProjectTodayDateKey() : wizard.startsOn,
+    endsOn: wizard.scheduleMode === "FINITE" ? wizard.endsOn : null,
+    scheduleConfig: {}
+  };
+  if (wizard.scheduleFrequency === "MONTHLY") payload.scheduleConfig.daysOfMonth = [wizard.dayOfMonth];
+  if (wizard.scheduleFrequency === "WEEKLY") payload.scheduleConfig.weekdays = [wizard.weekday];
+  if (wizard.scheduleFrequency === "CUSTOM") payload.scheduleConfig = {
+    customMode: wizard.customMode,
+    daysOfMonth: wizard.customDaysOfMonth,
+    weekdays: wizard.customWeekdays,
+    dates: wizard.customDates
+  };
+  return payload;
+}
+
+async function saveIlifeFinanceItem() {
+  const wizard = state.ilifeFinance.wizard;
+  if (!wizard) return;
+  const payload = buildIlifeFinancePayload();
+  if (!payload.title) {
+    const target = wizard.step === "details" ? ilifeFinanceDetailsStatus : ilifeFinanceWizardStatus;
+    if (target) target.textContent = "Digite uma descrição.";
+    return;
+  }
+  if (!payload.amountCents) {
+    const target = wizard.step === "details" ? ilifeFinanceDetailsStatus : ilifeFinanceWizardStatus;
+    if (target) target.textContent = "Digite um valor válido.";
+    return;
+  }
+  if (wizard.scheduleMode === "FINITE" && (!wizard.endsOn || wizard.endsOn < wizard.startsOn)) {
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Escolha uma data final depois da data inicial.";
+    return;
+  }
+  if (wizard.scheduleFrequency === "CUSTOM") {
+    const hasCustom = wizard.customMode === "MONTHLY" ? wizard.customDaysOfMonth.length : wizard.customMode === "WEEKLY" ? wizard.customWeekdays.length : wizard.customDates.length;
+    if (!hasCustom) {
+      if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Escolha os dias personalizados.";
+      return;
+    }
+  }
+  if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Salvando...";
+  if (ilifeFinanceSave) ilifeFinanceSave.disabled = true;
+  if (ilifeFinanceDetailsNext) ilifeFinanceDetailsNext.disabled = true;
+  try {
+    await apiRequest("/api/200/finance/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    closeIlifeFinanceWizard();
+    await loadIlifeFinanceLedger();
+  } catch (error) {
+    const target = wizard.step === "details" ? ilifeFinanceDetailsStatus : ilifeFinanceWizardStatus;
+    if (target) target.textContent = error instanceof Error ? error.message : "Não foi possível salvar.";
+  } finally {
+    if (ilifeFinanceSave) ilifeFinanceSave.disabled = false;
+    if (ilifeFinanceDetailsNext) ilifeFinanceDetailsNext.disabled = false;
+  }
+}
+
 function openModal(id) {
   if (id !== "runningConfirmModal" && runningConfirmModal?.classList.contains("active")) {
     closeRunningConfirmModal();
@@ -4946,6 +5295,12 @@ function openModal(id) {
 
   if (id === "financeModal") {
     startFinancePresentation();
+  }
+
+  if (id === "ilifeFinanceModal") {
+    setIlifeFinanceAddMenu(false);
+    renderIlifeFinanceSummary();
+    void loadIlifeFinanceLedger();
   }
 
   if (id === "profileRenameModal") {
@@ -5018,6 +5373,11 @@ function closeModal(modal) {
   if (modal.id === "financeModal" && financeTimer) {
     window.clearTimeout(financeTimer);
     financeTimer = null;
+  }
+
+  if (modal.id === "ilifeFinanceModal") {
+    setIlifeFinanceAddMenu(false);
+    closeIlifeFinanceWizard();
   }
 
   if (modal.id === "calendarModal" && platformMetricsTicker) {
@@ -12895,21 +13255,86 @@ function openPrimaryRunningSurface() {
 document.querySelectorAll("[data-open-modal]").forEach((button) => {
   button.addEventListener("click", () => {
     const loadingIcon = String(button.dataset.loadingIcon || "").trim();
-    if (loadingIcon) {
-      globalLoadingPreferredIcon = loadingIcon;
-    }
+    if (loadingIcon) globalLoadingPreferredIcon = loadingIcon;
     openModal(button.dataset.openModal);
   });
-
-document.querySelectorAll("[data-ilife-finance-action]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const action = String(button.dataset.ilifeFinanceAction || "").trim();
-    const status = document.getElementById("ilifeFinanceStatus");
-    if (!status) return;
-    const labels = { income: "Recebi", expense: "Gastei", account: "Minhas contas" };
-    status.textContent = `${labels[action] || "Finanças"}: este novo fluxo será construído a partir desta base.`;
-  });
 });
+
+ilifeFinanceAddButton?.addEventListener("click", () => setIlifeFinanceAddMenu(!state.ilifeFinance.addMenuOpen));
+ilifeFinanceAddMenu?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-ilife-finance-kind]");
+  if (button) openIlifeFinanceWizard(button.dataset.ilifeFinanceKind);
+});
+ilifeFinanceMonthPrev?.addEventListener("click", () => moveIlifeFinanceMonth(-1));
+ilifeFinanceMonthNext?.addEventListener("click", () => moveIlifeFinanceMonth(1));
+ilifeFinanceWizardClose?.addEventListener("click", closeIlifeFinanceWizard);
+document.querySelectorAll("[data-ilife-settlement]").forEach((button) => button.addEventListener("click", () => {
+  if (!state.ilifeFinance.wizard) return;
+  state.ilifeFinance.wizard.settlementType = button.dataset.ilifeSettlement;
+  renderIlifeFinanceWizard();
+}));
+ilifeFinanceDetailsNext?.addEventListener("click", () => {
+  const wizard = state.ilifeFinance.wizard;
+  if (!wizard) return;
+  if (!String(ilifeFinanceTitleInput?.value || "").trim()) { if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "Digite uma descrição."; return; }
+  if (!parseIlifeFinanceAmount(ilifeFinanceAmountInput?.value)) { if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "Digite um valor válido."; return; }
+  if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "";
+  if (wizard.settlementType === "CASH") void saveIlifeFinanceItem();
+  else { wizard.step = "schedule"; renderIlifeFinanceWizard(); }
+});
+document.querySelectorAll("[data-ilife-cycle]").forEach((button) => button.addEventListener("click", () => cycleIlifeFinanceOption(button.dataset.ilifeCycle, Number(button.dataset.direction || 1))));
+ilifeFinanceOnceDate?.addEventListener("change", () => { if (state.ilifeFinance.wizard && ilifeFinanceOnceDate.value) state.ilifeFinance.wizard.startsOn = ilifeFinanceOnceDate.value; });
+ilifeFinanceEndDate?.addEventListener("change", () => { if (state.ilifeFinance.wizard && ilifeFinanceEndDate.value) state.ilifeFinance.wizard.endsOn = ilifeFinanceEndDate.value; });
+ilifeFinanceScheduleBack?.addEventListener("click", () => { if (state.ilifeFinance.wizard) { state.ilifeFinance.wizard.step = "details"; renderIlifeFinanceWizard(); } });
+ilifeFinanceSave?.addEventListener("click", () => void saveIlifeFinanceItem());
+ilifeFinanceCustomOpen?.addEventListener("click", openIlifeFinanceCustom);
+document.querySelectorAll("[data-ilife-custom-direction]").forEach((button) => button.addEventListener("click", () => {
+  const wizard = state.ilifeFinance.wizard;
+  if (!wizard) return;
+  const index = ilifeFinanceCustomModes.indexOf(wizard.customMode);
+  wizard.customMode = ilifeFinanceCustomModes[(index + Number(button.dataset.ilifeCustomDirection || 1) + ilifeFinanceCustomModes.length) % ilifeFinanceCustomModes.length];
+  renderIlifeFinanceCustom();
+}));
+ilifeFinanceMonthDays?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-ilife-month-day]");
+  const wizard = state.ilifeFinance.wizard;
+  if (!button || !wizard) return;
+  const day = Number(button.dataset.ilifeMonthDay);
+  wizard.customDaysOfMonth = wizard.customDaysOfMonth.includes(day) ? wizard.customDaysOfMonth.filter((value) => value !== day) : [...wizard.customDaysOfMonth, day].sort((a,b) => a-b);
+  renderIlifeFinanceCustom();
+});
+ilifeFinanceWeekDays?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-ilife-weekday]");
+  const wizard = state.ilifeFinance.wizard;
+  if (!button || !wizard) return;
+  const day = Number(button.dataset.ilifeWeekday);
+  wizard.customWeekdays = wizard.customWeekdays.includes(day) ? wizard.customWeekdays.filter((value) => value !== day) : [...wizard.customWeekdays, day].sort((a,b) => a-b);
+  renderIlifeFinanceCustom();
+});
+ilifeFinanceCustomDateAdd?.addEventListener("click", () => {
+  const wizard = state.ilifeFinance.wizard;
+  const date = ilifeFinanceCustomDateInput?.value;
+  if (!wizard || !date) { if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "Escolha uma data."; return; }
+  wizard.customDates = [...new Set([...wizard.customDates, date])].sort();
+  if (ilifeFinanceCustomDateInput) ilifeFinanceCustomDateInput.value = "";
+  if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "";
+  renderIlifeFinanceCustom();
+});
+ilifeFinanceCustomDates?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-ilife-remove-date]");
+  const wizard = state.ilifeFinance.wizard;
+  if (!button || !wizard) return;
+  wizard.customDates = wizard.customDates.filter((date) => date !== button.dataset.ilifeRemoveDate);
+  renderIlifeFinanceCustom();
+});
+ilifeFinanceCustomCancel?.addEventListener("click", closeIlifeFinanceCustom);
+ilifeFinanceCustomApply?.addEventListener("click", () => {
+  const wizard = state.ilifeFinance.wizard;
+  if (!wizard) return;
+  const count = wizard.customMode === "MONTHLY" ? wizard.customDaysOfMonth.length : wizard.customMode === "WEEKLY" ? wizard.customWeekdays.length : wizard.customDates.length;
+  if (!count) { if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "Escolha pelo menos uma opção."; return; }
+  closeIlifeFinanceCustom();
+  renderIlifeFinanceWizard();
 });
 
 document.querySelectorAll("[data-switch-modal]").forEach((button) => {

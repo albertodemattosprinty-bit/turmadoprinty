@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260716-home-pronta-seis-radios" />
+  <link rel="stylesheet" href="/200/project.css?v=20260718-finance-ledger-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -895,50 +895,120 @@
     <button class="modal-close" type="button" data-close-modal aria-label="Fechar Finanças">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z" /></svg>
     </button>
-    <div class="ilife-finance-shell">
-      <header class="ilife-finance-header">
-        <img src="/200/icons/financas.svg" alt="" aria-hidden="true" />
-        <div>
-          <span class="ilife-finance-kicker">iLife</span>
-          <h1>Finanças</h1>
-          <p>Uma carteira simples para orientar sua vida real.</p>
-        </div>
-      </header>
-      <section class="ilife-finance-snapshot" aria-label="Resumo financeiro">
-        <article class="ilife-finance-card ilife-finance-card-primary">
-          <span>Nas suas contas</span>
-          <strong id="ilifeFinanceCurrentBalance">R$ 0,00</strong>
-          <small>Dinheiro que existe agora</small>
-        </article>
-        <article class="ilife-finance-card">
-          <span>Já comprometido</span>
-          <strong id="ilifeFinanceCommitted">R$ 0,00</strong>
-          <small>Contas e dívidas com destino</small>
-        </article>
-        <article class="ilife-finance-card">
-          <span>Livre para usar</span>
-          <strong id="ilifeFinanceFreeToUse">R$ 0,00</strong>
-          <small>Até sua próxima entrada</small>
-        </article>
-      </section>
-      <section class="ilife-finance-guidance" aria-live="polite">
-        <span class="ilife-finance-guidance-label">Orientação financeira</span>
-        <p id="ilifeFinanceGuidance">Registre sua primeira conta para o iLife começar a enxergar seu dinheiro.</p>
-      </section>
-      <section class="ilife-finance-actions" aria-label="Ações financeiras">
-        <button type="button" class="ilife-finance-action" data-ilife-finance-action="income">Recebi</button>
-        <button type="button" class="ilife-finance-action" data-ilife-finance-action="expense">Gastei</button>
-        <button type="button" class="ilife-finance-action" data-ilife-finance-action="account">Minhas contas</button>
-      </section>
-      <section class="ilife-finance-empty-state">
-        <img src="/200/icons/carteira.svg" alt="" aria-hidden="true" onerror="this.src='/200/icons/financas.svg'" />
-        <h2>Seu painel financeiro começa aqui</h2>
-        <p>Primeiro vamos organizar o dinheiro que existe. Depois entram compromissos, cartões e projeções.</p>
-      </section>
-      <p class="ilife-finance-status" id="ilifeFinanceStatus" aria-live="polite"></p>
+    <div class="ilife-finance-scroll">
+      <div class="ilife-finance-shell">
+        <header class="ilife-finance-header">
+          <img src="/200/icons/financas.svg" alt="" aria-hidden="true" />
+          <div class="ilife-finance-heading">
+            <span class="ilife-finance-kicker">iLife</span>
+            <div class="ilife-finance-title-row">
+              <h1>Finanças</h1>
+              <div class="ilife-finance-add-wrap">
+                <button class="ilife-finance-add" type="button" id="ilifeFinanceAddButton" aria-label="Adicionar lançamento" aria-expanded="false" aria-controls="ilifeFinanceAddMenu">+</button>
+                <div class="mission-variant-sort-menu ilife-finance-add-menu" id="ilifeFinanceAddMenu" hidden>
+                  <button type="button" data-ilife-finance-kind="INCOME"><span>Entrada</span><small>Adicionar dinheiro</small></button>
+                  <button type="button" data-ilife-finance-kind="EXPENSE"><span>Saída</span><small>Crédito ou débito</small></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section class="ilife-finance-snapshot" aria-label="Resumo financeiro do mês">
+          <article class="ilife-finance-card ilife-finance-card-primary">
+            <span>Nas suas contas</span>
+            <strong id="ilifeFinanceCurrentBalance">R$ 0,00</strong>
+            <small>Dinheiro registrado à vista</small>
+          </article>
+          <article class="ilife-finance-card ilife-finance-card-income">
+            <span>Entradas previstas</span>
+            <strong id="ilifeFinanceExpectedIncome">R$ 0,00</strong>
+            <small id="ilifeFinanceIncomeMonth">Neste mês</small>
+          </article>
+          <article class="ilife-finance-card ilife-finance-card-expense">
+            <span>Saídas previstas</span>
+            <strong id="ilifeFinanceExpectedExpense">R$ 0,00</strong>
+            <small id="ilifeFinanceExpenseMonth">Neste mês</small>
+          </article>
+        </section>
+
+        <section class="ilife-finance-guidance" aria-live="polite">
+          <span class="ilife-finance-guidance-label">Hoje</span>
+          <div id="ilifeFinanceTodayContent">
+            <h2>Seu painel financeiro começa aqui</h2>
+            <p>Primeiro vamos registrar uma entrada ou saída.</p>
+          </div>
+        </section>
+        <p class="ilife-finance-status" id="ilifeFinanceStatus" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <footer class="ilife-finance-month-footer" aria-label="Mês financeiro selecionado">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2Zm11 8H6v10h12V10ZM6 6v2h12V6H6Z" fill="currentColor"/></svg>
+      <button type="button" id="ilifeFinanceMonthPrev" aria-label="Mês anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <strong id="ilifeFinanceMonthLabel">Mês atual</strong>
+      <button type="button" id="ilifeFinanceMonthNext" aria-label="Próximo mês"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </footer>
+
+    <div class="ilife-finance-layer" id="ilifeFinanceEntryWizard" hidden aria-hidden="true">
+      <div class="ilife-finance-dialog">
+        <header class="ilife-finance-dialog-head">
+          <div><span class="ilife-finance-kicker" id="ilifeFinanceWizardKicker">Novo lançamento</span><h2 id="ilifeFinanceWizardTitle">Adicionar dinheiro</h2></div>
+          <button type="button" id="ilifeFinanceWizardClose" aria-label="Fechar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg></button>
+        </header>
+
+        <section id="ilifeFinanceDetailsStep">
+          <label class="ilife-finance-field"><span>Descrição</span><input type="text" id="ilifeFinanceTitleInput" maxlength="90" autocomplete="off" placeholder="Ex.: Salário, aluguel, internet" /></label>
+          <label class="ilife-finance-field"><span>Valor</span><div class="ilife-finance-money-input"><b>R$</b><input type="text" id="ilifeFinanceAmountInput" inputmode="decimal" autocomplete="off" placeholder="0,00" /></div></label>
+          <div class="ilife-finance-choice-grid" id="ilifeFinanceSettlementChoices">
+            <button type="button" data-ilife-settlement="CASH"><strong>À vista</strong><small>Já entrou ou já saiu</small></button>
+            <button type="button" data-ilife-settlement="FUTURE"><strong>Futuro</strong><small id="ilifeFinanceFutureHint">Dinheiro ainda não caiu</small></button>
+          </div>
+          <p class="ilife-finance-dialog-status" id="ilifeFinanceDetailsStatus" aria-live="polite"></p>
+          <button class="primary-btn ilife-finance-primary" type="button" id="ilifeFinanceDetailsNext">Continuar</button>
+        </section>
+
+        <section id="ilifeFinanceScheduleStep" hidden>
+          <p class="ilife-finance-schedule-question" id="ilifeFinanceScheduleQuestion">Que dia é o recebimento?</p>
+          <div class="ilife-finance-carousel-row">
+            <button type="button" data-ilife-cycle="mode" data-direction="-1" aria-label="Opção anterior"><svg viewBox="0 0 24 24"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+            <div><span>Agenda</span><strong id="ilifeFinanceModeLabel">Uma vez</strong><small id="ilifeFinanceModeHint">Define uma data única</small></div>
+            <button type="button" data-ilife-cycle="mode" data-direction="1" aria-label="Próxima opção"><svg viewBox="0 0 24 24"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+          </div>
+          <div class="ilife-finance-carousel-row" id="ilifeFinanceFrequencyRow">
+            <button type="button" data-ilife-cycle="frequency" data-direction="-1" aria-label="Frequência anterior"><svg viewBox="0 0 24 24"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+            <div><span>Frequência</span><strong id="ilifeFinanceFrequencyLabel">Mensal</strong><small>Mensal, semanal ou personalizado</small></div>
+            <button type="button" data-ilife-cycle="frequency" data-direction="1" aria-label="Próxima frequência"><svg viewBox="0 0 24 24"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+          </div>
+          <div class="ilife-finance-carousel-row" id="ilifeFinanceValueRow">
+            <button type="button" data-ilife-cycle="value" data-direction="-1" aria-label="Valor anterior"><svg viewBox="0 0 24 24"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+            <div><span>Quando</span><strong id="ilifeFinanceValueLabel">Dia 1</strong><small id="ilifeFinanceValueHint">Todo mês</small></div>
+            <button type="button" data-ilife-cycle="value" data-direction="1" aria-label="Próximo valor"><svg viewBox="0 0 24 24"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+          </div>
+          <label class="ilife-finance-field" id="ilifeFinanceOnceDateWrap"><span>Data única</span><input type="date" id="ilifeFinanceOnceDate" /></label>
+          <label class="ilife-finance-field" id="ilifeFinanceEndDateWrap" hidden><span>Repetir até</span><input type="date" id="ilifeFinanceEndDate" /></label>
+          <button class="ghost-btn ilife-finance-custom-open" type="button" id="ilifeFinanceCustomOpen" hidden>Escolher dias personalizados</button>
+          <p class="ilife-finance-dialog-status" id="ilifeFinanceWizardStatus" aria-live="polite"></p>
+          <div class="ilife-finance-dialog-actions"><button class="ghost-btn" type="button" id="ilifeFinanceScheduleBack">Voltar</button><button class="primary-btn" type="button" id="ilifeFinanceSave">Salvar lançamento</button></div>
+        </section>
+      </div>
+    </div>
+
+    <div class="ilife-finance-layer ilife-finance-custom-layer" id="ilifeFinanceCustomModal" hidden aria-hidden="true">
+      <div class="ilife-finance-dialog ilife-finance-custom-dialog">
+        <header class="ilife-finance-custom-head">
+          <button type="button" data-ilife-custom-direction="-1" aria-label="Modo anterior"><svg viewBox="0 0 24 24"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+          <div><span class="ilife-finance-kicker">Personalizado</span><h2 id="ilifeFinanceCustomTitle">Mensal</h2></div>
+          <button type="button" data-ilife-custom-direction="1" aria-label="Próximo modo"><svg viewBox="0 0 24 24"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+        </header>
+        <section id="ilifeFinanceCustomMonthly"><p>Toque nos dias do mês:</p><div class="ilife-finance-day-grid" id="ilifeFinanceMonthDays"></div></section>
+        <section id="ilifeFinanceCustomWeekly" hidden><p>Toque nos dias da semana:</p><div class="ilife-finance-week-list" id="ilifeFinanceWeekDays"></div></section>
+        <section id="ilifeFinanceCustomDaily" hidden><p>Adicione todas as datas do pagamento ou recebimento:</p><div class="ilife-finance-date-add"><input type="date" id="ilifeFinanceCustomDateInput" /><button type="button" id="ilifeFinanceCustomDateAdd" aria-label="Adicionar data">+</button></div><div class="ilife-finance-date-list" id="ilifeFinanceCustomDates"></div></section>
+        <p class="ilife-finance-dialog-status" id="ilifeFinanceCustomStatus" aria-live="polite"></p>
+        <div class="ilife-finance-dialog-actions"><button class="ghost-btn" type="button" id="ilifeFinanceCustomCancel">Voltar</button><button class="primary-btn" type="button" id="ilifeFinanceCustomApply">Aplicar dias</button></div>
+      </div>
     </div>
   </section>
-
 
 
 
@@ -1417,7 +1487,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260716-loading-tap-3s"></script>
+  <script type="module" src="/200/project.js?v=20260718-finance-ledger-v1"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

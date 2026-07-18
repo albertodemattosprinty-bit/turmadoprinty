@@ -8298,3 +8298,80 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
     min-height: auto;
   }
 }
+
+/* Carteira financeira do /200 */
+.ilife-finance-modal { overflow:hidden; padding:0; }
+.ilife-finance-scroll { position:absolute; inset:0; overflow-y:auto; overscroll-behavior:contain; padding-bottom:max(6dvh, 58px); }
+.ilife-finance-shell { width:min(980px, calc(100vw - 32px)); margin:0 auto; padding:clamp(24px, 5vw, 56px) 0 44px; }
+.ilife-finance-heading { min-width:0; }
+.ilife-finance-title-row { display:flex; align-items:center; gap:14px; }
+.ilife-finance-title-row h1 { margin:2px 0 0; }
+.ilife-finance-add-wrap { position:relative; }
+.ilife-finance-add { width:52px; height:52px; border:0; border-radius:50%; background:#20b86a; color:#fff; box-shadow:0 12px 28px rgba(32,184,106,.34); font:900 2rem/1 system-ui; cursor:pointer; }
+.ilife-finance-add:hover,.ilife-finance-add:focus-visible { transform:scale(1.04); outline:2px solid rgba(255,255,255,.72); }
+.ilife-finance-add-menu { top:calc(100% + 10px); right:auto; left:0; z-index:12; }
+.ilife-finance-card-income { border-color:rgba(48,210,119,.6); background:linear-gradient(145deg,rgba(17,112,68,.42),rgba(8,34,27,.72)); }
+.ilife-finance-card-expense { border-color:rgba(255,89,104,.62); background:linear-gradient(145deg,rgba(136,28,45,.44),rgba(40,12,23,.72)); }
+.ilife-finance-guidance h2 { margin:7px 0 6px; font-size:clamp(1.1rem,3vw,1.5rem); }
+.ilife-finance-today-list { display:grid; gap:8px; margin-top:12px; }
+.ilife-finance-today-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-radius:15px; background:rgba(255,255,255,.065); }
+.ilife-finance-today-item span { display:grid; gap:2px; }
+.ilife-finance-today-item small { color:var(--soft); }
+.ilife-finance-today-item strong { white-space:nowrap; }
+.ilife-finance-today-item.income strong { color:#5ee79b; }
+.ilife-finance-today-item.expense strong { color:#ff8491; }
+.ilife-finance-month-footer { position:absolute; z-index:9; left:0; right:0; bottom:0; min-height:58px; height:max(6dvh,58px); display:grid; grid-template-columns:auto 46px minmax(130px,auto) 46px; align-items:center; justify-content:center; gap:8px; padding:0 max(14px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(14px,env(safe-area-inset-left)); border-top:1px solid rgba(255,255,255,.14); background:rgba(5,12,25,.94); backdrop-filter:blur(18px); }
+.ilife-finance-month-footer>svg { width:25px; height:25px; color:#78b4ff; }
+.ilife-finance-month-footer button,.ilife-finance-dialog-head button,.ilife-finance-custom-head button { width:42px; height:42px; display:grid; place-items:center; border:0; border-radius:50%; background:rgba(255,255,255,.08); color:#fff; cursor:pointer; }
+.ilife-finance-month-footer button svg,.ilife-finance-dialog-head button svg,.ilife-finance-custom-head button svg { width:22px; height:22px; }
+.ilife-finance-month-footer strong { text-align:center; text-transform:capitalize; }
+.ilife-finance-layer { position:absolute; z-index:20; inset:0; display:grid; place-items:center; padding:18px; background:rgba(1,6,16,.78); backdrop-filter:blur(14px); overflow-y:auto; }
+.ilife-finance-layer[hidden] { display:none !important; }
+.ilife-finance-dialog { width:min(560px,100%); max-height:calc(100dvh - 36px); overflow-y:auto; padding:22px; border:1px solid rgba(255,255,255,.17); border-radius:24px; background:rgba(5,12,25,.98); box-shadow:0 28px 70px rgba(0,0,0,.52); }
+.ilife-finance-dialog-head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:20px; }
+.ilife-finance-dialog h2 { margin:3px 0 0; }
+.ilife-finance-field { display:grid; gap:7px; margin:13px 0; color:var(--soft); font-weight:800; }
+.ilife-finance-field input,.ilife-finance-date-add input { width:100%; min-height:50px; border:1px solid rgba(255,255,255,.16); border-radius:14px; padding:0 14px; background:rgba(255,255,255,.065); color:#fff; font:inherit; color-scheme:dark; }
+.ilife-finance-money-input { display:grid; grid-template-columns:auto 1fr; align-items:center; border:1px solid rgba(255,255,255,.16); border-radius:14px; background:rgba(255,255,255,.065); }
+.ilife-finance-money-input b { padding-left:14px; color:#fff; }
+.ilife-finance-money-input input { border:0; background:transparent; }
+.ilife-finance-choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0; }
+.ilife-finance-choice-grid button { min-height:86px; display:grid; gap:5px; align-content:center; padding:12px; border:1px solid rgba(255,255,255,.16); border-radius:17px; background:transparent; color:#fff; font:inherit; cursor:pointer; }
+.ilife-finance-choice-grid button small { color:var(--soft); }
+.ilife-finance-choice-grid button.active { border-color:#4f9cff; background:linear-gradient(135deg,rgba(30,112,220,.82),rgba(31,72,158,.82)); }
+.ilife-finance-primary { width:100%; }
+.ilife-finance-schedule-question { margin:0 0 14px; text-align:center; font-weight:900; }
+.ilife-finance-carousel-row { display:grid; grid-template-columns:44px 1fr 44px; align-items:center; gap:10px; min-height:92px; margin:10px 0; padding:10px; border:1px solid rgba(255,255,255,.14); border-radius:18px; background:rgba(255,255,255,.045); }
+.ilife-finance-carousel-row>button { width:42px; height:42px; display:grid; place-items:center; border:0; border-radius:50%; background:rgba(255,255,255,.08); color:#fff; }
+.ilife-finance-carousel-row svg { width:21px; height:21px; }
+.ilife-finance-carousel-row>div { display:grid; gap:3px; text-align:center; }
+.ilife-finance-carousel-row span,.ilife-finance-carousel-row small { color:var(--soft); }
+.ilife-finance-carousel-row strong { font-size:1.15rem; }
+.ilife-finance-carousel-row.is-disabled { opacity:.28; pointer-events:none; }
+.ilife-finance-custom-open { width:100%; margin:12px 0; }
+.ilife-finance-dialog-status { min-height:1.3em; margin:12px 0; color:var(--soft); text-align:center; }
+.ilife-finance-dialog-actions { display:grid; grid-template-columns:1fr 1.4fr; gap:10px; }
+.ilife-finance-custom-layer { z-index:24; }
+.ilife-finance-custom-head { display:grid; grid-template-columns:44px 1fr 44px; align-items:center; gap:10px; margin-bottom:16px; text-align:center; }
+.ilife-finance-custom-dialog section>p { color:var(--soft); text-align:center; }
+.ilife-finance-day-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+.ilife-finance-day-grid button { aspect-ratio:1; border:1px solid rgba(255,255,255,.13); border-radius:50%; background:rgba(255,255,255,.045); color:rgba(255,255,255,.46); font-weight:900; }
+.ilife-finance-day-grid button.active { border-color:#40d885; background:#188a54; color:#fff; }
+.ilife-finance-week-list { display:grid; gap:8px; }
+.ilife-finance-week-list button { min-height:45px; border:1px solid rgba(255,255,255,.13); border-radius:13px; background:rgba(255,255,255,.045); color:rgba(255,255,255,.48); font:inherit; font-weight:850; }
+.ilife-finance-week-list button.active { border-color:#40d885; background:#126b43; color:#fff; }
+.ilife-finance-date-add { display:grid; grid-template-columns:1fr 50px; gap:8px; }
+.ilife-finance-date-add button { border:0; border-radius:14px; background:#20b86a; color:#fff; font-size:1.8rem; font-weight:900; }
+.ilife-finance-date-list { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0; }
+.ilife-finance-date-list button { border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:8px 11px; background:rgba(255,255,255,.07); color:#fff; }
+@media (max-width:680px) {
+  .ilife-finance-scroll { padding-bottom:max(8dvh,64px); }
+  .ilife-finance-shell { width:min(100% - 22px,520px); padding-top:26px; }
+  .ilife-finance-header { align-items:flex-start; padding-right:54px; }
+  .ilife-finance-header>img { width:46px; height:46px; }
+  .ilife-finance-add { width:44px; height:44px; }
+  .ilife-finance-snapshot { grid-template-columns:1fr; }
+  .ilife-finance-month-footer { height:max(8dvh,64px); grid-template-columns:auto 42px minmax(105px,1fr) 42px; }
+  .ilife-finance-dialog { padding:18px; }
+  .ilife-finance-choice-grid { grid-template-columns:1fr; }
+}

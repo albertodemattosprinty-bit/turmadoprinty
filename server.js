@@ -62,6 +62,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
+import { createProject200FinanceItem, summarizeProject200FinanceLedgerMonth } from "./src/project200-finance-ledger.js";
 import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, ensureExtraGoalsSchema, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
@@ -10492,6 +10493,35 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleProject200TextOrganize(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/finance/ledger") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const summary = await summarizeProject200FinanceLedgerMonth(user.id, requestUrl.searchParams.get("month"));
+      sendJson(response, 200, { ok: true, summary });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar a carteira financeira."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/finance/ledger") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const item = await createProject200FinanceItem(user.id, body);
+      sendJson(response, 201, { ok: true, item });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar o lancamento."
+      });
+    }
     return;
   }
 
