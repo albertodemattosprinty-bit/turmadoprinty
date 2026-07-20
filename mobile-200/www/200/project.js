@@ -55,18 +55,18 @@ const statsScopes = [
   { key: "last30", label: "30 dias" }
 ];
 const statsPointCategories = [
-  { id: "sono", name: "Sono", targetPoints: 420, icon: "/200/aspect-icons/sono.svg" },
-  { id: "alimentacao", name: "Alimentação", targetPoints: 30, icon: "/200/aspect-icons/alimentacao.svg" },
-  { id: "hidratacao", name: "Hidratação", targetPoints: 15, icon: "/200/aspect-icons/hidratacao.svg" },
-  { id: "aprendizado", name: "Aprendizado", targetPoints: 60, icon: "/200/aspect-icons/aprendizado.svg" },
-  { id: "trabalho", name: "Trabalho", targetPoints: 360, icon: "/200/aspect-icons/trabalho.svg" },
-  { id: "casa", name: "Casa", targetPoints: 120, icon: "/200/aspect-icons/casa.svg" },
-  { id: "exercicios", name: "Exercícios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
-  { id: "social", name: "Social", targetPoints: 30, icon: "/200/aspect-icons/social.svg" },
-  { id: "planejamento", name: "Planejamento", targetPoints: 30, icon: "/200/aspect-icons/planejamento.svg" },
-  { id: "higiene", name: "Higiene", targetPoints: 15, icon: "/200/aspect-icons/higiene.svg" },
-  { id: "lazer", name: "Lazer", targetPoints: 90, icon: "/200/aspect-icons/lazer.svg" },
-  { id: "aspecto", name: "Aspecto", targetPoints: 30, icon: "/200/aspect-icons/aspecto.svg" }
+  { aspectId: "20000000-0000-4000-8000-000000000001", id: "sono", name: "Sono", targetPoints: 420, icon: "/200/aspect-icons/sono.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "Alimentação", targetPoints: 30, icon: "/200/aspect-icons/alimentacao.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "Hidratação", targetPoints: 15, icon: "/200/aspect-icons/hidratacao.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000004", id: "aprendizado", name: "Aprendizado", targetPoints: 60, icon: "/200/aspect-icons/aprendizado.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000005", id: "trabalho", name: "Trabalho", targetPoints: 360, icon: "/200/aspect-icons/trabalho.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa", targetPoints: 120, icon: "/200/aspect-icons/casa.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social", targetPoints: 30, icon: "/200/aspect-icons/social.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Planejamento", targetPoints: 30, icon: "/200/aspect-icons/planejamento.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene", targetPoints: 15, icon: "/200/aspect-icons/higiene.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer", targetPoints: 90, icon: "/200/aspect-icons/lazer.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Aspecto", targetPoints: 30, icon: "/200/aspect-icons/aspecto.svg" }
 ];
 const sleepDelayOptions = [0, 5, 15, 30, 60];
 const avatarPresetToPath = {
@@ -233,6 +233,8 @@ const statsAspectTargetMinusButton = document.getElementById("statsAspectTargetM
 const statsAspectTargetPlusButton = document.getElementById("statsAspectTargetPlus");
 const statsAspectTargetValue = document.getElementById("statsAspectTargetValue");
 const statsAspectMetaCopy = document.getElementById("statsAspectMetaCopy");
+const statsAspectManualTargetToggle = document.getElementById("statsAspectManualTargetToggle");
+const statsAspectManualTargetCopy = document.getElementById("statsAspectManualTargetCopy");
 const statsAspectTaskLabel = document.getElementById("statsAspectTaskLabel");
 const statsAspectTaskMinutes = document.getElementById("statsAspectTaskMinutes");
 const statsAspectProgressSummary = document.getElementById("statsAspectProgressSummary");
@@ -1023,7 +1025,8 @@ const state = {
   statsAspectModal: {
     categoryId: "",
     targetMinutes: 0,
-    missionGoalIds: []
+    missionGoalIds: [],
+    useManualTarget: false
   },
   sleepModal: {
     delayIndex: 0,
@@ -9434,14 +9437,18 @@ function formatSleepTimerValue(totalSeconds) {
 function getStatsAspectConfigEntry(categoryId) {
   const normalized = String(categoryId || "").trim().toLowerCase();
   const fallback = statsPointCategories.find((entry) => entry.id === normalized) || null;
-  const config = state.statsAspectConfig?.[normalized] || {};
+  const config = state.statsAspectConfig?.[normalized]
+    || state.statsAspectConfig?.[fallback?.aspectId]
+    || {};
   return {
+    aspectId: fallback?.aspectId || String(config.aspectId || "").trim(),
     targetMinutes: Math.max(1, Math.trunc(Number(config.targetMinutes || fallback?.targetPoints || 1) || 1)),
     missionGoalIds: isSleepStatsCategory(normalized)
       ? []
       : Array.isArray(config.missionGoalIds)
       ? [...new Set(config.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
-      : (String(config.missionGoalId || "").trim() ? [String(config.missionGoalId || "").trim()] : [])
+      : (String(config.missionGoalId || "").trim() ? [String(config.missionGoalId || "").trim()] : []),
+    useManualTarget: isSleepStatsCategory(normalized) ? true : Boolean(config.useManualTarget)
   };
 }
 
@@ -9515,28 +9522,45 @@ function formatMissionTimePromptLabel(title) {
   return `Quanto tempo leva 1 ${safeTitle}?`;
 }
 
-function buildStatsPointEntry(category, byCategory = {}) {
-  const config = getStatsAspectConfigEntry(category.id);
+function buildStatsPointEntry(category, byCategory = {}, configOverride = null) {
+  const config = configOverride || getStatsAspectConfigEntry(category.id);
   const selectedGoalIds = new Set((Array.isArray(config.missionGoalIds) ? config.missionGoalIds : []).map((id) => String(id || "").trim()).filter(Boolean));
   const scopedMissions = Array.isArray(state.statsScopeMissions) ? state.statsScopeMissions : [];
   const missionGoals = isSleepStatsCategory(category.id)
     ? []
     : scopedMissions.filter((goal) => selectedGoalIds.has(String(goal.id || "").trim()));
-  const taskMinutes = Math.max(0, Number(byCategory?.[category.id] || 0));
-  const points = missionGoals.length
-    ? missionGoals.reduce((sum, goal) => sum + (Math.max(0, Number(goal.progressValue || 0)) * getMissionUnitDurationMinutes(goal)), 0)
-    : Math.max(0, Number(byCategory?.[category.id] || 0));
-  const targetPoints = missionGoals.length
-    ? missionGoals.reduce((sum, goal) => sum + (Math.max(1, Number(goal.targetValue || 1)) * getMissionUnitDurationMinutes(goal)), 0)
-    : Math.max(1, Number(config.targetMinutes || category.targetPoints || 1)) * getStatsScopeDays();
+  const actionCompletedMinutes = Math.max(0, Number(byCategory?.[category.id] || 0));
+  const actionTargetMinutes = Math.max(0, Number(state.statsSummary?.byCategoryPlanned?.[category.id] || 0));
+  const missionCompletedMinutes = missionGoals.reduce(
+    (sum, goal) => sum + (Math.max(0, Number(goal.progressValue || 0)) * getMissionUnitDurationMinutes(goal)),
+    0
+  );
+  const missionTargetMinutes = missionGoals.reduce(
+    (sum, goal) => sum + (Math.max(1, Number(goal.targetValue || 1)) * getMissionUnitDurationMinutes(goal)),
+    0
+  );
+  const points = isSleepStatsCategory(category.id)
+    ? actionCompletedMinutes
+    : actionCompletedMinutes + missionCompletedMinutes;
+  const combinedTargetMinutes = actionTargetMinutes + missionTargetMinutes;
+  const manualTargetMinutes = Math.max(1, Number(config.targetMinutes || category.targetPoints || 1)) * getStatsScopeDays();
+  const targetPoints = config.useManualTarget || isSleepStatsCategory(category.id)
+    ? manualTargetMinutes
+    : (combinedTargetMinutes > 0 ? combinedTargetMinutes : manualTargetMinutes);
   const percent = targetPoints > 0 ? Math.max(0, Math.min(100, Math.round((points / targetPoints) * 100))) : 0;
   return {
+    aspectId: category.aspectId,
     id: category.id,
     name: category.name,
     points,
     targetPoints,
     percent,
-    taskMinutes,
+    taskMinutes: actionCompletedMinutes,
+    actionCompletedMinutes,
+    actionTargetMinutes,
+    missionCompletedMinutes,
+    missionTargetMinutes,
+    useManualTarget: config.useManualTarget,
     missionGoalIds: missionGoals.map((goal) => String(goal.id || "")),
     missionTitles: missionGoals.map((goal) => String(goal.title || "Missão")).filter(Boolean)
   };
@@ -9549,8 +9573,12 @@ function renderStatsAspectModalState() {
     return;
   }
   const isSleepCategory = isSleepStatsCategory(categoryId);
-  const currentEntry = (Array.isArray(state.statsMissions) ? state.statsMissions : []).find((entry) => entry.id === categoryId)
-    || buildStatsPointEntry(category, state.statsSummary?.byCategory || {});
+  const currentEntry = buildStatsPointEntry(category, state.statsSummary?.byCategory || {}, {
+    ...getStatsAspectConfigEntry(categoryId),
+    targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || category.targetPoints || 1) || 1)),
+    missionGoalIds: Array.isArray(state.statsAspectModal.missionGoalIds) ? state.statsAspectModal.missionGoalIds : [],
+    useManualTarget: isSleepCategory ? true : Boolean(state.statsAspectModal.useManualTarget)
+  });
   if (statsAspectTitle) {
     statsAspectTitle.textContent = category.name;
   }
@@ -9565,16 +9593,32 @@ function renderStatsAspectModalState() {
   if (statsAspectMetaCopy) {
     statsAspectMetaCopy.textContent = `${targetMinutes} minutos`;
   }
+  const useManualTarget = isSleepCategory ? true : Boolean(state.statsAspectModal.useManualTarget);
+  state.statsAspectModal.useManualTarget = useManualTarget;
+  if (statsAspectManualTargetToggle) {
+    statsAspectManualTargetToggle.hidden = isSleepCategory;
+    statsAspectManualTargetToggle.classList.toggle("is-active", useManualTarget);
+    statsAspectManualTargetToggle.setAttribute("aria-pressed", useManualTarget ? "true" : "false");
+    statsAspectManualTargetToggle.setAttribute("aria-label", useManualTarget ? "Usar soma de ações e missões" : "Usar tempo definido como meta");
+  }
+  if (statsAspectManualTargetCopy) {
+    statsAspectManualTargetCopy.hidden = isSleepCategory;
+    statsAspectManualTargetCopy.textContent = useManualTarget
+      ? "O tempo acima é a meta esperada."
+      : "A meta esperada soma Ações + Missões.";
+  }
   if (statsAspectTaskLabel) {
     statsAspectTaskLabel.textContent = isSleepCategory ? "Sono registrado:" : "Tarefas:";
   }
   if (statsAspectTaskMinutes) {
-    statsAspectTaskMinutes.textContent = formatMinutesHuman(isSleepCategory ? currentEntry.points || 0 : currentEntry.taskMinutes || 0);
+    statsAspectTaskMinutes.textContent = isSleepCategory
+      ? formatMinutesHuman(currentEntry.points || 0)
+      : `${formatMinutesHuman(currentEntry.actionCompletedMinutes || 0)} de ${formatMinutesHuman(currentEntry.actionTargetMinutes || 0)}`;
   }
   if (statsAspectProgressSummary) {
     const linkedMissionLabel = Array.isArray(currentEntry.missionTitles) && currentEntry.missionTitles.length
-      ? `${currentEntry.percent}% via ${currentEntry.missionTitles.join(" + ")}`
-      : `${currentEntry.percent}%`;
+      ? `${currentEntry.percent}% · ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)} · ${currentEntry.missionTitles.join(" + ")}`
+      : `${currentEntry.percent}% · ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)}`;
     statsAspectProgressSummary.textContent = linkedMissionLabel;
   }
   if (statsAspectLinkedGoalsLabel) {
@@ -9607,7 +9651,8 @@ function openStatsAspectModal(categoryId) {
   state.statsAspectModal = {
     categoryId: category.id,
     targetMinutes: config.targetMinutes,
-    missionGoalIds: [...config.missionGoalIds]
+    missionGoalIds: [...config.missionGoalIds],
+    useManualTarget: config.useManualTarget
   };
   if (statsAspectStatus) {
     statsAspectStatus.textContent = "";
@@ -10098,8 +10143,10 @@ function loadMissionQuickSlots(profileName = state.selectedProfile || getDefault
 
 function buildDefaultStatsAspectConfig() {
   return Object.fromEntries(statsPointCategories.map((category) => [category.id, {
+    aspectId: category.aspectId,
     targetMinutes: Math.max(1, Number(category.targetPoints || 1)),
-    missionGoalIds: isSleepStatsCategory(category.id) ? [] : []
+    missionGoalIds: isSleepStatsCategory(category.id) ? [] : [],
+    useManualTarget: isSleepStatsCategory(category.id)
   }]));
 }
 
@@ -10112,26 +10159,31 @@ function normalizeStatsAspectConfigMap(rawConfig = {}) {
         : category.id === "aspecto"
           ? (rawConfig?.fe_espiritualidade || rawConfig?.saude || rawConfig?.digital)
           : null;
-    const entry = rawConfig?.[category.id] || legacyEntry || {};
+    const entry = rawConfig?.[category.aspectId] || rawConfig?.[category.id] || legacyEntry || {};
     const missionGoalIds = Array.isArray(entry.missionGoalIds)
       ? [...new Set(entry.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
       : (String(entry.missionGoalId || "").trim() ? [String(entry.missionGoalId || "").trim()] : []);
     return [category.id, {
+      aspectId: category.aspectId,
       targetMinutes: Math.max(1, Math.trunc(Number(entry.targetMinutes || category.targetPoints || 1) || 1)),
-      missionGoalIds: isSleepStatsCategory(category.id) ? [] : missionGoalIds
+      missionGoalIds: isSleepStatsCategory(category.id) ? [] : missionGoalIds,
+      useManualTarget: isSleepStatsCategory(category.id) ? true : Boolean(entry.useManualTarget)
     }];
   }));
 }
 
 function buildStatsAspectConfigPayload(categoryId) {
   const entry = state.statsAspectConfig?.[categoryId] || {};
+  const category = statsPointCategories.find((item) => item.id === categoryId) || null;
   return {
+    aspectId: category?.aspectId || String(entry.aspectId || "").trim(),
     targetMinutes: Math.max(1, Math.trunc(Number(entry.targetMinutes || 1) || 1)),
     missionGoalIds: isSleepStatsCategory(categoryId)
       ? []
       : Array.isArray(entry.missionGoalIds)
       ? [...new Set(entry.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
-      : []
+      : [],
+    useManualTarget: isSleepStatsCategory(categoryId) ? true : Boolean(entry.useManualTarget)
   };
 }
 
@@ -10179,13 +10231,15 @@ async function persistStatsAspectConfig(categoryId, profileName = state.selected
   }
   const normalizedProfile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
   const payload = buildStatsAspectConfigPayload(normalizedCategoryId);
-  const result = await apiRequest(`/api/200/stats-aspects/${encodeURIComponent(normalizedCategoryId)}`, {
+  const stableAspectId = payload.aspectId || normalizedCategoryId;
+  const result = await apiRequest(`/api/200/stats-aspects/${encodeURIComponent(stableAspectId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       profile: normalizedProfile,
       targetMinutes: payload.targetMinutes,
-      missionGoalIds: payload.missionGoalIds
+      missionGoalIds: payload.missionGoalIds,
+      useManualTarget: payload.useManualTarget
     }),
     skipGlobalLoading: true
   });
@@ -14449,6 +14503,11 @@ statsAspectTargetPlusButton?.addEventListener("click", () => {
   renderStatsAspectModalState();
 });
 
+statsAspectManualTargetToggle?.addEventListener("click", () => {
+  state.statsAspectModal.useManualTarget = !Boolean(state.statsAspectModal.useManualTarget);
+  renderStatsAspectModalState();
+});
+
 statsAspectSaveButton?.addEventListener("click", () => {
   void (async () => {
     const categoryId = String(state.statsAspectModal?.categoryId || "").trim().toLowerCase();
@@ -14462,7 +14521,8 @@ statsAspectSaveButton?.addEventListener("click", () => {
         ? []
         : Array.isArray(state.statsAspectModal.missionGoalIds)
         ? [...new Set(state.statsAspectModal.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
-        : []
+        : [],
+      useManualTarget: isSleepStatsCategory(categoryId) ? true : Boolean(state.statsAspectModal.useManualTarget)
     };
     try {
       await persistStatsAspectConfig(categoryId);
@@ -14527,7 +14587,8 @@ statsAspectMissionSaveButton?.addEventListener("click", () => {
         ? []
         : Array.isArray(state.statsAspectModal.missionGoalIds)
         ? [...new Set(state.statsAspectModal.missionGoalIds.map((item) => String(item || "").trim()).filter(Boolean))]
-        : []
+        : [],
+      useManualTarget: isSleepStatsCategory(categoryId) ? true : Boolean(state.statsAspectModal.useManualTarget)
     };
     try {
       await persistStatsAspectConfig(categoryId);
@@ -14552,7 +14613,8 @@ statsAspectMissionClearButton?.addEventListener("click", () => {
     state.statsAspectConfig[categoryId] = {
       ...getStatsAspectConfigEntry(categoryId),
       targetMinutes: Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1)),
-      missionGoalIds: []
+      missionGoalIds: [],
+      useManualTarget: isSleepStatsCategory(categoryId) ? true : Boolean(state.statsAspectModal.useManualTarget)
     };
     try {
       await persistStatsAspectConfig(categoryId);

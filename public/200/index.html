@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260718-finance-attention-v2" />
+  <link rel="stylesheet" href="/200/project.css?v=20260719-stable-aspects-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -1057,6 +1057,12 @@
             <button class="history-mission-sign-btn active" type="button" id="statsAspectTargetPlus">+</button>
           </div>
           <div class="stats-aspect-meta-copy" id="statsAspectMetaCopy">15 minutos</div>
+          <button class="stats-aspect-manual-target-toggle" type="button" id="statsAspectManualTargetToggle" aria-pressed="false" aria-label="Usar tempo definido como meta">
+            <span class="stats-aspect-manual-target-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5l3.2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span id="statsAspectManualTargetCopy">A meta esperada soma Ações + Missões.</span>
+          </button>
         </div>
         <div class="stats-aspect-task-copy"><span id="statsAspectTaskLabel">Tarefas:</span> <strong id="statsAspectTaskMinutes">0 minutos</strong></div>
         <div class="stats-aspect-task-copy">Progresso atual: <strong id="statsAspectProgressSummary">0%</strong></div>
@@ -1494,7 +1500,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260718-finance-attention-v2"></script>
+  <script type="module" src="/200/project.js?v=20260719-stable-aspects-v1"></script>
   <script src='/speech-input-kit.js'></script>
 </body>
 </html>

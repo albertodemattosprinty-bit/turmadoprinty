@@ -3712,18 +3712,18 @@ async function handleProject200ActionInterpret(request, response) {
 }
 
 const PROJECT200_TASK_CATEGORIES = [
-  { id: "sono", name: "Sono" },
-  { id: "alimentacao", name: "Alimentação" },
-  { id: "hidratacao", name: "Hidratação" },
-  { id: "aprendizado", name: "Aprendizado" },
-  { id: "trabalho", name: "Trabalho" },
-  { id: "casa", name: "Casa" },
-  { id: "exercicios", name: "Exercícios" },
-  { id: "social", name: "Social" },
-  { id: "planejamento", name: "Planejamento" },
-  { id: "higiene", name: "Higiene" },
-  { id: "lazer", name: "Lazer" },
-  { id: "aspecto", name: "Aspecto" }
+  { aspectId: "20000000-0000-4000-8000-000000000001", id: "sono", name: "Sono" },
+  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "Alimentação" },
+  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "Hidratação" },
+  { aspectId: "20000000-0000-4000-8000-000000000004", id: "aprendizado", name: "Aprendizado" },
+  { aspectId: "20000000-0000-4000-8000-000000000005", id: "trabalho", name: "Trabalho" },
+  { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa" },
+  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios" },
+  { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Planejamento" },
+  { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene" },
+  { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer" },
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Aspecto" }
 ];
 
 function inferProject200CategoryLocally(title) {
@@ -11877,7 +11877,8 @@ const server = http.createServer(async (request, response) => {
       const profile = body?.profile || PROJECT200_DEFAULT_PROFILE_NAME;
       const config = await updateProject200StatsAspectConfig(user.id, profile, categoryId, {
         targetMinutes: body?.targetMinutes,
-        missionGoalIds: body?.missionGoalIds
+        missionGoalIds: body?.missionGoalIds,
+        useManualTarget: body?.useManualTarget
       });
       sendJson(response, 200, { ok: true, config });
     } catch (error) {

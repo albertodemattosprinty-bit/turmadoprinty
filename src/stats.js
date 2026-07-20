@@ -5,37 +5,42 @@ const DEFAULT_SALDO_GOAL_CENTS = 1000000;
 const CLOSED_DAILY_REPORT_SYNC_BATCH_SIZE = 3;
 const closedDailyReportSyncByUser = new Map();
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
-const PROJECT200_STATS_ASPECT_CATEGORIES = new Set([
-  PROJECT200_SLEEP_CATEGORY_ID,
-  "alimentacao",
-  "hidratacao",
-  "aprendizado",
-  "trabalho",
-  "casa",
-  "exercicios",
-  "social",
-  "planejamento",
-  "higiene",
-  "lazer",
-  "aspecto"
+const PROJECT200_STATS_ASPECTS = Object.freeze([
+  { aspectId: "20000000-0000-4000-8000-000000000001", categoryId: PROJECT200_SLEEP_CATEGORY_ID, aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000002", categoryId: "alimentacao", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000003", categoryId: "hidratacao", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000004", categoryId: "aprendizado", aliases: ["estudo", "financeiro"] },
+  { aspectId: "20000000-0000-4000-8000-000000000005", categoryId: "trabalho", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000006", categoryId: "casa", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000007", categoryId: "exercicios", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000008", categoryId: "social", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000009", categoryId: "planejamento", aliases: ["familia"] },
+  { aspectId: "20000000-0000-4000-8000-000000000010", categoryId: "higiene", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000011", categoryId: "lazer", aliases: [] },
+  { aspectId: "20000000-0000-4000-8000-000000000012", categoryId: "aspecto", aliases: ["fe_espiritualidade", "saude", "digital"] }
 ]);
+const PROJECT200_STATS_ASPECT_BY_ID = new Map(PROJECT200_STATS_ASPECTS.map((item) => [item.aspectId, item]));
+const PROJECT200_STATS_ASPECT_BY_CATEGORY = new Map();
+for (const aspect of PROJECT200_STATS_ASPECTS) {
+  PROJECT200_STATS_ASPECT_BY_CATEGORY.set(aspect.categoryId, aspect);
+  for (const alias of aspect.aliases) {
+    PROJECT200_STATS_ASPECT_BY_CATEGORY.set(alias, aspect);
+  }
+}
 
 function normalizeProject200StatsProfile(value) {
   return normalizeStoredProject200ProfileName(value || PROJECT200_DEFAULT_PROFILE_NAME);
 }
 
-function normalizeProject200StatsCategoryId(value) {
+function getProject200StatsAspect(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  const legacyMap = {
-    estudo: "aprendizado",
-    financeiro: "aprendizado",
-    familia: "planejamento",
-    fe_espiritualidade: "aspecto",
-    saude: "aspecto",
-    digital: "aspecto"
-  };
-  const mapped = legacyMap[normalized] || normalized;
-  return PROJECT200_STATS_ASPECT_CATEGORIES.has(mapped) ? mapped : "";
+  return PROJECT200_STATS_ASPECT_BY_ID.get(normalized)
+    || PROJECT200_STATS_ASPECT_BY_CATEGORY.get(normalized)
+    || null;
+}
+
+function normalizeProject200StatsCategoryId(value) {
+  return getProject200StatsAspect(value)?.categoryId || "";
 }
 
 function normalizeProject200MissionGoalIds(value) {
@@ -204,15 +209,77 @@ export async function ensureStatsSchema() {
   await query("alter table project200_stats_aspects add column if not exists updated_at timestamptz not null default now();");
   await query("update project200_stats_aspects set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
   await query("create index if not exists idx_project200_stats_aspects_user_profile on project200_stats_aspects(user_id, assigned_profile, updated_at desc);");
+
+  await query(`
+    create table if not exists project200_stats_aspect_settings (
+      user_id uuid not null references users(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      aspect_id text not null,
+      category_id text not null,
+      target_minutes integer not null default 1,
+      mission_goal_ids jsonb not null default '[]'::jsonb,
+      use_manual_target boolean not null default false,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      primary key (user_id, assigned_profile, aspect_id)
+    );
+  `);
+  await query("alter table project200_stats_aspect_settings add column if not exists category_id text not null default ''; ");
+  await query("alter table project200_stats_aspect_settings add column if not exists use_manual_target boolean not null default false;");
+  await query("create index if not exists idx_project200_stats_aspect_settings_user_profile on project200_stats_aspect_settings(user_id, assigned_profile, updated_at desc);");
+  await query(`
+    insert into project200_stats_aspect_settings (
+      user_id, assigned_profile, aspect_id, category_id, target_minutes, mission_goal_ids, created_at, updated_at
+    )
+    select distinct on (user_id, assigned_profile, aspect_id)
+      user_id, assigned_profile, aspect_id, category_id, target_minutes, mission_goal_ids, created_at, updated_at
+    from (
+      select
+        user_id,
+        assigned_profile,
+        case
+          when lower(category_id) = 'sono' then '20000000-0000-4000-8000-000000000001'
+          when lower(category_id) = 'alimentacao' then '20000000-0000-4000-8000-000000000002'
+          when lower(category_id) = 'hidratacao' then '20000000-0000-4000-8000-000000000003'
+          when lower(category_id) in ('aprendizado', 'estudo', 'financeiro') then '20000000-0000-4000-8000-000000000004'
+          when lower(category_id) = 'trabalho' then '20000000-0000-4000-8000-000000000005'
+          when lower(category_id) = 'casa' then '20000000-0000-4000-8000-000000000006'
+          when lower(category_id) = 'exercicios' then '20000000-0000-4000-8000-000000000007'
+          when lower(category_id) = 'social' then '20000000-0000-4000-8000-000000000008'
+          when lower(category_id) in ('planejamento', 'familia') then '20000000-0000-4000-8000-000000000009'
+          when lower(category_id) = 'higiene' then '20000000-0000-4000-8000-000000000010'
+          when lower(category_id) = 'lazer' then '20000000-0000-4000-8000-000000000011'
+          when lower(category_id) in ('aspecto', 'fe_espiritualidade', 'saude', 'digital') then '20000000-0000-4000-8000-000000000012'
+          else ''
+        end as aspect_id,
+        case
+          when lower(category_id) in ('aprendizado', 'estudo', 'financeiro') then 'aprendizado'
+          when lower(category_id) in ('planejamento', 'familia') then 'planejamento'
+          when lower(category_id) in ('aspecto', 'fe_espiritualidade', 'saude', 'digital') then 'aspecto'
+          else lower(category_id)
+        end as category_id,
+        target_minutes,
+        mission_goal_ids,
+        created_at,
+        updated_at
+      from project200_stats_aspects
+    ) legacy
+    where aspect_id <> ''
+    order by user_id, assigned_profile, aspect_id, updated_at desc
+    on conflict (user_id, assigned_profile, aspect_id) do nothing;
+  `);
 }
 
 function normalizeProject200StatsAspectRow(row) {
-  const categoryId = normalizeProject200StatsCategoryId(row?.category_id);
+  const aspect = getProject200StatsAspect(row?.aspect_id || row?.category_id);
+  const categoryId = aspect?.categoryId || "";
   const missionGoalIds = normalizeProject200MissionGoalIds(row?.mission_goal_ids);
   return {
+    aspectId: aspect?.aspectId || "",
     categoryId,
     targetMinutes: Math.max(1, Math.trunc(Number(row?.target_minutes || (categoryId === PROJECT200_SLEEP_CATEGORY_ID ? PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES : 1)) || 1)),
-    missionGoalIds: categoryId === PROJECT200_SLEEP_CATEGORY_ID ? [] : missionGoalIds
+    missionGoalIds: categoryId === PROJECT200_SLEEP_CATEGORY_ID ? [] : missionGoalIds,
+    useManualTarget: Boolean(row?.use_manual_target)
   };
 }
 
@@ -221,24 +288,31 @@ export async function getProject200StatsAspectConfig(userId, profileName = PROJE
   const normalizedProfile = normalizeProject200StatsProfile(profileName);
   const result = await query(
     `
-      select category_id, target_minutes, mission_goal_ids
-      from project200_stats_aspects
+      select aspect_id, category_id, target_minutes, mission_goal_ids, use_manual_target
+      from project200_stats_aspect_settings
       where user_id = $1
         and assigned_profile = $2
-      order by category_id asc
+      order by aspect_id asc
     `,
     [userId, normalizedProfile]
   );
   const config = {};
   for (const row of result.rows) {
     const normalized = normalizeProject200StatsAspectRow(row);
-    if (!normalized.categoryId) {
+    if (!normalized.aspectId) {
       continue;
     }
-    config[normalized.categoryId] = {
+    const entry = {
+      aspectId: normalized.aspectId,
+      categoryId: normalized.categoryId,
       targetMinutes: normalized.targetMinutes,
-      missionGoalIds: normalized.missionGoalIds
+      missionGoalIds: normalized.missionGoalIds,
+      useManualTarget: normalized.useManualTarget
     };
+    config[normalized.aspectId] = entry;
+    // Keep the semantic category alias for already-installed /200 clients.
+    // The database relationship itself is anchored only to the fixed aspectId.
+    config[normalized.categoryId] = entry;
   }
   return config;
 }
@@ -246,24 +320,28 @@ export async function getProject200StatsAspectConfig(userId, profileName = PROJE
 export async function updateProject200StatsAspectConfig(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, categoryId, payload = {}) {
   await ensureStatsSchema();
   const normalizedProfile = normalizeProject200StatsProfile(profileName);
-  const normalizedCategoryId = normalizeProject200StatsCategoryId(categoryId);
-  if (!normalizedCategoryId) {
+  const aspect = getProject200StatsAspect(categoryId);
+  if (!aspect) {
     throw new Error("Categoria de estatística inválida.");
   }
+  const normalizedCategoryId = aspect.categoryId;
   const targetMinutes = Math.max(1, Math.trunc(Number(payload?.targetMinutes || (normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES : 1)) || 1));
   const missionGoalIds = normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? [] : normalizeProject200MissionGoalIds(payload?.missionGoalIds);
+  const useManualTarget = normalizedCategoryId === PROJECT200_SLEEP_CATEGORY_ID ? true : Boolean(payload?.useManualTarget);
   await query(
     `
-      insert into project200_stats_aspects (
-        user_id, assigned_profile, category_id, target_minutes, mission_goal_ids, created_at, updated_at
+      insert into project200_stats_aspect_settings (
+        user_id, assigned_profile, aspect_id, category_id, target_minutes, mission_goal_ids, use_manual_target, created_at, updated_at
       )
-      values ($1, $2, $3, $4, $5::jsonb, now(), now())
-      on conflict (user_id, assigned_profile, category_id) do update
-        set target_minutes = excluded.target_minutes,
+      values ($1, $2, $3, $4, $5, $6::jsonb, $7, now(), now())
+      on conflict (user_id, assigned_profile, aspect_id) do update
+        set category_id = excluded.category_id,
+            target_minutes = excluded.target_minutes,
             mission_goal_ids = excluded.mission_goal_ids,
+            use_manual_target = excluded.use_manual_target,
             updated_at = now()
     `,
-    [userId, normalizedProfile, normalizedCategoryId, targetMinutes, JSON.stringify(missionGoalIds)]
+    [userId, normalizedProfile, aspect.aspectId, normalizedCategoryId, targetMinutes, JSON.stringify(missionGoalIds), useManualTarget]
   );
   return getProject200StatsAspectConfig(userId, normalizedProfile);
 }
@@ -429,6 +507,7 @@ async function buildStatsSummary(userId, range) {
         )
         select
           coalesce(nullif(trim(category_id), ''), 'sem_categoria') as category_id,
+          coalesce(sum(minutes), 0)::bigint as total_minutes,
           coalesce(sum(minutes * greatest(0, least(100, completion_percent)) / 100.0), 0)::bigint as completed_minutes
         from action_status
         group by coalesce(nullif(trim(category_id), ''), 'sem_categoria')
@@ -484,11 +563,16 @@ async function buildStatsSummary(userId, range) {
     }
   };
   const byCategory = {};
+  const byCategoryPlanned = {};
   for (const row of categoryResult.rows) {
-    const categoryId = String(row.category_id || "").trim().toLowerCase() || "sem_categoria";
-    byCategory[categoryId] = Number(row.completed_minutes || 0);
+    const categoryId = normalizeProject200StatsCategoryId(row.category_id)
+      || String(row.category_id || "").trim().toLowerCase()
+      || "sem_categoria";
+    byCategory[categoryId] = Number(byCategory[categoryId] || 0) + Number(row.completed_minutes || 0);
+    byCategoryPlanned[categoryId] = Number(byCategoryPlanned[categoryId] || 0) + Number(row.total_minutes || 0);
   }
   byCategory[PROJECT200_SLEEP_CATEGORY_ID] = Math.max(0, Number(sleepTotalMinutes || 0));
+  byCategoryPlanned[PROJECT200_SLEEP_CATEGORY_ID] = PROJECT200_SLEEP_DEFAULT_TARGET_MINUTES;
 
   return {
     rangeKey: range.key,
@@ -504,6 +588,7 @@ async function buildStatsSummary(userId, range) {
     },
     byAssignee,
     byCategory,
+    byCategoryPlanned,
     globalProfiles: []
   };
 }
