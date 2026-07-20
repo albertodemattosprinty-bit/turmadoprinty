@@ -507,7 +507,6 @@ const missionRunModePercentBtn = document.getElementById("missionRunModePercentB
 const missionRunModeTimeBtn = document.getElementById("missionRunModeTimeBtn");
 const missionRunCycleCount = document.getElementById("missionRunCycleCount");
 const missionRunPlayerSlot = document.getElementById("missionRunPlayerSlot");
-const missionRunLoadingOverlay = document.getElementById("missionRunLoadingOverlay");
 const missionRunStatus = document.getElementById("missionRunStatus");
 const missionRunCompleteButton = document.getElementById("missionRunCompleteButton");
 const missionRunConfirm = document.getElementById("missionRunConfirm");
@@ -12239,13 +12238,6 @@ function restoreRunningPlayerAfterMission() {
   renderHomeRunningTask();
 }
 
-function setMissionRunLoading(isLoading) {
-  const active = Boolean(isLoading);
-  missionRunLoadingOverlay?.classList.toggle("active", active);
-  missionRunLoadingOverlay?.setAttribute("aria-hidden", active ? "false" : "true");
-  document.body.classList.toggle("mission-run-loading", active);
-}
-
 function ensureMissionActionLoadingContent(button) {
   if (!button || button.dataset.missionLoadingReady === "1") return;
   const originalContent = button.innerHTML;
@@ -12768,18 +12760,15 @@ function beginMissionRun(goal, selectedVariant = null) {
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
   openModal("missionRunModal");
-  setMissionRunLoading(false);
 }
 
 async function openMissionRunModal(goalId) {
   const goal = getMissionRunGoalById(goalId);
   if (!goal) return;
-  setMissionRunLoading(true);
   try {
     state.missionVariants.goalId = String(goalId || "");
     const variants = await loadMissionVariants(goalId);
     if (variants.length >= 2) {
-      setMissionRunLoading(false);
       await openMissionVariantsModal(goalId, "choose", { items: variants });
       return;
     }
@@ -12787,10 +12776,6 @@ async function openMissionRunModal(goalId) {
     beginMissionRun(goal, variants[0] || null);
   } catch {
     beginMissionRun(goal, null);
-  } finally {
-    if (!document.getElementById("missionRunModal")?.classList.contains("active")) {
-      setMissionRunLoading(false);
-    }
   }
 }
 

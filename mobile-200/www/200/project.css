@@ -8106,51 +8106,6 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   }
 }
 
-/* Mission cycles, fast loading and the persistent ranking hand-off. */
-.mission-run-loading-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2600;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 14px;
-  background: var(--project-modal-theme, linear-gradient(145deg, #0d2d8f, #020d37));
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 180ms ease, visibility 180ms ease;
-}
-
-.mission-run-loading-overlay.active {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.mission-run-loading-spinner {
-  width: 58px;
-  height: 58px;
-  border: 4px solid rgba(255, 255, 255, 0.24);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: mission-run-loading-spin 760ms linear infinite;
-}
-
-.mission-run-loading-copy {
-  color: #fff;
-  font-size: 1.04rem;
-  font-weight: 850;
-}
-
-body.mission-run-loading > :not(.mission-run-loading-overlay) {
-  filter: blur(5px);
-}
-
-@keyframes mission-run-loading-spin {
-  to { transform: rotate(360deg); }
-}
-
 .history-mission-run-body {
   gap: clamp(8px, 1.6dvh, 16px);
 }
@@ -8532,8 +8487,10 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
 
 #missionProgressModal .mission-progress-start-btn,
 #missionProgressModal .mission-progress-confirm-btn {
-  width: min(100%, 520px);
-  min-height: 66px;
+  width: min(100%, 420px);
+  min-height: 58px;
+  height: 58px;
+  aspect-ratio: auto;
   border: 0;
   border-radius: 999px;
   display: flex;
@@ -8559,7 +8516,8 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
 }
 
 #missionProgressModal .mission-progress-confirm-btn {
-  height: auto;
+  height: 58px;
+  aspect-ratio: auto;
   background: linear-gradient(135deg, #2988ff, #1757ca);
   box-shadow: 0 14px 30px rgba(23, 87, 202, 0.34);
 }
@@ -8571,6 +8529,6 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
 }
 
 #missionProgressModal .mission-progress-confirm-btn:disabled {
-  opacity: 0.42;
+  opacity: 0.5;
   cursor: default;
 }
