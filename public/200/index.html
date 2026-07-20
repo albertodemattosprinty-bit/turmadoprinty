@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260719-stable-aspects-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260720-mission-start-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -1086,6 +1086,22 @@
       </div>
     </section>
 
+  <section class="workspace-modal simple-modal mission-variants-modal stats-aspect-links-modal" id="statsAspectLinksModal" aria-hidden="true" aria-label="Ações e missões vinculadas ao aspecto">
+    <div class="mission-variants-panel stats-aspect-links-panel">
+      <header class="mission-variants-head">
+        <div>
+          <div class="mission-variants-kicker">Vínculos do aspecto</div>
+          <div class="running-task-name mission-variants-title" id="statsAspectLinksTitle">Aspecto</div>
+        </div>
+        <button class="history-mission-modal-close" type="button" id="statsAspectLinksCloseButton" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
+        </button>
+      </header>
+      <div class="stats-aspect-links-period" id="statsAspectLinksPeriod">Hoje</div>
+      <div class="mission-variants-list stats-aspect-links-list" id="statsAspectLinksList" aria-live="polite"></div>
+    </div>
+  </section>
+
   <section class="workspace-modal" id="sleepModal" aria-hidden="true" aria-label="Sono">
       <div class="sleep-modal-shell" id="sleepModalShell">
         <button class="sleep-modal-close" type="button" id="sleepModalCloseButton" aria-label="Fechar modal do sono">Fechar</button>
@@ -1329,7 +1345,7 @@
     <div class="finance-content history-mission-modal-content mission-progress-modal-content history-mission-modal-shell">
       <div class="history-mission-modal-head">
         <div class="mission-modal-heading">
-          <span class="mission-modal-eyebrow">Adicionar progresso</span>
+          <span class="mission-modal-eyebrow">Preparar missão</span>
           <h1 class="mission-modal-title" id="missionProgressTitle">Missão</h1>
         </div>
         <button class="history-mission-modal-close" type="button" id="missionProgressCloseButton" aria-label="Fechar">
@@ -1337,21 +1353,13 @@
         </button>
       </div>
       <div class="history-mission-modal-body">
-        <div class="mission-modal-explainer">
-          <h2>Quanto você concluiu agora?</h2>
-          <p>Este painel abre ao manter a missão pressionada. Informe o avanço e confirme.</p>
-        </div>
+        <img class="mission-progress-icon" id="missionProgressIcon" src="/200/icons/target.svg" alt="Ícone da missão" />
         <div class="history-mission-adjust-stage">
           <button class="history-mission-sign-btn" type="button" id="missionProgressMinus">-</button>
           <div class="history-mission-adjust-value" id="missionProgressValue">1</div>
           <button class="history-mission-sign-btn active" type="button" id="missionProgressPlus">+</button>
         </div>
-        <div class="history-mission-adjust-presets history-mission-adjust-presets-four">
-          <button class="history-mission-preset-btn" type="button" data-mission-progress-add="1">+1</button>
-          <button class="history-mission-preset-btn" type="button" data-mission-progress-add="3">+3</button>
-          <button class="history-mission-preset-btn" type="button" data-mission-progress-add="5">+5</button>
-          <button class="history-mission-preset-btn" type="button" data-mission-progress-add="10">+10</button>
-        </div>
+        <button class="primary-btn mission-progress-start-btn" type="button" id="missionProgressStartButton">Iniciar agora</button>
         <p class="finance-status" id="missionProgressHint" aria-live="polite">Adicionando 0</p>
         <p class="finance-status" id="missionProgressStatus" aria-live="polite"></p>
       </div>
@@ -1500,8 +1508,8 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260719-stable-aspects-v1"></script>
-  <script src='/speech-input-kit.js'></script>
+  <script type="module" src="/200/project.js?v=20260720-mission-start-v1"></script>
+  <script src='/speech-input-kit.js?v=20260720-keyboard-v1'></script>
 </body>
 </html>
 

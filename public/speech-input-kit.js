@@ -1,7 +1,7 @@
 (() => {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const managedSelector = 'input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="date"]):not([type="datetime-local"]):not([type="month"]):not([type="time"]):not([type="week"]), textarea';
-  const skipTypes = new Set(["number"]);
+  const managedSelector = 'input:not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="date"]):not([type="datetime-local"]):not([type="month"]):not([type="time"]):not([type="week"]):not([type="password"]), textarea';
+  const skipTypes = new Set(["number", "password", "email", "tel", "url"]);
   const stateByField = new WeakMap();
   const mobileOnly = window.matchMedia("(max-width: 900px)").matches;
   let activeSession = null;
@@ -80,7 +80,8 @@
       return false;
     }
     const type = String(field.type || "").toLowerCase();
-    if (skipTypes.has(type)) {
+    const autocomplete = String(field.autocomplete || "").toLowerCase();
+    if (skipTypes.has(type) || field.dataset.speechKit === "off" || autocomplete.includes("password")) {
       return false;
     }
     return true;
@@ -208,13 +209,7 @@
 
     parent.classList.add("speech-kit-wrap");
     field.classList.add("speech-kit-field");
-    field.setAttribute("readonly", "readonly");
-    field.setAttribute("inputmode", "none");
     field.dataset.speechKitReady = "1";
-
-    field.addEventListener("focus", () => {
-      field.blur();
-    });
 
     const button = document.createElement("button");
     button.type = "button";
@@ -224,12 +219,6 @@
     button.addEventListener("click", () => handleTriggerClick(field));
 
     field.addEventListener("input", () => {
-      if (activeSession?.field !== field) {
-        const normalized = toTitleCase(field.value);
-        if (normalized !== field.value) {
-          field.value = normalized;
-        }
-      }
       if (activeSession?.field !== field) {
         syncButtonByValue(field);
       }

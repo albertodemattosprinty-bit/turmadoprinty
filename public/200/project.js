@@ -250,6 +250,11 @@ const statsAspectMissionOptions = document.getElementById("statsAspectMissionOpt
 const statsAspectMissionStatus = document.getElementById("statsAspectMissionStatus");
 const statsAspectMissionSaveButton = document.getElementById("statsAspectMissionSaveButton");
 const statsAspectMissionClearButton = document.getElementById("statsAspectMissionClearButton");
+const statsAspectLinksModal = document.getElementById("statsAspectLinksModal");
+const statsAspectLinksTitle = document.getElementById("statsAspectLinksTitle");
+const statsAspectLinksPeriod = document.getElementById("statsAspectLinksPeriod");
+const statsAspectLinksList = document.getElementById("statsAspectLinksList");
+const statsAspectLinksCloseButton = document.getElementById("statsAspectLinksCloseButton");
 const sleepModalElement = document.getElementById("sleepModal");
 const sleepModalShell = document.getElementById("sleepModalShell");
 const sleepModalCloseButton = document.getElementById("sleepModalCloseButton");
@@ -465,12 +470,14 @@ const openMissionAdjustTimeButton = document.getElementById("openMissionAdjustTi
 const missionAdjustConfirmButton = document.getElementById("missionAdjustConfirm");
 const missionAdjustDeleteButton = document.getElementById("missionAdjustDelete");
 const missionProgressTitle = document.getElementById("missionProgressTitle");
+const missionProgressIcon = document.getElementById("missionProgressIcon");
 const missionProgressCloseButton = document.getElementById("missionProgressCloseButton");
 const missionProgressMinusButton = document.getElementById("missionProgressMinus");
 const missionProgressPlusButton = document.getElementById("missionProgressPlus");
 const missionProgressValue = document.getElementById("missionProgressValue");
 const missionProgressHint = document.getElementById("missionProgressHint");
 const missionProgressStatus = document.getElementById("missionProgressStatus");
+const missionProgressStartButton = document.getElementById("missionProgressStartButton");
 const missionProgressConfirmButton = document.getElementById("missionProgressConfirm");
 const missionQuickAssignCloseButton = document.getElementById("missionQuickAssignCloseButton");
 const missionQuickAssignGrid = document.getElementById("missionQuickAssignGrid");
@@ -952,10 +959,6 @@ let runningMissionQuickFocusTimer = null;
 let runningMissionQuickRequestChain = Promise.resolve();
 let pointsUpdateFeedbackQueue = Promise.resolve();
 let runningMissionQuickSpotlightTimer = null;
-let missionCardHoldTimer = null;
-let missionCardHoldGoalId = "";
-let missionCardPressedGoalId = "";
-let missionCardHoldTriggered = false;
 let missionRunTicker = null;
 let missionRunAlarmTicker = null;
 let missionVariantsTicker = null;
@@ -1027,6 +1030,12 @@ const state = {
     targetMinutes: 0,
     missionGoalIds: [],
     useManualTarget: false
+  },
+  statsAspectLinks: {
+    categoryId: "",
+    actions: [],
+    missions: [],
+    loading: false
   },
   sleepModal: {
     delayIndex: 0,
@@ -9696,6 +9705,117 @@ function renderStatsAspectMissionOptions() {
   statsAspectMissionOptions.innerHTML = items.join("");
 }
 
+function getStatsAspectActionRange() {
+  const scopeDays = getStatsScopeDays();
+  const today = new Date(getServerNowMs());
+  const firstDay = addDays(today, -(scopeDays - 1));
+  return {
+    from: startOfDayIso(firstDay),
+    to: nextDayIso(today)
+  };
+}
+
+function getStatsAspectLinkedMissions(categoryId) {
+  const config = getStatsAspectConfigEntry(categoryId);
+  const selectedIds = new Set((Array.isArray(config.missionGoalIds) ? config.missionGoalIds : []).map((id) => String(id || "").trim()).filter(Boolean));
+  const scoped = Array.isArray(state.statsScopeMissions) && state.statsScopeMissions.length
+    ? state.statsScopeMissions
+    : (Array.isArray(state.missions) ? state.missions : []);
+  return scoped.filter((goal) => selectedIds.has(String(goal?.id || "").trim()));
+}
+
+function formatStatsAspectActionLogline(action) {
+  const duration = getActionDurationMinutes(action);
+  const startAt = new Date(action?.startAt || "");
+  const endAt = new Date(action?.endAt || "");
+  const interval = Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())
+    ? ""
+    : ` · ${formatTime(startAt)}–${formatTime(endAt)}`;
+  return `Ação · ${formatMinutesHuman(duration)}${interval}`;
+}
+
+function formatStatsAspectMissionLogline(goal) {
+  const unitMinutes = getMissionUnitDurationMinutes(goal);
+  const progressValue = Math.max(0, Number(goal?.progressValue || 0));
+  const targetValue = Math.max(1, Number(goal?.targetValue || 1));
+  if (unitMinutes > 0) {
+    return `Missão · ${formatMinutesHuman(progressValue * unitMinutes)} de ${formatMinutesHuman(targetValue * unitMinutes)}`;
+  }
+  return `Missão · ${progressValue} de ${targetValue} · tempo não definido`;
+}
+
+function renderStatsAspectLinksModal() {
+  const categoryId = String(state.statsAspectLinks?.categoryId || "").trim().toLowerCase();
+  const category = statsPointCategories.find((item) => item.id === categoryId) || null;
+  const actions = Array.isArray(state.statsAspectLinks?.actions) ? state.statsAspectLinks.actions : [];
+  const missions = Array.isArray(state.statsAspectLinks?.missions) ? state.statsAspectLinks.missions : [];
+  if (statsAspectLinksTitle) statsAspectLinksTitle.textContent = category?.name || "Aspecto";
+  if (statsAspectLinksPeriod) {
+    const scopeLabel = getActiveStatsScope()?.label || "Hoje";
+    statsAspectLinksPeriod.textContent = `${scopeLabel} · ${actions.length} ${actions.length === 1 ? "ação" : "ações"} · ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`;
+  }
+  if (!statsAspectLinksList) return;
+  if (state.statsAspectLinks?.loading) {
+    statsAspectLinksList.innerHTML = '<div class="empty-state">Carregando vínculos...</div>';
+    return;
+  }
+  const actionRows = actions.map((action) => {
+    const icon = getActionDisplayIcon(action);
+    return `<article class="stats-aspect-link-card">
+      <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(action?.title || "Ação"))}</strong><small>${escapeHtml(formatStatsAspectActionLogline(action))}</small></div>
+    </article>`;
+  });
+  const missionRows = missions.map((goal) => {
+    const icon = getMissionDisplayIcon(goal);
+    return `<article class="stats-aspect-link-card is-mission">
+      <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(goal?.title || "Missão"))}</strong><small>${escapeHtml(formatStatsAspectMissionLogline(goal))}</small></div>
+    </article>`;
+  });
+  const rows = [...actionRows, ...missionRows];
+  statsAspectLinksList.innerHTML = rows.length
+    ? rows.join("")
+    : '<div class="empty-state">Nenhuma ação ou missão vinculada neste período.</div>';
+}
+
+async function openStatsAspectLinksModal(categoryId) {
+  const normalizedCategoryId = normalizeTaskCategoryId(categoryId);
+  const category = statsPointCategories.find((item) => item.id === normalizedCategoryId) || null;
+  if (!category) return;
+  state.statsAspectLinks = {
+    categoryId: normalizedCategoryId,
+    actions: [],
+    missions: getStatsAspectLinkedMissions(normalizedCategoryId),
+    loading: true
+  };
+  renderStatsAspectLinksModal();
+  openModal("statsAspectLinksModal");
+  try {
+    const range = getStatsAspectActionRange();
+    const payload = await apiRequest(`/api/actions?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`, {
+      skipGlobalLoading: true
+    });
+    const actions = (Array.isArray(payload?.actions) ? payload.actions : [])
+      .filter((action) => normalizeAssigneeName(action?.assignee) === state.selectedProfile)
+      .filter((action) => normalizeTaskCategoryId(action?.categoryId) === normalizedCategoryId)
+      .sort((left, right) => new Date(left?.startAt || 0).getTime() - new Date(right?.startAt || 0).getTime());
+    if (String(state.statsAspectLinks?.categoryId || "") !== normalizedCategoryId) return;
+    state.statsAspectLinks.actions = actions;
+  } catch {
+    const fallbackActions = getVisibleActions()
+      .filter((action) => normalizeTaskCategoryId(action?.categoryId) === normalizedCategoryId)
+      .sort((left, right) => new Date(left?.startAt || 0).getTime() - new Date(right?.startAt || 0).getTime());
+    if (String(state.statsAspectLinks?.categoryId || "") !== normalizedCategoryId) return;
+    state.statsAspectLinks.actions = fallbackActions;
+  } finally {
+    if (String(state.statsAspectLinks?.categoryId || "") === normalizedCategoryId) {
+      state.statsAspectLinks.loading = false;
+      renderStatsAspectLinksModal();
+    }
+  }
+}
+
 function createStatsPointRow(entry) {
   const row = document.createElement("article");
   const progressPercent = Math.max(0, Math.min(100, Number(entry.percent || 0)));
@@ -10552,15 +10672,21 @@ function animatePointsUpdateTotal(fromPoints, toPoints) {
   window.requestAnimationFrame(tick);
 }
 
-function renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake) {
+function shouldShowPointsUpdateRankingNow(nowMs = getServerNowMs()) {
+  const minute = getProjectDateTimeParts(new Date(nowMs)).minute;
+  return minute % 6 === 0;
+}
+
+function renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake, allowRanking = true) {
   if (!pointsUpdateRanking || !pointsUpdateRankingList) {
     return;
   }
   const beforeEntries = getPointsUpdateRankingEntries(beforeSnapshot);
   const afterEntries = getPointsUpdateRankingEntries(afterSnapshot);
   const hasFriends = (Array.isArray(afterSnapshot?.friends) ? afterSnapshot.friends : []).length > 0;
-  pointsUpdateRanking.hidden = !hasFriends;
-  if (!hasFriends) {
+  const shouldShowRanking = allowRanking && hasFriends;
+  pointsUpdateRanking.hidden = !shouldShowRanking;
+  if (!shouldShowRanking) {
     pointsUpdateRankingList.innerHTML = "";
     return;
   }
@@ -10648,6 +10774,8 @@ async function showPointsUpdateFeedback(pointsUpdate) {
   const beforePosition = beforeEntries.findIndex((entry) => entry.isSelf);
   const afterPosition = afterEntries.findIndex((entry) => entry.isSelf);
   const didOvertake = !isLoss && beforePosition >= 0 && afterPosition >= 0 && afterPosition < beforePosition;
+  const hasFriends = (Array.isArray(afterSnapshot?.friends) ? afterSnapshot.friends : []).length > 0;
+  const showRanking = shouldShowPointsUpdateRankingNow() && hasFriends;
 
   if (String(state.social?.scopeKey || "today") === "today") {
     state.social.pendingCount = Math.max(0, Number(afterSnapshot?.pendingCount || 0) || 0);
@@ -10657,15 +10785,16 @@ async function showPointsUpdateFeedback(pointsUpdate) {
     renderSocialModal();
   }
 
-  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-loss");
+  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-loss", "is-solo-points");
   pointsUpdateModal.classList.toggle("is-loss", isLoss);
+  pointsUpdateModal.classList.toggle("is-solo-points", !showRanking);
   if (pointsUpdateContinue) pointsUpdateContinue.hidden = true;
   if (pointsUpdateTotal) pointsUpdateTotal.textContent = String(beforePoints);
   if (pointsUpdateDelta) {
     const absoluteDelta = Math.abs(pointsDelta);
     pointsUpdateDelta.textContent = `${pointsDelta > 0 ? "+" : "-"}${absoluteDelta} ${absoluteDelta === 1 ? "ponto" : "pontos"}`;
   }
-  renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake);
+  renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake, showRanking);
   openModal("pointsUpdateModal");
   animatePointsUpdateTotal(beforePoints, afterPoints);
 
@@ -10678,7 +10807,7 @@ async function showPointsUpdateFeedback(pointsUpdate) {
   pointsUpdateModal.classList.add("is-leaving");
   await new Promise((resolve) => window.setTimeout(resolve, 150));
   closeModal("pointsUpdateModal");
-  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-ready-to-continue", "is-loss");
+  pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-ready-to-continue", "is-loss", "is-solo-points");
   if (pointsUpdateContinue) pointsUpdateContinue.hidden = true;
 }
 
@@ -12589,6 +12718,7 @@ function openMissionProgressModal(goalId) {
   if (!goal) {
     return;
   }
+  const goalIcon = getMissionDisplayIcon(goal);
   state.missionProgress = {
     goalId: String(goal.id || ""),
     deltaValue: 0,
@@ -12596,6 +12726,10 @@ function openMissionProgressModal(goalId) {
   };
   if (missionProgressTitle) {
     missionProgressTitle.textContent = String(goal.title || "Missão");
+  }
+  if (missionProgressIcon) {
+    missionProgressIcon.src = goalIcon.src;
+    missionProgressIcon.alt = goalIcon.alt;
   }
   if (missionProgressStatus) {
     missionProgressStatus.textContent = "";
@@ -13664,6 +13798,8 @@ function registerScreenLockActivity() {
 }
 
 function renderOptionsModal() {
+  const optionsContent = document.querySelector("#optionsModal .options-content");
+  const previousScrollTop = Number(optionsContent?.scrollTop || 0);
   if (toggleFreeTimeHint) {
     toggleFreeTimeHint.textContent = state.options.showFreeTime ? "Mostrando" : "Ocultando";
   }
@@ -13695,6 +13831,11 @@ function renderOptionsModal() {
     toggleScreenLockHint.textContent = state.options.screenLockEnabled ? "Ativada" : "Desbloqueada";
   }
   toggleScreenLockOptionButton?.classList.toggle("is-off", !state.options.screenLockEnabled);
+  if (optionsContent && previousScrollTop > 0) {
+    window.requestAnimationFrame(() => {
+      optionsContent.scrollTop = previousScrollTop;
+    });
+  }
 }
 
 function resetProject200ExportModal() {
@@ -14336,11 +14477,7 @@ missionList?.addEventListener("click", (event) => {
     return;
   }
   if (missionCard && !event.target.closest("[data-mission-goal-edit]")) {
-    if (missionCardHoldTriggered) {
-      missionCardHoldTriggered = false;
-      return;
-    }
-    openMissionRunModal(missionCard.dataset.goalId || "");
+    openMissionProgressModal(missionCard.dataset.goalId || "");
     return;
   }
   const editButton = event.target.closest("[data-mission-goal-edit]");
@@ -14349,73 +14486,65 @@ missionList?.addEventListener("click", (event) => {
   }
   openMissionAdjustModal(editButton.dataset.missionGoalEdit || "");
 });
-missionList?.addEventListener("pointerdown", (event) => {
-  const missionCard = event.target.closest("[data-goal-id]");
-  if (!missionCard || missionCard.dataset.historyRangeActive === "true" || event.target.closest("[data-mission-goal-edit]") || event.target.closest(".task-avatar")) {
-    return;
-  }
-  const goalId = String(missionCard.dataset.goalId || "").trim();
-  if (!goalId) {
-    return;
-  }
-  if (missionCardHoldTimer) {
-    window.clearTimeout(missionCardHoldTimer);
-  }
-  missionCardPressedGoalId = goalId;
-  missionCardHoldGoalId = "";
-  missionCardHoldTriggered = false;
-  missionCardHoldTimer = window.setTimeout(() => {
-    missionCardHoldTimer = null;
-    if (!missionCardPressedGoalId) {
+
+let statsAspectHoldTimer = 0;
+let statsAspectHoldTriggered = false;
+let statsAspectHeldCategoryId = "";
+statsMissionsList?.addEventListener("pointerdown", (event) => {
+  const row = event.target.closest("[data-stats-aspect-id]");
+  if (!row) return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const categoryId = String(row.dataset.statsAspectId || "").trim().toLowerCase();
+  statsAspectHoldTriggered = false;
+  statsAspectHeldCategoryId = categoryId;
+  window.clearTimeout(statsAspectHoldTimer);
+  statsAspectHoldTimer = window.setTimeout(() => {
+    statsAspectHoldTriggered = true;
+    if (categoryId === "sono") {
+      void openSleepHistoryEditor();
       return;
     }
-    missionCardHoldGoalId = missionCardPressedGoalId;
-    missionCardHoldTriggered = true;
-    openMissionProgressModal(missionCardHoldGoalId);
-  }, 500);
-});
-["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
-  missionList?.addEventListener(eventName, () => {
-    if (missionCardHoldTimer) {
-      window.clearTimeout(missionCardHoldTimer);
-      missionCardHoldTimer = null;
-    }
-    window.setTimeout(() => {
-      missionCardPressedGoalId = "";
-      missionCardHoldGoalId = "";
-    }, missionCardHoldTriggered ? 80 : 0);
-  });
-});
-
-let sleepStatsHoldTimer = 0;
-let sleepStatsHoldTriggered = false;
-statsMissionsList?.addEventListener("pointerdown", (event) => {
-  const row = event.target.closest('[data-stats-aspect-id="sono"]');
-  if (!row) return;
-  sleepStatsHoldTriggered = false;
-  window.clearTimeout(sleepStatsHoldTimer);
-  sleepStatsHoldTimer = window.setTimeout(() => {
-    sleepStatsHoldTriggered = true;
-    void openSleepHistoryEditor();
+    void openStatsAspectLinksModal(categoryId);
   }, 500);
 });
 ["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
   statsMissionsList?.addEventListener(eventName, () => {
-    window.clearTimeout(sleepStatsHoldTimer);
-    sleepStatsHoldTimer = 0;
+    window.clearTimeout(statsAspectHoldTimer);
+    statsAspectHoldTimer = 0;
   });
+});
+statsMissionsList?.addEventListener("contextmenu", (event) => {
+  const row = event.target.closest("[data-stats-aspect-id]");
+  if (!row) return;
+  event.preventDefault();
+  window.clearTimeout(statsAspectHoldTimer);
+  statsAspectHoldTimer = 0;
+  const categoryId = String(row.dataset.statsAspectId || "").trim().toLowerCase();
+  if (statsAspectHoldTriggered && statsAspectHeldCategoryId === categoryId) {
+    return;
+  }
+  statsAspectHoldTriggered = false;
+  statsAspectHeldCategoryId = "";
+  if (categoryId === "sono") {
+    void openSleepHistoryEditor();
+    return;
+  }
+  void openStatsAspectLinksModal(categoryId);
 });
 statsMissionsList?.addEventListener("click", (event) => {
   const row = event.target.closest("[data-stats-aspect-id]");
   if (!row) {
     return;
   }
-  if (sleepStatsHoldTriggered && String(row.dataset.statsAspectId || "") === "sono") {
-    sleepStatsHoldTriggered = false;
+  if (statsAspectHoldTriggered && String(row.dataset.statsAspectId || "") === statsAspectHeldCategoryId) {
+    statsAspectHoldTriggered = false;
+    statsAspectHeldCategoryId = "";
     return;
   }
   openStatsAspectModal(String(row.dataset.statsAspectId || ""));
 });
+
+statsAspectLinksCloseButton?.addEventListener("click", () => closeModal("statsAspectLinksModal"));
 
 openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
 openMissionCreateButton?.addEventListener("click", openMissionCreateModal);
@@ -14801,6 +14930,15 @@ missionProgressPlusButton?.addEventListener("click", () => {
   renderMissionProgressState();
 });
 
+missionProgressStartButton?.addEventListener("click", () => {
+  const goalId = String(state.missionProgress?.goalId || "").trim();
+  if (!goalId) {
+    return;
+  }
+  closeModal("missionProgressModal");
+  void openMissionRunModal(goalId);
+});
+
 document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
   button.addEventListener("click", () => {
     state.missionAdjust.targetValue = Math.max(
@@ -14808,14 +14946,6 @@ document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
       Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) + Math.max(0, Math.trunc(Number(button.dataset.missionAdjustAdd || 0) || 0))
     );
     renderMissionAdjustState();
-  });
-});
-
-document.querySelectorAll("[data-mission-progress-add]").forEach((button) => {
-  button.addEventListener("click", () => {
-    state.missionProgress.deltaValue = Math.trunc(Number(state.missionProgress.deltaValue || 0) || 0)
-      + Math.max(0, Math.trunc(Number(button.dataset.missionProgressAdd || 0) || 0));
-    renderMissionProgressState();
   });
 });
 

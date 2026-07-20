@@ -1245,6 +1245,7 @@ body.start-decision-open .home-profile-button {
   gap: 14px;
   max-height: min(82dvh, 760px);
   overflow-y: auto;
+  overflow-anchor: none;
   overscroll-behavior: contain;
   padding-right: 4px;
 }
@@ -5454,6 +5455,25 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   gap: 16px;
 }
 
+.mission-progress-icon {
+  width: clamp(88px, 24vw, 132px);
+  height: clamp(88px, 24vw, 132px);
+  object-fit: contain;
+  filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.28));
+}
+
+.mission-progress-start-btn {
+  width: min(100%, 420px);
+  min-height: 58px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #24cf68, #109647);
+  color: #fff;
+  font-size: clamp(1.05rem, 3.8vw, 1.3rem);
+  font-weight: 950;
+  box-shadow: 0 15px 34px rgba(11, 128, 59, 0.34);
+}
+
 .mission-progress-confirm-btn {
   background: linear-gradient(135deg, #1d72ff, #0f49bf);
   color: #fff;
@@ -7003,6 +7023,15 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
 .mission-variants-kicker { color:#67a8ff; font-weight:900; font-size:.78rem; letter-spacing:.12em; text-transform:uppercase; margin-bottom:5px; }
 .mission-variants-title { font-size:clamp(1.35rem, 4vw, 2rem); }
 .mission-variants-list { display:grid; gap:12px; }
+.stats-aspect-links-panel { width:min(660px, 100%); }
+.stats-aspect-links-period { color:rgba(255,255,255,.64); font-size:.86rem; font-weight:800; }
+.stats-aspect-links-list { align-content:start; }
+.stats-aspect-link-card { min-width:0; display:grid; grid-template-columns:54px minmax(0,1fr); align-items:center; gap:14px; padding:13px 15px; border:1px solid rgba(255,255,255,.13); border-radius:18px; background:rgba(255,255,255,.08); }
+.stats-aspect-link-card.is-mission { border-color:rgba(103,168,255,.32); background:linear-gradient(135deg, rgba(23,101,216,.18), rgba(255,255,255,.07)); }
+.stats-aspect-link-icon { width:48px; height:48px; object-fit:contain; border-radius:14px; padding:5px; background:rgba(255,255,255,.08); }
+.stats-aspect-link-copy { min-width:0; display:grid; gap:5px; }
+.stats-aspect-link-copy strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:1.02rem; }
+.stats-aspect-link-copy small { color:rgba(255,255,255,.68); font-size:.84rem; font-weight:700; font-variant-numeric:tabular-nums; }
 .mission-variant-card { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.13); border-radius:18px; overflow:hidden; }
 .mission-variant-card.is-completed { background:linear-gradient(135deg, rgba(26,159,82,.92), rgba(10,86,51,.94)); border-color:rgba(120,255,170,.55); box-shadow:0 12px 26px rgba(12,116,59,.28); }
 .mission-variant-card.is-overdue { border-color:rgba(255,92,109,.46); }
@@ -7883,6 +7912,21 @@ body[data-background-theme="white"] :is(.mission-guide-number, .mission-guide-ti
   overflow: hidden auto;
   backdrop-filter: blur(12px);
   animation: points-update-shell-in 320ms cubic-bezier(0.2, 0.82, 0.28, 1) both;
+}
+
+#pointsUpdateModal.is-solo-points .points-update-shell {
+  width: min(520px, calc(100vw - 32px));
+  min-height: min(520px, calc(100dvh - 32px));
+  place-content: center;
+}
+
+#pointsUpdateModal.is-solo-points :is(.points-update-kicker, .points-update-delta, .points-update-ranking, .points-update-continue) {
+  display: none !important;
+}
+
+#pointsUpdateModal.is-solo-points .points-update-total {
+  font-size: clamp(8rem, 34vw, 14rem);
+  line-height: 0.86;
 }
 
 .points-update-kicker {
