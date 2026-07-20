@@ -7026,12 +7026,33 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
 .stats-aspect-links-panel { width:min(660px, 100%); }
 .stats-aspect-links-period { color:rgba(255,255,255,.64); font-size:.86rem; font-weight:800; }
 .stats-aspect-links-list { align-content:start; }
-.stats-aspect-link-card { min-width:0; display:grid; grid-template-columns:54px minmax(0,1fr); align-items:center; gap:14px; padding:13px 15px; border:1px solid rgba(255,255,255,.13); border-radius:18px; background:rgba(255,255,255,.08); }
+.stats-aspect-link-card { min-width:0; display:grid; grid-template-columns:54px minmax(0,1fr) auto; align-items:center; gap:14px; padding:13px 15px; border:1px solid rgba(255,255,255,.13); border-radius:18px; background:rgba(255,255,255,.08); transition:border-color 160ms ease, background 160ms ease, transform 160ms ease; }
 .stats-aspect-link-card.is-mission { border-color:rgba(103,168,255,.32); background:linear-gradient(135deg, rgba(23,101,216,.18), rgba(255,255,255,.07)); }
+.stats-aspect-link-card.has-change { border-color:rgba(83,230,144,.7); background:linear-gradient(135deg, rgba(19,157,80,.22), rgba(255,255,255,.08)); transform:translateY(-1px); }
 .stats-aspect-link-icon { width:48px; height:48px; object-fit:contain; border-radius:14px; padding:5px; background:rgba(255,255,255,.08); }
 .stats-aspect-link-copy { min-width:0; display:grid; gap:5px; }
 .stats-aspect-link-copy strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:1.02rem; }
 .stats-aspect-link-copy small { color:rgba(255,255,255,.68); font-size:.84rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.stats-aspect-link-adjust { display:grid; grid-template-columns:38px minmax(28px, auto) 38px; align-items:center; justify-content:end; gap:6px; }
+.stats-aspect-link-step { width:38px; height:38px; border:1px solid rgba(255,255,255,.16); border-radius:50%; background:rgba(255,255,255,.08); color:#fff; display:grid; place-items:center; padding:0; cursor:pointer; }
+.stats-aspect-link-step.is-add { border-color:rgba(76,226,137,.55); background:rgba(20,167,81,.2); }
+.stats-aspect-link-step svg { width:19px; height:19px; display:block; }
+.stats-aspect-link-step:disabled { opacity:.26; cursor:default; }
+.stats-aspect-link-delta { min-width:28px; color:transparent; font-size:.98rem; font-weight:950; text-align:center; font-variant-numeric:tabular-nums; }
+.stats-aspect-link-delta.is-visible { color:#72ed9d; }
+.stats-aspect-links-confirm-modal { z-index:2460; place-items:center; }
+.stats-aspect-links-confirm-card { width:min(440px, calc(100vw - 32px)); border:1px solid rgba(255,255,255,.16); border-radius:28px; padding:clamp(22px,5vw,34px); background:linear-gradient(145deg, rgba(7,17,38,.98), rgba(15,31,57,.98)); display:grid; gap:16px; text-align:center; box-shadow:0 26px 80px rgba(0,0,0,.42); }
+.stats-aspect-links-confirm-card .options-note { margin:0; }
+.stats-aspect-links-confirm-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+@media (max-width: 520px) {
+  .stats-aspect-link-card { grid-template-columns:44px minmax(0,1fr) auto; gap:9px; padding:11px 10px; }
+  .stats-aspect-link-icon { width:42px; height:42px; border-radius:12px; }
+  .stats-aspect-link-adjust { grid-template-columns:34px minmax(24px, auto) 34px; gap:4px; }
+  .stats-aspect-link-step { width:34px; height:34px; }
+  .stats-aspect-link-copy strong { font-size:.94rem; }
+  .stats-aspect-links-confirm-actions { grid-template-columns:1fr; }
+}
 .mission-variant-card { position:relative; display:grid; grid-template-columns:minmax(0,1fr) auto; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.13); border-radius:18px; overflow:hidden; }
 .mission-variant-card.is-completed { background:linear-gradient(135deg, rgba(26,159,82,.92), rgba(10,86,51,.94)); border-color:rgba(120,255,170,.55); box-shadow:0 12px 26px rgba(12,116,59,.28); }
 .mission-variant-card.is-overdue { border-color:rgba(255,92,109,.46); }

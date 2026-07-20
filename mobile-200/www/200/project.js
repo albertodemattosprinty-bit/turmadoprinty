@@ -220,6 +220,7 @@ const platformRecurrenceDayLabel = document.getElementById("platformRecurrenceDa
 const statsScopeLabel = document.getElementById("statsScopeLabel");
 const statsScopePrevButton = document.getElementById("statsScopePrevButton");
 const statsScopeNextButton = document.getElementById("statsScopeNextButton");
+const statsAllMissionsButton = document.getElementById("statsAllMissionsButton");
 const statsMissionSummary = document.getElementById("statsMissionSummary");
 const statsMissionTotal = document.getElementById("statsMissionTotal");
 const statsMissionCompleted = document.getElementById("statsMissionCompleted");
@@ -255,6 +256,10 @@ const statsAspectLinksTitle = document.getElementById("statsAspectLinksTitle");
 const statsAspectLinksPeriod = document.getElementById("statsAspectLinksPeriod");
 const statsAspectLinksList = document.getElementById("statsAspectLinksList");
 const statsAspectLinksCloseButton = document.getElementById("statsAspectLinksCloseButton");
+const statsAspectLinksConfirmModal = document.getElementById("statsAspectLinksConfirmModal");
+const statsAspectLinksConfirmStatus = document.getElementById("statsAspectLinksConfirmStatus");
+const statsAspectLinksConfirmBackButton = document.getElementById("statsAspectLinksConfirmBack");
+const statsAspectLinksConfirmSaveButton = document.getElementById("statsAspectLinksConfirmSave");
 const sleepModalElement = document.getElementById("sleepModal");
 const sleepModalShell = document.getElementById("sleepModalShell");
 const sleepModalCloseButton = document.getElementById("sleepModalCloseButton");
@@ -1032,10 +1037,13 @@ const state = {
     useManualTarget: false
   },
   statsAspectLinks: {
+    mode: "aspect",
     categoryId: "",
     actions: [],
     missions: [],
-    loading: false
+    draftDeltas: {},
+    loading: false,
+    saving: false
   },
   sleepModal: {
     delayIndex: 0,
@@ -9718,41 +9726,75 @@ function getStatsAspectActionRange() {
 function getStatsAspectLinkedMissions(categoryId) {
   const config = getStatsAspectConfigEntry(categoryId);
   const selectedIds = new Set((Array.isArray(config.missionGoalIds) ? config.missionGoalIds : []).map((id) => String(id || "").trim()).filter(Boolean));
-  const scoped = Array.isArray(state.statsScopeMissions) && state.statsScopeMissions.length
-    ? state.statsScopeMissions
-    : (Array.isArray(state.missions) ? state.missions : []);
-  return scoped.filter((goal) => selectedIds.has(String(goal?.id || "").trim()));
+  return (Array.isArray(state.missions) ? state.missions : [])
+    .filter((goal) => selectedIds.has(String(goal?.id || "").trim()));
 }
 
-function formatStatsAspectActionLogline(action) {
-  const duration = getActionDurationMinutes(action);
-  const startAt = new Date(action?.startAt || "");
-  const endAt = new Date(action?.endAt || "");
-  const interval = Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())
-    ? ""
-    : ` · ${formatTime(startAt)}–${formatTime(endAt)}`;
-  return `Ação · ${formatMinutesHuman(duration)}${interval}`;
+function getAllStatsAspectLinkedMissions() {
+  const selectedIds = new Set();
+  statsPointCategories.forEach((category) => {
+    getStatsAspectConfigEntry(category.id).missionGoalIds.forEach((goalId) => selectedIds.add(String(goalId || "").trim()));
+  });
+  return (Array.isArray(state.missions) ? state.missions : [])
+    .filter((goal) => selectedIds.has(String(goal?.id || "").trim()));
 }
 
-function formatStatsAspectMissionLogline(goal) {
-  const unitMinutes = getMissionUnitDurationMinutes(goal);
-  const progressValue = Math.max(0, Number(goal?.progressValue || 0));
-  const targetValue = Math.max(1, Number(goal?.targetValue || 1));
-  if (unitMinutes > 0) {
-    return `Missão · ${formatMinutesHuman(progressValue * unitMinutes)} de ${formatMinutesHuman(targetValue * unitMinutes)}`;
+function formatStatsLinkDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.round(Number(totalSeconds || 0) || 0));
+  if (seconds > 0 && seconds < 60) {
+    return seconds === 1 ? "1 segundo" : `${seconds} segundos`;
   }
-  return `Missão · ${progressValue} de ${targetValue} · tempo não definido`;
+  const minutes = Math.max(0, Math.round(seconds / 60));
+  return minutes === 1 ? "1 minuto" : `${minutes} minutos`;
+}
+
+function getStatsAspectLinkKey(type, id) {
+  return `${String(type || "mission").trim().toLowerCase()}:${String(id || "").trim()}`;
+}
+
+function getStatsAspectLinkDraftDelta(type, id) {
+  const key = getStatsAspectLinkKey(type, id);
+  return Math.trunc(Number(state.statsAspectLinks?.draftDeltas?.[key] || 0) || 0);
+}
+
+function hasStatsAspectLinkDraftChanges() {
+  return Object.values(state.statsAspectLinks?.draftDeltas || {}).some((value) => Math.trunc(Number(value || 0) || 0) !== 0);
+}
+
+function buildStatsAspectLinkAdjuster(type, item) {
+  const id = String(item?.id || "").trim();
+  const delta = getStatsAspectLinkDraftDelta(type, id);
+  const isAction = type === "action";
+  const currentValue = isAction
+    ? (normalizeActionStatus(item?.status) === actionStatuses.completed ? 1 : 0)
+    : Math.max(0, Math.trunc(Number(item?.progressValue || 0) || 0));
+  const nextValue = Math.max(0, currentValue + delta);
+  const minusDisabled = nextValue <= 0;
+  const plusDisabled = isAction && nextValue >= 1;
+  const deltaLabel = delta > 0 ? `+${delta}` : String(delta);
+  return `<div class="stats-aspect-link-adjust" data-stats-link-controls="${escapeHtml(getStatsAspectLinkKey(type, id))}">
+    <button class="stats-aspect-link-step" type="button" data-stats-link-step="-1" data-stats-link-type="${type}" data-stats-link-id="${escapeHtml(id)}" aria-label="Subtrair"${minusDisabled ? " disabled" : ""}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+    <span class="stats-aspect-link-delta${delta ? " is-visible" : ""}" aria-live="polite">${escapeHtml(deltaLabel)}</span>
+    <button class="stats-aspect-link-step is-add" type="button" data-stats-link-step="1" data-stats-link-type="${type}" data-stats-link-id="${escapeHtml(id)}" aria-label="Adicionar"${plusDisabled ? " disabled" : ""}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+  </div>`;
 }
 
 function renderStatsAspectLinksModal() {
+  const allMissionsMode = state.statsAspectLinks?.mode === "all";
   const categoryId = String(state.statsAspectLinks?.categoryId || "").trim().toLowerCase();
   const category = statsPointCategories.find((item) => item.id === categoryId) || null;
   const actions = Array.isArray(state.statsAspectLinks?.actions) ? state.statsAspectLinks.actions : [];
   const missions = Array.isArray(state.statsAspectLinks?.missions) ? state.statsAspectLinks.missions : [];
-  if (statsAspectLinksTitle) statsAspectLinksTitle.textContent = category?.name || "Aspecto";
+  if (statsAspectLinksTitle) statsAspectLinksTitle.textContent = allMissionsMode ? "Todas as missões" : (category?.name || "Aspecto");
   if (statsAspectLinksPeriod) {
     const scopeLabel = getActiveStatsScope()?.label || "Hoje";
-    statsAspectLinksPeriod.textContent = `${scopeLabel} · ${actions.length} ${actions.length === 1 ? "ação" : "ações"} · ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`;
+    statsAspectLinksPeriod.textContent = allMissionsMode
+      ? `Hoje · ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`
+      : `${scopeLabel} · ${actions.length} ${actions.length === 1 ? "ação" : "ações"} · ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`;
   }
   if (!statsAspectLinksList) return;
   if (state.statsAspectLinks?.loading) {
@@ -9761,22 +9803,26 @@ function renderStatsAspectLinksModal() {
   }
   const actionRows = actions.map((action) => {
     const icon = getActionDisplayIcon(action);
-    return `<article class="stats-aspect-link-card">
+    const delta = getStatsAspectLinkDraftDelta("action", action?.id);
+    return `<article class="stats-aspect-link-card${delta ? " has-change" : ""}">
       <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
-      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(action?.title || "Ação"))}</strong><small>${escapeHtml(formatStatsAspectActionLogline(action))}</small></div>
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(action?.title || "Ação"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getActionDurationMinutes(action) * 60))}</small></div>
+      ${buildStatsAspectLinkAdjuster("action", action)}
     </article>`;
   });
   const missionRows = missions.map((goal) => {
     const icon = getMissionDisplayIcon(goal);
-    return `<article class="stats-aspect-link-card is-mission">
+    const delta = getStatsAspectLinkDraftDelta("mission", goal?.id);
+    return `<article class="stats-aspect-link-card is-mission${delta ? " has-change" : ""}">
       <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
-      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(goal?.title || "Missão"))}</strong><small>${escapeHtml(formatStatsAspectMissionLogline(goal))}</small></div>
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(goal?.title || "Missão"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getMissionUnitDurationSeconds(goal)))}</small></div>
+      ${buildStatsAspectLinkAdjuster("mission", goal)}
     </article>`;
   });
   const rows = [...actionRows, ...missionRows];
   statsAspectLinksList.innerHTML = rows.length
     ? rows.join("")
-    : '<div class="empty-state">Nenhuma ação ou missão vinculada neste período.</div>';
+    : `<div class="empty-state">${allMissionsMode ? "Nenhuma missão vinculada aos aspectos." : "Nenhuma ação ou missão vinculada neste período."}</div>`;
 }
 
 async function openStatsAspectLinksModal(categoryId) {
@@ -9784,10 +9830,13 @@ async function openStatsAspectLinksModal(categoryId) {
   const category = statsPointCategories.find((item) => item.id === normalizedCategoryId) || null;
   if (!category) return;
   state.statsAspectLinks = {
+    mode: "aspect",
     categoryId: normalizedCategoryId,
     actions: [],
     missions: getStatsAspectLinkedMissions(normalizedCategoryId),
-    loading: true
+    draftDeltas: {},
+    loading: true,
+    saving: false
   };
   renderStatsAspectLinksModal();
   openModal("statsAspectLinksModal");
@@ -9813,6 +9862,149 @@ async function openStatsAspectLinksModal(categoryId) {
       state.statsAspectLinks.loading = false;
       renderStatsAspectLinksModal();
     }
+  }
+}
+
+async function openAllStatsMissionLinksModal() {
+  state.statsAspectLinks = {
+    mode: "all",
+    categoryId: "",
+    actions: [],
+    missions: [],
+    draftDeltas: {},
+    loading: true,
+    saving: false
+  };
+  renderStatsAspectLinksModal();
+  openModal("statsAspectLinksModal");
+  try {
+    await Promise.all([
+      loadMissions(),
+      hydrateStatsAspectConfig(state.selectedProfile || getDefaultProfileName(), { force: true, skipGlobalLoading: true })
+    ]);
+    if (state.statsAspectLinks?.mode !== "all") return;
+    state.statsAspectLinks.missions = getAllStatsAspectLinkedMissions();
+  } catch {
+    if (state.statsAspectLinks?.mode === "all") {
+      state.statsAspectLinks.missions = getAllStatsAspectLinkedMissions();
+    }
+  } finally {
+    if (state.statsAspectLinks?.mode === "all") {
+      state.statsAspectLinks.loading = false;
+      renderStatsAspectLinksModal();
+    }
+  }
+}
+
+function adjustStatsAspectLinkDraft(type, id, amount) {
+  if (state.statsAspectLinks?.saving) return;
+  const normalizedType = type === "action" ? "action" : "mission";
+  const itemList = normalizedType === "action" ? state.statsAspectLinks.actions : state.statsAspectLinks.missions;
+  const item = (Array.isArray(itemList) ? itemList : []).find((entry) => String(entry?.id || "") === String(id || ""));
+  if (!item) return;
+  const key = getStatsAspectLinkKey(normalizedType, id);
+  const currentDelta = getStatsAspectLinkDraftDelta(normalizedType, id);
+  const currentValue = normalizedType === "action"
+    ? (normalizeActionStatus(item?.status) === actionStatuses.completed ? 1 : 0)
+    : Math.max(0, Math.trunc(Number(item?.progressValue || 0) || 0));
+  const maximumValue = normalizedType === "action" ? 1 : Number.MAX_SAFE_INTEGER;
+  const nextValue = Math.max(0, Math.min(maximumValue, currentValue + currentDelta + Math.sign(Number(amount || 0))));
+  const nextDelta = nextValue - currentValue;
+  if (nextDelta) {
+    state.statsAspectLinks.draftDeltas[key] = nextDelta;
+  } else {
+    delete state.statsAspectLinks.draftDeltas[key];
+  }
+  renderStatsAspectLinksModal();
+}
+
+function requestStatsAspectLinksClose() {
+  if (!hasStatsAspectLinkDraftChanges()) {
+    closeModal("statsAspectLinksModal");
+    return;
+  }
+  if (statsAspectLinksConfirmStatus) statsAspectLinksConfirmStatus.textContent = "";
+  openModal("statsAspectLinksConfirmModal");
+}
+
+async function saveStatsAspectLinksDraft() {
+  if (state.statsAspectLinks?.saving) return;
+  const missionAdjustments = (Array.isArray(state.statsAspectLinks?.missions) ? state.statsAspectLinks.missions : [])
+    .map((goal) => ({ goal, delta: getStatsAspectLinkDraftDelta("mission", goal?.id) }))
+    .filter((entry) => entry.delta !== 0);
+  const actionAdjustments = (Array.isArray(state.statsAspectLinks?.actions) ? state.statsAspectLinks.actions : [])
+    .map((action) => ({ action, delta: getStatsAspectLinkDraftDelta("action", action?.id) }))
+    .filter((entry) => entry.delta !== 0);
+  if (!missionAdjustments.length && !actionAdjustments.length) {
+    closeModal("statsAspectLinksConfirmModal");
+    closeModal("statsAspectLinksModal");
+    return;
+  }
+
+  state.statsAspectLinks.saving = true;
+  if (statsAspectLinksConfirmSaveButton) statsAspectLinksConfirmSaveButton.disabled = true;
+  if (statsAspectLinksConfirmBackButton) statsAspectLinksConfirmBackButton.disabled = true;
+  if (statsAspectLinksConfirmStatus) statsAspectLinksConfirmStatus.textContent = "Salvando no PostgreSQL...";
+  let pointsBefore = null;
+  let pointsAfter = null;
+  const absorbPointsUpdate = (pointsUpdate) => {
+    if (!pointsUpdate?.after) return;
+    if (!pointsBefore && pointsUpdate.before) pointsBefore = pointsUpdate.before;
+    pointsAfter = pointsUpdate.after;
+  };
+
+  try {
+    const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+    for (const { goal, delta } of missionAdjustments) {
+      const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(String(goal.id || ""))}/progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile, delta }),
+        skipGlobalLoading: true
+      });
+      absorbPointsUpdate(payload?.pointsUpdate);
+      delete state.statsAspectLinks.draftDeltas[getStatsAspectLinkKey("mission", goal?.id)];
+      goal.progressValue = Math.max(0, Math.trunc(Number(goal?.progressValue || 0) || 0) + delta);
+    }
+    for (const { action, delta } of actionAdjustments) {
+      const completing = delta > 0;
+      const completedAtMs = getServerNowMs();
+      const plannedDurationMs = Math.max(1000, getActionDurationMinutes(action) * 60 * 1000);
+      const scheduledStartMs = new Date(action?.startAt || "").getTime();
+      const startedAtMs = Number.isFinite(scheduledStartMs) && scheduledStartMs < completedAtMs
+        ? scheduledStartMs
+        : completedAtMs - plannedDurationMs;
+      const payload = await apiRequest(`/api/actions/${encodeURIComponent(String(action.id || ""))}/status/manual`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(completing
+          ? { mode: "manual_complete", startedAt: new Date(startedAtMs).toISOString(), completedAt: new Date(completedAtMs).toISOString() }
+          : { mode: "restore" }),
+        skipGlobalLoading: true
+      });
+      absorbPointsUpdate(payload?.pointsUpdate);
+      delete state.statsAspectLinks.draftDeltas[getStatsAspectLinkKey("action", action?.id)];
+      action.status = completing ? actionStatuses.completed : actionStatuses.pending;
+    }
+    state.statsAspectLinks.draftDeltas = {};
+    if (pointsBefore && pointsAfter) enqueuePointsUpdateFeedback({ before: pointsBefore, after: pointsAfter });
+    if (missionAdjustments.some((entry) => entry.delta > 0) || actionAdjustments.some((entry) => entry.delta > 0)) {
+      playMissionProgressSound();
+    }
+    closeModal("statsAspectLinksConfirmModal");
+    closeModal("statsAspectLinksModal");
+    await Promise.all([loadActions(), loadStatsSummary()]);
+    renderActions();
+    renderMissions();
+  } catch (error) {
+    renderStatsAspectLinksModal();
+    if (statsAspectLinksConfirmStatus) {
+      statsAspectLinksConfirmStatus.textContent = error instanceof Error ? error.message : "Não foi possível salvar os lançamentos.";
+    }
+  } finally {
+    state.statsAspectLinks.saving = false;
+    if (statsAspectLinksConfirmSaveButton) statsAspectLinksConfirmSaveButton.disabled = false;
+    if (statsAspectLinksConfirmBackButton) statsAspectLinksConfirmBackButton.disabled = false;
   }
 }
 
@@ -13265,6 +13457,10 @@ function navigateBackOneProjectLayer() {
   }
   const topModal = getTopProjectModal();
   if (!topModal) return false;
+  if (topModal.id === "statsAspectLinksModal" && hasStatsAspectLinkDraftChanges()) {
+    requestStatsAspectLinksClose();
+    return true;
+  }
   const activeWorkspaceModals = [...document.querySelectorAll(".workspace-modal.active")];
   if (topModal.id === "runningTaskModal" && activeWorkspaceModals.length === 1) {
     return false;
@@ -14544,7 +14740,15 @@ statsMissionsList?.addEventListener("click", (event) => {
   openStatsAspectModal(String(row.dataset.statsAspectId || ""));
 });
 
-statsAspectLinksCloseButton?.addEventListener("click", () => closeModal("statsAspectLinksModal"));
+statsAllMissionsButton?.addEventListener("click", () => void openAllStatsMissionLinksModal());
+statsAspectLinksList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-stats-link-step]");
+  if (!button) return;
+  adjustStatsAspectLinkDraft(button.dataset.statsLinkType, button.dataset.statsLinkId, Number(button.dataset.statsLinkStep || 0));
+});
+statsAspectLinksCloseButton?.addEventListener("click", requestStatsAspectLinksClose);
+statsAspectLinksConfirmBackButton?.addEventListener("click", () => closeModal("statsAspectLinksConfirmModal"));
+statsAspectLinksConfirmSaveButton?.addEventListener("click", () => void saveStatsAspectLinksDraft());
 
 openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
 openMissionCreateButton?.addEventListener("click", openMissionCreateModal);

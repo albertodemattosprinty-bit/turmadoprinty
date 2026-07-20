@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260720-mission-start-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260720-stats-bulk-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -1025,7 +1025,7 @@
         <div id="statsMissionsList"></div>
       </div>
       <section class="actions-side-actions history-footer-actions history-missions-footer stats-scope-footer" aria-label="Período das estatísticas">
-        <button class="icon-action-btn history-mission-footer-btn" type="button" aria-label="Estatísticas atuais" aria-current="page">
+        <button class="icon-action-btn history-mission-footer-btn" type="button" id="statsAllMissionsButton" aria-label="Lançar missões de todos os aspectos">
           <img src="/200/icons/stats.svg" alt="" aria-hidden="true" />
         </button>
         <button class="icon-action-btn history-mission-footer-btn history-mission-scope-btn" type="button" id="statsScopePrevButton" aria-label="Período anterior">
@@ -1099,6 +1099,18 @@
       </header>
       <div class="stats-aspect-links-period" id="statsAspectLinksPeriod">Hoje</div>
       <div class="mission-variants-list stats-aspect-links-list" id="statsAspectLinksList" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="workspace-modal simple-modal stats-aspect-links-confirm-modal" id="statsAspectLinksConfirmModal" aria-hidden="true" aria-label="Salvar lançamentos">
+    <div class="finance-content stats-aspect-links-confirm-card">
+      <div class="running-task-name">Salvar alterações?</div>
+      <p class="options-note">Os lançamentos só serão atualizados no PostgreSQL depois da confirmação.</p>
+      <p class="finance-status" id="statsAspectLinksConfirmStatus" aria-live="polite"></p>
+      <div class="stats-aspect-links-confirm-actions">
+        <button class="ghost-btn" type="button" id="statsAspectLinksConfirmBack">Voltar</button>
+        <button class="primary-btn" type="button" id="statsAspectLinksConfirmSave">Salvar alterações</button>
+      </div>
     </div>
   </section>
 
@@ -1508,7 +1520,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260720-mission-start-v1"></script>
+  <script type="module" src="/200/project.js?v=20260720-stats-bulk-v1"></script>
   <script src='/speech-input-kit.js?v=20260720-keyboard-v1'></script>
 </body>
 </html>
