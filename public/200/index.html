@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260720-stats-bulk-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260720-optimistic-points-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -1195,11 +1195,10 @@
       <div class="points-update-kicker">Pontuação diária</div>
       <div class="points-update-total" id="pointsUpdateTotal">0</div>
       <div class="points-update-delta" id="pointsUpdateDelta">+0 pontos</div>
-      <div class="points-update-ranking" id="pointsUpdateRanking">
-        <h2>Ranking de amigos hoje</h2>
-        <div class="points-update-ranking-list" id="pointsUpdateRankingList"></div>
+      <div class="points-update-continue" id="pointsUpdateContinue" hidden>
+        <span>Toque para</span>
+        <span>continuar</span>
       </div>
-      <div class="points-update-continue" id="pointsUpdateContinue" hidden>Toque para continuar</div>
     </div>
   </section>
 
@@ -1371,13 +1370,17 @@
           <div class="history-mission-adjust-value" id="missionProgressValue">1</div>
           <button class="history-mission-sign-btn active" type="button" id="missionProgressPlus">+</button>
         </div>
-        <button class="primary-btn mission-progress-start-btn" type="button" id="missionProgressStartButton">Iniciar agora</button>
+        <button class="primary-btn mission-progress-start-btn" type="button" id="missionProgressStartButton">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z" fill="currentColor"/></svg>
+          <span>INICIAR AGORA</span>
+        </button>
         <p class="finance-status" id="missionProgressHint" aria-live="polite">Adicionando 0</p>
         <p class="finance-status" id="missionProgressStatus" aria-live="polite"></p>
       </div>
       <div class="history-mission-modal-footer history-mission-modal-footer-one">
         <button class="history-mission-footer-icon history-mission-footer-icon-green mission-progress-confirm-btn" type="button" id="missionProgressConfirm" aria-label="Atualizar progresso">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z" fill="currentColor"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg>
+          <span id="missionProgressConfirmLabel">ADICIONAR ITEM</span>
         </button>
       </div>
     </div>
@@ -1520,7 +1523,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260720-stats-bulk-v1"></script>
+  <script type="module" src="/200/project.js?v=20260720-optimistic-points-v1"></script>
   <script src='/speech-input-kit.js?v=20260720-keyboard-v1'></script>
 </body>
 </html>

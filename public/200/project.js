@@ -484,6 +484,7 @@ const missionProgressHint = document.getElementById("missionProgressHint");
 const missionProgressStatus = document.getElementById("missionProgressStatus");
 const missionProgressStartButton = document.getElementById("missionProgressStartButton");
 const missionProgressConfirmButton = document.getElementById("missionProgressConfirm");
+const missionProgressConfirmLabel = document.getElementById("missionProgressConfirmLabel");
 const missionQuickAssignCloseButton = document.getElementById("missionQuickAssignCloseButton");
 const missionQuickAssignGrid = document.getElementById("missionQuickAssignGrid");
 const missionQuickAssignStatus = document.getElementById("missionQuickAssignStatus");
@@ -743,8 +744,6 @@ const socialModalList = document.getElementById("socialModalList");
 const pointsUpdateModal = document.getElementById("pointsUpdateModal");
 const pointsUpdateTotal = document.getElementById("pointsUpdateTotal");
 const pointsUpdateDelta = document.getElementById("pointsUpdateDelta");
-const pointsUpdateRanking = document.getElementById("pointsUpdateRanking");
-const pointsUpdateRankingList = document.getElementById("pointsUpdateRankingList");
 const pointsUpdateContinue = document.getElementById("pointsUpdateContinue");
 const socialScopePrevButton = document.getElementById("socialScopePrevButton");
 const socialScopeNextButton = document.getElementById("socialScopeNextButton");
@@ -9941,10 +9940,32 @@ async function saveStatsAspectLinksDraft() {
     return;
   }
 
+  const rollback = {
+    missions: (state.missions || []).map((item) => ({ ...item })),
+    statsScopeMissions: (state.statsScopeMissions || []).map((item) => ({ ...item })),
+    actions: (state.actions || []).map((item) => ({ ...item })),
+    statsSummary: state.statsSummary ? JSON.parse(JSON.stringify(state.statsSummary)) : null,
+    linkedMissions: (state.statsAspectLinks?.missions || []).map((item) => ({ ...item })),
+    linkedActions: (state.statsAspectLinks?.actions || []).map((item) => ({ ...item })),
+    draftDeltas: { ...(state.statsAspectLinks?.draftDeltas || {}) }
+  };
+
   state.statsAspectLinks.saving = true;
-  if (statsAspectLinksConfirmSaveButton) statsAspectLinksConfirmSaveButton.disabled = true;
-  if (statsAspectLinksConfirmBackButton) statsAspectLinksConfirmBackButton.disabled = true;
-  if (statsAspectLinksConfirmStatus) statsAspectLinksConfirmStatus.textContent = "Salvando no PostgreSQL...";
+  missionAdjustments.forEach(({ goal, delta }) => applyMissionProgressLocally(goal?.id, delta));
+  actionAdjustments.forEach(({ action, delta }) => applyStatsActionProgressLocally(action, delta));
+  state.statsAspectLinks.draftDeltas = {};
+
+  renderActions();
+  renderMissions();
+  renderRunningMissionQuickButtons();
+  refreshStatsMissionsFromLocalState();
+  closeModal("statsAspectLinksConfirmModal");
+  closeModal("statsAspectLinksModal");
+
+  if (missionAdjustments.some((entry) => entry.delta > 0) || actionAdjustments.some((entry) => entry.delta > 0)) {
+    playMissionProgressSound();
+  }
+
   let pointsBefore = null;
   let pointsAfter = null;
   const absorbPointsUpdate = (pointsUpdate) => {
@@ -9963,9 +9984,14 @@ async function saveStatsAspectLinksDraft() {
         skipGlobalLoading: true
       });
       absorbPointsUpdate(payload?.pointsUpdate);
-      delete state.statsAspectLinks.draftDeltas[getStatsAspectLinkKey("mission", goal?.id)];
-      goal.progressValue = Math.max(0, Math.trunc(Number(goal?.progressValue || 0) || 0) + delta);
+      if (Array.isArray(payload?.goals)) {
+        state.missions = payload.goals;
+        if (getActiveStatsScope().key === "today") {
+          state.statsScopeMissions = payload.goals;
+        }
+      }
     }
+
     for (const { action, delta } of actionAdjustments) {
       const completing = delta > 0;
       const completedAtMs = getServerNowMs();
@@ -9983,24 +10009,40 @@ async function saveStatsAspectLinksDraft() {
         skipGlobalLoading: true
       });
       absorbPointsUpdate(payload?.pointsUpdate);
-      delete state.statsAspectLinks.draftDeltas[getStatsAspectLinkKey("action", action?.id)];
-      action.status = completing ? actionStatuses.completed : actionStatuses.pending;
+      if (payload?.action) {
+        state.actions = (state.actions || []).map((item) => (
+          String(item?.id || "") === String(payload.action?.id || "") ? payload.action : item
+        ));
+      }
     }
-    state.statsAspectLinks.draftDeltas = {};
-    if (pointsBefore && pointsAfter) enqueuePointsUpdateFeedback({ before: pointsBefore, after: pointsAfter });
-    if (missionAdjustments.some((entry) => entry.delta > 0) || actionAdjustments.some((entry) => entry.delta > 0)) {
-      playMissionProgressSound();
-    }
-    closeModal("statsAspectLinksConfirmModal");
-    closeModal("statsAspectLinksModal");
-    await Promise.all([loadActions(), loadStatsSummary()]);
+
+    refreshStatsMissionsFromLocalState();
     renderActions();
     renderMissions();
+    renderRunningMissionQuickButtons();
+    if (pointsBefore && pointsAfter) {
+      enqueuePointsUpdateFeedback({ before: pointsBefore, after: pointsAfter });
+    }
   } catch (error) {
+    state.missions = rollback.missions;
+    state.statsScopeMissions = rollback.statsScopeMissions;
+    state.actions = rollback.actions;
+    state.statsSummary = rollback.statsSummary;
+    state.statsAspectLinks.missions = rollback.linkedMissions;
+    state.statsAspectLinks.actions = rollback.linkedActions;
+    state.statsAspectLinks.draftDeltas = rollback.draftDeltas;
+    renderActions();
+    renderMissions();
+    renderRunningMissionQuickButtons();
+    refreshStatsMissionsFromLocalState();
     renderStatsAspectLinksModal();
     if (statsAspectLinksConfirmStatus) {
-      statsAspectLinksConfirmStatus.textContent = error instanceof Error ? error.message : "Não foi possível salvar os lançamentos.";
+      statsAspectLinksConfirmStatus.textContent = error instanceof Error
+        ? error.message
+        : "Nao foi possivel salvar os lancamentos.";
     }
+    openModal("statsAspectLinksModal");
+    openModal("statsAspectLinksConfirmModal");
   } finally {
     state.statsAspectLinks.saving = false;
     if (statsAspectLinksConfirmSaveButton) statsAspectLinksConfirmSaveButton.disabled = false;
@@ -10797,56 +10839,6 @@ function renderSocialModal() {
   }
 }
 
-function getPointsUpdateRankingEntries(snapshot) {
-  const entries = [];
-  if (snapshot?.self) {
-    entries.push({ ...snapshot.self, isSelf: true });
-  }
-  for (const friend of Array.isArray(snapshot?.friends) ? snapshot.friends : []) {
-    entries.push({ ...friend, isSelf: false });
-  }
-  entries.sort((left, right) => {
-    const pointsDelta = Number(right?.points || 0) - Number(left?.points || 0);
-    if (pointsDelta !== 0) {
-      return pointsDelta;
-    }
-    return String(left?.name || "").localeCompare(String(right?.name || ""), "pt-BR");
-  });
-  return entries.map((entry, index) => ({
-    ...entry,
-    points: Math.max(0, Math.trunc(Number(entry?.points || 0) || 0)),
-    rank: index + 1
-  }));
-}
-
-function getPointsUpdateEntryKey(entry) {
-  const userId = String(entry?.userId || "").trim();
-  if (userId) {
-    return userId;
-  }
-  return entry?.isSelf ? "self" : `friend:${String(entry?.name || "usuario").trim().toLowerCase()}`;
-}
-
-function getPointsUpdateVisibleRanking(entries) {
-  const selfIndex = entries.findIndex((entry) => entry.isSelf);
-  if (selfIndex < 0) {
-    return [];
-  }
-  return entries.slice(Math.max(0, selfIndex - 2), selfIndex + 3);
-}
-
-function playPointsRankOvertakeSound() {
-  if (!pointsRankOvertakeAudio) {
-    return;
-  }
-  try {
-    pointsRankOvertakeAudio.pause();
-    pointsRankOvertakeAudio.currentTime = 0;
-    pointsRankOvertakeAudio.volume = 1;
-    void pointsRankOvertakeAudio.play().catch(() => {});
-  } catch {}
-}
-
 function animatePointsUpdateTotal(fromPoints, toPoints) {
   if (!pointsUpdateTotal) {
     return;
@@ -10864,92 +10856,6 @@ function animatePointsUpdateTotal(fromPoints, toPoints) {
   window.requestAnimationFrame(tick);
 }
 
-function shouldShowPointsUpdateRankingNow(nowMs = getServerNowMs()) {
-  const minute = getProjectDateTimeParts(new Date(nowMs)).minute;
-  return minute % 6 === 0;
-}
-
-function renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake, allowRanking = true) {
-  if (!pointsUpdateRanking || !pointsUpdateRankingList) {
-    return;
-  }
-  const beforeEntries = getPointsUpdateRankingEntries(beforeSnapshot);
-  const afterEntries = getPointsUpdateRankingEntries(afterSnapshot);
-  const hasFriends = (Array.isArray(afterSnapshot?.friends) ? afterSnapshot.friends : []).length > 0;
-  const shouldShowRanking = allowRanking && hasFriends;
-  pointsUpdateRanking.hidden = !shouldShowRanking;
-  if (!shouldShowRanking) {
-    pointsUpdateRankingList.innerHTML = "";
-    return;
-  }
-
-  const visibleAfter = getPointsUpdateVisibleRanking(afterEntries);
-  const beforeByKey = new Map(beforeEntries.map((entry) => [getPointsUpdateEntryKey(entry), entry]));
-  const beforeRankByKey = new Map(beforeEntries.map((entry) => [getPointsUpdateEntryKey(entry), entry.rank]));
-  const initialEntries = didOvertake
-    ? [...visibleAfter].sort((left, right) => {
-        const leftRank = beforeRankByKey.get(getPointsUpdateEntryKey(left)) || Number.MAX_SAFE_INTEGER;
-        const rightRank = beforeRankByKey.get(getPointsUpdateEntryKey(right)) || Number.MAX_SAFE_INTEGER;
-        return leftRank - rightRank;
-      })
-    : visibleAfter;
-
-  pointsUpdateRankingList.innerHTML = initialEntries.map((entry) => {
-    const key = getPointsUpdateEntryKey(entry);
-    const initialEntry = didOvertake ? (beforeByKey.get(key) || entry) : entry;
-    return `
-      <div class="points-update-ranking-row${entry.isSelf ? " is-self" : ""}" data-points-ranking-user="${escapeHtml(key)}">
-        <span class="points-update-rank">${escapeHtml(`${initialEntry.rank || entry.rank}º`)}</span>
-        <strong class="points-update-name">${escapeHtml(String(entry?.name || (entry.isSelf ? "Você" : "Usuário")))}</strong>
-        <span class="points-update-row-points">${escapeHtml(String(initialEntry.points ?? entry.points))}</span>
-      </div>
-    `;
-  }).join("");
-
-  if (!didOvertake) {
-    return;
-  }
-
-  window.setTimeout(() => {
-    if (!pointsUpdateModal?.classList.contains("active")) {
-      return;
-    }
-    const nodes = new Map([...pointsUpdateRankingList.querySelectorAll("[data-points-ranking-user]")]
-      .map((node) => [String(node.dataset.pointsRankingUser || ""), node]));
-    const firstPositions = new Map([...nodes].map(([key, node]) => [key, node.getBoundingClientRect().top]));
-    visibleAfter.forEach((entry) => {
-      const node = nodes.get(getPointsUpdateEntryKey(entry));
-      if (node) {
-        pointsUpdateRankingList.appendChild(node);
-      }
-    });
-    const lastPositions = new Map([...nodes].map(([key, node]) => [key, node.getBoundingClientRect().top]));
-    visibleAfter.forEach((entry) => {
-      const key = getPointsUpdateEntryKey(entry);
-      const node = nodes.get(key);
-      if (!node) {
-        return;
-      }
-      const translateY = Number(firstPositions.get(key) || 0) - Number(lastPositions.get(key) || 0);
-      node.style.transition = "none";
-      node.style.transform = `translateY(${translateY}px)`;
-      const rankNode = node.querySelector(".points-update-rank");
-      const pointsNode = node.querySelector(".points-update-row-points");
-      if (rankNode) rankNode.textContent = `${entry.rank}º`;
-      if (pointsNode) pointsNode.textContent = String(entry.points);
-    });
-    void pointsUpdateRankingList.offsetHeight;
-    window.requestAnimationFrame(() => {
-      nodes.forEach((node) => {
-        node.style.transition = "transform 620ms cubic-bezier(0.2, 0.84, 0.28, 1)";
-        node.style.transform = "translateY(0)";
-      });
-      pointsUpdateModal.classList.add("is-overtaking");
-      playPointsRankOvertakeSound();
-    });
-  }, 170);
-}
-
 async function showPointsUpdateFeedback(pointsUpdate) {
   const beforeSnapshot = pointsUpdate?.before || null;
   const afterSnapshot = pointsUpdate?.after || null;
@@ -10961,14 +10867,6 @@ async function showPointsUpdateFeedback(pointsUpdate) {
     return;
   }
 
-  const beforeEntries = getPointsUpdateRankingEntries(beforeSnapshot);
-  const afterEntries = getPointsUpdateRankingEntries(afterSnapshot);
-  const beforePosition = beforeEntries.findIndex((entry) => entry.isSelf);
-  const afterPosition = afterEntries.findIndex((entry) => entry.isSelf);
-  const didOvertake = !isLoss && beforePosition >= 0 && afterPosition >= 0 && afterPosition < beforePosition;
-  const hasFriends = (Array.isArray(afterSnapshot?.friends) ? afterSnapshot.friends : []).length > 0;
-  const showRanking = shouldShowPointsUpdateRankingNow() && hasFriends;
-
   if (String(state.social?.scopeKey || "today") === "today") {
     state.social.pendingCount = Math.max(0, Number(afterSnapshot?.pendingCount || 0) || 0);
     state.social.self = afterSnapshot?.self || null;
@@ -10979,14 +10877,15 @@ async function showPointsUpdateFeedback(pointsUpdate) {
 
   pointsUpdateModal.classList.remove("is-leaving", "is-overtaking", "is-loss", "is-solo-points");
   pointsUpdateModal.classList.toggle("is-loss", isLoss);
-  pointsUpdateModal.classList.toggle("is-solo-points", !showRanking);
+  pointsUpdateModal.classList.add("is-solo-points");
+  if (pointsUpdateRanking) pointsUpdateRanking.hidden = true;
+  if (pointsUpdateRankingList) pointsUpdateRankingList.innerHTML = "";
   if (pointsUpdateContinue) pointsUpdateContinue.hidden = true;
   if (pointsUpdateTotal) pointsUpdateTotal.textContent = String(beforePoints);
   if (pointsUpdateDelta) {
     const absoluteDelta = Math.abs(pointsDelta);
     pointsUpdateDelta.textContent = `${pointsDelta > 0 ? "+" : "-"}${absoluteDelta} ${absoluteDelta === 1 ? "ponto" : "pontos"}`;
   }
-  renderPointsUpdateRanking(beforeSnapshot, afterSnapshot, didOvertake, showRanking);
   openModal("pointsUpdateModal");
   animatePointsUpdateTotal(beforePoints, afterPoints);
 
@@ -11528,13 +11427,13 @@ async function openRunningMissionQuickModal() {
   })();
 }
 
-function applyMissionProgressLocally(goalId, delta) {
-  state.missions = (Array.isArray(state.missions) ? state.missions : []).map((goal) => {
-    if (String(goal.id || "") !== String(goalId || "")) {
+function updateMissionProgressCollection(collection, goalId, delta) {
+  return (Array.isArray(collection) ? collection : []).map((goal) => {
+    if (String(goal?.id || "") !== String(goalId || "")) {
       return goal;
     }
-    const targetValue = Math.max(1, Number(goal.targetValue || 1));
-    const progressValue = Math.max(0, Number(goal.progressValue || 0) + Number(delta || 0));
+    const targetValue = Math.max(1, Number(goal?.targetValue || 1));
+    const progressValue = Math.max(0, Number(goal?.progressValue || 0) + Number(delta || 0));
     return {
       ...goal,
       progressValue,
@@ -11542,6 +11441,47 @@ function applyMissionProgressLocally(goalId, delta) {
       percent: Math.max(0, Math.min(100, Math.round((progressValue / targetValue) * 100)))
     };
   });
+}
+
+function refreshStatsMissionsFromLocalState() {
+  state.statsMissions = statsPointCategories.map((category) => (
+    buildStatsPointEntry(category, state.statsSummary?.byCategory || {})
+  ));
+  renderStatsMissions();
+}
+
+function applyMissionProgressLocally(goalId, delta) {
+  state.missions = updateMissionProgressCollection(state.missions, goalId, delta);
+  state.statsScopeMissions = updateMissionProgressCollection(state.statsScopeMissions, goalId, delta);
+  if (state.statsAspectLinks) {
+    state.statsAspectLinks.missions = updateMissionProgressCollection(state.statsAspectLinks.missions, goalId, delta);
+  }
+  refreshStatsMissionsFromLocalState();
+}
+
+function applyStatsActionProgressLocally(action, delta) {
+  const completing = Number(delta || 0) > 0;
+  const nextStatus = completing ? actionStatuses.completed : actionStatuses.pending;
+  const actionId = String(action?.id || "");
+  const categoryId = normalizeTaskCategoryId(action?.categoryId);
+  const durationMinutes = Math.max(0, getActionDurationMinutes(action));
+  const updateCollection = (collection) => (Array.isArray(collection) ? collection : []).map((item) => (
+    String(item?.id || "") === actionId ? { ...item, status: nextStatus } : item
+  ));
+
+  state.actions = updateCollection(state.actions);
+  if (state.statsAspectLinks) {
+    state.statsAspectLinks.actions = updateCollection(state.statsAspectLinks.actions);
+  }
+
+  const summary = state.statsSummary ? { ...state.statsSummary } : {};
+  summary.byCategory = { ...(summary.byCategory || {}) };
+  summary.byCategory[categoryId] = Math.max(
+    0,
+    Number(summary.byCategory[categoryId] || 0) + (completing ? durationMinutes : -durationMinutes)
+  );
+  state.statsSummary = summary;
+  refreshStatsMissionsFromLocalState();
 }
 
 function queueRunningMissionQuickIncrement(goal) {
@@ -12035,11 +11975,18 @@ function renderMissionProgressState() {
   const baseValue = Math.max(0, Math.trunc(Number(state.missionProgress?.baseValue || 0) || 0));
   const deltaValue = Math.trunc(Number(state.missionProgress?.deltaValue || 0) || 0);
   const previewValue = Math.max(0, baseValue + deltaValue);
+  const itemCount = Math.max(1, Math.abs(deltaValue));
   if (missionProgressValue) {
     missionProgressValue.textContent = String(previewValue);
   }
   if (missionProgressHint) {
     missionProgressHint.textContent = deltaValue < 0 ? `Subtraindo ${Math.abs(deltaValue)}` : `Adicionando ${deltaValue}`;
+  }
+  if (missionProgressConfirmLabel) {
+    missionProgressConfirmLabel.textContent = `${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"} ${itemCount === 1 ? "ITEM" : "ITENS"}`;
+  }
+  if (missionProgressConfirmButton) {
+    missionProgressConfirmButton.disabled = deltaValue === 0;
   }
   missionProgressMinusButton?.classList.remove("active");
   missionProgressPlusButton?.classList.add("active");
@@ -15192,42 +15139,58 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
 });
 
 missionProgressConfirmButton?.addEventListener("click", () => {
-  void (async () => {
-    const goalId = String(state.missionProgress?.goalId || "").trim();
-    const deltaValue = Math.trunc(Number(state.missionProgress?.deltaValue || 0) || 0);
-    if (!goalId || deltaValue === 0) {
-      return;
-    }
-    const finishLoading = beginMissionActionLoading(missionProgressConfirmButton);
-    if (!finishLoading) return;
-    if (missionProgressStatus) {
-      missionProgressStatus.textContent = deltaValue < 0 ? "Subtraindo..." : "Adicionando...";
-    }
-    try {
-      const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-          delta: deltaValue
-        })
-      });
-      enqueuePointsUpdateFeedback(payload?.pointsUpdate);
-      if (deltaValue > 0) {
-        playMissionProgressSound();
+  const goalId = String(state.missionProgress?.goalId || "").trim();
+  const deltaValue = Math.trunc(Number(state.missionProgress?.deltaValue || 0) || 0);
+  if (!goalId || deltaValue === 0) {
+    return;
+  }
+
+  const rollback = {
+    missions: (state.missions || []).map((item) => ({ ...item })),
+    statsScopeMissions: (state.statsScopeMissions || []).map((item) => ({ ...item })),
+    linkedMissions: (state.statsAspectLinks?.missions || []).map((item) => ({ ...item }))
+  };
+
+  applyMissionProgressLocally(goalId, deltaValue);
+  renderMissions();
+  renderRunningMissionQuickButtons();
+  closeModal("missionProgressModal");
+  if (deltaValue > 0) {
+    playMissionProgressSound();
+  }
+
+  void apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+      delta: deltaValue
+    }),
+    skipGlobalLoading: true
+  }).then((payload) => {
+    if (Array.isArray(payload?.goals)) {
+      state.missions = payload.goals;
+      if (getActiveStatsScope().key === "today") {
+        state.statsScopeMissions = payload.goals;
       }
-      closeModal("missionProgressModal");
-      await loadMissions();
-      renderMissions();
-      renderRunningMissionQuickButtons();
-    } catch (error) {
-      if (missionProgressStatus) {
-        missionProgressStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar progresso.";
-      }
-    } finally {
-      finishLoading();
     }
-  })();
+    refreshStatsMissionsFromLocalState();
+    renderMissions();
+    renderRunningMissionQuickButtons();
+    enqueuePointsUpdateFeedback(payload?.pointsUpdate);
+  }).catch((error) => {
+    state.missions = rollback.missions;
+    state.statsScopeMissions = rollback.statsScopeMissions;
+    if (state.statsAspectLinks) {
+      state.statsAspectLinks.missions = rollback.linkedMissions;
+    }
+    refreshStatsMissionsFromLocalState();
+    renderMissions();
+    renderRunningMissionQuickButtons();
+    if (missionStatus) {
+      missionStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar progresso.";
+    }
+  });
 });
 
 missionAdjustDeleteButton?.addEventListener("click", () => {

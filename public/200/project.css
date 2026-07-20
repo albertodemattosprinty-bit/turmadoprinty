@@ -8505,3 +8505,72 @@ body.mission-run-loading > :not(.mission-run-loading-overlay) {
   .ilife-finance-dialog { padding:18px; }
   .ilife-finance-choice-grid { grid-template-columns:1fr; }
 }
+
+/* Optimistic mission progress and points-only feedback. */
+#pointsUpdateModal .points-update-ranking {
+  display: none !important;
+}
+
+#pointsUpdateModal.is-solo-points :is(.points-update-kicker, .points-update-delta, .points-update-ranking) {
+  display: none !important;
+}
+
+#pointsUpdateModal.is-solo-points .points-update-continue {
+  display: grid !important;
+}
+
+.points-update-continue {
+  justify-items: center;
+  gap: 2px;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.points-update-continue[hidden] {
+  display: none !important;
+}
+
+#missionProgressModal .mission-progress-start-btn,
+#missionProgressModal .mission-progress-confirm-btn {
+  width: min(100%, 520px);
+  min-height: 66px;
+  border: 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 12px 22px;
+  color: #fff;
+  font-size: clamp(1.18rem, 4.8vw, 1.55rem);
+  font-weight: 950;
+  letter-spacing: 0.015em;
+  line-height: 1;
+}
+
+#missionProgressModal .mission-progress-start-btn {
+  background: linear-gradient(135deg, #28b76b, #16894c);
+  box-shadow: 0 14px 30px rgba(17, 137, 76, 0.3);
+}
+
+#missionProgressModal .history-mission-modal-footer-one {
+  width: 100%;
+  padding-top: 0;
+}
+
+#missionProgressModal .mission-progress-confirm-btn {
+  height: auto;
+  background: linear-gradient(135deg, #2988ff, #1757ca);
+  box-shadow: 0 14px 30px rgba(23, 87, 202, 0.34);
+}
+
+#missionProgressModal :is(.mission-progress-start-btn, .mission-progress-confirm-btn) svg {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+}
+
+#missionProgressModal .mission-progress-confirm-btn:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
