@@ -16,6 +16,7 @@ export async function ensureAuthSecuritySchema() {
       await query(`
         alter table users add column if not exists role text not null default 'USER';
       `);
+      await query(`alter table users add column if not exists project200_onboarding_required boolean not null default false;`);
       await query(`
         update users set role = 'USER' where role is null or upper(role) not in ('USER', 'ADMIN');
       `);
@@ -131,7 +132,7 @@ export async function createUser({ name, username, password }) {
     `
       insert into users (name, username, email, password_hash, email_verified)
       values ($1, $2, $3, $4, true)
-      returning id, name, username, email, email_verified, role, created_at
+      returning id, name, username, email, email_verified, role, project200_onboarding_required, created_at
     `,
     [name.trim(), normalizedUsername, syntheticEmail, passwordHash]
   );
@@ -143,7 +144,7 @@ export async function findUserByUsername(username) {
   await ensureAuthSecuritySchema();
   const result = await query(
     `
-      select id, name, username, email, password_hash, email_verified, role, created_at
+      select id, name, username, email, password_hash, email_verified, role, project200_onboarding_required, created_at
       from users
       where username = $1
       limit 1
@@ -180,7 +181,8 @@ export async function findUserBySessionToken(token) {
   await ensureAuthSecuritySchema();
   const result = await query(
     `
-      select u.id, u.name, u.username, u.email, u.email_verified, u.role, u.created_at, s.expires_at
+      select u.id, u.name, u.username, u.email, u.email_verified, u.role,
+             u.project200_onboarding_required, u.created_at, s.expires_at
         from user_sessions s
         join users u on u.id = s.user_id
        where s.token_hash = $1

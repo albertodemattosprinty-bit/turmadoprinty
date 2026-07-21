@@ -92,7 +92,7 @@ registerForm?.addEventListener("submit", async (event) => {
   }
   setLoginMessage("Criando conta...");
   try {
-    await runJsonRequest("/api/auth/register", { name, username, password });
+    await runJsonRequest("/api/auth/register", { name, username, password, app: "project200" });
     const data = await runJsonRequest("/api/auth/login", { username, password });
     if (!data?.token) {
       throw new Error("Conta criada, mas o login automatico falhou.");

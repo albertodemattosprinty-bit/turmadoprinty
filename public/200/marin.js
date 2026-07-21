@@ -1,10 +1,10 @@
 const DEFAULT_PERSONAS = [
-  { key: "marin", name: "Marin" },
-  { key: "peter", name: "Peter" },
-  { key: "lena", name: "Lena" },
-  { key: "gaia", name: "Gaia" },
-  { key: "sami", name: "Sami" },
-  { key: "zach", name: "Zach" }
+  { key: "marin", name: "Marin", avatar: "/200/agents/marin.svg" },
+  { key: "peter", name: "Peter", avatar: "/200/agents/peter.svg" },
+  { key: "lena", name: "Lena", avatar: "/200/agents/lena.svg" },
+  { key: "gaia", name: "Gaia", avatar: "/200/agents/gaia.svg" },
+  { key: "sami", name: "Sami", avatar: "/200/agents/sami.svg" },
+  { key: "zach", name: "Zach", avatar: "/200/agents/zach.svg" }
 ];
 
 const PERSONA_DESCRIPTIONS = {
@@ -144,9 +144,10 @@ export function initializeProject200MarinUi(dependencies = {}) {
       button.className = "marin-persona-option";
       button.classList.toggle("is-selected", persona.key === state.personaKey);
 
-      const avatar = document.createElement("span");
+      const avatar = document.createElement("img");
       avatar.className = "marin-persona-avatar";
-      avatar.textContent = String(persona.name || "?").slice(0, 1).toUpperCase();
+      avatar.src = persona.avatar;
+      avatar.alt = "";
 
       const copy = document.createElement("span");
       const name = document.createElement("strong");

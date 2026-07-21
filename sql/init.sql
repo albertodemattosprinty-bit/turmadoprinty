@@ -8,6 +8,7 @@ create table if not exists users (
   password_hash text not null,
   email_verified boolean not null default false,
   role text not null default 'USER',
+  project200_onboarding_required boolean not null default false,
   created_at timestamptz not null default now(),
   last_seen_at timestamptz
 );
@@ -16,6 +17,7 @@ alter table users add column if not exists email_verified boolean not null defau
 alter table users add column if not exists username text;
 alter table users add column if not exists last_seen_at timestamptz;
 alter table users add column if not exists role text not null default 'USER';
+alter table users add column if not exists project200_onboarding_required boolean not null default false;
 update users set role = 'USER' where role is null or upper(role) not in ('USER', 'ADMIN');
 
 create table if not exists auth_security_migrations (
@@ -34,6 +36,20 @@ set role = 'ADMIN'
 where exists (select 1 from applied)
   and lower(coalesce(username, '')) = any(array['rosemattos', 'lucasm', 'albertomattos']);
 create unique index if not exists idx_users_username on users(username);
+
+create table if not exists project200_user_onboarding (
+  user_id uuid primary key references users(id) on delete cascade,
+  status text not null default 'PENDING',
+  current_step integer not null default 1,
+  education_page integer not null default 0,
+  selected_persona text,
+  avatar_completed boolean not null default false,
+  started_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index if not exists idx_project200_user_onboarding_status on project200_user_onboarding(status);
 
 create table if not exists user_sessions (
   id uuid primary key default gen_random_uuid(),

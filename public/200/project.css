@@ -8751,6 +8751,8 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
 .marin-persona-avatar {
   width: 42px;
   height: 42px;
+  display: block;
+  object-fit: cover;
   border-radius: 50%;
   display: grid;
   place-items: center;

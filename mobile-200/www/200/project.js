@@ -1,5 +1,6 @@
 import { getApiUrl } from "../api.js";
-import { initializeProject200MarinUi } from "./marin.js?v=20260721-marin-v1";
+import { initializeProject200MarinUi } from "./marin.js?v=20260721-onboarding-v1";
+import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260721-onboarding-v1";
 
 import {
   MINUTE_CUE_INTERVALS,
@@ -1073,6 +1074,7 @@ const state = {
   actions: [],
   historySystem: [],
   historyTexts: [],
+  project200Onboarding: null,
   authUser: null,
   profiles: [],
   selectedProfile: defaultProjectProfileName,
@@ -7542,6 +7544,7 @@ async function ensureProject200Session() {
       }
       return false;
     }
+    state.project200Onboarding = payload?.onboarding || null;
     state.authUser = payload?.user || null;
     refreshProfileLockFromAuth(payload?.user || null);
     project200LoginOverlay?.classList.remove("active");
@@ -13579,7 +13582,25 @@ async function bootstrapProject200App() {
       redirectToProject200Login();
       return;
     }
-    await ensureProject200Session();
+    const authenticated = await ensureProject200Session();
+    if (!authenticated) {
+      return;
+    }
+    if (state.authUser?.onboardingRequired || state.project200Onboarding?.required) {
+      try {
+        await loadProject200Profiles();
+      } catch {
+        state.profiles = [];
+      }
+      await project200OnboardingUi.show(state.project200Onboarding || {
+        required: true,
+        currentStep: 1,
+        educationPage: 0
+      });
+      endStartupLoading();
+      return;
+    }
+    project200OnboardingUi.hide();
     void project200MarinUi.load({ silent: true });
     const musicStationsPromise = loadRunningMusicStations().catch(() => {});
     await refreshHomeSnapshot({ force: true });
@@ -13599,7 +13620,7 @@ async function bootstrapProject200App() {
       window.clearTimeout(homeBootstrapRetryTimer);
       homeBootstrapRetryTimer = null;
     }
-    if (getToken() && !revealInitialHomeIfReady()) {
+    if (getToken() && !project200OnboardingUi.isActive() && !revealInitialHomeIfReady()) {
       homeBootstrapRetryTimer = window.setTimeout(() => {
         homeBootstrapRetryTimer = null;
         if (!state.runningPlayer.stationsLoaded) void loadRunningMusicStations().then(() => revealInitialHomeIfReady());
@@ -16210,6 +16231,27 @@ const project200MarinUi = initializeProject200MarinUi({
   getProfileName: () => String(state.selectedProfile || getDefaultProfileName()).trim(),
   arrayBufferToBase64
 });
+const project200OnboardingUi = initializeProject200OnboardingUi({
+  getToken,
+  getUser: () => state.authUser,
+  getSelectedProfile: () => getProfileByName(state.selectedProfile) || getDefaultProfile(),
+  loadProfiles: loadProject200Profiles,
+  onProfileGenerated: (profile) => {
+    if (!profile?.id) return;
+    const exists = state.profiles.some((item) => String(item?.id || "") === String(profile.id));
+    state.profiles = exists
+      ? state.profiles.map((item) => String(item?.id || "") === String(profile.id) ? profile : item)
+      : [...state.profiles, profile];
+    renderProfileFooter();
+    renderHistorySpeakerSelectionOptions();
+  },
+  onComplete: async () => {
+    state.project200Onboarding = null;
+    if (state.authUser) state.authUser.onboardingRequired = false;
+    beginStartupLoading(loadingIconByArea.actions);
+    await bootstrapProject200App();
+  }
+});
 document.body.classList.add("project-no-select");
 const isEditableTarget = (target) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
 document.addEventListener("copy", (event) => {
@@ -16619,14 +16661,13 @@ project200LoginForm?.addEventListener("submit", (event) => {
       }
       setToken(String(data.token));
       state.authUser = data?.user || null;
+      state.project200Onboarding = data?.onboarding || null;
       refreshProfileLockFromAuth(data?.user || null);
       if (project200LoginMessage) project200LoginMessage.textContent = "Acesso liberado.";
       project200LoginOverlay?.classList.remove("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
-      await loadProject200Profiles();
-      await loadActions();
-      await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
-      openPrimaryRunningSurface();
+      beginStartupLoading(loadingIconByArea.actions);
+      await bootstrapProject200App();
       scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {
@@ -16670,7 +16711,7 @@ project200RegisterForm?.addEventListener("submit", (event) => {
       const registerResponse = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, username, password })
+        body: JSON.stringify({ name, username, password, app: "project200" })
       }), {
         path: "/api/auth/register",
         iconSrc: loadingIconByArea.options
@@ -16695,15 +16736,14 @@ project200RegisterForm?.addEventListener("submit", (event) => {
 
       setToken(String(loginData.token));
       state.authUser = loginData?.user || null;
+      state.project200Onboarding = loginData?.onboarding || registerData?.onboarding || null;
       refreshProfileLockFromAuth(loginData?.user || null);
       if (project200LoginMessage) project200LoginMessage.textContent = "Conta criada e acesso liberado.";
       project200LoginOverlay?.classList.remove("active");
       project200LoginOverlay?.setAttribute("aria-hidden", "true");
       setProject200AuthTab("login");
-      await loadProject200Profiles();
-      await loadActions();
-      await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
-      openPrimaryRunningSurface();
+      beginStartupLoading(loadingIconByArea.actions);
+      await bootstrapProject200App();
       scheduleScreenLockInactivity();
     } catch (error) {
       if (project200LoginMessage) {

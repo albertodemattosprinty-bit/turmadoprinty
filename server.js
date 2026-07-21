@@ -68,6 +68,7 @@ import { createProject200Profile, deleteProject200Profile, listProject200Profile
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints } from "./src/project200-friends.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
+import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -188,7 +189,7 @@ function applyCorsHeaders(request, response) {
   response.setHeader("Access-Control-Allow-Origin", origin);
   response.setHeader("Vary", "Origin");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-File-Name, X-Track-Title, X-Track-Order, X-Page-Order, X-Model, X-Mini-Course-Catalog");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-File-Name, X-Track-Title, X-Track-Order, X-Page-Order, X-Model, X-Mini-Course-Catalog, X-Avatar-Style, X-Avatar-Instructions");
   response.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Type, Content-Disposition");
 }
 
@@ -2022,6 +2023,7 @@ function sanitizeUser(user) {
     id: user.id,
     name: user.name,
     username: user.username || null,
+    onboardingRequired: Boolean(user.project200_onboarding_required),
     isAdmin: isAdminUser(user),
     isContractor: Boolean(user.is_contractor),
     contractorEventId: user.contractor_event_id || null,
@@ -2145,6 +2147,25 @@ function sanitizeAdminUserMessage(message) {
   };
 }
 
+function isProject200OnboardingRequestAllowed(request) {
+  const pathname = new URL(
+    request.url || "/",
+    `http://${request.headers.host || "localhost"}`
+  ).pathname;
+
+  if (pathname === "/api/auth/me" || pathname === "/api/auth/logout") {
+    return true;
+  }
+  if (pathname === "/api/200/onboarding") {
+    return true;
+  }
+  if (request.method === "GET" && pathname === "/api/200/profiles") {
+    return true;
+  }
+  return request.method === "POST"
+    && /^\/api\/200\/profiles\/[^/]+\/avatar\/generate$/.test(pathname);
+}
+
 async function requireAuth(request, response) {
   if (!hasDatabase()) {
     sendJson(response, 503, {
@@ -2165,6 +2186,23 @@ async function requireAuth(request, response) {
 
   if (!user) {
     sendJson(response, 401, { error: "Sessao invalida ou expirada." });
+    return null;
+  }
+
+  if (Boolean(user.project200_onboarding_required) && !isProject200OnboardingRequestAllowed(request)) {
+    try {
+      const onboarding = await getProject200Onboarding(user.id);
+      sendJson(response, 423, {
+        error: "Conclua o onboarding do iLife para liberar sua conta.",
+        code: "PROJECT200_ONBOARDING_REQUIRED",
+        onboarding
+      });
+    } catch {
+      sendJson(response, 423, {
+        error: "O onboarding do iLife precisa ser concluido antes de continuar.",
+        code: "PROJECT200_ONBOARDING_REQUIRED"
+      });
+    }
     return null;
   }
 
@@ -8879,14 +8917,33 @@ async function handleProject200ProfileAvatarGenerateRequest(request, response, p
   }
 
   try {
+    let avatarStyle = String(request.headers["x-avatar-style"] || "pixar").trim().toLowerCase().slice(0, 40);
+    let avatarInstructions = String(request.headers["x-avatar-instructions"] || "").trim().slice(0, 500);
+    try {
+      avatarStyle = decodeURIComponent(avatarStyle);
+      avatarInstructions = decodeURIComponent(avatarInstructions);
+    } catch {
+      // Os cabecalhos continuam utilizaveis mesmo sem codificacao URI.
+    }
+    const stylePrompts = {
+      pixar: "animacao 3D cinematografica moderna, com encanto visual de grandes filmes familiares",
+      realista: "retrato fotografico realista premium, natural e contemporaneo",
+      anime: "ilustracao anime moderna premium, elegante e expressiva",
+      aquarela: "aquarela digital sofisticada, luminosa e detalhada"
+    };
+    const selectedStyle = stylePrompts[avatarStyle] || avatarStyle || stylePrompts.pixar;
     const prompt = [
       "Crie um avatar quadrado estilizado para foto de perfil.",
       "Use a imagem enviada apenas como referencia da pessoa.",
-      "Transforme em uma ilustracao premium inspirada em animacao disney pixar, com acabamento cinematografico tipo 4k.",
+      `Estilo solicitado pelo usuario: ${selectedStyle}.`,
       "Mostre somente uma pessoa, centralizada, do peito para cima ou close no rosto.",
-      "Mantenha semelhanca facial, simpatia e expressao acolhedora.",
+      "Preserve claramente a identidade e os tracos reconheciveis.",
+      "Deixe a pessoa sutilmente mais bonita e suavemente mais em forma, sem exagero, com expressao acolhedora e acabamento 4k.",
+      avatarInstructions
+        ? `Instrucoes adicionais do usuario, que devem ter prioridade sobre o estilo padrao: ${avatarInstructions}.`
+        : "",
       "Nao escreva texto, letras, numeros, molduras ou marcas."
-    ].join(" ");
+    ].filter(Boolean).join(" ");
 
     const formData = new FormData();
     formData.append("model", "gpt-image-1");
@@ -8924,11 +8981,14 @@ async function handleProject200ProfileAvatarGenerateRequest(request, response, p
     const profile = await updateProject200ProfileAvatar(authUser.id, profileId, {
       avatarDataUrl: `data:image/png;base64,${b64}`
     });
+    await markProject200OnboardingAvatarComplete(authUser.id);
+    const onboarding = await getProject200Onboarding(authUser.id);
 
     sendJson(response, 200, {
       ok: true,
       model: "gpt-image-1",
       profile,
+      onboarding,
       feedback: `Avatar atualizado com gpt-image-1 para ${profile.name}.`
     });
   } catch (error) {
@@ -11520,6 +11580,7 @@ const server = http.createServer(async (request, response) => {
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const app = typeof body.app === "string" ? body.app.trim().toLowerCase() : "";
 
     if (name.length < 2) {
       sendJson(response, 400, { error: "Nome invalido." });
@@ -11545,13 +11606,18 @@ const server = http.createServer(async (request, response) => {
       }
 
       const user = await createUser({ name, username, password });
+      const onboarding = app === "project200"
+        ? await initializeProject200Onboarding(user.id)
+        : null;
+      user.project200_onboarding_required = Boolean(onboarding?.required);
       const session = await createSession(user.id);
 
       sendJson(response, 201, {
         ok: true,
         token: session.token,
         expiresAt: session.expiresAt.toISOString(),
-        user: sanitizeUser(user)
+        user: sanitizeUser(user),
+        onboarding
       });
     } catch (error) {
       sendJson(response, 500, {
@@ -11609,13 +11675,15 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
+      const onboarding = await getProject200Onboarding(user.id);
       const session = await createSession(user.id);
 
       sendJson(response, 200, {
         ok: true,
         token: session.token,
         expiresAt: session.expiresAt.toISOString(),
-        user: sanitizeUser(user)
+        user: sanitizeUser(user),
+        onboarding
       });
     } catch (error) {
       sendJson(response, 500, {
@@ -11637,6 +11705,35 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Erro ao encerrar sessao."
+      });
+    }
+    return;
+  }
+
+  if ((request.method === "GET" || request.method === "PATCH") && pathname === "/api/200/onboarding") {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+      if (request.method === "GET") {
+        const onboarding = await getProject200Onboarding(authUser.id);
+        sendJson(response, 200, { ok: true, onboarding });
+        return;
+      }
+      const body = await readJsonBody(request);
+      let onboarding = await saveProject200OnboardingProgress(authUser.id, body);
+      if (body.complete === true) {
+        const profileName = await resolveProject200ProfileName(authUser.id, body.profile, {
+          fallbackToDefault: true
+        });
+        await setProject200MarinPersona(authUser.id, profileName, onboarding.selectedPersona);
+        onboarding = await completeProject200Onboarding(authUser.id);
+      }
+      sendJson(response, 200, { ok: true, onboarding });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar o onboarding."
       });
     }
     return;
@@ -11701,6 +11798,7 @@ const server = http.createServer(async (request, response) => {
 
       const contractorState = await getUserContractorState(user.id);
       const project200Profile = await getProject200AssignedProfile(user.id);
+      const onboarding = await getProject200Onboarding(user.id);
 
       sendJson(response, 200, {
         ok: true,
@@ -11709,7 +11807,8 @@ const server = http.createServer(async (request, response) => {
           is_contractor: contractorState.isContractor,
           contractor_event_id: contractorState.contractorEventId,
           project200_profile: project200Profile || null
-        })
+        }),
+        onboarding
       });
     } catch (error) {
       sendJson(response, 500, {
@@ -13087,6 +13186,10 @@ void bootstrapMiniCourseJobsQueue();
 void ensureEscreverSchema().catch((error) => {
   console.error("Falha ao preparar a area /escrever:", error);
 });
+void ensureProject200OnboardingSchema().catch((error) => {
+  console.error("Falha ao preparar o onboarding do /200:", error);
+});
+
 
 server.listen(PORT, () => {
   console.log(`Servidor online em http://localhost:${PORT}`);
