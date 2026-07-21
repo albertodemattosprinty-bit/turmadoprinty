@@ -15926,13 +15926,28 @@ profileRenameConfirmButton?.addEventListener("click", () => {
   void saveProfileRename();
 });
 logoutProject200Button?.addEventListener("click", () => {
-  const shouldLogout = window.confirm("Deseja sair do login salvo neste aparelho?");
-  if (!shouldLogout) {
-    return;
-  }
-  clearProject200SessionState();
-  closeModal("optionsModal");
-  redirectToProject200Login();
+  void (async () => {
+    const shouldLogout = window.confirm("Deseja sair do login salvo neste aparelho?");
+    if (!shouldLogout) {
+      return;
+    }
+    const token = getToken();
+    try {
+      if (token) {
+        await fetch(getApiUrl("/api/auth/logout"), {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(3000) : undefined
+        });
+      }
+    } catch {
+      // A limpeza local continua mesmo se o aparelho estiver offline.
+    } finally {
+      clearProject200SessionState();
+      closeModal("optionsModal");
+      redirectToProject200Login();
+    }
+  })();
 });
 toggleMissionActionsOptionButton?.addEventListener("click", () => {
   const currentMode = normalizeMissionActionsMode(state.options.missionActionsMode);

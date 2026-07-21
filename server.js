@@ -16,7 +16,7 @@ import sharp from "sharp";
 import Stripe from "stripe";
 
 import { albums } from "./src/albums.js";
-import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, verifyPassword } from "./src/auth.js";
+import { createSession, createUser, findUserBySessionToken, findUserByUsername, parseBearerToken, revokeSessionToken, verifyPassword } from "./src/auth.js";
 import { deleteUserById, dismissAdminUserMessage, ensureAdminUsersSchema, getActiveAdminUserMessage, getUserContractorState, listUsersWithAdminData, recordNarrationUsage, recordTextTokenUsage, removeUserPlanOverride, saveUserReplyToAdminMessage, sendAdminUserMessage, setUserContractorStatus, setUserPlanOverride, touchUserPresence } from "./src/admin-users.js";
 import { createAlbumManifestStore } from "./src/album-manifests.js";
 import { canDownloadTrackForPlan } from "./src/access-rules.js";
@@ -91,7 +91,6 @@ const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || "").trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || "").trim();
 const R2_PUBLIC_BASE_URL = (process.env.R2_PUBLIC_BASE_URL || CONTENT_BASE_URL).replace(/\/+$/, "");
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
-const ADMIN_IDENTITIES = new Set(["rosemattos", "lucasm", "albertomattos"]);
 const ALBUM_ZIP_FOLDER = "album-zips";
 const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
 const MINI_COURSE_MODEL_CANDIDATES = ["gpt-5.1", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"];
@@ -163,19 +162,8 @@ const allowedCorsOrigins = new Set([
   "ionic://localhost"
 ]);
 
-function normalizeAdminIdentity(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/gi, "")
-    .trim()
-    .toLowerCase();
-}
-
 function isAdminUser(user) {
-  const username = normalizeAdminIdentity(user?.username);
-  const name = normalizeAdminIdentity(user?.name);
-  return ADMIN_IDENTITIES.has(username) || ADMIN_IDENTITIES.has(name);
+  return String(user?.role || "").trim().toUpperCase() === "ADMIN";
 }
 
 function isAllowedCorsOrigin(origin) {
@@ -11632,6 +11620,23 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Erro ao fazer login."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/auth/logout") {
+    const token = parseBearerToken(request.headers.authorization);
+    if (!token) {
+      sendJson(response, 401, { error: "Token ausente." });
+      return;
+    }
+    try {
+      const revoked = await revokeSessionToken(token);
+      sendJson(response, 200, { ok: true, revoked });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: error instanceof Error ? error.message : "Erro ao encerrar sessao."
       });
     }
     return;

@@ -7,6 +7,7 @@ create table if not exists users (
   email text not null unique,
   password_hash text not null,
   email_verified boolean not null default false,
+  role text not null default 'USER',
   created_at timestamptz not null default now(),
   last_seen_at timestamptz
 );
@@ -14,6 +15,24 @@ create table if not exists users (
 alter table users add column if not exists email_verified boolean not null default false;
 alter table users add column if not exists username text;
 alter table users add column if not exists last_seen_at timestamptz;
+alter table users add column if not exists role text not null default 'USER';
+update users set role = 'USER' where role is null or upper(role) not in ('USER', 'ADMIN');
+
+create table if not exists auth_security_migrations (
+  migration_key text primary key,
+  applied_at timestamptz not null default now()
+);
+
+with applied as (
+  insert into auth_security_migrations (migration_key)
+  values ('bootstrap-legacy-admin-roles-v1')
+  on conflict (migration_key) do nothing
+  returning migration_key
+)
+update users
+set role = 'ADMIN'
+where exists (select 1 from applied)
+  and lower(coalesce(username, '')) = any(array['rosemattos', 'lucasm', 'albertomattos']);
 create unique index if not exists idx_users_username on users(username);
 
 create table if not exists user_sessions (
@@ -21,11 +40,26 @@ create table if not exists user_sessions (
   user_id uuid not null references users(id) on delete cascade,
   token_hash text not null unique,
   created_at timestamptz not null default now(),
-  expires_at timestamptz not null
+  expires_at timestamptz not null,
+  revoked_at timestamptz,
+  last_used_at timestamptz
 );
 
+alter table user_sessions add column if not exists revoked_at timestamptz;
+alter table user_sessions add column if not exists last_used_at timestamptz;
 create index if not exists idx_user_sessions_user_id on user_sessions(user_id);
+create index if not exists idx_user_sessions_active_token on user_sessions(token_hash) where revoked_at is null;
 create index if not exists idx_user_sessions_expires_at on user_sessions(expires_at);
+
+create table if not exists user_data_encryption_keys (
+  user_id uuid primary key references users(id) on delete cascade,
+  wrapped_key bytea not null,
+  wrapped_iv bytea not null,
+  wrapped_tag bytea not null,
+  kek_version integer not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
 create table if not exists email_verification_codes (
   id uuid primary key default gen_random_uuid(),

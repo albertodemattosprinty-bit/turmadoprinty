@@ -12,6 +12,12 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: PROJECT200_DATA_KEK
+        sync: false
+      - key: PROJECT200_DATA_KEK_VERSION
+        value: 1
+      - key: PROJECT200_DATA_ENCRYPTION_REQUIRED
+        value: false
       - key: CONTENT_BASE_URL
         value: https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev
       - key: R2_ACCOUNT_ID

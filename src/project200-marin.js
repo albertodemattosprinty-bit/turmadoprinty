@@ -1,4 +1,7 @@
+import crypto from "node:crypto";
+
 import { query } from "./db.js";
+import { decryptUserJson, encryptUserJson, ensurePrivacyEncryptionSchema, getPrivacyEncryptionStatus } from "./privacy-crypto.js";
 
 export const PROJECT200_MARIN_PERSONAS = Object.freeze([
   { key: "marin", name: "Marin" },
@@ -43,21 +46,39 @@ function normalizeProfileName(value) {
   return String(value || "Usuario").trim().slice(0, 90) || "Usuario";
 }
 
-function normalizeMessage(row) {
+function messageEncryptionContext(messageId, field) {
+  return `project200-marin-message:${messageId}:${field}`;
+}
+
+async function normalizeMessage(userId, row) {
+  let content = String(row.content || "");
+  let storedProposals = Array.isArray(row.proposals) ? row.proposals : [];
+  if (Number(row.encryption_version) >= 1 && row.content_encrypted) {
+    content = String(await decryptUserJson(
+      userId,
+      row.content_encrypted,
+      messageEncryptionContext(row.id, "content")
+    ) || "");
+    storedProposals = await decryptUserJson(
+      userId,
+      row.proposals_encrypted,
+      messageEncryptionContext(row.id, "proposals")
+    ) || [];
+  }
   const applicationByKey = new Map(
     (Array.isArray(row.applications) ? row.applications : []).map((application) => [
       String(application?.proposalKey || ""),
       String(application?.status || "").toUpperCase()
     ])
   );
-  const proposals = (Array.isArray(row.proposals) ? row.proposals : []).map((proposal) => ({
+  const proposals = (Array.isArray(storedProposals) ? storedProposals : []).map((proposal) => ({
     ...proposal,
     _applied: ["PROCESSING", "APPLIED"].includes(applicationByKey.get(String(proposal?.key || "")))
   }));
   return {
     id: row.id,
     role: row.role,
-    content: String(row.content || ""),
+    content,
     proposals,
     model: row.model_id || "",
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null
@@ -65,6 +86,7 @@ function normalizeMessage(row) {
 }
 
 export async function ensureProject200MarinSchema() {
+  await ensurePrivacyEncryptionSchema();
   await query(`
     create table if not exists project200_marin_prompts (
       prompt_key text primary key,
@@ -107,6 +129,9 @@ export async function ensureProject200MarinSchema() {
       created_at timestamptz not null default now()
     );
   `);
+  await query("alter table project200_marin_messages add column if not exists content_encrypted jsonb;");
+  await query("alter table project200_marin_messages add column if not exists proposals_encrypted jsonb;");
+  await query("alter table project200_marin_messages add column if not exists encryption_version integer not null default 0;");
   await query("create index if not exists idx_project200_marin_messages_conversation_created on project200_marin_messages(conversation_id, created_at desc);");
   await query(`
     create table if not exists project200_marin_runs (
@@ -245,6 +270,7 @@ export async function listProject200MarinMessages(userId, profileName, personaKe
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(Number(limit) || 60)));
   const result = await query(
     `select recent.id, recent.role, recent.content, recent.proposals, recent.model_id, recent.created_at,
+            recent.content_encrypted, recent.proposals_encrypted, recent.encryption_version,
             coalesce((
               select jsonb_agg(jsonb_build_object(
                 'proposalKey', application.proposal_key,
@@ -254,7 +280,8 @@ export async function listProject200MarinMessages(userId, profileName, personaKe
                where application.user_id = $2 and application.message_id = recent.id
             ), '[]'::jsonb) as applications
        from (
-         select id, role, content, proposals, model_id, created_at
+         select id, role, content, proposals, model_id, created_at,
+                content_encrypted, proposals_encrypted, encryption_version
            from project200_marin_messages
           where conversation_id = $1 and user_id = $2
           order by created_at desc
@@ -263,7 +290,7 @@ export async function listProject200MarinMessages(userId, profileName, personaKe
       order by created_at asc`,
     [conversation.id, userId, safeLimit]
   );
-  return { conversation, messages: result.rows.map(normalizeMessage) };
+  return { conversation, messages: await Promise.all(result.rows.map((row) => normalizeMessage(userId, row))) };
 }
 
 export async function appendProject200MarinMessage(userId, conversationId, payload = {}) {
@@ -272,30 +299,88 @@ export async function appendProject200MarinMessage(userId, conversationId, paylo
   const content = String(payload?.content || "").trim();
   if (!content) throw new Error("Mensagem vazia.");
   const proposals = Array.isArray(payload?.proposals) ? payload.proposals.slice(0, 8) : [];
+  const messageId = crypto.randomUUID();
+  const [contentEncrypted, proposalsEncrypted] = await Promise.all([
+    encryptUserJson(userId, content, messageEncryptionContext(messageId, "content")),
+    encryptUserJson(userId, proposals, messageEncryptionContext(messageId, "proposals"))
+  ]);
+  const encrypted = Boolean(contentEncrypted && proposalsEncrypted);
   const result = await query(
-    `insert into project200_marin_messages (conversation_id, user_id, role, content, proposals, model_id)
-     select $1, $2, $3, $4, $5::jsonb, $6
+    `insert into project200_marin_messages (
+       id, conversation_id, user_id, role, content, proposals, model_id,
+       content_encrypted, proposals_encrypted, encryption_version
+     )
+     select $1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9::jsonb, $10
       where exists (
-        select 1 from project200_marin_conversations where id = $1 and user_id = $2
+        select 1 from project200_marin_conversations where id = $2 and user_id = $3
       )
-     returning id, role, content, proposals, model_id, created_at`,
-    [conversationId, userId, role, content, JSON.stringify(proposals), String(payload?.model || "").trim()]
+     returning id, role, content, proposals, model_id, created_at,
+               content_encrypted, proposals_encrypted, encryption_version`,
+    [
+      messageId,
+      conversationId,
+      userId,
+      role,
+      encrypted ? "[encrypted]" : content,
+      JSON.stringify(encrypted ? [] : proposals),
+      String(payload?.model || "").trim(),
+      contentEncrypted ? JSON.stringify(contentEncrypted) : null,
+      proposalsEncrypted ? JSON.stringify(proposalsEncrypted) : null,
+      encrypted ? 1 : 0
+    ]
   );
   if (!result.rows[0]) throw new Error("Conversa não encontrada.");
   await query("update project200_marin_conversations set updated_at = now() where id = $1 and user_id = $2", [conversationId, userId]);
-  return normalizeMessage(result.rows[0]);
+  return normalizeMessage(userId, result.rows[0]);
 }
 
 export async function getProject200MarinMessage(userId, messageId) {
   await ensureProject200MarinSchema();
   const result = await query(
-    `select id, role, content, proposals, model_id, created_at
+    `select id, role, content, proposals, model_id, created_at,
+            content_encrypted, proposals_encrypted, encryption_version
        from project200_marin_messages
       where id = $1 and user_id = $2
       limit 1`,
     [String(messageId || "").trim(), userId]
   );
-  return result.rows[0] ? normalizeMessage(result.rows[0]) : null;
+  return result.rows[0] ? normalizeMessage(userId, result.rows[0]) : null;
+}
+
+export async function migrateProject200MarinMessagesEncryption({ batchSize = 100 } = {}) {
+  await ensureProject200MarinSchema();
+  if (!getPrivacyEncryptionStatus().enabled) {
+    throw new Error("PROJECT200_DATA_KEK precisa estar configurada antes da migracao.");
+  }
+  const safeBatchSize = Math.max(1, Math.min(500, Math.trunc(Number(batchSize) || 100)));
+  const result = await query(
+    `select id, user_id, content, proposals
+       from project200_marin_messages
+      where encryption_version = 0
+      order by created_at asc
+      limit $1`,
+    [safeBatchSize]
+  );
+  let encrypted = 0;
+  for (const row of result.rows) {
+    const [contentEncrypted, proposalsEncrypted] = await Promise.all([
+      encryptUserJson(row.user_id, String(row.content || ""), messageEncryptionContext(row.id, "content")),
+      encryptUserJson(row.user_id, Array.isArray(row.proposals) ? row.proposals : [], messageEncryptionContext(row.id, "proposals"))
+    ]);
+    const updated = await query(
+      `update project200_marin_messages
+          set content = '[encrypted]',
+              proposals = '[]'::jsonb,
+              content_encrypted = $3::jsonb,
+              proposals_encrypted = $4::jsonb,
+              encryption_version = 1
+        where id = $1 and user_id = $2 and encryption_version = 0
+        returning id`,
+      [row.id, row.user_id, JSON.stringify(contentEncrypted), JSON.stringify(proposalsEncrypted)]
+    );
+    if (updated.rows[0]) encrypted += 1;
+  }
+  return { scanned: result.rows.length, encrypted };
 }
 
 export async function recordProject200MarinRun(userId, conversationId, payload = {}) {
