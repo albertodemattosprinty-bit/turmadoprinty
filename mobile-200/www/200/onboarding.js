@@ -475,12 +475,34 @@ export function initializeProject200OnboardingUi(config) {
     const data = onboarding || {};
     state.currentStep = Math.max(1, Math.min(4, Number(data.currentStep) || 1));
     state.educationPage = Math.max(0, Math.min(EDUCATION.length - 1, Number(data.educationPage) || 0));
-    state.selectedPersona = String(data.selectedPersona || state.selectedPersona || "");
-    state.avatarCompleted = Boolean(data.avatarCompleted || state.avatarCompleted);
+    if (Object.prototype.hasOwnProperty.call(data, "selectedPersona")) {
+      state.selectedPersona = String(data.selectedPersona || "");
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "avatarCompleted")) {
+      state.avatarCompleted = Boolean(data.avatarCompleted);
+    }
     const personaIndex = PERSONAS.findIndex(function (persona) {
       return persona.key === state.selectedPersona;
     });
-    if (personaIndex >= 0) state.personaIndex = personaIndex;
+    state.personaIndex = personaIndex >= 0 ? personaIndex : 0;
+  }
+
+  async function start() {
+    const response = await fetch(getApiUrl("/api/200/onboarding/start"), {
+      method: "POST",
+      headers: bearerHeaders(getToken())
+    });
+    const data = await readResponse(response);
+    if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
+    state.photoFile = null;
+    state.photoUrl = "";
+    state.generatedUrl = "";
+    if (photoInput) photoInput.value = "";
+    if (typeof options.loadProfiles === "function") {
+      await options.loadProfiles();
+    }
+    await show(data.onboarding || { required: true, currentStep: 1, educationPage: 0 });
+    return data.onboarding || null;
   }
 
   async function show(onboarding) {
@@ -505,6 +527,7 @@ export function initializeProject200OnboardingUi(config) {
   }
 
   return {
+    start: start,
     show: show,
     hide: hide,
     isActive: function () { return state.active; }

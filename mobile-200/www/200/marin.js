@@ -285,7 +285,16 @@ export function initializeProject200MarinUi(dependencies = {}) {
       state.profile = String(payload?.profile || profile);
       state.personaKey = String(payload?.personaKey || "marin");
       state.personaName = String(payload?.personaName || "Marin");
-      state.personas = Array.isArray(payload?.personas) && payload.personas.length ? payload.personas : state.personas;
+      if (Array.isArray(payload?.personas) && payload.personas.length) {
+        state.personas = payload.personas.map((persona) => {
+          const fallback = DEFAULT_PERSONAS.find((item) => item.key === persona?.key) || {};
+          return {
+            ...fallback,
+            ...persona,
+            avatar: String(persona?.avatar || fallback.avatar || "")
+          };
+        });
+      }
       state.generalPrompt = String(payload?.generalPrompt || "");
       state.isAdmin = Boolean(payload?.isAdmin);
       state.messages = Array.isArray(payload?.messages) ? payload.messages : [];

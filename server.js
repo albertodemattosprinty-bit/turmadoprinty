@@ -68,7 +68,7 @@ import { createProject200Profile, deleteProject200Profile, listProject200Profile
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints } from "./src/project200-friends.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
-import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
+import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2156,7 +2156,7 @@ function isProject200OnboardingRequestAllowed(request) {
   if (pathname === "/api/auth/me" || pathname === "/api/auth/logout") {
     return true;
   }
-  if (pathname === "/api/200/onboarding") {
+  if (pathname === "/api/200/onboarding" || pathname === "/api/200/onboarding/start") {
     return true;
   }
   if (request.method === "GET" && pathname === "/api/200/profiles") {
@@ -11705,6 +11705,22 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Erro ao encerrar sessao."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/onboarding/start") {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) {
+        return;
+      }
+      const onboarding = await restartProject200Onboarding(authUser.id);
+      sendJson(response, 200, { ok: true, onboarding });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel iniciar o onboarding."
       });
     }
     return;

@@ -9175,3 +9175,70 @@ body[data-background-theme="white"] .marin-proposal-meta {
     grid-template-rows: 68px minmax(0, 1fr) 56px 56px 0 54px;
   }
 }
+
+/* Home: marca, acesso ao Marin e entrada manual no onboarding. */
+.running-home-brand {
+  display: none;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout {
+  grid-template-rows:
+    clamp(108px, 18dvh, 150px)
+    minmax(0, 1fr)
+    clamp(58px, 9dvh, 76px)
+    clamp(70px, 10dvh, 88px)
+    0
+    clamp(56px, 10dvh, 74px);
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-home-brand {
+  display: flex;
+  grid-row: 1;
+  align-self: stretch;
+  justify-self: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  z-index: 3;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-home-logo {
+  display: block;
+  grid-row: auto;
+  align-self: auto;
+  justify-self: auto;
+  width: min(40vw, 210px);
+  max-height: clamp(50px, 8dvh, 72px);
+  opacity: 0.3;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .marin-home-entry {
+  width: auto;
+  min-height: 32px;
+  margin: 0;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 10px;
+  gap: 7px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  font-size: clamp(0.88rem, 3vw, 1.05rem);
+  white-space: nowrap;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .marin-home-entry svg {
+  width: 19px;
+  height: 19px;
+  flex-basis: 19px;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-next-panel {
+  display: none !important;
+}

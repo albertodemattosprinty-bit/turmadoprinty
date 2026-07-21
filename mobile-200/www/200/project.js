@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
-import { initializeProject200MarinUi } from "./marin.js?v=20260721-onboarding-v1";
-import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260721-onboarding-v1";
+import { initializeProject200MarinUi } from "./marin.js?v=20260721-home-onboarding-v2";
+import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260721-home-onboarding-v2";
 
 import {
   MINUTE_CUE_INTERVALS,
@@ -732,6 +732,7 @@ const homeSleepButton = document.getElementById("homeSleepButton");
 const runningHomeSocialButton = document.getElementById("runningHomeSocialButton");
 const runningHomeSocialBadge = document.getElementById("runningHomeSocialBadge");
 const runningHomeSleepButton = document.getElementById("runningHomeSleepButton");
+const runningHomeLogoButton = document.getElementById("runningHomeLogoButton");
 const socialModal = document.getElementById("socialModal");
 const socialModalShell = document.getElementById("socialModalShell");
 const socialModalLoading = document.getElementById("socialModalLoading");
@@ -793,6 +794,7 @@ const loadingIconByArea = {
 let globalLoadingCount = 0;
 let globalLoadingPreferredIcon = loadingIconByArea.actions;
 let startupLoadingActive = false;
+let startupLoadingHasCompleted = false;
 let startupLoadingFallbackTimer = null;
 let globalLoadingFallbackTimer = null;
 let globalLoadingTimedOut = false;
@@ -1527,7 +1529,7 @@ function resolveLoadingIconForPath(path = "", preferredIcon = "") {
 }
 
 function beginGlobalLoading(iconSrc = "") {
-  if (startupLoadingActive) return false;
+  if (startupLoadingActive || startupLoadingHasCompleted) return false;
   globalLoadingCount += 1;
   if (globalLoadingCount === 1) {
     window.__project200LoadingShownAt = Date.now();
@@ -1588,7 +1590,7 @@ async function runWithGlobalLoading(task, options = {}) {
 }
 
 function beginStartupLoading(iconSrc = loadingIconByArea.actions) {
-  if (startupLoadingActive) return;
+  if (startupLoadingActive || startupLoadingHasCompleted) return;
   startupLoadingActive = true;
   window.__project200LoadingShownAt = Date.now();
   state.homeClockReady = false;
@@ -1620,6 +1622,7 @@ function forceEndStartupLoading() {
 
 function endStartupLoading() {
   if (!startupLoadingActive) return;
+  startupLoadingHasCompleted = true;
   startupLoadingActive = false;
   if (startupLoadingFallbackTimer) {
     window.clearTimeout(startupLoadingFallbackTimer);
@@ -13606,8 +13609,13 @@ async function bootstrapProject200App() {
     await refreshHomeSnapshot({ force: true });
     project200LoginOverlay?.classList.remove("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
-    revealInitialHomeIfReady();
-    void musicStationsPromise.then(() => revealInitialHomeIfReady());
+    if (startupLoadingActive) {
+      revealInitialHomeIfReady();
+      void musicStationsPromise.then(() => revealInitialHomeIfReady());
+    } else {
+      openPrimaryRunningSurface();
+      void musicStationsPromise.then(() => renderHomeRunningTask());
+    }
   } catch (error) {
     if (isAuthErrorMessage(error?.message)) {
       clearProject200SessionState();
@@ -13620,7 +13628,7 @@ async function bootstrapProject200App() {
       window.clearTimeout(homeBootstrapRetryTimer);
       homeBootstrapRetryTimer = null;
     }
-    if (getToken() && !project200OnboardingUi.isActive() && !revealInitialHomeIfReady()) {
+    if (startupLoadingActive && getToken() && !project200OnboardingUi.isActive() && !revealInitialHomeIfReady()) {
       homeBootstrapRetryTimer = window.setTimeout(() => {
         homeBootstrapRetryTimer = null;
         if (!state.runningPlayer.stationsLoaded) void loadRunningMusicStations().then(() => revealInitialHomeIfReady());
@@ -15981,6 +15989,37 @@ toggleMissionActionsOptionButton?.addEventListener("click", () => {
   renderOptionsModal();
   renderActions();
 });
+async function openProject200OnboardingFromLogo() {
+  if (project200OnboardingUi.isActive()) return;
+  if (!getToken()) {
+    redirectToProject200Login();
+    return;
+  }
+  runningHomeLogoButton?.classList.add("is-loading");
+  runningHomeLogoButton?.setAttribute("aria-busy", "true");
+  try {
+    const onboarding = await project200OnboardingUi.start();
+    state.project200Onboarding = onboarding;
+    if (state.authUser) state.authUser.onboardingRequired = true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Nao foi possivel abrir o onboarding.";
+    console.error(message);
+    window.alert(message);
+  } finally {
+    runningHomeLogoButton?.classList.remove("is-loading");
+    runningHomeLogoButton?.removeAttribute("aria-busy");
+  }
+}
+
+runningHomeLogoButton?.addEventListener("click", () => {
+  void openProject200OnboardingFromLogo();
+});
+runningHomeLogoButton?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  void openProject200OnboardingFromLogo();
+});
+
 homeRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();
 });

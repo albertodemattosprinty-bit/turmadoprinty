@@ -81,6 +81,30 @@ export async function initializeProject200Onboarding(userId) {
   return getProject200Onboarding(userId);
 }
 
+export async function restartProject200Onboarding(userId) {
+  await ensureProject200OnboardingSchema();
+  await query(
+    `with restarted as (
+       insert into project200_user_onboarding (user_id, status, current_step, education_page)
+       values ($1, 'PENDING', 1, 0)
+       on conflict (user_id) do update
+         set status = 'PENDING',
+             current_step = 1,
+             education_page = 0,
+             selected_persona = null,
+             avatar_completed = false,
+             completed_at = null,
+             updated_at = now()
+       returning user_id
+     )
+     update users
+        set project200_onboarding_required = true
+      where id = $1 and exists (select 1 from restarted)`,
+    [userId]
+  );
+  return getProject200Onboarding(userId);
+}
+
 export async function getProject200Onboarding(userId) {
   await ensureProject200OnboardingSchema();
   const result = await query(

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260721-onboarding-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260721-home-onboarding-v2" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-onboarding-v1" />
 </head>
 <body data-background-theme="edge">
@@ -157,7 +157,13 @@
           <svg class="hub-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.4A8.8 8.8 0 0 1 9.6 3.8a9.2 9.2 0 1 0 10.6 10.6z" fill="currentColor"/></svg>
         </button>
       </div>
-      <img class="running-home-logo" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" />
+      <div class="running-home-brand">
+        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" aria-label="Abrir onboarding do iLife" />
+        <button class="marin-home-entry" type="button" id="marinHomeEntryButton" aria-label="Conversar com Marin">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
+        </button>
+      </div>
       <div class="running-task-title-row">
         <img class="running-task-category-icon" id="runningTaskCategoryIcon" src="/200/aspect-icons/trabalho.svg" alt="Aspecto atual" hidden />
         <div class="running-task-name" id="runningTaskName"></div>
@@ -179,11 +185,6 @@
       </div>
       <div class="running-completion-label" id="runningCompletionLabel"></div>
       <div class="running-next-panel" id="runningNextPanel">
-        <button class="marin-home-entry" type="button" id="marinHomeEntryButton" aria-label="Conversar com Marin">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
-        </button>
-        <span class="marin-home-entry-hint">Segure para escolher outra personalidade</span>
         <div class="running-task-next-label"></div>
         <div class="running-task-next-row">
           <div class="running-task-next" id="runningTaskNextName"></div>
@@ -1589,7 +1590,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260721-onboarding-v1"></script>
+  <script type="module" src="/200/project.js?v=20260721-home-onboarding-v2"></script>
   <script src='/speech-input-kit.js?v=20260720-keyboard-v1'></script>
 </body>
 </html>
