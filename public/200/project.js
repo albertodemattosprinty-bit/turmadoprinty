@@ -1,4 +1,5 @@
 import { getApiUrl } from "../api.js";
+import { initializeProject200MarinUi } from "./marin.js?v=20260721-marin-v1";
 
 import {
   MINUTE_CUE_INTERVALS,
@@ -2447,6 +2448,10 @@ function primeRunningIdleHomeShell() {
     const greeting = getRunningIdleGreeting(now);
     runningTaskNextName.textContent = greeting;
     runningTaskNextName.setAttribute("aria-label", greeting);
+    const runningIdleGreeting = document.getElementById("runningIdleGreeting");
+    if (runningIdleGreeting) {
+      runningIdleGreeting.textContent = greeting;
+    }
   }
   if (runningTaskNextTime) runningTaskNextTime.textContent = "";
   if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = true;
@@ -13575,6 +13580,7 @@ async function bootstrapProject200App() {
       return;
     }
     await ensureProject200Session();
+    void project200MarinUi.load({ silent: true });
     const musicStationsPromise = loadRunningMusicStations().catch(() => {});
     await refreshHomeSnapshot({ force: true });
     project200LoginOverlay?.classList.remove("active");
@@ -16181,7 +16187,14 @@ if (runningAudio) {
 handleSwipe(runningPlayerTrack, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
 handleSwipe(runningTaskModalElement, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
 
-updateConversationMicButtonVisual();
+const project200MarinUi = initializeProject200MarinUi({
+  apiRequest,
+  openModal,
+  closeModal,
+  formatMoney,
+  getProfileName: () => String(state.selectedProfile || getDefaultProfileName()).trim(),
+  arrayBufferToBase64
+});
 document.body.classList.add("project-no-select");
 const isEditableTarget = (target) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
 document.addEventListener("copy", (event) => {

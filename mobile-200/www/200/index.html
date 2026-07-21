@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260720-missions-no-loader-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260721-marin-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -171,12 +171,18 @@
           <circle class="running-progress-ring-fill" id="runningTaskProgressRing" cx="60" cy="60" r="48"></circle>
         </svg>
         <div class="running-task-percent" id="runningTaskPercent"></div>
+        <div class="running-idle-greeting" id="runningIdleGreeting">Bom dia</div>
         <button class="running-circle-toggle running-circle-toggle-right" id="runningModeTimeBtn" type="button" aria-label="Mostrar tempo">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
         </button>
       </div>
       <div class="running-completion-label" id="runningCompletionLabel"></div>
       <div class="running-next-panel" id="runningNextPanel">
+        <button class="marin-home-entry" type="button" id="marinHomeEntryButton" aria-label="Conversar com Marin">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
+        </button>
+        <span class="marin-home-entry-hint">Segure para escolher outra personalidade</span>
         <div class="running-task-next-label"></div>
         <div class="running-task-next-row">
           <div class="running-task-next" id="runningTaskNextName"></div>
@@ -1518,7 +1524,71 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260720-missions-no-loader-v1"></script>
+  <section class="workspace-modal marin-persona-modal" id="marinPersonaModal" aria-hidden="true" aria-label="Escolher personalidade">
+    <div class="marin-persona-shell">
+      <header class="marin-persona-header">
+        <button class="marin-round-button" type="button" data-close-modal aria-label="Voltar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div>
+          <span>iLife</span>
+          <h2>Escolha sua companhia</h2>
+        </div>
+        <button class="marin-admin-star" type="button" id="marinGeneralPromptButton" aria-label="Editar prompt geral" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.1 6.3L22 9.3l-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z"/></svg>
+        </button>
+      </header>
+      <div class="marin-persona-list" id="marinPersonaList"></div>
+      <p class="marin-persona-help" id="marinPersonaHelp">Toque para escolher. Administradores podem segurar por 500 ms para editar a personalidade.</p>
+    </div>
+  </section>
+
+  <section class="workspace-modal marin-prompt-modal" id="marinPromptModal" aria-hidden="true" aria-label="Editar prompt da personalidade">
+    <div class="marin-prompt-shell">
+      <header class="marin-prompt-header">
+        <button class="marin-round-button" type="button" id="marinPromptBackButton" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div>
+          <span>Prompt administrativo</span>
+          <h2 id="marinPromptTitle">Marin</h2>
+        </div>
+      </header>
+      <textarea class="marin-prompt-textarea" id="marinPromptTextarea" maxlength="30000" spellcheck="true" autocomplete="off"></textarea>
+      <p class="marin-prompt-status" id="marinPromptStatus" aria-live="polite"></p>
+      <button class="marin-prompt-save" type="button" id="marinPromptSaveButton">Salvar prompt</button>
+    </div>
+  </section>
+
+  <section class="workspace-modal marin-chat-modal" id="marinChatModal" aria-hidden="true" aria-label="Conversa com Marin">
+    <div class="marin-chat-shell">
+      <header class="marin-chat-header">
+        <button class="marin-round-button" type="button" data-close-modal aria-label="Voltar para a home">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="marin-chat-identity">
+          <span class="marin-chat-presence" aria-hidden="true"></span>
+          <div><strong id="marinChatPersonaName">Marin</strong><small>IA do iLife</small></div>
+        </div>
+        <button class="marin-round-button" type="button" id="marinChatPersonaButton" aria-label="Trocar personalidade">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.2a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4 0-7 2-7 4.5V20h14v-1.3c0-2.5-3-4.5-7-4.5Z"/></svg>
+        </button>
+      </header>
+      <main class="marin-chat-messages" id="marinChatMessages" aria-live="polite"></main>
+      <div class="marin-chat-status" id="marinChatStatus" aria-live="polite"></div>
+      <form class="marin-chat-composer" id="marinChatForm">
+        <textarea id="marinChatInput" rows="1" maxlength="4000" enterkeyhint="send" placeholder="Converse sobre sua vida..." aria-label="Mensagem"></textarea>
+        <button class="marin-chat-mic" type="button" id="marinChatMicButton" aria-label="Falar mensagem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button class="marin-chat-send" type="submit" id="marinChatSendButton" aria-label="Enviar mensagem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 20 18-8L3 4v6l12 2-12 2z"/></svg>
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <script type="module" src="/200/project.js?v=20260721-marin-v1"></script>
   <script src='/speech-input-kit.js?v=20260720-keyboard-v1'></script>
 </body>
 </html>

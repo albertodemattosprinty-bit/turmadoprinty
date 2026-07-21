@@ -1915,7 +1915,7 @@ body.screen-locked .project-login-overlay.active {
     clamp(72px, 14dvh, 118px)
     minmax(0, 1fr)
     clamp(58px, 9dvh, 76px)
-    clamp(44px, 8dvh, 66px)
+    clamp(70px, 10dvh, 88px)
     0
     clamp(56px, 10dvh, 74px);
   justify-items: center;
@@ -8531,4 +8531,645 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
 #missionProgressModal .mission-progress-confirm-btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+
+/* Marin: home definitiva, personalidades e conversa imersiva. */
+.project-shell {
+  display: none !important;
+}
+
+.running-idle-greeting {
+  display: none;
+}
+
+.marin-home-entry,
+.marin-home-entry-hint {
+  display: none;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-idle-greeting {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 64%;
+  display: block;
+  color: var(--white);
+  font-size: clamp(1.25rem, 4.6vw, 1.95rem);
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  pointer-events: none;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-next-panel {
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 7px;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next-label,
+#runningTaskModal .running-task-content.is-idle-layout .running-task-next-row,
+#runningTaskModal .running-task-content.is-idle-layout .running-task-start-btn {
+  display: none !important;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .marin-home-entry {
+  width: min(92%, 420px);
+  min-height: 54px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 12px 24px;
+  background: rgba(5, 20, 54, 0.18);
+  color: var(--white);
+  box-shadow: 0 16px 42px rgba(1, 17, 48, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: clamp(1.02rem, 4vw, 1.32rem);
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .marin-home-entry svg {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .marin-home-entry strong {
+  color: #fff3a4;
+  font-weight: 800;
+}
+
+#runningTaskModal .running-task-content.is-idle-layout .marin-home-entry-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.69rem;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.marin-persona-modal,
+.marin-prompt-modal,
+.marin-chat-modal {
+  z-index: 3600;
+  background: inherit;
+  color: var(--white);
+}
+
+.marin-persona-modal.active,
+.marin-prompt-modal.active,
+.marin-chat-modal.active {
+  display: block;
+}
+
+.marin-persona-shell,
+.marin-prompt-shell,
+.marin-chat-shell {
+  width: min(100%, 760px);
+  min-height: 100dvh;
+  height: 100dvh;
+  margin: 0 auto;
+  color: var(--white);
+  background: rgba(5, 16, 42, 0.14);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.marin-persona-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    max(18px, env(safe-area-inset-right, 0px))
+    max(22px, env(safe-area-inset-bottom, 0px))
+    max(18px, env(safe-area-inset-left, 0px));
+}
+
+.marin-persona-header,
+.marin-prompt-header,
+.marin-chat-header {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+}
+
+.marin-persona-header > div,
+.marin-prompt-header > div {
+  min-width: 0;
+  text-align: center;
+}
+
+.marin-persona-header span,
+.marin-prompt-header span {
+  display: block;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.marin-persona-header h2,
+.marin-prompt-header h2 {
+  margin: 3px 0 0;
+  color: var(--white);
+  font-size: clamp(1.18rem, 4vw, 1.55rem);
+}
+
+.marin-round-button,
+.marin-admin-star {
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--white);
+}
+
+.marin-round-button svg,
+.marin-admin-star svg {
+  width: 23px;
+  height: 23px;
+}
+
+.marin-admin-star {
+  background: #1168d8;
+  color: #ffd84d;
+  box-shadow: 0 10px 26px rgba(5, 61, 150, 0.32);
+}
+
+.marin-admin-star[hidden] {
+  display: none !important;
+}
+
+.marin-persona-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  scrollbar-width: none;
+}
+
+.marin-persona-list::-webkit-scrollbar {
+  display: none;
+}
+
+.marin-persona-option {
+  width: 100%;
+  min-height: 68px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 20px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--white);
+  text-align: left;
+}
+
+.marin-persona-option.is-selected {
+  border-color: rgba(134, 255, 202, 0.72);
+  background: rgba(35, 209, 161, 0.17);
+}
+
+.marin-persona-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, rgba(20, 117, 255, 0.92), rgba(25, 215, 168, 0.88));
+  color: #fff;
+  font-weight: 800;
+}
+
+.marin-persona-option strong {
+  display: block;
+  font-size: 1.06rem;
+}
+
+.marin-persona-option small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.73rem;
+}
+
+.marin-persona-check {
+  color: #7fffc5;
+  font-size: 1.2rem;
+  opacity: 0;
+}
+
+.marin-persona-option.is-selected .marin-persona-check {
+  opacity: 1;
+}
+
+.marin-persona-help {
+  min-height: 2.4em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.marin-prompt-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 14px;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    max(18px, env(safe-area-inset-right, 0px))
+    max(22px, env(safe-area-inset-bottom, 0px))
+    max(18px, env(safe-area-inset-left, 0px));
+}
+
+.marin-prompt-header {
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+}
+
+.marin-prompt-textarea {
+  width: 100%;
+  min-height: 0;
+  resize: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(4, 13, 36, 0.3);
+  color: var(--white);
+  font: 500 0.92rem/1.55 "Exo 2", sans-serif;
+  outline: none;
+  overflow-y: auto;
+}
+
+.marin-prompt-textarea:focus {
+  border-color: rgba(125, 240, 197, 0.74);
+}
+
+.marin-prompt-status {
+  min-height: 1.2em;
+  margin: 0;
+  color: #fff0a8;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.marin-prompt-save {
+  min-height: 52px;
+  border: 0;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #147df0, #0b58c2);
+  color: #fff;
+  font-weight: 800;
+}
+
+.marin-chat-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+}
+
+.marin-chat-header {
+  min-height: calc(72px + env(safe-area-inset-top, 0px));
+  padding:
+    max(12px, env(safe-area-inset-top, 0px))
+    max(14px, env(safe-area-inset-right, 0px))
+    10px
+    max(14px, env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(5, 17, 47, 0.14);
+}
+
+.marin-chat-identity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  text-align: left;
+}
+
+.marin-chat-presence {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 9px;
+  background: #5bf0a7;
+  box-shadow: 0 0 14px rgba(91, 240, 167, 0.8);
+}
+
+.marin-chat-identity strong,
+.marin-chat-identity small {
+  display: block;
+}
+
+.marin-chat-identity strong {
+  color: var(--white);
+  font-size: 1.05rem;
+}
+
+.marin-chat-identity small {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.marin-chat-messages {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px max(14px, env(safe-area-inset-right, 0px)) 14px max(14px, env(safe-area-inset-left, 0px));
+  scroll-behavior: smooth;
+}
+
+.marin-chat-empty {
+  margin: auto;
+  width: min(88%, 380px);
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.marin-message {
+  width: fit-content;
+  max-width: min(84%, 590px);
+  border-radius: 20px;
+  padding: 11px 14px;
+  color: #fff;
+  font-size: 0.94rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+  animation: marinMessageIn 180ms ease-out both;
+}
+
+@keyframes marinMessageIn {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.marin-message.is-user {
+  align-self: flex-end;
+  border-bottom-right-radius: 6px;
+  background: linear-gradient(145deg, rgba(18, 116, 239, 0.95), rgba(10, 86, 194, 0.96));
+}
+
+.marin-message.is-assistant {
+  align-self: flex-start;
+  border-bottom-left-radius: 6px;
+  background: rgba(5, 19, 52, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.marin-message-copy {
+  white-space: pre-wrap;
+}
+
+.marin-proposal-list {
+  width: min(92%, 620px);
+  align-self: flex-start;
+  display: grid;
+  gap: 8px;
+  margin: -3px 0 5px;
+}
+
+.marin-proposal-card {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 17px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  background: rgba(4, 16, 45, 0.34);
+  color: #fff;
+  text-align: left;
+  transition: border-color 180ms ease, background 180ms ease, transform 150ms ease;
+}
+
+.marin-proposal-card:active {
+  transform: scale(0.99);
+}
+
+.marin-proposal-icon {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.marin-proposal-card.is-finance .marin-proposal-icon {
+  opacity: 0.5;
+  transition: opacity 180ms ease;
+}
+
+.marin-proposal-copy {
+  min-width: 0;
+}
+
+.marin-proposal-title {
+  display: block;
+  color: #ffe26a;
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.marin-proposal-card.is-finance-income .marin-proposal-title {
+  color: #61efa6;
+}
+
+.marin-proposal-card.is-finance-expense .marin-proposal-title {
+  color: #ff7b90;
+}
+
+.marin-proposal-meta {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.marin-proposal-state {
+  min-width: 24px;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 1.15rem;
+  text-align: center;
+}
+
+.marin-proposal-card.is-applied {
+  border-color: rgba(99, 244, 164, 0.72);
+  background: rgba(29, 177, 105, 0.18);
+}
+
+.marin-proposal-card.is-applied .marin-proposal-title,
+.marin-proposal-card.is-applied .marin-proposal-state {
+  color: #67f1aa;
+}
+
+.marin-proposal-card.is-applied .marin-proposal-icon {
+  opacity: 1;
+}
+
+.marin-proposal-card.is-pending {
+  pointer-events: none;
+  opacity: 0.78;
+}
+
+.marin-chat-status {
+  min-height: 20px;
+  padding: 0 18px 5px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.72rem;
+}
+
+.marin-chat-status.is-thinking::after {
+  content: "";
+  display: inline-block;
+  width: 22px;
+  height: 8px;
+  margin-left: 7px;
+  background: radial-gradient(circle, currentColor 2px, transparent 3px) 0 50% / 8px 8px repeat-x;
+  animation: marinThinking 850ms linear infinite;
+}
+
+@keyframes marinThinking {
+  to { background-position: 8px 50%; }
+}
+
+.marin-chat-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
+  align-items: end;
+  gap: 8px;
+  padding:
+    9px
+    max(12px, env(safe-area-inset-right, 0px))
+    max(10px, env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(4, 14, 39, 0.2);
+}
+
+.marin-chat-composer textarea {
+  width: 100%;
+  min-height: 44px;
+  max-height: 132px;
+  resize: none;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 22px;
+  padding: 11px 15px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--white);
+  outline: none;
+  font: 500 0.92rem/1.35 "Exo 2", sans-serif;
+}
+
+.marin-chat-composer textarea::placeholder {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.marin-chat-mic,
+.marin-chat-send {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.marin-chat-mic {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.marin-chat-mic.is-recording {
+  background: #e84462;
+  animation: marinMicPulse 1s ease-in-out infinite;
+}
+
+@keyframes marinMicPulse {
+  50% { box-shadow: 0 0 0 8px rgba(232, 68, 98, 0.18); }
+}
+
+.marin-chat-send {
+  background: linear-gradient(145deg, #1b86f7, #0b59c3);
+}
+
+.marin-chat-mic svg,
+.marin-chat-send svg {
+  width: 21px;
+  height: 21px;
+}
+
+.marin-chat-send:disabled,
+.marin-chat-mic:disabled {
+  opacity: 0.45;
+}
+
+body[data-background-theme="white"] :is(
+  .marin-persona-shell,
+  .marin-prompt-shell,
+  .marin-chat-shell
+) {
+  color: #2f3640;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+body[data-background-theme="white"] :is(
+  .marin-persona-header h2,
+  .marin-prompt-header h2,
+  .marin-round-button,
+  .marin-persona-option,
+  .marin-chat-identity strong,
+  .marin-prompt-textarea,
+  .marin-chat-composer textarea
+) {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] :is(
+  .marin-message.is-assistant,
+  .marin-proposal-card
+) {
+  background: rgba(255, 255, 255, 0.72);
+  color: #2f3640;
+  border-color: rgba(47, 54, 64, 0.12);
+}
+
+body[data-background-theme="white"] .marin-proposal-meta {
+  color: rgba(47, 54, 64, 0.82);
+}
+
+@media (max-height: 680px) {
+  #runningTaskModal .running-task-content.is-idle-layout .marin-home-entry-hint {
+    display: none;
+  }
+
+  #runningTaskModal .running-task-content.is-idle-layout {
+    grid-template-rows: 68px minmax(0, 1fr) 56px 56px 0 54px;
+  }
 }

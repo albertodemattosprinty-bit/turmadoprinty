@@ -67,6 +67,7 @@ import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGo
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints } from "./src/project200-friends.js";
+import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +78,9 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-nano";
 const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
+const PROJECT200_MARIN_MODEL_LUNA = process.env.PROJECT200_MARIN_MODEL_LUNA || "gpt-5.6-luna";
+const PROJECT200_MARIN_MODEL_TERRA = process.env.PROJECT200_MARIN_MODEL_TERRA || "gpt-5.6-terra";
+const PROJECT200_MARIN_MODEL_SOL = process.env.PROJECT200_MARIN_MODEL_SOL || "gpt-5.6-sol";
 const OPENAI_TTS_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
@@ -3342,6 +3346,538 @@ async function handleProject200FinanceInterpret(request, response) {
     sendJson(response, 500, {
       error: "Nao foi possivel interpretar o texto financeiro.",
       details: error instanceof Error ? error.message : "Erro desconhecido."
+    });
+  }
+}
+
+const PROJECT200_MARIN_ASPECT_IDS = new Set([
+  "sono", "alimentacao", "hidratacao", "aprendizado", "trabalho", "casa",
+  "exercicios", "social", "planejamento", "higiene", "lazer", "aspecto"
+]);
+
+const PROJECT200_MARIN_REPLY_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["message", "proposals"],
+  properties: {
+    message: { type: "string", maxLength: 400 },
+    proposals: {
+      type: "array",
+      maxItems: 8,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "type", "title", "description", "aspectId", "dateLabel", "timeLabel",
+          "startAt", "endAt", "durationMinutes", "targetValue", "unitDurationMinutes",
+          "financeKind", "amountCents", "settlementType", "scheduleMode",
+          "scheduleFrequency", "scheduleConfig", "startsOn", "endsOn"
+        ],
+        properties: {
+          type: { type: "string", enum: ["action", "mission", "finance"] },
+          title: { type: "string", minLength: 2, maxLength: 90 },
+          description: { type: ["string", "null"], maxLength: 180 },
+          aspectId: { type: ["string", "null"] },
+          dateLabel: { type: ["string", "null"], maxLength: 90 },
+          timeLabel: { type: ["string", "null"], maxLength: 90 },
+          startAt: { type: ["string", "null"] },
+          endAt: { type: ["string", "null"] },
+          durationMinutes: { type: ["integer", "null"], minimum: 1, maximum: 1440 },
+          targetValue: { type: ["integer", "null"], minimum: 1, maximum: 10000 },
+          unitDurationMinutes: { type: ["integer", "null"], minimum: 0, maximum: 1440 },
+          financeKind: { type: ["string", "null"], enum: ["INCOME", "EXPENSE", null] },
+          amountCents: { type: ["integer", "null"], minimum: 1 },
+          settlementType: { type: ["string", "null"], enum: ["CASH", "FUTURE", null] },
+          scheduleMode: { type: ["string", "null"], enum: ["ONCE", "RECURRING", "FINITE", null] },
+          scheduleFrequency: { type: ["string", "null"], enum: ["NONE", "MONTHLY", "WEEKLY", "CUSTOM", null] },
+          scheduleConfig: {
+            type: ["object", "null"],
+            additionalProperties: false,
+            required: ["customMode", "daysOfMonth", "weekdays", "dates"],
+            properties: {
+              customMode: { type: ["string", "null"], enum: ["MONTHLY", "WEEKLY", "DAILY", null] },
+              daysOfMonth: { type: "array", items: { type: "integer", minimum: 1, maximum: 31 } },
+              weekdays: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 } },
+              dates: { type: "array", items: { type: "string" } }
+            }
+          },
+          startsOn: { type: ["string", "null"] },
+          endsOn: { type: ["string", "null"] }
+        }
+      }
+    }
+  }
+};
+
+function normalizeProject200MarinPersonaKey(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return PROJECT200_MARIN_PERSONAS.some((persona) => persona.key === normalized) ? normalized : "marin";
+}
+
+function getProject200MarinPersonaName(key) {
+  return PROJECT200_MARIN_PERSONAS.find((persona) => persona.key === normalizeProject200MarinPersonaKey(key))?.name || "Marin";
+}
+
+function getProject200MarinDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PROJECT200_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return values.year + "-" + values.month + "-" + values.day;
+}
+
+function shortenProject200MarinMessage(value) {
+  const message = String(value || "").replace(/\s+/g, " ").trim();
+  if (message.length <= 400) return message;
+  const clipped = message.slice(0, 397);
+  const boundary = clipped.lastIndexOf(" ");
+  return (boundary > 280 ? clipped.slice(0, boundary) : clipped).trimEnd() + "...";
+}
+
+function detectProject200MarinContextAreas(message) {
+  const normalized = String(message || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const areas = new Set();
+  if (/\b(dinheiro|financ|entrada|saida|receb|pagar|pagamento|divida|credito|debito|conta|renda|salario|valor|reais)\b/.test(normalized)) areas.add("finance");
+  if (/\b(missao|missoes|meta|habito|objetivo|vezes|repetir|progresso)\b/.test(normalized)) areas.add("missions");
+  if (/\b(acao|acoes|tarefa|tarefas|agenda|rotina|horario|hora|minuto|hoje|amanha|semana)\b/.test(normalized)) areas.add("actions");
+  if (/\b(estatistica|aspecto|barra|ponto|pontos|evolucao|desempenho|qualidade de vida|como estou|minha vida)\b/.test(normalized)) areas.add("stats");
+  if (/\b(plano de vida|planejar minha vida|organizar minha vida)\b/.test(normalized)) {
+    areas.add("actions");
+    areas.add("missions");
+    areas.add("stats");
+  }
+  return [...areas];
+}
+
+function chooseProject200MarinModel(message, areas) {
+  const normalized = String(message || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/\b(plano de vida|cinco anos|5 anos|mudar minha vida|analise profunda|todos os aspectos|estrategia de longo prazo)\b/.test(normalized)) {
+    return { model: PROJECT200_MARIN_MODEL_SOL, reason: "deep-life-plan", effort: "medium" };
+  }
+  if (areas.length || normalized.length > 120 || /\b(crie|criar|adicione|adicionar|organize|planeje)\b/.test(normalized)) {
+    return { model: PROJECT200_MARIN_MODEL_TERRA, reason: "contextual-coach", effort: "low" };
+  }
+  return { model: PROJECT200_MARIN_MODEL_LUNA, reason: "fast-conversation", effort: "none" };
+}
+
+async function buildProject200MarinUserContext(user, profileName, areas) {
+  const context = {
+    profile: profileName,
+    today: getProject200MarinDateKey(),
+    loadedAreas: areas
+  };
+  const todayKey = context.today;
+  const from = new Date(todayKey + "T00:00:00-03:00");
+  const to = new Date(from.getTime() + (8 * 24 * 60 * 60 * 1000));
+  const profileNeedle = String(profileName || "").trim().toLowerCase();
+
+  await Promise.all(areas.map(async (area) => {
+    if (area === "actions") {
+      const actions = await listUserActions(user.id, { from: from.toISOString(), to: to.toISOString() });
+      context.actions = actions
+        .filter((action) => String(action?.assignee || "").trim().toLowerCase() === profileNeedle)
+        .slice(0, 40)
+        .map((action) => ({
+          title: action.title,
+          aspectId: action.categoryId || "",
+          startAt: action.startAt,
+          endAt: action.endAt,
+          status: action.status
+        }));
+    }
+    if (area === "missions") {
+      const scoped = await listExtraGoalsByScope(user.id, profileName, "today");
+      context.missions = (Array.isArray(scoped?.goals) ? scoped.goals : []).slice(0, 40).map((goal) => ({
+        title: goal.title,
+        targetValue: goal.targetValue,
+        progressValue: goal.progressValue,
+        unitDurationMinutes: goal.unitDurationMinutes
+      }));
+    }
+    if (area === "finance") {
+      const finance = await summarizeProject200FinanceLedgerMonth(user.id, todayKey.slice(0, 7));
+      context.finance = {
+        month: finance.month,
+        balanceCents: finance.balanceCents,
+        expectedIncomeCents: finance.incomeCents,
+        expectedExpenseCents: finance.expenseCents,
+        todayEntries: Array.isArray(finance.todayEntries) ? finance.todayEntries.slice(0, 20) : [],
+        attentionEntries: Array.isArray(finance.attentionEntries) ? finance.attentionEntries.slice(0, 30) : []
+      };
+    }
+    if (area === "stats") {
+      const stats = await getStatsSummary(user.id, "today");
+      context.stats = {
+        totals: stats?.totals || {},
+        byCategory: stats?.byCategory || {},
+        byCategoryPlanned: stats?.byCategoryPlanned || {}
+      };
+    }
+  }));
+
+  return context;
+}
+
+function extractProject200MarinResponseText(payload) {
+  if (typeof payload?.output_text === "string" && payload.output_text.trim()) return payload.output_text.trim();
+  for (const item of Array.isArray(payload?.output) ? payload.output : []) {
+    for (const content of Array.isArray(item?.content) ? item.content : []) {
+      if (typeof content?.text === "string" && content.text.trim()) return content.text.trim();
+    }
+  }
+  return "";
+}
+
+function parseProject200MarinReply(payload) {
+  const raw = extractProject200MarinResponseText(payload);
+  const normalized = raw.replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "").trim();
+  if (!normalized) throw new Error("A IA devolveu uma resposta vazia.");
+  return JSON.parse(normalized);
+}
+
+function normalizeProject200MarinDateOnly(value) {
+  const raw = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+}
+
+function sanitizeProject200MarinProposals(rawProposals) {
+  const proposals = [];
+  for (const raw of Array.isArray(rawProposals) ? rawProposals.slice(0, 8) : []) {
+    const type = ["action", "mission", "finance"].includes(raw?.type) ? raw.type : "";
+    const title = String(raw?.title || "").trim().slice(0, 90);
+    if (!type || title.length < 2) continue;
+
+    const proposal = {
+      key: crypto.randomUUID(),
+      type,
+      title,
+      description: String(raw?.description || "").trim().slice(0, 180),
+      dateLabel: String(raw?.dateLabel || "").trim().slice(0, 90),
+      timeLabel: String(raw?.timeLabel || "").trim().slice(0, 90)
+    };
+
+    if (type === "action") {
+      const startAt = new Date(raw?.startAt || "");
+      const endAt = new Date(raw?.endAt || "");
+      if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) continue;
+      proposal.aspectId = PROJECT200_MARIN_ASPECT_IDS.has(String(raw?.aspectId || "").trim().toLowerCase())
+        ? String(raw.aspectId).trim().toLowerCase()
+        : "aspecto";
+      proposal.startAt = startAt.toISOString();
+      proposal.endAt = endAt.toISOString();
+      proposal.durationMinutes = Math.max(1, Math.min(1440, Math.round((endAt - startAt) / 60000)));
+    }
+
+    if (type === "mission") {
+      proposal.targetValue = Math.max(1, Math.min(10000, Math.trunc(Number(raw?.targetValue) || 1)));
+      proposal.unitDurationMinutes = Math.max(0, Math.min(1440, Math.trunc(Number(raw?.unitDurationMinutes) || 0)));
+    }
+
+    if (type === "finance") {
+      const kind = String(raw?.financeKind || "").toUpperCase();
+      const settlementType = String(raw?.settlementType || "").toUpperCase();
+      const scheduleMode = String(raw?.scheduleMode || "").toUpperCase();
+      const scheduleFrequency = String(raw?.scheduleFrequency || "").toUpperCase();
+      const startsOn = normalizeProject200MarinDateOnly(raw?.startsOn);
+      if (!["INCOME", "EXPENSE"].includes(kind) || !["CASH", "FUTURE"].includes(settlementType) || !startsOn) continue;
+      proposal.financeKind = kind;
+      proposal.amountCents = Math.max(1, Math.trunc(Number(raw?.amountCents) || 0));
+      proposal.settlementType = settlementType;
+      proposal.scheduleMode = settlementType === "CASH" ? "ONCE" : (["ONCE", "RECURRING", "FINITE"].includes(scheduleMode) ? scheduleMode : "ONCE");
+      proposal.scheduleFrequency = proposal.scheduleMode === "ONCE"
+        ? "NONE"
+        : (["MONTHLY", "WEEKLY", "CUSTOM"].includes(scheduleFrequency) ? scheduleFrequency : "MONTHLY");
+      proposal.scheduleConfig = raw?.scheduleConfig && typeof raw.scheduleConfig === "object" ? raw.scheduleConfig : {};
+      proposal.startsOn = startsOn;
+      proposal.endsOn = proposal.scheduleMode === "FINITE" ? normalizeProject200MarinDateOnly(raw?.endsOn) : null;
+      if (!proposal.amountCents || (proposal.scheduleMode === "FINITE" && !proposal.endsOn)) continue;
+    }
+
+    proposals.push(proposal);
+  }
+  return proposals;
+}
+
+async function requestProject200MarinReply({ apiKey, user, profileName, personaKey, messages, context, areas }) {
+  const prompts = await getProject200MarinPrompts({ includeText: true });
+  const persona = prompts.personas.find((entry) => entry.key === personaKey) || prompts.personas[0];
+  const latestText = String(messages[messages.length - 1]?.content || "");
+  const route = chooseProject200MarinModel(latestText, areas);
+  const personaName = persona?.name || "Marin";
+  const instructions = [
+    prompts.generalPrompt,
+    "",
+    "PERSONALIDADE VISÍVEL: " + personaName,
+    String(persona?.prompt || ""),
+    "Quando o prompt geral disser Marin, entenda como o papel da IA do iLife; apresente-se sempre como " + personaName + ".",
+    "",
+    "LIMITES OPERACIONAIS:",
+    "- Nunca diga que já gravou algo. Você somente oferece cartões; o usuário precisa tocar para confirmar.",
+    "- Não crie microtarefas de missões.",
+    "- Não invente datas, horários, valores ou durações. Se faltar dado obrigatório, pergunte antes e retorne proposals vazio.",
+    "- Ações usam apenas estes IDs de aspecto: sono, alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto.",
+    "- Ambiente deve mapear para casa. Família pode mapear para planejamento ou aspecto conforme o sentido.",
+    "- Preserve sono, alimentação, saúde, segurança, autonomia e limites físicos. Disciplina nunca significa privação perigosa.",
+    "- Não substitua orientação médica, jurídica ou financeira profissional.",
+    "- A resposta textual tem no máximo 400 caracteres e as propostas no máximo 8.",
+    "",
+    "CONTEXTO DO USUÁRIO CARREGADO SOMENTE PARA ESTA PERGUNTA:",
+    JSON.stringify(context)
+  ].join("\n");
+
+  const input = messages.slice(-24).map((message) => ({
+    role: message.role === "assistant" ? "assistant" : "user",
+    content: String(message.content || "").slice(0, 4000)
+  }));
+  const startedAt = Date.now();
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: route.model,
+      instructions,
+      input,
+      reasoning: { effort: route.effort },
+      text: {
+        verbosity: "low",
+        format: {
+          type: "json_schema",
+          name: "project200_marin_reply",
+          strict: true,
+          schema: PROJECT200_MARIN_REPLY_SCHEMA
+        }
+      },
+      max_output_tokens: 1600,
+      store: false,
+      safety_identifier: "ilife_" + crypto.createHash("sha256").update(String(user.id)).digest("hex").slice(0, 32)
+    })
+  });
+  const parsedResponse = await readApiResponse(openAiResponse);
+  if (!openAiResponse.ok) {
+    const details = parsedResponse.data || parsedResponse.text || "Resposta vazia da OpenAI.";
+    const requestError = new Error("Falha ao conversar com " + personaName + ".");
+    requestError.details = details;
+    requestError.statusCode = openAiResponse.status;
+    requestError.route = route;
+    requestError.latencyMs = Date.now() - startedAt;
+    throw requestError;
+  }
+  if (!parsedResponse.data) throw new Error("A OpenAI devolveu uma resposta inválida.");
+  return {
+    payload: parsedResponse.data,
+    reply: parseProject200MarinReply(parsedResponse.data),
+    route,
+    latencyMs: Date.now() - startedAt
+  };
+}
+
+async function handleProject200MarinBootstrapRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const requestUrl = new URL(request.url || "/api/200/marin/bootstrap", "http://" + (request.headers.host || "localhost"));
+    const profileName = await resolveProject200ProfileName(user.id, requestUrl.searchParams.get("profile"), { fallbackToDefault: true });
+    const setting = await getProject200MarinSetting(user.id, profileName);
+    const admin = isAdminUser(user);
+    const prompts = await getProject200MarinPrompts({ includeText: admin });
+    const chat = await listProject200MarinMessages(user.id, profileName, setting.personaKey, 80);
+    sendJson(response, 200, {
+      ok: true,
+      profile: profileName,
+      personaKey: setting.personaKey,
+      personaName: getProject200MarinPersonaName(setting.personaKey),
+      personas: prompts.personas,
+      generalPrompt: admin ? prompts.generalPrompt : "",
+      isAdmin: admin,
+      messages: chat.messages
+    });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível abrir o Marin." });
+  }
+}
+
+async function handleProject200MarinPersonaRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const profileName = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const setting = await setProject200MarinPersona(user.id, profileName, body?.personaKey);
+    const chat = await listProject200MarinMessages(user.id, profileName, setting.personaKey, 80);
+    sendJson(response, 200, {
+      ok: true,
+      ...setting,
+      personaName: getProject200MarinPersonaName(setting.personaKey),
+      messages: chat.messages
+    });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível trocar a personalidade." });
+  }
+}
+
+async function handleProject200MarinPromptRequest(request, response) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const body = await readJsonBody(request);
+    const prompt = await updateProject200MarinPrompt(admin.id, body?.key, body?.prompt);
+    sendJson(response, 200, { ok: true, prompt });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível salvar o prompt." });
+  }
+}
+
+async function handleProject200MarinMessageRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(response, 503, { error: "OPENAI_API_KEY não configurada no backend." });
+    return;
+  }
+
+  let conversation = null;
+  let route = null;
+  const startedAt = Date.now();
+  try {
+    const body = await readJsonBody(request);
+    const content = String(body?.content || "").trim().slice(0, 4000);
+    if (!content) {
+      sendJson(response, 400, { error: "Escreva uma mensagem para conversar." });
+      return;
+    }
+    const profileName = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const setting = await getProject200MarinSetting(user.id, profileName);
+    const personaKey = normalizeProject200MarinPersonaKey(body?.personaKey || setting.personaKey);
+    conversation = await getOrCreateProject200MarinConversation(user.id, profileName, personaKey);
+    await appendProject200MarinMessage(user.id, conversation.id, { role: "user", content });
+    const history = await listProject200MarinMessages(user.id, profileName, personaKey, 24);
+    const areas = detectProject200MarinContextAreas(content);
+    const context = await buildProject200MarinUserContext(user, profileName, areas);
+    const generated = await requestProject200MarinReply({
+      apiKey,
+      user,
+      profileName,
+      personaKey,
+      messages: history.messages,
+      context,
+      areas
+    });
+    route = generated.route;
+    const replyText = shortenProject200MarinMessage(generated.reply?.message)
+      || "Quero entender melhor. Me conta um pouco mais?";
+    const proposals = sanitizeProject200MarinProposals(generated.reply?.proposals);
+    const saved = await appendProject200MarinMessage(user.id, conversation.id, {
+      role: "assistant",
+      content: replyText,
+      proposals,
+      model: generated.payload?.model || route.model
+    });
+    const usage = generated.payload?.usage || {};
+    await recordProject200MarinRun(user.id, conversation.id, {
+      model: generated.payload?.model || route.model,
+      routeReason: route.reason,
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+      totalTokens: usage.total_tokens,
+      latencyMs: generated.latencyMs,
+      status: "COMPLETED"
+    });
+    sendJson(response, 201, {
+      ok: true,
+      personaKey,
+      personaName: getProject200MarinPersonaName(personaKey),
+      message: saved
+    });
+  } catch (error) {
+    if (conversation?.id) {
+      await recordProject200MarinRun(user.id, conversation.id, {
+        model: route?.model || "unknown",
+        routeReason: route?.reason || "request-error",
+        latencyMs: Date.now() - startedAt,
+        status: "FAILED",
+        errorText: error instanceof Error ? error.message : "Erro desconhecido."
+      }).catch(() => {});
+    }
+    sendJson(response, Number(error?.statusCode) || 500, {
+      error: error instanceof Error ? error.message : "Não foi possível conversar agora.",
+      details: error?.details || undefined
+    });
+  }
+}
+
+async function handleProject200MarinProposalApplyRequest(request, response, messageId, proposalKey) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  let claim = null;
+  try {
+    const body = await readJsonBody(request);
+    const profileName = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const message = await getProject200MarinMessage(user.id, messageId);
+    if (!message || message.role !== "assistant") throw new Error("Mensagem da IA não encontrada.");
+    const proposal = message.proposals.find((entry) => String(entry?.key || "") === String(proposalKey || ""));
+    if (!proposal) throw new Error("Proposta não encontrada.");
+    claim = await claimProject200MarinProposal(user.id, messageId, proposal.key, proposal.type);
+    if (!claim.claimed) {
+      const status = String(claim.application?.status || "");
+      sendJson(response, 200, {
+        ok: status === "APPLIED",
+        alreadyApplied: status === "APPLIED",
+        processing: status === "PROCESSING",
+        status
+      });
+      return;
+    }
+
+    let entityId = null;
+    if (proposal.type === "action") {
+      const actions = await createUserAction(user.id, {
+        title: proposal.title,
+        assignee: profileName,
+        categoryId: proposal.aspectId || "aspecto",
+        repeatRule: "none",
+        repeatDays: [],
+        occurrences: [{ startAt: proposal.startAt, endAt: proposal.endAt }]
+      });
+      entityId = actions[0]?.id || null;
+    } else if (proposal.type === "mission") {
+      const goals = await createExtraGoal(user.id, profileName, {
+        title: proposal.title,
+        targetValue: proposal.targetValue,
+        unitDurationMinutes: proposal.unitDurationMinutes
+      });
+      entityId = [...goals].reverse().find((goal) => String(goal.title || "") === proposal.title)?.id || null;
+    } else if (proposal.type === "finance") {
+      const item = await createProject200FinanceItem(user.id, {
+        title: proposal.title,
+        kind: proposal.financeKind,
+        amountCents: proposal.amountCents,
+        settlementType: proposal.settlementType,
+        scheduleMode: proposal.scheduleMode,
+        scheduleFrequency: proposal.scheduleFrequency,
+        scheduleConfig: proposal.scheduleConfig,
+        startsOn: proposal.startsOn,
+        endsOn: proposal.endsOn
+      });
+      entityId = item.id || null;
+    } else {
+      throw new Error("Tipo de proposta inválido.");
+    }
+
+    await finishProject200MarinProposal(user.id, messageId, proposal.key, entityId);
+    sendJson(response, 201, { ok: true, applied: true, type: proposal.type, entityId });
+  } catch (error) {
+    if (claim?.claimed) {
+      await failProject200MarinProposal(user.id, messageId, proposalKey, error instanceof Error ? error.message : "Falha").catch(() => {});
+    }
+    sendJson(response, error?.code === "ACTION_OVERLAP" ? 409 : 400, {
+      error: error instanceof Error ? error.message : "Não foi possível ativar a proposta."
     });
   }
 }
@@ -10493,6 +11029,37 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleProject200TextOrganize(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/marin/bootstrap") {
+    await handleProject200MarinBootstrapRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/200/marin/persona") {
+    await handleProject200MarinPersonaRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/200/marin/prompt") {
+    await handleProject200MarinPromptRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/marin/messages") {
+    await handleProject200MarinMessageRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/marin\/messages\/[^/]+\/proposals\/[^/]+\/apply$/)) {
+    const match = pathname.match(/^\/api\/200\/marin\/messages\/([^/]+)\/proposals\/([^/]+)\/apply$/);
+    await handleProject200MarinProposalApplyRequest(
+      request,
+      response,
+      decodeURIComponent(match[1]),
+      decodeURIComponent(match[2])
+    );
     return;
   }
 
