@@ -197,8 +197,8 @@ export async function ensureProject200TutorsSchema() {
             select 1
               from information_schema.columns
              where table_schema = current_schema()
-               and table_name = ''project200_tutor_messages''
-               and column_name = ''read_at''
+               and table_name = 'project200_tutor_messages'
+               and column_name = 'read_at'
           ) then
             alter table project200_tutor_messages add column read_at timestamptz;
             update project200_tutor_messages set read_at = created_at where read_at is null;
