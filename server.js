@@ -68,6 +68,7 @@ import { createProject200Profile, deleteProject200Profile, listProject200Profile
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
+import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorMessages, listProject200Tutors } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -3941,6 +3942,125 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
     });
   }
 }
+
+async function handleProject200TutorsRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    if (request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await addProject200Tutor(user.id, body?.tutorUserId);
+      sendJson(response, 201, { ok: true, ...payload });
+      return;
+    }
+    const payload = await listProject200Tutors(user.id);
+    sendJson(response, 200, { ok: true, ...payload });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar os tutores."
+    });
+  }
+}
+
+async function handleProject200TutorMessagesRequest(request, response, contactUserId) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    if (request.method === "POST") {
+      const body = await readJsonBody(request);
+      const message = await appendProject200TutorMessage(user.id, contactUserId, {
+        content: body?.content,
+        proposal: body?.proposal
+      });
+      sendJson(response, 201, { ok: true, message });
+      return;
+    }
+    const requestUrl = new URL(request.url || "/", "http://" + (request.headers.host || "localhost"));
+    const payload = await listProject200TutorMessages(
+      user.id,
+      contactUserId,
+      requestUrl.searchParams.get("limit") || 80
+    );
+    sendJson(response, 200, { ok: true, ...payload });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel abrir a conversa com o tutor."
+    });
+  }
+}
+
+async function applyProject200TutorProposalEntity(userId, profileName, proposal) {
+  if (proposal.type === "action") {
+    const occurrences = Array.isArray(proposal.occurrences) && proposal.occurrences.length
+      ? proposal.occurrences
+      : [{ startAt: proposal.startAt, endAt: proposal.endAt }];
+    const actions = await createUserAction(userId, {
+      title: proposal.title,
+      assignee: profileName,
+      categoryId: proposal.aspectId || "aspecto",
+      svgIconUrl: proposal.svgIconUrl || "",
+      svgIconLabel: proposal.svgIconLabel || "",
+      repeatRule: proposal.repeatRule || "none",
+      repeatDays: Array.isArray(proposal.repeatDays) ? proposal.repeatDays : [],
+      occurrences
+    });
+    return actions[0]?.id || null;
+  }
+  if (proposal.type === "mission") {
+    const goals = await createExtraGoal(userId, profileName, {
+      title: proposal.title,
+      targetValue: proposal.targetValue,
+      unitDurationSeconds: proposal.unitDurationSeconds,
+      unitDurationMinutes: proposal.unitDurationMinutes,
+      svgIconUrl: proposal.svgIconUrl || "",
+      svgIconLabel: proposal.svgIconLabel || ""
+    });
+    return [...goals].reverse().find((goal) => String(goal.title || "") === proposal.title)?.id || null;
+  }
+  throw new Error("Tipo de proposta invalido.");
+}
+
+async function handleProject200TutorProposalApplyRequest(request, response, messageId, proposalKey) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  let claim = null;
+  try {
+    const body = await readJsonBody(request);
+    const profileName = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    claim = await claimProject200TutorProposal(user.id, messageId, proposalKey);
+    if (!claim.claimed) {
+      const status = String(claim.application?.status || "");
+      sendJson(response, 200, {
+        ok: status === "APPLIED",
+        alreadyApplied: status === "APPLIED",
+        processing: status === "PROCESSING",
+        status
+      });
+      return;
+    }
+    const entityId = await applyProject200TutorProposalEntity(user.id, profileName, claim.proposal);
+    await finishProject200TutorProposal(user.id, messageId, proposalKey, entityId);
+    sendJson(response, 201, {
+      ok: true,
+      applied: true,
+      type: claim.proposal.type,
+      entityId
+    });
+  } catch (error) {
+    if (claim?.claimed) {
+      await failProject200TutorProposal(
+        user.id,
+        messageId,
+        proposalKey,
+        error instanceof Error ? error.message : "Falha"
+      ).catch(() => {});
+    }
+    sendJson(response, error?.code === "ACTION_OVERLAP" ? 409 : 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel ativar a proposta."
+    });
+  }
+}
+
 
 async function handleProject200PersonalFinanceRequest(request, response) {
   const user = await requireAuth(request, response);
@@ -11150,6 +11270,28 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "POST" && pathname.match(/^\/api\/200\/marin\/messages\/[^/]+\/proposals\/[^/]+\/apply$/)) {
     const match = pathname.match(/^\/api\/200\/marin\/messages\/([^/]+)\/proposals\/([^/]+)\/apply$/);
     await handleProject200MarinProposalApplyRequest(
+      request,
+      response,
+      decodeURIComponent(match[1]),
+      decodeURIComponent(match[2])
+    );
+    return;
+  }
+
+  if ((request.method === "GET" || request.method === "POST") && pathname === "/api/200/tutors") {
+    await handleProject200TutorsRequest(request, response);
+    return;
+  }
+
+  if ((request.method === "GET" || request.method === "POST") && pathname.match(/^\/api\/200\/tutors\/[^/]+\/messages$/)) {
+    const match = pathname.match(/^\/api\/200\/tutors\/([^/]+)\/messages$/);
+    await handleProject200TutorMessagesRequest(request, response, decodeURIComponent(match[1]));
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/tutors\/messages\/[^/]+\/proposals\/[^/]+\/apply$/)) {
+    const match = pathname.match(/^\/api\/200\/tutors\/messages\/([^/]+)\/proposals\/([^/]+)\/apply$/);
+    await handleProject200TutorProposalApplyRequest(
       request,
       response,
       decodeURIComponent(match[1]),

@@ -9459,3 +9459,260 @@ body[data-background-theme="white"] .marin-proposal-meta {
     padding-inline: 98px;
   }
 }
+
+/* Tutor humano: selecao, conversa e cartoes pendentes. */
+.marin-tutor-modal {
+  z-index: 3720;
+  background: inherit;
+  color: var(--white);
+}
+
+.marin-tutor-proposal-type-modal {
+  z-index: 3760;
+  background: rgba(2, 10, 29, 0.72);
+  color: var(--white);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.marin-tutor-modal.active {
+  display: block;
+}
+
+.marin-tutor-proposal-type-modal.active {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.marin-tutor-shell {
+  width: min(100%, 760px);
+  min-height: 100dvh;
+  height: 100dvh;
+  margin: 0 auto;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 16px;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    max(18px, env(safe-area-inset-right, 0px))
+    max(22px, env(safe-area-inset-bottom, 0px))
+    max(18px, env(safe-area-inset-left, 0px));
+  background: rgba(5, 16, 42, 0.14);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.marin-tutor-intro {
+  width: min(100%, 560px);
+  margin: 0 auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.marin-tutor-list {
+  min-height: 0;
+  width: min(100%, 620px);
+  margin: 0 auto;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.marin-tutor-option {
+  min-height: 68px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 19px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 13px;
+  background: rgba(4, 16, 45, 0.28);
+  color: var(--white);
+  text-align: left;
+}
+
+.marin-tutor-option:disabled {
+  opacity: 0.66;
+}
+
+.marin-tutor-avatar,
+.marin-chat-contact-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  background: linear-gradient(145deg, #147df0, #19d7a8);
+  color: #fff;
+  font-weight: 800;
+}
+
+.marin-chat-contact-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.marin-tutor-option strong,
+.marin-tutor-option small {
+  display: block;
+}
+
+.marin-tutor-option small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.marin-tutor-option-state {
+  color: #72f4b1;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.marin-tutor-empty {
+  margin: auto;
+  color: var(--muted);
+  text-align: center;
+}
+
+.marin-persona-divider {
+  padding: 12px 6px 2px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.marin-chat-header {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+}
+
+.marin-chat-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.marin-chat-proposal-button {
+  border-color: rgba(91, 240, 167, 0.5);
+  background: linear-gradient(145deg, rgba(20, 125, 240, 0.95), rgba(25, 215, 168, 0.88));
+}
+
+.marin-proposal-list.is-user {
+  align-self: flex-end;
+}
+
+.marin-proposal-card.is-sent {
+  opacity: 0.78;
+}
+
+.marin-tutor-proposal-type-shell {
+  width: min(92vw, 440px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  padding: 20px;
+  background: rgba(5, 16, 42, 0.94);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+.marin-tutor-proposal-type-shell > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+}
+
+.marin-tutor-proposal-type-shell header span {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.marin-tutor-proposal-type-shell h2 {
+  margin: 4px 0 0;
+  color: var(--white);
+  font-size: 1.22rem;
+}
+
+.marin-tutor-proposal-type-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.marin-tutor-proposal-type-list > button {
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 19px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  padding: 12px 15px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--white);
+  text-align: left;
+}
+
+.marin-tutor-proposal-type-list img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.marin-tutor-proposal-type-list strong,
+.marin-tutor-proposal-type-list small {
+  display: block;
+}
+
+.marin-tutor-proposal-type-list small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+body[data-background-theme="white"] :is(
+  .marin-tutor-shell,
+  .marin-tutor-proposal-type-shell
+) {
+  color: #2f3640;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+body[data-background-theme="white"] :is(
+  .marin-tutor-option,
+  .marin-tutor-proposal-type-list > button,
+  .marin-tutor-proposal-type-shell h2
+) {
+  color: #2f3640;
+}
+
+body[data-background-theme="white"] :is(
+  .marin-tutor-option,
+  .marin-tutor-proposal-type-list > button
+) {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(47, 54, 64, 0.12);
+}
+
+@media (max-width: 520px) {
+  .marin-chat-header-actions {
+    gap: 4px;
+  }
+
+  .marin-chat-header-actions .marin-round-button {
+    width: 42px;
+    height: 42px;
+  }
+}

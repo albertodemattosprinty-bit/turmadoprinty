@@ -265,6 +265,10 @@ export function initializeProject200OnboardingUi(config) {
 
   async function handleContinue() {
     if (state.busy) return;
+    if (state.currentStep >= 4 && state.avatarCompleted) {
+      await finish();
+      return;
+    }
     setBusy(true);
     setStatus("");
     try {
@@ -284,9 +288,6 @@ export function initializeProject200OnboardingUi(config) {
         }
       } else if (!state.avatarCompleted) {
         photoInput.click();
-        return;
-      } else {
-        await finish();
         return;
       }
       const saved = await patchProgress({
@@ -431,7 +432,7 @@ export function initializeProject200OnboardingUi(config) {
     setBusy(true);
     setStatus("Preparando sua home...");
     try {
-      await patchProgress({
+      const completed = await patchProgress({
         currentStep: 4,
         educationPage: EDUCATION.length - 1,
         selectedPersona: state.selectedPersona || persona.key,
@@ -439,6 +440,10 @@ export function initializeProject200OnboardingUi(config) {
         profile: profile && profile.name || "",
         complete: true
       });
+      if (completed.required || completed.status !== "COMPLETED") {
+        throw new Error("Não foi possível confirmar a conclusão do onboarding.");
+      }
+      hydrate(completed);
       hide();
       if (typeof options.onComplete === "function") {
         await options.onComplete();

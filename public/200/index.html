@@ -1568,6 +1568,48 @@
     </div>
   </section>
 
+  <section class="workspace-modal marin-tutor-modal" id="marinTutorModal" aria-hidden="true" aria-label="Adicionar Tutor">
+    <div class="marin-tutor-shell">
+      <header class="marin-persona-header">
+        <button class="marin-round-button" type="button" id="marinTutorCloseButton" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div>
+          <span>Conversa humana</span>
+          <h2>Adicionar Tutor</h2>
+        </div>
+        <span aria-hidden="true"></span>
+      </header>
+      <p class="marin-tutor-intro">Escolha um amigo para conversar, compartilhar tarefas e construir missoes em conjunto.</p>
+      <div class="marin-tutor-list" id="marinTutorList"></div>
+      <p class="marin-prompt-status" id="marinTutorStatus" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="workspace-modal marin-tutor-proposal-type-modal" id="marinTutorProposalTypeModal" aria-hidden="true" aria-label="Criar sugestao">
+    <div class="marin-tutor-proposal-type-shell">
+      <header>
+        <div>
+          <span>Enviar no chat</span>
+          <h2>O que deseja sugerir?</h2>
+        </div>
+        <button class="marin-round-button" type="button" id="marinTutorProposalTypeClose" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="marin-tutor-proposal-type-list">
+        <button type="button" id="marinTutorProposalAction">
+          <img src="/200/icons/acts.svg" alt="">
+          <span><strong>Tarefa</strong><small>Criar um cartao para aprovacao</small></span>
+        </button>
+        <button type="button" id="marinTutorProposalMission">
+          <img src="/200/icons/target.svg" alt="">
+          <span><strong>Missao</strong><small>Criar um cartao para aprovacao</small></span>
+        </button>
+      </div>
+    </div>
+  </section>
+
   <section class="workspace-modal marin-chat-modal" id="marinChatModal" aria-hidden="true" aria-label="Conversa com Marin">
     <div class="marin-chat-shell">
       <header class="marin-chat-header">
@@ -1576,11 +1618,16 @@
         </button>
         <div class="marin-chat-identity">
           <span class="marin-chat-presence" aria-hidden="true"></span>
-          <div><strong id="marinChatPersonaName">Marin</strong><small>IA do iLife</small></div>
+          <div><strong id="marinChatPersonaName">Marin</strong><small id="marinChatIdentityType">IA do iLife</small></div>
         </div>
-        <button class="marin-round-button" type="button" id="marinChatPersonaButton" aria-label="Trocar personalidade">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.2a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4 0-7 2-7 4.5V20h14v-1.3c0-2.5-3-4.5-7-4.5Z"/></svg>
-        </button>
+        <div class="marin-chat-header-actions">
+          <button class="marin-round-button marin-chat-proposal-button" type="button" id="marinChatProposalButton" aria-label="Criar sugestao" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
+          <button class="marin-round-button" type="button" id="marinChatPersonaButton" aria-label="Adicionar tutor">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12.2a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4 0-7 2-7 4.5V20h14v-1.3c0-2.5-3-4.5-7-4.5Z"/></svg>
+          </button>
+        </div>
       </header>
       <main class="marin-chat-messages" id="marinChatMessages" aria-live="polite"></main>
       <div class="marin-chat-status" id="marinChatStatus" aria-live="polite"></div>
@@ -1593,7 +1640,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260721-fixes-v4"></script>
+  <script type="module" src="/200/project.js?v=20260722-tutors-v1"></script>
 </body>
 </html>
 

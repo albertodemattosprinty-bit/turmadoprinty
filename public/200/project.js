@@ -1,6 +1,7 @@
 import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=20260721-home-onboarding-v2";
-import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260721-avatar-fix-v3";
+import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260722-tutors-v1";
+import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
 
 import {
   MINUTE_CUE_INTERVALS,
@@ -14,6 +15,7 @@ const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
 const optionsConfigKey = "project_200_options_v1";
 let optionsConfigLoadPromise = null;
+let project200TutorsUi = null;
 const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
 const missionVariantSortKey = "project_200_mission_variant_sort_v1";
 const defaultSaldoGoalCents = 1000000;
@@ -1079,6 +1081,10 @@ const state = {
     mode: "",
     action: null,
     mission: null
+  },
+  tutorProposalDraft: {
+    active: false,
+    type: ""
   },
   missions: [],
   actionMissions: [],
@@ -5502,12 +5508,23 @@ function closeModal(modal) {
     return;
   }
 
+  const returnMissionToTutor = modal.id === "missionCreateModal"
+    && state.tutorProposalDraft?.active
+    && state.tutorProposalDraft.type === "mission";
+  if (returnMissionToTutor) {
+    state.tutorProposalDraft = { active: false, type: "" };
+    setTutorProposalComposerControls(false);
+  }
+
   const wasActive = modal.classList.contains("active");
   modal.classList.remove("active");
   modal.setAttribute("aria-hidden", "true");
   const stackIndex = modalNavigationStack.lastIndexOf(modal.id);
   if (stackIndex === modalNavigationStack.length - 1) {
     modalNavigationStack.pop();
+  }
+  if (returnMissionToTutor) {
+    reopenTutorConversation();
   }
   if (modal.id === "actionWizard") {
     closeWizard();
@@ -6479,6 +6496,44 @@ async function openFriendAssignmentPicker(mode) {
 function closeFriendAssignmentPicker() {
   closeModal("friendAssignmentModal");
 }
+function reopenTutorConversation() {
+  window.setTimeout(() => {
+    void project200TutorsUi?.openChat();
+  }, 0);
+}
+
+function setTutorProposalComposerControls(active) {
+  const hidden = Boolean(active);
+  if (actionFriendAssignButton) actionFriendAssignButton.hidden = hidden;
+  if (missionFriendAssignButton) missionFriendAssignButton.hidden = hidden;
+}
+
+async function submitTutorProposal(proposal) {
+  try {
+    await project200TutorsUi?.sendHumanProposal(proposal);
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : "Nao foi possivel enviar o cartao.");
+  } finally {
+    await project200TutorsUi?.openChat();
+  }
+}
+
+function openTutorProposalComposer(type) {
+  const normalizedType = type === "mission" ? "mission" : "action";
+  if (!project200TutorsUi?.isHumanActive()) {
+    return;
+  }
+  state.tutorProposalDraft = { active: true, type: normalizedType };
+  setTutorProposalComposerControls(true);
+  closeModal("marinChatModal");
+  if (normalizedType === "mission") {
+    openMissionCreateModal();
+    return;
+  }
+  openModal("actionsModal");
+  openWizard();
+}
+
 function openWizard(action = null, options = {}) {
   state.wizard = buildInitialWizardState();
   state.friendAssignment.action = null;
@@ -6533,6 +6588,7 @@ function openRepeatEditorFromTaskComposer() {
 }
 
 function closeWizard() {
+  const returnToTutor = state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "action";
   stopActionMic();
   if (actionCategoryInterpretTimer) {
     window.clearTimeout(actionCategoryInterpretTimer);
@@ -6552,6 +6608,12 @@ function closeWizard() {
   }
   actionWizard.classList.remove("active");
   actionWizard.setAttribute("aria-hidden", "true");
+  if (returnToTutor) {
+    state.tutorProposalDraft = { active: false, type: "" };
+    setTutorProposalComposerControls(false);
+    closeModal("actionsModal");
+    reopenTutorConversation();
+  }
 }
 
 function renderActionCategoryPicker() {
@@ -8671,6 +8733,35 @@ async function saveAction() {
     } else if (!editingAction && (repeatRule !== "none" || occurrences.length > 1)) {
       applyTo = "series";
     }
+
+    if (state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "action" && !editingAction) {
+      const firstOccurrence = occurrences[0];
+      const occurrenceCount = occurrences.length;
+      const proposal = {
+        type: "action",
+        title: taskTitle.value.trim(),
+        aspectId: String(state.wizard.categoryId || "aspecto").trim().toLowerCase(),
+        repeatRule,
+        repeatDays,
+        occurrences,
+        startAt: firstOccurrence?.startAt || "",
+        endAt: firstOccurrence?.endAt || "",
+        durationMinutes: firstOccurrence ? getActionDurationMinutes(firstOccurrence) : 0,
+        dateLabel: firstOccurrence ? formatDateLabel(new Date(firstOccurrence.startAt)) : "",
+        timeLabel: firstOccurrence
+          ? `${formatHourChip(firstOccurrence.startAt)} - ${formatHourChip(firstOccurrence.endAt)}${occurrenceCount > 1 ? ` - ${occurrenceCount} horarios` : ""}`
+          : "",
+        svgIconUrl: String(state.wizard.svgIconUrl || "").trim(),
+        svgIconLabel: String(state.wizard.svgIconLabel || "").trim()
+      };
+      state.tutorProposalDraft = { active: false, type: "" };
+      setTutorProposalComposerControls(false);
+      closeWizard();
+      closeModal("actionsModal");
+      await submitTutorProposal(proposal);
+      return;
+    }
+
     const overlaps = state.friendAssignment.action
       ? []
       : computeOverlapsForOccurrences(occurrences, {
@@ -15007,6 +15098,22 @@ missionCreateConfirmButton?.addEventListener("click", () => {
       openMissionTimeModal("create");
       return;
     }
+    if (state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "mission") {
+      const proposal = {
+        type: "mission",
+        title,
+        targetValue,
+        unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
+        svgIconUrl: "",
+        svgIconLabel: ""
+      };
+      state.tutorProposalDraft = { active: false, type: "" };
+      setTutorProposalComposerControls(false);
+      closeModal("missionCreateModal");
+      await submitTutorProposal(proposal);
+      return;
+    }
+
     await runMissionActionWithLoading(missionCreateConfirmButton, async () => {
       if (missionCreateStatus) {
         missionCreateStatus.textContent = "Criando missão...";
@@ -16520,6 +16627,13 @@ const project200MarinUi = initializeProject200MarinUi({
   formatMoney,
   getProfileName: () => String(state.selectedProfile || getDefaultProfileName()).trim(),
   arrayBufferToBase64
+});
+project200TutorsUi = initializeProject200TutorsUi({
+  apiRequest,
+  openModal,
+  closeModal,
+  getProfileName: () => String(state.selectedProfile || getDefaultProfileName()).trim(),
+  onRequestProposal: openTutorProposalComposer
 });
 const project200OnboardingUi = initializeProject200OnboardingUi({
   getToken,
