@@ -337,7 +337,7 @@
   </section>
   <section class="workspace-modal simple-modal" id="startDecisionModal" aria-hidden="true" aria-label="Decisão de início">
     <div class="finance-content running-task-content start-decision-content" id="startDecisionContent">
-      <button class="start-decision-home-btn" type="button" id="closeStartDecisionModal" aria-label="Voltar para a home"><svg viewBox="0 0 24 24"><path d="M3 11h4v10h6v-6h2v6h6V11h4L12 2 3 11z" fill="currentColor"/></svg></button>
+      <button class="start-decision-home-btn friend-assignment-button" type="button" id="actionFriendAssignButton" aria-label="Criar tarefa para um amigo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.7-3.35a3.2 3.2 0 0 0 0-1.7l6.7-3.35A3 3 0 1 0 15 7a3.2 3.2 0 0 0 .08.68l-6.7 3.35a3 3 0 1 0 0 3.94l6.7 3.35A3 3 0 1 0 18 16Z" fill="currentColor"/></svg></button>
       <div class="start-decision-top">
         <div class="start-decision-top-spacer" aria-hidden="true"></div>
         <div class="start-decision-title-wrap">
@@ -1236,6 +1236,22 @@
     </div>
   </section>
 
+  <section class="workspace-modal simple-modal friend-assignment-modal" id="friendAssignmentModal" aria-hidden="true" aria-label="Escolher amigo">
+    <div class="friend-assignment-shell">
+      <header class="friend-assignment-head">
+        <div>
+          <span>Compartilhar criação</span>
+          <h1 id="friendAssignmentTitle">Criar para um amigo</h1>
+        </div>
+        <button class="history-mission-modal-close" type="button" id="friendAssignmentCloseButton" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
+        </button>
+      </header>
+      <p class="friend-assignment-copy">Escolha quem receberá este item. A tarefa ou missão será salva diretamente na conta da pessoa.</p>
+      <div class="friend-assignment-list" id="friendAssignmentList"></div>
+      <p class="finance-status" id="friendAssignmentStatus" aria-live="polite"></p>
+    </div>
+  </section>
   <section class="workspace-modal simple-modal" id="missionCreateModal" aria-hidden="true" aria-label="Nova missão">
     <div class="finance-content history-mission-modal-content history-mission-modal-shell mission-guide-shell">
       <div class="history-mission-modal-head">
@@ -1243,9 +1259,14 @@
           <span class="mission-modal-eyebrow">Organize uma nova rotina</span>
           <h1 class="mission-modal-title">Nova missão</h1>
         </div>
-        <button class="history-mission-modal-close" type="button" id="missionCreateCloseButton" aria-label="Fechar">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
-        </button>
+        <div class="mission-create-head-actions">
+          <button class="friend-assignment-button" type="button" id="missionFriendAssignButton" aria-label="Criar missão para um amigo">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.7-3.35a3.2 3.2 0 0 0 0-1.7l6.7-3.35A3 3 0 1 0 15 7a3.2 3.2 0 0 0 .08.68l-6.7 3.35a3 3 0 1 0 0 3.94l6.7 3.35A3 3 0 1 0 18 16Z" fill="currentColor"/></svg>
+          </button>
+          <button class="history-mission-modal-close" type="button" id="missionCreateCloseButton" aria-label="Fechar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
+          </button>
+        </div>
       </div>
       <div class="history-mission-modal-body mission-guide-body">
         <section class="mission-guide-step" aria-labelledby="missionCreateNameStep">

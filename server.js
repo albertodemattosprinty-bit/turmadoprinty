@@ -1,4 +1,4 @@
-﻿import "./src/load-env.js";
+import "./src/load-env.js";
 
 import { createReadStream, existsSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -66,7 +66,7 @@ import { createProject200FinanceItem, summarizeProject200FinanceLedgerMonth } fr
 import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, ensureExtraGoalsSchema, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
-import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints } from "./src/project200-friends.js";
+import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 
@@ -3490,9 +3490,26 @@ function chooseProject200MarinModel(message, areas) {
 }
 
 async function buildProject200MarinUserContext(user, profileName, areas) {
+  const serverNow = new Date();
+  const serverClock = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: PROJECT200_TIME_ZONE,
+    dateStyle: "full",
+    timeStyle: "short"
+  }).format(serverNow);
+  const pointTotals = await getProject200UserPointTotals(user.id);
+
   const context = {
     profile: profileName,
-    today: getProject200MarinDateKey(),
+    today: getProject200MarinDateKey(serverNow),
+    serverTime: {
+      iso: serverNow.toISOString(),
+      timeZone: PROJECT200_TIME_ZONE,
+      display: serverClock
+    },
+    points: {
+      today: Math.max(0, Math.trunc(Number(dailyStats?.totals?.completedMinutes || 0) || 0)),
+      total: Math.max(0, Math.trunc(Number(totalStats?.totals?.completedMinutes || 0) || 0))
+    },
     loadedAreas: areas
   };
   const todayKey = context.today;
@@ -3995,10 +4012,20 @@ async function handleExtraGoalCreateRequest(request, response) {
   }
 
   try {
-    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
-    const goals = await createExtraGoal(user.id, selectedProfile, body);
+    const ownerUserId = await resolveProject200FriendAssignmentUser(user.id, body?.recipientUserId);
+    const assignedToFriend = ownerUserId !== String(user.id);
+    const requestedProfile = assignedToFriend ? PROJECT200_DEFAULT_PROFILE_NAME : body?.profile;
+    const selectedProfile = await resolveProject200ProfileName(ownerUserId, requestedProfile, { fallbackToDefault: true });
+    const goals = await createExtraGoal(ownerUserId, selectedProfile, body);
     const summary = summarizeExtraGoals(goals);
-    sendJson(response, 200, { ok: true, profile: selectedProfile, goals, summary });
+    sendJson(response, 200, {
+      ok: true,
+      profile: selectedProfile,
+      goals: assignedToFriend ? [] : goals,
+      summary: assignedToFriend ? null : summary,
+      assignedToFriend,
+      recipientUserId: ownerUserId
+    });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel criar a missao."
@@ -9028,10 +9055,13 @@ async function handleProject200ProfileAvatarUploadRequest(request, response, pro
     const profile = await updateProject200ProfileAvatar(authUser.id, profileId, {
       avatarDataUrl: `data:${contentType};base64,${uploadedReferenceBuffer.toString("base64")}`
     });
+    await markProject200OnboardingAvatarComplete(authUser.id);
+    const onboarding = await getProject200Onboarding(authUser.id);
 
     sendJson(response, 200, {
       ok: true,
       profile,
+      onboarding,
       feedback: `Foto atualizada para ${profile.name}.`
     });
   } catch (error) {
@@ -12829,6 +12859,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "POST" && pathname === "/api/actions") {
+    let assignedToFriend = false;
     try {
       const user = await requireAuth(request, response);
 
@@ -12837,11 +12868,23 @@ const server = http.createServer(async (request, response) => {
       }
 
       const body = await readJsonBody(request);
-      const actions = await createUserAction(user.id, body);
+      const ownerUserId = await resolveProject200FriendAssignmentUser(user.id, body?.recipientUserId);
+      assignedToFriend = ownerUserId !== String(user.id);
+      const actions = await createUserAction(ownerUserId, {
+        ...body,
+        assignee: assignedToFriend ? PROJECT200_DEFAULT_PROFILE_NAME : body?.assignee
+      });
 
-      sendJson(response, 201, { ok: true, actions });
+      sendJson(response, 201, { ok: true, actions, assignedToFriend, recipientUserId: ownerUserId });
     } catch (error) {
       const isOverlap = error?.code === "ACTION_OVERLAP";
+      if (assignedToFriend && isOverlap) {
+        sendJson(response, 409, {
+          error: "Este horário não está disponível para o amigo.",
+          code: "ACTION_OVERLAP"
+        });
+        return;
+      }
       sendJson(response, isOverlap ? 409 : 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar a acao.",
         code: isOverlap ? "ACTION_OVERLAP" : undefined,

@@ -82,7 +82,6 @@ export function initializeProject200OnboardingUi(config) {
   let contentEl = null;
   let continueButton = null;
   let statusEl = null;
-  let optionsModal = null;
   let photoInput = null;
   let state = {
     active: false,
@@ -94,9 +93,6 @@ export function initializeProject200OnboardingUi(config) {
     avatarCompleted: false,
     photoFile: null,
     photoUrl: "",
-    generatedUrl: "",
-    avatarStyle: "pixar",
-    avatarInstructions: ""
   };
   let progressFrame = 0;
   let progressStartedAt = 0;
@@ -144,48 +140,16 @@ export function initializeProject200OnboardingUi(config) {
       '<button class="project200-onboarding__continue" type="button">CONTINUAR</button>',
       '</footer>',
       '<input class="project200-onboarding__file" type="file" accept="image/*" aria-label="Escolher foto">',
-      '<section class="project200-avatar-options" aria-hidden="true">',
-      '<div class="project200-avatar-options__card" role="dialog" aria-modal="true" aria-label="Personalizar desenho">',
-      '<p class="project200-onboarding__eyebrow">Antes de gerar</p>',
-      '<h2>Como você quer seu desenho?</h2>',
-      '<div class="project200-avatar-options__styles" role="group" aria-label="Estilo do avatar">',
-      '<button type="button" data-avatar-style="pixar">3D moderno</button>',
-      '<button type="button" data-avatar-style="realista">Realista</button>',
-      '<button type="button" data-avatar-style="anime">Anime</button>',
-      '<button type="button" data-avatar-style="aquarela">Aquarela</button>',
-      '</div>',
-      '<label>Detalhes opcionais',
-      '<textarea maxlength="500" rows="4" placeholder="Ex.: à noite, diante da Torre Eiffel, usando uma jaqueta azul..."></textarea>',
-      '</label>',
-      '<p>Suas escolhas têm prioridade sobre o estilo padrão.</p>',
-      '<div class="project200-avatar-options__actions">',
-      '<button type="button" data-avatar-cancel>Voltar</button>',
-      '<button type="button" data-avatar-generate>GERAR COM IA</button>',
-      '</div>',
-      '</div>',
-      '</section>'
     ].join("");
     document.body.appendChild(root);
     contentEl = root.querySelector(".project200-onboarding__content");
     continueButton = root.querySelector(".project200-onboarding__continue");
     statusEl = root.querySelector(".project200-onboarding__status");
-    optionsModal = root.querySelector(".project200-avatar-options");
     photoInput = root.querySelector(".project200-onboarding__file");
 
     continueButton.addEventListener("click", handleContinue);
     root.addEventListener("click", handleRootClick);
     photoInput.addEventListener("change", handlePhotoSelected);
-    optionsModal.querySelector("[data-avatar-cancel]").addEventListener("click", closeAvatarOptions);
-    optionsModal.querySelector("[data-avatar-generate]").addEventListener("click", generateAvatar);
-    optionsModal.querySelector("textarea").addEventListener("input", function (event) {
-      state.avatarInstructions = String(event.target.value || "");
-    });
-    optionsModal.querySelectorAll("[data-avatar-style]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        state.avatarStyle = String(button.dataset.avatarStyle || "pixar");
-        renderAvatarStyleButtons();
-      });
-    });
   }
 
   function renderProgress() {
@@ -254,23 +218,22 @@ export function initializeProject200OnboardingUi(config) {
   }
 
   function avatarVisualUrl() {
-    return state.generatedUrl || state.photoUrl || "";
+    return state.photoUrl || "";
   }
 
   function renderAvatar() {
     const url = avatarVisualUrl();
-    const hasGenerated = Boolean(state.generatedUrl);
     contentEl.innerHTML = [
       '<section class="project200-onboarding__avatar">',
       '<p class="project200-onboarding__eyebrow">Seu avatar</p>',
-      '<h1>Sua foto será convertida em um desenho</h1>',
-      '<p>O iLife não mantém sua foto original salva. Ela é usada apenas para criar o seu avatar.</p>',
+      '<h1>Escolha sua foto</h1>',
+      '<p>Use uma foto que represente você no iLife.</p>',
       '<button class="project200-onboarding__avatar-ring' + (state.busy ? " is-generating" : "") + '" type="button" data-avatar-pick style="--avatar-progress:0deg">',
       url
-        ? '<img src="' + safeText(url) + '" alt="' + (hasGenerated ? "Avatar gerado" : "Foto escolhida") + '">'
+        ? '<img src="' + safeText(url) + '" alt="Foto escolhida">'
         : '<span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4zM12 10a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Escolher foto</span>',
       '</button>',
-      '<p class="project200-onboarding__avatar-hint">' + (hasGenerated ? "Toque para gerar uma nova" : "Você poderá escolher o estilo antes de gerar") + '</p>',
+      '<p class="project200-onboarding__avatar-hint">' + (state.avatarCompleted ? "Toque para escolher outra foto" : "A foto aparece no seu perfil assim que for escolhida") + '</p>',
       '<button class="project200-onboarding__skip" type="button" data-avatar-skip>Agora não</button>',
       '</section>'
     ].join("");
@@ -358,7 +321,7 @@ export function initializeProject200OnboardingUi(config) {
     }
   }
 
-  function handlePhotoSelected() {
+  async function handlePhotoSelected() {
     const file = photoInput.files && photoInput.files[0];
     if (!file) return;
     if (!String(file.type || "").startsWith("image/")) {
@@ -368,27 +331,9 @@ export function initializeProject200OnboardingUi(config) {
     if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
     state.photoFile = file;
     state.photoUrl = URL.createObjectURL(file);
-    state.generatedUrl = "";
+    state.avatarCompleted = false;
     render();
-    openAvatarOptions();
-  }
-
-  function renderAvatarStyleButtons() {
-    if (!optionsModal) return;
-    optionsModal.querySelectorAll("[data-avatar-style]").forEach(function (button) {
-      button.classList.toggle("is-active", button.dataset.avatarStyle === state.avatarStyle);
-    });
-  }
-
-  function openAvatarOptions() {
-    optionsModal.classList.add("is-open");
-    optionsModal.setAttribute("aria-hidden", "false");
-    renderAvatarStyleButtons();
-  }
-
-  function closeAvatarOptions() {
-    optionsModal.classList.remove("is-open");
-    optionsModal.setAttribute("aria-hidden", "true");
+    await saveAvatarPhoto();
   }
 
   function startProgressLoop() {
@@ -406,30 +351,62 @@ export function initializeProject200OnboardingUi(config) {
     progressFrame = requestAnimationFrame(tick);
   }
 
-  async function generateAvatar() {
+  function loadPhotoImage(file) {
+    return new Promise(function (resolve, reject) {
+      const imageUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = function () {
+        URL.revokeObjectURL(imageUrl);
+        resolve(image);
+      };
+      image.onerror = function () {
+        URL.revokeObjectURL(imageUrl);
+        reject(new Error("Não foi possível abrir esta imagem."));
+      };
+      image.src = imageUrl;
+    });
+  }
+
+  async function compilePhotoToWebp(file) {
+    const image = await loadPhotoImage(file);
+    const sourceWidth = Math.max(1, Number(image.naturalWidth || image.width || 1));
+    const sourceHeight = Math.max(1, Number(image.naturalHeight || image.height || 1));
+    const width = Math.min(800, sourceWidth);
+    const height = Math.max(1, Math.round(sourceHeight * (width / sourceWidth)));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Não foi possível preparar sua foto.");
+    context.drawImage(image, 0, 0, width, height);
+    const blob = await new Promise(function (resolve) {
+      canvas.toBlob(resolve, "image/webp", 0.88);
+    });
+    if (!blob) throw new Error("Seu navegador não conseguiu otimizar a foto.");
+    return blob;
+  }
+
+  async function saveAvatarPhoto() {
     if (!state.photoFile || state.busy) return;
     const profile = getProfile();
     if (!profile || !profile.id) {
       setStatus("Não foi possível localizar seu perfil.", true);
-      closeAvatarOptions();
       return;
     }
-    closeAvatarOptions();
     setBusy(true);
     render();
-    setStatus("Criando seu desenho...");
+    setStatus("Preparando sua foto...");
     try {
-      const response = await fetch(getApiUrl("/api/200/profiles/" + encodeURIComponent(profile.id) + "/avatar/generate"), {
+      const webpPhoto = await compilePhotoToWebp(state.photoFile);
+      const response = await fetch(getApiUrl("/api/200/profiles/" + encodeURIComponent(profile.id) + "/avatar/upload"), {
         method: "POST",
-        headers: bearerHeaders(getToken(), {
-          "Content-Type": state.photoFile.type || "image/png",
-          "X-Avatar-Style": encodeURIComponent(state.avatarStyle),
-          "X-Avatar-Instructions": encodeURIComponent(state.avatarInstructions)
-        }),
-        body: state.photoFile
+        headers: bearerHeaders(getToken(), { "Content-Type": "image/webp" }),
+        body: webpPhoto
       });
       const data = await readResponse(response);
-      state.generatedUrl = String(data.profile && data.profile.avatarUrl || data.profile && data.profile.avatarDataUrl || "");
+      if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
+      state.photoFile = webpPhoto;
+      state.photoUrl = String(data.profile && (data.profile.avatarUrl || data.profile.avatarDataUrl) || "");
       state.avatarCompleted = true;
       if (typeof options.onProfileGenerated === "function") {
         options.onProfileGenerated(data.profile);
@@ -438,11 +415,11 @@ export function initializeProject200OnboardingUi(config) {
       render();
       const image = root.querySelector(".project200-onboarding__avatar-ring img");
       if (image) image.classList.add("is-revealed");
-      setStatus("Seu novo avatar está pronto.");
+      setStatus("Sua foto está pronta.");
     } catch (error) {
       setBusy(false);
       render();
-      setStatus(error instanceof Error ? error.message : "Não foi possível gerar o avatar.", true);
+      setStatus(error instanceof Error ? error.message : "Não foi possível salvar a foto.", true);
     }
   }
 
@@ -496,7 +473,6 @@ export function initializeProject200OnboardingUi(config) {
     if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
     state.photoFile = null;
     state.photoUrl = "";
-    state.generatedUrl = "";
     if (photoInput) photoInput.value = "";
     if (typeof options.loadProfiles === "function") {
       await options.loadProfiles();

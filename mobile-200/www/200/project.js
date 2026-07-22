@@ -289,6 +289,7 @@ const sleepHistoryStatus = document.getElementById("sleepHistoryStatus");
 const openActionWizardButton = document.getElementById("openActionWizard");
 const actionWizard = document.getElementById("actionWizard");
 const closeActionWizardButton = document.getElementById("closeActionWizard");
+const actionFriendAssignButton = document.getElementById("actionFriendAssignButton");
 const actionForm = document.getElementById("actionForm");
 const wizardStepLabel = document.getElementById("wizardStepLabel");
 const wizardHeaderBackButton = document.getElementById("wizardHeaderBack");
@@ -461,6 +462,12 @@ const missionTitleInput = document.getElementById("missionTitleInput");
 const missionTargetInput = document.getElementById("missionTargetInput");
 const missionCreateStatus = document.getElementById("missionCreateStatus");
 const missionCreateCloseButton = document.getElementById("missionCreateCloseButton");
+const missionFriendAssignButton = document.getElementById("missionFriendAssignButton");
+const friendAssignmentModal = document.getElementById("friendAssignmentModal");
+const friendAssignmentTitle = document.getElementById("friendAssignmentTitle");
+const friendAssignmentList = document.getElementById("friendAssignmentList");
+const friendAssignmentStatus = document.getElementById("friendAssignmentStatus");
+const friendAssignmentCloseButton = document.getElementById("friendAssignmentCloseButton");
 const missionCreateTimeSummary = document.getElementById("missionCreateTimeSummary");
 const openMissionCreateTimeButton = document.getElementById("openMissionCreateTimeButton");
 const missionCreateConfirmButton = document.getElementById("missionCreateConfirm");
@@ -1066,6 +1073,11 @@ const state = {
     self: null,
     incomingInvites: [],
     friends: []
+  },
+  friendAssignment: {
+    mode: "",
+    action: null,
+    mission: null
   },
   missions: [],
   actionMissions: [],
@@ -6325,8 +6337,91 @@ function moveActiveDate(amount) {
   void loadActionMissions();
 }
 
+const friendAssignmentShareSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.7-3.35a3.2 3.2 0 0 0 0-1.7l6.7-3.35A3 3 0 1 0 15 7a3.2 3.2 0 0 0 .08.68l-6.7 3.35a3 3 0 1 0 0 3.94l6.7 3.35A3 3 0 1 0 18 16Z" fill="currentColor"/></svg>';
+
+function getFriendAssignment(mode) {
+  return mode === "mission" ? state.friendAssignment.mission : state.friendAssignment.action;
+}
+
+function renderFriendAssignmentButton(button, friend, label) {
+  if (!button) return;
+  button.classList.toggle("has-friend", Boolean(friend));
+  button.setAttribute("aria-label", friend ? `${label} para ${friend.name || "amigo"}` : `${label} para um amigo`);
+  if (!friend) {
+    button.innerHTML = friendAssignmentShareSvg;
+    return;
+  }
+  const avatarUrl = String(friend.avatarDataUrl || friend.svgIconUrl || "").trim();
+  button.innerHTML = avatarUrl
+    ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(friend.name || "Amigo")}">`
+    : `<span>${escapeHtml(friend.initials || String(friend.name || "A").slice(0, 2).toUpperCase())}</span>`;
+}
+
+function renderFriendAssignmentButtons() {
+  renderFriendAssignmentButton(actionFriendAssignButton, state.friendAssignment.action, "Criar tarefa");
+  renderFriendAssignmentButton(missionFriendAssignButton, state.friendAssignment.mission, "Criar missão");
+}
+
+function renderFriendAssignmentList() {
+  if (!friendAssignmentList) return;
+  const mode = state.friendAssignment.mode === "mission" ? "mission" : "action";
+  const selected = getFriendAssignment(mode);
+  friendAssignmentList.innerHTML = "";
+
+  const selfButton = document.createElement("button");
+  selfButton.type = "button";
+  selfButton.className = `friend-assignment-card${selected ? "" : " is-selected"}`;
+  selfButton.dataset.friendAssignmentSelf = "true";
+  selfButton.innerHTML = '<span class="friend-assignment-avatar friend-assignment-avatar-self">EU</span><span><strong>Para mim</strong><small>Salvar na minha própria conta</small></span>';
+  friendAssignmentList.appendChild(selfButton);
+
+  for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `friend-assignment-card${String(selected?.userId || "") === String(friend?.userId || "") ? " is-selected" : ""}`;
+    button.dataset.friendAssignmentUserId = String(friend?.userId || "");
+    const avatarUrl = String(friend?.avatarDataUrl || friend?.svgIconUrl || "").trim();
+    const avatar = avatarUrl
+      ? `<img class="friend-assignment-avatar" src="${escapeHtml(avatarUrl)}" alt="">`
+      : `<span class="friend-assignment-avatar">${escapeHtml(friend?.initials || "A")}</span>`;
+    button.innerHTML = `${avatar}<span><strong>${escapeHtml(friend?.name || "Amigo")}</strong><small>${friend?.username ? "@" + escapeHtml(friend.username) : "Amizade aceita"}</small></span>`;
+    friendAssignmentList.appendChild(button);
+  }
+
+  if (!(Array.isArray(state.social?.friends) && state.social.friends.length) && friendAssignmentStatus) {
+    friendAssignmentStatus.textContent = "Você ainda não tem amigos com convite aceito.";
+  }
+}
+
+async function openFriendAssignmentPicker(mode) {
+  state.friendAssignment.mode = mode === "mission" ? "mission" : "action";
+  if (friendAssignmentTitle) {
+    friendAssignmentTitle.textContent = state.friendAssignment.mode === "mission"
+      ? "Criar missão para"
+      : "Criar tarefa para";
+  }
+  if (friendAssignmentStatus) friendAssignmentStatus.textContent = "Carregando amigos...";
+  openModal("friendAssignmentModal");
+  try {
+    const payload = await apiRequest("/api/200/friends?scope=today", { skipGlobalLoading: true });
+    state.social.self = payload?.self || state.social.self;
+    state.social.friends = Array.isArray(payload?.friends) ? payload.friends : [];
+    if (friendAssignmentStatus) friendAssignmentStatus.textContent = "";
+    renderFriendAssignmentList();
+  } catch (error) {
+    if (friendAssignmentStatus) {
+      friendAssignmentStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar seus amigos.";
+    }
+  }
+}
+
+function closeFriendAssignmentPicker() {
+  closeModal("friendAssignmentModal");
+}
 function openWizard(action = null, options = {}) {
   state.wizard = buildInitialWizardState();
+  state.friendAssignment.action = null;
+  renderFriendAssignmentButtons();
   if (action) {
     const startAt = new Date(action.startAt);
     const endAt = new Date(action.endAt);
@@ -6907,6 +7002,8 @@ function renderTaskComposerModal() {
 
 function openTaskComposer(action = null, options = {}) {
   state.wizard = buildInitialWizardState();
+  state.friendAssignment.action = null;
+  renderFriendAssignmentButtons();
   state.startDecisionContext.mode = action ? "edit" : "create";
   state.startDecisionContext.actionId = String(action?.id || "");
   state.startDecisionContext.fieldToFocus = String(options.fieldToFocus || "");
@@ -8515,9 +8612,11 @@ async function saveAction() {
     } else if (!editingAction && (repeatRule !== "none" || occurrences.length > 1)) {
       applyTo = "series";
     }
-    const overlaps = computeOverlapsForOccurrences(occurrences, {
-      excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
-    });
+    const overlaps = state.friendAssignment.action
+      ? []
+      : computeOverlapsForOccurrences(occurrences, {
+          excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
+        });
     if (overlaps.length) {
       let replaceOverlaps = false;
       const decision = await openOverlapWizard(overlaps, occurrences);
@@ -8561,6 +8660,7 @@ async function saveAction() {
       },
       body: JSON.stringify({
         title: taskTitle.value.trim(),
+        recipientUserId: String(state.friendAssignment.action?.userId || ""),
         assignee: getWizardAssigneeName(),
         categoryId: String(state.wizard.categoryId || "").trim().toLowerCase(),
         svgIconUrl: String(state.wizard.svgIconUrl || "").trim(),
@@ -11637,9 +11737,11 @@ async function saveTaskComposer() {
     } else if (!editingAction && (repeatRule !== "none" || occurrences.length > 1)) {
       applyTo = "series";
     }
-    const overlaps = computeOverlapsForOccurrences(occurrences, {
-      excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
-    });
+    const overlaps = state.friendAssignment.action
+      ? []
+      : computeOverlapsForOccurrences(occurrences, {
+          excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
+        });
     if (overlaps.length) {
       let replaceOverlaps = false;
       const decision = await openOverlapWizard(overlaps, occurrences);
@@ -11687,6 +11789,7 @@ async function saveTaskComposer() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title,
+        recipientUserId: String(state.friendAssignment.action?.userId || ""),
         assignee: getWizardAssigneeName(),
         categoryId: normalizeTaskCategoryId(state.wizard.categoryId),
         repeatRule,
@@ -11950,10 +12053,12 @@ function openMissionCreateModal() {
   if (missionCreateStatus) {
     missionCreateStatus.textContent = "";
   }
+  state.friendAssignment.mission = null;
   state.missionCreate = {
     unitDurationSeconds: DEFAULT_MISSION_DURATION_SECONDS,
     timeConfigured: true
   };
+  renderFriendAssignmentButtons();
   if (missionCreateTimeSummary) {
     missionCreateTimeSummary.textContent = `1 missão leva ${formatMissionDurationValue(DEFAULT_MISSION_DURATION_SECONDS)}`;
   }
@@ -14090,6 +14195,28 @@ openActionWizardButton.addEventListener("click", () => {
   openTaskComposer();
 });
 
+actionFriendAssignButton?.addEventListener("click", () => {
+  void openFriendAssignmentPicker("action");
+});
+missionFriendAssignButton?.addEventListener("click", () => {
+  void openFriendAssignmentPicker("mission");
+});
+friendAssignmentCloseButton?.addEventListener("click", closeFriendAssignmentPicker);
+friendAssignmentList?.addEventListener("click", (event) => {
+  const selfButton = event.target.closest("[data-friend-assignment-self]");
+  const friendButton = event.target.closest("[data-friend-assignment-user-id]");
+  if (!selfButton && !friendButton) return;
+  const mode = state.friendAssignment.mode === "mission" ? "mission" : "action";
+  if (selfButton) {
+    state.friendAssignment[mode] = null;
+  } else {
+    const userId = String(friendButton.dataset.friendAssignmentUserId || "");
+    state.friendAssignment[mode] = (Array.isArray(state.social?.friends) ? state.social.friends : [])
+      .find((friend) => String(friend?.userId || "") === userId) || null;
+  }
+  renderFriendAssignmentButtons();
+  closeFriendAssignmentPicker();
+});
 closeActionWizardButton.addEventListener("click", closeWizard);
 closeActionCategoryModal?.addEventListener("click", () => closeModal(actionCategoryModal));
 actionCategoryTrigger?.addEventListener("click", () => {
@@ -14763,6 +14890,7 @@ missionCreateConfirmButton?.addEventListener("click", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title,
+            recipientUserId: String(state.friendAssignment.mission?.userId || ""),
             targetValue,
             profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
             unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),

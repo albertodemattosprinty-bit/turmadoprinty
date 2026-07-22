@@ -551,3 +551,70 @@ export async function getProject200FriendsSnapshot(userId, scopeKey = "today") {
     friends
   };
 }
+export async function resolveProject200FriendAssignmentUser(requesterUserId, recipientUserId) {
+  await ensureProject200FriendsSchema();
+  const requesterId = String(requesterUserId || "").trim();
+  const recipientId = String(recipientUserId || "").trim();
+  if (!requesterId) {
+    throw new Error("Usuario responsavel invalido.");
+  }
+  if (!recipientId || recipientId === requesterId) {
+    return requesterId;
+  }
+  const result = await query(
+    `
+      select 1
+      from project200_friendships
+      where status = 'accepted'
+        and (
+          (requester_user_id = $1 and addressee_user_id = $2)
+          or
+          (requester_user_id = $2 and addressee_user_id = $1)
+        )
+      limit 1
+    `,
+    [requesterId, recipientId]
+  );
+  if (!result.rows[0]) {
+    const error = new Error("Escolha um amigo com amizade aceita.");
+    error.code = "FRIEND_ASSIGNMENT_FORBIDDEN";
+    throw error;
+  }
+  return recipientId;
+}
+export async function getProject200UserPointTotals(userId) {
+  await ensureProject200FriendsSchema();
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) {
+    throw new Error("Usuario invalido para consultar pontos.");
+  }
+  const [todayMap, totalResult] = await Promise.all([
+    getPointsByUserIds([normalizedUserId], "today"),
+    query(
+      `
+        with mission_points as (
+          select coalesce(sum(
+            h.progress_value * coalesce(nullif(g.unit_duration_seconds, 0), g.unit_duration_minutes * 60)
+          ) / 60.0, 0)::bigint as points
+          from extra_goal_progress_history h
+          join extra_goals g
+            on g.id = h.goal_id
+           and g.user_id = h.user_id
+          where h.user_id = $1
+        ),
+        event_points as (
+          select coalesce(sum(points), 0)::bigint as points
+          from project200_point_events
+          where user_id = $1
+        )
+        select (mission_points.points + event_points.points)::bigint as points
+        from mission_points, event_points
+      `,
+      [normalizedUserId]
+    )
+  ]);
+  return {
+    today: Math.max(0, Math.trunc(Number(todayMap.get(normalizedUserId) || 0) || 0)),
+    total: Math.max(0, Math.trunc(Number(totalResult.rows[0]?.points || 0) || 0))
+  };
+}
