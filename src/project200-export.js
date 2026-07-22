@@ -268,9 +268,9 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
     await client.query(
       `
         insert into project200_music_favorites (
-          user_id, station_name, track_name, track_url, created_at, updated_at
+          user_id, station_id, track_id, station_name, track_name, track_url, created_at, updated_at
         )
-        select $2, station_name, track_name, track_url, created_at, updated_at
+        select $2, station_id, track_id, station_name, track_name, track_url, created_at, updated_at
         from project200_music_favorites
         where user_id = $1
         order by updated_at asc, created_at asc
@@ -281,9 +281,9 @@ export async function exportProject200DataToUser({ sourceUserId, targetUserId })
     await client.query(
       `
         insert into project200_music_task_defaults (
-          user_id, task_title, default_mode, station_name, track_name, track_url, created_at, updated_at
+          user_id, task_title, default_mode, station_id, track_id, station_name, track_name, track_url, created_at, updated_at
         )
-        select $2, task_title, default_mode, station_name, track_name, track_url, created_at, updated_at
+        select $2, task_title, default_mode, station_id, track_id, station_name, track_name, track_url, created_at, updated_at
         from project200_music_task_defaults
         where user_id = $1
         order by updated_at asc, created_at asc

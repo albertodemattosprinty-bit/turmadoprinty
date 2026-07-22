@@ -13,6 +13,7 @@ import {
 const tokenKey = "turma_do_printy_token";
 const projectProfileKey = "project_200_profile_v1";
 const optionsConfigKey = "project_200_options_v1";
+let optionsConfigLoadPromise = null;
 const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
 const missionVariantSortKey = "project_200_mission_variant_sort_v1";
 const defaultSaldoGoalCents = 1000000;
@@ -1133,7 +1134,9 @@ const state = {
     preloadedDailyRanking: null,
     rankingPreloadStarted: false,
     announcedCueSeconds: [],
-    previousRemainingSeconds: null
+    previousRemainingSeconds: null,
+    musicStoppedOnFinish: false,
+    musicWasPlayingAtFinish: false
   },
   missionVariants: {
     goalId: "",
@@ -1220,6 +1223,7 @@ const state = {
     shuffleEnabled: false,
     repeatEnabled: false,
     favoriteTrackUrls: new Set(),
+    favoriteTrackIds: new Set(),
     hiddenTrackUrls: new Set(),
     defaultPreferenceByTaskTitle: new Map(),
     currentTaskTitle: "",
@@ -3512,6 +3516,41 @@ function renderHomeRunningTask() {
   renderRunningMusicPlayer();
 }
 
+function normalizeRunningMusicCatalog(stations = []) {
+  return (Array.isArray(stations) ? stations : []).map((station, stationIndex) => {
+    const stationId = String(station?.id || `radio-${String(stationIndex + 1).padStart(2, "0")}`).trim().toLowerCase();
+    return {
+      ...station,
+      id: stationId,
+      tracks: (Array.isArray(station?.tracks) ? station.tracks : []).map((track, trackIndex) => ({
+        ...track,
+        id: String(track?.id || `${stationId}-track-${String(trackIndex + 1).padStart(3, "0")}`).trim().toLowerCase(),
+        stationId
+      }))
+    };
+  });
+}
+
+function getRunningStationId(station) {
+  return String(station?.id || "").trim().toLowerCase();
+}
+
+function getRunningTrackId(track) {
+  return String(track?.id || "").trim().toLowerCase();
+}
+
+function runningStationMatchesPreference(station, preference) {
+  const stationId = String(preference?.stationId || "").trim().toLowerCase();
+  return Boolean(stationId && getRunningStationId(station) === stationId)
+    || String(station?.name || "").trim() === String(preference?.stationName || "").trim();
+}
+
+function runningTrackMatchesPreference(track, preference) {
+  const trackId = String(preference?.trackId || "").trim().toLowerCase();
+  return Boolean(trackId && getRunningTrackId(track) === trackId)
+    || normalizeRunningTrackUrl(track?.url) === normalizeRunningTrackUrl(preference?.trackUrl);
+}
+
 async function loadRunningMusicStations() {
   const previousTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
   const previousStationName = String(getCurrentRunningStation()?.name || "").trim();
@@ -3545,9 +3584,10 @@ async function loadRunningMusicStations() {
     };
   });
 
-  state.runningPlayer.stations = fallbackStations;
+  state.runningPlayer.stations = normalizeRunningMusicCatalog(fallbackStations);
   state.runningPlayer.stationsLoaded = true;
   state.runningPlayer.favoriteTrackUrls = new Set();
+  state.runningPlayer.favoriteTrackIds = new Set();
   state.runningPlayer.defaultPreferenceByTaskTitle = new Map();
   ensureRunningStationHasTracks(previousStationName);
   syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
@@ -3561,7 +3601,7 @@ async function loadRunningMusicStations() {
       const radioStations = Array.isArray(radioData?.stations) ? radioData.stations : [];
       const validLocalStations = radioStations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
       if (validLocalStations.length) {
-        state.runningPlayer.stations = validLocalStations;
+        state.runningPlayer.stations = normalizeRunningMusicCatalog(validLocalStations);
       }
     }
   } catch {
@@ -3573,7 +3613,7 @@ async function loadRunningMusicStations() {
     const stations = Array.isArray(payload?.stations) ? payload.stations : [];
     const validStations = stations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
     if (validStations.length) {
-      state.runningPlayer.stations = validStations;
+      state.runningPlayer.stations = normalizeRunningMusicCatalog(validStations);
     }
   } catch {
     // keep local/fallback stations
@@ -3594,9 +3634,12 @@ async function loadRunningMusicStations() {
     const stations = Array.isArray(payload?.stations) ? payload.stations : [];
     const validStations = stations.filter((s) => Array.isArray(s?.tracks) && s.tracks.length > 0);
     if (validStations.length) {
-      state.runningPlayer.stations = validStations;
+      state.runningPlayer.stations = normalizeRunningMusicCatalog(validStations);
       state.runningPlayer.favoriteTrackUrls = new Set(Array.isArray(payload?.preferences?.favoriteTrackUrls) ? payload.preferences.favoriteTrackUrls : []);
+    state.runningPlayer.favoriteTrackIds = new Set(Array.isArray(payload?.preferences?.favoriteTrackIds) ? payload.preferences.favoriteTrackIds : []);
+      state.runningPlayer.favoriteTrackIds = new Set(Array.isArray(payload?.preferences?.favoriteTrackIds) ? payload.preferences.favoriteTrackIds : []);
       state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
+    ensureRunningAudioLoopState();
       const refreshedStationIndex = previousStationName
         ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
         : -1;
@@ -3667,6 +3710,12 @@ function getRunningFavoriteSet() {
     : new Set();
 }
 
+function getRunningFavoriteIdSet() {
+  return state.runningPlayer.favoriteTrackIds instanceof Set
+    ? state.runningPlayer.favoriteTrackIds
+    : new Set();
+}
+
 function getRunningHiddenTrackSet() {
   return state.runningPlayer.hiddenTrackUrls instanceof Set
     ? state.runningPlayer.hiddenTrackUrls
@@ -3686,19 +3735,21 @@ function buildRunningDefaultPreferenceMap(preferences = {}) {
     .map((item) => {
       const taskTitle = String(item?.taskTitle || "").trim();
       const mode = String(item?.mode || "track").trim() === "station" ? "station" : "track";
+      const stationId = String(item?.stationId || "").trim().toLowerCase();
+      const trackId = String(item?.trackId || "").trim().toLowerCase();
       const stationName = String(item?.stationName || "").trim();
       const trackName = String(item?.trackName || "").trim();
       const trackUrl = String(item?.trackUrl || "").trim();
       if (!taskTitle) {
         return null;
       }
-      if (mode === "station" && !stationName) {
+      if (mode === "station" && !stationId && !stationName) {
         return null;
       }
-      if (mode === "track" && !trackUrl) {
+      if (mode === "track" && !trackId && !trackUrl) {
         return null;
       }
-      return [taskTitle, { mode, stationName, trackName, trackUrl }];
+      return [taskTitle, { mode, stationId, trackId, stationName, trackName, trackUrl }];
     })
     .filter(Boolean));
 }
@@ -3734,7 +3785,7 @@ function applyRunningTaskDefaultSelection(action = getRunningActionForSelectedPr
   }
 
   if (preference.mode === "station") {
-    const stationIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === preference.stationName);
+    const stationIndex = state.runningPlayer.stations.findIndex((station) => runningStationMatchesPreference(station, preference));
     if (stationIndex >= 0) {
       state.runningPlayer.stationIndex = stationIndex;
       syncRunningMusicOrder({ preserveTrackUrl: "" });
@@ -3743,11 +3794,12 @@ function applyRunningTaskDefaultSelection(action = getRunningActionForSelectedPr
   }
 
   const stationIndex = state.runningPlayer.stations.findIndex((station) =>
-    Array.isArray(station?.tracks) && station.tracks.some((track) => String(track?.url || "").trim() === preference.trackUrl)
+    Array.isArray(station?.tracks) && station.tracks.some((track) => runningTrackMatchesPreference(track, preference))
   );
   if (stationIndex >= 0) {
     state.runningPlayer.stationIndex = stationIndex;
-    syncRunningMusicOrder({ preserveTrackUrl: preference.trackUrl });
+    const matchedTrack = state.runningPlayer.stations[stationIndex]?.tracks?.find((track) => runningTrackMatchesPreference(track, preference));
+    syncRunningMusicOrder({ preserveTrackUrl: String(matchedTrack?.url || preference.trackUrl || "").trim() });
   }
 }
 
@@ -3886,7 +3938,9 @@ function getCurrentRunningTrack() {
 }
 
 function isRunningTrackFavorite(track) {
-  return getRunningFavoriteSet().has(String(track?.url || "").trim());
+  const trackId = getRunningTrackId(track);
+  return Boolean(trackId && getRunningFavoriteIdSet().has(trackId))
+    || getRunningFavoriteSet().has(String(track?.url || "").trim());
 }
 
 function isRunningTrackHidden(track) {
@@ -3898,7 +3952,7 @@ function isRunningTrackDefaultForCurrentTask(track) {
   if (!preference || preference.mode !== "track") {
     return false;
   }
-  return String(preference.trackUrl || "").trim() === String(track?.url || "").trim();
+  return runningTrackMatchesPreference(track, preference);
 }
 
 function isRunningStationDefaultForCurrentTask(station = getCurrentRunningStation()) {
@@ -3906,7 +3960,7 @@ function isRunningStationDefaultForCurrentTask(station = getCurrentRunningStatio
   if (!preference || preference.mode !== "station") {
     return false;
   }
-  return String(preference.stationName || "").trim() === String(station?.name || "").trim();
+  return runningStationMatchesPreference(station, preference);
 }
 
 function renderRunningMusicPlayer() {
@@ -3963,7 +4017,9 @@ function renderRunningMusicPlayer() {
 
 function ensureRunningAudioLoopState() {
   if (runningAudio) {
-    runningAudio.loop = Boolean(state.runningPlayer.repeatEnabled);
+    const currentTrack = getRunningPlaybackState().track || getCurrentRunningTrack();
+    const defaultTrackLoop = Boolean(currentTrack && isRunningTrackDefaultForCurrentTask(currentTrack));
+    runningAudio.loop = Boolean(state.runningPlayer.repeatEnabled || defaultTrackLoop);
   }
 }
 
@@ -4201,6 +4257,8 @@ async function toggleRunningTrackFavorite() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        stationId: getRunningStationId(station),
+        trackId: getRunningTrackId(track),
         stationName: station.name,
         trackName: track.name,
         trackUrl: track.url,
@@ -4334,12 +4392,13 @@ async function executeRunningTaskDefaultPreference() {
   let targetTrackUrl = "";
 
   if (preference.mode === "station") {
-    nextStationIndex = state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === String(preference.stationName || "").trim());
+    nextStationIndex = state.runningPlayer.stations.findIndex((station) => runningStationMatchesPreference(station, preference));
   } else {
     nextStationIndex = state.runningPlayer.stations.findIndex((station) =>
-      Array.isArray(station?.tracks) && station.tracks.some((track) => String(track?.url || "").trim() === String(preference.trackUrl || "").trim())
+      Array.isArray(station?.tracks) && station.tracks.some((track) => runningTrackMatchesPreference(track, preference))
     );
-    targetTrackUrl = String(preference.trackUrl || "").trim();
+    const matchedTrack = state.runningPlayer.stations[nextStationIndex]?.tracks?.find((track) => runningTrackMatchesPreference(track, preference));
+    targetTrackUrl = String(matchedTrack?.url || preference.trackUrl || "").trim();
   }
 
   if (nextStationIndex < 0) {
@@ -4405,6 +4464,8 @@ async function saveRunningTaskDefault(mode = "track") {
       body: JSON.stringify({
         mode: safeMode,
         taskTitle,
+        stationId: getRunningStationId(station),
+        trackId: safeMode === "track" ? getRunningTrackId(track) : "",
         stationName: station.name,
         trackName: safeMode === "track" ? track?.name : "",
         trackUrl: safeMode === "track" ? track?.url : ""
@@ -7617,7 +7678,7 @@ async function ensureProject200Session() {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 7000);
   try {
-    const response = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/me"), {
+    const response = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/me?app=project200"), {
       headers: {
         Authorization: `Bearer ${token}`
       },
@@ -12095,13 +12156,14 @@ function renderMissionProgressState() {
     missionProgressValue.textContent = String(previewValue);
   }
   if (missionProgressHint) {
-    missionProgressHint.textContent = deltaValue < 0 ? `Subtraindo ${Math.abs(deltaValue)}` : `Adicionando ${deltaValue}`;
-  }
-  if (missionProgressConfirmLabel) {
-    missionProgressConfirmLabel.textContent = `${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"} ${itemCount === 1 ? "ITEM" : "ITENS"}`;
+    missionProgressHint.textContent = "";
   }
   if (missionProgressConfirmButton) {
-    missionProgressConfirmButton.disabled = deltaValue === 0;
+    missionProgressConfirmButton.disabled = false;
+    missionProgressConfirmButton.classList.toggle("is-update", deltaValue !== 0);
+    missionProgressConfirmButton.innerHTML = deltaValue === 0
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR AGORA</span>'
+      : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"} ${itemCount === 1 ? "ITEM" : "ITENS"}</span>`;
   }
   missionProgressMinusButton?.classList.remove("active");
   missionProgressPlusButton?.classList.add("active");
@@ -12336,6 +12398,30 @@ function fadeOutRunningMusicAfterMissionClose() {
   missionRunMusicFadeTimer = timer;
 }
 
+function fadeOutRunningMusicAtMissionFinish() {
+  if (!state.options.stopMusicOnFinish || state.missionRun.musicStoppedOnFinish) return;
+  if (!runningAudio || runningAudio.paused || runningAudio.ended) return;
+  state.missionRun.musicStoppedOnFinish = true;
+  state.missionRun.musicWasPlayingAtFinish = true;
+  fadeOutRunningMusicAfterMissionClose();
+}
+
+async function resumeRunningMusicAfterMissionExtension() {
+  if (!state.missionRun.musicStoppedOnFinish) return;
+  const shouldResume = Boolean(state.missionRun.musicWasPlayingAtFinish);
+  state.missionRun.musicStoppedOnFinish = false;
+  state.missionRun.musicWasPlayingAtFinish = false;
+  cancelMissionRunMusicFade();
+  if (!shouldResume || !runningAudio) return;
+  ensureRunningAudioLoopState();
+  try {
+    await runningAudio.play();
+    state.runningPlayer.isPlaying = true;
+    renderRunningMusicPlayer();
+    renderRunningMusicList();
+  } catch {}
+}
+
 function stopRunningMusicAfterFinishedActivity() {
   cancelMissionRunMusicFade({ restoreVolume: false });
   if (!runningAudio) return;
@@ -12511,6 +12597,9 @@ function setMissionRunCycleTarget(value) {
   if (nextTarget < previousTarget) {
     state.missionRun.selectedVariantIds = (state.missionRun.selectedVariantIds || []).slice(0, nextTarget);
   }
+  if (nextTarget > previousTarget) {
+    void resumeRunningMusicAfterMissionExtension();
+  }
   if (nextTarget > previousTarget
     && Array.isArray(state.missionRun.availableVariants)
     && state.missionRun.availableVariants.length >= 2
@@ -12522,6 +12611,7 @@ function setMissionRunCycleTarget(value) {
 
 function restartMissionRunLocally() {
   if (state.missionRun.finalizing) return;
+  void resumeRunningMusicAfterMissionExtension();
   const completed = Math.max(1, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1));
   if (completed >= MISSION_RUN_MAX_CYCLES) {
     if (missionRunStatus) missionRunStatus.textContent = `O máximo é de ${MISSION_RUN_MAX_CYCLES} ciclos. Toque em Finalizar para receber os pontos.`;
@@ -12621,6 +12711,7 @@ function renderMissionRunState() {
       advanceMissionRunCycle();
     } else if (isLastCycle) {
       startMissionRunAlarm();
+      fadeOutRunningMusicAtMissionFinish();
     }
   }
 }
@@ -12854,6 +12945,8 @@ function beginMissionRun(goal, selectedVariant = null) {
   state.missionRun.rankingPreloadStarted = false;
   state.missionRun.announcedCueSeconds = [];
   state.missionRun.previousRemainingSeconds = null;
+  state.missionRun.musicStoppedOnFinish = false;
+  state.missionRun.musicWasPlayingAtFinish = false;
   state.missionRun.previousTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
   state.runningPlayer.currentTaskTitle = String(goal.title || "Missão").trim();
   if (missionRunConfirm) {
@@ -13700,12 +13793,17 @@ async function bootstrapProject200App() {
       } catch {
         state.profiles = [];
       }
+      project200LoginOverlay?.classList.remove("active");
+      project200LoginOverlay?.setAttribute("aria-hidden", "true");
+      primeRunningIdleHomeShell();
+      openModal("runningTaskModal");
+      endStartupLoading();
+      await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
       await project200OnboardingUi.show(state.project200Onboarding || {
         required: true,
         currentStep: 1,
         educationPage: 0
       });
-      endStartupLoading();
       return;
     }
     project200OnboardingUi.hide();
@@ -13917,45 +14015,76 @@ async function playCompletionBeeps(cycleCount) {
   await wait(Math.max(250, cycleCount * 500 + 180));
 }
 
-function loadOptionsConfig() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(optionsConfigKey) || "{}");
-    state.options.showFreeTime = parsed.showFreeTime !== false;
-    state.options.missionActionsMode = normalizeMissionActionsMode(parsed.missionActionsMode);
-    state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
-      ? Number(parsed.completionBeepCycles)
-      : 0;
-    state.options.minuteNotificationInterval = normalizeMinuteCueInterval(parsed.minuteNotificationInterval);
-    state.options.finalMinuteNotificationsEnabled = parsed.finalMinuteNotificationsEnabled !== false;
-    state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
-    state.options.screenLockEnabled = parsed.screenLockEnabled === true;
-    state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
-  } catch {
-    state.options.showFreeTime = true;
-    state.options.missionActionsMode = "show";
-    state.options.completionBeepCycles = 0;
-    state.options.minuteNotificationInterval = 1;
-    state.options.finalMinuteNotificationsEnabled = true;
-    state.options.backgroundTheme = "edge";
-    state.options.screenLockEnabled = false;
-    state.options.stopMusicOnFinish = false;
-  }
-  applyBackgroundTheme();
+async function loadOptionsConfig() {
+  if (optionsConfigLoadPromise) return optionsConfigLoadPromise;
+  optionsConfigLoadPromise = (async () => {
+    let raw = "";
+    try {
+      raw = String(window.localStorage.getItem(optionsConfigKey) || "");
+    } catch {}
+
+    const nativePreferences = window.Capacitor?.Plugins?.Preferences || null;
+    if (nativePreferences?.get) {
+      try {
+        const stored = await Promise.race([
+          nativePreferences.get({ key: optionsConfigKey }),
+          new Promise((resolve) => window.setTimeout(() => resolve({ value: "" }), 1200))
+        ]);
+        if (String(stored?.value || "").trim()) {
+          raw = String(stored.value);
+          try { window.localStorage.setItem(optionsConfigKey, raw); } catch {}
+        } else if (raw && nativePreferences?.set) {
+          void nativePreferences.set({ key: optionsConfigKey, value: raw }).catch(() => {});
+        }
+      } catch {}
+    }
+
+    try {
+      const parsed = JSON.parse(raw || "{}");
+      state.options.showFreeTime = parsed.showFreeTime !== false;
+      state.options.missionActionsMode = normalizeMissionActionsMode(parsed.missionActionsMode);
+      state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
+        ? Number(parsed.completionBeepCycles)
+        : 0;
+      state.options.minuteNotificationInterval = normalizeMinuteCueInterval(parsed.minuteNotificationInterval);
+      state.options.finalMinuteNotificationsEnabled = parsed.finalMinuteNotificationsEnabled !== false;
+      state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
+      state.options.screenLockEnabled = parsed.screenLockEnabled === true;
+      state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
+    } catch {
+      state.options.showFreeTime = true;
+      state.options.missionActionsMode = "show";
+      state.options.completionBeepCycles = 0;
+      state.options.minuteNotificationInterval = 1;
+      state.options.finalMinuteNotificationsEnabled = true;
+      state.options.backgroundTheme = "edge";
+      state.options.screenLockEnabled = false;
+      state.options.stopMusicOnFinish = false;
+    }
+    applyBackgroundTheme();
+  })();
+  return optionsConfigLoadPromise;
 }
 
 function saveOptionsConfig() {
+  const serialized = JSON.stringify({
+    showFreeTime: Boolean(state.options.showFreeTime),
+    missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
+    completionBeepCycles: Number(state.options.completionBeepCycles || 0),
+    minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
+    finalMinuteNotificationsEnabled: Boolean(state.options.finalMinuteNotificationsEnabled),
+    backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
+    screenLockEnabled: Boolean(state.options.screenLockEnabled),
+    stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish)
+  });
   try {
-    window.localStorage.setItem(optionsConfigKey, JSON.stringify({
-      showFreeTime: Boolean(state.options.showFreeTime),
-      missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
-      completionBeepCycles: Number(state.options.completionBeepCycles || 0),
-      minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
-      finalMinuteNotificationsEnabled: Boolean(state.options.finalMinuteNotificationsEnabled),
-      backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
-      screenLockEnabled: Boolean(state.options.screenLockEnabled),
-      stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish)
-    }));
+    window.localStorage.setItem(optionsConfigKey, serialized);
   } catch {}
+
+  const nativePreferences = window.Capacitor?.Plugins?.Preferences || null;
+  if (nativePreferences?.set) {
+    void nativePreferences.set({ key: optionsConfigKey, value: serialized }).catch(() => {});
+  }
 }
 
 function getInteractionClientY(event) {
@@ -15229,15 +15358,6 @@ missionProgressPlusButton?.addEventListener("click", () => {
   renderMissionProgressState();
 });
 
-missionProgressStartButton?.addEventListener("click", () => {
-  const goalId = String(state.missionProgress?.goalId || "").trim();
-  if (!goalId) {
-    return;
-  }
-  closeModal("missionProgressModal");
-  void openMissionRunModal(goalId);
-});
-
 document.querySelectorAll("[data-mission-adjust-add]").forEach((button) => {
   button.addEventListener("click", () => {
     state.missionAdjust.targetValue = Math.max(
@@ -15289,7 +15409,12 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
 missionProgressConfirmButton?.addEventListener("click", () => {
   const goalId = String(state.missionProgress?.goalId || "").trim();
   const deltaValue = Math.trunc(Number(state.missionProgress?.deltaValue || 0) || 0);
-  if (!goalId || deltaValue === 0) {
+  if (!goalId) {
+    return;
+  }
+  if (deltaValue === 0) {
+    closeModal("missionProgressModal");
+    void openMissionRunModal(goalId);
     return;
   }
 
@@ -16478,7 +16603,10 @@ historyTextForm?.addEventListener("submit", (event) => {
 state.profileLock = "";
 beginStartupLoading(loadingIconByArea.actions);
 applySelectedProfile(readSelectedProfile());
-void bootstrapProject200App();
+void (async () => {
+  await loadOptionsConfig();
+  await bootstrapProject200App();
+})();
 
 profileFooter?.addEventListener("contextmenu", (event) => {
   const button = event.target.closest("[data-profile]");
@@ -16817,7 +16945,7 @@ project200LoginForm?.addEventListener("submit", (event) => {
       const response = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, app: "project200" })
       }), {
         path: "/api/auth/login",
         iconSrc: loadingIconByArea.actions
@@ -16891,7 +17019,7 @@ project200RegisterForm?.addEventListener("submit", (event) => {
       const loginResponse = await runWithGlobalLoading(() => fetch(getApiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, app: "project200" })
       }), {
         path: "/api/auth/login",
         iconSrc: loadingIconByArea.actions
@@ -16920,7 +17048,6 @@ project200RegisterForm?.addEventListener("submit", (event) => {
   })();
 });
 
-loadOptionsConfig();
 applyScreenLockUi();
 scheduleScreenLockInactivity();
 startHomeDeviceClock();

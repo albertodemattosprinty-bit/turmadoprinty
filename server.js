@@ -1043,6 +1043,21 @@ function getR2Client() {
   return r2Client;
 }
 
+function ensureProject200MusicCatalogIds(stations = []) {
+  return (Array.isArray(stations) ? stations : []).map((station, stationIndex) => {
+    const stationId = String(station?.id || `radio-${String(stationIndex + 1).padStart(2, "0")}`).trim();
+    return {
+      ...station,
+      id: stationId,
+      tracks: (Array.isArray(station?.tracks) ? station.tracks : []).map((track, trackIndex) => ({
+        ...track,
+        id: String(track?.id || `${stationId}-track-${String(trackIndex + 1).padStart(3, "0")}`).trim(),
+        stationId
+      }))
+    };
+  });
+}
+
 async function listProject200MusicStations() {
   try {
     const radioStationsPath = path.join(__dirname, "public", "200", "radio-stations.json");
@@ -1052,16 +1067,18 @@ async function listProject200MusicStations() {
     const validStations = radioStations
       .filter((station) => Array.isArray(station?.tracks) && station.tracks.length > 0)
       .map((station) => ({
+        id: String(station?.id || "").trim(),
         name: String(station?.name || "").trim() || "Estação",
         tracks: station.tracks
           .filter((track) => String(track?.url || "").trim())
           .map((track) => ({
+            id: String(track?.id || "").trim(),
             name: String(track?.name || "Faixa").trim() || "Faixa",
             url: String(track?.url || "").trim()
           }))
       }));
     if (validStations.length) {
-      return validStations;
+      return ensureProject200MusicCatalogIds(validStations);
     }
   } catch {
     // Fall through to R2-based discovery.
@@ -1119,9 +1136,9 @@ async function listProject200MusicStations() {
         });
         return { name, tracks: renamed };
       });
-    return stations.length ? stations : fallbackStations;
+    return ensureProject200MusicCatalogIds(stations.length ? stations : fallbackStations);
   } catch {
-    return fallbackStations;
+    return ensureProject200MusicCatalogIds(fallbackStations);
   }
 }
 
@@ -2163,7 +2180,7 @@ function isProject200OnboardingRequestAllowed(request) {
     return true;
   }
   return request.method === "POST"
-    && /^\/api\/200\/profiles\/[^/]+\/avatar\/generate$/.test(pathname);
+    && /^\/api\/200\/profiles\/[^/]+\/avatar\/(?:generate|upload)$/.test(pathname);
 }
 
 async function requireAuth(request, response) {
@@ -11684,6 +11701,7 @@ const server = http.createServer(async (request, response) => {
 
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const app = typeof body.app === "string" ? body.app.trim().toLowerCase() : "";
 
     if (!isValidUsername(username) || !password) {
       sendJson(response, 400, { error: "Nome de usuario e senha sao obrigatorios." });
@@ -11705,7 +11723,10 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
-      const onboarding = await getProject200Onboarding(user.id);
+      const onboarding = app === "project200"
+        ? await initializeProject200Onboarding(user.id)
+        : await getProject200Onboarding(user.id);
+      user.project200_onboarding_required = Boolean(onboarding?.required);
       const session = await createSession(user.id);
 
       sendJson(response, 200, {
@@ -11844,7 +11865,11 @@ const server = http.createServer(async (request, response) => {
 
       const contractorState = await getUserContractorState(user.id);
       const project200Profile = await getProject200AssignedProfile(user.id);
-      const onboarding = await getProject200Onboarding(user.id);
+      const isProject200Session = String(requestUrl.searchParams.get("app") || "").trim().toLowerCase() === "project200";
+      const onboarding = isProject200Session
+        ? await initializeProject200Onboarding(user.id)
+        : await getProject200Onboarding(user.id);
+      user.project200_onboarding_required = Boolean(onboarding?.required);
 
       sendJson(response, 200, {
         ok: true,
@@ -12296,7 +12321,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 200, { ok: true, ...personalized });
         return;
       }
-      sendJson(response, 200, { ok: true, stations, preferences: { favoriteTrackUrls: [], defaults: [] } });
+      sendJson(response, 200, { ok: true, stations, preferences: { favoriteTrackUrls: [], favoriteTrackIds: [], defaults: [] } });
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel carregar as estacoes."
@@ -12316,6 +12341,8 @@ const server = http.createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const result = await toggleProject200MusicFavorite({
         userId: user.id,
+        stationId: body.stationId,
+        trackId: body.trackId,
         stationName: body.stationName,
         trackName: body.trackName,
         trackUrl: body.trackUrl,
@@ -12346,12 +12373,16 @@ const server = http.createServer(async (request, response) => {
         userId: user.id,
         taskTitle: body.taskTitle,
         mode: body.mode,
+        stationId: body.stationId,
+        trackId: body.trackId,
         stationName: body.stationName,
         trackName: body.trackName,
         trackUrl: body.trackUrl
       });
       await setActionMusicDefaultByTitle(user.id, body.taskTitle, {
         mode: body.mode,
+        stationId: body.stationId,
+        trackId: body.trackId,
         stationName: body.stationName,
         trackName: body.trackName,
         trackUrl: body.trackUrl

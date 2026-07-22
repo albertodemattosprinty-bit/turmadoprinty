@@ -8518,6 +8518,11 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
 #missionProgressModal .mission-progress-confirm-btn {
   height: 58px;
   aspect-ratio: auto;
+  background: linear-gradient(135deg, #28b76b, #16894c);
+  box-shadow: 0 14px 30px rgba(17, 137, 76, 0.3);
+}
+
+#missionProgressModal .mission-progress-confirm-btn.is-update {
   background: linear-gradient(135deg, #2988ff, #1757ca);
   box-shadow: 0 14px 30px rgba(23, 87, 202, 0.34);
 }
