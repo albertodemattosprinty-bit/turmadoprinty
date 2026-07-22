@@ -93,7 +93,8 @@ async function getTutorLink(userId, contactUserId = "") {
     )`;
   }
   const result = await query(
-    `select id, owner_user_id, tutor_user_id, active, created_at, updated_at
+    `select id, owner_user_id, tutor_user_id, active, created_at, updated_at,
+            clock_timestamp() as sync_cursor
        from project200_tutor_links
       where active = true
         and (owner_user_id = $1 or tutor_user_id = $1)
@@ -203,6 +204,7 @@ export async function ensureProject200TutorsSchema() {
           primary key (recipient_user_id, message_id, proposal_key)
         );
       `);
+      await query("create index if not exists idx_project200_tutor_proposal_applications_message_updated on project200_tutor_proposal_applications(message_id, updated_at desc);");
     })().catch((error) => {
       tutorsSchemaPromise = null;
       throw error;
@@ -278,11 +280,18 @@ export async function addProject200Tutor(userId, tutorUserId) {
   return listProject200Tutors(ownerId);
 }
 
-export async function listProject200TutorMessages(userId, contactUserId, limit = 80) {
+export async function listProject200TutorMessages(userId, contactUserId, limit = 80, after = "") {
   const viewerId = normalizeId(userId);
   const link = await getTutorLink(viewerId, contactUserId);
   if (!link) throw new Error("Tutor nao encontrado.");
   const safeLimit = Math.max(1, Math.min(MAX_MESSAGES, Math.trunc(Number(limit) || 80)));
+  const rawAfter = String(after || "").trim();
+  const afterDate = rawAfter ? new Date(rawAfter) : null;
+  if (afterDate && Number.isNaN(afterDate.getTime())) {
+    throw new Error("Cursor de mensagens invalido.");
+  }
+  const cursor = new Date(link.sync_cursor || Date.now()).toISOString();
+  const afterIso = afterDate ? afterDate.toISOString() : null;
   const result = await query(
     `select recent.*,
             $3::uuid as owner_user_id,
@@ -295,19 +304,34 @@ export async function listProject200TutorMessages(userId, contactUserId, limit =
                where application.message_id = recent.id
             ), '[]'::jsonb) as applications
        from (
-         select id, link_id, sender_user_id, recipient_user_id, content, proposals,
-                content_encrypted, proposals_encrypted, encryption_version, created_at
-           from project200_tutor_messages
-          where link_id = $1
-          order by created_at desc
+         select message.id, message.link_id, message.sender_user_id, message.recipient_user_id,
+                message.content, message.proposals, message.content_encrypted,
+                message.proposals_encrypted, message.encryption_version, message.created_at
+           from project200_tutor_messages message
+          where message.link_id = $1
+            and message.created_at <= $5::timestamptz
+            and (
+              $4::timestamptz is null
+              or message.created_at > $4::timestamptz
+              or exists (
+                select 1
+                  from project200_tutor_proposal_applications changed_application
+                 where changed_application.message_id = message.id
+                   and changed_application.updated_at > $4::timestamptz
+                   and changed_application.updated_at <= $5::timestamptz
+              )
+            )
+          order by message.created_at desc
           limit $2
        ) recent
       order by recent.created_at asc`,
-    [link.id, safeLimit, link.owner_user_id]
+    [link.id, safeLimit, link.owner_user_id, afterIso, cursor]
   );
   return {
     linkId: normalizeId(link.id),
     contactUserId: getCounterpartUserId(link, viewerId),
+    cursor,
+    incremental: Boolean(afterIso),
     messages: await Promise.all(result.rows.map((row) => normalizeTutorMessage(viewerId, row)))
   };
 }

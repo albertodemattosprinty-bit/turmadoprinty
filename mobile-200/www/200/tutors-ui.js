@@ -42,6 +42,10 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     messages: [],
     sending: false,
     pollTimer: 0,
+    syncCursor: "",
+    syncing: false,
+    syncToken: 0,
+    syncContactId: "",
     renderingContacts: false
   };
 
@@ -160,7 +164,38 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     return button;
   }
 
-  function renderMessages({ preserveScroll = false } = {}) {
+  function messageFingerprint(message) {
+    return JSON.stringify([
+      String(message?.id || ""),
+      String(message?.role || ""),
+      String(message?.content || ""),
+      String(message?.createdAt || ""),
+      Array.isArray(message?.proposals) ? message.proposals : []
+    ]);
+  }
+
+  function conversationFingerprint(messages) {
+    return (Array.isArray(messages) ? messages : [])
+      .map((message) => messageFingerprint(message))
+      .join("\n");
+  }
+
+  function mergeMessageChanges(changes) {
+    const merged = new Map(state.messages.map((message) => [String(message?.id || ""), message]));
+    changes.forEach((message) => {
+      const id = String(message?.id || "");
+      if (id) merged.set(id, message);
+    });
+    state.messages = [...merged.values()]
+      .sort((left, right) => {
+        const leftTime = Date.parse(String(left?.createdAt || "")) || 0;
+        const rightTime = Date.parse(String(right?.createdAt || "")) || 0;
+        return leftTime - rightTime || String(left?.id || "").localeCompare(String(right?.id || ""));
+      })
+      .slice(-100);
+  }
+
+  function renderMessages({ preserveScroll = false, animateMessageIds = new Set() } = {}) {
     if (!elements.messages || !state.human) return;
     const bottomDistance = elements.messages.scrollHeight - elements.messages.scrollTop - elements.messages.clientHeight;
     elements.messages.innerHTML = "";
@@ -172,8 +207,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       return;
     }
     state.messages.forEach((message) => {
+      const messageId = String(message?.id || "");
       const bubble = document.createElement("article");
       bubble.className = "marin-message " + (message.role === "user" ? "is-user" : "is-assistant");
+      if (!animateMessageIds.has(messageId)) {
+        bubble.classList.add("is-synced");
+      }
       const copy = document.createElement("div");
       copy.className = "marin-message-copy";
       copy.textContent = String(message.content || "");
@@ -302,18 +341,58 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     }
   }
 
-  async function refreshMessages({ silent = true } = {}) {
+  async function refreshMessages({ silent = true, forceFull = false } = {}) {
     const contactId = activeContactId();
     if (!state.human || !contactId) return;
+    if (state.syncing && state.syncContactId === contactId) return;
+
+    const useCursor = !forceFull && Boolean(state.syncCursor);
+    const requestToken = state.syncToken + 1;
+    state.syncToken = requestToken;
+    state.syncing = true;
+    state.syncContactId = contactId;
+    let requestPath = "/api/200/tutors/" + encodeURIComponent(contactId) + "/messages?limit=80";
+    if (useCursor) {
+      requestPath += "&after=" + encodeURIComponent(state.syncCursor);
+    }
+
     try {
-      const payload = await apiRequest("/api/200/tutors/" + encodeURIComponent(contactId) + "/messages?limit=80", {
-        skipGlobalLoading: true
-      });
-      state.messages = Array.isArray(payload?.messages) ? payload.messages : [];
-      renderMessages({ preserveScroll: silent });
+      const payload = await apiRequest(requestPath, { skipGlobalLoading: true });
+      if (
+        requestToken !== state.syncToken
+        || !state.human
+        || activeContactId() !== contactId
+      ) {
+        return;
+      }
+
+      const changes = Array.isArray(payload?.messages) ? payload.messages : [];
+      const previousIds = new Set(state.messages.map((message) => String(message?.id || "")));
+      const beforeFingerprint = conversationFingerprint(state.messages);
+      if (useCursor) {
+        mergeMessageChanges(changes);
+      } else {
+        state.messages = changes.slice(-100);
+      }
+      state.syncCursor = String(payload?.cursor || state.syncCursor || "");
+      const afterFingerprint = conversationFingerprint(state.messages);
+
+      if (beforeFingerprint !== afterFingerprint) {
+        const animateMessageIds = silent
+          ? new Set(changes
+              .map((message) => String(message?.id || ""))
+              .filter((id) => id && !previousIds.has(id)))
+          : new Set();
+        renderMessages({ preserveScroll: silent, animateMessageIds });
+      }
       if (!silent) setStatus("");
     } catch (error) {
       if (!silent) setStatus(error instanceof Error ? error.message : "Nao foi possivel abrir a conversa.");
+    } finally {
+      if (requestToken === state.syncToken) {
+        state.syncing = false;
+        state.syncContactId = "";
+      }
     }
   }
 
@@ -322,22 +401,37 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     state.pollTimer = 0;
   }
 
+  function canPollMessages() {
+    return Boolean(
+      state.human
+      && activeContactId()
+      && !document.hidden
+      && elements.chatModal?.classList.contains("active")
+    );
+  }
+
   function startPolling() {
     stopPolling();
     if (!state.human || !activeContactId()) return;
     state.pollTimer = window.setInterval(() => {
-      if (state.human && elements.chatModal?.classList.contains("active")) {
+      if (canPollMessages()) {
         void refreshMessages({ silent: true });
       }
-    }, 2500);
+    }, 5000);
+  }
+
+  function syncVisibleConversation() {
+    if (canPollMessages()) {
+      void refreshMessages({ silent: true });
+    }
   }
 
   async function openHumanChat() {
     if (!state.human || !state.activeTutor) return;
     openModal("marinChatModal");
     updateHeader();
-    renderMessages();
-    await refreshMessages({ silent: false });
+    renderMessages({ animateMessageIds: new Set() });
+    await refreshMessages({ silent: false, forceFull: !state.syncCursor });
     startPolling();
     window.setTimeout(() => elements.input?.focus({ preventScroll: true }), 60);
   }
@@ -346,6 +440,10 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     state.human = true;
     state.activeTutor = tutor;
     state.messages = [];
+    state.syncCursor = "";
+    state.syncToken += 1;
+    state.syncing = false;
+    state.syncContactId = "";
     closeModal(elements.personaModal);
     closeModal(elements.tutorModal);
     updateHeader();
@@ -358,6 +456,10 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     state.human = false;
     state.activeTutor = null;
     state.messages = [];
+    state.syncCursor = "";
+    state.syncToken += 1;
+    state.syncing = false;
+    state.syncContactId = "";
     stopPolling();
     updateHeader();
     renderTutorContacts();
@@ -368,11 +470,18 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     const contactId = activeContactId();
     if (!state.human || !content || !contactId || state.sending) return;
     const localId = "local-" + Date.now();
-    state.messages.push({ id: localId, role: "user", content, proposals: [], source: "human" });
+    state.messages.push({
+      id: localId,
+      role: "user",
+      content,
+      proposals: [],
+      source: "human",
+      createdAt: new Date().toISOString()
+    });
     elements.input.value = "";
     state.sending = true;
     if (elements.send) elements.send.disabled = true;
-    renderMessages();
+    renderMessages({ animateMessageIds: new Set([localId]) });
     setStatus("Enviando...");
     try {
       const payload = await apiRequest("/api/200/tutors/" + encodeURIComponent(contactId) + "/messages", {
@@ -383,11 +492,13 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       });
       state.messages = state.messages.filter((message) => message.id !== localId);
       if (payload?.message) state.messages.push(payload.message);
-      renderMessages();
+      renderMessages({
+        animateMessageIds: new Set(payload?.message?.id ? [String(payload.message.id)] : [])
+      });
       setStatus("");
     } catch (error) {
       state.messages = state.messages.filter((message) => message.id !== localId);
-      renderMessages();
+      renderMessages({ animateMessageIds: new Set() });
       setStatus(error instanceof Error ? error.message : "Nao foi possivel enviar.");
     } finally {
       state.sending = false;
@@ -408,7 +519,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       skipGlobalLoading: true
     });
     if (payload?.message) state.messages.push(payload.message);
-    renderMessages();
+    renderMessages({
+      animateMessageIds: new Set(payload?.message?.id ? [String(payload.message.id)] : [])
+    });
     return payload?.message || null;
   }
 
@@ -452,6 +565,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     if (!state.human || !activeContactId()) return;
     if (typeof onRequestProposal === "function") onRequestProposal(type);
   }
+
+  document.addEventListener("visibilitychange", syncVisibleConversation);
+  window.addEventListener("focus", syncVisibleConversation);
 
   elements.chatPersonButton?.addEventListener("click", (event) => {
     event.preventDefault();

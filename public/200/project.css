@@ -8929,6 +8929,10 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   animation: marinMessageIn 180ms ease-out both;
 }
 
+.marin-message.is-synced {
+  animation: none;
+}
+
 @keyframes marinMessageIn {
   from { opacity: 0; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }
@@ -9602,6 +9606,27 @@ body[data-background-theme="white"] .marin-proposal-meta {
   gap: 7px;
 }
 
+#marinChatPersonaButton {
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  min-height: 46px;
+  flex: 0 0 46px;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+#marinChatPersonaButton .marin-chat-contact-avatar {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+}
+
 .marin-chat-proposal-button {
   border-color: rgba(91, 240, 167, 0.5);
   background: linear-gradient(145deg, rgba(20, 125, 240, 0.95), rgba(25, 215, 168, 0.88));
@@ -9714,5 +9739,11 @@ body[data-background-theme="white"] :is(
   .marin-chat-header-actions .marin-round-button {
     width: 42px;
     height: 42px;
+  }
+
+  #marinChatPersonaButton {
+    min-width: 42px;
+    min-height: 42px;
+    flex-basis: 42px;
   }
 }

@@ -3979,7 +3979,8 @@ async function handleProject200TutorMessagesRequest(request, response, contactUs
     const payload = await listProject200TutorMessages(
       user.id,
       contactUserId,
-      requestUrl.searchParams.get("limit") || 80
+      requestUrl.searchParams.get("limit") || 80,
+      requestUrl.searchParams.get("after") || ""
     );
     sendJson(response, 200, { ok: true, ...payload });
   } catch (error) {

@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=20260721-home-onboarding-v2";
-import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260722-tutors-v1";
+import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260722-tutors-sync-v2";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
 
 import {
