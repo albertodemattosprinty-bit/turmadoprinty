@@ -443,7 +443,12 @@
         <span>Faça login em outro fluxo do app para sincronizar a agenda nesta conta.</span>
       </div>
 
-      <div class="actions-list" id="actionsList" aria-live="polite"></div>
+      <div class="actions-content">
+        <div class="actions-list" id="actionsList" aria-live="polite"></div>
+        <section class="actions-missions-panel" id="actionsMissionsPanel" aria-label="Missões do usuário" hidden>
+          <div class="actions-missions-list" id="actionsMissionsList" aria-live="polite"></div>
+        </section>
+      </div>
       <footer class="actions-progress" id="actionsProgress" hidden>
         <div class="actions-progress-head">
           <strong id="actionsProgressLabel">0% concluido</strong>
@@ -458,9 +463,8 @@
           <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openActionWizard" aria-label="Adicionar tarefa">
             <span class="actions-side-plus" aria-hidden="true">+</span>
           </button>
-          <button class="icon-action-btn actions-mission-filter-btn" type="button" id="actionsMissionFilterButton" aria-label="Mostrar somente missões">
-            <span id="actionsMissionRemainingCount">0</span>
-            <svg id="actionsMissionListIcon" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M5 6h14v2H5V6Zm0 5h14v2H5v-2Zm0 5h14v2H5v-2Z"/></svg>
+          <button class="icon-action-btn actions-mission-filter-btn" type="button" id="actionsMissionFilterButton" aria-label="Abrir missões" aria-controls="actionsMissionsPanel" aria-expanded="false">
+            <img src="/200/icons/target.svg" alt="" aria-hidden="true" />
           </button>
         </div>
         <button class="icon-action-btn actions-side-btn actions-footer-nav" type="button" data-day-nav="-1" aria-label="Data anterior">

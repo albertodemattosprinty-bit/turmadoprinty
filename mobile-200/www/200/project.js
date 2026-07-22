@@ -20,9 +20,8 @@ const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
 const missionVariantSortKey = "project_200_mission_variant_sort_v1";
 const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
-const missionActionsModes = ["show", "hide", "separate"];
+const missionActionsModes = ["separate", "hide"];
 const missionActionsModeLabels = new Map([
-  ["show", "Mostrar"],
   ["hide", "Não mostrar"],
   ["separate", "Janela separada"]
 ]);
@@ -187,8 +186,8 @@ const actionsProgressLabel = document.getElementById("actionsProgressLabel");
 const actionsProgressMinutes = document.getElementById("actionsProgressMinutes");
 const actionsProgressFill = document.getElementById("actionsProgressFill");
 const actionsMissionFilterButton = document.getElementById("actionsMissionFilterButton");
-const actionsMissionRemainingCount = document.getElementById("actionsMissionRemainingCount");
-const actionsMissionListIcon = document.getElementById("actionsMissionListIcon");
+const actionsMissionsPanel = document.getElementById("actionsMissionsPanel");
+const actionsMissionsList = document.getElementById("actionsMissionsList");
 const financeDateLabel = document.getElementById("financeDateLabel");
 const platformEntriesList = document.getElementById("platformEntriesList");
 const financeEntryConfirmWizard = document.getElementById("financeEntryConfirmWizard");
@@ -1178,7 +1177,7 @@ const state = {
   wizard: buildInitialWizardState(),
   options: {
     showFreeTime: true,
-    missionActionsMode: "show",
+    missionActionsMode: "separate",
     completionBeepCycles: 0,
     minuteNotificationInterval: 1,
     finalMinuteNotificationsEnabled: true,
@@ -1965,132 +1964,85 @@ function buildActionTimelineEntries() {
 
 function normalizeMissionActionsMode(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  return missionActionsModes.includes(normalized) ? normalized : "show";
-}
-
-function buildPendingActionMissionUnits() {
-  if (state.activeOffset !== 0) return [];
-  const weightedGoals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).map((goal, goalIndex) => {
-    const targetValue = Math.max(1, Math.trunc(Number(goal?.targetValue || 1) || 1));
-    const progressValue = Math.max(0, Math.trunc(Number(goal?.progressValue || 0) || 0));
-    const remainingValue = Math.max(0, targetValue - progressValue);
-    return {
-      goal,
-      goalIndex,
-      progressValue,
-      remainingValue,
-      emittedValue: 0,
-      currentWeight: 0
-    };
-  }).filter((entry) => entry.remainingValue > 0);
-  const totalWeight = weightedGoals.reduce((sum, entry) => sum + entry.remainingValue, 0);
-  const units = [];
-  let lastGoalIndex = -1;
-  while (units.length < totalWeight) {
-    weightedGoals.forEach((entry) => {
-      if (entry.emittedValue < entry.remainingValue) {
-        entry.currentWeight += entry.remainingValue;
-      }
-    });
-    const available = weightedGoals.filter((entry) => entry.emittedValue < entry.remainingValue);
-    if (!available.length) break;
-    available.sort((left, right) => (
-      right.currentWeight - left.currentWeight
-      || left.goalIndex - right.goalIndex
-    ));
-    let selected = available[0];
-    if (selected.goalIndex === lastGoalIndex && available.length > 1) {
-      const selectedRemaining = selected.remainingValue - selected.emittedValue;
-      const otherRemaining = available.reduce((sum, entry) => (
-        entry.goalIndex === selected.goalIndex ? sum : sum + (entry.remainingValue - entry.emittedValue)
-      ), 0);
-      if (selectedRemaining <= otherRemaining + 1) {
-        selected = available.find((entry) => entry.goalIndex !== lastGoalIndex) || selected;
-      }
-    }
-    selected.currentWeight -= totalWeight;
-    selected.emittedValue += 1;
-    lastGoalIndex = selected.goalIndex;
-    units.push({
-      goal: selected.goal,
-      unitIndex: selected.progressValue + selected.emittedValue
-    });
-  }
-  return units;
-}
-
-function getActionMissionScheduleBounds() {
-  const scheduled = getVisibleActions()
-    .map((action) => ({
-      startMs: new Date(action?.startAt).getTime(),
-      endMs: new Date(action?.endAt).getTime()
-    }))
-    .filter((entry) => Number.isFinite(entry.startMs))
-    .sort((left, right) => left.startMs - right.startMs);
-  if (scheduled.length >= 2) {
-    const startMs = scheduled[0].startMs;
-    const last = scheduled[scheduled.length - 1];
-    const endMs = last.startMs > startMs
-      ? last.startMs
-      : (Number.isFinite(last.endMs) && last.endMs > startMs ? last.endMs : startMs + (60 * 60 * 1000));
-    return { startMs, endMs };
-  }
-  if (scheduled.length === 1) {
-    const startMs = scheduled[0].startMs;
-    const endMs = Number.isFinite(scheduled[0].endMs) && scheduled[0].endMs > startMs
-      ? scheduled[0].endMs
-      : startMs + (60 * 60 * 1000);
-    return { startMs, endMs };
-  }
-  const selectedDate = dateFromOffset(state.activeOffset);
-  const startMs = projectDateKeyToDate(getProjectDateKey(selectedDate), 8, 0).getTime();
-  return { startMs, endMs: projectDateKeyToDate(getProjectDateKey(selectedDate), 20, 0).getTime() };
-}
-
-function buildActionMissionTimelineEntries() {
-  const units = buildPendingActionMissionUnits();
-  if (!units.length) return [];
-  const { startMs, endMs } = getActionMissionScheduleBounds();
-  const rangeMs = Math.max(0, endMs - startMs);
-  return units.map(({ goal, unitIndex }, index) => {
-    const ratio = (index + 1) / (units.length + 1);
-    const scheduledMs = startMs + (rangeMs * ratio);
-    const durationSeconds = Math.max(1, getMissionUnitDurationSeconds(goal));
-    return {
-      kind: "mission",
-      id: `mission-${String(goal?.id || "")}-${unitIndex}`,
-      goalId: String(goal?.id || ""),
-      goal,
-      unitIndex,
-      status: actionStatuses.pending,
-      title: String(goal?.title || "Missão"),
-      startAt: new Date(scheduledMs).toISOString(),
-      endAt: new Date(scheduledMs + (durationSeconds * 1000)).toISOString()
-    };
-  });
-}
-
-function formatActionMissionDuration(goal) {
-  return formatMissionDurationValue(getMissionUnitDurationSeconds(goal));
+  if (normalized === "show") return "separate";
+  return missionActionsModes.includes(normalized) ? normalized : "separate";
 }
 
 function renderActionsMissionFilter() {
   if (!actionsMissionFilterButton) return;
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
   const isAvailable = Boolean(getToken()) && state.activeOffset === 0 && mode !== "hide";
-  const remainingCount = buildPendingActionMissionUnits().length;
   actionsMissionFilterButton.hidden = !isAvailable;
   actionsMissionFilterButton.classList.toggle("is-filtering", state.actionsMissionOnly);
   actionsMissionFilterButton.setAttribute("aria-label", state.actionsMissionOnly
     ? "Voltar para a lista de ações"
-    : `Mostrar somente missões: ${remainingCount} restantes`);
-  if (actionsMissionRemainingCount) {
-    actionsMissionRemainingCount.hidden = state.actionsMissionOnly;
-    actionsMissionRemainingCount.textContent = String(remainingCount);
+    : "Abrir missões");
+  actionsMissionFilterButton.setAttribute("aria-controls", "actionsMissionsPanel");
+  actionsMissionFilterButton.setAttribute("aria-expanded", state.actionsMissionOnly ? "true" : "false");
+}
+
+function getAvailableMissionById(goalId) {
+  const normalizedId = String(goalId || "").trim();
+  if (!normalizedId) return null;
+  return [state.missions, state.actionMissions]
+    .flatMap((collection) => Array.isArray(collection) ? collection : [])
+    .find((goal) => String(goal?.id || "") === normalizedId) || null;
+}
+
+function getActionsMissionProgress(goal) {
+  const variants = Array.isArray(goal?.variants) ? goal.variants : [];
+  const dailyVariantProgress = variants.length ? getMissionVariantsDailyProgress(variants) : null;
+  const progress = dailyVariantProgress
+    ? Math.max(0, Number(dailyVariantProgress.completed || 0))
+    : Math.max(0, Number(goal?.progressValue || 0));
+  const target = dailyVariantProgress
+    ? Math.max(0, Number(dailyVariantProgress.total || 0))
+    : Math.max(1, Number(goal?.targetValue || 1));
+  return {
+    progress: Math.max(0, Math.trunc(progress)),
+    target: Math.max(0, Math.trunc(target)),
+    percent: dailyVariantProgress
+      ? dailyVariantProgress.percent
+      : Math.max(0, Math.min(100, Math.round((progress / Math.max(1, target)) * 100)))
+  };
+}
+
+function renderActionsMissionsPanel() {
+  if (!actionsMissionsPanel || !actionsMissionsList) return;
+  const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  const isOpen = Boolean(getToken()) && state.activeOffset === 0 && mode !== "hide" && state.actionsMissionOnly;
+  actionsMissionsPanel.hidden = !isOpen;
+  actionsList.hidden = isOpen;
+  if (!isOpen) return;
+
+  const goals = Array.isArray(state.actionMissions) ? state.actionMissions : [];
+  actionsMissionsList.innerHTML = "";
+  if (!goals.length) {
+    actionsMissionsList.innerHTML = '<div class="empty-state">Você não tem missões para hoje.</div>';
+    return;
   }
-  if (actionsMissionListIcon) {
-    actionsMissionListIcon.hidden = !state.actionsMissionOnly;
-  }
+
+  goals.forEach((goal) => {
+    const progress = getActionsMissionProgress(goal);
+    const card = document.createElement("article");
+    card.className = "actions-mission-card";
+    card.dataset.actionsMissionGoalId = String(goal?.id || "");
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
+    card.innerHTML = `
+      <div class="actions-mission-card-copy">
+        <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
+        <p>${progress.progress} de ${progress.target}</p>
+      </div>
+      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(String(goal?.id || ""))}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
+      </button>
+      <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
+        <div class="actions-mission-card-fill" style="width:${progress.percent}%"></div>
+      </div>
+    `;
+    actionsMissionsList.appendChild(card);
+  });
 }
 
 function getRunningActionProgressState(action) {
@@ -5571,6 +5523,10 @@ function closeModal(modal) {
     closeHistoryTextComposer();
   }
 
+  if (["missionAdjustModal", "missionProgressModal"].includes(modal.id)) {
+    document.body.classList.remove("actions-mission-editor-open");
+  }
+
   if (modal.id === "profileAvatarModal") {
     resetProfileAvatarModal();
     profileAvatarTargetId = "";
@@ -6017,6 +5973,7 @@ function renderActions() {
   actionsList.innerHTML = "";
   actionsAuthAlert.hidden = Boolean(getToken());
   renderActionsMissionFilter();
+  renderActionsMissionsPanel();
 
   if (!getToken()) {
     actionsProgress.hidden = true;
@@ -6024,46 +5981,17 @@ function renderActions() {
     return;
   }
 
-  const missionMode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  const missionEntries = buildActionMissionTimelineEntries();
-  const actionEntries = buildActionTimelineEntries();
-  const timelineEntries = (state.actionsMissionOnly
-    ? missionEntries
-    : missionMode === "show" ? [...actionEntries, ...missionEntries] : actionEntries)
+  const timelineEntries = buildActionTimelineEntries()
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
 
   if (!timelineEntries.length) {
-    actionsList.innerHTML = state.actionsMissionOnly
-      ? '<div class="empty-state">Todas as missões do dia foram concluídas.</div>'
-      : '<div class="empty-state">Sem tarefas nesse dia.</div>';
+    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse dia.</div>';
   }
 
   timelineEntries.forEach((action) => {
     const slotOwner = state.selectedProfile;
     const slotAvatar = getActionAvatarPath(slotOwner);
-    if (action.kind === "mission") {
-      const delayMinutes = getPendingDelayMinutes(action);
-      const cleanPendingClass = delayMinutes <= 0 ? " task-pending-clean" : "";
-      const row = document.createElement("article");
-      row.className = `task-row task-mission-entry${getDelayClassByMinutes(delayMinutes)}${cleanPendingClass}`;
-      if (delayMinutes > 0 && delayMinutes <= 15) {
-        row.style.setProperty("--delay-soft-rgb", getDelaySoftRgbByMinutes(delayMinutes));
-      }
-      row.dataset.actionMissionGoalId = String(action.goalId || "");
-      row.setAttribute("role", "button");
-      row.tabIndex = 0;
-      const missionIcon = getMissionDisplayIcon(action.goal);
-      row.innerHTML = `
-        ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: true })}
-        <div class="task-main">
-          <div class="task-title">${buildActionTitleMarkup(action.title, getActionThemeDotColor(action, { delayMinutes }), false)}</div>
-          <div class="task-assignee task-duration">${escapeHtml(formatActionMissionDuration(action.goal))}</div>
-        </div>
-        <div class="task-time" aria-hidden="true"></div>
-      `;
-      actionsList.appendChild(row);
-      return;
-    }
+
     if (action.kind === "free") {
       const duration = getActionDurationMinutes(action);
       const ended = getServerNowMs() >= new Date(action.endAt).getTime();
@@ -6122,6 +6050,9 @@ function renderActions() {
   });
 
   renderActionsProgress();
+  if (state.actionsMissionOnly) {
+    actionsProgress.hidden = true;
+  }
   renderHomeRunningTask();
   if (document.getElementById("actionsModal")?.classList.contains("active")) {
     window.requestAnimationFrame(() => {
@@ -11712,6 +11643,7 @@ function refreshStatsMissionsFromLocalState() {
 
 function applyMissionProgressLocally(goalId, delta) {
   state.missions = updateMissionProgressCollection(state.missions, goalId, delta);
+  state.actionMissions = updateMissionProgressCollection(state.actionMissions, goalId, delta);
   state.statsScopeMissions = updateMissionProgressCollection(state.statsScopeMissions, goalId, delta);
   if (state.statsAspectLinks) {
     state.statsAspectLinks.missions = updateMissionProgressCollection(state.statsAspectLinks.missions, goalId, delta);
@@ -12217,7 +12149,7 @@ function openMissionCreateModal() {
 }
 
 function openMissionAdjustModal(goalId) {
-  const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id) === String(goalId));
+  const goal = getAvailableMissionById(goalId);
   if (!goal) {
     return;
   }
@@ -12283,7 +12215,7 @@ function openMissionTimeModal(mode) {
       value: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds)
     };
   } else {
-    const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === String(state.missionAdjust?.goalId || ""));
+    const goal = getAvailableMissionById(state.missionAdjust?.goalId);
     state.missionTime = {
       mode: "adjust",
       title: String(goal?.title || missionAdjustTitle?.textContent || "esta missão").trim(),
@@ -12906,11 +12838,14 @@ function getMissionVariantsDailyProgress(variants, nowMs = getServerNowMs()) {
 
 function syncMissionVariantsIntoMissionState(goalId, items) {
   const variants = Array.isArray(items) ? items : [];
-  state.missions = (Array.isArray(state.missions) ? state.missions : []).map((goal) => (
+  const syncCollection = (collection) => (Array.isArray(collection) ? collection : []).map((goal) => (
     String(goal?.id || "") === String(goalId || "")
       ? { ...goal, variants, variantCount: variants.length }
       : goal
   ));
+  state.missions = syncCollection(state.missions);
+  state.actionMissions = syncCollection(state.actionMissions);
+  renderActionsMissionsPanel();
 }
 
 function renderMissionVariants() {
@@ -13136,7 +13071,7 @@ async function finalizeMissionRun(triggerButton = null) {
 }
 
 function openMissionProgressModal(goalId) {
-  const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id) === String(goalId));
+  const goal = getAvailableMissionById(goalId);
   if (!goal) {
     return;
   }
@@ -14142,7 +14077,7 @@ async function loadOptionsConfig() {
       state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
     } catch {
       state.options.showFreeTime = true;
-      state.options.missionActionsMode = "show";
+      state.options.missionActionsMode = "separate";
       state.options.completionBeepCycles = 0;
       state.options.minuteNotificationInterval = 1;
       state.options.finalMinuteNotificationsEnabled = true;
@@ -14292,7 +14227,7 @@ function renderOptionsModal() {
   toggleFreeTimeOptionButton?.classList.toggle("is-off", !state.options.showFreeTime);
   const missionActionsMode = normalizeMissionActionsMode(state.options.missionActionsMode);
   if (toggleMissionActionsHint) {
-    toggleMissionActionsHint.textContent = missionActionsModeLabels.get(missionActionsMode) || "Mostrar";
+    toggleMissionActionsHint.textContent = missionActionsModeLabels.get(missionActionsMode) || "Janela separada";
   }
   toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode === "hide");
   if (toggleTaskBeepHint) {
@@ -14814,11 +14749,6 @@ actionsList.addEventListener("pointerleave", endActionLongPress);
 actionsList.addEventListener("pointercancel", endActionLongPress);
 
 actionsList.addEventListener("click", async (event) => {
-  const missionRow = event.target.closest("[data-action-mission-goal-id]");
-  if (missionRow) {
-    openMissionRunModal(String(missionRow.dataset.actionMissionGoalId || ""));
-    return;
-  }
   const row = event.target.closest("[data-action-id]");
   if (!row) {
     return;
@@ -14910,13 +14840,6 @@ platformEntriesList?.addEventListener("click", async (event) => {
 
 actionsList.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter" && event.key !== " ") {
-    return;
-  }
-
-  const missionRow = event.target.closest("[data-action-mission-goal-id]");
-  if (missionRow) {
-    event.preventDefault();
-    openMissionRunModal(String(missionRow.dataset.actionMissionGoalId || ""));
     return;
   }
 
@@ -15477,7 +15400,7 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
   void (async () => {
     const goalId = String(state.missionAdjust?.goalId || "").trim();
     const targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust?.targetValue || 1) || 1));
-    const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === goalId) || null;
+    const goal = getAvailableMissionById(goalId);
     if (!goalId) {
       return;
     }
@@ -15499,8 +15422,9 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
         })
       });
       closeModal("missionAdjustModal");
-      await loadMissions();
+      await Promise.all([loadMissions(), loadActionMissions()]);
       renderMissions();
+      renderActionsMissionsPanel();
     } catch (error) {
       if (missionAdjustStatus) {
         missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
@@ -15525,12 +15449,14 @@ missionProgressConfirmButton?.addEventListener("click", () => {
 
   const rollback = {
     missions: (state.missions || []).map((item) => ({ ...item })),
+    actionMissions: (state.actionMissions || []).map((item) => ({ ...item })),
     statsScopeMissions: (state.statsScopeMissions || []).map((item) => ({ ...item })),
     linkedMissions: (state.statsAspectLinks?.missions || []).map((item) => ({ ...item }))
   };
 
   applyMissionProgressLocally(goalId, deltaValue);
   renderMissions();
+  renderActionsMissionsPanel();
   renderRunningMissionQuickButtons();
   closeModal("missionProgressModal");
   if (deltaValue > 0) {
@@ -15548,22 +15474,26 @@ missionProgressConfirmButton?.addEventListener("click", () => {
   }).then((payload) => {
     if (Array.isArray(payload?.goals)) {
       state.missions = payload.goals;
+      state.actionMissions = payload.goals;
       if (getActiveStatsScope().key === "today") {
         state.statsScopeMissions = payload.goals;
       }
     }
     refreshStatsMissionsFromLocalState();
     renderMissions();
+    renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
     enqueuePointsUpdateFeedback(payload?.pointsUpdate);
   }).catch((error) => {
     state.missions = rollback.missions;
+    state.actionMissions = rollback.actionMissions;
     state.statsScopeMissions = rollback.statsScopeMissions;
     if (state.statsAspectLinks) {
       state.statsAspectLinks.missions = rollback.linkedMissions;
     }
     refreshStatsMissionsFromLocalState();
     renderMissions();
+    renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
     if (missionStatus) {
       missionStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar progresso.";
@@ -15574,8 +15504,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
 missionAdjustDeleteButton?.addEventListener("click", () => {
   const goalId = String(state.missionAdjust?.goalId || "").trim();
   if (!goalId) return;
-  const goal = (Array.isArray(state.missions) ? state.missions : [])
-    .find((item) => String(item?.id || "") === goalId) || { title: "Missão" };
+  const goal = getAvailableMissionById(goalId) || { title: "Missão" };
   openRunningConfirmModal("delete_mission", goal, () => {
     void (async () => {
       const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
@@ -15595,8 +15524,9 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
         });
         persistMissionQuickSlots();
         closeModal("missionAdjustModal");
-        await loadMissions();
+        await Promise.all([loadMissions(), loadActionMissions()]);
         renderMissions();
+        renderActionsMissionsPanel();
         renderRunningMissionQuickButtons();
       } catch (error) {
         if (missionAdjustStatus) {
@@ -16183,7 +16113,33 @@ actionsMissionFilterButton?.addEventListener("click", () => {
   if (normalizeMissionActionsMode(state.options.missionActionsMode) === "hide") return;
   state.actionsMissionOnly = !state.actionsMissionOnly;
   renderActions();
-  window.requestAnimationFrame(() => actionsList?.scrollTo({ top: 0, behavior: "smooth" }));
+  window.requestAnimationFrame(() => {
+    const target = state.actionsMissionOnly ? actionsMissionsPanel : actionsList;
+    target?.scrollTo({ top: 0, behavior: "smooth" });
+  });
+});
+
+actionsMissionsList?.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-actions-mission-edit]");
+  if (editButton) {
+    event.stopPropagation();
+    document.body.classList.add("actions-mission-editor-open");
+    openMissionAdjustModal(String(editButton.dataset.actionsMissionEdit || ""));
+    return;
+  }
+  const card = event.target.closest("[data-actions-mission-goal-id]");
+  if (!card) return;
+  document.body.classList.add("actions-mission-editor-open");
+  openMissionProgressModal(String(card.dataset.actionsMissionGoalId || ""));
+});
+
+actionsMissionsList?.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key)) return;
+  const card = event.target.closest("[data-actions-mission-goal-id]");
+  if (!card || event.target.closest("button")) return;
+  event.preventDefault();
+  document.body.classList.add("actions-mission-editor-open");
+  openMissionProgressModal(String(card.dataset.actionsMissionGoalId || ""));
 });
 toggleFreeTimeOptionButton?.addEventListener("click", () => {
   state.options.showFreeTime = !state.options.showFreeTime;

@@ -3248,6 +3248,19 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   padding-bottom: 0;
 }
 
+#actionsModal .actions-content {
+  min-height: 0;
+  display: grid;
+}
+
+#actionsModal .actions-content > :is(.actions-list, .actions-missions-panel) {
+  grid-area: 1 / 1;
+}
+
+#actionsModal .actions-content > :is(.actions-list, .actions-missions-panel)[hidden] {
+  display: none !important;
+}
+
 #actionsModal .actions-list {
   min-height: 0;
   margin-left: 0;
@@ -4952,28 +4965,139 @@ body[data-background-theme="white"] #runningMissionQuickModal.workspace-modal {
   min-height: 38px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
-  background: #63c9f5;
+  border-radius: 0;
+  background: transparent;
   color: #fff;
-  box-shadow: 0 8px 20px rgba(42, 163, 218, 0.28);
+  box-shadow: none;
   font-size: 1rem;
   font-weight: 900;
   line-height: 1;
 }
 
-#actionsModal .actions-mission-filter-btn svg {
-  width: 22px;
-  height: 22px;
-  fill: currentColor;
+#actionsModal .actions-mission-filter-btn img {
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 
 #actionsModal .actions-mission-filter-btn.is-filtering {
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: none;
+  opacity: 0.58;
 }
 
-.task-row.task-mission-entry .task-time {
+#actionsModal .actions-missions-panel {
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  padding: 12px 0 22px;
+}
+
+#actionsModal .actions-missions-list {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+#actionsModal .actions-mission-card {
+  width: 100%;
   min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 15px 16px 13px;
+  border: 0;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(90deg, rgba(8, 31, 83, 0.52) 0%, rgba(8, 31, 83, 0.08) 100%);
+  cursor: pointer;
+}
+
+#actionsModal .actions-mission-card-copy {
+  min-width: 0;
+}
+
+#actionsModal .actions-mission-card-copy h3,
+#actionsModal .actions-mission-card-copy p {
+  margin: 0;
+}
+
+#actionsModal .actions-mission-card-copy h3 {
+  overflow: hidden;
+  color: inherit;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#actionsModal .actions-mission-card-copy p {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+#actionsModal .actions-mission-card-edit {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+#actionsModal .actions-mission-card-edit svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+#actionsModal .actions-mission-card-track {
+  grid-column: 1 / -1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+#actionsModal .actions-mission-card-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #70adff, #4be0b5);
+  transition: width 220ms ease;
+}
+
+body[data-background-theme="light"] #actionsModal .actions-mission-card,
+body[data-background-theme="white"] #actionsModal .actions-mission-card {
+  color: #343a40;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.64) 0%, rgba(255, 255, 255, 0.12) 100%);
+}
+
+body[data-background-theme="light"] #actionsModal .actions-mission-card-copy p,
+body[data-background-theme="white"] #actionsModal .actions-mission-card-copy p {
+  color: rgba(52, 58, 64, 0.74);
+}
+
+body[data-background-theme="light"] #actionsModal .actions-mission-card-edit,
+body[data-background-theme="white"] #actionsModal .actions-mission-card-edit {
+  color: #343a40;
+  background: rgba(52, 58, 64, 0.08);
+}
+
+body.actions-mission-editor-open #missionAdjustModal.workspace-modal,
+body.actions-mission-editor-open #missionProgressModal.workspace-modal {
+  z-index: 1900;
+}
+
+body.actions-mission-editor-open #missionVariantsModal.workspace-modal,
+body.actions-mission-editor-open #missionTimeModal.workspace-modal {
+  z-index: 2000;
 }
 
 @media (max-width: 720px) {
@@ -7615,40 +7739,20 @@ body .action-wizard > .wizard-panel {
 
 /* Mission containers fade from 40% on the left to fully transparent on the right. */
 .history-mission-card,
-.task-row.task-mission-entry.task-pending-clean,
 .task-row.stats-mission-row {
   background: linear-gradient(90deg, rgba(8, 31, 83, 0.4) 0%, rgba(8, 31, 83, 0) 100%) !important;
   box-shadow: none;
 }
 
-body[data-background-theme="light"] :is(.history-mission-card, .task-row.task-mission-entry.task-pending-clean, .task-row.stats-mission-row),
-body[data-background-theme="white"] :is(.history-mission-card, .task-row.task-mission-entry.task-pending-clean, .task-row.stats-mission-row) {
+body[data-background-theme="light"] :is(.history-mission-card, .task-row.stats-mission-row),
+body[data-background-theme="white"] :is(.history-mission-card, .task-row.stats-mission-row) {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%) !important;
 }
 
-body[data-background-theme="edge"] :is(.history-mission-card, .task-row.task-mission-entry.task-pending-clean, .task-row.stats-mission-row) {
+body[data-background-theme="edge"] :is(.history-mission-card, .task-row.stats-mission-row) {
   background: linear-gradient(90deg, rgba(5, 66, 126, 0.4) 0%, rgba(5, 66, 126, 0) 100%) !important;
 }
 
-.task-row.task-mission-entry.task-delay-soft {
-  background: linear-gradient(90deg, rgba(var(--delay-soft-rgb, 255, 219, 120), 0.4) 0%, rgba(var(--delay-soft-rgb, 255, 219, 120), 0) 100%) !important;
-}
-
-.task-row.task-mission-entry.task-delay-yellow {
-  background: linear-gradient(90deg, rgba(255, 214, 61, 0.4) 0%, rgba(255, 214, 61, 0) 100%) !important;
-}
-
-.task-row.task-mission-entry.task-delay-orange {
-  background: linear-gradient(90deg, rgba(255, 151, 45, 0.4) 0%, rgba(255, 151, 45, 0) 100%) !important;
-}
-
-.task-row.task-mission-entry.task-delay-red {
-  background: linear-gradient(90deg, rgba(226, 59, 59, 0.4) 0%, rgba(226, 59, 59, 0) 100%) !important;
-}
-
-.task-row.task-mission-entry.task-delay-black {
-  background: linear-gradient(90deg, rgba(26, 26, 26, 0.4) 0%, rgba(26, 26, 26, 0) 100%) !important;
-}
 
 /* Light surfaces use charcoal typography; colored action buttons keep white labels. */
 body[data-background-theme="light"],
