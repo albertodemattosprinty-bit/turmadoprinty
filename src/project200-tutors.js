@@ -150,6 +150,7 @@ async function normalizeTutorMessage(viewerUserId, row) {
       };
     }),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+    readAt: row.read_at ? new Date(row.read_at).toISOString() : null,
     source: "human"
   };
 }
@@ -184,11 +185,28 @@ export async function ensureProject200TutorsSchema() {
           content_encrypted jsonb,
           proposals_encrypted jsonb,
           encryption_version integer not null default 0,
+          read_at timestamptz,
           created_at timestamptz not null default now(),
           check (sender_user_id <> recipient_user_id)
         );
       `);
+      await query(`
+        do $$
+        begin
+          if not exists (
+            select 1
+              from information_schema.columns
+             where table_schema = current_schema()
+               and table_name = ''project200_tutor_messages''
+               and column_name = ''read_at''
+          ) then
+            alter table project200_tutor_messages add column read_at timestamptz;
+            update project200_tutor_messages set read_at = created_at where read_at is null;
+          end if;
+        end $$;
+      `);
       await query("create index if not exists idx_project200_tutor_messages_link_created on project200_tutor_messages(link_id, created_at desc);");
+      await query("create index if not exists idx_project200_tutor_messages_recipient_unread on project200_tutor_messages(recipient_user_id, created_at desc) where read_at is null;");
       await query(`
         create table if not exists project200_tutor_proposal_applications (
           recipient_user_id uuid not null references users(id) on delete cascade,
@@ -306,7 +324,7 @@ export async function listProject200TutorMessages(userId, contactUserId, limit =
        from (
          select message.id, message.link_id, message.sender_user_id, message.recipient_user_id,
                 message.content, message.proposals, message.content_encrypted,
-                message.proposals_encrypted, message.encryption_version, message.created_at
+                message.proposals_encrypted, message.encryption_version, message.read_at, message.created_at
            from project200_tutor_messages message
           where message.link_id = $1
             and message.created_at <= $5::timestamptz
@@ -336,6 +354,81 @@ export async function listProject200TutorMessages(userId, contactUserId, limit =
   };
 }
 
+export async function listProject200TutorInbox(userId, limit = 100) {
+  await ensureProject200TutorsSchema();
+  const viewerId = normalizeId(userId);
+  const safeLimit = Math.max(1, Math.min(200, Math.trunc(Number(limit) || 100)));
+  const result = await query(
+    `select message.id, message.sender_user_id, message.created_at,
+            count(*) over()::integer as unread_total
+       from project200_tutor_messages message
+       join project200_tutor_links link
+         on link.id = message.link_id
+        and link.active = true
+      where message.recipient_user_id = $1
+        and message.read_at is null
+      order by message.created_at desc
+      limit $2`,
+    [viewerId, safeLimit]
+  );
+  if (!result.rows.length) {
+    return { unreadCount: 0, notifications: [] };
+  }
+
+  const snapshot = await getProject200FriendsSnapshot(viewerId, "today");
+  const friendById = new Map((Array.isArray(snapshot?.friends) ? snapshot.friends : []).map((friend) => [
+    normalizeId(friend?.userId),
+    friend
+  ]));
+  const notificationBySender = new Map();
+  result.rows.forEach((row) => {
+    const contactUserId = normalizeId(row.sender_user_id);
+    const existing = notificationBySender.get(contactUserId);
+    if (existing) {
+      existing.unreadCount += 1;
+      return;
+    }
+    const friend = friendById.get(contactUserId) || {
+      userId: contactUserId,
+      name: "Usuario",
+      username: "",
+      initials: "U",
+      avatarDataUrl: "",
+      svgIconUrl: ""
+    };
+    notificationBySender.set(contactUserId, {
+      ...friend,
+      contactUserId,
+      unreadCount: 1,
+      latestMessageId: normalizeId(row.id),
+      latestMessageAt: row.created_at ? new Date(row.created_at).toISOString() : null
+    });
+  });
+  return {
+    unreadCount: Math.max(0, Number(result.rows[0]?.unread_total || result.rows.length)),
+    notifications: [...notificationBySender.values()]
+  };
+}
+
+export async function markProject200TutorMessagesRead(userId, contactUserId) {
+  await ensureProject200TutorsSchema();
+  const viewerId = normalizeId(userId);
+  const contactId = normalizeId(contactUserId);
+  const link = await getTutorLink(viewerId, contactId);
+  if (!link) throw new Error("Tutor nao encontrado.");
+  const result = await query(
+    `update project200_tutor_messages
+        set read_at = clock_timestamp()
+      where link_id = $1
+        and recipient_user_id = $2
+        and sender_user_id = $3
+        and read_at is null
+      returning id`,
+    [link.id, viewerId, contactId]
+  );
+  return { readCount: result.rowCount || 0 };
+}
+
 export async function appendProject200TutorMessage(userId, contactUserId, payload = {}) {
   const senderId = normalizeId(userId);
   const link = await getTutorLink(senderId, contactUserId);
@@ -360,7 +453,7 @@ export async function appendProject200TutorMessage(userId, contactUserId, payloa
        content_encrypted, proposals_encrypted, encryption_version
      ) values ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9)
      returning id, link_id, sender_user_id, recipient_user_id, content, proposals,
-               content_encrypted, proposals_encrypted, encryption_version, created_at`,
+               content_encrypted, proposals_encrypted, encryption_version, read_at, created_at`,
     [
       messageId,
       link.id,

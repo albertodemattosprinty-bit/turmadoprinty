@@ -5374,7 +5374,7 @@ body.actions-mission-editor-open #missionTimeModal.workspace-modal {
   overscroll-behavior: contain;
   touch-action: pan-y;
   padding-right: 4px;
-  padding-bottom: 22px;
+  padding-bottom: 60px;
 }
 
 .missions-app {
@@ -9984,5 +9984,91 @@ body[data-background-theme="white"] :is(
   #actionsModal .actions-mission-card-icon {
     width: 38px;
     height: 38px;
+  }
+}
+
+/* Human message notifications: opt-in floating alert. */
+.tutor-unread-alert {
+  position: fixed;
+  top: 50%;
+  right: max(18px, env(safe-area-inset-right, 0px));
+  z-index: 1850;
+  width: 68px;
+  height: 68px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  transform: translateY(-50%);
+  cursor: pointer;
+  filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.34));
+  animation: tutorUnreadArrive 280ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+}
+
+.tutor-unread-avatar-frame {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  overflow: hidden;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #147df0, #19d7a8);
+}
+
+.tutor-unread-avatar-frame img,
+.tutor-unread-avatar-frame > span {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.tutor-unread-avatar-frame img {
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+
+.tutor-unread-avatar-frame > span {
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 20px;
+}
+
+.tutor-unread-count {
+  position: absolute;
+  top: -4px;
+  right: -2px;
+  display: grid;
+  place-items: center;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 6px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #ef3340;
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+@keyframes tutorUnreadArrive {
+  from { opacity: 0; transform: translate(18px, -50%) scale(0.72); }
+  to { opacity: 1; transform: translate(0, -50%) scale(1); }
+}
+
+@media (max-width: 520px) {
+  .tutor-unread-alert {
+    right: max(12px, env(safe-area-inset-right, 0px));
+    width: 62px;
+    height: 62px;
+  }
+
+  .tutor-unread-avatar-frame {
+    width: 55px;
+    height: 55px;
   }
 }

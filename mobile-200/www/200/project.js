@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=20260721-home-onboarding-v2";
-import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260722-tutors-sync-v2";
+import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260722-message-notifications-v1";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
 
 import {
@@ -770,6 +770,10 @@ const toggleMinuteNotificationsOptionButton = document.getElementById("toggleMin
 const toggleMinuteNotificationsHint = document.getElementById("toggleMinuteNotificationsHint");
 const toggleFinalMinuteNotificationsOptionButton = document.getElementById("toggleFinalMinuteNotificationsOption");
 const toggleFinalMinuteNotificationsHint = document.getElementById("toggleFinalMinuteNotificationsHint");
+const toggleMessageNotificationsOptionButton = document.getElementById("toggleMessageNotificationsOption");
+const toggleMessageNotificationsHint = document.getElementById("toggleMessageNotificationsHint");
+const toggleMessageNotificationSoundOptionButton = document.getElementById("toggleMessageNotificationSoundOption");
+const toggleMessageNotificationSoundHint = document.getElementById("toggleMessageNotificationSoundHint");
 const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
 const toggleBackgroundThemeHint = document.getElementById("toggleBackgroundThemeHint");
 const toggleStopMusicOnFinishOptionButton = document.getElementById("toggleStopMusicOnFinishOption");
@@ -1184,7 +1188,9 @@ const state = {
     finalMinuteNotificationsEnabled: true,
     backgroundTheme: "edge",
     screenLockEnabled: false,
-    stopMusicOnFinish: false
+    stopMusicOnFinish: false,
+    messageNotificationsEnabled: false,
+    messageNotificationSoundEnabled: false,
   },
   svgAssets: [],
   svgSelector: {
@@ -14135,6 +14141,8 @@ async function loadOptionsConfig() {
       state.options.backgroundTheme = normalizeBackgroundTheme(parsed.backgroundTheme);
       state.options.screenLockEnabled = parsed.screenLockEnabled === true;
       state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
+      state.options.messageNotificationsEnabled = parsed.messageNotificationsEnabled === true;
+      state.options.messageNotificationSoundEnabled = parsed.messageNotificationSoundEnabled === true;
     } catch {
       state.options.showFreeTime = true;
       state.options.missionActionsMode = "separate";
@@ -14144,6 +14152,8 @@ async function loadOptionsConfig() {
       state.options.backgroundTheme = "edge";
       state.options.screenLockEnabled = false;
       state.options.stopMusicOnFinish = false;
+      state.options.messageNotificationsEnabled = false;
+      state.options.messageNotificationSoundEnabled = false;
     }
     applyBackgroundTheme();
   })();
@@ -14159,7 +14169,9 @@ function saveOptionsConfig() {
     finalMinuteNotificationsEnabled: Boolean(state.options.finalMinuteNotificationsEnabled),
     backgroundTheme: normalizeBackgroundTheme(state.options.backgroundTheme),
     screenLockEnabled: Boolean(state.options.screenLockEnabled),
-    stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish)
+    stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish),
+    messageNotificationsEnabled: Boolean(state.options.messageNotificationsEnabled),
+    messageNotificationSoundEnabled: Boolean(state.options.messageNotificationSoundEnabled)
   });
   try {
     window.localStorage.setItem(optionsConfigKey, serialized);
@@ -14169,6 +14181,54 @@ function saveOptionsConfig() {
   if (nativePreferences?.set) {
     void nativePreferences.set({ key: optionsConfigKey, value: serialized }).catch(() => {});
   }
+}
+
+async function requestMessageNotificationPermission() {
+  const nativeNotifications = window.Capacitor?.Plugins?.LocalNotifications || null;
+  if (nativeNotifications?.requestPermissions) {
+    try {
+      let permission = await nativeNotifications.checkPermissions();
+      if (permission?.display !== "granted") {
+        permission = await nativeNotifications.requestPermissions();
+      }
+      if (permission?.display !== "granted") return false;
+      if (nativeNotifications?.createChannel) {
+        await Promise.allSettled([
+          nativeNotifications.createChannel({
+            id: "ilife-messages",
+            name: "Mensagens iLife",
+            description: "Mensagens recebidas de tutores e tutorados",
+            importance: 5,
+            visibility: 1,
+            vibration: true,
+            sound: "ilife.mp3"
+          }),
+          nativeNotifications.createChannel({
+            id: "ilife-messages-silent",
+            name: "Mensagens iLife sem som",
+            description: "Mensagens recebidas sem som",
+            importance: 4,
+            visibility: 1,
+            vibration: false,
+            sound: null
+          })
+        ]);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (typeof window.Notification === "function") {
+    if (window.Notification.permission === "granted") return true;
+    if (window.Notification.permission === "denied") return false;
+    try {
+      return (await window.Notification.requestPermission()) === "granted";
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 function getInteractionClientY(event) {
@@ -14301,6 +14361,14 @@ function renderOptionsModal() {
     toggleFinalMinuteNotificationsHint.textContent = state.options.finalMinuteNotificationsEnabled ? "Ligadas: 5, 3 e 1 minuto" : "Desligadas";
   }
   toggleFinalMinuteNotificationsOptionButton?.classList.toggle("is-off", !state.options.finalMinuteNotificationsEnabled);
+  if (toggleMessageNotificationsHint) {
+    toggleMessageNotificationsHint.textContent = state.options.messageNotificationsEnabled ? "Ativado" : "Desativado";
+  }
+  toggleMessageNotificationsOptionButton?.classList.toggle("is-off", !state.options.messageNotificationsEnabled);
+  if (toggleMessageNotificationSoundHint) {
+    toggleMessageNotificationSoundHint.textContent = state.options.messageNotificationSoundEnabled ? "Som iLife ativado" : "Desativado";
+  }
+  toggleMessageNotificationSoundOptionButton?.classList.toggle("is-off", !state.options.messageNotificationSoundEnabled);
   if (toggleBackgroundThemeHint) {
     toggleBackgroundThemeHint.textContent = getBackgroundThemeMode(state.options.backgroundTheme).label;
   }
@@ -16229,6 +16297,36 @@ toggleFinalMinuteNotificationsOptionButton?.addEventListener("click", () => {
   renderOptionsModal();
   renderHomeRunningTask();
 });
+toggleMessageNotificationsOptionButton?.addEventListener("click", () => {
+  void (async () => {
+    if (state.options.messageNotificationsEnabled) {
+      state.options.messageNotificationsEnabled = false;
+      saveOptionsConfig();
+      renderOptionsModal();
+      project200TutorsUi?.refreshNotificationPreferences();
+      return;
+    }
+    toggleMessageNotificationsOptionButton.disabled = true;
+    const systemPermissionGranted = await requestMessageNotificationPermission();
+    state.options.messageNotificationsEnabled = true;
+    saveOptionsConfig();
+    renderOptionsModal();
+    project200TutorsUi?.refreshNotificationPreferences();
+    if (!systemPermissionGranted) {
+      showFloatingNotice("Aviso dentro do iLife ativado. O sistema nao liberou o balao externo.");
+    }
+    toggleMessageNotificationsOptionButton.disabled = false;
+  })();
+});
+toggleMessageNotificationSoundOptionButton?.addEventListener("click", () => {
+  state.options.messageNotificationSoundEnabled = !state.options.messageNotificationSoundEnabled;
+  saveOptionsConfig();
+  renderOptionsModal();
+  if (state.options.messageNotificationSoundEnabled) {
+    void project200TutorsUi?.primeNotificationSound();
+  }
+  project200TutorsUi?.refreshNotificationPreferences();
+});
 toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
   const currentIndex = Math.max(0, backgroundThemeModes.findIndex((item) => item.key === getBackgroundThemeMode(state.options.backgroundTheme).key));
   const nextIndex = (currentIndex + 1) % backgroundThemeModes.length;
@@ -16649,7 +16747,11 @@ project200TutorsUi = initializeProject200TutorsUi({
   openModal,
   closeModal,
   getProfileName: () => String(state.selectedProfile || getDefaultProfileName()).trim(),
-  onRequestProposal: openTutorProposalComposer
+  onRequestProposal: openTutorProposalComposer,
+  getNotificationPreferences: () => ({
+    enabled: Boolean(state.options.messageNotificationsEnabled),
+    soundEnabled: Boolean(state.options.messageNotificationSoundEnabled)
+  })
 });
 const project200OnboardingUi = initializeProject200OnboardingUi({
   getToken,
@@ -16733,6 +16835,7 @@ beginStartupLoading(loadingIconByArea.actions);
 applySelectedProfile(readSelectedProfile());
 void (async () => {
   await loadOptionsConfig();
+  project200TutorsUi?.refreshNotificationPreferences();
   await bootstrapProject200App();
 })();
 

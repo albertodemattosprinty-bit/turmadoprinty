@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260722-avatar-circle-v3" />
+  <link rel="stylesheet" href="/200/project.css?v=20260722-message-notifications-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -735,6 +735,16 @@
         <span class="running-music-default-top">Reproduzir os MP3 quando faltarem 5, 3 e 1 minuto</span>
         <strong>Áudios dos minutos finais</strong>
         <span class="running-music-default-bottom" id="toggleFinalMinuteNotificationsHint">Ligadas: 5, 3 e 1 minuto</span>
+      </button>
+      <button class="running-music-default-option options-toggle-btn is-off" type="button" id="toggleMessageNotificationsOption">
+        <span class="running-music-default-top">Mostrar um balão no APK ou navegador quando outra pessoa enviar uma mensagem</span>
+        <strong>Notificar dentro do app</strong>
+        <span class="running-music-default-bottom" id="toggleMessageNotificationsHint">Desativado</span>
+      </button>
+      <button class="running-music-default-option options-toggle-btn is-off" type="button" id="toggleMessageNotificationSoundOption">
+        <span class="running-music-default-top">Tocar o som iLife somente depois da sua autorização</span>
+        <strong>Som de notificação</strong>
+        <span class="running-music-default-bottom" id="toggleMessageNotificationSoundHint">Desativado</span>
       </button>
       <button class="running-music-default-option" type="button" id="toggleBackgroundThemeOption">
         <span class="running-music-default-top">Alternar entre fundos vivos em degrade com leitura forte no branco</span>
@@ -1641,7 +1651,16 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260722-tutors-sync-v2"></script>
+  <button class="tutor-unread-alert" type="button" id="tutorUnreadAlert" aria-label="Abrir novas mensagens" hidden>
+    <span class="tutor-unread-avatar-frame">
+      <img id="tutorUnreadAvatar" alt="" hidden />
+      <span id="tutorUnreadAvatarFallback" aria-hidden="true">U</span>
+    </span>
+    <span class="tutor-unread-count" id="tutorUnreadCount">0</span>
+  </button>
+  <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
+
+  <script type="module" src="/200/project.js?v=20260722-message-notifications-v1"></script>
 </body>
 </html>
 

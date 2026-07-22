@@ -5,7 +5,8 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     closeModal,
     showFloatingNotice,
     getProfileName,
-    onRequestProposal
+    onRequestProposal,
+    getNotificationPreferences
   } = dependencies;
 
   const elements = {
@@ -30,7 +31,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     proposalTypeModal: document.getElementById("marinTutorProposalTypeModal"),
     proposalTypeClose: document.getElementById("marinTutorProposalTypeClose"),
     proposalAction: document.getElementById("marinTutorProposalAction"),
-    proposalMission: document.getElementById("marinTutorProposalMission")
+    proposalMission: document.getElementById("marinTutorProposalMission"),
+    unreadAlert: document.getElementById("tutorUnreadAlert"),
+    unreadAvatar: document.getElementById("tutorUnreadAvatar"),
+    unreadAvatarFallback: document.getElementById("tutorUnreadAvatarFallback"),
+    unreadCount: document.getElementById("tutorUnreadCount"),
+    notificationAudio: document.getElementById("tutorNotificationAudio")
   };
 
   const defaultPersonMarkup = elements.chatPersonButton?.innerHTML || "";
@@ -46,7 +52,13 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     syncing: false,
     syncToken: 0,
     syncContactId: "",
-    renderingContacts: false
+    renderingContacts: false,
+    inboxTimer: 0,
+    inboxSyncing: false,
+    inboxHydrated: false,
+    inboxNotifications: [],
+    inboxUnreadCount: 0,
+    notifiedMessageIds: new Set()
   };
 
   function currentProfile() {
@@ -88,6 +100,226 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     fallback.className = className;
     fallback.textContent = String(entry?.initials || entry?.name || "U").trim().slice(0, 2).toUpperCase();
     return fallback;
+  }
+
+  function notificationPreferences() {
+    const preferences = typeof getNotificationPreferences === "function" ? getNotificationPreferences() : {};
+    return {
+      enabled: preferences?.enabled === true,
+      soundEnabled: preferences?.soundEnabled === true
+    };
+  }
+
+  function notificationEntryKey(entry) {
+    return String(entry?.latestMessageId || "").trim();
+  }
+
+  function localNotificationId(value) {
+    const text = String(value || Date.now());
+    let hash = 0;
+    for (let index = 0; index < text.length; index += 1) {
+      hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+    }
+    return Math.max(1, Math.abs(hash) % 2147483000);
+  }
+
+  function renderUnreadAlert() {
+    if (!elements.unreadAlert) return;
+    const preferences = notificationPreferences();
+    const notifications = Array.isArray(state.inboxNotifications) ? state.inboxNotifications : [];
+    const unreadCount = Math.max(0, Number(state.inboxUnreadCount || 0)) || notifications.reduce((total, entry) => total + Math.max(0, Number(entry?.unreadCount || 0)), 0);
+    const latest = notifications[0] || null;
+    const visible = preferences.enabled && Boolean(latest) && unreadCount > 0;
+    elements.unreadAlert.hidden = !visible;
+    if (!visible) {
+      elements.unreadAlert.dataset.contactId = "";
+      return;
+    }
+    elements.unreadAlert.dataset.contactId = String(latest.contactUserId || latest.userId || "");
+    elements.unreadAlert.setAttribute("aria-label", `${unreadCount} ${unreadCount === 1 ? "mensagem nova" : "mensagens novas"} de ${String(latest.name || "um contato")}`);
+    if (elements.unreadCount) elements.unreadCount.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+    const url = avatarUrl(latest);
+    if (elements.unreadAvatar) {
+      elements.unreadAvatar.hidden = !url;
+      if (url && elements.unreadAvatar.src !== url) elements.unreadAvatar.src = url;
+    }
+    if (elements.unreadAvatarFallback) {
+      elements.unreadAvatarFallback.hidden = Boolean(url);
+      elements.unreadAvatarFallback.textContent = String(latest.initials || latest.name || "U").trim().slice(0, 2).toUpperCase();
+    }
+  }
+
+  async function primeNotificationSound() {
+    if (!elements.notificationAudio) return false;
+    const previousVolume = elements.notificationAudio.volume;
+    try {
+      elements.notificationAudio.volume = 0;
+      elements.notificationAudio.currentTime = 0;
+      await elements.notificationAudio.play();
+      elements.notificationAudio.pause();
+      elements.notificationAudio.currentTime = 0;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      elements.notificationAudio.volume = previousVolume || 1;
+    }
+  }
+
+  async function playNotificationSound() {
+    if (!notificationPreferences().soundEnabled || !elements.notificationAudio) return;
+    try {
+      elements.notificationAudio.pause();
+      elements.notificationAudio.currentTime = 0;
+      elements.notificationAudio.volume = 1;
+      await elements.notificationAudio.play();
+    } catch {}
+  }
+
+  async function showSystemNotification(entry) {
+    if (!notificationPreferences().enabled || !entry) return false;
+    const name = String(entry.name || "um contato");
+    const title = `Nova mensagem de ${name}`;
+    const body = Number(entry.unreadCount || 0) > 1
+      ? `${Math.max(1, Number(entry.unreadCount || 0))} mensagens novas no iLife`
+      : "Voce recebeu uma nova mensagem no iLife.";
+    const nativeNotifications = window.Capacitor?.Plugins?.LocalNotifications || null;
+    if (nativeNotifications?.schedule) {
+      try {
+        const permission = await nativeNotifications.checkPermissions();
+        if (permission?.display !== "granted") return false;
+        const withSound = notificationPreferences().soundEnabled;
+        await nativeNotifications.schedule({
+          notifications: [{
+            id: localNotificationId(notificationEntryKey(entry)),
+            title,
+            body,
+            channelId: withSound ? "ilife-messages" : "ilife-messages-silent",
+            sound: withSound ? "ilife.mp3" : null,
+            schedule: { at: new Date(Date.now() + 160) },
+            extra: { contactUserId: String(entry.contactUserId || entry.userId || "") }
+          }]
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    if (typeof window.Notification === "function" && window.Notification.permission === "granted") {
+      try {
+        const notification = new window.Notification(title, {
+          body,
+          icon: avatarUrl(entry) || "/200/images/ilife-mindsetplan-home.png",
+          tag: `ilife-message-${String(entry.contactUserId || entry.userId || "")}`,
+          renotify: true,
+          silent: true
+        });
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+          void openUnreadContact(String(entry.contactUserId || entry.userId || ""));
+        };
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  async function announceInboxEntry(entry) {
+    const usedNativeNotification = await showSystemNotification(entry);
+    if (!usedNativeNotification || !window.Capacitor?.Plugins?.LocalNotifications) {
+      await playNotificationSound();
+    }
+  }
+
+  async function refreshInbox({ announce = true } = {}) {
+    if (!notificationPreferences().enabled || state.inboxSyncing) {
+      renderUnreadAlert();
+      return;
+    }
+    state.inboxSyncing = true;
+    try {
+      const payload = await apiRequest("/api/200/tutors/inbox", { skipGlobalLoading: true });
+      const nextNotifications = Array.isArray(payload?.notifications) ? payload.notifications : [];
+      const freshEntries = nextNotifications.filter((entry) => {
+        const key = notificationEntryKey(entry);
+        return key && !state.notifiedMessageIds.has(key);
+      });
+      state.inboxNotifications = nextNotifications;
+      state.inboxUnreadCount = Math.max(0, Number(payload?.unreadCount || 0));
+      renderUnreadAlert();
+      if (!state.inboxHydrated) {
+        state.inboxHydrated = true;
+      } else if (announce && freshEntries.length) {
+        await announceInboxEntry(freshEntries[0]);
+      }
+      nextNotifications.forEach((entry) => {
+        const key = notificationEntryKey(entry);
+        if (key) state.notifiedMessageIds.add(key);
+      });
+      if (state.notifiedMessageIds.size > 240) {
+        state.notifiedMessageIds = new Set([...state.notifiedMessageIds].slice(-160));
+      }
+    } catch {
+      renderUnreadAlert();
+    } finally {
+      state.inboxSyncing = false;
+    }
+  }
+
+  function stopInboxPolling() {
+    if (state.inboxTimer) window.clearInterval(state.inboxTimer);
+    state.inboxTimer = 0;
+  }
+
+  function startInboxPolling() {
+    stopInboxPolling();
+    if (!notificationPreferences().enabled) return;
+    state.inboxTimer = window.setInterval(() => void refreshInbox({ announce: true }), 8000);
+  }
+
+  function refreshNotificationPreferences() {
+    if (!notificationPreferences().enabled) {
+      stopInboxPolling();
+      state.inboxHydrated = false;
+      state.inboxNotifications = [];
+      state.inboxUnreadCount = 0;
+      renderUnreadAlert();
+      return;
+    }
+    renderUnreadAlert();
+    void refreshInbox({ announce: state.inboxHydrated });
+    startInboxPolling();
+  }
+
+  async function acknowledgeConversation(contactId) {
+    const normalizedContactId = String(contactId || "").trim();
+    if (!normalizedContactId) return;
+    state.inboxNotifications = state.inboxNotifications.filter((entry) => String(entry?.contactUserId || entry?.userId || "") !== normalizedContactId);
+    state.inboxUnreadCount = state.inboxNotifications.reduce((total, entry) => total + Math.max(0, Number(entry?.unreadCount || 0)), 0);
+    renderUnreadAlert();
+    try {
+      await apiRequest(`/api/200/tutors/${encodeURIComponent(normalizedContactId)}/messages/read`, {
+        method: "POST",
+        skipGlobalLoading: true
+      });
+      await refreshInbox({ announce: false });
+    } catch {}
+  }
+
+  async function openUnreadContact(contactId) {
+    const normalizedContactId = String(contactId || "").trim();
+    if (!normalizedContactId) return;
+    let tutor = state.tutors.find((entry) => String(entry.contactUserId || entry.userId || "") === normalizedContactId);
+    if (!tutor) {
+      try {
+        await loadDirectory();
+      } catch {}
+      tutor = state.tutors.find((entry) => String(entry.contactUserId || entry.userId || "") === normalizedContactId);
+    }
+    if (tutor) await selectTutor(tutor);
   }
 
   function updateHeader() {
@@ -432,6 +664,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     updateHeader();
     renderMessages({ animateMessageIds: new Set() });
     await refreshMessages({ silent: false, forceFull: !state.syncCursor });
+    await acknowledgeConversation(activeContactId());
     startPolling();
     window.setTimeout(() => elements.input?.focus({ preventScroll: true }), 60);
   }
@@ -568,6 +801,23 @@ export function initializeProject200TutorsUi(dependencies = {}) {
 
   document.addEventListener("visibilitychange", syncVisibleConversation);
   window.addEventListener("focus", syncVisibleConversation);
+  const syncInboxOnResume = () => {
+    if (!document.hidden && notificationPreferences().enabled) {
+      void refreshInbox({ announce: state.inboxHydrated });
+    }
+  };
+  document.addEventListener("visibilitychange", syncInboxOnResume);
+  window.addEventListener("focus", syncInboxOnResume);
+
+  elements.unreadAlert?.addEventListener("click", () => {
+    void openUnreadContact(String(elements.unreadAlert?.dataset.contactId || ""));
+  });
+  const nativeNotifications = window.Capacitor?.Plugins?.LocalNotifications || null;
+  nativeNotifications?.addListener?.("localNotificationActionPerformed", (event) => {
+    const contactId = String(event?.notification?.extra?.contactUserId || "");
+    if (contactId) void openUnreadContact(contactId);
+  });
+
 
   elements.chatPersonButton?.addEventListener("click", (event) => {
     event.preventDefault();
@@ -634,6 +884,11 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     openChat: openHumanChat,
     sendHumanProposal,
     isHumanActive: () => Boolean(state.human && activeContactId()),
-    stop: stopPolling
+    refreshNotificationPreferences,
+    primeNotificationSound,
+    stop: () => {
+      stopPolling();
+      stopInboxPolling();
+    }
   };
 }
