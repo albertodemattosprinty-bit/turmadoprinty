@@ -460,9 +460,6 @@
       </footer>
       <div class="actions-side-actions">
         <div class="actions-footer-primary">
-          <button class="icon-action-btn actions-side-btn actions-side-btn-left" type="button" id="openActionWizard" aria-label="Adicionar tarefa">
-            <span class="actions-side-plus" aria-hidden="true">+</span>
-          </button>
           <button class="icon-action-btn actions-mission-filter-btn" type="button" id="actionsMissionFilterButton" aria-label="Abrir missões" aria-controls="actionsMissionsPanel" aria-expanded="false">
             <img src="/200/icons/target.svg" alt="" aria-hidden="true" />
           </button>
@@ -480,6 +477,9 @@
           </svg>
         </button>
       </div>
+      <button class="actions-floating-add" type="button" id="openActionWizard" aria-label="Adicionar tarefa">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7V3Z" fill="currentColor"/></svg>
+      </button>
     </div>
 
     <div class="action-wizard" id="actionWizard" aria-hidden="true">
@@ -1379,7 +1379,6 @@
     <div class="finance-content history-mission-modal-content mission-progress-modal-content history-mission-modal-shell">
       <div class="history-mission-modal-head">
         <div class="mission-modal-heading">
-          <span class="mission-modal-eyebrow">Preparar missão</span>
           <h1 class="mission-modal-title" id="missionProgressTitle">Missão</h1>
         </div>
         <button class="history-mission-modal-close" type="button" id="missionProgressCloseButton" aria-label="Fechar">
@@ -1393,13 +1392,11 @@
           <div class="history-mission-adjust-value" id="missionProgressValue">1</div>
           <button class="history-mission-sign-btn active" type="button" id="missionProgressPlus">+</button>
         </div>
-        <p class="finance-status" id="missionProgressStatus" aria-live="polite"></p>
-      </div>
-      <div class="history-mission-modal-footer history-mission-modal-footer-one">
         <button class="history-mission-footer-icon history-mission-footer-icon-green mission-progress-confirm-btn" type="button" id="missionProgressConfirm" aria-label="Atualizar progresso">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg>
-          <span id="missionProgressConfirmLabel">ADICIONAR ITEM</span>
+          <span id="missionProgressConfirmLabel">ADICIONAR</span>
         </button>
+        <p class="finance-status" id="missionProgressStatus" aria-live="polite"></p>
       </div>
     </div>
   </section>

@@ -9851,3 +9851,138 @@ body[data-background-theme="white"] :is(
     flex-basis: 42px;
   }
 }
+
+/* Actions and missions completion polish. */
+#actionsModal .actions-floating-add {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 28;
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #29c86d, #11954a);
+  color: #fff !important;
+  box-shadow: 0 16px 34px rgba(11, 136, 62, 0.38);
+  cursor: pointer;
+}
+
+#actionsModal .actions-floating-add svg {
+  width: 38px;
+  height: 38px;
+  color: #fff !important;
+  fill: currentColor;
+}
+
+#actionsModal .actions-list,
+#actionsModal .actions-missions-panel {
+  padding-bottom: 102px;
+}
+
+#actionsModal .actions-mission-card {
+  grid-template-columns: 48px minmax(0, 1fr) 44px;
+}
+
+#actionsModal .actions-mission-card-icon {
+  grid-column: 1;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  justify-self: center;
+}
+
+#actionsModal .actions-mission-card-copy {
+  grid-column: 2;
+}
+
+#actionsModal .actions-mission-card-edit {
+  grid-column: 3;
+}
+
+.actions-progress-fill,
+.history-mission-progress-fill,
+#actionsModal .actions-mission-card-fill {
+  position: relative;
+  transition: width 680ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width;
+}
+
+@keyframes progressFillSoftGlow {
+  0% { filter: brightness(1); }
+  45% { filter: brightness(1.34) saturate(1.18); }
+  100% { filter: brightness(1); }
+}
+
+.is-progress-animating {
+  animation: progressFillSoftGlow 760ms ease;
+}
+
+@keyframes actionCompletionSweep {
+  0% {
+    background-size: 0% 100%;
+    filter: brightness(1);
+  }
+  55% {
+    filter: brightness(1.18);
+  }
+  100% {
+    background-size: 100% 100%;
+    filter: brightness(1);
+  }
+}
+
+.task-row.task-completed.task-completion-animate {
+  background-repeat: no-repeat;
+  animation: actionCompletionSweep 760ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#missionProgressModal .mission-modal-heading {
+  padding-top: 60px;
+}
+
+#missionProgressModal .history-mission-modal-body {
+  gap: 18px;
+}
+
+#missionProgressModal .mission-progress-confirm-btn {
+  width: min(100%, 560px);
+  min-height: 76px;
+  height: 76px;
+  margin-top: 0;
+  font-size: clamp(1.75rem, 7vw, 2.3rem);
+}
+
+#missionProgressModal .mission-progress-confirm-btn svg {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+}
+
+@media (max-width: 720px) {
+  #actionsModal .actions-floating-add {
+    right: max(14px, env(safe-area-inset-right, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    width: 62px;
+    height: 62px;
+  }
+
+  #actionsModal .actions-floating-add svg {
+    width: 35px;
+    height: 35px;
+  }
+
+  #actionsModal .actions-mission-card {
+    grid-template-columns: 44px minmax(0, 1fr) 40px;
+    gap: 9px 11px;
+    padding-inline: 12px;
+  }
+
+  #actionsModal .actions-mission-card-icon {
+    width: 38px;
+    height: 38px;
+  }
+}

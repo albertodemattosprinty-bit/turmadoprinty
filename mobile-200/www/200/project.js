@@ -857,6 +857,7 @@ let actionPendingAiPayload = null;
 let actionStatusTargetId = "";
 let runningTaskTicker = null;
 let pendingActionsAnchorId = "";
+let actionCompletionAnimationId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
 let actionCategoryTargetActionId = "";
@@ -2007,6 +2008,26 @@ function getActionsMissionProgress(goal) {
   };
 }
 
+function animateProgressFillWidth(element, nextPercent, fromPercent = null) {
+  if (!element) return;
+  const next = Math.max(0, Math.min(100, Number(nextPercent || 0)));
+  const inlinePercent = Number.parseFloat(String(element.style.width || ""));
+  const hasFromOverride = fromPercent !== null && fromPercent !== undefined && Number.isFinite(Number(fromPercent));
+  const from = hasFromOverride ? Number(fromPercent) : inlinePercent;
+  if (!Number.isFinite(from) || Math.abs(from - next) < 0.1) {
+    element.style.width = `${next}%`;
+    return;
+  }
+  element.style.width = `${Math.max(0, Math.min(100, from))}%`;
+  element.getBoundingClientRect();
+  element.classList.remove("is-progress-animating");
+  window.requestAnimationFrame(() => {
+    element.style.width = `${next}%`;
+    element.classList.add("is-progress-animating");
+    window.setTimeout(() => element.classList.remove("is-progress-animating"), 820);
+  });
+}
+
 function renderActionsMissionsPanel() {
   if (!actionsMissionsPanel || !actionsMissionsList) return;
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
@@ -2015,6 +2036,12 @@ function renderActionsMissionsPanel() {
   actionsList.hidden = isOpen;
   if (!isOpen) return;
 
+  const previousProgress = new Map(
+    [...actionsMissionsList.querySelectorAll("[data-actions-mission-goal-id]")].map((card) => [
+      String(card.dataset.actionsMissionGoalId || ""),
+      Number(card.dataset.progressPercent)
+    ])
+  );
   const goals = Array.isArray(state.actionMissions) ? state.actionMissions : [];
   actionsMissionsList.innerHTML = "";
   if (!goals.length) {
@@ -2024,24 +2051,33 @@ function renderActionsMissionsPanel() {
 
   goals.forEach((goal) => {
     const progress = getActionsMissionProgress(goal);
+    const goalId = String(goal?.id || "");
+    const goalIcon = getMissionDisplayIcon(goal);
+    const priorPercent = previousProgress.get(goalId);
+    const initialPercent = Number.isFinite(priorPercent) ? priorPercent : progress.percent;
     const card = document.createElement("article");
     card.className = "actions-mission-card";
-    card.dataset.actionsMissionGoalId = String(goal?.id || "");
+    card.dataset.actionsMissionGoalId = goalId;
+    card.dataset.progressPercent = String(progress.percent);
     card.setAttribute("role", "button");
     card.tabIndex = 0;
     card.innerHTML = `
+      <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
         <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
         <p>${progress.progress} de ${progress.target}</p>
       </div>
-      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(String(goal?.id || ""))}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
+      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
       </button>
       <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
-        <div class="actions-mission-card-fill" style="width:${progress.percent}%"></div>
+        <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
       </div>
     `;
     actionsMissionsList.appendChild(card);
+    if (Number.isFinite(priorPercent) && Math.abs(priorPercent - progress.percent) >= 0.1) {
+      animateProgressFillWidth(card.querySelector(".actions-mission-card-fill"), progress.percent, priorPercent);
+    }
   });
 }
 
@@ -6024,7 +6060,12 @@ function renderActions() {
     const delayMinutes = getPendingDelayMinutes(action);
     const row = document.createElement("article");
     const cleanPendingClass = (status === actionStatuses.pending && delayMinutes <= 0) ? " task-pending-clean" : "";
-    row.className = `task-row${stateClass}${gaveUpClass}${getDelayClassByMinutes(delayMinutes)}${cleanPendingClass}`;
+    const completionAnimationClass = status === actionStatuses.completed
+      && actionsModal?.classList.contains("active")
+      && String(action.id || "") === String(actionCompletionAnimationId || "")
+      ? " task-completion-animate"
+      : "";
+    row.className = `task-row${stateClass}${gaveUpClass}${getDelayClassByMinutes(delayMinutes)}${cleanPendingClass}${completionAnimationClass}`;
     if (delayMinutes > 0 && delayMinutes <= 15) {
       row.style.setProperty("--delay-soft-rgb", getDelaySoftRgbByMinutes(delayMinutes));
     } else {
@@ -6047,6 +6088,9 @@ function renderActions() {
       <div class="task-time">${formatHourChip(action.startAt)}</div>
     `;
     actionsList.appendChild(row);
+    if (completionAnimationClass) {
+      actionCompletionAnimationId = "";
+    }
   });
 
   renderActionsProgress();
@@ -6139,7 +6183,7 @@ function renderActionsProgress() {
 
   actionsProgressLabel.textContent = `${percent}%`;
   actionsProgressMinutes.textContent = "";
-  actionsProgressFill.style.width = `${percent}%`;
+  animateProgressFillWidth(actionsProgressFill, percent);
   actionsProgressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
   registerDailyMissionEvents();
 }
@@ -6307,6 +6351,7 @@ async function toggleActionStatus(actionId, options = {}) {
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
       delete state.runningLocalStarts[String(targetId)];
       pendingActionsAnchorId = updated?.id || "";
+      actionCompletionAnimationId = String(updated?.id || "");
       enqueueActionPointsUpdateFeedback(
         payload?.pointsUpdate,
         RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS + 120
@@ -12172,7 +12217,6 @@ function renderMissionProgressState() {
   const baseValue = Math.max(0, Math.trunc(Number(state.missionProgress?.baseValue || 0) || 0));
   const deltaValue = Math.trunc(Number(state.missionProgress?.deltaValue || 0) || 0);
   const previewValue = Math.max(0, baseValue + deltaValue);
-  const itemCount = Math.max(1, Math.abs(deltaValue));
   if (missionProgressValue) {
     missionProgressValue.textContent = String(previewValue);
   }
@@ -12183,8 +12227,8 @@ function renderMissionProgressState() {
     missionProgressConfirmButton.disabled = false;
     missionProgressConfirmButton.classList.toggle("is-update", deltaValue !== 0);
     missionProgressConfirmButton.innerHTML = deltaValue === 0
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR AGORA</span>'
-      : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"} ${itemCount === 1 ? "ITEM" : "ITENS"}</span>`;
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR</span>'
+      : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"}</span>`;
   }
   missionProgressMinusButton?.classList.remove("active");
   missionProgressPlusButton?.classList.add("active");
@@ -13095,7 +13139,7 @@ function openMissionProgressModal(goalId) {
   openModal("missionProgressModal");
 }
 
-function createMissionCard(goal) {
+function createMissionCard(goal, initialPercent = null) {
   const goalIcon = getMissionDisplayIcon(goal);
   const historyRangeActive = isMissionHistoryRangeActive();
   const variants = Array.isArray(goal?.variants) ? goal.variants : [];
@@ -13112,9 +13156,12 @@ function createMissionCard(goal) {
     ? dailyVariantProgress.label
     : `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
   const card = document.createElement("article");
+  const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
+  const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : percent;
   card.className = `history-mission-card${hasMicrotasks ? " has-microtasks" : ""}`;
   card.dataset.goalId = String(goal.id || "");
   card.dataset.historyRangeActive = historyRangeActive ? "true" : "false";
+  card.dataset.progressPercent = String(percent);
   card.innerHTML = `
     <div class="history-mission-card-top">
       <div class="history-mission-card-info">
@@ -13129,7 +13176,7 @@ function createMissionCard(goal) {
       </div>
     </div>
     <div class="history-mission-progress-track" aria-hidden="true">
-      <div class="history-mission-progress-fill" style="width:${percent}%;"></div>
+      <div class="history-mission-progress-fill" style="width:${safeInitialPercent}%;"></div>
     </div>
   `;
   return card;
@@ -13137,6 +13184,12 @@ function createMissionCard(goal) {
 
 function renderMissions() {
   const goals = Array.isArray(state.missions) ? state.missions : [];
+  const previousProgress = new Map(
+    [...(missionList?.querySelectorAll("[data-goal-id]") || [])].map((card) => [
+      String(card.dataset.goalId || ""),
+      Number(card.dataset.progressPercent)
+    ])
+  );
   renderMissionScopeControls();
   if (missionsEmpty) {
     missionsEmpty.hidden = goals.length > 0;
@@ -13152,7 +13205,14 @@ function renderMissions() {
     return;
   }
   goals.forEach((goal) => {
-    missionList.appendChild(createMissionCard(goal));
+    const goalId = String(goal?.id || "");
+    const priorPercent = previousProgress.get(goalId);
+    const card = createMissionCard(goal, priorPercent);
+    missionList.appendChild(card);
+    const nextPercent = Number(card.dataset.progressPercent);
+    if (Number.isFinite(priorPercent) && Number.isFinite(nextPercent) && Math.abs(priorPercent - nextPercent) >= 0.1) {
+      animateProgressFillWidth(card.querySelector(".history-mission-progress-fill"), nextPercent, priorPercent);
+    }
   });
 }
 
