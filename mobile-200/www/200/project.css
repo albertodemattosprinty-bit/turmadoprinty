@@ -9067,7 +9067,7 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
 
 .marin-chat-composer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px 44px;
+  grid-template-columns: minmax(0, 1fr) 44px;
   align-items: end;
   gap: 8px;
   padding:
@@ -9298,7 +9298,7 @@ body[data-background-theme="white"] .marin-proposal-meta {
 }
 
 .friend-assignment-modal {
-  z-index: 80;
+  z-index: 3600;
   padding: 18px;
   background: rgba(3, 8, 24, 0.82);
   backdrop-filter: blur(16px);

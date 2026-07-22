@@ -260,6 +260,8 @@ html.project200-onboarding-active body {
   place-items: center;
   width: clamp(180px, 33vw, 270px);
   height: clamp(180px, 33vw, 270px);
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
   margin: 26px auto 0;
   padding: 7px;
   border: 0;
@@ -280,10 +282,13 @@ html.project200-onboarding-active body {
 }
 
 .project200-onboarding__avatar-ring img {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 7px;
+  width: calc(100% - 14px);
+  height: calc(100% - 14px);
   border-radius: 50%;
   object-fit: cover;
+  object-position: 50% 50%;
   opacity: 1;
   transition: opacity 650ms ease, filter 650ms ease, transform 650ms ease;
 }

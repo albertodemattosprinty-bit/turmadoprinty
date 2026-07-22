@@ -237,7 +237,7 @@ export function initializeProject200OnboardingUi(config) {
       '<button class="project200-onboarding__skip" type="button" data-avatar-skip>Agora não</button>',
       '</section>'
     ].join("");
-    continueButton.textContent = state.avatarCompleted ? "ENTRAR NO ILIFE" : "ESCOLHER FOTO";
+    continueButton.textContent = state.avatarCompleted ? "AVANÇAR" : "ESCOLHER FOTO";
     continueButton.hidden = false;
     continueButton.disabled = state.busy;
     if (state.busy) startProgressLoop();
@@ -371,8 +371,9 @@ export function initializeProject200OnboardingUi(config) {
     const image = await loadPhotoImage(file);
     const sourceWidth = Math.max(1, Number(image.naturalWidth || image.width || 1));
     const sourceHeight = Math.max(1, Number(image.naturalHeight || image.height || 1));
-    const width = Math.min(800, sourceWidth);
-    const height = Math.max(1, Math.round(sourceHeight * (width / sourceWidth)));
+    const scale = Math.min(1, 800 / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;

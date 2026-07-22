@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=20260721-home-onboarding-v2";
-import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260721-home-onboarding-v2";
+import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260721-avatar-fix-v3";
 
 import {
   MINUTE_CUE_INTERVALS,
@@ -6970,7 +6970,7 @@ function renderTaskComposerMeta(button, iconMarkup, label, placeholder = false) 
 }
 
 function renderTaskComposerModal() {
-  if (!startDecisionContent || !startDecisionTaskTitle || !startDecisionMicButton) {
+  if (!startDecisionContent || !startDecisionTaskTitle) {
     return;
   }
   const mode = state.startDecisionContext.mode;
@@ -6980,8 +6980,6 @@ function renderTaskComposerModal() {
   startDecisionTaskTitle.textContent = titleValue || "Inserir nome da tarefa";
   startDecisionTaskTitle.classList.toggle("is-placeholder", !titleValue);
   startDecisionTaskTitle.style.cursor = "pointer";
-  startDecisionMicButton.hidden = false;
-  startDecisionMicButton.classList.toggle("is-active", actionMediaRecorder && actionMediaRecorder.state !== "inactive");
   if (closeStartDecisionModal) {
     closeStartDecisionModal.hidden = false;
   }

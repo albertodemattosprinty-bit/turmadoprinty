@@ -3524,8 +3524,8 @@ async function buildProject200MarinUserContext(user, profileName, areas) {
       display: serverClock
     },
     points: {
-      today: Math.max(0, Math.trunc(Number(dailyStats?.totals?.completedMinutes || 0) || 0)),
-      total: Math.max(0, Math.trunc(Number(totalStats?.totals?.completedMinutes || 0) || 0))
+      today: pointTotals.today,
+      total: pointTotals.total
     },
     loadedAreas: areas
   };

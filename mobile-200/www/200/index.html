@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260721-radio-options-onboarding-v3" />
-  <link rel="stylesheet" href="/200/onboarding.css?v=20260721-onboarding-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260721-fixes-v4" />
+  <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -342,9 +342,6 @@
         <div class="start-decision-top-spacer" aria-hidden="true"></div>
         <div class="start-decision-title-wrap">
           <h1 class="start-decision-task-title" id="startDecisionTaskTitle">Tarefa X</h1>
-          <button class="start-decision-mic" type="button" id="startDecisionMicButton" aria-label="Falar tarefa" hidden>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-3.07A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0z"/></svg>
-          </button>
         </div>
       </div>
       <div class="start-decision-middle">
@@ -501,12 +498,6 @@
               <img class="task-avatar" id="actionCategoryPreviewIcon" src="/200/avatars/rose.png" alt="Categoria da tarefa" />
               <span id="actionCategoryPreviewLabel">Aspecto</span>
             </button>
-            <div class="action-voice-tools">
-              <button class="history-icon-btn mic-idle" type="button" id="actionMicButton" aria-label="Falar tarefa">
-                <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-3.07A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0z"/></svg>
-              </button>
-              <span class="history-voice-status action-voice-status" id="actionVoiceStatus">Toque no microfone para criar por voz.</span>
-            </div>
           </section>
 
           <section class="wizard-step" data-step="2">
@@ -573,7 +564,6 @@
             <p><strong>Datas selecionadas:</strong> <span id="actionAiConfirmDates">-</span> <button type="button" id="actionAiEditDates">Editar data</button></p>
             <div class="wizard-ai-confirm-actions">
               <button class="ghost-btn" type="button" id="actionAiEdit">Editar manualmente</button>
-              <button class="ghost-btn" type="button" id="actionAiRenameMic">Renomear com voz</button>
               <button class="primary-btn" type="button" id="actionAiApply">Confirmar</button>
             </div>
           </section>
@@ -1596,9 +1586,6 @@
       <div class="marin-chat-status" id="marinChatStatus" aria-live="polite"></div>
       <form class="marin-chat-composer" id="marinChatForm">
         <textarea id="marinChatInput" rows="1" maxlength="4000" enterkeyhint="send" placeholder="Converse sobre sua vida..." aria-label="Mensagem"></textarea>
-        <button class="marin-chat-mic" type="button" id="marinChatMicButton" aria-label="Falar mensagem">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
         <button class="marin-chat-send" type="submit" id="marinChatSendButton" aria-label="Enviar mensagem">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 20 18-8L3 4v6l12 2-12 2z"/></svg>
         </button>
@@ -1606,8 +1593,7 @@
     </div>
   </section>
 
-  <script type="module" src="/200/project.js?v=20260721-radio-options-onboarding-v3"></script>
-  <script src='/speech-input-kit.js?v=20260720-keyboard-v1'></script>
+  <script type="module" src="/200/project.js?v=20260721-fixes-v4"></script>
 </body>
 </html>
 
