@@ -10304,3 +10304,10 @@ body[data-background-theme="white"] .active-time-fields input { color: #2f3640; 
   .mission-order-controls { gap: 5px; }
   .mission-order-controls button { width: 34px; height: 34px; }
 }
+.history-mission-card.mission-overdue-container {
+  background: linear-gradient(90deg, rgba(var(--mission-delay-rgb, 255, 151, 45), 0.9) 0%, rgba(var(--mission-delay-rgb, 255, 151, 45), 0.68) 52%, rgba(var(--mission-delay-rgb, 255, 151, 45), 0.08) 100%);
+}
+
+.history-mission-card.mission-overdue-container.mission-dynamic-extreme {
+  background: linear-gradient(90deg, rgba(220, 42, 42, 0.96) 0%, rgba(130, 20, 20, 0.94) 42%, rgba(10, 10, 12, calc(0.35 + (var(--mission-delay-darkness, 0) * 0.63))) 76%, rgba(0, 0, 0, 0.08) 100%);
+}

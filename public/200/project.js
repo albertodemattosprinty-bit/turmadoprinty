@@ -2051,7 +2051,8 @@ function getMissionExpectation(goal, nowMs = getServerNowMs()) {
   const nextDueAtMs = completed >= target
     ? null
     : nextScheduledUnit?.dueAtMs ?? (windowState.startMs + (nextInstallmentNumber * ((windowState.endMs - windowState.startMs) / target)));
-  return { target, completed, expected, ratio, tone, windowState, nextInstallmentNumber, nextDueAtMs };
+  const delayMinutes = nextDueAtMs ? Math.max(0, Math.floor((nowMs - nextDueAtMs) / 60000)) : 0;
+  return { target, completed, expected, ratio, tone, windowState, nextInstallmentNumber, nextDueAtMs, delayMinutes };
 }
 function mixMissionRgb(start, end, amount) {
   const progress = Math.max(0, Math.min(1, Number(amount || 0)));
@@ -13546,12 +13547,18 @@ function createMissionCard(goal, initialPercent = null) {
     : `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
-  const displayPercent = expectation ? expectation.ratio : percent;
-  const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : displayPercent;
-  card.className = `history-mission-card${hasMicrotasks ? " has-microtasks" : ""}${expectation ? ` mission-expectation-${expectation.tone}` : ""}`;
+  const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : percent;
+  const delayVisual = expectation && expectation.delayMinutes > 60
+    ? getMissionInstallmentVisual(expectation.delayMinutes)
+    : null;
+  card.className = `history-mission-card${hasMicrotasks ? " has-microtasks" : ""}${delayVisual ? ` mission-overdue-container ${delayVisual.className}` : ""}`;
+  if (delayVisual) {
+    card.style.setProperty("--mission-delay-rgb", delayVisual.rgb);
+    card.style.setProperty("--mission-delay-darkness", String(delayVisual.darkness || 0));
+  }
   card.dataset.goalId = String(goal.id || "");
   card.dataset.historyRangeActive = historyRangeActive ? "true" : "false";
-  card.dataset.progressPercent = String(displayPercent);
+  card.dataset.progressPercent = String(percent);
   card.innerHTML = `
     <div class="history-mission-card-top">
       <div class="history-mission-card-info">
