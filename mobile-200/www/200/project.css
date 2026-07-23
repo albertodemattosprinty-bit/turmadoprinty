@@ -10072,3 +10072,114 @@ body[data-background-theme="white"] :is(
     height: 55px;
   }
 }
+/* Active-time mission pacing */
+.active-time-option {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.active-time-option > strong {
+  color: #fff;
+  font-size: 1.04rem;
+}
+
+.active-time-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.active-time-fields label {
+  display: grid;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.active-time-fields input,
+.active-time-fields button {
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  color: #fff;
+  background: rgba(5, 18, 48, 0.52);
+  font: inherit;
+  font-weight: 850;
+}
+
+.active-time-fields input { width: 100%; padding: 0 10px; color-scheme: dark; }
+.active-time-fields button { padding: 0 16px; background: linear-gradient(135deg, #1ec85e, #119a45); cursor: pointer; }
+.active-time-fields button:disabled { opacity: 0.5; cursor: wait; }
+
+.history-mission-card.mission-expectation-green,
+#actionsModal .actions-mission-card.mission-expectation-green { background: linear-gradient(90deg, rgba(24, 167, 92, 0.72), rgba(24, 167, 92, 0.08)); }
+.history-mission-card.mission-expectation-blue,
+#actionsModal .actions-mission-card.mission-expectation-blue { background: linear-gradient(90deg, rgba(36, 97, 206, 0.78), rgba(36, 97, 206, 0.08)); }
+.history-mission-card.mission-expectation-yellow,
+#actionsModal .actions-mission-card.mission-expectation-yellow { background: linear-gradient(90deg, rgba(224, 181, 31, 0.82), rgba(224, 181, 31, 0.08)); }
+.history-mission-card.mission-expectation-orange,
+#actionsModal .actions-mission-card.mission-expectation-orange { background: linear-gradient(90deg, rgba(238, 126, 28, 0.86), rgba(238, 126, 28, 0.08)); }
+.history-mission-card.mission-expectation-red,
+#actionsModal .actions-mission-card.mission-expectation-red { background: linear-gradient(90deg, rgba(202, 45, 45, 0.9), rgba(202, 45, 45, 0.08)); }
+
+.mission-expectation-green :is(.history-mission-progress-fill, .actions-mission-card-fill) { background: #25d477 !important; }
+.mission-expectation-blue :is(.history-mission-progress-fill, .actions-mission-card-fill) { background: #4b8cff !important; }
+.mission-expectation-yellow :is(.history-mission-progress-fill, .actions-mission-card-fill) { background: #ffd63d !important; }
+.mission-expectation-orange :is(.history-mission-progress-fill, .actions-mission-card-fill) { background: #ff972d !important; }
+.mission-expectation-red :is(.history-mission-progress-fill, .actions-mission-card-fill) { background: #e23b3b !important; }
+
+.task-row.task-mission-dynamic {
+  background: linear-gradient(90deg, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.94) 0%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.82) 52%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0) 100%);
+}
+
+.task-row.task-mission-dynamic.mission-dynamic-extreme {
+  background: linear-gradient(90deg, rgba(220, 42, 42, 0.96) 0%, rgba(130, 20, 20, 0.94) 42%, rgba(10, 10, 12, calc(0.35 + (var(--mission-delay-darkness, 0) * 0.63))) 76%, rgba(0, 0, 0, 0) 100%);
+}
+
+.actions-mission-filter-btn.is-dynamic { position: relative; }
+.actions-mission-filter-btn.is-dynamic::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  top: 50%;
+  width: 20px;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  transform: translateY(-50%);
+}
+.actions-mission-filter-btn.is-dynamic::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  right: 3px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
+  transition: transform 180ms ease, background 180ms ease;
+}
+.actions-mission-filter-btn.is-dynamic.is-filtering::after { background: #1ec85e; }
+.actions-mission-filter-btn.is-dynamic.is-filtering::before { transform: translate(9px, -50%); }
+
+body[data-background-theme="light"] .active-time-option,
+body[data-background-theme="white"] .active-time-option { background: rgba(30, 56, 105, 0.08); }
+body[data-background-theme="light"] .active-time-option > strong,
+body[data-background-theme="white"] .active-time-option > strong,
+body[data-background-theme="light"] .active-time-fields label,
+body[data-background-theme="white"] .active-time-fields label { color: #2f3640; }
+body[data-background-theme="light"] .active-time-fields input,
+body[data-background-theme="white"] .active-time-fields input { color: #2f3640; background: rgba(255,255,255,.78); color-scheme: light; }
+
+@media (max-width: 540px) {
+  .active-time-fields { grid-template-columns: 1fr auto 1fr; }
+  .active-time-fields button { grid-column: 1 / -1; }
+}

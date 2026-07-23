@@ -20,10 +20,11 @@ const missionQuickSlotsKey = "project_200_mission_quick_slots_v1";
 const missionVariantSortKey = "project_200_mission_variant_sort_v1";
 const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
-const missionActionsModes = ["separate", "hide"];
+const missionActionsModes = ["separate", "dynamic", "hide"];
 const missionActionsModeLabels = new Map([
   ["hide", "Não mostrar"],
-  ["separate", "Janela separada"]
+  ["separate", "Janela separada"],
+  ["dynamic", "Dinâmico"]
 ]);
 const taskBeepOptionLabels = new Map([
   [0, "Nenhum"],
@@ -400,6 +401,10 @@ const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption
 const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
 const toggleMissionActionsOptionButton = document.getElementById("toggleMissionActionsOption");
 const toggleMissionActionsHint = document.getElementById("toggleMissionActionsHint");
+const activeTimeStartInput = document.getElementById("activeTimeStartInput");
+const activeTimeEndInput = document.getElementById("activeTimeEndInput");
+const saveActiveTimeButton = document.getElementById("saveActiveTimeButton");
+const activeTimeStatus = document.getElementById("activeTimeStatus");
 const toggleScreenLockOptionButton = document.getElementById("toggleScreenLockOption");
 const toggleScreenLockHint = document.getElementById("toggleScreenLockHint");
 const openProject200ExportModalButton = document.getElementById("openProject200ExportModal");
@@ -1093,6 +1098,8 @@ const state = {
   missions: [],
   actionMissions: [],
   actionsMissionOnly: false,
+  actionsDynamicMissionsVisible: true,
+  activeTime: { startMinutes: 480, endMinutes: 1440, loaded: false, saving: false },
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -1191,6 +1198,7 @@ const state = {
     stopMusicOnFinish: false,
     messageNotificationsEnabled: false,
     messageNotificationSoundEnabled: false,
+    missionNotificationsEnabled: false,
   },
   svgAssets: [],
   svgSelector: {
@@ -1975,17 +1983,190 @@ function normalizeMissionActionsMode(value) {
   return missionActionsModes.includes(normalized) ? normalized : "separate";
 }
 
+function normalizeActiveTimeMinutes(value, fallback, allowEndOfDay = false) {
+  const maximum = allowEndOfDay ? 1440 : 1439;
+  const numeric = Math.trunc(Number(value));
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(maximum, numeric)) : fallback;
+}
+
+function clockInputToMinutes(value, { end = false } = {}) {
+  const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
+  if (!match) return end ? 1440 : 480;
+  const minutes = Math.max(0, Math.min(1439, (Number(match[1]) * 60) + Number(match[2])));
+  return end && minutes === 0 ? 1440 : minutes;
+}
+
+function activeMinutesToInput(minutes) {
+  const safe = Math.max(0, Math.min(1440, Number(minutes || 0)));
+  if (safe === 1440) return "00:00";
+  return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function activeMinutesToLabel(minutes) {
+  const value = Number(minutes) === 1440 ? 0 : Math.max(0, Number(minutes || 0));
+  return `${String(Math.floor(value / 60)).padStart(2, "0")}h${value % 60 ? String(value % 60).padStart(2, "0") : ""}`;
+}
+
+function getActiveTimeDurationMinutes(settings = state.activeTime) {
+  const start = normalizeActiveTimeMinutes(settings?.startMinutes, 480);
+  const end = normalizeActiveTimeMinutes(settings?.endMinutes, 1440, true);
+  return end > start ? end - start : (1440 - start) + end;
+}
+
+function getActiveTimeWindow(nowMs = getServerNowMs()) {
+  const startMinutes = normalizeActiveTimeMinutes(state.activeTime?.startMinutes, 480);
+  const endMinutes = normalizeActiveTimeMinutes(state.activeTime?.endMinutes, 1440, true);
+  const durationMinutes = getActiveTimeDurationMinutes({ startMinutes, endMinutes });
+  const dateKey = getProjectDateKey(new Date(nowMs));
+  let dayStartMs = projectDateKeyToDate(dateKey).getTime();
+  let startMs = dayStartMs + (startMinutes * 60000);
+  let endMs = startMs + (durationMinutes * 60000);
+  if (endMinutes <= startMinutes && nowMs < dayStartMs + (endMinutes * 60000)) {
+    startMs -= 86400000;
+    endMs -= 86400000;
+  }
+  return { startMs, endMs, startMinutes, endMinutes, durationMinutes, dateKey: getProjectDateKey(new Date(startMs)) };
+}
+
+function getMissionExpectation(goal, nowMs = getServerNowMs()) {
+  const target = Math.max(1, Math.trunc(Number(goal?.targetValue || 1)));
+  const completed = Math.max(0, Math.trunc(Number(goal?.progressValue || 0)));
+  const windowState = getActiveTimeWindow(nowMs);
+  const elapsed = Math.max(0, Math.min(windowState.endMs - windowState.startMs, nowMs - windowState.startMs));
+  const expected = Math.min(target, Math.floor((elapsed / Math.max(1, windowState.endMs - windowState.startMs)) * target));
+  const ratio = expected > 0 ? Math.max(0, Math.min(100, Math.round((completed / expected) * 100))) : 100;
+  const tone = ratio >= 90 ? "green" : ratio >= 80 ? "blue" : ratio >= 70 ? "yellow" : ratio >= 60 ? "orange" : "red";
+  const nextInstallmentNumber = Math.min(target, completed + 1);
+  const nextDueAtMs = completed >= target
+    ? null
+    : windowState.startMs + (nextInstallmentNumber * ((windowState.endMs - windowState.startMs) / target));
+  return { target, completed, expected, ratio, tone, windowState, nextInstallmentNumber, nextDueAtMs };
+}
+
+function mixMissionRgb(start, end, amount) {
+  const progress = Math.max(0, Math.min(1, Number(amount || 0)));
+  return start.map((value, index) => Math.round(value + ((end[index] - value) * progress))).join(", ");
+}
+
+function getMissionInstallmentVisual(delayMinutes) {
+  const delay = Number(delayMinutes || 0);
+  if (delay <= 15) return { className: "mission-dynamic-blue", rgb: "36, 97, 206" };
+  if (delay <= 30) return { className: "mission-dynamic-gradient", rgb: mixMissionRgb([36, 97, 206], [255, 214, 61], (delay - 15) / 15) };
+  if (delay <= 60) return { className: "mission-dynamic-gradient", rgb: mixMissionRgb([255, 214, 61], [255, 151, 45], (delay - 30) / 30) };
+  if (delay <= 180) return { className: "mission-dynamic-gradient", rgb: mixMissionRgb([255, 151, 45], [226, 59, 59], (delay - 60) / 120) };
+  if (delay <= 360) return { className: "mission-dynamic-extreme", rgb: "226, 59, 59", darkness: Math.max(0, Math.min(1, (delay - 180) / 180)) };
+  return { className: "mission-dynamic-extreme", rgb: "196, 38, 38", darkness: 1 };
+}
+
+function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs() } = {}) {
+  const windowState = getActiveTimeWindow(nowMs);
+  const goals = [...(Array.isArray(state.actionMissions) ? state.actionMissions : [])]
+    .sort((left, right) => String(left?.title || "").localeCompare(String(right?.title || ""), "pt-BR"));
+  const allUnits = goals.flatMap((goal) => {
+    const target = Math.max(1, Math.trunc(Number(goal?.targetValue || 1)));
+    const completed = Math.max(0, Math.min(target, Math.trunc(Number(goal?.progressValue || 0))));
+    return Array.from({ length: target }, (_, index) => ({
+      goal,
+      goalId: String(goal?.id || ""),
+      title: String(goal?.title || "Missão"),
+      installmentNumber: index + 1,
+      target,
+      completed: index < completed
+    }));
+  });
+  const intervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, allUnits.length);
+  return allUnits.map((unit, globalIndex) => {
+    const dueAtMs = windowState.startMs + ((globalIndex + 1) * intervalMs);
+    return {
+      ...unit,
+      kind: "mission-installment",
+      id: `mission-${unit.goalId}-${windowState.dateKey}-${unit.installmentNumber}`,
+      dueAtMs,
+      startAt: new Date(dueAtMs).toISOString(),
+      delayMinutes: Math.floor((nowMs - dueAtMs) / 60000)
+    };
+  }).filter((entry) => !entry.completed)
+    .filter((entry) => !availableOnly || nowMs >= entry.dueAtMs - (15 * 60000))
+    .sort((left, right) => left.dueAtMs - right.dueAtMs || left.title.localeCompare(right.title, "pt-BR"));
+}
+async function loadProject200ActiveTime() {
+  if (!getToken()) return;
+  try {
+    const payload = await apiRequest("/api/200/active-time", { skipGlobalLoading: true });
+    state.activeTime = {
+      startMinutes: normalizeActiveTimeMinutes(payload?.activeTime?.startMinutes, 480),
+      endMinutes: normalizeActiveTimeMinutes(payload?.activeTime?.endMinutes, 1440, true),
+      loaded: true,
+      saving: false
+    };
+  } catch {
+    state.activeTime = { startMinutes: 480, endMinutes: 1440, loaded: true, saving: false };
+  }
+  renderOptionsModal();
+}
+
+async function requestMissionNotificationPermission() {
+  const notifications = window.Capacitor?.Plugins?.LocalNotifications || null;
+  if (!notifications?.requestPermissions) return false;
+  try {
+    let permission = await notifications.checkPermissions();
+    if (permission?.display !== "granted") permission = await notifications.requestPermissions();
+    if (permission?.display !== "granted") return false;
+    if (notifications.createChannel) {
+      await notifications.createChannel({ id: "ilife-missions", name: "Missões iLife", description: "Alertas de missões atrasadas", importance: 5, visibility: 1, vibration: true });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function missionNotificationId(value) {
+  let hash = 0;
+  for (const character of String(value || "")) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
+  return Math.max(1, Math.abs(hash) % 2147483000);
+}
+
+async function scheduleMissionNotifications() {
+  const notifications = window.Capacitor?.Plugins?.LocalNotifications || null;
+  if (!state.options.missionNotificationsEnabled || !notifications?.schedule) return;
+  try {
+    const pending = await notifications.getPending?.();
+    const previous = (pending?.notifications || []).filter((item) => item?.extra?.kind === "project200-mission-active-time");
+    if (previous.length && notifications.cancel) await notifications.cancel({ notifications: previous.map((item) => ({ id: item.id })) });
+    const nowMs = getServerNowMs();
+    const scheduled = [];
+    buildMissionInstallments({ availableOnly: false, nowMs }).forEach((entry) => {
+      [{ tier: "orange", offset: 60 }, { tier: "red", offset: 180 }].forEach(({ tier, offset }) => {
+        const atMs = entry.dueAtMs + (offset * 60000);
+        if (atMs <= nowMs || scheduled.length >= 48) return;
+        scheduled.push({
+          id: missionNotificationId(`${entry.id}-${tier}`),
+          title: tier === "red" ? "Missão muito atrasada" : "Missão atrasada",
+          body: `${entry.title} · parcela ${entry.installmentNumber} de ${entry.target}`,
+          channelId: "ilife-missions",
+          schedule: { at: new Date(atMs) },
+          extra: { kind: "project200-mission-active-time", goalId: entry.goalId, tier }
+        });
+      });
+    });
+    if (scheduled.length) await notifications.schedule({ notifications: scheduled });
+  } catch {}
+}
+
 function renderActionsMissionFilter() {
   if (!actionsMissionFilterButton) return;
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
   const isAvailable = Boolean(getToken()) && state.activeOffset === 0 && mode !== "hide";
   actionsMissionFilterButton.hidden = !isAvailable;
-  actionsMissionFilterButton.classList.toggle("is-filtering", state.actionsMissionOnly);
-  actionsMissionFilterButton.setAttribute("aria-label", state.actionsMissionOnly
-    ? "Voltar para a lista de ações"
-    : "Abrir missões");
+  const filterActive = mode === "dynamic" ? state.actionsDynamicMissionsVisible : state.actionsMissionOnly;
+  actionsMissionFilterButton.classList.toggle("is-filtering", filterActive);
+  actionsMissionFilterButton.classList.toggle("is-dynamic", mode === "dynamic");
+  actionsMissionFilterButton.setAttribute("aria-label", mode === "dynamic"
+    ? (state.actionsDynamicMissionsVisible ? "Ocultar missões dinâmicas" : "Mostrar missões dinâmicas")
+    : (state.actionsMissionOnly ? "Voltar para a lista de ações" : "Abrir missões"));
   actionsMissionFilterButton.setAttribute("aria-controls", "actionsMissionsPanel");
-  actionsMissionFilterButton.setAttribute("aria-expanded", state.actionsMissionOnly ? "true" : "false");
+  actionsMissionFilterButton.setAttribute("aria-expanded", filterActive ? "true" : "false");
 }
 
 function getAvailableMissionById(goalId) {
@@ -2037,7 +2218,7 @@ function animateProgressFillWidth(element, nextPercent, fromPercent = null) {
 function renderActionsMissionsPanel() {
   if (!actionsMissionsPanel || !actionsMissionsList) return;
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  const isOpen = Boolean(getToken()) && state.activeOffset === 0 && mode !== "hide" && state.actionsMissionOnly;
+  const isOpen = Boolean(getToken()) && state.activeOffset === 0 && mode === "separate" && state.actionsMissionOnly;
   actionsMissionsPanel.hidden = !isOpen;
   actionsList.hidden = isOpen;
   if (!isOpen) return;
@@ -2062,7 +2243,8 @@ function renderActionsMissionsPanel() {
     const priorPercent = previousProgress.get(goalId);
     const initialPercent = Number.isFinite(priorPercent) ? priorPercent : progress.percent;
     const card = document.createElement("article");
-    card.className = "actions-mission-card";
+    const expectation = getMissionExpectation(goal);
+    card.className = `actions-mission-card mission-expectation-${expectation.tone}`;
     card.dataset.actionsMissionGoalId = goalId;
     card.dataset.progressPercent = String(progress.percent);
     card.setAttribute("role", "button");
@@ -2071,7 +2253,7 @@ function renderActionsMissionsPanel() {
       <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
         <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
-        <p>${progress.progress} de ${progress.target}</p>
+        <p>${progress.progress} de ${progress.target} · ${expectation.ratio}% do esperado${expectation.nextDueAtMs ? ` · próxima ${formatHourChip(new Date(expectation.nextDueAtMs).toISOString())}` : ""}</p>
       </div>
       <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
@@ -6023,7 +6205,12 @@ function renderActions() {
     return;
   }
 
-  const timelineEntries = buildActionTimelineEntries()
+  const dynamicMissionEntries = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
+    && state.actionsDynamicMissionsVisible
+    && state.activeOffset === 0
+    ? buildMissionInstallments()
+    : [];
+  const timelineEntries = [...buildActionTimelineEntries(), ...dynamicMissionEntries]
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
 
   if (!timelineEntries.length) {
@@ -6034,6 +6221,33 @@ function renderActions() {
     const slotOwner = state.selectedProfile;
     const slotAvatar = getActionAvatarPath(slotOwner);
 
+    if (action.kind === "mission-installment") {
+      const visual = getMissionInstallmentVisual(action.delayMinutes);
+      const missionIcon = getMissionDisplayIcon(action.goal);
+      const row = document.createElement("article");
+      row.className = `task-row task-mission-dynamic ${visual.className}`;
+      row.dataset.missionGoalId = action.goalId;
+      row.dataset.missionInstallment = String(action.installmentNumber);
+      row.style.setProperty("--mission-delay-rgb", visual.rgb);
+      row.style.setProperty("--mission-delay-darkness", String(visual.darkness || 0));
+      row.setAttribute("role", "button");
+      row.tabIndex = 0;
+      const timingLabel = action.delayMinutes <= 0
+        ? `Disponível · vence ${formatHourChip(action.startAt)}`
+        : action.delayMinutes <= 15
+          ? `No horário · ${action.delayMinutes} min`
+          : `${action.delayMinutes} min de atraso`;
+      row.innerHTML = `
+        ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: missionIcon.categoryIcon })}
+        <div class="task-main">
+          <div class="task-title">${escapeHtml(action.title)}</div>
+          <div class="task-assignee task-duration">Parcela ${action.installmentNumber} de ${action.target} · ${escapeHtml(timingLabel)}</div>
+        </div>
+        <div class="task-time">${formatHourChip(action.startAt)}</div>
+      `;
+      actionsList.appendChild(row);
+      return;
+    }
     if (action.kind === "free") {
       const duration = getActionDurationMinutes(action);
       const ended = getServerNowMs() >= new Date(action.endAt).getTime();
@@ -10679,6 +10893,7 @@ async function loadActionMissions() {
   } catch {
     state.actionMissions = [];
   }
+  void scheduleMissionNotifications();
   if (actionsModal?.classList.contains("active")) {
     renderActions();
   } else {
@@ -13158,13 +13373,14 @@ function createMissionCard(goal, initialPercent = null) {
   const percent = dailyVariantProgress
     ? dailyVariantProgress.percent
     : Math.max(0, Math.min(100, Math.round((progress / target) * 100)));
+  const expectation = historyRangeActive ? null : getMissionExpectation(goal);
   const progressLabel = dailyVariantProgress
     ? dailyVariantProgress.label
-    : `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
+    : `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}${expectation ? ` · ${expectation.ratio}% do esperado${expectation.nextDueAtMs ? ` · próxima ${formatHourChip(new Date(expectation.nextDueAtMs).toISOString())}` : ""}` : ""}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
   const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : percent;
-  card.className = `history-mission-card${hasMicrotasks ? " has-microtasks" : ""}`;
+  card.className = `history-mission-card${hasMicrotasks ? " has-microtasks" : ""}${expectation ? ` mission-expectation-${expectation.tone}` : ""}`;
   card.dataset.goalId = String(goal.id || "");
   card.dataset.historyRangeActive = historyRangeActive ? "true" : "false";
   card.dataset.progressPercent = String(percent);
@@ -13877,6 +14093,7 @@ async function bootstrapProject200App() {
     if (!authenticated) {
       return;
     }
+    await loadProject200ActiveTime();
     if (state.authUser?.onboardingRequired || state.project200Onboarding?.required) {
       try {
         await loadProject200Profiles();
@@ -14143,6 +14360,7 @@ async function loadOptionsConfig() {
       state.options.stopMusicOnFinish = parsed.stopMusicOnFinish === true;
       state.options.messageNotificationsEnabled = parsed.messageNotificationsEnabled === true;
       state.options.messageNotificationSoundEnabled = parsed.messageNotificationSoundEnabled === true;
+      state.options.missionNotificationsEnabled = parsed.missionNotificationsEnabled === true;
     } catch {
       state.options.showFreeTime = true;
       state.options.missionActionsMode = "separate";
@@ -14154,6 +14372,7 @@ async function loadOptionsConfig() {
       state.options.stopMusicOnFinish = false;
       state.options.messageNotificationsEnabled = false;
       state.options.messageNotificationSoundEnabled = false;
+      state.options.missionNotificationsEnabled = false;
     }
     applyBackgroundTheme();
   })();
@@ -14171,7 +14390,8 @@ function saveOptionsConfig() {
     screenLockEnabled: Boolean(state.options.screenLockEnabled),
     stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish),
     messageNotificationsEnabled: Boolean(state.options.messageNotificationsEnabled),
-    messageNotificationSoundEnabled: Boolean(state.options.messageNotificationSoundEnabled)
+    messageNotificationSoundEnabled: Boolean(state.options.messageNotificationSoundEnabled),
+    missionNotificationsEnabled: Boolean(state.options.missionNotificationsEnabled)
   });
   try {
     window.localStorage.setItem(optionsConfigKey, serialized);
@@ -14349,7 +14569,15 @@ function renderOptionsModal() {
   if (toggleMissionActionsHint) {
     toggleMissionActionsHint.textContent = missionActionsModeLabels.get(missionActionsMode) || "Janela separada";
   }
-  toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode === "hide");
+toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode === "hide");
+  if (activeTimeStartInput && document.activeElement !== activeTimeStartInput) activeTimeStartInput.value = activeMinutesToInput(state.activeTime.startMinutes);
+  if (activeTimeEndInput && document.activeElement !== activeTimeEndInput) activeTimeEndInput.value = activeMinutesToInput(state.activeTime.endMinutes);
+  if (activeTimeStatus && !state.activeTime.saving) {
+    const duration = getActiveTimeDurationMinutes();
+    const durationLabel = duration % 60 ? `${Math.floor(duration / 60)}h ${duration % 60}min` : `${duration / 60} horas`;
+    activeTimeStatus.textContent = `${activeMinutesToLabel(state.activeTime.startMinutes)}–${activeMinutesToLabel(state.activeTime.endMinutes)} · ${durationLabel} ativas`;
+  }
+  if (saveActiveTimeButton) saveActiveTimeButton.disabled = Boolean(state.activeTime.saving);
   if (toggleTaskBeepHint) {
     toggleTaskBeepHint.textContent = taskBeepOptionLabels.get(Number(state.options.completionBeepCycles || 0)) || "Nenhum";
   }
@@ -14877,6 +15105,11 @@ actionsList.addEventListener("pointerleave", endActionLongPress);
 actionsList.addEventListener("pointercancel", endActionLongPress);
 
 actionsList.addEventListener("click", async (event) => {
+  const missionRow = event.target.closest("[data-mission-goal-id]");
+  if (missionRow) {
+    openMissionProgressModal(String(missionRow.dataset.missionGoalId || ""));
+    return;
+  }
   const row = event.target.closest("[data-action-id]");
   if (!row) {
     return;
@@ -16238,11 +16471,16 @@ runningMusicListDefaultButton?.addEventListener("click", () => {
   void saveRunningTaskDefault("track");
 });
 actionsMissionFilterButton?.addEventListener("click", () => {
-  if (normalizeMissionActionsMode(state.options.missionActionsMode) === "hide") return;
-  state.actionsMissionOnly = !state.actionsMissionOnly;
+  const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  if (mode === "hide") return;
+  if (mode === "dynamic") {
+    state.actionsDynamicMissionsVisible = !state.actionsDynamicMissionsVisible;
+  } else {
+    state.actionsMissionOnly = !state.actionsMissionOnly;
+  }
   renderActions();
   window.requestAnimationFrame(() => {
-    const target = state.actionsMissionOnly ? actionsMissionsPanel : actionsList;
+    const target = mode === "separate" && state.actionsMissionOnly ? actionsMissionsPanel : actionsList;
     target?.scrollTo({ top: 0, behavior: "smooth" });
   });
 });
@@ -16451,15 +16689,50 @@ logoutProject200Button?.addEventListener("click", () => {
   })();
 });
 toggleMissionActionsOptionButton?.addEventListener("click", () => {
-  const currentMode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  const currentIndex = Math.max(0, missionActionsModes.indexOf(currentMode));
-  state.options.missionActionsMode = missionActionsModes[(currentIndex + 1) % missionActionsModes.length];
-  if (state.options.missionActionsMode === "hide") {
+  void (async () => {
+    const currentMode = normalizeMissionActionsMode(state.options.missionActionsMode);
+    const currentIndex = Math.max(0, missionActionsModes.indexOf(currentMode));
+    state.options.missionActionsMode = missionActionsModes[(currentIndex + 1) % missionActionsModes.length];
     state.actionsMissionOnly = false;
-  }
-  saveOptionsConfig();
-  renderOptionsModal();
-  renderActions();
+    state.actionsDynamicMissionsVisible = true;
+    if (state.options.missionActionsMode === "dynamic" && !state.options.missionNotificationsEnabled) {
+      state.options.missionNotificationsEnabled = await requestMissionNotificationPermission();
+    }
+    saveOptionsConfig();
+    renderOptionsModal();
+    renderActions();
+    void scheduleMissionNotifications();
+  })();
+});
+
+saveActiveTimeButton?.addEventListener("click", () => {
+  void (async () => {
+    const startMinutes = clockInputToMinutes(activeTimeStartInput?.value);
+    const endMinutes = clockInputToMinutes(activeTimeEndInput?.value, { end: true });
+    if (startMinutes === endMinutes) {
+      if (activeTimeStatus) activeTimeStatus.textContent = "Escolha horários diferentes.";
+      return;
+    }
+    state.activeTime.saving = true;
+    renderOptionsModal();
+    if (activeTimeStatus) activeTimeStatus.textContent = "Salvando no iLife…";
+    try {
+      const payload = await apiRequest("/api/200/active-time", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startMinutes, endMinutes })
+      });
+      state.activeTime = { ...payload.activeTime, loaded: true, saving: false };
+      renderOptionsModal();
+      renderMissions();
+      renderActions();
+      void scheduleMissionNotifications();
+    } catch (error) {
+      state.activeTime.saving = false;
+      renderOptionsModal();
+      if (activeTimeStatus) activeTimeStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar.";
+    }
+  })();
 });
 async function openProject200OnboardingFromLogo() {
   if (project200OnboardingUi.isActive()) return;

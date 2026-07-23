@@ -4,6 +4,8 @@ import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME }
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
 const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
 const EXTRA_GOAL_MAX_CYCLES = 12;
+const DEFAULT_ACTIVE_TIME_START_MINUTES = 8 * 60;
+const DEFAULT_ACTIVE_TIME_END_MINUTES = 24 * 60;
 export const EXTRA_GOAL_HISTORY_SCOPES = [
   { key: "today", label: "Hoje", days: 1 },
   { key: "last7", label: "Ultimos 7 dias", days: 7 },
@@ -31,6 +33,24 @@ function normalizeExtraGoalProfile(value) {
 
 function normalizeExtraGoalVariantUnit(value) {
   return String(value || "days").trim().toLowerCase() === "hours" ? "hours" : "days";
+}
+
+function normalizeActiveTimeMinutes(value, fallback, { allowEndOfDay = false } = {}) {
+  const maximum = allowEndOfDay ? 24 * 60 : (24 * 60) - 1;
+  const number = Math.trunc(Number(value));
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(0, Math.min(maximum, number));
+}
+
+function normalizeActiveTimeRow(row = {}) {
+  const startMinutes = normalizeActiveTimeMinutes(row.active_start_minutes, DEFAULT_ACTIVE_TIME_START_MINUTES);
+  let endMinutes = normalizeActiveTimeMinutes(row.active_end_minutes, DEFAULT_ACTIVE_TIME_END_MINUTES, { allowEndOfDay: true });
+  if (endMinutes === startMinutes) endMinutes = DEFAULT_ACTIVE_TIME_END_MINUTES;
+  return {
+    startMinutes,
+    endMinutes,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null
+  };
 }
 
 function normalizeExtraGoalVariantRow(row) {
@@ -329,6 +349,46 @@ export async function ensureExtraGoalsSchema() {
     );
   `);
   await query("create index if not exists idx_extra_goal_variants_owner on extra_goal_variants(user_id, goal_id, assigned_profile, updated_at desc);");
+  await query(`
+    create table if not exists project200_user_active_time (
+      user_id uuid primary key references users(id) on delete cascade,
+      active_start_minutes integer not null default 480,
+      active_end_minutes integer not null default 1440,
+      updated_at timestamptz not null default now(),
+      constraint project200_active_start_range check (active_start_minutes between 0 and 1439),
+      constraint project200_active_end_range check (active_end_minutes between 0 and 1440),
+      constraint project200_active_time_not_equal check (active_start_minutes <> active_end_minutes)
+    );
+  `);
+}
+
+export async function getProject200ActiveTime(userId) {
+  await ensureExtraGoalsSchema();
+  await query(`insert into project200_user_active_time (user_id) values ($1) on conflict (user_id) do nothing`, [userId]);
+  const result = await query(`
+    select active_start_minutes, active_end_minutes, updated_at
+    from project200_user_active_time
+    where user_id = $1
+    limit 1
+  `, [userId]);
+  return normalizeActiveTimeRow(result.rows[0]);
+}
+
+export async function updateProject200ActiveTime(userId, payload = {}) {
+  await ensureExtraGoalsSchema();
+  const startMinutes = normalizeActiveTimeMinutes(payload?.startMinutes, DEFAULT_ACTIVE_TIME_START_MINUTES);
+  const endMinutes = normalizeActiveTimeMinutes(payload?.endMinutes, DEFAULT_ACTIVE_TIME_END_MINUTES, { allowEndOfDay: true });
+  if (startMinutes === endMinutes) throw new Error("O tempo ativo precisa ter horários diferentes.");
+  const result = await query(`
+    insert into project200_user_active_time (user_id, active_start_minutes, active_end_minutes, updated_at)
+    values ($1, $2, $3, now())
+    on conflict (user_id) do update
+    set active_start_minutes = excluded.active_start_minutes,
+        active_end_minutes = excluded.active_end_minutes,
+        updated_at = now()
+    returning active_start_minutes, active_end_minutes, updated_at
+  `, [userId, startMinutes, endMinutes]);
+  return normalizeActiveTimeRow(result.rows[0]);
 }
 
 export async function listExtraGoalVariants(userId, profileName, goalId) {

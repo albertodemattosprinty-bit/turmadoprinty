@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260722-message-notifications-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260723-active-time-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -774,8 +774,19 @@
       <button class="running-music-default-option options-toggle-btn" type="button" id="toggleMissionActionsOption">
         <span class="running-music-default-top">Escolher onde as missões do dia aparecem</span>
         <strong>Missões</strong>
-        <span class="running-music-default-bottom" id="toggleMissionActionsHint">Mostrar</span>
+        <span class="running-music-default-bottom" id="toggleMissionActionsHint">Janela separada</span>
       </button>
+      <section class="active-time-option" aria-labelledby="activeTimeOptionTitle">
+        <span class="running-music-default-top">Distribui as parcelas das missões ao longo do seu dia</span>
+        <strong id="activeTimeOptionTitle">Tempo ativo</strong>
+        <div class="active-time-fields">
+          <label>Início<input id="activeTimeStartInput" type="time" value="08:00" /></label>
+          <span aria-hidden="true">—</span>
+          <label>Fim<input id="activeTimeEndInput" type="time" value="00:00" /></label>
+          <button type="button" id="saveActiveTimeButton">Salvar</button>
+        </div>
+        <span class="running-music-default-bottom" id="activeTimeStatus">08h–00h · 16 horas ativas</span>
+      </section>
       <button class="running-music-default-option" type="button" id="openProfileAvatarModalFromOptions">
         <span class="running-music-default-top">Escolher, enviar ou gerar a foto circular do usuário atual</span>
         <strong>Foto do usuario</strong>
@@ -1660,7 +1671,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260722-message-notifications-v1"></script>
+  <script type="module" src="/200/project.js?v=20260723-active-time-v1"></script>
 </body>
 </html>
 
