@@ -58,7 +58,7 @@ import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEn
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
-import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, listProject200History } from "./src/project200-history.js";
+import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
@@ -12496,6 +12496,19 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/200/history/span") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const span = await getProject200HistorySpan(user.id);
+      sendJson(response, 200, { ok: true, ...span });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Não foi possível carregar o período disponível."
+      });
+    }
+    return;
+  }
   if (request.method === "GET" && pathname === "/api/200/history") {
     try {
       const user = await requireAuth(request, response);

@@ -187,6 +187,8 @@ const actionsProgressLabel = document.getElementById("actionsProgressLabel");
 const actionsProgressMinutes = document.getElementById("actionsProgressMinutes");
 const actionsProgressFill = document.getElementById("actionsProgressFill");
 const actionsMissionFilterButton = document.getElementById("actionsMissionFilterButton");
+const actionsMissionOverdueBadge = document.getElementById("actionsMissionOverdueBadge");
+const actionsPeriodButton = document.getElementById("actionsPeriodButton");
 const actionsMissionsPanel = document.getElementById("actionsMissionsPanel");
 const actionsMissionsList = document.getElementById("actionsMissionsList");
 const financeDateLabel = document.getElementById("financeDateLabel");
@@ -225,6 +227,11 @@ const platformRecurrenceDayLabel = document.getElementById("platformRecurrenceDa
 const statsScopeLabel = document.getElementById("statsScopeLabel");
 const statsScopePrevButton = document.getElementById("statsScopePrevButton");
 const statsScopeNextButton = document.getElementById("statsScopeNextButton");
+const statsPeriodButton = document.getElementById("statsPeriodButton");
+const metricPeriodModal = document.getElementById("metricPeriodModal");
+const metricPeriodOptions = document.getElementById("metricPeriodOptions");
+const metricPeriodHint = document.getElementById("metricPeriodHint");
+const metricPeriodStatus = document.getElementById("metricPeriodStatus");
 const statsAllMissionsButton = document.getElementById("statsAllMissionsButton");
 const statsMissionSummary = document.getElementById("statsMissionSummary");
 const statsMissionTotal = document.getElementById("statsMissionTotal");
@@ -468,6 +475,7 @@ const missionsFooter = document.getElementById("missionsFooter");
 const missionScopePrevButton = document.getElementById("missionScopePrevButton");
 const missionScopeLabel = document.getElementById("missionScopeLabel");
 const missionScopeNextButton = document.getElementById("missionScopeNextButton");
+const missionPeriodButton = document.getElementById("missionPeriodButton");
 const openMissionCreateHeroButton = document.getElementById("openMissionCreateHero");
 const openMissionCreateButton = document.getElementById("openMissionCreateButton");
 const missionTitleInput = document.getElementById("missionTitleInput");
@@ -1029,6 +1037,12 @@ const defaultMissionSvgPath = "/200/icons/target.svg";
 
 const state = {
   activeOffset: 0,
+  actionPeriodDays: 3,
+  missionPeriodDays: 3,
+  statsPeriodDays: 3,
+  historySpan: { loaded: false, loading: false, maxDays: 1, firstOccurredAt: null },
+  metricPeriodTarget: "",
+  forceHomeOverview: false,
   platformOffset: 0,
   statsScopeIndex: 0,
   financePeriodIndex: 0,
@@ -1940,6 +1954,9 @@ function buildActionTimelineEntries() {
   const visibleActions = getVisibleActions()
     .slice()
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  if (state.actionPeriodDays > 1) {
+    return visibleActions.map((action) => ({ kind: "action", ...action }));
+  }
   const entries = [];
   const baseDate = dateFromOffset(state.activeOffset);
   const dayStart = new Date(baseDate);
@@ -2339,8 +2356,15 @@ function renderActionsMissionFilter() {
     : (state.actionsMissionOnly ? "Voltar para a lista de ações" : "Abrir missões"));
   actionsMissionFilterButton.setAttribute("aria-controls", "actionsMissionsPanel");
   actionsMissionFilterButton.setAttribute("aria-expanded", filterActive ? "true" : "false");
+  const overdueCount = mode === "dynamic"
+    ? buildMissionInstallments().filter((entry) => Number(entry.delayMinutes || 0) > 15).length
+    : 0;
+  if (actionsMissionOverdueBadge) {
+    actionsMissionOverdueBadge.hidden = overdueCount < 1;
+    actionsMissionOverdueBadge.textContent = overdueCount > 99 ? "99+" : String(overdueCount);
+    actionsMissionOverdueBadge.setAttribute("aria-label", `${overdueCount} parcelas atrasadas`);
+  }
 }
-
 function getAvailableMissionById(goalId) {
   const normalizedId = String(goalId || "").trim();
   if (!normalizedId) return null;
@@ -3735,7 +3759,7 @@ function renderHomeRunningTask() {
     }
   }
   setRunningCompletionVisualState(false);
-  const action = getRunningActionForSelectedProfile();
+  const action = state.forceHomeOverview ? null : getRunningActionForSelectedProfile();
   state.runningPlayer.currentTaskTitle = String(action?.title || "").trim();
   const runningActionId = String(action?.id || "").trim();
   if (runningActionId && state.runningPlayer.defaultAppliedActionId !== runningActionId) {
@@ -4967,27 +4991,120 @@ function formatHistoryDateLabel(date) {
   return `${String(date.getDate()).padStart(2, "0")} ${monthLabels[date.getMonth()]}`;
 }
 
+const metricPeriodPresetDays = [3, 7, 15, 30, 183, 365];
+
+function formatMetricPeriodLabel(days) {
+  const safeDays = Math.max(1, Math.trunc(Number(days || 1)));
+  if (safeDays === 1) return "1 dia";
+  if (safeDays === 183) return "6 meses";
+  if (safeDays === 365) return "1 ano";
+  return `${safeDays} dias`;
+}
+
+function getMetricScopeFromDays(days) {
+  const safeDays = Math.max(1, Math.trunc(Number(days || 1)));
+  if (safeDays === 1) return { key: "today", label: "1 dia", days: 1 };
+  if (safeDays === 7) return { key: "last7", label: "7 dias", days: 7 };
+  if (safeDays === 15) return { key: "last15", label: "15 dias", days: 15 };
+  if (safeDays === 30) return { key: "last30", label: "30 dias", days: 30 };
+  return { key: `days-${safeDays}`, label: formatMetricPeriodLabel(safeDays), days: safeDays };
+}
+
+function getMetricPeriodDays(target = state.metricPeriodTarget) {
+  if (target === "missions") return state.missionPeriodDays;
+  if (target === "stats") return state.statsPeriodDays;
+  return state.actionPeriodDays;
+}
+
+function setMetricPeriodDays(target, days) {
+  const safeDays = Math.max(1, Math.min(state.historySpan.maxDays || 1, Math.trunc(Number(days || 1))));
+  if (target === "missions") state.missionPeriodDays = safeDays;
+  else if (target === "stats") state.statsPeriodDays = safeDays;
+  else state.actionPeriodDays = safeDays;
+  return safeDays;
+}
+
+function getAvailableMetricPeriods() {
+  const maximum = Math.max(1, Math.trunc(Number(state.historySpan.maxDays || 1)));
+  const values = metricPeriodPresetDays.filter((days) => days <= maximum);
+  if (!values.includes(maximum)) values.push(maximum);
+  return [...new Set(values)].sort((left, right) => left - right);
+}
+
+async function loadMetricHistorySpan() {
+  if (!getToken() || state.historySpan.loading) return;
+  state.historySpan.loading = true;
+  try {
+    const payload = await apiRequest("/api/200/history/span", { skipGlobalLoading: true });
+    state.historySpan = {
+      loaded: true,
+      loading: false,
+      maxDays: Math.max(1, Math.trunc(Number(payload?.maxDays || 1))),
+      firstOccurredAt: payload?.firstOccurredAt || null
+    };
+    ["actions", "missions", "stats"].forEach((target) => setMetricPeriodDays(target, getMetricPeriodDays(target)));
+  } catch (error) {
+    state.historySpan.loading = false;
+    if (metricPeriodStatus) metricPeriodStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar períodos.";
+  }
+}
+
+function renderMetricPeriodModal() {
+  if (!metricPeriodOptions) return;
+  const selectedDays = getMetricPeriodDays();
+  const options = getAvailableMetricPeriods();
+  metricPeriodOptions.innerHTML = options.map((days) => `<button type="button" class="metric-period-option${days === selectedDays ? " is-active" : ""}" data-metric-period-days="${days}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${escapeHtml(formatMetricPeriodLabel(days))}</span></button>`).join("");
+  if (metricPeriodHint) {
+    metricPeriodHint.textContent = state.historySpan.firstOccurredAt
+      ? `Disponível desde a primeira movimentação · ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
+      : "O período cresce a partir da sua primeira movimentação.";
+  }
+}
+
+async function openMetricPeriodSelector(target) {
+  state.metricPeriodTarget = target;
+  if (metricPeriodStatus) metricPeriodStatus.textContent = "";
+  openModal("metricPeriodModal");
+  if (!state.historySpan.loaded) {
+    if (metricPeriodOptions) metricPeriodOptions.innerHTML = buildDbLoadingMarkup(120);
+    await loadMetricHistorySpan();
+  }
+  renderMetricPeriodModal();
+}
+
+async function applyMetricPeriodSelection(days) {
+  const target = state.metricPeriodTarget || "actions";
+  setMetricPeriodDays(target, days);
+  closeModal("metricPeriodModal");
+  if (target === "missions") {
+    renderMissionScopeControls();
+    await loadMissions();
+    renderMissions();
+    return;
+  }
+  if (target === "stats") {
+    renderStatsScopeControls();
+    await loadStatsSummary();
+    return;
+  }
+  state.activeOffset = 0;
+  renderDateHeader();
+  await loadActions();
+  await loadActionMissions();
+}
+
 function getMissionHistoryScope() {
-  return missionHistoryScopes[state.missionHistoryScopeIndex] || missionHistoryScopes[0];
+  return getMetricScopeFromDays(state.missionPeriodDays);
 }
 
 function isMissionHistoryRangeActive() {
-  return getMissionHistoryScope().key !== "today";
+  return getMissionHistoryScope().days > 1;
 }
 
 function renderMissionScopeControls() {
   const scope = getMissionHistoryScope();
-  if (missionScopeLabel) {
-    missionScopeLabel.textContent = scope.label;
-  }
-  if (missionScopePrevButton) {
-    missionScopePrevButton.disabled = state.missionHistoryScopeIndex <= 0;
-  }
-  if (missionScopeNextButton) {
-    missionScopeNextButton.disabled = state.missionHistoryScopeIndex >= missionHistoryScopes.length - 1;
-  }
+  if (missionScopeLabel) missionScopeLabel.textContent = scope.label;
 }
-
 function toLocalDateKey(value) {
   const raw = String(value || "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
@@ -5761,6 +5878,18 @@ function openModal(id) {
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
 
+  if (["actionsModal", "historyModal", "statsModal"].includes(id) && !state.historySpan.loaded && !state.historySpan.loading) {
+    void loadMetricHistorySpan().then(() => {
+      if (!modal.classList.contains("active")) return;
+      renderDateHeader();
+      renderMissionScopeControls();
+      renderStatsScopeControls();
+      if (id === "actionsModal") void loadActions({ silent: true });
+      if (id === "historyModal") void loadMissions().then(() => renderMissions());
+      if (id === "statsModal") void loadStatsSummary();
+    });
+  }
+
   if (id === "actionsModal") {
     const runningAction = getRunningActionForSelectedProfile();
     const latestDone = getLatestCompletedActionForSelectedProfile();
@@ -6063,7 +6192,7 @@ function navigateToProjectHome() {
     modalNavigationStack.length = 0;
     document.body.classList.remove("modal-open", "start-decision-open", "start-conflict-open", "task-starting", "running-confirm-open", "running-confirm-from-actions", "quick-task-open");
   }
-  openPrimaryRunningSurface();
+  openPrimaryRunningSurface({ overview: true });
 }
 
 function isDirectProjectHomeButton(button) {
@@ -6362,7 +6491,14 @@ async function saveFinanceNotes() {
 }
 
 function renderDateHeader() {
-  activeDateLabel.textContent = formatDateLabel(dateFromOffset(state.activeOffset));
+  if (activeDateLabel) activeDateLabel.textContent = formatMetricPeriodLabel(state.actionPeriodDays);
+}
+
+function formatActionPeriodTime(value) {
+  if (state.actionPeriodDays <= 1) return formatHourChip(value);
+  const date = new Date(value);
+  const parts = getProjectDateTimeParts(date);
+  return `${String(parts.day).padStart(2, "0")}/${String(parts.month).padStart(2, "0")} ${formatHourChip(value)}`;
 }
 
 function renderActions() {
@@ -6384,11 +6520,17 @@ function renderActions() {
     : [];
   const timelineEntries = [...buildActionTimelineEntries(), ...dynamicMissionEntries]
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
+  const showMissionsSuccess = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
+    && state.actionsDynamicMissionsVisible
+    && state.activeOffset === 0
+    && dynamicMissionEntries.length === 0;
 
-  if (!timelineEntries.length) {
-    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse dia.</div>';
+  if (showMissionsSuccess) {
+    actionsList.insertAdjacentHTML("beforeend", '<section class="actions-missions-success" aria-label="Tudo em dia com suas missões"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7.8 12.2 2.7 2.7 5.8-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><strong>Tudo em dia com suas missões</strong></section>');
   }
-
+  if (!timelineEntries.length && !showMissionsSuccess) {
+    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse período.</div>';
+  }
   timelineEntries.forEach((action) => {
     const slotOwner = state.selectedProfile;
     const slotAvatar = getActionAvatarPath(slotOwner);
@@ -6410,7 +6552,7 @@ function renderActions() {
           <div class="task-title">${escapeHtml(action.title)}</div>
           <div class="task-assignee task-duration">Parcela ${action.installmentNumber} de ${action.target}</div>
         </div>
-        <div class="task-time">${formatHourChip(action.startAt)}</div>
+        <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
       `;
       actionsList.appendChild(row);
       return;
@@ -6430,7 +6572,7 @@ function renderActions() {
           <div class="task-title">${buildActionTitleMarkup("Tempo livre", dotColor, false)}</div>
           <div class="task-assignee task-duration">${formatMinutesHuman(duration)}</div>
         </div>
-        <div class="task-time">${formatHourChip(action.startAt)}</div>
+        <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
       `;
       actionsList.appendChild(row);
       return;
@@ -6472,7 +6614,7 @@ function renderActions() {
         <div class="task-title">${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
         <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}${status === actionStatuses.paused ? ` · ${getActionStoredCompletionPercent(action)}%` : ""}</div>
       </div>
-      <div class="task-time">${formatHourChip(action.startAt)}</div>
+      <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
     `;
     actionsList.appendChild(row);
     if (completionAnimationClass) {
@@ -6607,11 +6749,12 @@ async function loadActions(options = {}) {
   }
 
   const date = dateFromOffset(state.activeOffset);
+  const rangeStartDate = projectDateKeyToDate(addDaysToDateKey(getProjectDateKey(date), -(Math.max(1, state.actionPeriodDays) - 1)));
   if (options.silent !== true) {
     showDbLoadingState(actionsList, 220);
   }
   try {
-    const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(date))}&to=${encodeURIComponent(nextDayIso(date))}`, {
+    const payload = await apiRequestWithTimeout(`/api/actions?from=${encodeURIComponent(startOfDayIso(rangeStartDate))}&to=${encodeURIComponent(nextDayIso(date))}`, {
       skipGlobalLoading: options.silent === true
     }, 7000);
     state.actions = Array.isArray(payload.actions) ? payload.actions : [];
@@ -9947,35 +10090,26 @@ async function startActionMic() {
 }
 
 function getActiveStatsScope() {
-  return statsScopes[state.statsScopeIndex] || statsScopes[0];
+  return getMetricScopeFromDays(state.statsPeriodDays);
 }
 
 function getStatsScopeDays(scope = getActiveStatsScope()) {
-  const key = String(scope?.key || "today").trim();
-  if (key === "last30") return 30;
-  if (key === "last15") return 15;
-  if (key === "last7") return 7;
-  return 1;
+  return Math.max(1, Math.trunc(Number(scope?.days || 1)));
+}
+
+function moveStatsScope(direction) {
+  const periods = getAvailableMetricPeriods();
+  if (!periods.length) return;
+  const currentIndex = Math.max(0, periods.indexOf(state.statsPeriodDays));
+  const nextIndex = Math.max(0, Math.min(periods.length - 1, currentIndex + Number(direction || 0)));
+  state.metricPeriodTarget = "stats";
+  void applyMetricPeriodSelection(periods[nextIndex]);
 }
 
 function renderStatsScopeControls() {
   const scope = getActiveStatsScope();
   if (statsScopeLabel) statsScopeLabel.textContent = scope.label;
-  if (statsScopePrevButton) statsScopePrevButton.disabled = state.statsScopeIndex <= 0;
-  if (statsScopeNextButton) statsScopeNextButton.disabled = state.statsScopeIndex >= statsScopes.length - 1;
 }
-
-function moveStatsScope(amount) {
-  const nextIndex = Math.max(0, Math.min(statsScopes.length - 1, state.statsScopeIndex + amount));
-  if (nextIndex === state.statsScopeIndex) {
-    renderStatsScopeControls();
-    return;
-  }
-  state.statsScopeIndex = nextIndex;
-  renderStatsScopeControls();
-  void loadStatsSummary();
-}
-
 function renderMissionSummary() {
   const summary = state.statsPointsOverview || { total: 0, last7: 0, last30: 0 };
   if (statsMissionTotal) {
@@ -14322,11 +14456,12 @@ async function bootstrapProject200App() {
     }
   }
 }
-function openPrimaryRunningSurface() {
+function openPrimaryRunningSurface({ overview = false } = {}) {
   if (!getToken()) {
     redirectToProject200Login();
     return;
   }
+  state.forceHomeOverview = Boolean(overview);
   if (state.homeSnapshotReady) {
     renderHomeRunningTask();
   } else {
@@ -14857,6 +14992,16 @@ document.querySelectorAll("[data-close-modal]").forEach((button) => {
   });
 });
 
+document.querySelectorAll("[data-metric-period-target]").forEach((button) => {
+  button.addEventListener("click", () => {
+    void openMetricPeriodSelector(String(button.dataset.metricPeriodTarget || "actions"));
+  });
+});
+metricPeriodOptions?.addEventListener("click", (event) => {
+  const option = event.target.closest("[data-metric-period-days]");
+  if (!option) return;
+  void applyMetricPeriodSelection(Number(option.dataset.metricPeriodDays));
+});
 document.querySelectorAll("[data-day-nav]").forEach((button) => {
   button.addEventListener("click", () => moveActiveDate(Number(button.dataset.dayNav)));
 });

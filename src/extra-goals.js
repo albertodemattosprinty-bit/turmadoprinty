@@ -122,6 +122,11 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
 
 function getExtraGoalHistoryScope(scopeKey = "today") {
   const normalized = String(scopeKey || "today").trim().toLowerCase();
+  const dynamicMatch = normalized.match(/^days-(\d+)$/);
+  if (dynamicMatch) {
+    const days = Math.max(1, Math.min(3650, Math.trunc(Number(dynamicMatch[1]) || 1)));
+    return { key: `days-${days}`, label: `${days} dias`, days };
+  }
   return EXTRA_GOAL_HISTORY_SCOPES.find((scope) => scope.key === normalized) || EXTRA_GOAL_HISTORY_SCOPES[0];
 }
 

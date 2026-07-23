@@ -61,6 +61,22 @@ function normalizeTextEntry(row) {
   };
 }
 
+export async function getProject200HistorySpan(userId) {
+  await ensureProject200HistorySchema();
+  const result = await query(`
+    select min(occurred_at) as first_occurred_at
+    from project_200_history_entries
+    where user_id = $1
+  `, [userId]);
+  const firstOccurredAt = toIso(result.rows[0]?.first_occurred_at);
+  const now = new Date();
+  const first = firstOccurredAt ? new Date(firstOccurredAt) : now;
+  const elapsedDays = Math.floor((now.getTime() - first.getTime()) / 86400000) + 1;
+  return {
+    firstOccurredAt,
+    maxDays: Math.max(1, elapsedDays)
+  };
+}
 export async function listProject200History(userId, { from, to }) {
   await ensureProject200HistorySchema();
   const result = await query(

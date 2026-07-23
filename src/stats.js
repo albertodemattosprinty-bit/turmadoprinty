@@ -131,7 +131,11 @@ function resolveStatsRange(scope = "general") {
   if (!normalized || normalized === "general") {
     return { key: "general", label: "Geral", from: null, to: null };
   }
-  if (normalized === "today") {
+  const dynamicMatch = normalized.match(/^days-(\d+)$/);
+  if (dynamicMatch) {
+    const days = Math.max(1, Math.min(3650, Math.trunc(Number(dynamicMatch[1]) || 1)));
+    return { key: `days-${days}`, label: `${days} dias`, from: addProjectDays(today, -(days - 1)), to: addProjectDays(today, 1) };
+  }  if (normalized === "today") {
     return { key: "today", label: "Hoje", from: today, to: addProjectDays(today, 1) };
   }
   if (normalized === "week") {

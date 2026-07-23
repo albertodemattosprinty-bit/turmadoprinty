@@ -10311,3 +10311,83 @@ body[data-background-theme="white"] .active-time-fields input { color: #2f3640; 
 .history-mission-card.mission-overdue-container.mission-dynamic-extreme {
   background: linear-gradient(90deg, rgba(220, 42, 42, 0.96) 0%, rgba(130, 20, 20, 0.94) 42%, rgba(10, 10, 12, calc(0.35 + (var(--mission-delay-darkness, 0) * 0.63))) 76%, rgba(0, 0, 0, 0.08) 100%);
 }
+/* Compact metric headers and unified period selector. */
+#actionsModal .actions-side-actions.actions-compact-header,
+.actions-side-actions.metric-compact-footer {
+  grid-template-columns: minmax(76px, .75fr) minmax(150px, 1.5fr) minmax(76px, .75fr);
+  align-items: center;
+}
+#actionsModal .actions-footer-primary { display:flex; align-items:center; justify-content:center; min-width:0; }
+#actionsModal .actions-mission-filter-btn { position:relative; display:inline-flex; align-items:center; justify-content:center; overflow:visible; }
+#actionsModal .actions-mission-filter-btn.is-dynamic::before,
+#actionsModal .actions-mission-filter-btn.is-dynamic::after { content:none !important; }
+.actions-mission-toggle {
+  position:absolute; top:50%; left:calc(100% + 5px); width:27px; height:15px;
+  border:1px solid rgba(255,255,255,.22); border-radius:999px; background:rgba(148,163,184,.72);
+  box-shadow:inset 0 0 0 1px rgba(2,8,23,.12); transform:translateY(-50%);
+  transition:background 180ms ease; pointer-events:none;
+}
+.actions-mission-toggle i {
+  position:absolute; top:2px; left:2px; width:9px; height:9px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 4px rgba(2,8,23,.28); transition:transform 180ms ease;
+}
+.actions-mission-filter-btn.is-filtering .actions-mission-toggle { background:#20c875; }
+.actions-mission-filter-btn.is-filtering .actions-mission-toggle i { transform:translateX(12px); }
+.actions-mission-overdue-badge {
+  position:absolute; z-index:4; top:-8px; right:-6px; display:grid; place-items:center;
+  min-width:21px; height:21px; padding:0 5px; border:2px solid rgba(7,18,42,.95);
+  border-radius:999px; color:#fff; background:#ef3340; box-shadow:0 5px 12px rgba(239,51,64,.36);
+  font-size:.68rem; font-weight:950; line-height:1;
+}
+.actions-mission-overdue-badge[hidden] { display:none !important; }
+.metric-period-trigger {
+  display:inline-flex; align-items:center; justify-content:center; justify-self:center; gap:9px;
+  min-width:0; min-height:46px; padding:8px 15px; border:0; border-radius:16px;
+  color:rgba(255,255,255,.94); background:transparent; cursor:pointer;
+}
+.metric-period-trigger:hover, .metric-period-trigger:focus-visible { background:rgba(255,255,255,.08); }
+.metric-period-trigger svg { flex:0 0 auto; width:22px; height:22px; }
+.metric-period-trigger span { overflow:hidden; font-size:.88rem; font-weight:900; text-overflow:ellipsis; white-space:nowrap; }
+.actions-missions-success {
+  grid-column:1 / -1; display:grid; justify-items:center; align-content:center; gap:17px;
+  min-height:clamp(260px,48vh,520px); padding:36px 22px; color:#28d17c; text-align:center;
+}
+.actions-missions-success svg { width:clamp(82px,22vw,132px); height:clamp(82px,22vw,132px); filter:drop-shadow(0 12px 30px rgba(40,209,124,.24)); }
+.actions-missions-success strong { max-width:310px; color:rgba(255,255,255,.96); font-size:clamp(1.05rem,3.5vw,1.35rem); line-height:1.3; }
+#metricPeriodModal.workspace-modal {
+  z-index:2600; align-items:center; justify-items:center;
+  padding:max(20px,env(safe-area-inset-top)) 18px max(20px,env(safe-area-inset-bottom));
+  background:rgba(2,8,23,.56) !important; -webkit-backdrop-filter:blur(18px) saturate(.82);
+  backdrop-filter:blur(18px) saturate(.82);
+}
+#metricPeriodModal.workspace-modal.active { display:grid; }
+.metric-period-panel {
+  width:min(100%,480px); max-height:min(720px,calc(100dvh - 40px)); overflow-y:auto; padding:22px;
+  border:1px solid rgba(255,255,255,.15); border-radius:25px; color:#fff;
+  background:linear-gradient(155deg,rgba(18,35,72,.97),rgba(5,14,34,.98)); box-shadow:0 28px 80px rgba(0,0,0,.46);
+}
+.metric-period-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.metric-period-head span { color:rgba(255,255,255,.58); font-size:.72rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+.metric-period-head h2 { margin:4px 0 0; font-size:clamp(1.45rem,5vw,2rem); }
+.metric-period-panel > p { margin:16px 0 18px; color:rgba(255,255,255,.66); font-size:.82rem; font-weight:700; line-height:1.45; }
+.metric-period-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.metric-period-option {
+  display:flex; align-items:center; gap:10px; min-height:58px; padding:11px 14px;
+  border:1px solid rgba(255,255,255,.12); border-radius:16px; color:rgba(255,255,255,.88);
+  background:rgba(255,255,255,.06); cursor:pointer;
+}
+.metric-period-option svg { flex:0 0 auto; width:21px; height:21px; color:#62a9ff; }
+.metric-period-option span { font-size:.9rem; font-weight:900; }
+.metric-period-option.is-active {
+  border-color:rgba(52,211,153,.75); color:#fff;
+  background:linear-gradient(135deg,rgba(22,163,74,.56),rgba(16,185,129,.3));
+  box-shadow:0 9px 24px rgba(16,185,129,.14);
+}
+.metric-period-option.is-active svg { color:#76f0b3; }
+@media (max-width:540px) {
+  #actionsModal .actions-side-actions.actions-compact-header,
+  .actions-side-actions.metric-compact-footer { grid-template-columns:76px minmax(0,1fr) 64px; }
+  .metric-period-trigger { gap:7px; padding-inline:9px; }
+  .metric-period-trigger span { font-size:.8rem; }
+  .metric-period-panel { padding:19px 16px; border-radius:22px; }
+}
