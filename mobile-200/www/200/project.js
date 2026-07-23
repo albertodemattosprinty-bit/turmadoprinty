@@ -2039,11 +2039,7 @@ function getMissionExpectation(goal, nowMs = getServerNowMs()) {
   const completed = Math.max(0, Math.trunc(Number(goal?.progressValue || 0)));
   const windowState = getActiveTimeWindow(nowMs);
   const goalId = String(goal?.id || "");
-  const orderedUnits = getOrderedMissionUnits();
-  const intervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, orderedUnits.length);
-  const scheduledUnits = orderedUnits
-    .map((unit, index) => ({ ...unit, dueAtMs: windowState.startMs + ((index + 1) * intervalMs) }))
-    .filter((unit) => unit.goalId === goalId);
+  const scheduledUnits = buildMissionScheduleUnits(nowMs).filter((unit) => unit.goalId === goalId);
   const elapsed = Math.max(0, Math.min(windowState.endMs - windowState.startMs, nowMs - windowState.startMs));
   const expected = scheduledUnits.length
     ? scheduledUnits.filter((unit) => unit.dueAtMs <= nowMs).length
@@ -2072,8 +2068,14 @@ function getMissionInstallmentVisual(delayMinutes) {
   return { className: "mission-dynamic-extreme", rgb: "196, 38, 38", darkness: 1 };
 }
 
+function isSharedMissionOrderGoal(goal) {
+  const target = Math.max(1, Math.trunc(Number(goal?.targetValue || goal?.target || 1)));
+  return target <= 3;
+}
+
 function getAlphabeticalMissionOrderUnits() {
   return [...(Array.isArray(state.actionMissions) ? state.actionMissions : [])]
+    .filter(isSharedMissionOrderGoal)
     .sort((left, right) => String(left?.title || "").localeCompare(String(right?.title || ""), "pt-BR"))
     .flatMap((goal) => {
       const target = Math.max(1, Math.trunc(Number(goal?.targetValue || 1)));
@@ -2106,30 +2108,53 @@ function getOrderedMissionUnits() {
   return ordered;
 }
 
+function buildMissionScheduleUnits(nowMs = getServerNowMs()) {
+  const windowState = getActiveTimeWindow(nowMs);
+  const goals = Array.isArray(state.actionMissions) ? state.actionMissions : [];
+  const goalsById = new Map(goals.map((goal) => [String(goal?.id || ""), goal]));
+  const sharedUnits = getOrderedMissionUnits();
+  const sharedIntervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, sharedUnits.length);
+  const sharedSchedule = sharedUnits.map((unit, index) => ({
+    ...unit,
+    goal: goalsById.get(unit.goalId),
+    dueAtMs: windowState.startMs + ((index + 1) * sharedIntervalMs)
+  }));
+  const independentSchedule = goals
+    .filter((goal) => !isSharedMissionOrderGoal(goal))
+    .flatMap((goal) => {
+      const target = Math.max(4, Math.trunc(Number(goal?.targetValue || 4)));
+      const intervalMs = (windowState.endMs - windowState.startMs) / target;
+      return Array.from({ length: target }, (_, index) => ({
+        unitKey: `${String(goal?.id || "")}:${index + 1}`,
+        goalId: String(goal?.id || ""),
+        title: String(goal?.title || "Missão"),
+        installmentNumber: index + 1,
+        target,
+        goal,
+        dueAtMs: windowState.startMs + ((index + 1) * intervalMs)
+      }));
+    });
+  return [...sharedSchedule, ...independentSchedule]
+    .filter((unit) => unit.goal)
+    .sort((left, right) => left.dueAtMs - right.dueAtMs || left.title.localeCompare(right.title, "pt-BR"));
+}
+
 function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs() } = {}) {
   const windowState = getActiveTimeWindow(nowMs);
-  const goalsById = new Map((Array.isArray(state.actionMissions) ? state.actionMissions : []).map((goal) => [String(goal?.id || ""), goal]));
-  const allUnits = getOrderedMissionUnits().map((unit) => {
-    const goal = goalsById.get(unit.goalId);
-    const completed = Math.max(0, Math.min(unit.target, Math.trunc(Number(goal?.progressValue || 0))));
-    return { ...unit, goal, completed: unit.installmentNumber <= completed };
-  }).filter((unit) => unit.goal);
-  const intervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, allUnits.length);
-  return allUnits.map((unit, globalIndex) => {
-    const dueAtMs = windowState.startMs + ((globalIndex + 1) * intervalMs);
+  return buildMissionScheduleUnits(nowMs).map((unit) => {
+    const completed = Math.max(0, Math.min(unit.target, Math.trunc(Number(unit.goal?.progressValue || 0))));
     return {
       ...unit,
+      completed: unit.installmentNumber <= completed,
       kind: "mission-installment",
       id: `mission-${unit.goalId}-${windowState.dateKey}-${unit.installmentNumber}`,
-      dueAtMs,
-      startAt: new Date(dueAtMs).toISOString(),
-      delayMinutes: Math.floor((nowMs - dueAtMs) / 60000)
+      startAt: new Date(unit.dueAtMs).toISOString(),
+      delayMinutes: Math.floor((nowMs - unit.dueAtMs) / 60000)
     };
   }).filter((entry) => !entry.completed)
     .filter((entry) => !availableOnly || nowMs >= entry.dueAtMs - (15 * 60000))
     .sort((left, right) => left.dueAtMs - right.dueAtMs || left.title.localeCompare(right.title, "pt-BR"));
 }
-
 function formatMissionOrderTime(minutes) {
   const safe = ((Math.round(Number(minutes || 0)) % 1440) + 1440) % 1440;
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}h${String(safe % 60).padStart(2, "0")}`;
@@ -2159,14 +2184,14 @@ function renderMissionOrderModal() {
   if (!missionOrderList) return;
   const units = getScheduledMissionOrderUnits();
   if (missionOrderSummary) {
-    missionOrderSummary.textContent = `${units.length} ${units.length === 1 ? "parcela" : "parcelas"} entre ${activeMinutesToLabel(state.activeTime.startMinutes)} e ${activeMinutesToLabel(state.activeTime.endMinutes)}.`;
+    missionOrderSummary.textContent = `${units.length} ${units.length === 1 ? "parcela" : "parcelas"} de missões com 1 a 3 repetições entre ${activeMinutesToLabel(state.activeTime.startMinutes)} e ${activeMinutesToLabel(state.activeTime.endMinutes)}.`;
   }
   if (state.missionOrder.loading) {
     missionOrderList.innerHTML = '<div class="empty-state">Organizando missões…</div>';
     return;
   }
   if (!units.length) {
-    missionOrderList.innerHTML = '<div class="empty-state">Nenhuma missão disponível.</div>';
+    missionOrderList.innerHTML = '<div class="empty-state">Nenhuma missão de 1 a 3 repetições.</div>';
     return;
   }
   missionOrderList.innerHTML = units.map((unit, index) => {

@@ -411,6 +411,7 @@ export async function getProject200MissionInstallmentOrder(userId, profileName =
     select id, title, target_value, svg_icon_url, svg_icon_label
     from extra_goals
     where user_id = $1 and assigned_profile = $2
+      and target_value between 1 and 3
     order by lower(title) asc, title asc, id asc
   `, [userId, normalizedProfile]);
   const alphabeticalUnits = goalsResult.rows.flatMap((row) => {
