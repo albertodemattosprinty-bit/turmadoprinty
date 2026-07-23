@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { db, query } from "./db.js";
 import { ensureProject200ProfilesSchema, PROJECT200_DEFAULT_PROFILE_AVATAR, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 import { ensureExtraGoalsSchema } from "./extra-goals.js";
+import { recordProject200FirstPointOrigin } from "./project200-metric-origin.js";
 
 const PROJECT200_FRIEND_SCOPE_MAP = new Map([
   ["today", { key: "today", label: "Hoje", days: 1 }],
@@ -192,6 +193,9 @@ export async function recordProject200ActionPoints(userId, action, completedAt =
     ]
   );
   const deltaPoints = points - previousPoints;
+  if (deltaPoints > 0) {
+    await recordProject200FirstPointOrigin(normalizedUserId, new Date());
+  }
   return {
     points: result.rows[0] ? points : previousPoints,
     previousPoints,
@@ -236,6 +240,9 @@ export async function addProject200ManualPoints(userId, points, scopeDate = new 
     `,
     [normalizedUserId, normalizedSourceKey, safePoints, dateKey]
   );
+  if (result.rows[0]) {
+    await recordProject200FirstPointOrigin(normalizedUserId, new Date());
+  }
   return {
     points: result.rows[0] ? safePoints : 0,
     created: Boolean(result.rows[0]),

@@ -1,5 +1,7 @@
 import { query } from "./db.js";
 import { PROJECT200_DEFAULT_PROFILE_NAME, normalizeStoredProject200ProfileName, resolveProject200ProfileName } from "./project200-profiles.js";
+import { ensureExtraGoalsSchema } from "./extra-goals.js";
+import { ensureProject200MetricOriginSchema } from "./project200-metric-origin.js";
 
 function toIso(value) {
   if (!value) {
@@ -62,18 +64,52 @@ function normalizeTextEntry(row) {
 }
 
 export async function getProject200HistorySpan(userId) {
-  await ensureProject200HistorySchema();
+  await Promise.all([
+    ensureProject200HistorySchema(),
+    ensureExtraGoalsSchema(),
+    ensureProject200MetricOriginSchema()
+  ]);
   const result = await query(`
-    select min(occurred_at) as first_occurred_at
-    from project_200_history_entries
-    where user_id = $1
+    select
+      (
+        select first_point_at
+        from project200_user_metric_origins
+        where user_id = $1
+      ) as first_point_at,
+      (
+        select min(occurred_at)
+        from project_200_history_entries
+        where user_id = $1
+      ) as first_history_at,
+      (
+        select to_char(min(scope_date), 'YYYY-MM-DD')
+        from extra_goal_progress_history
+        where user_id = $1
+      ) as first_mission_date_key
   `, [userId]);
-  const firstOccurredAt = toIso(result.rows[0]?.first_occurred_at);
+  const row = result.rows[0] || {};
+  const firstPointAt = toIso(row.first_point_at);
+  const firstHistoryAt = toIso(row.first_history_at);
+  const firstMissionAt = row.first_mission_date_key
+    ? toIso(`${row.first_mission_date_key}T00:00:00-03:00`)
+    : null;
+  const fallbackCandidates = [firstHistoryAt, firstMissionAt]
+    .filter(Boolean)
+    .sort((left, right) => new Date(left).getTime() - new Date(right).getTime());
+  const firstOccurredAt = firstPointAt || fallbackCandidates[0] || null;
   const now = new Date();
   const first = firstOccurredAt ? new Date(firstOccurredAt) : now;
   const elapsedDays = Math.floor((now.getTime() - first.getTime()) / 86400000) + 1;
   return {
     firstOccurredAt,
+    firstPointAt,
+    originSource: firstPointAt
+      ? "first_point"
+      : firstHistoryAt && firstOccurredAt === firstHistoryAt
+        ? "history"
+        : firstMissionAt
+          ? "mission"
+          : "none",
     maxDays: Math.max(1, elapsedDays)
   };
 }

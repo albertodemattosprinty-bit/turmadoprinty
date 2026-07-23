@@ -1052,7 +1052,7 @@ const state = {
   missionPeriodDays: 1,
   missionKindFilter: "goal",
   statsPeriodDays: 1,
-  historySpan: { loaded: false, loading: false, maxDays: 1, firstOccurredAt: null },
+  historySpan: { loaded: false, loading: false, maxDays: 1, firstOccurredAt: null, originSource: "none" },
   metricPeriodTarget: "",
   forceHomeOverview: false,
   platformOffset: 0,
@@ -5064,7 +5064,8 @@ async function loadMetricHistorySpan() {
       loaded: true,
       loading: false,
       maxDays: Math.max(1, Math.trunc(Number(payload?.maxDays || 1))),
-      firstOccurredAt: payload?.firstOccurredAt || null
+      firstOccurredAt: payload?.firstOccurredAt || null,
+      originSource: String(payload?.originSource || "none")
     };
     ["actions", "missions", "stats"].forEach((target) => setMetricPeriodDays(target, getMetricPeriodDays(target)));
   } catch (error) {
@@ -5080,8 +5081,8 @@ function renderMetricPeriodModal() {
   metricPeriodOptions.innerHTML = options.map((days) => `<button type="button" class="metric-period-option${days === selectedDays ? " is-active" : ""}" data-metric-period-days="${days}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${escapeHtml(formatMetricPeriodLabel(days))}</span></button>`).join("");
   if (metricPeriodHint) {
     metricPeriodHint.textContent = state.historySpan.firstOccurredAt
-      ? `Disponível desde a primeira movimentação · ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
-      : "O período cresce a partir da sua primeira movimentação.";
+      ? `Disponível desde o início das suas métricas · ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
+      : "O período cresce a partir do seu primeiro ponto.";
   }
 }
 

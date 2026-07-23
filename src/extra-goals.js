@@ -680,18 +680,38 @@ export async function listExtraGoalsByScope(userId, profileName = PROJECT200_DEF
   const startDateKey = toDateKey(new Date(Date.now() - ((scope.days - 1) * 24 * 60 * 60 * 1000)));
   const result = await query(
     `
+      with first_entries as (
+        select
+          goal_id,
+          to_char(min(scope_date), 'YYYY-MM-DD') as first_scope_date_key
+        from extra_goal_progress_history
+        where user_id = $1
+          and assigned_profile = $2
+        group by goal_id
+      ),
+      scoped_entries as (
+        select
+          goal_id,
+          count(*) filter (where progress_value >= target_value and target_value > 0) as completed_days,
+          count(*) filter (where progress_value > 0) as active_days,
+          coalesce(sum(progress_value), 0) as total_progress_value,
+          max(updated_at) as updated_at
+        from extra_goal_progress_history
+        where user_id = $1
+          and assigned_profile = $2
+          and scope_date >= $3::date
+          and scope_date <= $4::date
+        group by goal_id
+      )
       select
-        goal_id,
-        count(*) filter (where progress_value >= target_value and target_value > 0) as completed_days,
-        count(*) filter (where progress_value > 0) as active_days,
-        coalesce(sum(progress_value), 0) as total_progress_value,
-        max(updated_at) as updated_at
-      from extra_goal_progress_history
-      where user_id = $1
-        and assigned_profile = $2
-        and scope_date >= $3::date
-        and scope_date <= $4::date
-      group by goal_id
+        first_entries.goal_id,
+        first_entries.first_scope_date_key,
+        coalesce(scoped_entries.completed_days, 0) as completed_days,
+        coalesce(scoped_entries.active_days, 0) as active_days,
+        coalesce(scoped_entries.total_progress_value, 0) as total_progress_value,
+        scoped_entries.updated_at
+      from first_entries
+      left join scoped_entries using (goal_id)
     `,
     [userId, normalizedProfile, startDateKey, endDateKey]
   );
@@ -702,20 +722,24 @@ export async function listExtraGoalsByScope(userId, profileName = PROJECT200_DEF
       startDateKey,
       endDateKey
     },
-    goals: goals.map((goal) => {
-      const history = historyByGoalId.get(String(goal.id || "").trim()) || {};
+    goals: goals.flatMap((goal) => {
+      const history = historyByGoalId.get(String(goal.id || "").trim());
+      if (!history?.first_scope_date_key || history.first_scope_date_key > startDateKey) {
+        return [];
+      }
       const totalProgressValue = Math.max(0, Math.trunc(Number(history.total_progress_value || 0) || 0));
       const expandedTargetValue = Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1)) * scope.days;
-      return {
+      return [{
         ...goal,
         isHistoryRange: true,
+        firstEntryDateKey: history.first_scope_date_key,
         totalProgressValue,
         progressValue: totalProgressValue,
         targetValue: expandedTargetValue,
         remainingValue: Math.max(0, expandedTargetValue - totalProgressValue),
         percent: expandedTargetValue > 0 ? Math.max(0, Math.min(100, Math.round((totalProgressValue / expandedTargetValue) * 100))) : 0,
         scopeKey: scope.key
-      };
+      }];
     })
   };
 }
