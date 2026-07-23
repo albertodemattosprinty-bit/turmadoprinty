@@ -31,6 +31,10 @@ function normalizeExtraGoalProfile(value) {
   return normalizeStoredProject200ProfileName(value || PROJECT200_DEFAULT_PROFILE_NAME);
 }
 
+function normalizeExtraGoalKind(value) {
+  return String(value || "goal").trim().toLowerCase() === "limit" ? "limit" : "goal";
+}
+
 function normalizeExtraGoalVariantUnit(value) {
   return String(value || "days").trim().toLowerCase() === "hours" ? "hours" : "days";
 }
@@ -107,6 +111,7 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
     userId: row.user_id,
     profileName: normalizeExtraGoalProfile(row.assigned_profile),
     title: normalizeExtraGoalTitle(row.title),
+    goalKind: normalizeExtraGoalKind(row.goal_kind),
     svgIconUrl: String(row.svg_icon_url || "").trim(),
     svgIconLabel: String(row.svg_icon_label || "").trim(),
     targetValue,
@@ -278,6 +283,7 @@ export async function ensureExtraGoalsSchema() {
       user_id uuid not null references users(id) on delete cascade,
       assigned_profile text not null default 'Usuario',
       title text not null,
+      goal_kind text not null default 'goal',
       target_value integer not null default 1,
       unit_duration_minutes integer not null default 0,
       unit_duration_seconds integer not null default 0,
@@ -290,6 +296,8 @@ export async function ensureExtraGoalsSchema() {
     );
   `);
   await query("alter table extra_goals add column if not exists assigned_profile text not null default 'Usuario';");
+  await query("alter table extra_goals add column if not exists goal_kind text not null default 'goal';");
+  await query("update extra_goals set goal_kind = 'goal' where goal_kind is null or goal_kind not in ('goal', 'limit');");
   await query("alter table extra_goals add column if not exists progress_value integer not null default 0;");
   await query("alter table extra_goals add column if not exists progress_date date;");
   await query("alter table extra_goals add column if not exists unit_duration_minutes integer not null default 0;");
@@ -416,6 +424,7 @@ export async function getProject200MissionInstallmentOrder(userId, profileName =
     select id, title, target_value, svg_icon_url, svg_icon_label
     from extra_goals
     where user_id = $1 and assigned_profile = $2
+      and goal_kind = 'goal'
       and target_value between 1 and 3
     order by lower(title) asc, title asc, id asc
   `, [userId, normalizedProfile]);
@@ -602,6 +611,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
         user_id,
         assigned_profile,
         title,
+        goal_kind,
         target_value,
         unit_duration_minutes,
         unit_duration_seconds,
@@ -725,6 +735,7 @@ export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_
         user_id,
         assigned_profile,
         title,
+        goal_kind,
         target_value,
         unit_duration_minutes,
         unit_duration_seconds,
@@ -752,6 +763,7 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
   const title = normalizeExtraGoalTitle(payload?.title);
   const targetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
+  const goalKind = normalizeExtraGoalKind(payload?.goalKind);
   const storedSvgDefault = await getStoredExtraGoalSvgDefault(userId, normalizedProfile, title);
   const svgIconUrl = String(payload?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
   const svgIconLabel = String(payload?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
@@ -768,11 +780,11 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   await query(
     `
       insert into extra_goals (
-        user_id, assigned_profile, title, target_value, unit_duration_minutes, unit_duration_seconds, svg_icon_url, svg_icon_label, progress_value, progress_date, created_at, updated_at
+        user_id, assigned_profile, title, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds, svg_icon_url, svg_icon_label, progress_value, progress_date, created_at, updated_at
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, 0, null, now(), now())
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, null, now(), now())
     `,
-    [userId, normalizedProfile, title, targetValue, unitDurationMinutes, unitDurationSeconds, svgIconUrl, svgIconLabel]
+    [userId, normalizedProfile, title, goalKind, targetValue, unitDurationMinutes, unitDurationSeconds, svgIconUrl, svgIconLabel]
   );
   if (svgIconUrl) {
     await saveExtraGoalSvgDefault(userId, normalizedProfile, title, svgIconUrl, svgIconLabel);

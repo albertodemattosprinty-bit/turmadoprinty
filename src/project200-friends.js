@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { db, query } from "./db.js";
 import { ensureProject200ProfilesSchema, PROJECT200_DEFAULT_PROFILE_AVATAR, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
+import { ensureExtraGoalsSchema } from "./extra-goals.js";
 
 const PROJECT200_FRIEND_SCOPE_MAP = new Map([
   ["today", { key: "today", label: "Hoje", days: 1 }],
@@ -267,6 +268,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
           from extra_goals
           where user_id = any($1::uuid[])
             and assigned_profile = $3
+            and coalesce(goal_kind, 'goal') <> 'limit'
           group by user_id
         ),
         event_points as (
@@ -305,6 +307,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
          and g.user_id = h.user_id
         where h.user_id = any($1::uuid[])
           and h.assigned_profile = $2
+          and coalesce(g.goal_kind, 'goal') <> 'limit'
           and h.scope_date >= $3::date
           and h.scope_date <= $4::date
         group by h.user_id
@@ -330,6 +333,7 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
 }
 
 export async function ensureProject200FriendsSchema() {
+  await ensureExtraGoalsSchema();
   await ensureProject200PointsSchema();
   await query(`
     create table if not exists project200_friendships (
@@ -601,6 +605,7 @@ export async function getProject200UserPointTotals(userId) {
             on g.id = h.goal_id
            and g.user_id = h.user_id
           where h.user_id = $1
+            and coalesce(g.goal_kind, 'goal') <> 'limit'
         ),
         event_points as (
           select coalesce(sum(points), 0)::bigint as points
