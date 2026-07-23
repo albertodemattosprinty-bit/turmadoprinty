@@ -63,7 +63,7 @@ import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProj
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
 import { createProject200FinanceItem, summarizeProject200FinanceLedgerMonth } from "./src/project200-finance-ledger.js";
-import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, ensureExtraGoalsSchema, getProject200ActiveTime, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateProject200ActiveTime } from "./src/extra-goals.js";
+import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, ensureExtraGoalsSchema, getProject200ActiveTime, getProject200MissionInstallmentOrder, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateProject200ActiveTime, updateProject200MissionInstallmentOrder } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
@@ -4176,6 +4176,27 @@ async function handleProject200ActiveTimeRequest(request, response) {
   }
 }
 
+async function handleProject200MissionOrderRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const requestUrl = new URL(request.url || "/api/200/mission-order", `http://${request.headers.host || "localhost"}`);
+    const body = request.method === "PUT" ? await readJsonBody(request) : {};
+    const selectedProfile = await resolveProject200ProfileName(
+      user.id,
+      body?.profile || requestUrl.searchParams.get("profile"),
+      { fallbackToDefault: true }
+    );
+    const order = request.method === "PUT"
+      ? await updateProject200MissionInstallmentOrder(user.id, selectedProfile, body)
+      : await getProject200MissionInstallmentOrder(user.id, selectedProfile);
+    sendJson(response, 200, { ok: true, ...order });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Não foi possível atualizar a lista de missões."
+    });
+  }
+}
 async function handleExtraGoalCreateRequest(request, response) {
   const user = await requireAuth(request, response);
   if (!user) {
@@ -11413,6 +11434,10 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if ((request.method === "GET" || request.method === "PUT") && pathname === "/api/200/mission-order") {
+    await handleProject200MissionOrderRequest(request, response);
+    return;
+  }
   if (request.method === "POST" && pathname === "/api/200/extra-goals") {
     await handleExtraGoalCreateRequest(request, response);
     return;

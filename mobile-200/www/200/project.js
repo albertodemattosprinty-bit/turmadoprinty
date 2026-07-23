@@ -405,6 +405,11 @@ const activeTimeStartInput = document.getElementById("activeTimeStartInput");
 const activeTimeEndInput = document.getElementById("activeTimeEndInput");
 const saveActiveTimeButton = document.getElementById("saveActiveTimeButton");
 const activeTimeStatus = document.getElementById("activeTimeStatus");
+const openMissionOrderModalButton = document.getElementById("openMissionOrderModalButton");
+const missionOrderModal = document.getElementById("missionOrderModal");
+const missionOrderList = document.getElementById("missionOrderList");
+const missionOrderSummary = document.getElementById("missionOrderSummary");
+const missionOrderStatus = document.getElementById("missionOrderStatus");
 const toggleScreenLockOptionButton = document.getElementById("toggleScreenLockOption");
 const toggleScreenLockHint = document.getElementById("toggleScreenLockHint");
 const openProject200ExportModalButton = document.getElementById("openProject200ExportModal");
@@ -1100,6 +1105,7 @@ const state = {
   actionsMissionOnly: false,
   actionsDynamicMissionsVisible: true,
   activeTime: { startMinutes: 480, endMinutes: 1440, loaded: false, saving: false },
+  missionOrder: { units: [], loaded: false, loading: false, saving: false, editingUnitKey: "" },
   constitutionVersions: [],
   constitutionIndex: 0,
   constitutionEditing: false,
@@ -2032,17 +2038,25 @@ function getMissionExpectation(goal, nowMs = getServerNowMs()) {
   const target = Math.max(1, Math.trunc(Number(goal?.targetValue || 1)));
   const completed = Math.max(0, Math.trunc(Number(goal?.progressValue || 0)));
   const windowState = getActiveTimeWindow(nowMs);
+  const goalId = String(goal?.id || "");
+  const orderedUnits = getOrderedMissionUnits();
+  const intervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, orderedUnits.length);
+  const scheduledUnits = orderedUnits
+    .map((unit, index) => ({ ...unit, dueAtMs: windowState.startMs + ((index + 1) * intervalMs) }))
+    .filter((unit) => unit.goalId === goalId);
   const elapsed = Math.max(0, Math.min(windowState.endMs - windowState.startMs, nowMs - windowState.startMs));
-  const expected = Math.min(target, Math.floor((elapsed / Math.max(1, windowState.endMs - windowState.startMs)) * target));
+  const expected = scheduledUnits.length
+    ? scheduledUnits.filter((unit) => unit.dueAtMs <= nowMs).length
+    : Math.min(target, Math.floor((elapsed / Math.max(1, windowState.endMs - windowState.startMs)) * target));
   const ratio = expected > 0 ? Math.max(0, Math.min(100, Math.round((completed / expected) * 100))) : 100;
   const tone = ratio >= 90 ? "green" : ratio >= 80 ? "blue" : ratio >= 70 ? "yellow" : ratio >= 60 ? "orange" : "red";
   const nextInstallmentNumber = Math.min(target, completed + 1);
+  const nextScheduledUnit = scheduledUnits.find((unit) => unit.installmentNumber > completed) || null;
   const nextDueAtMs = completed >= target
     ? null
-    : windowState.startMs + (nextInstallmentNumber * ((windowState.endMs - windowState.startMs) / target));
+    : nextScheduledUnit?.dueAtMs ?? (windowState.startMs + (nextInstallmentNumber * ((windowState.endMs - windowState.startMs) / target)));
   return { target, completed, expected, ratio, tone, windowState, nextInstallmentNumber, nextDueAtMs };
 }
-
 function mixMissionRgb(start, end, amount) {
   const progress = Math.max(0, Math.min(1, Number(amount || 0)));
   return start.map((value, index) => Math.round(value + ((end[index] - value) * progress))).join(", ");
@@ -2058,22 +2072,48 @@ function getMissionInstallmentVisual(delayMinutes) {
   return { className: "mission-dynamic-extreme", rgb: "196, 38, 38", darkness: 1 };
 }
 
+function getAlphabeticalMissionOrderUnits() {
+  return [...(Array.isArray(state.actionMissions) ? state.actionMissions : [])]
+    .sort((left, right) => String(left?.title || "").localeCompare(String(right?.title || ""), "pt-BR"))
+    .flatMap((goal) => {
+      const target = Math.max(1, Math.trunc(Number(goal?.targetValue || 1)));
+      return Array.from({ length: target }, (_, index) => ({
+        unitKey: `${String(goal?.id || "")}:${index + 1}`,
+        goalId: String(goal?.id || ""),
+        title: String(goal?.title || "Missão"),
+        installmentNumber: index + 1,
+        target
+      }));
+    });
+}
+
+function getOrderedMissionUnits() {
+  const alphabetical = getAlphabeticalMissionOrderUnits();
+  const validByKey = new Map(alphabetical.map((unit) => [unit.unitKey, unit]));
+  const ordered = [];
+  const seen = new Set();
+  (Array.isArray(state.missionOrder.units) ? state.missionOrder.units : []).forEach((saved) => {
+    const key = String(saved?.unitKey || "");
+    const current = validByKey.get(key);
+    if (current && !seen.has(key)) {
+      seen.add(key);
+      ordered.push({ ...current, ...saved, ...current });
+    }
+  });
+  alphabetical.forEach((unit) => {
+    if (!seen.has(unit.unitKey)) ordered.push(unit);
+  });
+  return ordered;
+}
+
 function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs() } = {}) {
   const windowState = getActiveTimeWindow(nowMs);
-  const goals = [...(Array.isArray(state.actionMissions) ? state.actionMissions : [])]
-    .sort((left, right) => String(left?.title || "").localeCompare(String(right?.title || ""), "pt-BR"));
-  const allUnits = goals.flatMap((goal) => {
-    const target = Math.max(1, Math.trunc(Number(goal?.targetValue || 1)));
-    const completed = Math.max(0, Math.min(target, Math.trunc(Number(goal?.progressValue || 0))));
-    return Array.from({ length: target }, (_, index) => ({
-      goal,
-      goalId: String(goal?.id || ""),
-      title: String(goal?.title || "Missão"),
-      installmentNumber: index + 1,
-      target,
-      completed: index < completed
-    }));
-  });
+  const goalsById = new Map((Array.isArray(state.actionMissions) ? state.actionMissions : []).map((goal) => [String(goal?.id || ""), goal]));
+  const allUnits = getOrderedMissionUnits().map((unit) => {
+    const goal = goalsById.get(unit.goalId);
+    const completed = Math.max(0, Math.min(unit.target, Math.trunc(Number(goal?.progressValue || 0))));
+    return { ...unit, goal, completed: unit.installmentNumber <= completed };
+  }).filter((unit) => unit.goal);
   const intervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, allUnits.length);
   return allUnits.map((unit, globalIndex) => {
     const dueAtMs = windowState.startMs + ((globalIndex + 1) * intervalMs);
@@ -2088,6 +2128,112 @@ function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs
   }).filter((entry) => !entry.completed)
     .filter((entry) => !availableOnly || nowMs >= entry.dueAtMs - (15 * 60000))
     .sort((left, right) => left.dueAtMs - right.dueAtMs || left.title.localeCompare(right.title, "pt-BR"));
+}
+
+function formatMissionOrderTime(minutes) {
+  const safe = ((Math.round(Number(minutes || 0)) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(safe / 60)).padStart(2, "0")}h${String(safe % 60).padStart(2, "0")}`;
+}
+
+function getMissionOrderPeriod(minutes) {
+  const safe = ((Math.round(Number(minutes || 0)) % 1440) + 1440) % 1440;
+  if (safe >= 4 * 60 && safe < 12 * 60) return { key: "morning", label: "manhã" };
+  if (safe >= 12 * 60 && safe < 18 * 60) return { key: "afternoon", label: "tarde" };
+  return { key: "night", label: "noite" };
+}
+
+function getScheduledMissionOrderUnits() {
+  const units = Array.isArray(state.missionOrder.units) && state.missionOrder.units.length
+    ? state.missionOrder.units
+    : getAlphabeticalMissionOrderUnits();
+  const duration = getActiveTimeDurationMinutes();
+  const start = normalizeActiveTimeMinutes(state.activeTime.startMinutes, 480);
+  return units.map((unit, index) => ({
+    ...unit,
+    dueMinutes: Math.round(start + (((index + 1) * duration) / Math.max(1, units.length))) % 1440,
+    sortOrder: index
+  }));
+}
+
+function renderMissionOrderModal() {
+  if (!missionOrderList) return;
+  const units = getScheduledMissionOrderUnits();
+  if (missionOrderSummary) {
+    missionOrderSummary.textContent = `${units.length} ${units.length === 1 ? "parcela" : "parcelas"} entre ${activeMinutesToLabel(state.activeTime.startMinutes)} e ${activeMinutesToLabel(state.activeTime.endMinutes)}.`;
+  }
+  if (state.missionOrder.loading) {
+    missionOrderList.innerHTML = '<div class="empty-state">Organizando missões…</div>';
+    return;
+  }
+  if (!units.length) {
+    missionOrderList.innerHTML = '<div class="empty-state">Nenhuma missão disponível.</div>';
+    return;
+  }
+  missionOrderList.innerHTML = units.map((unit, index) => {
+    const period = getMissionOrderPeriod(unit.dueMinutes);
+    const editing = state.missionOrder.editingUnitKey === unit.unitKey;
+    const installmentLabel = Number(unit.target || 1) > 1 ? `<small>${unit.installmentNumber} de ${unit.target}</small>` : "";
+    return `<article class="mission-order-row mission-order-row--${period.key}${editing ? " is-editing" : ""}" data-mission-order-key="${escapeHtml(unit.unitKey)}">
+      <div class="mission-order-position">${index + 1}</div>
+      <div class="mission-order-copy"><strong>${escapeHtml(unit.title)}</strong>${installmentLabel}<span>${formatMissionOrderTime(unit.dueMinutes)}</span></div>
+      ${editing ? `<div class="mission-order-controls"><button type="button" data-mission-order-move="up" aria-label="Subir" ${index === 0 ? "disabled" : ""}><svg viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></svg></button><button type="button" data-mission-order-move="down" aria-label="Descer" ${index === units.length - 1 ? "disabled" : ""}><svg viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></svg></button></div>` : `<span class="mission-order-period">${period.label}</span>`}
+    </article>`;
+  }).join("");
+}
+
+async function loadMissionOrder({ silent = false } = {}) {
+  if (!getToken() || state.missionOrder.loading) return;
+  state.missionOrder.loading = true;
+  if (!silent) renderMissionOrderModal();
+  try {
+    const profile = encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim());
+    const payload = await apiRequest(`/api/200/mission-order?profile=${profile}`, { skipGlobalLoading: true });
+    state.missionOrder.units = Array.isArray(payload?.units) ? payload.units : [];
+    state.missionOrder.loaded = true;
+  } catch (error) {
+    if (!silent && missionOrderStatus) missionOrderStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar a lista.";
+  } finally {
+    state.missionOrder.loading = false;
+    renderMissionOrderModal();
+  }
+}
+
+async function persistMissionOrder() {
+  if (state.missionOrder.saving) return;
+  state.missionOrder.saving = true;
+  if (missionOrderStatus) missionOrderStatus.textContent = "Salvando ordem…";
+  try {
+    const payload = await apiRequest("/api/200/mission-order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+        unitKeys: state.missionOrder.units.map((unit) => unit.unitKey)
+      }),
+      skipGlobalLoading: true
+    });
+    state.missionOrder.units = Array.isArray(payload?.units) ? payload.units : state.missionOrder.units;
+    if (missionOrderStatus) missionOrderStatus.textContent = "Ordem salva.";
+    renderMissionOrderModal();
+    renderActions();
+    void scheduleMissionNotifications();
+  } catch (error) {
+    if (missionOrderStatus) missionOrderStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a ordem.";
+  } finally {
+    state.missionOrder.saving = false;
+  }
+}
+
+function moveMissionOrderUnit(unitKey, direction) {
+  const units = getScheduledMissionOrderUnits().map(({ dueMinutes, sortOrder, ...unit }) => unit);
+  const index = units.findIndex((unit) => unit.unitKey === unitKey);
+  const nextIndex = direction === "up" ? index - 1 : index + 1;
+  if (index < 0 || nextIndex < 0 || nextIndex >= units.length) return;
+  [units[index], units[nextIndex]] = [units[nextIndex], units[index]];
+  state.missionOrder.units = units;
+  state.missionOrder.editingUnitKey = unitKey;
+  renderMissionOrderModal();
+  void persistMissionOrder();
 }
 async function loadProject200ActiveTime() {
   if (!getToken()) return;
@@ -2253,7 +2399,7 @@ function renderActionsMissionsPanel() {
       <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
         <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
-        <p>${progress.progress} de ${progress.target} · ${expectation.ratio}% do esperado${expectation.nextDueAtMs ? ` · próxima ${formatHourChip(new Date(expectation.nextDueAtMs).toISOString())}` : ""}</p>
+        <p>${progress.progress} de ${progress.target}</p>
       </div>
       <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
@@ -6232,16 +6378,11 @@ function renderActions() {
       row.style.setProperty("--mission-delay-darkness", String(visual.darkness || 0));
       row.setAttribute("role", "button");
       row.tabIndex = 0;
-      const timingLabel = action.delayMinutes <= 0
-        ? `Disponível · vence ${formatHourChip(action.startAt)}`
-        : action.delayMinutes <= 15
-          ? `No horário · ${action.delayMinutes} min`
-          : `${action.delayMinutes} min de atraso`;
       row.innerHTML = `
         ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: missionIcon.categoryIcon })}
         <div class="task-main">
           <div class="task-title">${escapeHtml(action.title)}</div>
-          <div class="task-assignee task-duration">Parcela ${action.installmentNumber} de ${action.target} · ${escapeHtml(timingLabel)}</div>
+          <div class="task-assignee task-duration">Parcela ${action.installmentNumber} de ${action.target}</div>
         </div>
         <div class="task-time">${formatHourChip(action.startAt)}</div>
       `;
@@ -10893,6 +11034,7 @@ async function loadActionMissions() {
   } catch {
     state.actionMissions = [];
   }
+  await loadMissionOrder({ silent: true });
   void scheduleMissionNotifications();
   if (actionsModal?.classList.contains("active")) {
     renderActions();
@@ -13376,14 +13518,15 @@ function createMissionCard(goal, initialPercent = null) {
   const expectation = historyRangeActive ? null : getMissionExpectation(goal);
   const progressLabel = dailyVariantProgress
     ? dailyVariantProgress.label
-    : `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}${expectation ? ` · ${expectation.ratio}% do esperado${expectation.nextDueAtMs ? ` · próxima ${formatHourChip(new Date(expectation.nextDueAtMs).toISOString())}` : ""}` : ""}`;
+    : `${Math.max(0, Math.trunc(progress || 0))} de ${Math.max(1, Math.trunc(target || 1))}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
-  const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : percent;
+  const displayPercent = expectation ? expectation.ratio : percent;
+  const safeInitialPercent = hasInitialPercent ? Number(initialPercent) : displayPercent;
   card.className = `history-mission-card${hasMicrotasks ? " has-microtasks" : ""}${expectation ? ` mission-expectation-${expectation.tone}` : ""}`;
   card.dataset.goalId = String(goal.id || "");
   card.dataset.historyRangeActive = historyRangeActive ? "true" : "false";
-  card.dataset.progressPercent = String(percent);
+  card.dataset.progressPercent = String(displayPercent);
   card.innerHTML = `
     <div class="history-mission-card-top">
       <div class="history-mission-card-info">
@@ -16705,6 +16848,58 @@ toggleMissionActionsOptionButton?.addEventListener("click", () => {
   })();
 });
 
+openMissionOrderModalButton?.addEventListener("click", () => {
+  closeModal("optionsModal");
+  state.missionOrder.editingUnitKey = "";
+  if (missionOrderStatus) missionOrderStatus.textContent = "";
+  openModal("missionOrderModal");
+  renderMissionOrderModal();
+  void loadMissionOrder();
+});
+
+let missionOrderHoldTimer = 0;
+let missionOrderHoldTriggered = false;
+function clearMissionOrderHold() {
+  if (missionOrderHoldTimer) window.clearTimeout(missionOrderHoldTimer);
+  missionOrderHoldTimer = 0;
+}
+
+missionOrderList?.addEventListener("pointerdown", (event) => {
+  const row = event.target.closest("[data-mission-order-key]");
+  if (!row || event.target.closest("button")) return;
+  clearMissionOrderHold();
+  missionOrderHoldTriggered = false;
+  missionOrderHoldTimer = window.setTimeout(() => {
+    missionOrderHoldTriggered = true;
+    state.missionOrder.editingUnitKey = String(row.dataset.missionOrderKey || "");
+    renderMissionOrderModal();
+  }, 500);
+});
+["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+  missionOrderList?.addEventListener(eventName, clearMissionOrderHold);
+});
+missionOrderList?.addEventListener("contextmenu", (event) => {
+  const row = event.target.closest("[data-mission-order-key]");
+  if (!row) return;
+  event.preventDefault();
+  clearMissionOrderHold();
+  state.missionOrder.editingUnitKey = String(row.dataset.missionOrderKey || "");
+  renderMissionOrderModal();
+});
+missionOrderList?.addEventListener("click", (event) => {
+  const moveButton = event.target.closest("[data-mission-order-move]");
+  if (!moveButton) {
+    if (missionOrderHoldTriggered) {
+      missionOrderHoldTriggered = false;
+      event.preventDefault();
+    }
+    return;
+  }
+  const row = moveButton.closest("[data-mission-order-key]");
+  if (!row || moveButton.disabled) return;
+  moveMissionOrderUnit(String(row.dataset.missionOrderKey || ""), String(moveButton.dataset.missionOrderMove || ""));
+});
+
 saveActiveTimeButton?.addEventListener("click", () => {
   void (async () => {
     const startMinutes = clockInputToMinutes(activeTimeStartInput?.value);
@@ -16723,6 +16918,7 @@ saveActiveTimeButton?.addEventListener("click", () => {
         body: JSON.stringify({ startMinutes, endMinutes })
       });
       state.activeTime = { ...payload.activeTime, loaded: true, saving: false };
+      await loadMissionOrder({ silent: true });
       renderOptionsModal();
       renderMissions();
       renderActions();

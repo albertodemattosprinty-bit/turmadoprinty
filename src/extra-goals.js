@@ -360,6 +360,15 @@ export async function ensureExtraGoalsSchema() {
       constraint project200_active_time_not_equal check (active_start_minutes <> active_end_minutes)
     );
   `);
+  await query(`
+    create table if not exists project200_mission_installment_orders (
+      user_id uuid not null references users(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      unit_keys jsonb not null default '[]'::jsonb,
+      updated_at timestamptz not null default now(),
+      primary key (user_id, assigned_profile)
+    );
+  `);
 }
 
 export async function getProject200ActiveTime(userId) {
@@ -391,6 +400,103 @@ export async function updateProject200ActiveTime(userId, payload = {}) {
   return normalizeActiveTimeRow(result.rows[0]);
 }
 
+function buildProject200MissionUnitKey(goalId, installmentNumber) {
+  return `${String(goalId || "").trim()}:${Math.max(1, Math.trunc(Number(installmentNumber || 1)))}`;
+}
+
+export async function getProject200MissionInstallmentOrder(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const goalsResult = await query(`
+    select id, title, target_value, svg_icon_url, svg_icon_label
+    from extra_goals
+    where user_id = $1 and assigned_profile = $2
+    order by lower(title) asc, title asc, id asc
+  `, [userId, normalizedProfile]);
+  const alphabeticalUnits = goalsResult.rows.flatMap((row) => {
+    const target = Math.max(1, Math.trunc(Number(row.target_value || 1)));
+    return Array.from({ length: target }, (_, index) => ({
+      unitKey: buildProject200MissionUnitKey(row.id, index + 1),
+      goalId: String(row.id || ""),
+      title: normalizeExtraGoalTitle(row.title),
+      installmentNumber: index + 1,
+      target,
+      svgIconUrl: String(row.svg_icon_url || "").trim(),
+      svgIconLabel: String(row.svg_icon_label || "").trim()
+    }));
+  });
+  const validByKey = new Map(alphabeticalUnits.map((unit) => [unit.unitKey, unit]));
+  const savedResult = await query(`
+    select unit_keys, updated_at
+    from project200_mission_installment_orders
+    where user_id = $1 and assigned_profile = $2
+    limit 1
+  `, [userId, normalizedProfile]);
+  const savedKeys = Array.isArray(savedResult.rows[0]?.unit_keys) ? savedResult.rows[0].unit_keys : [];
+  const orderedKeys = [];
+  const seen = new Set();
+  savedKeys.forEach((value) => {
+    const key = String(value || "").trim();
+    if (validByKey.has(key) && !seen.has(key)) {
+      seen.add(key);
+      orderedKeys.push(key);
+    }
+  });
+  alphabeticalUnits.forEach((unit) => {
+    if (!seen.has(unit.unitKey)) {
+      seen.add(unit.unitKey);
+      orderedKeys.push(unit.unitKey);
+    }
+  });
+  const activeTime = await getProject200ActiveTime(userId);
+  const startMinutes = normalizeActiveTimeMinutes(activeTime.startMinutes, DEFAULT_ACTIVE_TIME_START_MINUTES);
+  const endMinutes = normalizeActiveTimeMinutes(activeTime.endMinutes, DEFAULT_ACTIVE_TIME_END_MINUTES, { allowEndOfDay: true });
+  const durationMinutes = endMinutes > startMinutes ? endMinutes - startMinutes : (1440 - startMinutes) + endMinutes;
+  const totalUnits = Math.max(1, orderedKeys.length);
+  return {
+    profile: normalizedProfile,
+    units: orderedKeys.map((key, index) => {
+      const dueAbsoluteMinutes = startMinutes + (((index + 1) * durationMinutes) / totalUnits);
+      return {
+        ...validByKey.get(key),
+        sortOrder: index,
+        dueMinutes: Math.round(dueAbsoluteMinutes) % 1440,
+        dueDayOffset: Math.floor(dueAbsoluteMinutes / 1440)
+      };
+    }),
+    activeTime,
+    updatedAt: savedResult.rows[0]?.updated_at ? new Date(savedResult.rows[0].updated_at).toISOString() : null
+  };
+}
+
+export async function updateProject200MissionInstallmentOrder(userId, profileName, payload = {}) {
+  const current = await getProject200MissionInstallmentOrder(userId, profileName);
+  const validByKey = new Map(current.units.map((unit) => [unit.unitKey, unit]));
+  const requestedKeys = Array.isArray(payload?.unitKeys) ? payload.unitKeys : [];
+  const orderedKeys = [];
+  const seen = new Set();
+  requestedKeys.forEach((value) => {
+    const key = String(value || "").trim();
+    if (validByKey.has(key) && !seen.has(key)) {
+      seen.add(key);
+      orderedKeys.push(key);
+    }
+  });
+  current.units.forEach((unit) => {
+    if (!seen.has(unit.unitKey)) {
+      seen.add(unit.unitKey);
+      orderedKeys.push(unit.unitKey);
+    }
+  });
+  await query(`
+    insert into project200_mission_installment_orders (user_id, assigned_profile, unit_keys, updated_at)
+    values ($1, $2, $3::jsonb, now())
+    on conflict (user_id, assigned_profile) do update
+    set unit_keys = excluded.unit_keys,
+        updated_at = now()
+  `, [userId, current.profile, JSON.stringify(orderedKeys)]);
+  return getProject200MissionInstallmentOrder(userId, current.profile);
+}
 export async function listExtraGoalVariants(userId, profileName, goalId) {
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
