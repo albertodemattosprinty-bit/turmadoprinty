@@ -316,13 +316,24 @@ export async function listProject200SleepHistory(userId, payload = {}) {
   await ensureProject200SleepSchema();
   const profileName = normalizeProfileName(payload?.profileName);
   const limit = Math.max(1, Math.min(7, Math.trunc(Number(payload?.limit || 7) || 7)));
+  const endDateKey = toProjectDateKey(new Date());
   const result = await query(
-    `select sleep_date::text as sleep_date, total_minutes
-       from "sono-user"
-      where user_id = $1 and assigned_profile = $2
-      order by sleep_date desc
-      limit $3`,
-    [userId, profileName, limit]
+    `with calendar_days as (
+       select generate_series(
+         $3::date - (($4::integer - 1) * interval '1 day'),
+         $3::date,
+         interval '1 day'
+       )::date as sleep_date
+     )
+     select calendar_days.sleep_date::text as sleep_date,
+            coalesce(sleep_user.total_minutes, 0) as total_minutes
+       from calendar_days
+       left join "sono-user" sleep_user
+         on sleep_user.user_id = $1
+        and sleep_user.assigned_profile = $2
+        and sleep_user.sleep_date = calendar_days.sleep_date
+      order by calendar_days.sleep_date desc`,
+    [userId, profileName, endDateKey, limit]
   );
   return result.rows.map((row) => ({
     sleepDate: String(row.sleep_date || "").slice(0, 10),
