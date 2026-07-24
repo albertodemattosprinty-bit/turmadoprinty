@@ -11914,6 +11914,11 @@ body[data-background-theme="white"] .mission-limit-interval-picker > strong {
   color: #fff;
   background: #57363b;
 }
+
+.project-native-keyboard.is-numeric .project-native-key.is-return {
+  color: #fff;
+  background: linear-gradient(145deg, #25c96f, #128b49);
+}
 body.project-native-keyboard-open #startDecisionModal .start-decision-task-title {
   text-shadow: 0 0 22px rgba(255,255,255,.15);
 }

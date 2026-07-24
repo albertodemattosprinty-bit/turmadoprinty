@@ -7826,13 +7826,13 @@ function getProjectNativeKeyboardRows() {
   if (numeric) {
     return [
       ["1", "2", "3", { action: "noop", label: "-", className: "is-command is-future-key" }],
-      ["4", "5", "6", { action: "noop", label: "*", className: "is-command is-future-key" }],
+      ["4", "5", "6", { action: "clear", label: "x", className: "is-command is-clear", ariaLabel: "Apagar tudo" }],
       ["7", "8", "9", { action: "backspace", label: "<", className: "is-command", ariaLabel: "Apagar um número" }],
       [
         { action: "noop", label: ",", className: "is-command is-future-key" },
         "0",
         { action: "noop", label: ".", className: "is-command is-future-key" },
-        { action: "clear", label: "x", className: "is-command is-clear", ariaLabel: "Apagar tudo" }
+        { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar e avançar" }
       ]
     ];
   }
@@ -8005,7 +8005,7 @@ function handleProjectNativeKeyboardAction(action, value = "") {
       if (String(marinChatInput?.value || "").trim()) marinChatForm?.requestSubmit();
       return;
     }
-    if (state.nativeKeyboard?.target === "mission-title") {
+    if (state.nativeKeyboard?.target === "mission-title" || state.nativeKeyboard?.target === "mission-target") {
       missionCreateConfirmButton?.click();
       return;
     }
@@ -16497,7 +16497,11 @@ document.querySelectorAll("[data-mission-kind]").forEach((button) => {
 
 missionCreateBackButton?.addEventListener("click", () => moveMissionCreateStep(-1));
 missionTitleInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; renderMissionCreateStep(); });
-missionTargetInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; renderMissionCreateStep(); });
+missionTargetInput?.addEventListener("input", () => {
+  missionTargetInput.value = String(missionTargetInput.value || "").replace(/\D+/g, "").slice(0, 6);
+  if (missionCreateStatus) missionCreateStatus.textContent = "";
+  renderMissionCreateStep();
+});
 missionLimitIntervalPrevButton?.addEventListener("click", () => {
   state.missionCreate.limitIntervalIndex = Math.max(0, Math.trunc(Number(state.missionCreate?.limitIntervalIndex || 0)) - 1);
   renderMissionCreateStep();

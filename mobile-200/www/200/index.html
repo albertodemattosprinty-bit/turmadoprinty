@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260724-limit-cycles-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260724-numeric-next-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -1368,7 +1368,7 @@
             <span class="mission-guide-number">2</span>
             <h2 id="missionCreateTargetStep">Quantas vezes por dia?</h2>
             <p id="missionCreateTargetCopy" hidden></p>
-            <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="none" maxlength="6" autocomplete="off" placeholder="Digite um número" />
+            <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="none" maxlength="6" pattern="[0-9]*" autocomplete="off" placeholder="Digite um número" />
           </section>
           <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="3" aria-labelledby="missionCreateFinalStepTitle">
             <span class="mission-guide-number">3</span>
@@ -1760,7 +1760,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260724-mission-keyboard-v1"></script>
+  <script type="module" src="/200/project.js?v=20260724-numeric-next-v1"></script>
 </body>
 </html>
 
