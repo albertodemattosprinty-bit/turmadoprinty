@@ -512,6 +512,9 @@ const missionCreateTargetStep = document.getElementById("missionCreateTargetStep
 const missionCreateFinalStepTitle = document.getElementById("missionCreateFinalStepTitle");
 const missionCreateLimitIntervalPanel = document.getElementById("missionCreateLimitIntervalPanel");
 const missionCreateTimePanel = document.getElementById("missionCreateTimePanel");
+const missionCreateCategoryTrigger = document.getElementById("missionCreateCategoryTrigger");
+const missionCreateCategoryIcon = document.getElementById("missionCreateCategoryIcon");
+const missionCreateCategoryLabel = document.getElementById("missionCreateCategoryLabel");
 const missionLimitExampleTitle = document.getElementById("missionLimitExampleTitle");
 const missionLimitIntervalPrevButton = document.getElementById("missionLimitIntervalPrev");
 const missionLimitIntervalLabel = document.getElementById("missionLimitIntervalLabel");
@@ -556,6 +559,13 @@ const missionProgressStatus = document.getElementById("missionProgressStatus");
 const missionProgressStartButton = document.getElementById("missionProgressStartButton");
 const missionProgressConfirmButton = document.getElementById("missionProgressConfirm");
 const missionProgressConfirmLabel = document.getElementById("missionProgressConfirmLabel");
+const missionProgressHistoryLink = document.getElementById("missionProgressHistoryLink");
+const limitHistoryModal = document.getElementById("limitHistoryModal");
+const limitHistoryCloseButton = document.getElementById("limitHistoryCloseButton");
+const limitHistoryTitle = document.getElementById("limitHistoryTitle");
+const limitHistoryModeToggle = document.getElementById("limitHistoryModeToggle");
+const limitHistoryList = document.getElementById("limitHistoryList");
+const limitHistoryStatus = document.getElementById("limitHistoryStatus");
 const missionQuickAssignCloseButton = document.getElementById("missionQuickAssignCloseButton");
 const missionQuickAssignGrid = document.getElementById("missionQuickAssignGrid");
 const missionQuickAssignStatus = document.getElementById("missionQuickAssignStatus");
@@ -926,8 +936,10 @@ let pendingActionsAnchorId = "";
 let actionCompletionAnimationId = "";
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
+let missionCategoryInterpretTimer = null;
 let actionCategoryTargetActionId = "";
 let actionCategorySelectionId = "";
+let categoryPickerContext = "action";
 let actionsTimeTicker = null;
 let actionsTimeShowDuration = false;
 let timeButtonHoldTimer = null;
@@ -1191,13 +1203,30 @@ const state = {
     step: 0,
     unitDurationSeconds: 30,
     timeConfigured: true,
-    limitIntervalIndex: 0
+    limitIntervalIndex: 0,
+    categoryId: "planejamento",
+    categoryName: "Propósito",
+    categoryResolved: false,
+    categoryThinking: false,
+    categoryManuallySelected: false
   },
   missionProgress: {
     goalId: "",
     goalKind: "goal",
     deltaValue: 0,
     baseValue: 0
+  },
+  limitHistory: {
+    goalId: "",
+    title: "",
+    mode: "history",
+    events: [],
+    bestIntervals: [],
+    loading: false,
+    editingEventId: "",
+    editValue: 1,
+    editDate: "",
+    editTime: ""
   },
   missionTime: {
     mode: "",
@@ -7441,6 +7470,54 @@ async function interpretActionCategoryFromTitle(titleText) {
   }
 }
 
+function renderMissionCreateCategoryPicker() {
+  if (!missionCreateCategoryTrigger) return;
+  const limitCreation = normalizeMissionKind(state.missionCreate?.goalKind) === "limit";
+  const manuallySelected = Boolean(state.missionCreate?.categoryManuallySelected);
+  const resolved = Boolean(state.missionCreate?.categoryResolved || manuallySelected);
+  const thinking = Boolean(state.missionCreate?.categoryThinking) && !manuallySelected;
+  const categoryId = normalizeTaskCategoryId(state.missionCreate?.categoryId);
+  missionCreateCategoryTrigger.hidden = limitCreation;
+  missionCreateCategoryTrigger.classList.toggle("is-thinking", thinking);
+  missionCreateCategoryTrigger.classList.toggle("is-unresolved", !resolved && !thinking);
+  if (missionCreateCategoryIcon) {
+    missionCreateCategoryIcon.src = resolved ? getTaskCategoryIconPath(categoryId) : "/200/icons/plataformas.svg";
+    missionCreateCategoryIcon.alt = thinking ? "Definindo aspecto" : resolved ? getTaskCategoryName(categoryId) : "Aspecto da missão";
+  }
+  setActionCategoryLabel(
+    missionCreateCategoryLabel,
+    thinking ? "Pensando..." : resolved ? getTaskCategoryName(categoryId) : "Aspecto"
+  );
+}
+
+async function interpretMissionCategoryFromTitle(titleText) {
+  const title = String(titleText || "").trim();
+  if (title.length < 2 || normalizeMissionKind(state.missionCreate?.goalKind) === "limit") return;
+  state.missionCreate.categoryThinking = true;
+  state.missionCreate.categoryResolved = false;
+  renderMissionCreateCategoryPicker();
+  try {
+    const payload = await apiRequest("/api/200/actions/categorize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+      skipGlobalLoading: true
+    });
+    const categoryId = normalizeTaskCategoryId(payload?.category?.id);
+    if (!categoryId || String(missionTitleInput?.value || "").trim() !== title || state.missionCreate?.categoryManuallySelected) return;
+    state.missionCreate.categoryId = categoryId;
+    state.missionCreate.categoryName = String(payload?.category?.name || getTaskCategoryName(categoryId));
+    state.missionCreate.categoryResolved = true;
+  } catch {
+    state.missionCreate.categoryResolved = false;
+  } finally {
+    if (String(missionTitleInput?.value || "").trim() === title && !state.missionCreate?.categoryManuallySelected) {
+      state.missionCreate.categoryThinking = false;
+      renderMissionCreateCategoryPicker();
+    }
+  }
+}
+
 async function saveActionCategory(actionId, categoryId) {
   const action = state.actions.find((item) => String(item.id) === String(actionId));
   if (!action) return;
@@ -7677,7 +7754,8 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     finalize: "Concluir?",
     restore: "Restaurar tarefa",
     delete: "Excluir microtarefa?",
-    delete_mission: "Excluir missão inteira?"
+    delete_mission: "Excluir missão inteira?",
+    delete_progress_event: "Remover última movimentação?"
   };
   const buttonMap = {
     giveup: "Desistir",
@@ -7685,7 +7763,8 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     finalize: "Concluir",
     restore: "Restaurar tarefa",
     delete: "Excluir",
-    delete_mission: "Excluir missão"
+    delete_mission: "Excluir missão",
+    delete_progress_event: "Remover"
   };
   const classMap = {
     giveup: "is-desistir",
@@ -7693,7 +7772,8 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     finalize: "is-concluir",
     restore: "is-restaurar",
     delete: "is-excluir",
-    delete_mission: "is-excluir"
+    delete_mission: "is-excluir",
+    delete_progress_event: "is-excluir"
   };
   runningConfirmTitle.textContent = titleMap[kind] || "Desistir?";
   runningConfirmName.textContent = String(action?.title || "Nome da tarefa");
@@ -13304,6 +13384,7 @@ function renderMissionCreateStep(direction = 0) {
   if (missionCreateLimitIntervalPanel) missionCreateLimitIntervalPanel.hidden = !limitCreation;
   if (missionCreateTimePanel) missionCreateTimePanel.hidden = limitCreation;
   if (openMissionCreateTimeButton) openMissionCreateTimeButton.hidden = limitCreation;
+  renderMissionCreateCategoryPicker();
   if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = "Defina quanto tempo leva cada execução desta missão.";
   if (missionCreateTimeSummary) missionCreateTimeSummary.textContent = formatMissionDurationValue(normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds));
   const interval = getSelectedLimitInterval();
@@ -13337,6 +13418,8 @@ function validateMissionCreateStep(step = state.missionCreate?.step) {
   if (step === 0 && !state.missionCreate?.goalKind) return "Escolha Meta ou Limite.";
   if (step === 1 && !String(missionTitleInput?.value || "").trim()) return "Digite o nome.";
   if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diária.";
+  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && state.missionCreate?.categoryThinking) return "Aguarde a definição do aspecto.";
+  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && !state.missionCreate?.categoryResolved) return "Escolha um aspecto.";
   return "";
 }
 
@@ -13382,12 +13465,21 @@ function openMissionCreateModal() {
   if (missionTargetInput) missionTargetInput.value = "";
   if (missionCreateStatus) missionCreateStatus.textContent = "";
   state.friendAssignment.mission = null;
+  if (missionCategoryInterpretTimer) {
+    window.clearTimeout(missionCategoryInterpretTimer);
+    missionCategoryInterpretTimer = null;
+  }
   state.missionCreate = {
     goalKind: "",
     step: 0,
     unitDurationSeconds: DEFAULT_MISSION_DURATION_SECONDS,
     timeConfigured: true,
-    limitIntervalIndex: 0
+    limitIntervalIndex: 0,
+    categoryId: "planejamento",
+    categoryName: "Propósito",
+    categoryResolved: false,
+    categoryThinking: false,
+    categoryManuallySelected: false
   };
   renderFriendAssignmentButtons();
 
@@ -13429,6 +13521,7 @@ function renderMissionProgressState() {
   if (missionProgressHint) {
     missionProgressHint.textContent = "";
   }
+  if (missionProgressHistoryLink) missionProgressHistoryLink.hidden = !limit;
   if (missionProgressConfirmButton) {
     const hasUpdate = deltaValue !== 0;
     const showAdd = limit || hasUpdate;
@@ -14434,21 +14527,210 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
   return { ratio: safeRatio, width, background };
 }
 
+function formatLimitElapsedDuration(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
+  const totalMinutes = Math.floor(safeSeconds / 60);
+  if (totalMinutes < 1) return "menos de 1 minuto";
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) return `${totalHours} ${totalHours === 1 ? "hora" : "horas"}`;
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  return `${days} ${days === 1 ? "dia" : "dias"} e ${hours} ${hours === 1 ? "hora" : "horas"}`;
+}
+
 function formatLimitLastProgress(goal) {
   const lastProgressMs = new Date(goal?.lastProgressAt || "").getTime();
   if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcação ainda";
-  const elapsedMinutes = Math.max(0, Math.floor((getServerNowMs() - lastProgressMs) / 60000));
-  if (elapsedMinutes < 1) return "Última vez agora";
-  if (elapsedMinutes < 60) return `Última vez em ${elapsedMinutes}min`;
-  const elapsedHours = Math.floor(elapsedMinutes / 60);
-  if (elapsedHours < 24) return `Última vez em ${elapsedHours}h`;
-  const elapsedDays = Math.floor(elapsedHours / 24);
-  if (elapsedDays < 30) return `Última vez em ${elapsedDays} ${elapsedDays === 1 ? "dia" : "dias"}`;
-  const elapsedMonths = Math.floor(elapsedDays / 30);
-  if (elapsedDays < 365) return `Última vez em ${elapsedMonths} ${elapsedMonths === 1 ? "mês" : "meses"}`;
-  const elapsedYears = Math.floor(elapsedDays / 365);
-  return `Última vez em ${elapsedYears} ${elapsedYears === 1 ? "ano" : "anos"}`;
+  const elapsedSeconds = Math.max(0, Math.floor((getServerNowMs() - lastProgressMs) / 1000));
+  if (elapsedSeconds < 60) return "Última vez agora";
+  return `Última vez em ${formatLimitElapsedDuration(elapsedSeconds)}`;
 }
+function getLimitHistoryDateParts(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) {
+    return { dateInput: "", timeInput: "", dateLabel: "Data indisponível", timeLabel: "--h--" };
+  }
+  const parts = getProjectDateTimeParts(date);
+  const dateInput = `${parts.year}-${parts.month}-${parts.day}`;
+  const timeInput = `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
+  const monthLabel = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: projectTimeZone,
+    month: "short"
+  }).format(date).replace(".", "");
+  const normalizedMonth = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+  return {
+    dateInput,
+    timeInput,
+    dateLabel: `${String(parts.day).padStart(2, "0")} ${normalizedMonth} ${parts.year}`,
+    timeLabel: timeInput.replace(":", "h")
+  };
+}
+
+function formatLimitHistoryDate(value) {
+  const parts = getLimitHistoryDateParts(value);
+  return `${parts.dateLabel} | ${parts.timeLabel}`;
+}
+
+function buildLimitHistoryOccurredAt(dateInput, timeInput) {
+  const dateMatch = String(dateInput || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = String(timeInput || "").match(/^(\d{2}):(\d{2})$/);
+  if (!dateMatch || !timeMatch) return "";
+  return makeProjectZonedDate(
+    Number(dateMatch[1]),
+    Number(dateMatch[2]),
+    Number(dateMatch[3]),
+    Number(timeMatch[1]),
+    Number(timeMatch[2]),
+    0
+  ).toISOString();
+}
+
+function syncLimitHistoryGoals(payload) {
+  if (!Array.isArray(payload?.goals)) return;
+  state.missions = payload.goals;
+  state.actionMissions = payload.goals;
+  if (getActiveStatsScope().key === "today") state.statsScopeMissions = payload.goals;
+  refreshStatsMissionsFromLocalState();
+  renderMissions();
+  renderActions();
+  renderActionsMissionsPanel();
+  renderRunningMissionQuickButtons();
+}
+
+function renderLimitHistoryModal() {
+  if (!limitHistoryList || !limitHistoryModeToggle) return;
+  const recordsMode = state.limitHistory?.mode === "records";
+  limitHistoryModeToggle.setAttribute("aria-pressed", recordsMode ? "true" : "false");
+  if (limitHistoryTitle) limitHistoryTitle.textContent = state.limitHistory?.title || "Limite";
+  if (state.limitHistory?.loading) {
+    limitHistoryList.innerHTML = '<div class="limit-history-empty">Carregando histórico...</div>';
+    return;
+  }
+  if (recordsMode) {
+    const records = Array.isArray(state.limitHistory?.bestIntervals) ? state.limitHistory.bestIntervals : [];
+    limitHistoryList.innerHTML = records.length
+      ? records.map((record, index) => `
+          <article class="limit-history-record">
+            <span class="limit-history-record-rank">#${index + 1}</span>
+            <div class="limit-history-record-copy">
+              <strong>${escapeHtml(formatLimitElapsedDuration(record.durationSeconds))}</strong>
+              <span>${escapeHtml(formatLimitHistoryDate(record.fromAt))} → ${escapeHtml(formatLimitHistoryDate(record.toAt))}</span>
+            </div>
+          </article>
+        `).join("")
+      : '<div class="limit-history-empty">Ainda não existem dois registros<br>para calcular um intervalo.</div>';
+    return;
+  }
+  const events = Array.isArray(state.limitHistory?.events) ? state.limitHistory.events : [];
+  limitHistoryList.innerHTML = events.length
+    ? events.map((event) => {
+        const editing = state.limitHistory.editingEventId === String(event.id || "");
+        if (editing && event.isLatest) {
+          return `
+            <article class="limit-history-entry is-latest is-editing" data-limit-history-event="${escapeHtml(String(event.id || ""))}">
+              <div class="limit-history-editor">
+                <div class="limit-history-editor-quantity">
+                  <button type="button" data-limit-history-edit-step="-1" aria-label="Diminuir quantidade">−</button>
+                  <strong>${Math.max(1, Number(state.limitHistory.editValue || 1))}</strong>
+                  <button type="button" data-limit-history-edit-step="1" aria-label="Aumentar quantidade">+</button>
+                </div>
+                <label>Dia<input type="date" data-limit-history-edit-date value="${escapeHtml(state.limitHistory.editDate || "")}"></label>
+                <label>Horário<input type="time" data-limit-history-edit-time value="${escapeHtml(state.limitHistory.editTime || "")}"></label>
+                <button class="limit-history-save" type="button" data-limit-history-save>Salvar</button>
+              </div>
+            </article>
+          `;
+        }
+        return `
+          <article class="limit-history-entry${event.isLatest ? " is-latest" : ""}" data-limit-history-event="${escapeHtml(String(event.id || ""))}">
+            <div class="limit-history-entry-copy">
+              <strong>${Math.max(1, Number(event.value || 1))} ${escapeHtml(state.limitHistory?.title || "Limite")} <i>|</i> ${escapeHtml(formatLimitHistoryDate(event.occurredAt))}</strong>
+              ${event.editedAt ? "<span>Atualização corrigida</span>" : ""}
+            </div>
+            <div class="limit-history-entry-actions">
+              <button type="button" data-limit-history-edit ${event.isLatest ? "" : "disabled"} aria-label="Editar movimentação">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.8-.8 4 4-.8L18.9 8.3l-3.2-3.2L4 16.8Zm13-13 3.2 3.2 1.1-1.1a1.4 1.4 0 0 0 0-2l-1.2-1.2a1.4 1.4 0 0 0-2 0L17 3.8Z" fill="currentColor"/></svg>
+              </button>
+              <button type="button" data-limit-history-delete ${event.isLatest ? "" : "disabled"} aria-label="Remover movimentação">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10l-.7 14H7.7L7 7Zm2-4h6l1 2h4v2H4V5h4l1-2Z" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("")
+    : '<div class="limit-history-empty">Nenhuma movimentação registrada ainda.</div>';
+}
+
+async function loadLimitHistory() {
+  const goalId = String(state.limitHistory?.goalId || "").trim();
+  if (!goalId) return;
+  state.limitHistory.loading = true;
+  if (limitHistoryStatus) limitHistoryStatus.textContent = "";
+  renderLimitHistoryModal();
+  try {
+    const profile = encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim());
+    const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress-history?profile=${profile}`, {
+      skipGlobalLoading: true
+    });
+    state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
+    state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
+  } catch (error) {
+    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar.";
+  } finally {
+    state.limitHistory.loading = false;
+    renderLimitHistoryModal();
+  }
+}
+
+function openLimitHistoryModal(goalId) {
+  const goal = getAvailableMissionById(goalId);
+  if (!goal || !isLimitGoal(goal)) return;
+  state.limitHistory = {
+    goalId: String(goal.id || ""),
+    title: String(goal.title || "Limite"),
+    mode: "history",
+    events: [],
+    bestIntervals: [],
+    loading: true,
+    editingEventId: "",
+    editValue: 1,
+    editDate: "",
+    editTime: ""
+  };
+  renderLimitHistoryModal();
+  openModal("limitHistoryModal");
+  void loadLimitHistory();
+}
+
+async function mutateLimitHistoryEvent(eventId, method, value = 0, occurredAt = "") {
+  const goalId = String(state.limitHistory?.goalId || "").trim();
+  if (!goalId || !eventId) return;
+  if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Removendo última movimentação..." : "Salvando correção...";
+  try {
+    const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
+    const payload = await apiRequest(
+      `/api/200/extra-goals/${encodeURIComponent(goalId)}/progress-history/${encodeURIComponent(eventId)}${method === "DELETE" ? `?profile=${encodeURIComponent(profile)}` : ""}`,
+      {
+        method,
+        headers: method === "DELETE" ? undefined : { "Content-Type": "application/json" },
+        body: method === "DELETE" ? undefined : JSON.stringify({ profile, value, occurredAt }),
+        skipGlobalLoading: true
+      }
+    );
+    syncLimitHistoryGoals(payload);
+    state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
+    state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
+    state.limitHistory.editingEventId = "";
+    state.limitHistory.editDate = "";
+    state.limitHistory.editTime = "";
+    if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Movimentação removida." : "Movimentação corrigida.";
+    renderLimitHistoryModal();
+  } catch (error) {
+    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "Não foi possível atualizar.";
+  }
+}
+
 function formatMissionRangeProgress(progress, days) {
   const total = Math.max(0, Math.trunc(Number(progress || 0)));
   const average = total / Math.max(1, Number(days || 1));
@@ -15845,6 +16127,7 @@ friendAssignmentList?.addEventListener("click", (event) => {
 closeActionWizardButton.addEventListener("click", closeWizard);
 closeActionCategoryModal?.addEventListener("click", () => closeModal(actionCategoryModal));
 actionCategoryTrigger?.addEventListener("click", () => {
+  categoryPickerContext = "action";
   actionCategoryTargetActionId = "";
   actionCategorySelectionId = String(state.wizard.categoryId || "").trim().toLowerCase();
   renderActionCategoryModal();
@@ -15855,6 +16138,17 @@ actionCategoryGrid?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-category-id]");
   if (!button) return;
   actionCategorySelectionId = normalizeTaskCategoryId(button.dataset.categoryId);
+  if (categoryPickerContext === "mission-create") {
+    state.missionCreate.categoryManuallySelected = true;
+    state.missionCreate.categoryResolved = true;
+    state.missionCreate.categoryThinking = false;
+    state.missionCreate.categoryId = actionCategorySelectionId;
+    state.missionCreate.categoryName = getTaskCategoryName(actionCategorySelectionId);
+    renderMissionCreateCategoryPicker();
+    closeModal(actionCategoryModal);
+    categoryPickerContext = "action";
+    return;
+  }
   state.startDecisionContext.categoryManuallySelected = true;
   state.wizard.categoryResolved = true;
   state.wizard.categoryThinking = false;
@@ -15870,6 +16164,17 @@ actionCategoryGrid?.addEventListener("click", (event) => {
 });
 confirmActionCategoryModal?.addEventListener("click", () => {
   if (!actionCategorySelectionId) return;
+  if (categoryPickerContext === "mission-create") {
+    state.missionCreate.categoryManuallySelected = true;
+    state.missionCreate.categoryResolved = true;
+    state.missionCreate.categoryThinking = false;
+    state.missionCreate.categoryId = normalizeTaskCategoryId(actionCategorySelectionId);
+    state.missionCreate.categoryName = getTaskCategoryName(state.missionCreate.categoryId);
+    renderMissionCreateCategoryPicker();
+    closeModal(actionCategoryModal);
+    categoryPickerContext = "action";
+    return;
+  }
   state.startDecisionContext.categoryManuallySelected = true;
   state.wizard.categoryResolved = true;
   state.wizard.categoryThinking = false;
@@ -16496,7 +16801,31 @@ document.querySelectorAll("[data-mission-kind]").forEach((button) => {
 });
 
 missionCreateBackButton?.addEventListener("click", () => moveMissionCreateStep(-1));
-missionTitleInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; renderMissionCreateStep(); });
+missionCreateCategoryTrigger?.addEventListener("click", () => {
+  if (normalizeMissionKind(state.missionCreate?.goalKind) === "limit") return;
+  categoryPickerContext = "mission-create";
+  actionCategoryTargetActionId = "";
+  actionCategorySelectionId = normalizeTaskCategoryId(state.missionCreate?.categoryId);
+  renderActionCategoryModal();
+  if (actionCategoryModal?.parentElement !== document.body) document.body.appendChild(actionCategoryModal);
+  openModal("actionCategoryModal");
+});
+missionTitleInput?.addEventListener("input", () => {
+  if (missionCategoryInterpretTimer) window.clearTimeout(missionCategoryInterpretTimer);
+  const title = String(missionTitleInput.value || "").trim();
+  state.missionCreate.categoryManuallySelected = false;
+  state.missionCreate.categoryResolved = false;
+  state.missionCreate.categoryThinking = Boolean(title) && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit";
+  state.missionCreate.categoryId = "planejamento";
+  state.missionCreate.categoryName = "Propósito";
+  if (missionCreateStatus) missionCreateStatus.textContent = "";
+  renderMissionCreateStep();
+  if (title && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit") {
+    missionCategoryInterpretTimer = window.setTimeout(() => {
+      void interpretMissionCategoryFromTitle(title);
+    }, 350);
+  }
+});
 missionTargetInput?.addEventListener("input", () => {
   missionTargetInput.value = String(missionTargetInput.value || "").replace(/\D+/g, "").slice(0, 6);
   if (missionCreateStatus) missionCreateStatus.textContent = "";
@@ -16521,11 +16850,12 @@ missionCreateConfirmButton?.addEventListener("click", () => {
     const targetValue = Math.max(1, Math.trunc(Number(missionTargetInput?.value || 0) || 0));
     const goalKind = normalizeMissionKind(state.missionCreate?.goalKind);
     const selectedLimitInterval = getSelectedLimitInterval();
+    const categoryId = normalizeTaskCategoryId(state.missionCreate?.categoryId);
     const stepError = validateMissionCreateStep(createMaxStep);
     if (stepError) { if (missionCreateStatus) missionCreateStatus.textContent = stepError; return; }
 
     if (state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "mission") {
-      const proposal = { type: "mission", goalKind, title, targetValue, unitDurationSeconds: goalKind === "limit" ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), limitIntervalValue: selectedLimitInterval.value, limitIntervalUnit: selectedLimitInterval.unit, svgIconUrl: "", svgIconLabel: "" };
+      const proposal = { type: "mission", goalKind, title, targetValue, aspectId: categoryId, categoryId, unitDurationSeconds: goalKind === "limit" ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), limitIntervalValue: selectedLimitInterval.value, limitIntervalUnit: selectedLimitInterval.unit, svgIconUrl: "", svgIconLabel: "" };
       state.tutorProposalDraft = { active: false, type: "" };
       setTutorProposalComposerControls(false);
       closeModal("missionCreateModal");
@@ -16543,6 +16873,7 @@ missionCreateConfirmButton?.addEventListener("click", () => {
             title,
             recipientUserId: String(state.friendAssignment.mission?.userId || ""),
             targetValue,
+            categoryId,
             profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
             unitDurationSeconds: goalKind === "limit" ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
             limitIntervalValue: selectedLimitInterval.value,
@@ -16833,9 +17164,72 @@ sleepModalShell?.addEventListener("click", (event) => {
 });
 
 missionProgressMinusButton?.addEventListener("click", () => {
+  const currentDelta = Math.trunc(Number(state.missionProgress.deltaValue || 0) || 0);
+  if (normalizeMissionKind(state.missionProgress?.goalKind) === "limit") {
+    if (currentDelta > 0) {
+      state.missionProgress.deltaValue = currentDelta - 1;
+      renderMissionProgressState();
+    } else {
+      openLimitHistoryModal(state.missionProgress?.goalId);
+    }
+    return;
+  }
   const baseValue = Math.max(0, Math.trunc(Number(state.missionProgress.baseValue || 0) || 0));
-  state.missionProgress.deltaValue = Math.max(-baseValue, Math.trunc(Number(state.missionProgress.deltaValue || 0) || 0) - 1);
+  state.missionProgress.deltaValue = Math.max(-baseValue, currentDelta - 1);
   renderMissionProgressState();
+});
+
+missionProgressHistoryLink?.addEventListener("click", () => {
+  openLimitHistoryModal(state.missionProgress?.goalId);
+});
+limitHistoryCloseButton?.addEventListener("click", () => closeModal("limitHistoryModal"));
+limitHistoryModeToggle?.addEventListener("click", () => {
+  state.limitHistory.mode = state.limitHistory?.mode === "records" ? "history" : "records";
+  state.limitHistory.editingEventId = "";
+  renderLimitHistoryModal();
+});
+limitHistoryList?.addEventListener("input", (event) => {
+  const dateInput = event.target.closest("[data-limit-history-edit-date]");
+  const timeInput = event.target.closest("[data-limit-history-edit-time]");
+  if (dateInput) state.limitHistory.editDate = String(dateInput.value || "");
+  if (timeInput) state.limitHistory.editTime = String(timeInput.value || "");
+});
+limitHistoryList?.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-limit-history-event]");
+  const eventId = String(row?.dataset.limitHistoryEvent || "");
+  const entry = (state.limitHistory?.events || []).find((item) => String(item?.id || "") === eventId);
+  if (!entry || !entry.isLatest) return;
+  if (event.target.closest("[data-limit-history-edit]")) {
+    const dateParts = getLimitHistoryDateParts(entry.occurredAt);
+    state.limitHistory.editingEventId = eventId;
+    state.limitHistory.editValue = Math.max(1, Number(entry.value || 1));
+    state.limitHistory.editDate = dateParts.dateInput;
+    state.limitHistory.editTime = dateParts.timeInput;
+    renderLimitHistoryModal();
+    return;
+  }
+  const stepButton = event.target.closest("[data-limit-history-edit-step]");
+  if (stepButton) {
+    state.limitHistory.editValue = Math.max(1, Number(state.limitHistory.editValue || 1) + Number(stepButton.dataset.limitHistoryEditStep || 0));
+    renderLimitHistoryModal();
+    return;
+  }
+  if (event.target.closest("[data-limit-history-save]")) {
+    const occurredAt = buildLimitHistoryOccurredAt(state.limitHistory.editDate, state.limitHistory.editTime);
+    if (!occurredAt) {
+      if (limitHistoryStatus) limitHistoryStatus.textContent = "Informe dia e horário válidos.";
+      return;
+    }
+    void mutateLimitHistoryEvent(eventId, "PATCH", state.limitHistory.editValue, occurredAt);
+    return;
+  }
+  if (event.target.closest("[data-limit-history-delete]")) {
+    openRunningConfirmModal("delete_progress_event", {
+      title: `+${Math.max(1, Number(entry.value || 1))} • ${formatLimitHistoryDate(entry.occurredAt)}`
+    }, () => {
+      void mutateLimitHistoryEvent(eventId, "DELETE");
+    });
+  }
 });
 
 missionProgressPlusButton?.addEventListener("click", () => {
@@ -18124,6 +18518,7 @@ partialTaskContinueButton?.addEventListener("click", () => {
   if (resolve) resolve(partialTaskPercentValue);
 });
 startDecisionAspectLabel?.addEventListener("click", () => {
+  categoryPickerContext = "action";
   const action = findActionById(state.startDecisionContext.actionId);
   actionCategoryTargetActionId = isTaskComposerMode() ? "" : String(action?.id || "");
   actionCategorySelectionId = normalizeTaskCategoryId(isTaskComposerMode() ? state.wizard.categoryId : action?.categoryId);

@@ -63,7 +63,7 @@ import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProj
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
 import { createProject200FinanceItem, summarizeProject200FinanceLedgerMonth } from "./src/project200-finance-ledger.js";
-import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, ensureExtraGoalsSchema, getExtraGoalById, getProject200ActiveTime, getProject200MissionInstallmentOrder, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateProject200ActiveTime, updateProject200MissionInstallmentOrder } from "./src/extra-goals.js";
+import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, deleteLatestExtraGoalProgressEvent, ensureExtraGoalsSchema, getExtraGoalById, getProject200ActiveTime, getProject200MissionInstallmentOrder, listExtraGoalProgressEvents, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateLatestExtraGoalProgressEvent, updateProject200ActiveTime, updateProject200MissionInstallmentOrder } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
@@ -3634,6 +3634,9 @@ function sanitizeProject200MarinProposals(rawProposals) {
     }
 
     if (type === "mission") {
+      proposal.aspectId = PROJECT200_MARIN_ASPECT_IDS.has(String(raw?.aspectId || "").trim().toLowerCase())
+        ? String(raw.aspectId).trim().toLowerCase()
+        : "planejamento";
       proposal.targetValue = Math.max(1, Math.min(10000, Math.trunc(Number(raw?.targetValue) || 1)));
       proposal.unitDurationMinutes = Math.max(0, Math.min(1440, Math.trunc(Number(raw?.unitDurationMinutes) || 0)));
     }
@@ -3911,6 +3914,7 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
     } else if (proposal.type === "mission") {
       const goals = await createExtraGoal(user.id, profileName, {
         title: proposal.title,
+        categoryId: proposal.aspectId || proposal.categoryId || "planejamento",
         goalKind: proposal.goalKind,
         targetValue: proposal.targetValue,
         unitDurationSeconds: proposal.unitDurationSeconds,
@@ -4041,6 +4045,7 @@ async function applyProject200TutorProposalEntity(userId, profileName, proposal)
   if (proposal.type === "mission") {
     const goals = await createExtraGoal(userId, profileName, {
       title: proposal.title,
+      categoryId: proposal.aspectId || proposal.categoryId || "planejamento",
       targetValue: proposal.targetValue,
       unitDurationSeconds: proposal.unitDurationSeconds,
       unitDurationMinutes: proposal.unitDurationMinutes,
@@ -4303,6 +4308,43 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel atualizar a missao."
+    });
+  }
+}
+
+async function handleExtraGoalProgressHistoryRequest(request, response, goalId, eventId = "") {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    const body = request.method === "GET" ? {} : await readJsonBody(request);
+    const selectedProfile = await resolveProject200ProfileName(
+      user.id,
+      body?.profile || requestUrl.searchParams.get("profile"),
+      { fallbackToDefault: true }
+    );
+    if (request.method === "PATCH") {
+      const result = await updateLatestExtraGoalProgressEvent(
+        user.id,
+        selectedProfile,
+        goalId,
+        eventId,
+        body?.value,
+        body?.occurredAt
+      );
+      sendJson(response, 200, { ok: true, profile: selectedProfile, ...result });
+      return;
+    }
+    if (request.method === "DELETE") {
+      const result = await deleteLatestExtraGoalProgressEvent(user.id, selectedProfile, goalId, eventId);
+      sendJson(response, 200, { ok: true, profile: selectedProfile, ...result });
+      return;
+    }
+    const history = await listExtraGoalProgressEvents(user.id, selectedProfile, goalId);
+    sendJson(response, 200, { ok: true, profile: selectedProfile, history });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Não foi possível atualizar o histórico."
     });
   }
 }
@@ -11460,6 +11502,18 @@ const server = http.createServer(async (request, response) => {
   }
   if (request.method === "POST" && pathname === "/api/200/extra-goals") {
     await handleExtraGoalCreateRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/progress-history$/)) {
+    const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)\/progress-history$/, "$1");
+    await handleExtraGoalProgressHistoryRequest(request, response, goalId);
+    return;
+  }
+
+  if ((request.method === "PATCH" || request.method === "DELETE") && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/progress-history\/[^/]+$/)) {
+    const match = pathname.match(/^\/api\/200\/extra-goals\/([^/]+)\/progress-history\/([^/]+)$/);
+    await handleExtraGoalProgressHistoryRequest(request, response, match?.[1] || "", match?.[2] || "");
     return;
   }
 

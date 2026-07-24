@@ -1,4 +1,4 @@
-import { query } from "./db.js";
+import { db, query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
@@ -6,6 +6,10 @@ const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
 const EXTRA_GOAL_MAX_CYCLES = 12;
 const DEFAULT_ACTIVE_TIME_START_MINUTES = 8 * 60;
 const DEFAULT_ACTIVE_TIME_END_MINUTES = 24 * 60;
+const EXTRA_GOAL_CATEGORY_IDS = new Set([
+  "alimentacao", "hidratacao", "aprendizado", "trabalho", "casa", "exercicios",
+  "social", "planejamento", "higiene", "lazer", "aspecto"
+]);
 export const EXTRA_GOAL_HISTORY_SCOPES = [
   { key: "today", label: "Hoje", days: 1 },
   { key: "last7", label: "Ultimos 7 dias", days: 7 },
@@ -33,6 +37,11 @@ function normalizeExtraGoalKind(value) {
 function normalizeLimitIntervalUnit(value) {
   const normalized = String(value || "day").trim().toLowerCase();
   return ["day", "week", "month", "year"].includes(normalized) ? normalized : "day";
+}
+
+function normalizeExtraGoalCategoryId(value) {
+  const normalized = String(value || "planejamento").trim().toLowerCase();
+  return EXTRA_GOAL_CATEGORY_IDS.has(normalized) ? normalized : "planejamento";
 }
 
 const extraGoalTimeZonePartsFormatter = new Intl.DateTimeFormat("en-CA", {
@@ -137,6 +146,36 @@ function normalizeActiveTimeRow(row = {}) {
   };
 }
 
+function normalizeExtraGoalProgressEventRow(row, latestId = "") {
+  const id = String(row?.id || "").trim();
+  return {
+    id,
+    goalId: String(row?.goal_id || "").trim(),
+    value: Math.max(1, Math.trunc(Number(row?.delta_value || 1))),
+    originalValue: Math.max(1, Math.trunc(Number(row?.original_delta_value || row?.delta_value || 1))),
+    occurredAt: row?.occurred_at ? new Date(row.occurred_at).toISOString() : null,
+    createdAt: row?.created_at ? new Date(row.created_at).toISOString() : null,
+    editedAt: row?.edited_at ? new Date(row.edited_at).toISOString() : null,
+    isLatest: Boolean(latestId && id === latestId)
+  };
+}
+
+function buildExtraGoalBestIntervals(events = []) {
+  const chronological = [...events]
+    .filter((event) => event?.occurredAt)
+    .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
+  return chronological.slice(1).map((event, index) => {
+    const previous = chronological[index];
+    const fromMs = new Date(previous.occurredAt).getTime();
+    const toMs = new Date(event.occurredAt).getTime();
+    return {
+      fromAt: previous.occurredAt,
+      toAt: event.occurredAt,
+      durationSeconds: Math.max(0, Math.floor((toMs - fromMs) / 1000))
+    };
+  }).sort((left, right) => right.durationSeconds - left.durationSeconds).slice(0, 10);
+}
+
 function normalizeExtraGoalVariantRow(row) {
   return {
     id: row.id,
@@ -199,6 +238,7 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
     userId: row.user_id,
     profileName: normalizeExtraGoalProfile(row.assigned_profile),
     title: normalizeExtraGoalTitle(row.title),
+    categoryId: normalizeExtraGoalCategoryId(row.category_id),
     goalKind,
     svgIconUrl: String(row.svg_icon_url || "").trim(),
     svgIconLabel: String(row.svg_icon_label || "").trim(),
@@ -376,6 +416,7 @@ export async function ensureExtraGoalsSchema() {
       user_id uuid not null references users(id) on delete cascade,
       assigned_profile text not null default 'Usuario',
       title text not null,
+      category_id text not null default 'planejamento',
       goal_kind text not null default 'goal',
       target_value integer not null default 1,
       unit_duration_minutes integer not null default 0,
@@ -393,6 +434,8 @@ export async function ensureExtraGoalsSchema() {
     );
   `);
   await query("alter table extra_goals add column if not exists assigned_profile text not null default 'Usuario';");
+  await query("alter table extra_goals add column if not exists category_id text not null default 'planejamento';");
+  await query("update extra_goals set category_id = 'planejamento' where category_id is null or btrim(category_id) = '';");
   await query("alter table extra_goals add column if not exists goal_kind text not null default 'goal';");
   await query("update extra_goals set goal_kind = 'goal' where goal_kind is null or goal_kind not in ('goal', 'limit');");
   await query("alter table extra_goals add column if not exists progress_value integer not null default 0;");
@@ -428,6 +471,52 @@ export async function ensureExtraGoalsSchema() {
   await query("alter table extra_goal_progress_history add column if not exists updated_at timestamptz not null default now();");
   await query("update extra_goal_progress_history set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
   await query("create index if not exists idx_extra_goal_progress_history_user_profile_date on extra_goal_progress_history(user_id, assigned_profile, scope_date desc);");
+  await query(`
+    create table if not exists extra_goal_progress_events (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references users(id) on delete cascade,
+      goal_id uuid not null references extra_goals(id) on delete cascade,
+      assigned_profile text not null default 'Usuario',
+      delta_value integer not null,
+      original_delta_value integer not null,
+      occurred_at timestamptz not null default now(),
+      edited_at timestamptz,
+      deleted_at timestamptz,
+      created_at timestamptz not null default now(),
+      constraint extra_goal_progress_events_positive check (delta_value > 0),
+      constraint extra_goal_progress_events_original_positive check (original_delta_value > 0)
+    );
+  `);
+  await query("alter table extra_goal_progress_events add column if not exists original_delta_value integer;");
+  await query("update extra_goal_progress_events set original_delta_value = delta_value where original_delta_value is null;");
+  await query("alter table extra_goal_progress_events alter column original_delta_value set not null;");
+  await query("alter table extra_goal_progress_events add column if not exists occurred_at timestamptz not null default now();");
+  await query("alter table extra_goal_progress_events add column if not exists edited_at timestamptz;");
+  await query("alter table extra_goal_progress_events add column if not exists deleted_at timestamptz;");
+  await query("create index if not exists idx_extra_goal_progress_events_timeline on extra_goal_progress_events(user_id, assigned_profile, goal_id, occurred_at desc, created_at desc);");
+  await query(`
+    insert into extra_goal_progress_events (
+      user_id, goal_id, assigned_profile, delta_value, original_delta_value, occurred_at, created_at
+    )
+    select
+      goal.user_id,
+      goal.id,
+      goal.assigned_profile,
+      goal.progress_value,
+      goal.progress_value,
+      goal.last_progress_at,
+      coalesce(goal.updated_at, goal.last_progress_at)
+    from extra_goals goal
+    where goal.goal_kind = 'limit'
+      and goal.progress_value > 0
+      and goal.last_progress_at is not null
+      and not exists (
+        select 1 from extra_goal_progress_events event
+        where event.user_id = goal.user_id
+          and event.goal_id = goal.id
+          and event.assigned_profile = goal.assigned_profile
+      )
+  `);
   await query("alter table extra_goal_profiles add column if not exists assigned_profile text not null default 'Usuario';");
   await query("alter table extra_goal_profiles add column if not exists seeded_at timestamptz not null default now();");
   await query("update extra_goal_profiles set assigned_profile = 'Usuario' where assigned_profile is null or btrim(assigned_profile) = '';");
@@ -714,6 +803,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
         user_id,
         assigned_profile,
         title,
+        category_id,
         goal_kind,
         target_value,
         unit_duration_minutes,
@@ -866,6 +956,7 @@ export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_
         user_id,
         assigned_profile,
         title,
+        category_id,
         goal_kind,
         target_value,
         unit_duration_minutes,
@@ -899,6 +990,7 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   const title = normalizeExtraGoalTitle(payload?.title);
   const targetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
   const goalKind = normalizeExtraGoalKind(payload?.goalKind);
+  const categoryId = normalizeExtraGoalCategoryId(payload?.categoryId);
   const storedSvgDefault = await getStoredExtraGoalSvgDefault(userId, normalizedProfile, title);
   const svgIconUrl = String(payload?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
   const svgIconLabel = String(payload?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
@@ -918,13 +1010,13 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   await query(
     `
       insert into extra_goals (
-        user_id, assigned_profile, title, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds,
+        user_id, assigned_profile, title, category_id, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds,
         limit_interval_value, limit_interval_unit, limit_cycle_started_at,
         svg_icon_url, svg_icon_label, progress_value, progress_date, created_at, updated_at
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11, 0, null, now(), now())
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11, $12, 0, null, now(), now())
     `,
-    [userId, normalizedProfile, title, goalKind, targetValue, unitDurationMinutes, unitDurationSeconds, limitIntervalValue, limitIntervalUnit, svgIconUrl, svgIconLabel]
+    [userId, normalizedProfile, title, categoryId, goalKind, targetValue, unitDurationMinutes, unitDurationSeconds, limitIntervalValue, limitIntervalUnit, svgIconUrl, svgIconLabel]
   );
   if (svgIconUrl) {
     await saveExtraGoalSvgDefault(userId, normalizedProfile, title, svgIconUrl, svgIconLabel);
@@ -980,8 +1072,18 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
     : ((getStoredDateKey(current.progress_date_key) || getStoredDateKey(current.progress_date)) === dateKey
       ? Math.max(0, Math.trunc(Number(current.progress_value || 0) || 0))
       : 0);
+  if (currentKind === "limit" && safeDelta < 0) {
+    throw new Error("Use o histórico para corrigir movimentações do limite.");
+  }
   const nextProgress = Math.max(0, currentProgress + safeDelta);
-  await query(
+  const limitClient = currentKind === "limit" ? await db?.connect() : null;
+  if (currentKind === "limit" && !limitClient) {
+    throw new Error("Banco de dados indisponível.");
+  }
+  try {
+    if (limitClient) await limitClient.query("begin");
+    const runner = limitClient || { query };
+    await runner.query(
     `
       update extra_goals
       set progress_value = $4,
@@ -994,7 +1096,25 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
         and assigned_profile = $3
     `,
     [safeGoalId, userId, normalizedProfile, nextProgress, dateKey, safeDelta, limitCycle.start.toISOString()]
-  );
+    );
+    if (limitClient && safeDelta > 0) {
+      await limitClient.query(
+        `
+          insert into extra_goal_progress_events (
+            user_id, goal_id, assigned_profile, delta_value, original_delta_value, occurred_at, created_at
+          )
+          values ($1, $2, $3, $4, $4, $5::timestamptz, now())
+        `,
+        [userId, safeGoalId, normalizedProfile, safeDelta, (date instanceof Date ? date : new Date(date)).toISOString()]
+      );
+    }
+    if (limitClient) await limitClient.query("commit");
+  } catch (error) {
+    if (limitClient) await limitClient.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    limitClient?.release();
+  }
   const safeVariantIds = [...new Set([
     ...(Array.isArray(variantIds) ? variantIds : []),
     variantId
@@ -1011,6 +1131,163 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
     await syncExtraGoalProgressHistory(userId, updatedGoal, dateKey);
   }
   return goals;
+}
+
+export async function listExtraGoalProgressEvents(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId) {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeGoalId = String(goalId || "").trim();
+  const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
+  if (!goal || normalizeExtraGoalKind(goal.goalKind) !== "limit") {
+    throw new Error("Histórico disponível somente para limites.");
+  }
+  const result = await query(
+    `
+      select id, goal_id, delta_value, original_delta_value, occurred_at, edited_at, created_at
+      from extra_goal_progress_events
+      where user_id = $1
+        and goal_id = $2
+        and assigned_profile = $3
+        and deleted_at is null
+      order by created_at desc, id desc
+      limit 1000
+    `,
+    [userId, safeGoalId, normalizedProfile]
+  );
+  const latestId = String(result.rows[0]?.id || "");
+  const events = result.rows.map((row) => normalizeExtraGoalProgressEventRow(row, latestId));
+  return {
+    goal,
+    events,
+    bestIntervals: buildExtraGoalBestIntervals(events)
+  };
+}
+
+async function mutateLatestExtraGoalProgressEvent(userId, profileName, goalId, eventId, operation, nextValue = 0, nextOccurredAt = "") {
+  await ensureExtraGoalsSchema();
+  const normalizedProfile = normalizeExtraGoalProfile(profileName);
+  const safeGoalId = String(goalId || "").trim();
+  const safeEventId = String(eventId || "").trim();
+  const client = await db?.connect();
+  if (!client) throw new Error("Banco de dados indisponível.");
+  try {
+    await client.query("begin");
+    const goalResult = await client.query(
+      `
+        select id, goal_kind, progress_value, limit_interval_value, limit_interval_unit,
+               limit_cycle_started_at, created_at
+        from extra_goals
+        where id = $1 and user_id = $2 and assigned_profile = $3
+        for update
+      `,
+      [safeGoalId, userId, normalizedProfile]
+    );
+    const goal = goalResult.rows[0];
+    if (!goal || normalizeExtraGoalKind(goal.goal_kind) !== "limit") {
+      throw new Error("Limite não encontrado.");
+    }
+    const eventResult = await client.query(
+      `
+        select id, delta_value, occurred_at
+        from extra_goal_progress_events
+        where user_id = $1 and goal_id = $2 and assigned_profile = $3 and deleted_at is null
+        order by created_at desc, id desc
+        limit 1
+        for update
+      `,
+      [userId, safeGoalId, normalizedProfile]
+    );
+    const latest = eventResult.rows[0];
+    if (!latest || String(latest.id) !== safeEventId) {
+      throw new Error("Somente a última movimentação pode ser alterada.");
+    }
+    const cycle = resolveLimitCycleWindow(
+      goal.limit_cycle_started_at || goal.created_at || new Date(),
+      goal.limit_interval_value,
+      goal.limit_interval_unit
+    );
+    const eventMs = new Date(latest.occurred_at).getTime();
+    const eventInsideCycle = eventMs >= cycle.start.getTime() && eventMs < cycle.end.getTime();
+    const currentProgress = cycle.advanced ? 0 : Math.max(0, Math.trunc(Number(goal.progress_value || 0)));
+    let nextProgress = currentProgress;
+    if (operation === "edit") {
+      const safeNextValue = Math.max(1, Math.min(1000000, Math.trunc(Number(nextValue) || 0)));
+      if (!safeNextValue) throw new Error("Informe uma quantidade válida.");
+      const safeNextOccurredAt = new Date(nextOccurredAt || latest.occurred_at);
+      if (Number.isNaN(safeNextOccurredAt.getTime())) throw new Error("Informe uma data e um horário válidos.");
+      if (safeNextOccurredAt.getTime() > Date.now()) throw new Error("A movimentação não pode estar no futuro.");
+      const nextEventInsideCycle = safeNextOccurredAt.getTime() >= cycle.start.getTime()
+        && safeNextOccurredAt.getTime() < cycle.end.getTime();
+      nextProgress = Math.max(
+        0,
+        currentProgress
+          - (eventInsideCycle ? Number(latest.delta_value || 0) : 0)
+          + (nextEventInsideCycle ? safeNextValue : 0)
+      );
+      await client.query(
+        `update extra_goal_progress_events
+         set delta_value = $5, occurred_at = $6::timestamptz, edited_at = now()
+         where id = $1 and user_id = $2 and goal_id = $3 and assigned_profile = $4`,
+        [safeEventId, userId, safeGoalId, normalizedProfile, safeNextValue, safeNextOccurredAt.toISOString()]
+      );
+    } else {
+      if (eventInsideCycle) nextProgress = Math.max(0, currentProgress - Number(latest.delta_value || 0));
+      await client.query(
+        `update extra_goal_progress_events set deleted_at = now()
+         where id = $1 and user_id = $2 and goal_id = $3 and assigned_profile = $4`,
+        [safeEventId, userId, safeGoalId, normalizedProfile]
+      );
+    }
+    const previousResult = await client.query(
+      `
+        select occurred_at
+        from extra_goal_progress_events
+        where user_id = $1 and goal_id = $2 and assigned_profile = $3 and deleted_at is null
+        order by occurred_at desc, created_at desc, id desc
+        limit 1
+      `,
+      [userId, safeGoalId, normalizedProfile]
+    );
+    await client.query(
+      `
+        update extra_goals
+        set progress_value = $4,
+            limit_cycle_started_at = $5::timestamptz,
+            last_progress_at = $6::timestamptz,
+            updated_at = now()
+        where id = $1 and user_id = $2 and assigned_profile = $3
+      `,
+      [
+        safeGoalId,
+        userId,
+        normalizedProfile,
+        nextProgress,
+        cycle.start.toISOString(),
+        previousResult.rows[0]?.occurred_at ? new Date(previousResult.rows[0].occurred_at).toISOString() : null
+      ]
+    );
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+  const goals = await listExtraGoals(userId, normalizedProfile);
+  const updatedGoal = goals.find((goal) => String(goal.id || "") === safeGoalId);
+  if (updatedGoal) await syncExtraGoalProgressHistory(userId, updatedGoal, toDateKey());
+  return {
+    goals,
+    history: await listExtraGoalProgressEvents(userId, normalizedProfile, safeGoalId)
+  };
+}
+
+export async function updateLatestExtraGoalProgressEvent(userId, profileName, goalId, eventId, value, occurredAt) {
+  return mutateLatestExtraGoalProgressEvent(userId, profileName, goalId, eventId, "edit", value, occurredAt);
+}
+
+export async function deleteLatestExtraGoalProgressEvent(userId, profileName, goalId, eventId) {
+  return mutateLatestExtraGoalProgressEvent(userId, profileName, goalId, eventId, "delete");
 }
 
 export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, goalId, payload = {}) {
@@ -1032,6 +1309,7 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
       ?? 0
   ) || 0)));
   const nextGoalKind = normalizeExtraGoalKind(currentGoal?.goalKind);
+  const nextCategoryId = normalizeExtraGoalCategoryId(payload?.categoryId ?? currentGoal?.categoryId);
   const safeNextUnitDurationSeconds = nextGoalKind === "limit" ? 0 : nextUnitDurationSeconds;
   const nextUnitDurationMinutes = Math.max(0, Math.trunc(safeNextUnitDurationSeconds / 60));
   const nextLimitIntervalValue = Math.max(1, Math.min(999, Math.trunc(Number(payload?.limitIntervalValue ?? currentGoal?.limitIntervalValue ?? 1) || 1)));
@@ -1042,19 +1320,20 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   await query(
     `
       update extra_goals
-      set target_value = $4,
-          unit_duration_minutes = $5,
-          unit_duration_seconds = $6,
-          limit_interval_value = $7,
-          limit_interval_unit = $8,
-          svg_icon_url = $9,
-          svg_icon_label = $10,
+      set category_id = $4,
+          target_value = $5,
+          unit_duration_minutes = $6,
+          unit_duration_seconds = $7,
+          limit_interval_value = $8,
+          limit_interval_unit = $9,
+          svg_icon_url = $10,
+          svg_icon_label = $11,
           updated_at = now()
       where id = $1
         and user_id = $2
         and assigned_profile = $3
     `,
-    [safeGoalId, userId, normalizedProfile, nextTargetValue, nextUnitDurationMinutes, safeNextUnitDurationSeconds, nextLimitIntervalValue, nextLimitIntervalUnit, svgIconUrl, svgIconLabel]
+    [safeGoalId, userId, normalizedProfile, nextCategoryId, nextTargetValue, nextUnitDurationMinutes, safeNextUnitDurationSeconds, nextLimitIntervalValue, nextLimitIntervalUnit, svgIconUrl, svgIconLabel]
   );
   if (svgIconUrl && currentTitle) {
     await saveExtraGoalSvgDefault(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
