@@ -13043,9 +13043,13 @@ function renderMissionProgressState() {
     missionProgressHint.textContent = "";
   }
   if (missionProgressConfirmButton) {
-    missionProgressConfirmButton.disabled = deltaValue === 0;
-    missionProgressConfirmButton.classList.toggle("is-update", deltaValue !== 0);
-    missionProgressConfirmButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"}</span>`;
+    const hasUpdate = deltaValue !== 0;
+    missionProgressConfirmButton.disabled = false;
+    missionProgressConfirmButton.classList.toggle("is-update", hasUpdate);
+    missionProgressConfirmButton.setAttribute("aria-label", hasUpdate ? "Atualizar progresso" : "Iniciar missão");
+    missionProgressConfirmButton.innerHTML = hasUpdate
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">ADICIONAR</span>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR</span>';
   }
   missionProgressMinusButton?.classList.remove("active");
   missionProgressPlusButton?.classList.add("active");
@@ -16441,7 +16445,11 @@ missionProgressConfirmButton?.addEventListener("click", () => {
   if (!goalId) {
     return;
   }
-  if (deltaValue === 0) return;
+  if (deltaValue === 0) {
+    closeModal("missionProgressModal");
+    void openMissionRunModal(goalId);
+    return;
+  }
 
   const rollback = {
     missions: (state.missions || []).map((item) => ({ ...item })),
