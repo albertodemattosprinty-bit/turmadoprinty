@@ -11093,6 +11093,32 @@ body[data-background-theme="white"] :is(
   background: linear-gradient(90deg, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.94) 0%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.82) 52%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0) 100%);
 }
 
+.task-row.task-mission-dynamic.is-settled {
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(37, 212, 119, 0.96) 0%, rgba(23, 158, 89, 0.88) 54%, rgba(23, 158, 89, 0) 100%) !important;
+  box-shadow: 0 12px 28px rgba(21, 174, 96, 0.3);
+  transition:
+    background 240ms ease,
+    box-shadow 240ms ease,
+    opacity 460ms ease,
+    filter 460ms ease,
+    transform 460ms ease,
+    height 460ms ease,
+    min-height 460ms ease,
+    padding 460ms ease;
+}
+
+.task-row.task-mission-dynamic.is-settled.is-dissolving {
+  height: 0 !important;
+  min-height: 0 !important;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  filter: blur(5px);
+  transform: translateY(-8px) scale(0.985);
+  box-shadow: none;
+}
 .task-row.task-mission-dynamic.mission-dynamic-extreme {
   background: linear-gradient(90deg, rgba(220, 42, 42, 0.96) 0%, rgba(130, 20, 20, 0.94) 42%, rgba(10, 10, 12, calc(0.35 + (var(--mission-delay-darkness, 0) * 0.63))) 76%, rgba(0, 0, 0, 0) 100%);
 }

@@ -6689,6 +6689,39 @@ function formatActionPeriodTime(value) {
   return `${String(parts.day).padStart(2, "0")}/${String(parts.month).padStart(2, "0")} ${formatHourChip(value)}`;
 }
 
+function animateDynamicMissionSettlement(goalId, completedCount = 1) {
+  const safeGoalId = String(goalId || "").trim();
+  const safeCount = Math.max(1, Math.trunc(Number(completedCount || 1) || 1));
+  const dynamicViewActive = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
+    && state.actionsDynamicMissionsVisible;
+  const rows = dynamicViewActive && safeGoalId
+    ? [...actionsList.querySelectorAll(".task-row.task-mission-dynamic")]
+      .filter((row) => String(row.dataset.missionGoalId || "") === safeGoalId)
+      .slice(0, safeCount)
+    : [];
+
+  playMissionProgressSound();
+  if (!rows.length) {
+    renderActions();
+    return Promise.resolve(false);
+  }
+
+  rows.forEach((row) => {
+    row.style.height = `${Math.ceil(row.getBoundingClientRect().height)}px`;
+    row.classList.add("is-settled");
+  });
+
+  return new Promise((resolve) => {
+    window.setTimeout(() => {
+      rows.forEach((row) => row.classList.add("is-dissolving"));
+    }, 360);
+    window.setTimeout(() => {
+      rows.forEach((row) => row.remove());
+      renderActions();
+      resolve(true);
+    }, 900);
+  });
+}
 function renderActions() {
   actionsList.innerHTML = "";
   actionsAuthAlert.hidden = Boolean(getToken());
@@ -13888,12 +13921,31 @@ async function finalizeMissionRun(triggerButton = null) {
   });
   const completedCycles = Math.max(1, Math.min(MISSION_RUN_MAX_CYCLES, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1)));
   const preloadedDailyRanking = state.missionRun.preloadedDailyRanking;
+  const selectedVariantId = String(state.missionRun.selectedVariantId || "");
+  const selectedVariantIds = (state.missionRun.selectedVariantIds || []).slice(0, completedCycles);
   state.missionRun.finalizing = true;
   if (missionRunFinishButton) missionRunFinishButton.disabled = true;
   if (missionRunRestartButton) missionRunRestartButton.disabled = true;
   if (missionRunStatus) {
     missionRunStatus.textContent = "Concluindo...";
   }
+  const rollback = {
+    missions: (state.missions || []).map((item) => ({ ...item })),
+    actionMissions: (state.actionMissions || []).map((item) => ({ ...item })),
+    statsScopeMissions: (state.statsScopeMissions || []).map((item) => ({ ...item })),
+    linkedMissions: (state.statsAspectLinks?.missions || []).map((item) => ({ ...item }))
+  };
+  applyMissionProgressLocally(goalId, completedCycles);
+  renderMissions();
+  renderActionsMissionsPanel();
+  renderRunningMissionQuickButtons();
+  state.missionRun.completedSuccessfully = true;
+  stopMissionRunAlarm();
+  if (state.options.stopMusicOnFinish) {
+    stopRunningMusicAfterFinishedActivity();
+  }
+  closeModal("missionRunModal");
+  const completionUx = animateDynamicMissionSettlement(goalId, completedCycles);
   try {
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
       method: "PATCH",
@@ -13901,27 +13953,41 @@ async function finalizeMissionRun(triggerButton = null) {
       body: JSON.stringify({
         profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
         delta: completedCycles,
-        variantId: String(state.missionRun.selectedVariantId || ""),
-        variantIds: (state.missionRun.selectedVariantIds || []).slice(0, completedCycles),
+        variantId: selectedVariantId,
+        variantIds: selectedVariantIds,
         pointsSnapshotPrepared: Boolean(preloadedDailyRanking)
-      })
+      }),
+      skipGlobalLoading: true
     });
+    if (Array.isArray(payload?.goals)) {
+      state.missions = payload.goals;
+      state.actionMissions = payload.goals;
+      if (getActiveStatsScope().key === "today") {
+        state.statsScopeMissions = payload.goals;
+      }
+    }
+    refreshStatsMissionsFromLocalState();
+    await completionUx;
+    renderMissions();
+    renderActions();
+    renderRunningMissionQuickButtons();
     enqueuePointsUpdateFeedback({
       before: payload?.pointsUpdate?.before || preloadedDailyRanking,
       after: payload?.pointsUpdate?.after || null
     });
-    stopMissionRunAlarm();
-    playMissionProgressSound();
-    await Promise.all([loadMissions(), loadActionMissions()]);
+  } catch (error) {
+    await completionUx;
+    state.missions = rollback.missions;
+    state.actionMissions = rollback.actionMissions;
+    state.statsScopeMissions = rollback.statsScopeMissions;
+    if (state.statsAspectLinks) {
+      state.statsAspectLinks.missions = rollback.linkedMissions;
+    }
+    refreshStatsMissionsFromLocalState();
     renderMissions();
     renderActions();
+    renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
-    state.missionRun.completedSuccessfully = true;
-    if (state.options.stopMusicOnFinish) {
-      stopRunningMusicAfterFinishedActivity();
-    }
-    closeModal("missionRunModal");
-  } catch (error) {
     state.missionRun.finalizing = false;
     showFloatingNotice(error instanceof Error ? error.message : "Falha ao concluir missão.");
     if (missionRunStatus) {
@@ -13935,7 +14001,6 @@ async function finalizeMissionRun(triggerButton = null) {
     }
   }
 }
-
 function openMissionProgressModal(goalId) {
   const goal = getAvailableMissionById(goalId);
   if (!goal) {
@@ -16463,9 +16528,9 @@ missionProgressConfirmButton?.addEventListener("click", () => {
   renderActionsMissionsPanel();
   renderRunningMissionQuickButtons();
   closeModal("missionProgressModal");
-  if (deltaValue > 0) {
-    playMissionProgressSound();
-  }
+  const completionUx = deltaValue > 0
+    ? animateDynamicMissionSettlement(goalId, deltaValue)
+    : Promise.resolve(renderActions());
 
   void apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
     method: "PATCH",
@@ -16475,7 +16540,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
       delta: deltaValue
     }),
     skipGlobalLoading: true
-  }).then((payload) => {
+  }).then(async (payload) => {
     if (Array.isArray(payload?.goals)) {
       state.missions = payload.goals;
       state.actionMissions = payload.goals;
@@ -16484,11 +16549,14 @@ missionProgressConfirmButton?.addEventListener("click", () => {
       }
     }
     refreshStatsMissionsFromLocalState();
+    await completionUx;
     renderMissions();
+    renderActions();
     renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
     enqueuePointsUpdateFeedback(payload?.pointsUpdate);
-  }).catch((error) => {
+  }).catch(async (error) => {
+    await completionUx;
     state.missions = rollback.missions;
     state.actionMissions = rollback.actionMissions;
     state.statsScopeMissions = rollback.statsScopeMissions;
@@ -16497,6 +16565,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
     }
     refreshStatsMissionsFromLocalState();
     renderMissions();
+    renderActions();
     renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
     if (missionStatus) {
