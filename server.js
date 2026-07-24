@@ -3911,8 +3911,12 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
     } else if (proposal.type === "mission") {
       const goals = await createExtraGoal(user.id, profileName, {
         title: proposal.title,
+        goalKind: proposal.goalKind,
         targetValue: proposal.targetValue,
-        unitDurationMinutes: proposal.unitDurationMinutes
+        unitDurationSeconds: proposal.unitDurationSeconds,
+        unitDurationMinutes: proposal.unitDurationMinutes,
+        limitIntervalValue: proposal.limitIntervalValue,
+        limitIntervalUnit: proposal.limitIntervalUnit
       });
       entityId = [...goals].reverse().find((goal) => String(goal.title || "") === proposal.title)?.id || null;
     } else if (proposal.type === "finance") {
@@ -4040,6 +4044,9 @@ async function applyProject200TutorProposalEntity(userId, profileName, proposal)
       targetValue: proposal.targetValue,
       unitDurationSeconds: proposal.unitDurationSeconds,
       unitDurationMinutes: proposal.unitDurationMinutes,
+      goalKind: proposal.goalKind,
+      limitIntervalValue: proposal.limitIntervalValue,
+      limitIntervalUnit: proposal.limitIntervalUnit,
       svgIconUrl: proposal.svgIconUrl || "",
       svgIconLabel: proposal.svgIconLabel || ""
     });

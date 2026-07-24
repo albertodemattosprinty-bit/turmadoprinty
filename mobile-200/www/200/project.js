@@ -502,6 +502,11 @@ const missionKindToggleLabel = document.getElementById("missionKindToggleLabel")
 const missionKindIcon = document.getElementById("missionKindIcon");
 const missionTitleInput = document.getElementById("missionTitleInput");
 const missionTargetInput = document.getElementById("missionTargetInput");
+const missionCreateTargetStep = document.getElementById("missionCreateTargetStep");
+const missionLimitExampleTitle = document.getElementById("missionLimitExampleTitle");
+const missionLimitIntervalPrevButton = document.getElementById("missionLimitIntervalPrev");
+const missionLimitIntervalLabel = document.getElementById("missionLimitIntervalLabel");
+const missionLimitIntervalNextButton = document.getElementById("missionLimitIntervalNext");
 const missionCreateStatus = document.getElementById("missionCreateStatus");
 const missionCreateCloseButton = document.getElementById("missionCreateCloseButton");
 const missionFriendAssignButton = document.getElementById("missionFriendAssignButton");
@@ -1176,10 +1181,12 @@ const state = {
     goalKind: "",
     step: 0,
     unitDurationSeconds: 30,
-    timeConfigured: true
+    timeConfigured: true,
+    limitIntervalIndex: 0
   },
   missionProgress: {
     goalId: "",
+    goalKind: "goal",
     deltaValue: 0,
     baseValue: 0
   },
@@ -6077,7 +6084,7 @@ function openModal(id) {
   if (id === "historyModal") {
     if (missionHealthTicker) window.clearInterval(missionHealthTicker);
     void (async () => { await loadMissions(); renderMissions(); })();
-    missionHealthTicker = window.setInterval(() => renderMissions(), 60000);
+    missionHealthTicker = window.setInterval(() => renderMissions(), 2000);
   }
 
   if (id === "runningTaskModal") {
@@ -10520,6 +10527,32 @@ const MISSION_DURATION_OPTIONS_SECONDS = Object.freeze([
   ...Array.from({ length: MISSION_MAX_DURATION_MINUTES }, (_, index) => (index + 1) * 60)
 ]);
 const DEFAULT_MISSION_DURATION_SECONDS = 30;
+const LIMIT_INTERVAL_OPTIONS = [
+  { value: 1, unit: "day", label: "Dia" },
+  { value: 1, unit: "week", label: "Semana" },
+  { value: 1, unit: "month", label: "Mês" },
+  { value: 1, unit: "year", label: "Ano" },
+  ...Array.from({ length: 998 }, (_, index) => {
+    const value = index + 2;
+    return { value, unit: "day", label: `${value} Dias` };
+  })
+];
+
+function getSelectedLimitInterval() {
+  const index = Math.max(0, Math.min(LIMIT_INTERVAL_OPTIONS.length - 1, Math.trunc(Number(state.missionCreate?.limitIntervalIndex || 0))));
+  return LIMIT_INTERVAL_OPTIONS[index] || LIMIT_INTERVAL_OPTIONS[0];
+}
+
+function formatLimitInterval(value, unit) {
+  const amount = Math.max(1, Math.trunc(Number(value || 1)));
+  const labels = {
+    day: amount === 1 ? "Dia" : "Dias",
+    week: amount === 1 ? "Semana" : "Semanas",
+    month: amount === 1 ? "Mês" : "Meses",
+    year: amount === 1 ? "Ano" : "Anos"
+  };
+  return amount === 1 ? labels[unit] || "Dia" : `${amount} ${labels[unit] || "Dias"}`;
+}
 
 function getMissionUnitDurationSeconds(goal) {
   const storedSeconds = Math.max(0, Math.trunc(Number(goal?.unitDurationSeconds || 0) || 0));
@@ -12956,29 +12989,43 @@ function renderMissionKindFilter() {
 }
 
 function renderMissionCreateStep(direction = 0) {
-  const step = Math.max(0, Math.min(2, Math.trunc(Number(state.missionCreate?.step || 0))));
-  state.missionCreate.step = step;
   const kind = state.missionCreate.goalKind;
+  const maxStep = kind === "limit" ? 3 : 2;
+  const step = Math.max(0, Math.min(maxStep, Math.trunc(Number(state.missionCreate?.step || 0))));
+  state.missionCreate.step = step;
   missionCreateSlider?.querySelectorAll("[data-mission-create-step]").forEach((panel) => {
     const panelStep = Number(panel.dataset.missionCreateStep || 0);
-    panel.classList.toggle("is-active", panelStep === step);
-    panel.classList.toggle("is-before", panelStep < step);
-    panel.classList.toggle("is-after", panelStep > step);
-    panel.setAttribute("aria-hidden", panelStep === step ? "false" : "true");
+    const available = panelStep <= maxStep;
+    panel.hidden = !available;
+    panel.classList.toggle("is-active", available && panelStep === step);
+    panel.classList.toggle("is-before", available && panelStep < step);
+    panel.classList.toggle("is-after", available && panelStep > step);
+    panel.setAttribute("aria-hidden", available && panelStep === step ? "false" : "true");
   });
   document.querySelectorAll("[data-mission-kind]").forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.missionKind === kind);
   });
   if (missionCreateBackButton) missionCreateBackButton.hidden = step === 0;
-  if (missionCreateConfirmLabel) missionCreateConfirmLabel.textContent = step < 2 ? "Continuar" : (kind === "limit" ? "Criar limite" : "Criar meta");
+  if (missionCreateConfirmLabel) missionCreateConfirmLabel.textContent = step < maxStep ? "Continuar" : (kind === "limit" ? "Criar limite" : "Criar meta");
   missionCreateConfirmButton?.classList.toggle("is-limit", kind === "limit");
   const modal = document.getElementById("missionCreateModal");
   modal?.classList.toggle("is-limit-creation", kind === "limit");
   const title = modal?.querySelector(".mission-modal-title");
   if (title) title.textContent = kind === "limit" ? "Novo limite" : kind === "goal" ? "Nova meta" : "Nova missão";
   if (missionCreateNameCopy) missionCreateNameCopy.textContent = kind === "limit" ? "Dê um nome simples ao comportamento que você quer manter sob controle." : "Use um nome simples para reconhecer rapidamente o que você quer cumprir.";
-  if (missionCreateTargetCopy) missionCreateTargetCopy.textContent = kind === "limit" ? "Defina o máximo diário saudável. Limites nunca somam pontos." : "Defina a meta diária que mostrará o seu progresso.";
-  if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = kind === "limit" ? "Defina a duração apenas para registrar o tempo; ela não será convertida em pontos." : "Escolha a duração de uma execução para o relógio acompanhar cada atividade.";
+  if (missionCreateTargetStep) missionCreateTargetStep.textContent = kind === "limit" ? "Quantas vezes?" : "Quantas vezes por dia?";
+  if (missionCreateTargetCopy) missionCreateTargetCopy.textContent = kind === "limit" ? "Defina quantas ocorrências cabem no intervalo. Limites nunca somam pontos." : "Defina a meta diária que mostrará o seu progresso.";
+  if (missionTargetInput) missionTargetInput.placeholder = kind === "limit" ? "Ex.: 3 vezes" : "Ex.: 8 vezes por dia";
+  if (openMissionCreateTimeButton) openMissionCreateTimeButton.hidden = kind === "limit";
+  const interval = getSelectedLimitInterval();
+  if (missionLimitIntervalLabel) missionLimitIntervalLabel.textContent = interval.label;
+  if (missionLimitIntervalPrevButton) missionLimitIntervalPrevButton.disabled = Number(state.missionCreate?.limitIntervalIndex || 0) <= 0;
+  if (missionLimitIntervalNextButton) missionLimitIntervalNextButton.disabled = Number(state.missionCreate?.limitIntervalIndex || 0) >= LIMIT_INTERVAL_OPTIONS.length - 1;
+  if (missionLimitExampleTitle) {
+    const amount = Math.max(1, Math.trunc(Number(missionTargetInput?.value || 1)));
+    const name = String(missionTitleInput?.value || "Limite").trim() || "Limite";
+    missionLimitExampleTitle.textContent = `${amount} ${name}`;
+  }
   if (direction !== 0) {
     const active = missionCreateSlider?.querySelector('[data-mission-create-step="' + step + '"]');
     active?.classList.add(direction > 0 ? "slide-from-right" : "slide-from-left");
@@ -12989,17 +13036,18 @@ function renderMissionCreateStep(direction = 0) {
 function validateMissionCreateStep(step = state.missionCreate?.step) {
   if (step === 0 && !state.missionCreate?.goalKind) return "Escolha Meta ou Limite.";
   if (step === 1 && !String(missionTitleInput?.value || "").trim()) return "Digite o nome.";
-  if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return "Digite a quantidade diária.";
+  if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diária.";
   return "";
 }
 
 function moveMissionCreateStep(direction) {
-  const current = Math.max(0, Math.min(2, Number(state.missionCreate?.step || 0)));
+  const maxStep = state.missionCreate?.goalKind === "limit" ? 3 : 2;
+  const current = Math.max(0, Math.min(maxStep, Number(state.missionCreate?.step || 0)));
   if (direction > 0) {
     const error = validateMissionCreateStep(current);
     if (error) { if (missionCreateStatus) missionCreateStatus.textContent = error; return false; }
   }
-  state.missionCreate.step = Math.max(0, Math.min(2, current + Number(direction || 0)));
+  state.missionCreate.step = Math.max(0, Math.min(maxStep, current + Number(direction || 0)));
   if (missionCreateStatus) missionCreateStatus.textContent = "";
   renderMissionCreateStep(direction);
   window.setTimeout(() => {
@@ -13016,12 +13064,14 @@ function renderMissionAdjustState() {
     missionAdjustValue.textContent = String(targetValue);
   }
   const limit = normalizeMissionKind(state.missionAdjust?.goalKind) === "limit";
-  if (missionAdjustHint) missionAdjustHint.textContent = `${limit ? "Limite" : "Meta"} diário ${targetValue}x`;
+  if (missionAdjustHint) missionAdjustHint.textContent = limit
+    ? `Limite ${targetValue}x a cada ${formatLimitInterval(state.missionAdjust?.limitIntervalValue, state.missionAdjust?.limitIntervalUnit).toLocaleLowerCase("pt-BR")}`
+    : `Meta diária ${targetValue}x`;
   const adjustModal = document.getElementById("missionAdjustModal");
   const adjustEyebrow = adjustModal?.querySelector(".mission-modal-eyebrow");
   const adjustQuestion = adjustModal?.querySelector(".mission-modal-explainer h2");
   if (adjustEyebrow) adjustEyebrow.textContent = limit ? "Editar limite" : "Editar meta";
-  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite diário?" : "Qual será a meta diária?";
+  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite?" : "Qual será a meta diária?";
 
   missionAdjustMinusButton?.classList.remove("active");
   missionAdjustPlusButton?.classList.add("active");
@@ -13036,7 +13086,8 @@ function openMissionCreateModal() {
     goalKind: "",
     step: 0,
     unitDurationSeconds: DEFAULT_MISSION_DURATION_SECONDS,
-    timeConfigured: true
+    timeConfigured: true,
+    limitIntervalIndex: 0
   };
   renderFriendAssignmentButtons();
 
@@ -13053,7 +13104,9 @@ function openMissionAdjustModal(goalId) {
     goalId: String(goal.id),
     goalKind: normalizeMissionKind(goal.goalKind),
     targetValue: Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1)),
-    unitDurationSeconds: getMissionUnitDurationSeconds(goal)
+    unitDurationSeconds: isLimitGoal(goal) ? 0 : getMissionUnitDurationSeconds(goal),
+    limitIntervalValue: Math.max(1, Math.trunc(Number(goal.limitIntervalValue || 1))),
+    limitIntervalUnit: String(goal.limitIntervalUnit || "day")
   };
   if (missionAdjustTitle) {
     missionAdjustTitle.textContent = String(goal.title || "Missão");
@@ -13066,6 +13119,7 @@ function openMissionAdjustModal(goalId) {
 }
 
 function renderMissionProgressState() {
+  const limit = normalizeMissionKind(state.missionProgress?.goalKind) === "limit";
   const baseValue = Math.max(0, Math.trunc(Number(state.missionProgress?.baseValue || 0) || 0));
   const deltaValue = Math.trunc(Number(state.missionProgress?.deltaValue || 0) || 0);
   const previewValue = Math.max(0, baseValue + deltaValue);
@@ -13077,10 +13131,11 @@ function renderMissionProgressState() {
   }
   if (missionProgressConfirmButton) {
     const hasUpdate = deltaValue !== 0;
+    const showAdd = limit || hasUpdate;
     missionProgressConfirmButton.disabled = false;
-    missionProgressConfirmButton.classList.toggle("is-update", hasUpdate);
-    missionProgressConfirmButton.setAttribute("aria-label", hasUpdate ? "Atualizar progresso" : "Iniciar missão");
-    missionProgressConfirmButton.innerHTML = hasUpdate
+    missionProgressConfirmButton.classList.toggle("is-update", showAdd);
+    missionProgressConfirmButton.setAttribute("aria-label", showAdd ? "Atualizar progresso" : "Iniciar missão");
+    missionProgressConfirmButton.innerHTML = showAdd
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">ADICIONAR</span>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR</span>';
   }
@@ -13896,7 +13951,7 @@ function beginMissionRun(goal, selectedVariant = null) {
 
 async function openMissionRunModal(goalId) {
   const goal = getMissionRunGoalById(goalId);
-  if (!goal) return;
+  if (!goal || isLimitGoal(goal)) return;
   try {
     state.missionVariants.goalId = String(goalId || "");
     const variants = await loadMissionVariants(goalId);
@@ -14009,6 +14064,7 @@ function openMissionProgressModal(goalId) {
   const goalIcon = getMissionDisplayIcon(goal);
   state.missionProgress = {
     goalId: String(goal.id || ""),
+    goalKind: normalizeMissionKind(goal.goalKind),
     deltaValue: 0,
     baseValue: Math.max(0, Math.trunc(Number(goal.progressValue || 0) || 0))
   };
@@ -14049,8 +14105,12 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
   if (historyRangeActive) {
     ratio = (progress / target) * 100;
   } else {
-    const windowState = getActiveTimeWindow();
-    const elapsedFraction = Math.max(0, Math.min(1, (getServerNowMs() - windowState.startMs) / Math.max(1, windowState.endMs - windowState.startMs)));
+    const startMs = new Date(goal?.limitCycleStartedAt || goal?.createdAt || "").getTime();
+    const endMs = new Date(goal?.limitCycleEndsAt || "").getTime();
+    const nowMs = getServerNowMs();
+    const elapsedFraction = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+      ? Math.max(0, Math.min(1, (nowMs - startMs) / (endMs - startMs)))
+      : 1;
     const expectedLimitNow = target * elapsedFraction;
     ratio = progress <= 0 ? 0 : expectedLimitNow > 0 ? (progress / expectedLimitNow) * 100 : 400;
   }
@@ -14097,12 +14157,13 @@ function createMissionCard(goal, initialPercent = null) {
   const limitVisual = limit ? getLimitProgressVisual(goal, historyRangeActive) : null;
   const percent = limitVisual ? limitVisual.width : regularPercent;
   const expectation = !limit && !historyRangeActive ? getMissionExpectation(goal) : null;
+  const showLimitRatio = limit && !historyRangeActive && Math.floor(getServerNowMs() / 2000) % 2 === 1;
   const progressLabel = historyRangeActive
     ? formatMissionRangeProgress(progress, getMissionHistoryScope().days)
     : dailyVariantProgress
       ? dailyVariantProgress.label
       : limit
-        ? formatLimitLastProgress(goal)
+        ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do esperado` : formatLimitLastProgress(goal))
         : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
@@ -14121,7 +14182,7 @@ function createMissionCard(goal, initialPercent = null) {
       <div class="history-mission-card-info">
         ${goalIcon ? buildTaskAvatarMarkup(goalIcon.src, goalIcon.alt, { categoryIcon: goalIcon.categoryIcon }) : ""}
         <div><h3 class="history-mission-card-title">${escapeHtml(String(goal.title || (limit ? "Limite" : "Meta")))}${hasMicrotasks ? '<svg class="history-mission-folder-icon" viewBox="0 0 24 24" aria-label="Meta com microtarefas" role="img"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg>' : ""}</h3>
-        <div class="history-mission-card-progress">${escapeHtml(progressLabel)}</div></div>
+        <div class="history-mission-card-progress${showLimitRatio ? " is-limit-ratio" : ""}"${showLimitRatio ? ` style="background:${limitVisual.background};"` : ""}>${escapeHtml(progressLabel)}</div></div>
       </div>
       <div class="history-mission-card-actions"><button class="history-mission-card-edit" type="button" data-mission-goal-edit="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Editar ${String(goal.title || (limit ? "limite" : "meta"))}`)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg></button></div>
     </div>
@@ -16124,22 +16185,32 @@ document.querySelectorAll("[data-mission-kind]").forEach((button) => {
 });
 
 missionCreateBackButton?.addEventListener("click", () => moveMissionCreateStep(-1));
-missionTitleInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; });
-missionTargetInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; });
+missionTitleInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; renderMissionCreateStep(); });
+missionTargetInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; renderMissionCreateStep(); });
+missionLimitIntervalPrevButton?.addEventListener("click", () => {
+  state.missionCreate.limitIntervalIndex = Math.max(0, Math.trunc(Number(state.missionCreate?.limitIntervalIndex || 0)) - 1);
+  renderMissionCreateStep();
+});
+missionLimitIntervalNextButton?.addEventListener("click", () => {
+  state.missionCreate.limitIntervalIndex = Math.min(LIMIT_INTERVAL_OPTIONS.length - 1, Math.trunc(Number(state.missionCreate?.limitIntervalIndex || 0)) + 1);
+  renderMissionCreateStep();
+});
 missionCreateConfirmButton?.addEventListener("click", () => {
   void (async () => {
-    if (Number(state.missionCreate?.step || 0) < 2) {
+    const createMaxStep = state.missionCreate?.goalKind === "limit" ? 3 : 2;
+    if (Number(state.missionCreate?.step || 0) < createMaxStep) {
       moveMissionCreateStep(1);
       return;
     }
     const title = String(missionTitleInput?.value || "").trim();
     const targetValue = Math.max(1, Math.trunc(Number(missionTargetInput?.value || 0) || 0));
     const goalKind = normalizeMissionKind(state.missionCreate?.goalKind);
-    const stepError = validateMissionCreateStep(2);
+    const selectedLimitInterval = getSelectedLimitInterval();
+    const stepError = validateMissionCreateStep(createMaxStep);
     if (stepError) { if (missionCreateStatus) missionCreateStatus.textContent = stepError; return; }
 
     if (state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "mission") {
-      const proposal = { type: "mission", goalKind, title, targetValue, unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), svgIconUrl: "", svgIconLabel: "" };
+      const proposal = { type: "mission", goalKind, title, targetValue, unitDurationSeconds: goalKind === "limit" ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), limitIntervalValue: selectedLimitInterval.value, limitIntervalUnit: selectedLimitInterval.unit, svgIconUrl: "", svgIconLabel: "" };
       state.tutorProposalDraft = { active: false, type: "" };
       setTutorProposalComposerControls(false);
       closeModal("missionCreateModal");
@@ -16158,7 +16229,9 @@ missionCreateConfirmButton?.addEventListener("click", () => {
             recipientUserId: String(state.friendAssignment.mission?.userId || ""),
             targetValue,
             profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-            unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
+            unitDurationSeconds: goalKind === "limit" ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
+            limitIntervalValue: selectedLimitInterval.value,
+            limitIntervalUnit: selectedLimitInterval.unit,
             svgIconUrl: "",
             svgIconLabel: ""
           })
@@ -16485,7 +16558,9 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
         body: JSON.stringify({
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
           targetValue,
-          unitDurationSeconds: normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
+          unitDurationSeconds: normalizeMissionKind(state.missionAdjust?.goalKind) === "limit" ? 0 : normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
+          limitIntervalValue: Math.max(1, Math.trunc(Number(state.missionAdjust?.limitIntervalValue || 1))),
+          limitIntervalUnit: String(state.missionAdjust?.limitIntervalUnit || "day"),
           svgIconUrl: String(goal?.svgIconUrl || "").trim(),
           svgIconLabel: String(goal?.svgIconLabel || "").trim()
         })
@@ -16511,6 +16586,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
     return;
   }
   if (deltaValue === 0) {
+    if (normalizeMissionKind(state.missionProgress?.goalKind) === "limit") return;
     closeModal("missionProgressModal");
     void openMissionRunModal(goalId);
     return;

@@ -12,12 +12,7 @@ export const EXTRA_GOAL_HISTORY_SCOPES = [
   { key: "last15", label: "Ultimos 15 dias", days: 15 },
   { key: "last30", label: "Ultimos 30 dias", days: 30 }
 ];
-const DEFAULT_EXTRA_GOALS = [
-  { title: "Beber água", targetValue: 8 },
-  { title: "Guardar 6 itens", targetValue: 6 },
-  { title: "Ler uma página", targetValue: 6 },
-  { title: "Escovar os dentes", targetValue: 3 }
-];
+const DEFAULT_EXTRA_GOALS = [];
 
 function normalizeExtraGoalTitle(value) {
   return String(value || "")
@@ -33,6 +28,43 @@ function normalizeExtraGoalProfile(value) {
 
 function normalizeExtraGoalKind(value) {
   return String(value || "goal").trim().toLowerCase() === "limit" ? "limit" : "goal";
+}
+
+function normalizeLimitIntervalUnit(value) {
+  const normalized = String(value || "day").trim().toLowerCase();
+  return ["day", "week", "month", "year"].includes(normalized) ? normalized : "day";
+}
+
+function addLimitInterval(startValue, intervalValue, intervalUnit) {
+  const result = new Date(startValue);
+  const amount = Math.max(1, Math.min(999, Math.trunc(Number(intervalValue) || 1)));
+  const unit = normalizeLimitIntervalUnit(intervalUnit);
+  if (unit === "week") result.setUTCDate(result.getUTCDate() + (amount * 7));
+  else if (unit === "month" || unit === "year") {
+    const originalDay = result.getUTCDate();
+    result.setUTCDate(1);
+    if (unit === "month") result.setUTCMonth(result.getUTCMonth() + amount);
+    else result.setUTCFullYear(result.getUTCFullYear() + amount);
+    const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+    result.setUTCDate(Math.min(originalDay, lastDay));
+  } else result.setUTCDate(result.getUTCDate() + amount);
+  return result;
+}
+
+function resolveLimitCycleWindow(startValue, intervalValue, intervalUnit, nowValue = new Date()) {
+  const now = nowValue instanceof Date && !Number.isNaN(nowValue.getTime()) ? nowValue : new Date();
+  let start = new Date(startValue);
+  if (Number.isNaN(start.getTime()) || start.getTime() > now.getTime()) start = new Date(now);
+  let end = addLimitInterval(start, intervalValue, intervalUnit);
+  let advanced = false;
+  let guard = 0;
+  while (end.getTime() <= now.getTime() && guard < 5000) {
+    start = end;
+    end = addLimitInterval(start, intervalValue, intervalUnit);
+    advanced = true;
+    guard += 1;
+  }
+  return { start, end, advanced };
 }
 
 function normalizeExtraGoalVariantUnit(value) {
@@ -101,22 +133,34 @@ function getStoredDateKey(value) {
 function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
   const targetValue = Math.max(1, Math.trunc(Number(row.target_value || 0) || 1));
   const rawProgress = Math.max(0, Math.trunc(Number(row.progress_value || 0) || 0));
+  const goalKind = normalizeExtraGoalKind(row.goal_kind);
   const storedDateKey = getStoredDateKey(row.progress_date_key) || getStoredDateKey(row.progress_date);
-  const progressValue = storedDateKey === dateKey ? rawProgress : 0;
-  const unitDurationMinutes = Math.max(0, Math.trunc(Number(row.unit_duration_minutes || 0) || 0));
-  const storedUnitDurationSeconds = Math.max(0, Math.trunc(Number(row.unit_duration_seconds || 0) || 0));
+  const limitIntervalValue = Math.max(1, Math.min(999, Math.trunc(Number(row.limit_interval_value || 1))));
+  const limitIntervalUnit = normalizeLimitIntervalUnit(row.limit_interval_unit);
+  const limitCycle = resolveLimitCycleWindow(
+    row.limit_cycle_started_at || row.created_at || new Date(),
+    limitIntervalValue,
+    limitIntervalUnit
+  );
+  const progressValue = goalKind === "limit" ? (limitCycle.advanced ? 0 : rawProgress) : (storedDateKey === dateKey ? rawProgress : 0);
+  const unitDurationMinutes = goalKind === "limit" ? 0 : Math.max(0, Math.trunc(Number(row.unit_duration_minutes || 0) || 0));
+  const storedUnitDurationSeconds = goalKind === "limit" ? 0 : Math.max(0, Math.trunc(Number(row.unit_duration_seconds || 0) || 0));
   const unitDurationSeconds = storedUnitDurationSeconds || (unitDurationMinutes * 60);
   return {
     id: row.id,
     userId: row.user_id,
     profileName: normalizeExtraGoalProfile(row.assigned_profile),
     title: normalizeExtraGoalTitle(row.title),
-    goalKind: normalizeExtraGoalKind(row.goal_kind),
+    goalKind,
     svgIconUrl: String(row.svg_icon_url || "").trim(),
     svgIconLabel: String(row.svg_icon_label || "").trim(),
     targetValue,
     unitDurationMinutes,
     unitDurationSeconds,
+    limitIntervalValue,
+    limitIntervalUnit,
+    limitCycleStartedAt: limitCycle.start.toISOString(),
+    limitCycleEndsAt: limitCycle.end.toISOString(),
     progressValue,
     lastProgressAt: row.last_progress_at ? new Date(row.last_progress_at).toISOString() : null,
     remainingValue: Math.max(0, targetValue - progressValue),
@@ -288,6 +332,9 @@ export async function ensureExtraGoalsSchema() {
       target_value integer not null default 1,
       unit_duration_minutes integer not null default 0,
       unit_duration_seconds integer not null default 0,
+      limit_interval_value integer not null default 1,
+      limit_interval_unit text not null default 'day',
+      limit_cycle_started_at timestamptz not null default now(),
       svg_icon_url text not null default '',
       svg_icon_label text not null default '',
       progress_value integer not null default 0,
@@ -305,6 +352,11 @@ export async function ensureExtraGoalsSchema() {
   await query("alter table extra_goals add column if not exists last_progress_at timestamptz;");
   await query("alter table extra_goals add column if not exists unit_duration_minutes integer not null default 0;");
   await query("alter table extra_goals add column if not exists unit_duration_seconds integer not null default 0;");
+  await query("alter table extra_goals add column if not exists limit_interval_value integer not null default 1;");
+  await query("alter table extra_goals add column if not exists limit_interval_unit text not null default 'day';");
+  await query("alter table extra_goals add column if not exists limit_cycle_started_at timestamptz not null default now();");
+  await query("update extra_goals set limit_interval_value = 1 where limit_interval_value is null or limit_interval_value < 1;");
+  await query("update extra_goals set limit_interval_unit = 'day' where limit_interval_unit is null or limit_interval_unit not in ('day', 'week', 'month', 'year');");
   await query("update extra_goals set unit_duration_seconds = unit_duration_minutes * 60 where unit_duration_seconds <= 0 and unit_duration_minutes > 0;");
   await query("alter table extra_goals add column if not exists svg_icon_url text not null default '';");
   await query("alter table extra_goals add column if not exists svg_icon_label text not null default '';");
@@ -618,6 +670,9 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
         target_value,
         unit_duration_minutes,
         unit_duration_seconds,
+        limit_interval_value,
+        limit_interval_unit,
+        limit_cycle_started_at,
         svg_icon_url,
         svg_icon_label,
         progress_value,
@@ -767,6 +822,9 @@ export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_
         target_value,
         unit_duration_minutes,
         unit_duration_seconds,
+        limit_interval_value,
+        limit_interval_unit,
+        limit_cycle_started_at,
         svg_icon_url,
         svg_icon_label,
         progress_value,
@@ -802,18 +860,23 @@ export async function createExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   if (!targetValue) {
     throw new Error("Informe a unidade diaria da missao.");
   }
-  const unitDurationSeconds = Math.min(EXTRA_GOAL_MAX_DURATION_SECONDS, Math.max(0, Math.trunc(Number(
+  const limitIntervalValue = Math.max(1, Math.min(999, Math.trunc(Number(payload?.limitIntervalValue || 1))));
+  const limitIntervalUnit = normalizeLimitIntervalUnit(payload?.limitIntervalUnit);
+  const requestedDurationSeconds = Math.min(EXTRA_GOAL_MAX_DURATION_SECONDS, Math.max(0, Math.trunc(Number(
     payload?.unitDurationSeconds ?? (Number(payload?.unitDurationMinutes || 0) * 60)
   ) || 0)));
+  const unitDurationSeconds = goalKind === "limit" ? 0 : requestedDurationSeconds;
   const unitDurationMinutes = Math.max(0, Math.trunc(unitDurationSeconds / 60));
   await query(
     `
       insert into extra_goals (
-        user_id, assigned_profile, title, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds, svg_icon_url, svg_icon_label, progress_value, progress_date, created_at, updated_at
+        user_id, assigned_profile, title, goal_kind, target_value, unit_duration_minutes, unit_duration_seconds,
+        limit_interval_value, limit_interval_unit, limit_cycle_started_at,
+        svg_icon_url, svg_icon_label, progress_value, progress_date, created_at, updated_at
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, null, now(), now())
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11, 0, null, now(), now())
     `,
-    [userId, normalizedProfile, title, goalKind, targetValue, unitDurationMinutes, unitDurationSeconds, svgIconUrl, svgIconLabel]
+    [userId, normalizedProfile, title, goalKind, targetValue, unitDurationMinutes, unitDurationSeconds, limitIntervalValue, limitIntervalUnit, svgIconUrl, svgIconLabel]
   );
   if (svgIconUrl) {
     await saveExtraGoalSvgDefault(userId, normalizedProfile, title, svgIconUrl, svgIconLabel);
@@ -837,9 +900,14 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
     `
       select
         id,
+        goal_kind,
         progress_value,
         progress_date,
-        to_char(progress_date, 'YYYY-MM-DD') as progress_date_key
+        to_char(progress_date, 'YYYY-MM-DD') as progress_date_key,
+        limit_interval_value,
+        limit_interval_unit,
+        limit_cycle_started_at,
+        created_at
       from extra_goals
       where id = $1
         and user_id = $2
@@ -852,22 +920,32 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   if (!current) {
     throw new Error("Missao nao encontrada.");
   }
-  const currentProgress = (getStoredDateKey(current.progress_date_key) || getStoredDateKey(current.progress_date)) === dateKey
-    ? Math.max(0, Math.trunc(Number(current.progress_value || 0) || 0))
-    : 0;
+  const currentKind = normalizeExtraGoalKind(current.goal_kind);
+  const limitCycle = resolveLimitCycleWindow(
+    current.limit_cycle_started_at || current.created_at || date,
+    current.limit_interval_value,
+    current.limit_interval_unit,
+    date instanceof Date ? date : new Date(date)
+  );
+  const currentProgress = currentKind === "limit"
+    ? (limitCycle.advanced ? 0 : Math.max(0, Math.trunc(Number(current.progress_value || 0) || 0)))
+    : ((getStoredDateKey(current.progress_date_key) || getStoredDateKey(current.progress_date)) === dateKey
+      ? Math.max(0, Math.trunc(Number(current.progress_value || 0) || 0))
+      : 0);
   const nextProgress = Math.max(0, currentProgress + safeDelta);
   await query(
     `
       update extra_goals
       set progress_value = $4,
           progress_date = $5::date,
+          limit_cycle_started_at = case when goal_kind = 'limit' then $7::timestamptz else limit_cycle_started_at end,
           last_progress_at = case when $6 > 0 then now() else last_progress_at end,
           updated_at = now()
       where id = $1
         and user_id = $2
         and assigned_profile = $3
     `,
-    [safeGoalId, userId, normalizedProfile, nextProgress, dateKey, safeDelta]
+    [safeGoalId, userId, normalizedProfile, nextProgress, dateKey, safeDelta, limitCycle.start.toISOString()]
   );
   const safeVariantIds = [...new Set([
     ...(Array.isArray(variantIds) ? variantIds : []),
@@ -905,7 +983,11 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
       ?? (payload?.unitDurationMinutes !== undefined ? Number(payload.unitDurationMinutes || 0) * 60 : currentGoal?.unitDurationSeconds)
       ?? 0
   ) || 0)));
-  const nextUnitDurationMinutes = Math.max(0, Math.trunc(nextUnitDurationSeconds / 60));
+  const nextGoalKind = normalizeExtraGoalKind(currentGoal?.goalKind);
+  const safeNextUnitDurationSeconds = nextGoalKind === "limit" ? 0 : nextUnitDurationSeconds;
+  const nextUnitDurationMinutes = Math.max(0, Math.trunc(safeNextUnitDurationSeconds / 60));
+  const nextLimitIntervalValue = Math.max(1, Math.min(999, Math.trunc(Number(payload?.limitIntervalValue ?? currentGoal?.limitIntervalValue ?? 1) || 1)));
+  const nextLimitIntervalUnit = normalizeLimitIntervalUnit(payload?.limitIntervalUnit ?? currentGoal?.limitIntervalUnit);
   if (!nextTargetValue) {
     throw new Error("Informe a unidade diaria da missao.");
   }
@@ -915,14 +997,16 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
       set target_value = $4,
           unit_duration_minutes = $5,
           unit_duration_seconds = $6,
-          svg_icon_url = $7,
-          svg_icon_label = $8,
+          limit_interval_value = $7,
+          limit_interval_unit = $8,
+          svg_icon_url = $9,
+          svg_icon_label = $10,
           updated_at = now()
       where id = $1
         and user_id = $2
         and assigned_profile = $3
     `,
-    [safeGoalId, userId, normalizedProfile, nextTargetValue, nextUnitDurationMinutes, nextUnitDurationSeconds, svgIconUrl, svgIconLabel]
+    [safeGoalId, userId, normalizedProfile, nextTargetValue, nextUnitDurationMinutes, safeNextUnitDurationSeconds, nextLimitIntervalValue, nextLimitIntervalUnit, svgIconUrl, svgIconLabel]
   );
   if (svgIconUrl && currentTitle) {
     await saveExtraGoalSvgDefault(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);

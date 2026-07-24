@@ -1373,6 +1373,16 @@
             <p id="missionCreateTargetCopy">Defina a meta diária que mostrará o seu progresso.</p>
             <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Ex.: 8 vezes por dia" />
           </section>
+          <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="3" aria-labelledby="missionCreateIntervalStep">
+            <span class="mission-guide-number">3</span>
+            <h2 id="missionCreateIntervalStep">Qual é o intervalo?</h2>
+            <p class="mission-limit-example"><strong id="missionLimitExampleTitle">3 Pizza</strong> a cada</p>
+            <div class="mission-limit-interval-picker" role="group" aria-label="Intervalo do limite">
+              <button type="button" id="missionLimitIntervalPrev" aria-label="Intervalo anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <strong id="missionLimitIntervalLabel">Dia</strong>
+              <button type="button" id="missionLimitIntervalNext" aria-label="Próximo intervalo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </section>
         </div>
         <p class="finance-status" id="missionCreateStatus" aria-live="polite"></p>
       </div>

@@ -11753,3 +11753,56 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
   .mission-guide-navigation .mission-guide-back { order:1; }
   .mission-guide-navigation .mission-guide-submit { order:2; }
 }
+
+
+/* Limites: intervalo independente de cronômetro */
+.mission-limit-example {
+  margin: 8px 0 18px;
+  font-size: clamp(1.18rem, 4.8vw, 1.72rem);
+  font-weight: 850;
+}
+.mission-limit-example strong,
+.history-mission-card.is-limit .history-mission-card-title {
+  color: #ff8418 !important;
+  text-shadow: 0 0 18px rgba(255, 132, 24, 0.2);
+}
+.mission-limit-interval-picker {
+  display: grid;
+  grid-template-columns: 58px minmax(150px, 1fr) 58px;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 420px);
+  margin: 6px auto 0;
+}
+.mission-limit-interval-picker button {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(255, 132, 24, 0.45);
+  border-radius: 18px;
+  color: #ff9a3d;
+  background: rgba(255, 132, 24, 0.12);
+}
+.mission-limit-interval-picker button:disabled {
+  opacity: 0.28;
+}
+.mission-limit-interval-picker button svg {
+  width: 28px;
+  height: 28px;
+}
+.mission-limit-interval-picker > strong {
+  color: #fff;
+  font-size: clamp(1.5rem, 7vw, 2.45rem);
+  font-weight: 950;
+  text-align: center;
+}
+.history-mission-card-progress.is-limit-ratio {
+  color: transparent !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent;
+}
+body[data-background-theme="white"] .mission-limit-interval-picker > strong {
+  color: #242b35;
+}
