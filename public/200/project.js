@@ -6145,6 +6145,9 @@ function closeModal(modal) {
   if (returnMissionToTutor) {
     reopenTutorConversation();
   }
+  if (modal.id === "missionCreateModal" && String(state.nativeKeyboard?.target || "").startsWith("mission-")) {
+    closeProjectNativeKeyboard({ commit: false, immediate: true });
+  }
   if (modal.id === "actionWizard") {
     closeWizard();
     return;
@@ -7819,6 +7822,20 @@ function shouldUseProjectNativeKeyboard() {
 }
 
 function getProjectNativeKeyboardRows() {
+  const numeric = state.nativeKeyboard?.layout === "numeric";
+  if (numeric) {
+    return [
+      ["1", "2", "3", { action: "noop", label: "-", className: "is-command is-future-key" }],
+      ["4", "5", "6", { action: "noop", label: "*", className: "is-command is-future-key" }],
+      ["7", "8", "9", { action: "backspace", label: "<", className: "is-command", ariaLabel: "Apagar um número" }],
+      [
+        { action: "noop", label: ",", className: "is-command is-future-key" },
+        "0",
+        { action: "noop", label: ".", className: "is-command is-future-key" },
+        { action: "clear", label: "x", className: "is-command is-clear", ariaLabel: "Apagar tudo" }
+      ]
+    ];
+  }
   const symbols = state.nativeKeyboard?.layout === "symbols";
   if (symbols) {
     return [
@@ -7857,6 +7874,7 @@ function getProjectNativeKeyboardRows() {
 function renderProjectNativeKeyboard() {
   if (!projectNativeKeyboardRows || !projectNativeKeyboard) return;
   projectNativeKeyboard.classList.toggle("is-symbols", state.nativeKeyboard?.layout === "symbols");
+  projectNativeKeyboard.classList.toggle("is-numeric", state.nativeKeyboard?.layout === "numeric");
   projectNativeKeyboardRows.innerHTML = "";
   getProjectNativeKeyboardRows().forEach((row) => {
     const rowElement = document.createElement("div");
@@ -7877,7 +7895,10 @@ function renderProjectNativeKeyboard() {
 }
 
 function getProjectNativeKeyboardTarget() {
-  return state.nativeKeyboard?.target === "chat" ? marinChatInput : taskTitle;
+  if (state.nativeKeyboard?.target === "chat") return marinChatInput;
+  if (state.nativeKeyboard?.target === "mission-title") return missionTitleInput;
+  if (state.nativeKeyboard?.target === "mission-target") return missionTargetInput;
+  return taskTitle;
 }
 
 function syncProjectNativeKeyboardHeight() {
@@ -7890,17 +7911,18 @@ function syncProjectNativeKeyboardHeight() {
 
 function openProjectNativeKeyboard(target = "task") {
   if (!shouldUseProjectNativeKeyboard() || !projectNativeKeyboard) return false;
-  const normalizedTarget = target === "chat" ? "chat" : "task";
+  const normalizedTarget = ["chat", "mission-title", "mission-target"].includes(target) ? target : "task";
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   state.nativeKeyboard.open = true;
   state.nativeKeyboard.target = normalizedTarget;
-  state.nativeKeyboard.layout = "letters";
-  state.nativeKeyboard.shift = !String((normalizedTarget === "chat" ? marinChatInput : taskTitle)?.value || "").trim();
+  state.nativeKeyboard.layout = normalizedTarget === "mission-target" ? "numeric" : "letters";
+  state.nativeKeyboard.shift = !String(getProjectNativeKeyboardTarget()?.value || "").trim();
   projectNativeKeyboard.setAttribute("aria-hidden", "false");
   projectNativeKeyboard.dataset.keyboardTarget = normalizedTarget;
   renderProjectNativeKeyboard();
   document.body.classList.add("project-native-keyboard-open");
   document.body.classList.toggle("project-native-keyboard-chat-open", normalizedTarget === "chat");
+  document.body.classList.toggle("project-native-keyboard-mission-open", normalizedTarget.startsWith("mission-"));
   window.requestAnimationFrame(() => {
     syncProjectNativeKeyboardHeight();
     projectNativeKeyboard.classList.add("is-open");
@@ -7913,7 +7935,7 @@ function closeProjectNativeKeyboard({ commit = true, immediate = false } = {}) {
   if (!projectNativeKeyboard) return;
   const closingTarget = state.nativeKeyboard?.target || "task";
   state.nativeKeyboard.open = false;
-  document.body.classList.remove("project-native-keyboard-open", "project-native-keyboard-chat-open");
+  document.body.classList.remove("project-native-keyboard-open", "project-native-keyboard-chat-open", "project-native-keyboard-mission-open");
   projectNativeKeyboard.classList.remove("is-open");
   const finish = () => {
     if (!state.nativeKeyboard.open) {
@@ -7936,7 +7958,13 @@ function closeProjectNativeKeyboard({ commit = true, immediate = false } = {}) {
 function updateProjectNativeKeyboardTarget(nextValue) {
   const target = getProjectNativeKeyboardTarget();
   if (!target) return;
-  const maxLength = state.nativeKeyboard?.target === "chat" ? 4000 : 80;
+  const maxLength = state.nativeKeyboard?.target === "chat"
+    ? 4000
+    : state.nativeKeyboard?.target === "mission-title"
+      ? 120
+      : state.nativeKeyboard?.target === "mission-target"
+        ? 6
+        : 80;
   target.value = String(nextValue || "").slice(0, maxLength);
   if (state.nativeKeyboard?.target === "task") markTaskComposerDirty();
   target.dispatchEvent(new Event("input", { bubbles: true }));
@@ -7964,6 +7992,10 @@ function handleProjectNativeKeyboardAction(action, value = "") {
     updateProjectNativeKeyboardTarget(Array.from(current).slice(0, -1).join(""));
     return;
   }
+  if (action === "clear") {
+    updateProjectNativeKeyboardTarget("");
+    return;
+  }
   if (action === "space") {
     if (current && !current.endsWith(" ")) updateProjectNativeKeyboardTarget(`${current} `);
     return;
@@ -7971,6 +8003,10 @@ function handleProjectNativeKeyboardAction(action, value = "") {
   if (action === "return") {
     if (state.nativeKeyboard?.target === "chat") {
       if (String(marinChatInput?.value || "").trim()) marinChatForm?.requestSubmit();
+      return;
+    }
+    if (state.nativeKeyboard?.target === "mission-title") {
+      missionCreateConfirmButton?.click();
       return;
     }
     closeProjectNativeKeyboard({ commit: true });
@@ -8013,6 +8049,26 @@ function initializeProjectNativeChatKeyboard() {
   window.addEventListener("resize", () => {
     if (state.nativeKeyboard?.open) syncProjectNativeKeyboardHeight();
   });
+}
+
+function initializeProjectNativeMissionKeyboard() {
+  if (!missionTitleInput || !missionTargetInput || !shouldUseProjectNativeKeyboard()) return;
+  [missionTitleInput, missionTargetInput].forEach((input) => {
+    input.readOnly = true;
+    input.inputMode = "none";
+    input.setAttribute("data-native-keyboard-input", "true");
+  });
+  const bind = (input, target) => {
+    const open = (event) => {
+      event?.preventDefault?.();
+      openProjectNativeKeyboard(target);
+    };
+    input.addEventListener("pointerdown", open);
+    input.addEventListener("click", open);
+    input.addEventListener("focus", open);
+  };
+  bind(missionTitleInput, "mission-title");
+  bind(missionTargetInput, "mission-target");
 }
 
 function renderTaskComposerModal() {
@@ -13238,12 +13294,11 @@ function renderMissionCreateStep(direction = 0) {
   missionCreateConfirmButton?.classList.toggle("is-limit", kind === "limit");
   const modal = document.getElementById("missionCreateModal");
   modal?.classList.toggle("is-limit-creation", kind === "limit");
-  const title = modal?.querySelector(".mission-modal-title");
-  if (title) title.textContent = kind === "limit" ? "Novo limite" : kind === "goal" ? "Nova meta" : "Nova missão";
-  if (missionCreateNameCopy) missionCreateNameCopy.textContent = kind === "limit" ? "Dê um nome simples ao comportamento que você quer manter sob controle." : "Use um nome simples para reconhecer rapidamente o que você quer cumprir.";
+  modal?.classList.toggle("is-compact-stage", step > 0);
+  const nameStepTitle = document.getElementById("missionCreateNameStep");
+  if (nameStepTitle) nameStepTitle.textContent = kind === "limit" ? "Nome do limite" : "Nome da missão";
   if (missionCreateTargetStep) missionCreateTargetStep.textContent = kind === "limit" ? "Quantas vezes?" : "Quantas vezes por dia?";
-  if (missionCreateTargetCopy) missionCreateTargetCopy.textContent = kind === "limit" ? "Defina quantas ocorrências cabem no intervalo. Limites nunca somam pontos." : "Defina a meta diária que mostrará o seu progresso.";
-  if (missionTargetInput) missionTargetInput.placeholder = kind === "limit" ? "Ex.: 3 vezes" : "Ex.: 8 vezes por dia";
+  if (missionTargetInput) missionTargetInput.placeholder = "Digite um número";
   const limitCreation = kind === "limit";
   if (missionCreateFinalStepTitle) missionCreateFinalStepTitle.textContent = limitCreation ? "Qual é o intervalo?" : "Quanto tempo leva?";
   if (missionCreateLimitIntervalPanel) missionCreateLimitIntervalPanel.hidden = !limitCreation;
@@ -13259,6 +13314,17 @@ function renderMissionCreateStep(direction = 0) {
     const amount = Math.max(1, Math.trunc(Number(missionTargetInput?.value || 1)));
     const name = String(missionTitleInput?.value || "Limite").trim() || "Limite";
     missionLimitExampleTitle.textContent = `${amount} ${name}`;
+  }
+  if (shouldUseProjectNativeKeyboard()) {
+    const keyboardTarget = step === 1 ? "mission-title" : step === 2 ? "mission-target" : "";
+    const missionKeyboardOpen = String(state.nativeKeyboard?.target || "").startsWith("mission-");
+    if (keyboardTarget && (!state.nativeKeyboard?.open || state.nativeKeyboard?.target !== keyboardTarget)) {
+      window.setTimeout(() => {
+        if (Number(state.missionCreate?.step || 0) === step) openProjectNativeKeyboard(keyboardTarget);
+      }, direction === 0 ? 40 : 180);
+    } else if (!keyboardTarget && missionKeyboardOpen) {
+      closeProjectNativeKeyboard({ commit: false });
+    }
   }
   if (direction !== 0) {
     const active = missionCreateSlider?.querySelector('[data-mission-create-step="' + step + '"]');
@@ -14339,12 +14405,23 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
   if (historyRangeActive) {
     ratio = (progress / target) * 100;
   } else {
-    const startMs = new Date(goal?.limitCycleStartedAt || goal?.createdAt || "").getTime();
-    const endMs = new Date(goal?.limitCycleEndsAt || "").getTime();
     const nowMs = getServerNowMs();
-    const elapsedFraction = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
-      ? Math.max(0, Math.min(1, (nowMs - startMs) / (endMs - startMs)))
-      : 1;
+    const intervalValue = Math.max(1, Math.trunc(Number(goal?.limitIntervalValue || 1)));
+    const intervalUnit = String(goal?.limitIntervalUnit || "day").trim().toLowerCase();
+    let elapsedFraction;
+    if (intervalValue === 1 && intervalUnit === "day") {
+      const activeWindow = getActiveTimeWindow(nowMs);
+      elapsedFraction = Math.max(0, Math.min(
+        1,
+        (nowMs - activeWindow.startMs) / Math.max(1, activeWindow.endMs - activeWindow.startMs)
+      ));
+    } else {
+      const startMs = new Date(goal?.limitCycleStartedAt || goal?.createdAt || "").getTime();
+      const endMs = new Date(goal?.limitCycleEndsAt || "").getTime();
+      elapsedFraction = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+        ? Math.max(0, Math.min(1, (nowMs - startMs) / (endMs - startMs)))
+        : 1;
+    }
     const expectedLimitNow = target * elapsedFraction;
     ratio = progress <= 0 ? 0 : expectedLimitNow > 0 ? (progress / expectedLimitNow) * 100 : 400;
   }
@@ -18115,6 +18192,7 @@ project200TutorsUi = initializeProject200TutorsUi({
   })
 });
 initializeProjectNativeChatKeyboard();
+initializeProjectNativeMissionKeyboard();
 const project200OnboardingUi = initializeProject200OnboardingUi({
   getToken,
   getUser: () => state.authUser,

@@ -10505,7 +10505,7 @@ body[data-background-theme="white"] .marin-proposal-meta {
 }
 
 #missionCreateModal .mission-modal-heading {
-  padding-inline: 122px;
+  display: none;
 }
 
 @media (max-width: 620px) {
@@ -10520,7 +10520,7 @@ body[data-background-theme="white"] .marin-proposal-meta {
   }
 
   #missionCreateModal .mission-modal-heading {
-    padding-inline: 98px;
+    display: none;
   }
 }
 
@@ -11493,6 +11493,8 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
   .mission-kind-choice-grid { gap:10px; }
   .mission-kind-choice { min-height:138px; padding-inline:10px; }
   .mission-guide-slider { min-height:390px; }
+  #missionCreateModal.is-compact-stage .mission-guide-slider { min-height:220px; }
+  body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-slider { min-height:190px; }
   .mission-guide-navigation { grid-template-columns:88px minmax(0,1fr); }
 }
 
@@ -11897,8 +11899,20 @@ body[data-background-theme="white"] .mission-limit-interval-picker > strong {
   height: 22px;
   vertical-align: middle;
 }
-.project-native-keyboard.is-symbols .project-native-key {
+.project-native-keyboard.is-symbols .project-native-key,
+.project-native-keyboard.is-numeric .project-native-key {
   font-size: clamp(.8rem, 3.7vw, 1.04rem);
+}
+.project-native-keyboard.is-numeric .project-native-key {
+  flex: 1 1 25%;
+}
+.project-native-keyboard.is-numeric .project-native-key.is-future-key {
+  color: rgba(255, 255, 255, .42);
+  background: #34383e;
+}
+.project-native-keyboard.is-numeric .project-native-key.is-clear {
+  color: #fff;
+  background: #57363b;
 }
 body.project-native-keyboard-open #startDecisionModal .start-decision-task-title {
   text-shadow: 0 0 22px rgba(255,255,255,.15);
@@ -11930,6 +11944,49 @@ body.project-native-keyboard-chat-open .marin-chat-composer {
 
 body.project-native-keyboard-chat-open .marin-chat-messages {
   padding-bottom: calc(var(--project-native-keyboard-height, 250px) + 82px);
+}
+
+#missionCreateModal .history-mission-modal-head {
+  min-height: 54px;
+  justify-content: flex-end;
+}
+#missionCreateModal.is-compact-stage .mission-guide-slider {
+  height: min(40dvh, 320px);
+  min-height: 220px;
+}
+#missionCreateModal.is-compact-stage .mission-guide-step {
+  padding: clamp(12px, 2.4vw, 18px);
+  gap: 7px;
+}
+#missionCreateModal.is-compact-stage .mission-guide-step > p[hidden] {
+  display: none !important;
+}
+#missionCreateModal.is-compact-stage .mission-guide-step h2 {
+  font-size: clamp(1.18rem, 4vw, 1.72rem);
+}
+#missionCreateModal.is-compact-stage .mission-guide-step .text-field.options-text-field {
+  min-height: 54px;
+  margin-top: 2px;
+}
+body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-shell {
+  height: calc(100dvh - var(--project-native-keyboard-height, 250px));
+  min-height: 0;
+  padding: max(8px, env(safe-area-inset-top, 0px)) 14px 8px;
+  grid-template-rows: 54px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-body {
+  padding-block: 0;
+}
+body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-slider {
+  height: min(40dvh, 300px);
+  min-height: 190px;
+}
+body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-navigation {
+  min-height: 56px;
+}
+body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-navigation > button {
+  min-height: 56px;
 }
 
 @media (min-width: 1101px) {

@@ -35,23 +35,71 @@ function normalizeLimitIntervalUnit(value) {
   return ["day", "week", "month", "year"].includes(normalized) ? normalized : "day";
 }
 
-function addLimitInterval(startValue, intervalValue, intervalUnit) {
-  const result = new Date(startValue);
+const extraGoalTimeZonePartsFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: EXTRA_GOALS_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23"
+});
+
+function getExtraGoalTimeZoneOffsetMs(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const parts = extraGoalTimeZonePartsFormatter.formatToParts(date);
+  const read = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  const representedAsUtc = Date.UTC(
+    read("year"),
+    Math.max(0, read("month") - 1),
+    Math.max(1, read("day")),
+    read("hour"),
+    read("minute"),
+    read("second")
+  );
+  return representedAsUtc - date.getTime();
+}
+
+function extraGoalDateKeyToMidnight(dateKey) {
+  const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return new Date(Number.NaN);
+  const wallClockUtc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  let timestamp = wallClockUtc;
+  for (let index = 0; index < 3; index += 1) {
+    timestamp = wallClockUtc - getExtraGoalTimeZoneOffsetMs(new Date(timestamp));
+  }
+  return new Date(timestamp);
+}
+
+function addLimitIntervalDateKey(startValue, intervalValue, intervalUnit) {
   const amount = Math.max(1, Math.min(999, Math.trunc(Number(intervalValue) || 1)));
   const unit = normalizeLimitIntervalUnit(intervalUnit);
-  if (unit === "week") result.setUTCDate(result.getUTCDate() + (amount * 7));
-  else if (unit === "month" || unit === "year") {
+  const startKey = toDateKey(startValue);
+  const [year, month, day] = startKey.split("-").map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day, 12));
+  if (unit === "day" || unit === "week") {
+    result.setUTCDate(result.getUTCDate() + (unit === "week" ? amount * 7 : amount));
+  } else {
     const originalDay = result.getUTCDate();
     result.setUTCDate(1);
     if (unit === "month") result.setUTCMonth(result.getUTCMonth() + amount);
     else result.setUTCFullYear(result.getUTCFullYear() + amount);
     const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
     result.setUTCDate(Math.min(originalDay, lastDay));
-  } else result.setUTCDate(result.getUTCDate() + amount);
-  return result;
+  }
+  return [
+    String(result.getUTCFullYear()).padStart(4, "0"),
+    String(result.getUTCMonth() + 1).padStart(2, "0"),
+    String(result.getUTCDate()).padStart(2, "0")
+  ].join("-");
 }
 
-function resolveLimitCycleWindow(startValue, intervalValue, intervalUnit, nowValue = new Date()) {
+function addLimitInterval(startValue, intervalValue, intervalUnit) {
+  return extraGoalDateKeyToMidnight(addLimitIntervalDateKey(startValue, intervalValue, intervalUnit));
+}
+
+export function resolveLimitCycleWindow(startValue, intervalValue, intervalUnit, nowValue = new Date()) {
   const now = nowValue instanceof Date && !Number.isNaN(nowValue.getTime()) ? nowValue : new Date();
   let start = new Date(startValue);
   if (Number.isNaN(start.getTime()) || start.getTime() > now.getTime()) start = new Date(now);

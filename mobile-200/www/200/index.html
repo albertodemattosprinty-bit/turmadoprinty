@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260724-chat-keyboard-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260724-limit-cycles-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -1331,10 +1331,7 @@
   <section class="workspace-modal simple-modal" id="missionCreateModal" aria-hidden="true" aria-label="Nova missão">
     <div class="finance-content history-mission-modal-content history-mission-modal-shell mission-guide-shell">
       <div class="history-mission-modal-head">
-        <div class="mission-modal-heading">
-          <span class="mission-modal-eyebrow">Organize uma nova rotina</span>
-          <h1 class="mission-modal-title">Nova missão</h1>
-        </div>
+        <div class="mission-modal-heading" aria-hidden="true"></div>
         <div class="mission-create-head-actions">
           <button class="friend-assignment-button" type="button" id="missionFriendAssignButton" aria-label="Criar missão para um amigo">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2l-6.7-3.35a3.2 3.2 0 0 0 0-1.7l6.7-3.35A3 3 0 1 0 15 7a3.2 3.2 0 0 0 .08.68l-6.7 3.35a3 3 0 1 0 0 3.94l6.7 3.35A3 3 0 1 0 18 16Z" fill="currentColor"/></svg>
@@ -1363,15 +1360,15 @@
           </section>
           <section class="mission-guide-step" data-mission-create-step="1" aria-labelledby="missionCreateNameStep">
             <span class="mission-guide-number">1</span>
-            <h2 id="missionCreateNameStep">Qual é o nome?</h2>
-            <p id="missionCreateNameCopy">Use um nome simples para reconhecer rapidamente o que você quer cumprir.</p>
-            <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" placeholder="Ex.: Beber água" />
+            <h2 id="missionCreateNameStep">Nome da missão</h2>
+            <p id="missionCreateNameCopy" hidden></p>
+            <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" inputmode="none" placeholder="Digite o nome" />
           </section>
           <section class="mission-guide-step" data-mission-create-step="2" aria-labelledby="missionCreateTargetStep">
             <span class="mission-guide-number">2</span>
             <h2 id="missionCreateTargetStep">Quantas vezes por dia?</h2>
-            <p id="missionCreateTargetCopy">Defina a meta diária que mostrará o seu progresso.</p>
-            <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Ex.: 8 vezes por dia" />
+            <p id="missionCreateTargetCopy" hidden></p>
+            <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="none" maxlength="6" autocomplete="off" placeholder="Digite um número" />
           </section>
           <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="3" aria-labelledby="missionCreateFinalStepTitle">
             <span class="mission-guide-number">3</span>
@@ -1385,7 +1382,7 @@
               </div>
             </div>
             <div class="mission-create-time-panel" id="missionCreateTimePanel">
-              <p id="missionCreateTimeCopy">Defina quanto tempo leva cada execução desta missão.</p>
+              <p id="missionCreateTimeCopy" hidden></p>
               <button class="mission-create-time-button" type="button" id="openMissionCreateTimeButton">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg>
                 <span><small>Tempo por missão</small><strong id="missionCreateTimeSummary">30 segundos</strong></span>
@@ -1763,7 +1760,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260724-chat-keyboard-v1"></script>
+  <script type="module" src="/200/project.js?v=20260724-mission-keyboard-v1"></script>
 </body>
 </html>
 
