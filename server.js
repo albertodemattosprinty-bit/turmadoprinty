@@ -3680,8 +3680,8 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "- Nunca diga que já gravou algo. Você somente oferece cartões; o usuário precisa tocar para confirmar.",
     "- Não crie microtarefas de missões.",
     "- Não invente datas, horários, valores ou durações. Se faltar dado obrigatório, pergunte antes e retorne proposals vazio.",
-    "- Ações usam apenas estes IDs de aspecto: sono, alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto.",
-    "- Ambiente deve mapear para casa. Família pode mapear para planejamento ou aspecto conforme o sentido.",
+    "- Ações usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto. Sono nunca é atribuído a uma ação.",
+    "- Ambiente mapeia para casa. Propósito usa planejamento. Família usa aspecto e nunca social.",
     "- Preserve sono, alimentação, saúde, segurança, autonomia e limites físicos. Disciplina nunca significa privação perigosa.",
     "- Não substitua orientação médica, jurídica ou financeira profissional.",
     "- A resposta textual tem no máximo 400 caracteres e as propostas no máximo 8.",
@@ -3902,7 +3902,7 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
       const actions = await createUserAction(user.id, {
         title: proposal.title,
         assignee: profileName,
-        categoryId: proposal.aspectId || "aspecto",
+        categoryId: proposal.aspectId || "planejamento",
         repeatRule: "none",
         repeatDays: [],
         occurrences: [{ startAt: proposal.startAt, endAt: proposal.endAt }]
@@ -4025,7 +4025,7 @@ async function applyProject200TutorProposalEntity(userId, profileName, proposal)
     const actions = await createUserAction(userId, {
       title: proposal.title,
       assignee: profileName,
-      categoryId: proposal.aspectId || "aspecto",
+      categoryId: proposal.aspectId || "planejamento",
       svgIconUrl: proposal.svgIconUrl || "",
       svgIconLabel: proposal.svgIconLabel || "",
       repeatRule: proposal.repeatRule || "none",
@@ -4520,33 +4520,33 @@ const PROJECT200_TASK_CATEGORIES = [
   { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa" },
   { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios" },
   { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social" },
-  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Planejamento" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Propósito" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer" },
-  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Aspecto" }
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família" }
 ];
+const PROJECT200_TASK_ASSIGNABLE_CATEGORIES = PROJECT200_TASK_CATEGORIES.filter((item) => item.id !== "sono");
 
 function inferProject200CategoryLocally(title) {
   const normalized = String(title || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-  const pick = (id) => PROJECT200_TASK_CATEGORIES.find((item) => item.id === id) || PROJECT200_TASK_CATEGORIES[0];
-  if (/\b(agua|hidrata|garrafa|beber)\b/.test(normalized)) return pick("hidratacao");
-  if (/\b(cafe|almoco|jantar|comida|refeicao|lanche|cozinhar)\b/.test(normalized)) return pick("alimentacao");
-  if (/\b(dormir|sono|cochilo|descansar)\b/.test(normalized)) return pick("sono");
-  if (/\b(estudar|estudo|ler|leitura|curso|aula|revisao|aprender|habilidade|treinar idioma)\b/.test(normalized)) return pick("aprendizado");
-  if (/\b(planejar|planejamento|agenda|meta|organizar|orcamento|fatura|conta|pix|pagar|invest|finance|dinheiro)\b/.test(normalized)) return pick("planejamento");
-  if (/\b(reuniao|projeto|cliente|entrega|trabalho|task)\b/.test(normalized)) return pick("trabalho");
-  if (/\b(arrumar|limpar|lavar|cozinha|quarto|banheiro|casa)\b/.test(normalized)) return pick("casa");
-  if (/\b(filme|serie|jogo|lazer|passeio)\b/.test(normalized)) return pick("lazer");
-  if (/\b(treino|academia|corrida|caminhada|alongamento|exercicio)\b/.test(normalized)) return pick("exercicios");
-  if (/\b(amigo|social|evento|encontro)\b/.test(normalized)) return pick("social");
-  if (/\b(familia|filho|filha|pai|mae|esposa|marido)\b/.test(normalized)) return pick("planejamento");
-  if (/\b(escovar|banho|higiene|barba|cabelo|dente)\b/.test(normalized)) return pick("higiene");
-  return pick("aspecto");
+  const pick = (id) => PROJECT200_TASK_ASSIGNABLE_CATEGORIES.find((item) => item.id === id)
+    || PROJECT200_TASK_ASSIGNABLE_CATEGORIES.find((item) => item.id === "planejamento");
+  if (/\b(agua|hidrata|garrafa|beber|sede)\b/.test(normalized)) return pick("hidratacao");
+  if (/\b(cafe|almoco|jantar|comida|comer|refeicao|lanche|cozinhar|aliment)\b/.test(normalized)) return pick("alimentacao");
+  if (/\b(estudar|estudo|ler|leitura|curso|aula|escola|revisao|aprender|habilidade|treinar idioma|praticar idioma)\b/.test(normalized)) return pick("aprendizado");
+  if (/\b(reuniao|projeto|cliente|entrega|trabalho|emprego|profissao|expediente|task)\b/.test(normalized)) return pick("trabalho");
+  if (/\b(familia|familiar|filho|filha|pai|mae|esposa|marido|irmao|irma|avo|avó)\b/.test(normalized)) return pick("aspecto");
+  if (/\b(escovar|banho|higiene|barba|cabelo|dente|unha|lavar rosto|lavar roupa|ir ao banheiro|sanitario)\b/.test(normalized)) return pick("higiene");
+  if (/\b(arrumar|faxina|limpar|manutencao|consertar|organizar casa|cozinha|quarto|banheiro|casa|ambiente|lixo)\b/.test(normalized)) return pick("casa");
+  if (/\b(treino|academia|corrida|caminhada|alongamento|exercicio|flexao|agachamento|esporte)\b/.test(normalized)) return pick("exercicios");
+  if (/\b(amigo|amizade|social|evento|encontro|whatsapp|mensagem|responder|visitar pessoas)\b/.test(normalized)) return pick("social");
+  if (/\b(filme|serie|jogo|lazer|passeio|diversao|hobby|descansar)\b/.test(normalized)) return pick("lazer");
+  if (/\b(igreja|orar|oracao|meditar|meditacao|atencao plena|mindfulness|voluntari|acao social|proposito|espiritual|planejar|planejamento|agenda|meta|dormir|sono|cochilo)\b/.test(normalized)) return pick("planejamento");
+  return pick("planejamento");
 }
-
 async function suggestProject200SvgAsset(text, options = {}) {
   const input = String(text || "").trim();
   const kind = String(options?.kind || "task").trim().toLowerCase() || "task";
@@ -4630,14 +4630,16 @@ async function handleProject200ActionCategorize(request, response) {
   }
 
   try {
-    const model = "gpt-4.1-nano";
+    const model = "gpt-5-nano";
     const completion = await createChatCompletion(apiKey, {
       model,
-      temperature: 0,
+      reasoning_effort: "minimal",
+      max_completion_tokens: 80,
+      response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content: `Classifique o título de tarefa em UM dos 12 aspectos. Responda JSON puro: {"categoryId":"...","categoryName":"..."}. Use Aspecto apenas quando nenhum conceito for claramente provável. Aspectos válidos: ${PROJECT200_TASK_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
+          content: `Classifique o título em exatamente UM aspecto permitido e responda somente JSON: {"categoryId":"...","categoryName":"..."}. Sono é proibido para tarefas. Regras: alimentação cobre qualquer ação de comer; hidratação cobre beber água; aprendizado cobre escola, cursos e habilidades; trabalho cobre atividades profissionais; casa cobre ambiente, arrumação e manutenção; exercícios cobre atividade física; social cobre amigos, mensagens e encontros, nunca família; propósito cobre igreja, oração, meditação, atenção plena, ação social e o que transcende as outras categorias; higiene cobre banheiro, banho, rosto, dentes, unhas, barba e roupas; lazer cobre diversão; família cobre somente relações familiares. Aspectos permitidos: ${PROJECT200_TASK_ASSIGNABLE_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
         },
         { role: "user", content: title.slice(0, 180) }
       ]
@@ -4645,7 +4647,7 @@ async function handleProject200ActionCategorize(request, response) {
     const raw = extractChatCompletionText(completion);
     const parsed = JSON.parse(raw);
     const categoryId = String(parsed?.categoryId || "").trim().toLowerCase();
-    const hit = PROJECT200_TASK_CATEGORIES.find((item) => item.id === categoryId) || inferProject200CategoryLocally(title);
+    const hit = PROJECT200_TASK_ASSIGNABLE_CATEGORIES.find((item) => item.id === categoryId) || inferProject200CategoryLocally(title);
     sendJson(response, 200, {
       ok: true,
       category: hit,

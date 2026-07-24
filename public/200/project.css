@@ -6362,10 +6362,6 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   background: linear-gradient(145deg, rgba(46, 126, 255, 0.9), rgba(19, 75, 188, 0.92));
 }
 
-.sleep-music-toggle.is-direct {
-  background: linear-gradient(145deg, rgba(35, 178, 255, 0.98), rgba(10, 88, 211, 0.98));
-  box-shadow: 0 0 0 1px rgba(129, 216, 255, 0.35), 0 12px 28px rgba(10, 88, 211, 0.28);
-}
 
 .sleep-music-toggle.is-loading {
   pointer-events: none;
@@ -6519,6 +6515,166 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   opacity: 0.25;
 }
 
+.sleep-music-picker-modal {
+  z-index: 4200;
+  background: rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.sleep-music-picker-modal.active {
+  display: block;
+}
+
+.sleep-music-picker-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #070b14 0%, #000 100%);
+  color: #fff;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.sleep-music-picker-header {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.sleep-music-picker-header span {
+  display: block;
+  color: #58a6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sleep-music-picker-header h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 6vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.sleep-music-picker-close {
+  width: 50px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-close svg {
+  width: 25px;
+  height: 25px;
+}
+
+.sleep-music-picker-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 4px 2px 28px;
+  scrollbar-width: thin;
+}
+
+.sleep-music-picker-track {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.sleep-music-picker-track:active {
+  transform: scale(0.985);
+}
+
+.sleep-music-picker-track.is-selected {
+  border-color: rgba(61, 145, 255, 0.75);
+  background: linear-gradient(135deg, rgba(35, 104, 219, 0.42), rgba(20, 72, 165, 0.25));
+}
+
+.sleep-music-picker-track-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(61, 145, 255, 0.18);
+  color: #70b2ff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-track-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sleep-music-picker-track strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+}
+
+.sleep-music-picker-track small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-check {
+  color: #55e88a;
+  font-size: 1.2rem;
+  font-weight: 900;
+  opacity: 0;
+}
+
+.sleep-music-picker-track.is-selected .sleep-music-picker-check {
+  opacity: 1;
+}
+
+.sleep-music-picker-status {
+  min-height: 20px;
+  margin: 0;
+  color: #91a0b8;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-stop {
+  width: min(100%, 360px);
+  min-height: 52px;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aeb6c5;
+  font-weight: 800;
+}
 #socialModal.workspace-modal {
   --social-bg:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 34%),
@@ -6535,7 +6691,167 @@ body[data-background-theme="white"] .stats-aspect-mission-option-progress span {
   background: var(--social-bg);
 }
 
-body[data-background-theme="orange"] #socialModal.workspace-modal {
+body[data-background-theme="orange"] .sleep-music-picker-modal {
+  z-index: 4200;
+  background: rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.sleep-music-picker-modal.active {
+  display: block;
+}
+
+.sleep-music-picker-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #070b14 0%, #000 100%);
+  color: #fff;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.sleep-music-picker-header {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.sleep-music-picker-header span {
+  display: block;
+  color: #58a6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sleep-music-picker-header h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 6vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.sleep-music-picker-close {
+  width: 50px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-close svg {
+  width: 25px;
+  height: 25px;
+}
+
+.sleep-music-picker-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 4px 2px 28px;
+  scrollbar-width: thin;
+}
+
+.sleep-music-picker-track {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.sleep-music-picker-track:active {
+  transform: scale(0.985);
+}
+
+.sleep-music-picker-track.is-selected {
+  border-color: rgba(61, 145, 255, 0.75);
+  background: linear-gradient(135deg, rgba(35, 104, 219, 0.42), rgba(20, 72, 165, 0.25));
+}
+
+.sleep-music-picker-track-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(61, 145, 255, 0.18);
+  color: #70b2ff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-track-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sleep-music-picker-track strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+}
+
+.sleep-music-picker-track small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-check {
+  color: #55e88a;
+  font-size: 1.2rem;
+  font-weight: 900;
+  opacity: 0;
+}
+
+.sleep-music-picker-track.is-selected .sleep-music-picker-check {
+  opacity: 1;
+}
+
+.sleep-music-picker-status {
+  min-height: 20px;
+  margin: 0;
+  color: #91a0b8;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-stop {
+  width: min(100%, 360px);
+  min-height: 52px;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aeb6c5;
+  font-weight: 800;
+}
+#socialModal.workspace-modal {
   --social-bg:
     radial-gradient(circle at top left, rgba(255, 228, 178, 0.2), transparent 34%),
     linear-gradient(145deg, rgba(53, 23, 5, 0.98), rgba(115, 58, 16, 0.98));
@@ -6543,26 +6859,666 @@ body[data-background-theme="orange"] #socialModal.workspace-modal {
 
 body[data-background-theme="bluevivid"] #socialModal.workspace-modal,
 body[data-background-theme="bluedark"] #socialModal.workspace-modal,
-body[data-background-theme="edge"] #socialModal.workspace-modal {
+body[data-background-theme="edge"] .sleep-music-picker-modal {
+  z-index: 4200;
+  background: rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.sleep-music-picker-modal.active {
+  display: block;
+}
+
+.sleep-music-picker-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #070b14 0%, #000 100%);
+  color: #fff;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.sleep-music-picker-header {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.sleep-music-picker-header span {
+  display: block;
+  color: #58a6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sleep-music-picker-header h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 6vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.sleep-music-picker-close {
+  width: 50px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-close svg {
+  width: 25px;
+  height: 25px;
+}
+
+.sleep-music-picker-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 4px 2px 28px;
+  scrollbar-width: thin;
+}
+
+.sleep-music-picker-track {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.sleep-music-picker-track:active {
+  transform: scale(0.985);
+}
+
+.sleep-music-picker-track.is-selected {
+  border-color: rgba(61, 145, 255, 0.75);
+  background: linear-gradient(135deg, rgba(35, 104, 219, 0.42), rgba(20, 72, 165, 0.25));
+}
+
+.sleep-music-picker-track-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(61, 145, 255, 0.18);
+  color: #70b2ff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-track-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sleep-music-picker-track strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+}
+
+.sleep-music-picker-track small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-check {
+  color: #55e88a;
+  font-size: 1.2rem;
+  font-weight: 900;
+  opacity: 0;
+}
+
+.sleep-music-picker-track.is-selected .sleep-music-picker-check {
+  opacity: 1;
+}
+
+.sleep-music-picker-status {
+  min-height: 20px;
+  margin: 0;
+  color: #91a0b8;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-stop {
+  width: min(100%, 360px);
+  min-height: 52px;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aeb6c5;
+  font-weight: 800;
+}
+#socialModal.workspace-modal {
   --social-bg:
     radial-gradient(circle at top left, rgba(179, 232, 255, 0.18), transparent 34%),
     linear-gradient(145deg, rgba(5, 16, 42, 0.98), rgba(15, 71, 124, 0.98));
 }
 
-body[data-background-theme="pinkstrong"] #socialModal.workspace-modal {
+body[data-background-theme="pinkstrong"] .sleep-music-picker-modal {
+  z-index: 4200;
+  background: rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.sleep-music-picker-modal.active {
+  display: block;
+}
+
+.sleep-music-picker-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #070b14 0%, #000 100%);
+  color: #fff;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.sleep-music-picker-header {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.sleep-music-picker-header span {
+  display: block;
+  color: #58a6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sleep-music-picker-header h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 6vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.sleep-music-picker-close {
+  width: 50px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-close svg {
+  width: 25px;
+  height: 25px;
+}
+
+.sleep-music-picker-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 4px 2px 28px;
+  scrollbar-width: thin;
+}
+
+.sleep-music-picker-track {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.sleep-music-picker-track:active {
+  transform: scale(0.985);
+}
+
+.sleep-music-picker-track.is-selected {
+  border-color: rgba(61, 145, 255, 0.75);
+  background: linear-gradient(135deg, rgba(35, 104, 219, 0.42), rgba(20, 72, 165, 0.25));
+}
+
+.sleep-music-picker-track-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(61, 145, 255, 0.18);
+  color: #70b2ff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-track-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sleep-music-picker-track strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+}
+
+.sleep-music-picker-track small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-check {
+  color: #55e88a;
+  font-size: 1.2rem;
+  font-weight: 900;
+  opacity: 0;
+}
+
+.sleep-music-picker-track.is-selected .sleep-music-picker-check {
+  opacity: 1;
+}
+
+.sleep-music-picker-status {
+  min-height: 20px;
+  margin: 0;
+  color: #91a0b8;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-stop {
+  width: min(100%, 360px);
+  min-height: 52px;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aeb6c5;
+  font-weight: 800;
+}
+#socialModal.workspace-modal {
   --social-bg:
     radial-gradient(circle at top left, rgba(255, 197, 220, 0.18), transparent 34%),
     linear-gradient(145deg, rgba(55, 8, 29, 0.98), rgba(143, 26, 78, 0.98));
 }
 
-body[data-background-theme="brown"] #socialModal.workspace-modal {
+body[data-background-theme="brown"] .sleep-music-picker-modal {
+  z-index: 4200;
+  background: rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.sleep-music-picker-modal.active {
+  display: block;
+}
+
+.sleep-music-picker-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #070b14 0%, #000 100%);
+  color: #fff;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.sleep-music-picker-header {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.sleep-music-picker-header span {
+  display: block;
+  color: #58a6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sleep-music-picker-header h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 6vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.sleep-music-picker-close {
+  width: 50px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-close svg {
+  width: 25px;
+  height: 25px;
+}
+
+.sleep-music-picker-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 4px 2px 28px;
+  scrollbar-width: thin;
+}
+
+.sleep-music-picker-track {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.sleep-music-picker-track:active {
+  transform: scale(0.985);
+}
+
+.sleep-music-picker-track.is-selected {
+  border-color: rgba(61, 145, 255, 0.75);
+  background: linear-gradient(135deg, rgba(35, 104, 219, 0.42), rgba(20, 72, 165, 0.25));
+}
+
+.sleep-music-picker-track-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(61, 145, 255, 0.18);
+  color: #70b2ff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-track-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sleep-music-picker-track strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+}
+
+.sleep-music-picker-track small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-check {
+  color: #55e88a;
+  font-size: 1.2rem;
+  font-weight: 900;
+  opacity: 0;
+}
+
+.sleep-music-picker-track.is-selected .sleep-music-picker-check {
+  opacity: 1;
+}
+
+.sleep-music-picker-status {
+  min-height: 20px;
+  margin: 0;
+  color: #91a0b8;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-stop {
+  width: min(100%, 360px);
+  min-height: 52px;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aeb6c5;
+  font-weight: 800;
+}
+#socialModal.workspace-modal {
   --social-bg:
     radial-gradient(circle at top left, rgba(233, 211, 189, 0.18), transparent 34%),
     linear-gradient(145deg, rgba(42, 24, 17, 0.98), rgba(90, 58, 42, 0.98));
 }
 
 body[data-background-theme="light"] #socialModal.workspace-modal,
-body[data-background-theme="white"] #socialModal.workspace-modal {
+body[data-background-theme="white"] .sleep-music-picker-modal {
+  z-index: 4200;
+  background: rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.sleep-music-picker-modal.active {
+  display: block;
+}
+
+.sleep-music-picker-shell {
+  width: 100vw;
+  height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #070b14 0%, #000 100%);
+  color: #fff;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.sleep-music-picker-header {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.sleep-music-picker-header span {
+  display: block;
+  color: #58a6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sleep-music-picker-header h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: clamp(1.5rem, 6vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.sleep-music-picker-close {
+  width: 50px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-close svg {
+  width: 25px;
+  height: 25px;
+}
+
+.sleep-music-picker-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 4px 2px 28px;
+  scrollbar-width: thin;
+}
+
+.sleep-music-picker-track {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.sleep-music-picker-track:active {
+  transform: scale(0.985);
+}
+
+.sleep-music-picker-track.is-selected {
+  border-color: rgba(61, 145, 255, 0.75);
+  background: linear-gradient(135deg, rgba(35, 104, 219, 0.42), rgba(20, 72, 165, 0.25));
+}
+
+.sleep-music-picker-track-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(61, 145, 255, 0.18);
+  color: #70b2ff;
+  display: grid;
+  place-items: center;
+}
+
+.sleep-music-picker-track-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sleep-music-picker-track strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+}
+
+.sleep-music-picker-track small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-check {
+  color: #55e88a;
+  font-size: 1.2rem;
+  font-weight: 900;
+  opacity: 0;
+}
+
+.sleep-music-picker-track.is-selected .sleep-music-picker-check {
+  opacity: 1;
+}
+
+.sleep-music-picker-status {
+  min-height: 20px;
+  margin: 0;
+  color: #91a0b8;
+  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.sleep-music-picker-stop {
+  width: min(100%, 360px);
+  min-height: 52px;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aeb6c5;
+  font-weight: 800;
+}
+#socialModal.workspace-modal {
   --social-bg:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 34%),
     linear-gradient(145deg, rgba(232, 242, 248, 0.98), rgba(209, 226, 238, 0.98));
@@ -10512,4 +11468,94 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
   .mission-kind-choice { min-height:138px; padding-inline:10px; }
   .mission-guide-slider { min-height:390px; }
   .mission-guide-navigation { grid-template-columns:88px minmax(0,1fr); }
+}
+
+/* Guided task title, larger mission toggles and immersive aspect selector. */
+.start-decision-title-hint {
+  margin: -8px 0 0;
+  color: rgba(255, 255, 255, .68);
+  font-size: clamp(.82rem, 2.2vw, 1rem);
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.start-decision-title-hint[hidden] { display: none !important; }
+#create-task > .start-decision-home-btn,
+#create-task > .start-decision-middle,
+#create-task > .start-decision-bottom {
+  transition: filter 240ms ease, opacity 240ms ease;
+}
+#create-task.is-awaiting-title > .start-decision-home-btn,
+#create-task.is-awaiting-title > .start-decision-middle,
+#create-task.is-awaiting-title > .start-decision-bottom {
+  filter: blur(9px);
+  opacity: .25;
+  pointer-events: none;
+  user-select: none;
+}
+.actions-mission-toggle {
+  left: calc(100% + 15px);
+  width: 34px;
+  height: 19px;
+}
+.actions-mission-toggle i {
+  top: 3px;
+  left: 3px;
+  width: 11px;
+  height: 11px;
+}
+.actions-mission-filter-btn.is-filtering .actions-mission-toggle i { transform: translateX(15px); }
+.mission-kind-toggle { left: calc(50% + 32px); }
+.mission-kind-toggle-track { width: 35px; height: 20px; }
+.mission-kind-toggle-track i { left: 3px; top: 3px; width: 12px; height: 12px; }
+.mission-kind-toggle.is-limit .mission-kind-toggle-track i { transform: translateX(15px); }
+.aspect-selector-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
+  isolation: isolate;
+}
+.aspect-selector-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) 18px max(14px, env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+.aspect-selector-panel .wizard-head {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: auto;
+  min-height: 58px;
+}
+.aspect-selector-panel .wizard-head > span {
+  justify-self: center;
+  font-size: 1.25rem;
+  font-weight: 950;
+  text-align: center;
+}
+.aspect-selector-panel .wizard-close {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+.aspect-selector-panel .category-grid {
+  height: auto;
+  min-height: 0;
+  padding: 4px 0 calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.aspect-selector-panel .category-item-btn {
+  min-height: 7.5dvh;
+  height: auto;
+  font-size: clamp(1.19rem, 2.75dvh, 1.4rem);
+}
+@media (max-width: 540px) {
+  .mission-kind-toggle { left: calc(50% + 29px); }
+  .aspect-selector-panel { padding-inline: 14px; }
 }

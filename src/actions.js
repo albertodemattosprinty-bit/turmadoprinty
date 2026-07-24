@@ -9,7 +9,7 @@ const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_PAUSED = "PAUSED";
 const ACTION_STATUS_COMPLETED = "COMPLETED";
 const DEFAULT_ASSIGNEE = PROJECT200_DEFAULT_PROFILE_NAME;
-const DEFAULT_CATEGORY_ID = "aspecto";
+const DEFAULT_CATEGORY_ID = "planejamento";
 const QUICK_TASK_CATEGORY_ID = "quick_task";
 const ACTIONS_TIME_ZONE = "America/Sao_Paulo";
 
@@ -57,7 +57,9 @@ function normalizeCategoryId(value) {
   const legacyMap = {
     estudo: "aprendizado",
     financeiro: "aprendizado",
-    familia: "planejamento",
+    familia: "aspecto",
+    administracao: "aspecto",
+    proposito: "planejamento",
     fe_espiritualidade: "aspecto",
     saude: "aspecto",
     digital: "aspecto"
@@ -230,8 +232,9 @@ export async function ensureActionsSchema() {
   await query("alter table actions add column if not exists svg_icon_url text not null default '';");
   await query("alter table actions add column if not exists svg_icon_label text not null default '';");
   await query(`update actions set category_id = 'aprendizado' where lower(category_id) in ('estudo', 'financeiro');`);
-  await query(`update actions set category_id = 'planejamento' where lower(category_id) = 'familia';`);
-  await query(`update actions set category_id = 'aspecto' where coalesce(btrim(category_id), '') = '' or lower(category_id) in ('fe_espiritualidade', 'saude', 'digital');`);
+  await query(`update actions set category_id = 'planejamento' where coalesce(btrim(category_id), '') = '' or lower(category_id) = 'proposito';`);
+  await query(`update actions set category_id = 'aspecto' where lower(category_id) in ('familia', 'administracao');`);
+  await query(`update actions set category_id = 'aspecto' where lower(category_id) in ('fe_espiritualidade', 'saude', 'digital');`);
 
   await query("create index if not exists idx_actions_user_time on actions(user_id, start_at, end_at);");
   await query("create index if not exists idx_actions_repeat_group on actions(user_id, repeat_group_id);");

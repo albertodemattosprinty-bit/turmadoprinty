@@ -68,10 +68,10 @@ const statsPointCategories = [
   { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa", targetPoints: 120, icon: "/200/aspect-icons/casa.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social", targetPoints: 30, icon: "/200/aspect-icons/social.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Planejamento", targetPoints: 30, icon: "/200/aspect-icons/planejamento.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Propósito", targetPoints: 30, icon: "/200/aspect-icons/proposito.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene", targetPoints: 15, icon: "/200/aspect-icons/higiene.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer", targetPoints: 90, icon: "/200/aspect-icons/lazer.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Aspecto", targetPoints: 30, icon: "/200/aspect-icons/aspecto.svg" }
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família", targetPoints: 30, icon: "/200/aspect-icons/familia.svg" }
 ];
 const sleepDelayOptions = [0, 5, 15, 30, 60];
 const avatarPresetToPath = {
@@ -86,7 +86,9 @@ const taskCategoryDefinitions = statsPointCategories.map(({ id, name, icon }) =>
 const legacyTaskCategoryMap = new Map([
   ["estudo", "aprendizado"],
   ["financeiro", "aprendizado"],
-  ["familia", "planejamento"],
+  ["familia", "aspecto"],
+  ["administracao", "aspecto"],
+  ["proposito", "planejamento"],
   ["fe_espiritualidade", "aspecto"],
   ["saude", "aspecto"],
   ["digital", "aspecto"]
@@ -144,6 +146,11 @@ const recurrenceDays = {
   weekdays: [1, 2, 3, 4, 5]
 };
 const runningMusicStationSeeds = {
+  Ambience: [
+    "Deep.mp3", "Rain.mp3", "Japan.mp3", "Babies.mp3", "Delta Waves.mp3", "Modern.mp3",
+    "Brown Noise.mp3", "Soar.mp3", "Piano.mp3", "Sleep Deep.mp3", "Focus mode.mp3",
+    "LoFi.mp3", "Beaitful Light.mp3"
+  ],
   Calm: [
     "About space.mp3", "Good morning.mp3", "I feel joy.mp3", "I get up at 7.mp3",
     "I have seen.mp3", "I play chess.mp3", "I say yes.mp3", "It's good.mp3",
@@ -292,6 +299,11 @@ const sleepContinueButton = document.getElementById("sleepContinueButton");
 const sleepFinishButton = document.getElementById("sleepFinishButton");
 const sleepAbortButton = document.getElementById("sleepAbortButton");
 const sleepMusicToggleButton = document.getElementById("sleepMusicToggleButton");
+const sleepMusicPickerModal = document.getElementById("sleepMusicPickerModal");
+const sleepMusicPickerClose = document.getElementById("sleepMusicPickerClose");
+const sleepMusicPickerList = document.getElementById("sleepMusicPickerList");
+const sleepMusicPickerStop = document.getElementById("sleepMusicPickerStop");
+const sleepMusicPickerStatus = document.getElementById("sleepMusicPickerStatus");
 const sleepHistoryModal = document.getElementById("sleepHistoryModal");
 const sleepHistoryCloseButton = document.getElementById("sleepHistoryCloseButton");
 const sleepHistoryList = document.getElementById("sleepHistoryList");
@@ -680,6 +692,7 @@ const startDecisionModal = document.getElementById("startDecisionModal");
 const closeStartDecisionModal = document.getElementById("closeStartDecisionModal");
 const startDecisionContent = document.getElementById("startDecisionContent");
 const startDecisionTaskTitle = document.getElementById("startDecisionTaskTitle");
+const startDecisionTitleHint = document.getElementById("startDecisionTitleHint");
 const startDecisionMicButton = document.getElementById("startDecisionMicButton");
 const startDecisionStartAt = document.getElementById("startDecisionStartAt");
 const startDecisionEndAt = document.getElementById("startDecisionEndAt");
@@ -963,10 +976,9 @@ const RUNNING_COMPLETION_PUNCTUALITY_HOLD_MS = 2000;
 const MISSION_RUN_MUSIC_FADE_OUT_MS = 2000;
 const MISSION_RUN_MAX_CYCLES = 12;
 const MISSION_RUN_CUE_PRIORITY_RADIUS_SECONDS = 15;
-const SLEEP_FREQUENCY_STATION_NAME = "Frequency";
+const DEFAULT_RUNNING_STATION_NAME = "Ambience";
+const SLEEP_AMBIENCE_STATION_NAME = "Ambience";
 const SLEEP_FREQUENCY_FADE_MS = 15 * 60 * 1000;
-const SLEEP_DIRECT_TRACK_URL = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/trilhas/videoplayback%20(3).m4a";
-const SLEEP_DIRECT_TRACK_HOLD_MS = 500;
 const TOUCH_CLICK_SOUND_THROTTLE_MS = 45;
 const RUNNING_NEXT_METRIC_PROGRESS_MS = 1500;
 const RUNNING_NEXT_METRIC_PUNCTUALITY_MS = 2500;
@@ -1038,8 +1050,8 @@ const missionRunCycleCueMap = new Map([
 ]);
 let sleepFrequencyMonitorTicker = null;
 let sleepFrequencyFadeToken = 0;
-let sleepMusicHoldTimer = null;
-let sleepMusicHoldTriggered = false;
+let sleepAmbienceShuffleSignature = "";
+let sleepAmbienceShuffledTracks = [];
 let lastTouchClickSoundAt = 0;
 let svgAssetLibraryPromise = null;
 let socialSnapshotHydrationPromise = null;
@@ -1103,8 +1115,10 @@ const state = {
     controlsVisible: false,
     musicEnabled: false,
     musicLoading: false,
-    musicMode: "frequency",
     musicTrackIndex: 0,
+    selectedTrackId: "",
+    selectedTrackName: "",
+    selectedTrackUrl: "",
     lastPhase: "",
     fadeStarted: false
   },
@@ -1331,7 +1345,8 @@ const state = {
     actionId: "",
     mode: "view",
     fieldToFocus: "",
-    dirty: false
+    dirty: false,
+    categoryManuallySelected: false
   },
   uiAnchors: {
     actionsCurrentCentered: false,
@@ -3275,28 +3290,40 @@ function renderSleepMusicToggleState() {
   }
   const isActive = Boolean(state.sleepModal?.musicEnabled);
   const isLoading = Boolean(state.sleepModal?.musicLoading);
-  const isDirectMode = String(state.sleepModal?.musicMode || "frequency") === "direct";
+  const selectedName = String(state.sleepModal?.selectedTrackName || "").trim();
   sleepMusicToggleButton.classList.toggle("is-active", isActive);
-  sleepMusicToggleButton.classList.toggle("is-direct", isActive && isDirectMode);
+  sleepMusicToggleButton.classList.remove("is-direct");
   sleepMusicToggleButton.classList.toggle("is-loading", isLoading);
   sleepMusicToggleButton.setAttribute(
     "aria-label",
-    isActive
-      ? (isDirectMode ? "Desativar trilha direta do sono" : "Desativar música da rádio Frequency")
-      : "Ativar música do sono"
+    isActive && selectedName
+      ? `Escolher música do sono. Tocando ${selectedName}`
+      : "Escolher música da rádio Ambience"
   );
 }
 
-function getSleepFrequencyStationFromList(stations) {
+function getSleepAmbienceStationFromList(stations) {
   return (Array.isArray(stations) ? stations : []).find((station) =>
-    String(station?.name || "").trim().toLowerCase() === SLEEP_FREQUENCY_STATION_NAME.toLowerCase()
+    String(station?.name || "").trim().toLowerCase() === SLEEP_AMBIENCE_STATION_NAME.toLowerCase()
     && Array.isArray(station?.tracks)
     && station.tracks.some((track) => String(track?.url || "").trim())
   ) || null;
 }
 
-async function loadSleepFrequencyStation() {
-  const existing = getSleepFrequencyStationFromList(state.runningPlayer?.stations);
+function getShuffledSleepAmbienceTracks(station) {
+  const tracks = Array.isArray(station?.tracks)
+    ? station.tracks.filter((track) => String(track?.url || "").trim())
+    : [];
+  const signature = tracks.map((track) => `${String(track?.id || "")}|${String(track?.url || "")}`).join("::");
+  if (signature !== sleepAmbienceShuffleSignature) {
+    sleepAmbienceShuffleSignature = signature;
+    sleepAmbienceShuffledTracks = shuffleRunningTracks(tracks);
+  }
+  return sleepAmbienceShuffledTracks;
+}
+
+async function loadSleepAmbienceStation() {
+  const existing = getSleepAmbienceStationFromList(state.runningPlayer?.stations);
   if (existing) {
     return existing;
   }
@@ -3304,19 +3331,65 @@ async function loadSleepFrequencyStation() {
     const response = await fetch("/200/radio-stations.json", { cache: "no-store" });
     if (response.ok) {
       const payload = await response.json();
-      const station = getSleepFrequencyStationFromList(payload?.stations);
+      const station = getSleepAmbienceStationFromList(payload?.stations);
       if (station) {
         return station;
       }
     }
   } catch {
-    // keep fallback path
+    // keep API fallback
   }
   try {
     const payload = await apiRequest("/api/200/music/stations", { skipGlobalLoading: true });
-    return getSleepFrequencyStationFromList(payload?.stations);
+    return getSleepAmbienceStationFromList(payload?.stations);
   } catch {
     return null;
+  }
+}
+
+function closeSleepMusicPicker() {
+  if (!sleepMusicPickerModal) return;
+  sleepMusicPickerModal.classList.remove("active");
+  sleepMusicPickerModal.setAttribute("aria-hidden", "true");
+}
+
+function renderSleepMusicPicker(station) {
+  if (!sleepMusicPickerList) return;
+  const tracks = getShuffledSleepAmbienceTracks(station);
+  const selectedUrl = normalizeRunningTrackUrl(state.sleepModal?.selectedTrackUrl || "");
+  if (!tracks.length) {
+    sleepMusicPickerList.innerHTML = '<div class="empty-state">Nenhuma faixa Ambience disponível.</div>';
+    return;
+  }
+  sleepMusicPickerList.innerHTML = tracks.map((track) => {
+    const trackUrl = String(track?.url || "").trim();
+    const selected = Boolean(selectedUrl && normalizeRunningTrackUrl(trackUrl) === selectedUrl);
+    return `
+      <button class="sleep-music-picker-track${selected ? " is-selected" : ""}" type="button"
+        data-sleep-track-id="${escapeHtml(String(track?.id || ""))}"
+        data-sleep-track-name="${escapeHtml(String(track?.name || "Faixa"))}"
+        data-sleep-track-url="${escapeHtml(trackUrl)}">
+        <span class="sleep-music-picker-track-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg>
+        </span>
+        <span><strong>${escapeHtml(String(track?.name || "Faixa"))}</strong><small>Ambience</small></span>
+        <span class="sleep-music-picker-check" aria-hidden="true">✓</span>
+      </button>
+    `;
+  }).join("");
+}
+
+async function openSleepMusicPicker() {
+  if (!sleepMusicPickerModal) return;
+  if (sleepMusicPickerModal.parentElement !== document.body) document.body.appendChild(sleepMusicPickerModal);
+  sleepMusicPickerModal.classList.add("active");
+  sleepMusicPickerModal.setAttribute("aria-hidden", "false");
+  if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = "Carregando Ambience...";
+  if (sleepMusicPickerList) sleepMusicPickerList.innerHTML = '<div class="empty-state">Carregando faixas...</div>';
+  const station = await loadSleepAmbienceStation();
+  renderSleepMusicPicker(station);
+  if (sleepMusicPickerStatus) {
+    sleepMusicPickerStatus.textContent = station ? "A faixa escolhida tocará até o fade-out do sono." : "Não foi possível carregar Ambience.";
   }
 }
 
@@ -3341,7 +3414,6 @@ async function stopSleepFrequencyPlayback({ keepEnabled = false } = {}) {
   state.sleepModal.lastPhase = "";
   if (!keepEnabled) {
     state.sleepModal.musicEnabled = false;
-    state.sleepModal.musicMode = "frequency";
   }
   state.sleepModal.musicLoading = false;
   renderSleepMusicToggleState();
@@ -3351,31 +3423,16 @@ async function playSleepFrequencyCurrentTrack() {
   if (!sleepFrequencyAudio || !state.sleepModal?.musicEnabled) {
     return false;
   }
-  if (String(state.sleepModal?.musicMode || "frequency") === "direct") {
-    sleepFrequencyAudio.loop = true;
-    sleepFrequencyAudio.volume = 1;
-    if (normalizeRunningTrackUrl(sleepFrequencyAudio.src || "") !== normalizeRunningTrackUrl(SLEEP_DIRECT_TRACK_URL)) {
-      sleepFrequencyAudio.src = SLEEP_DIRECT_TRACK_URL;
-    }
-    try {
-      await sleepFrequencyAudio.play();
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  const station = await loadSleepFrequencyStation();
-  const tracks = Array.isArray(station?.tracks) ? station.tracks.filter((track) => String(track?.url || "").trim()) : [];
-  if (!tracks.length) {
+  const selectedUrl = String(state.sleepModal?.selectedTrackUrl || "").trim();
+  if (!selectedUrl) {
     return false;
   }
-  const trackIndex = ((Number(state.sleepModal?.musicTrackIndex || 0) % tracks.length) + tracks.length) % tracks.length;
-  const track = tracks[trackIndex] || tracks[0];
-  state.sleepModal.musicTrackIndex = trackIndex;
-  sleepFrequencyAudio.loop = Boolean(state.sleepModal?.fadeStarted);
-  sleepFrequencyAudio.volume = 1;
-  if (normalizeRunningTrackUrl(sleepFrequencyAudio.src || "") !== normalizeRunningTrackUrl(track.url || "")) {
-    sleepFrequencyAudio.src = String(track.url || "").trim();
+  sleepFrequencyAudio.loop = true;
+  if (!state.sleepModal?.fadeStarted) {
+    sleepFrequencyAudio.volume = 1;
+  }
+  if (normalizeRunningTrackUrl(sleepFrequencyAudio.src || "") !== normalizeRunningTrackUrl(selectedUrl)) {
+    sleepFrequencyAudio.src = selectedUrl;
   }
   try {
     await sleepFrequencyAudio.play();
@@ -3383,19 +3440,6 @@ async function playSleepFrequencyCurrentTrack() {
   } catch {
     return false;
   }
-}
-
-async function advanceSleepFrequencyTrack() {
-  if (String(state.sleepModal?.musicMode || "frequency") === "direct") {
-    return;
-  }
-  const station = await loadSleepFrequencyStation();
-  const tracks = Array.isArray(station?.tracks) ? station.tracks.filter((track) => String(track?.url || "").trim()) : [];
-  if (!tracks.length || !state.sleepModal?.musicEnabled) {
-    return;
-  }
-  state.sleepModal.musicTrackIndex = (Number(state.sleepModal?.musicTrackIndex || 0) + 1) % tracks.length;
-  await playSleepFrequencyCurrentTrack();
 }
 
 function startSleepFrequencyMonitor() {
@@ -3420,15 +3464,8 @@ async function startSleepFrequencyFadeOut() {
 
 async function syncSleepFrequencyPlayback() {
   renderSleepMusicToggleState();
-  if (!state.sleepModal?.musicEnabled) {
+  if (!state.sleepModal?.musicEnabled || !state.sleepModal?.selectedTrackUrl) {
     stopSleepFrequencyMonitor();
-    return;
-  }
-  if (String(state.sleepModal?.musicMode || "frequency") === "direct") {
-    stopSleepFrequencyMonitor();
-    state.sleepModal.fadeStarted = false;
-    state.sleepModal.lastPhase = "";
-    await playSleepFrequencyCurrentTrack();
     return;
   }
   const session = getComputedSleepSessionSnapshot(state.sleepModal?.session);
@@ -3464,14 +3501,7 @@ async function syncSleepFrequencyPlayback() {
 
 if (sleepFrequencyAudio) {
   sleepFrequencyAudio.preload = "auto";
-  sleepFrequencyAudio.addEventListener("ended", () => {
-    if (!state.sleepModal?.musicEnabled || state.sleepModal?.fadeStarted || String(state.sleepModal?.musicMode || "frequency") === "direct") {
-      return;
-    }
-    void advanceSleepFrequencyTrack();
-  });
 }
-
 function clearRunningMinuteCuePlayers() {
   runningMinuteCuePlayers.forEach((audio) => {
     try {
@@ -3921,15 +3951,16 @@ function renderHomeRunningTask() {
 function normalizeRunningMusicCatalog(stations = []) {
   return (Array.isArray(stations) ? stations : []).map((station, stationIndex) => {
     const stationId = String(station?.id || `radio-${String(stationIndex + 1).padStart(2, "0")}`).trim().toLowerCase();
-    return {
-      ...station,
-      id: stationId,
-      tracks: (Array.isArray(station?.tracks) ? station.tracks : []).map((track, trackIndex) => ({
-        ...track,
-        id: String(track?.id || `${stationId}-track-${String(trackIndex + 1).padStart(3, "0")}`).trim().toLowerCase(),
-        stationId
-      }))
-    };
+    const stationName = String(station?.name || "").trim();
+    let tracks = (Array.isArray(station?.tracks) ? station.tracks : []).map((track, trackIndex) => ({
+      ...track,
+      id: String(track?.id || `${stationId}-track-${String(trackIndex + 1).padStart(3, "0")}`).trim().toLowerCase(),
+      stationId
+    }));
+    if (stationName.toLowerCase() === DEFAULT_RUNNING_STATION_NAME.toLowerCase()) {
+      tracks = shuffleRunningTracks(tracks);
+    }
+    return { ...station, id: stationId, tracks };
   });
 }
 
@@ -3957,6 +3988,23 @@ async function loadRunningMusicStations() {
   const previousTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
   const previousStationName = String(getCurrentRunningStation()?.name || "").trim();
   const fallbackStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => {
+    if (name === "Ambience") {
+      return {
+        name,
+        id: "radio-ambience",
+        tracks: [
+          ...files.map((fileName) => ({
+            name: fileName.replace(/\.[^.]+$/, ""),
+            url: `https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/${encodeURIComponent(fileName)}`
+          })),
+          {
+            id: "radio-ambience-white-noise",
+            name: "White Noise",
+            url: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/trilhas/videoplayback%20(3).m4a"
+          }
+        ]
+      };
+    }
     if (name === "Energy") {
       return {
         name,
@@ -4022,7 +4070,7 @@ async function loadRunningMusicStations() {
   }
   const preferredStationIndex = previousStationName
     ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
-    : -1;
+    : state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim().toLowerCase() === DEFAULT_RUNNING_STATION_NAME.toLowerCase());
   if (preferredStationIndex >= 0) {
     state.runningPlayer.stationIndex = preferredStationIndex;
   } else {
@@ -4044,7 +4092,7 @@ async function loadRunningMusicStations() {
     ensureRunningAudioLoopState();
       const refreshedStationIndex = previousStationName
         ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
-        : -1;
+        : state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim().toLowerCase() === DEFAULT_RUNNING_STATION_NAME.toLowerCase());
       state.runningPlayer.stationIndex = refreshedStationIndex >= 0 ? refreshedStationIndex : 0;
       ensureRunningStationHasTracks(previousStationName);
       syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
@@ -4209,6 +4257,8 @@ function getRunningDisplayedTracks(station = getCurrentRunningStation()) {
   const tracks = Array.isArray(station?.tracks) ? station.tracks : [];
   const favoriteSet = getRunningFavoriteSet();
   const hiddenSet = getRunningHiddenTrackSet();
+  const preserveShuffledOrder = String(station?.name || "").trim().toLowerCase() === DEFAULT_RUNNING_STATION_NAME.toLowerCase();
+  const originalOrder = new Map(tracks.map((track, index) => [String(track?.url || "").trim(), index]));
   return [...tracks].sort((left, right) => {
     const leftHidden = hiddenSet.has(String(left?.url || "").trim());
     const rightHidden = hiddenSet.has(String(right?.url || "").trim());
@@ -4219,6 +4269,9 @@ function getRunningDisplayedTracks(station = getCurrentRunningStation()) {
     const rightFavorite = favoriteSet.has(String(right?.url || "").trim());
     if (leftFavorite !== rightFavorite) {
       return leftFavorite ? -1 : 1;
+    }
+    if (preserveShuffledOrder) {
+      return Number(originalOrder.get(String(left?.url || "").trim()) || 0) - Number(originalOrder.get(String(right?.url || "").trim()) || 0);
     }
     return String(left?.name || "").localeCompare(String(right?.name || ""), "pt-BR");
   });
@@ -5293,7 +5346,7 @@ function getMissionDisplayIcon(goal) {
 
 function getTaskCategoryIconPath(categoryId) {
   const normalized = normalizeTaskCategoryId(categoryId);
-  return taskCategoryMap.get(normalized)?.icon || taskCategoryMap.get("aspecto")?.icon || "";
+  return taskCategoryMap.get(normalized)?.icon || taskCategoryMap.get("planejamento")?.icon || "";
 }
 
 function buildTaskAvatarMarkup(src, alt, options = {}) {
@@ -5305,13 +5358,13 @@ function buildTaskAvatarMarkup(src, alt, options = {}) {
 
 function getTaskCategoryName(categoryId) {
   const normalized = normalizeTaskCategoryId(categoryId);
-  return taskCategoryMap.get(normalized)?.name || "Aspecto";
+  return taskCategoryMap.get(normalized)?.name || "Propósito";
 }
 
 function normalizeTaskCategoryId(categoryId) {
   const normalized = String(categoryId || "").trim().toLowerCase();
   if (taskCategoryMap.has(normalized)) return normalized;
-  return legacyTaskCategoryMap.get(normalized) || "aspecto";
+  return legacyTaskCategoryMap.get(normalized) || "planejamento";
 }
 
 function getActionThemeDotColor(action, options = {}) {
@@ -5356,7 +5409,7 @@ function buildActionTitleMarkup(title, dotColor = "", isBlinking = false) {
 function getStationNameForCategory(categoryId) {
   const id = String(categoryId || "").trim().toLowerCase();
   if (id === "sono") {
-    return "Frequency";
+    return DEFAULT_RUNNING_STATION_NAME;
   }
   if (id === "exercicios" || id === "casa") {
     return "Energy";
@@ -5407,8 +5460,8 @@ function buildInitialWizardState() {
     startMinute: rounded.getMinutes() % 60,
     endHour: end.getHours(),
     endMinute: end.getMinutes(),
-    categoryId: "aspecto",
-    categoryName: "Aspecto",
+    categoryId: "planejamento",
+    categoryName: "Propósito",
     svgIconUrl: "",
     svgIconLabel: "",
     editingActionId: null,
@@ -7164,7 +7217,7 @@ function renderActionCategoryPicker() {
     actionCategoryPreviewIcon.alt = String(state.wizard.svgIconLabel || "").trim() || selectedName || "Avatar do usuário";
   }
   if (actionCategoryPreviewLabel) {
-    actionCategoryPreviewLabel.textContent = selectedName || "Aspecto";
+    actionCategoryPreviewLabel.textContent = selectedName || "Propósito";
   }
 }
 
@@ -7193,11 +7246,12 @@ async function interpretActionCategoryFromTitle(titleText) {
       body: JSON.stringify({ title })
     });
     const categoryId = normalizeTaskCategoryId(payload?.category?.id);
-    if (!categoryId || taskTitle.value.trim() !== title) return;
+    if (!categoryId || taskTitle.value.trim() !== title || state.startDecisionContext.categoryManuallySelected) return;
     state.wizard.categoryId = categoryId;
     state.wizard.categoryName = String(payload?.category?.name || getTaskCategoryName(categoryId));
     renderActionCategoryPicker();
     renderActionCategoryModal();
+    renderTaskComposerModal();
   } catch {}
 }
 
@@ -7505,6 +7559,7 @@ function closeStartDecisionModalWith(value) {
   state.startDecisionContext.mode = "view";
   state.startDecisionContext.fieldToFocus = "";
   state.startDecisionContext.dirty = false;
+  state.startDecisionContext.categoryManuallySelected = false;
   if (startDecisionMessage) {
     startDecisionMessage.textContent = "";
   }
@@ -7577,9 +7632,14 @@ function renderTaskComposerModal() {
   const untouchedCreate = mode === "create" && !state.startDecisionContext.dirty;
   startDecisionContent.id = mode === "create" ? "create-task" : "edit-task";
   const titleValue = String(taskTitle?.value || "").trim();
+  const awaitingTitle = mode === "create" && !titleValue;
+  startDecisionContent.classList.toggle("is-awaiting-title", awaitingTitle);
   startDecisionTaskTitle.textContent = titleValue || "Inserir nome da tarefa";
   startDecisionTaskTitle.classList.toggle("is-placeholder", !titleValue);
   startDecisionTaskTitle.style.cursor = "pointer";
+  if (startDecisionTitleHint) {
+    startDecisionTitleHint.hidden = !awaitingTitle;
+  }
   if (closeStartDecisionModal) {
     closeStartDecisionModal.hidden = false;
   }
@@ -7667,6 +7727,7 @@ function openTaskComposer(action = null, options = {}) {
   state.startDecisionContext.actionId = String(action?.id || "");
   state.startDecisionContext.fieldToFocus = String(options.fieldToFocus || "");
   state.startDecisionContext.dirty = false;
+  state.startDecisionContext.categoryManuallySelected = Boolean(action);
   if (startDecisionMessage) {
     startDecisionMessage.textContent = "";
   }
@@ -7713,6 +7774,7 @@ function openTaskComposerFieldEditor(field) {
     if (taskTitle) {
       taskTitle.value = String(nextTitle).trim().slice(0, 80);
     }
+    state.startDecisionContext.categoryManuallySelected = false;
     markTaskComposerDirty();
     renderTaskComposerModal();
     void interpretActionCategoryFromTitle(taskTitle?.value || "");
@@ -7873,6 +7935,7 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
     state.startDecisionContext.mode = "view";
     state.startDecisionContext.fieldToFocus = "";
     state.startDecisionContext.dirty = false;
+    state.startDecisionContext.categoryManuallySelected = true;
     if (startDecisionContent) {
       startDecisionContent.id = "startDecisionContent";
     }
@@ -11300,9 +11363,9 @@ function normalizeStatsAspectConfigMap(rawConfig = {}) {
     const legacyEntry = category.id === "aprendizado"
       ? (rawConfig?.estudo || rawConfig?.financeiro)
       : category.id === "planejamento"
-        ? rawConfig?.familia
+        ? rawConfig?.proposito
         : category.id === "aspecto"
-          ? (rawConfig?.fe_espiritualidade || rawConfig?.saude || rawConfig?.digital)
+          ? (rawConfig?.familia || rawConfig?.administracao || rawConfig?.fe_espiritualidade || rawConfig?.saude || rawConfig?.digital)
           : null;
     const entry = rawConfig?.[category.aspectId] || rawConfig?.[category.id] || legacyEntry || {};
     const missionGoalIds = Array.isArray(entry.missionGoalIds)
@@ -15185,6 +15248,7 @@ actionCategoryGrid?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-category-id]");
   if (!button) return;
   actionCategorySelectionId = normalizeTaskCategoryId(button.dataset.categoryId);
+  state.startDecisionContext.categoryManuallySelected = true;
   state.wizard.categoryId = actionCategorySelectionId;
   state.wizard.categoryName = getTaskCategoryName(actionCategorySelectionId);
   renderActionCategoryPicker();
@@ -15197,6 +15261,7 @@ actionCategoryGrid?.addEventListener("click", (event) => {
 });
 confirmActionCategoryModal?.addEventListener("click", () => {
   if (!actionCategorySelectionId) return;
+  state.startDecisionContext.categoryManuallySelected = true;
   state.wizard.categoryId = normalizeTaskCategoryId(actionCategorySelectionId);
   state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
   renderActionCategoryPicker();
@@ -15211,9 +15276,10 @@ taskTitle?.addEventListener("input", () => {
     window.clearTimeout(actionCategoryInterpretTimer);
   }
   const title = taskTitle.value.trim();
+  state.startDecisionContext.categoryManuallySelected = false;
   if (!title) {
-    state.wizard.categoryId = "aspecto";
-    state.wizard.categoryName = "Aspecto";
+    state.wizard.categoryId = "planejamento";
+    state.wizard.categoryName = "Propósito";
     state.wizard.svgIconUrl = "";
     state.wizard.svgIconLabel = "";
     renderActionCategoryPicker();
@@ -16026,53 +16092,22 @@ sleepStartButton?.addEventListener("click", () => {
   void startSleepSessionFlow();
 });
 
-async function toggleSleepFrequencyMode() {
-  if (state.sleepModal?.musicLoading) {
-    return;
-  }
-  const nextEnabled = !Boolean(state.sleepModal?.musicEnabled);
-  state.sleepModal.musicLoading = true;
-  if (!nextEnabled) {
-    renderSleepMusicToggleState();
-    await stopSleepFrequencyPlayback();
-    return;
-  }
-  state.sleepModal.musicEnabled = true;
-  state.sleepModal.musicMode = "frequency";
-  state.sleepModal.fadeStarted = false;
-  state.sleepModal.lastPhase = "";
-  renderSleepMusicToggleState();
-  const started = await playSleepFrequencyCurrentTrack();
-  state.sleepModal.musicLoading = false;
-  if (!started) {
-    state.sleepModal.musicEnabled = false;
-    state.sleepModal.musicMode = "frequency";
-    if (sleepModalFeedback) {
-      sleepModalFeedback.textContent = "Nao foi possivel iniciar a radio Frequency agora.";
-    }
-    renderSleepMusicToggleState();
-    return;
-  }
-  if (sleepModalFeedback) {
-    sleepModalFeedback.textContent = "";
-  }
-  await syncSleepFrequencyPlayback();
-  renderSleepMusicToggleState();
-}
-
-async function activateSleepDirectTrackMode() {
-  if (state.sleepModal?.musicLoading) {
-    return;
-  }
+async function selectSleepAmbienceTrack(track) {
+  const trackUrl = String(track?.url || "").trim();
+  const trackName = String(track?.name || "Faixa").trim() || "Faixa";
+  if (!trackUrl || state.sleepModal?.musicLoading) return;
   state.sleepModal.musicLoading = true;
   sleepFrequencyFadeToken += 1;
   stopSleepFrequencyMonitor();
   if (sleepFrequencyAudio) {
     sleepFrequencyAudio.pause();
     sleepFrequencyAudio.currentTime = 0;
+    sleepFrequencyAudio.volume = 1;
   }
   state.sleepModal.musicEnabled = true;
-  state.sleepModal.musicMode = "direct";
+  state.sleepModal.selectedTrackId = String(track?.id || "").trim();
+  state.sleepModal.selectedTrackName = trackName;
+  state.sleepModal.selectedTrackUrl = trackUrl;
   state.sleepModal.fadeStarted = false;
   state.sleepModal.lastPhase = "";
   renderSleepMusicToggleState();
@@ -16080,48 +16115,41 @@ async function activateSleepDirectTrackMode() {
   state.sleepModal.musicLoading = false;
   if (!started) {
     state.sleepModal.musicEnabled = false;
-    state.sleepModal.musicMode = "frequency";
-    if (sleepModalFeedback) {
-      sleepModalFeedback.textContent = "Nao foi possivel iniciar essa trilha agora.";
-    }
+    if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `Não foi possível iniciar ${trackName}.`;
+    if (sleepModalFeedback) sleepModalFeedback.textContent = `Não foi possível iniciar ${trackName}.`;
     renderSleepMusicToggleState();
     return;
   }
-  if (sleepModalFeedback) {
-    sleepModalFeedback.textContent = "";
-  }
+  if (sleepModalFeedback) sleepModalFeedback.textContent = "";
+  if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `${trackName} está tocando.`;
+  await syncSleepFrequencyPlayback();
   renderSleepMusicToggleState();
+  closeSleepMusicPicker();
 }
 
 sleepMusicToggleButton?.addEventListener("click", () => {
-  if (sleepMusicHoldTriggered) {
-    sleepMusicHoldTriggered = false;
-    return;
-  }
-  void toggleSleepFrequencyMode();
+  void openSleepMusicPicker();
 });
 
-["pointerup", "pointerleave", "pointercancel"].forEach((eventName) => {
-  sleepMusicToggleButton?.addEventListener(eventName, () => {
-    if (sleepMusicHoldTimer) {
-      window.clearTimeout(sleepMusicHoldTimer);
-      sleepMusicHoldTimer = null;
-    }
+sleepMusicPickerClose?.addEventListener("click", closeSleepMusicPicker);
+
+sleepMusicPickerList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-sleep-track-url]");
+  if (!button) return;
+  void selectSleepAmbienceTrack({
+    id: String(button.dataset.sleepTrackId || ""),
+    name: String(button.dataset.sleepTrackName || "Faixa"),
+    url: String(button.dataset.sleepTrackUrl || "")
   });
 });
 
-sleepMusicToggleButton?.addEventListener("pointerdown", () => {
-  if (sleepMusicHoldTimer) {
-    window.clearTimeout(sleepMusicHoldTimer);
-  }
-  sleepMusicHoldTriggered = false;
-  sleepMusicHoldTimer = window.setTimeout(() => {
-    sleepMusicHoldTimer = null;
-    sleepMusicHoldTriggered = true;
-    void activateSleepDirectTrackMode();
-  }, SLEEP_DIRECT_TRACK_HOLD_MS);
+sleepMusicPickerStop?.addEventListener("click", () => {
+  void (async () => {
+    await stopSleepFrequencyPlayback();
+    if (sleepModalFeedback) sleepModalFeedback.textContent = "";
+    closeSleepMusicPicker();
+  })();
 });
-
 sleepModalCloseButton?.addEventListener("click", () => {
   closeModal("sleepModal");
 });

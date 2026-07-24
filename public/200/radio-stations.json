@@ -1,6 +1,25 @@
 {
   "stations": [
     {
+      "name": "Ambience",
+      "tracks": [
+        { "name": "Deep", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Deep.mp3", "id": "radio-ambience-deep" },
+        { "name": "Rain", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Rain.mp3", "id": "radio-ambience-rain" },
+        { "name": "Japan", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Japan.mp3", "id": "radio-ambience-japan" },
+        { "name": "Babies", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Babies.mp3", "id": "radio-ambience-babies" },
+        { "name": "Delta Waves", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Delta%20Waves.mp3", "id": "radio-ambience-delta-waves" },
+        { "name": "Modern", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Modern.mp3", "id": "radio-ambience-modern" },
+        { "name": "White Noise", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/trilhas/videoplayback%20(3).m4a", "id": "radio-ambience-white-noise" },
+        { "name": "Brown Noise", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Brown%20Noise.mp3", "id": "radio-ambience-brown-noise" },
+        { "name": "Soar", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Soar.mp3", "id": "radio-ambience-soar" },
+        { "name": "Piano", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Piano.mp3", "id": "radio-ambience-piano" },
+        { "name": "Sleep Deep", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Sleep%20Deep.mp3", "id": "radio-ambience-sleep-deep" },
+        { "name": "Focus mode", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Focus%20mode.mp3", "id": "radio-ambience-focus-mode" },
+        { "name": "LoFi", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/LoFi.mp3", "id": "radio-ambience-lofi" },
+        { "name": "Beaitful Light", "url": "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/Music/Ambience/Beaitful%20Light.mp3", "id": "radio-ambience-beaitful-light" }
+      ],
+      "id": "radio-ambience"
+    },    {
       "name": "Calm",
       "tracks": [
         {

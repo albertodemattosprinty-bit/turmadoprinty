@@ -54,7 +54,7 @@ function normalizeProposal(rawProposal) {
     });
     const first = occurrences[0];
     const durationMinutes = Math.max(1, Math.round((new Date(first.endAt) - new Date(first.startAt)) / 60000));
-    proposal.aspectId = String(rawProposal.aspectId || rawProposal.categoryId || "aspecto").trim().toLowerCase().slice(0, 60) || "aspecto";
+    proposal.aspectId = String(rawProposal.aspectId || rawProposal.categoryId || "planejamento").trim().toLowerCase().slice(0, 60) || "planejamento";
     proposal.repeatRule = String(rawProposal.repeatRule || "none").trim().toLowerCase().slice(0, 40) || "none";
     proposal.repeatDays = [...new Set((Array.isArray(rawProposal.repeatDays) ? rawProposal.repeatDays : [])
       .map((value) => Math.trunc(Number(value)))

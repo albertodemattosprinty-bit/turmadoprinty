@@ -18,10 +18,10 @@ const ASPECTS = [
   { name: "Casa", icon: "/200/aspect-icons/casa.svg" },
   { name: "Exercícios", icon: "/200/aspect-icons/exercicios.svg" },
   { name: "Social", icon: "/200/aspect-icons/social.svg" },
-  { name: "Planejamento", icon: "/200/aspect-icons/planejamento.svg" },
+  { name: "Propósito", icon: "/200/aspect-icons/proposito.svg" },
   { name: "Higiene", icon: "/200/aspect-icons/higiene.svg" },
   { name: "Lazer", icon: "/200/aspect-icons/lazer.svg" },
-  { name: "Aspecto", icon: "/200/aspect-icons/aspecto.svg" }
+  { name: "Família", icon: "/200/aspect-icons/familia.svg" }
 ];
 
 const EDUCATION = [

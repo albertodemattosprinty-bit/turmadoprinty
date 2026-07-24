@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260723-limits-v6" />
+  <link rel="stylesheet" href="/200/project.css?v=20260723-ambience-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -342,6 +342,7 @@
         <div class="start-decision-top-spacer" aria-hidden="true"></div>
         <div class="start-decision-title-wrap">
           <h1 class="start-decision-task-title" id="startDecisionTaskTitle">Tarefa X</h1>
+          <p class="start-decision-title-hint" id="startDecisionTitleHint" hidden>Toque para inserir</p>
         </div>
       </div>
       <div class="start-decision-middle">
@@ -362,8 +363,8 @@
           <span>Definir música</span>
         </button>
         <button class="start-decision-task-meta start-decision-meta-btn start-decision-aspect-btn" type="button" id="startDecisionAspectLabel">
-          <img src="/200/aspect-icons/aspecto.svg" alt="" aria-hidden="true" />
-          <span>Aspecto</span>
+          <img src="/200/aspect-icons/proposito.svg" alt="" aria-hidden="true" />
+          <span>Propósito</span>
         </button>
       </div>
       <div class="start-decision-bottom">
@@ -496,7 +497,7 @@
             <input id="taskTitle" class="text-field" name="title" autocomplete="off" maxlength="80" />
             <button class="category-picker-trigger" type="button" id="actionCategoryTrigger" aria-label="Selecionar categoria">
               <img class="task-avatar" id="actionCategoryPreviewIcon" src="/200/avatars/rose.png" alt="Categoria da tarefa" />
-              <span id="actionCategoryPreviewLabel">Aspecto</span>
+              <span id="actionCategoryPreviewLabel">Propósito</span>
             </button>
           </section>
 
@@ -1161,7 +1162,7 @@
   <section class="workspace-modal" id="sleepModal" aria-hidden="true" aria-label="Sono">
       <div class="sleep-modal-shell" id="sleepModalShell">
         <button class="sleep-modal-close" type="button" id="sleepModalCloseButton" aria-label="Fechar modal do sono">Fechar</button>
-        <button class="sleep-music-toggle" type="button" id="sleepMusicToggleButton" aria-label="Ativar música da rádio Frequency">
+        <button class="sleep-music-toggle" type="button" id="sleepMusicToggleButton" aria-label="Escolher música Ambience">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg>
         </button>
         <div class="sleep-modal-setup" id="sleepModalSetup">
@@ -1189,6 +1190,22 @@
       </div>
     </section>
 
+  <section class="workspace-modal sleep-music-picker-modal" id="sleepMusicPickerModal" aria-hidden="true" aria-label="Escolher música para o sono">
+    <div class="sleep-music-picker-shell">
+      <header class="sleep-music-picker-header">
+        <div>
+          <span>Rádio Ambience</span>
+          <h2>Escolha uma faixa</h2>
+        </div>
+        <button class="sleep-music-picker-close" type="button" id="sleepMusicPickerClose" aria-label="Fechar seletor de músicas">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="sleep-music-picker-list" id="sleepMusicPickerList" aria-live="polite"></div>
+      <p class="sleep-music-picker-status" id="sleepMusicPickerStatus" aria-live="polite"></p>
+      <button class="sleep-music-picker-stop" type="button" id="sleepMusicPickerStop">Dormir sem música</button>
+    </div>
+  </section>
   <section class="workspace-modal sleep-history-modal" id="sleepHistoryModal" aria-hidden="true" aria-label="Editar últimos registros de sono">
     <div class="sleep-history-shell">
       <header class="sleep-history-header">
@@ -1713,7 +1730,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260723-limits-v6"></script>
+  <script type="module" src="/200/project.js?v=20260723-ambience-v1"></script>
 </body>
 </html>
 

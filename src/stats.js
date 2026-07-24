@@ -14,10 +14,10 @@ const PROJECT200_STATS_ASPECTS = Object.freeze([
   { aspectId: "20000000-0000-4000-8000-000000000006", categoryId: "casa", aliases: [] },
   { aspectId: "20000000-0000-4000-8000-000000000007", categoryId: "exercicios", aliases: [] },
   { aspectId: "20000000-0000-4000-8000-000000000008", categoryId: "social", aliases: [] },
-  { aspectId: "20000000-0000-4000-8000-000000000009", categoryId: "planejamento", aliases: ["familia"] },
+  { aspectId: "20000000-0000-4000-8000-000000000009", categoryId: "planejamento", aliases: ["proposito"] },
   { aspectId: "20000000-0000-4000-8000-000000000010", categoryId: "higiene", aliases: [] },
   { aspectId: "20000000-0000-4000-8000-000000000011", categoryId: "lazer", aliases: [] },
-  { aspectId: "20000000-0000-4000-8000-000000000012", categoryId: "aspecto", aliases: ["fe_espiritualidade", "saude", "digital"] }
+  { aspectId: "20000000-0000-4000-8000-000000000012", categoryId: "aspecto", aliases: ["familia", "administracao", "fe_espiritualidade", "saude", "digital"] }
 ]);
 const PROJECT200_STATS_ASPECT_BY_ID = new Map(PROJECT200_STATS_ASPECTS.map((item) => [item.aspectId, item]));
 const PROJECT200_STATS_ASPECT_BY_CATEGORY = new Map();
@@ -250,16 +250,16 @@ export async function ensureStatsSchema() {
           when lower(category_id) = 'casa' then '20000000-0000-4000-8000-000000000006'
           when lower(category_id) = 'exercicios' then '20000000-0000-4000-8000-000000000007'
           when lower(category_id) = 'social' then '20000000-0000-4000-8000-000000000008'
-          when lower(category_id) in ('planejamento', 'familia') then '20000000-0000-4000-8000-000000000009'
+          when lower(category_id) in ('planejamento', 'proposito') then '20000000-0000-4000-8000-000000000009'
           when lower(category_id) = 'higiene' then '20000000-0000-4000-8000-000000000010'
           when lower(category_id) = 'lazer' then '20000000-0000-4000-8000-000000000011'
-          when lower(category_id) in ('aspecto', 'fe_espiritualidade', 'saude', 'digital') then '20000000-0000-4000-8000-000000000012'
+          when lower(category_id) in ('aspecto', 'familia', 'administracao', 'fe_espiritualidade', 'saude', 'digital') then '20000000-0000-4000-8000-000000000012'
           else ''
         end as aspect_id,
         case
           when lower(category_id) in ('aprendizado', 'estudo', 'financeiro') then 'aprendizado'
-          when lower(category_id) in ('planejamento', 'familia') then 'planejamento'
-          when lower(category_id) in ('aspecto', 'fe_espiritualidade', 'saude', 'digital') then 'aspecto'
+          when lower(category_id) in ('planejamento', 'proposito') then 'planejamento'
+          when lower(category_id) in ('aspecto', 'familia', 'administracao', 'fe_espiritualidade', 'saude', 'digital') then 'aspecto'
           else lower(category_id)
         end as category_id,
         target_minutes,
