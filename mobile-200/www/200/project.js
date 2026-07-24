@@ -14529,14 +14529,25 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
 
 function formatLimitElapsedDuration(totalSeconds) {
   const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
-  const totalMinutes = Math.floor(safeSeconds / 60);
-  if (totalMinutes < 1) return "menos de 1 minuto";
-  if (totalMinutes < 60) return `${totalMinutes}min`;
-  const totalHours = Math.floor(totalMinutes / 60);
-  if (totalHours < 24) return `${totalHours} ${totalHours === 1 ? "hora" : "horas"}`;
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  return `${days} ${days === 1 ? "dia" : "dias"} e ${hours} ${hours === 1 ? "hora" : "horas"}`;
+  let remainingMinutes = Math.floor(safeSeconds / 60);
+  if (remainingMinutes < 1) return "menos de 1 minuto";
+
+  const durationUnits = [
+    { minutes: 365 * 24 * 60, singular: "ano", plural: "anos" },
+    { minutes: 30 * 24 * 60, singular: "mês", plural: "meses" },
+    { minutes: 24 * 60, singular: "dia", plural: "dias" },
+    { minutes: 60, singular: "hora", plural: "horas" },
+    { minutes: 1, singular: "minuto", plural: "minutos" }
+  ];
+  const parts = [];
+  for (const unit of durationUnits) {
+    const value = Math.floor(remainingMinutes / unit.minutes);
+    if (value <= 0) continue;
+    parts.push(`${value} ${value === 1 ? unit.singular : unit.plural}`);
+    remainingMinutes -= value * unit.minutes;
+    if (parts.length === 2) break;
+  }
+  return parts.length > 1 ? `${parts[0]} e ${parts[1]}` : parts[0];
 }
 
 function formatLimitLastProgress(goal) {
