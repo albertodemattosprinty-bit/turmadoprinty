@@ -5498,6 +5498,8 @@ function buildInitialWizardState() {
     endMinute: end.getMinutes(),
     categoryId: "planejamento",
     categoryName: "Propósito",
+    categoryResolved: false,
+    categoryThinking: false,
     svgIconUrl: "",
     svgIconLabel: "",
     editingActionId: null,
@@ -7239,6 +7241,8 @@ function openWizard(action = null, options = {}) {
     state.wizard.endMinute = endAt.getMinutes();
     state.wizard.categoryId = normalizeTaskCategoryId(action.categoryId);
     state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
+    state.wizard.categoryResolved = true;
+    state.wizard.categoryThinking = false;
     state.wizard.editingActionId = action.id;
     taskTitle.value = action.title || "";
   } else {
@@ -7304,18 +7308,33 @@ function closeWizard() {
   }
 }
 
+function setActionCategoryLabel(element, text) {
+  if (!element) return;
+  const nextText = String(text || "");
+  if (element.textContent === nextText) return;
+  element.classList.remove("is-dissolving");
+  void element.offsetWidth;
+  element.textContent = nextText;
+  element.classList.add("is-dissolving");
+}
+
 function renderActionCategoryPicker() {
+  const resolved = Boolean(state.wizard.categoryResolved || state.startDecisionContext.categoryManuallySelected || state.wizard.editingActionId);
+  const thinking = Boolean(state.wizard.categoryThinking) && !state.startDecisionContext.categoryManuallySelected;
   const selectedId = normalizeTaskCategoryId(state.wizard.categoryId);
-  const selectedName = getTaskCategoryName(selectedId);
-  const selectedIcon = String(state.wizard.svgIconUrl || "").trim() || getTaskCategoryIconPath(selectedId);
-  const profileAvatar = getActionAvatarPath(getWizardAssigneeName());
+  const selectedName = resolved ? getTaskCategoryName(selectedId) : "Aspecto";
+  const selectedIcon = resolved
+    ? String(state.wizard.svgIconUrl || "").trim() || getTaskCategoryIconPath(selectedId)
+    : "/200/icons/plataformas.svg";
+  if (actionCategoryTrigger) {
+    actionCategoryTrigger.classList.toggle("is-thinking", thinking);
+    actionCategoryTrigger.classList.toggle("is-unresolved", !resolved && !thinking);
+  }
   if (actionCategoryPreviewIcon) {
-    actionCategoryPreviewIcon.src = selectedIcon || profileAvatar;
-    actionCategoryPreviewIcon.alt = String(state.wizard.svgIconLabel || "").trim() || selectedName || "Avatar do usuário";
+    actionCategoryPreviewIcon.src = selectedIcon;
+    actionCategoryPreviewIcon.alt = thinking ? "Definindo aspecto" : String(state.wizard.svgIconLabel || "").trim() || selectedName;
   }
-  if (actionCategoryPreviewLabel) {
-    actionCategoryPreviewLabel.textContent = selectedName || "Propósito";
-  }
+  setActionCategoryLabel(actionCategoryPreviewLabel, thinking ? "Pensando..." : selectedName);
 }
 
 function renderActionCategoryModal() {
@@ -7336,6 +7355,10 @@ function renderActionCategoryModal() {
 async function interpretActionCategoryFromTitle(titleText) {
   const title = String(titleText || "").trim();
   if (title.length < 2) return;
+  state.wizard.categoryThinking = true;
+  state.wizard.categoryResolved = false;
+  renderActionCategoryPicker();
+  if (isTaskComposerMode()) renderTaskComposerModal();
   try {
     const payload = await apiRequest("/api/200/actions/categorize", {
       method: "POST",
@@ -7346,10 +7369,17 @@ async function interpretActionCategoryFromTitle(titleText) {
     if (!categoryId || taskTitle.value.trim() !== title || state.startDecisionContext.categoryManuallySelected) return;
     state.wizard.categoryId = categoryId;
     state.wizard.categoryName = String(payload?.category?.name || getTaskCategoryName(categoryId));
-    renderActionCategoryPicker();
+    state.wizard.categoryResolved = true;
     renderActionCategoryModal();
-    renderTaskComposerModal();
-  } catch {}
+  } catch {
+    state.wizard.categoryResolved = false;
+  } finally {
+    if (taskTitle.value.trim() === title && !state.startDecisionContext.categoryManuallySelected) {
+      state.wizard.categoryThinking = false;
+      renderActionCategoryPicker();
+      if (isTaskComposerMode()) renderTaskComposerModal();
+    }
+  }
 }
 
 async function saveActionCategory(actionId, categoryId) {
@@ -7766,12 +7796,17 @@ function renderTaskComposerModal() {
     formatActionMusicInlineLabel(findActionById(state.startDecisionContext.actionId)) || "Definir música",
     false
   );
+  const categoryThinking = Boolean(state.wizard.categoryThinking) && !state.startDecisionContext.categoryManuallySelected;
+  const categoryResolved = Boolean(state.wizard.categoryResolved || state.startDecisionContext.categoryManuallySelected || state.wizard.editingActionId);
   renderTaskComposerMeta(
     startDecisionAspectLabel,
-    `<img src="${getTaskCategoryIconPath(state.wizard.categoryId)}" alt="" aria-hidden="true" />`,
-    getTaskCategoryName(state.wizard.categoryId),
-    false
+    categoryThinking
+      ? '<span class="task-category-thinking-loop" aria-hidden="true"></span>'
+      : `<img src="${categoryResolved ? getTaskCategoryIconPath(state.wizard.categoryId) : "/200/icons/plataformas.svg"}" alt="" aria-hidden="true" />`,
+    categoryThinking ? "Pensando..." : categoryResolved ? getTaskCategoryName(state.wizard.categoryId) : "Aspecto",
+    !categoryResolved && !categoryThinking
   );
+  startDecisionAspectLabel?.classList.toggle("is-thinking", categoryThinking);
 
   if (startDecisionActions) {
     startDecisionActions.innerHTML = "";
@@ -7779,6 +7814,7 @@ function renderTaskComposerModal() {
     primary.type = "button";
     primary.className = "decision-btn decision-btn-start";
     primary.innerHTML = `<span>${mode === "create" ? "Criar tarefa" : "Salvar edição"}</span>`;
+    primary.disabled = !titleValue || categoryThinking || !categoryResolved;
     primary.addEventListener("click", () => {
       void saveTaskComposer();
     });
@@ -7841,6 +7877,8 @@ function openTaskComposer(action = null, options = {}) {
     state.wizard.endMinute = endAt.getMinutes();
     state.wizard.categoryId = normalizeTaskCategoryId(action.categoryId);
     state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
+    state.wizard.categoryResolved = true;
+    state.wizard.categoryThinking = false;
     state.wizard.svgIconUrl = String(action.svgIconUrl || "").trim();
     state.wizard.svgIconLabel = String(action.svgIconLabel || "").trim();
     state.wizard.editingActionId = action.id;
@@ -12389,6 +12427,7 @@ function updateMissionProgressCollection(collection, goalId, delta) {
     return {
       ...goal,
       progressValue,
+      lastProgressAt: Number(delta || 0) > 0 ? new Date(getServerNowMs()).toISOString() : goal?.lastProgressAt || null,
       remainingValue: Math.max(0, targetValue - progressValue),
       percent: Math.max(0, Math.min(100, Math.round((progressValue / targetValue) * 100)))
     };
@@ -12884,7 +12923,7 @@ function renderMissionKindFilter() {
 }
 
 function renderMissionCreateStep(direction = 0) {
-  const step = Math.max(0, Math.min(3, Math.trunc(Number(state.missionCreate?.step || 0))));
+  const step = Math.max(0, Math.min(2, Math.trunc(Number(state.missionCreate?.step || 0))));
   state.missionCreate.step = step;
   const kind = state.missionCreate.goalKind;
   missionCreateSlider?.querySelectorAll("[data-mission-create-step]").forEach((panel) => {
@@ -12898,7 +12937,7 @@ function renderMissionCreateStep(direction = 0) {
     button.classList.toggle("is-selected", button.dataset.missionKind === kind);
   });
   if (missionCreateBackButton) missionCreateBackButton.hidden = step === 0;
-  if (missionCreateConfirmLabel) missionCreateConfirmLabel.textContent = step < 3 ? "Continuar" : (kind === "limit" ? "Criar limite" : "Criar meta");
+  if (missionCreateConfirmLabel) missionCreateConfirmLabel.textContent = step < 2 ? "Continuar" : (kind === "limit" ? "Criar limite" : "Criar meta");
   missionCreateConfirmButton?.classList.toggle("is-limit", kind === "limit");
   const modal = document.getElementById("missionCreateModal");
   modal?.classList.toggle("is-limit-creation", kind === "limit");
@@ -12922,12 +12961,12 @@ function validateMissionCreateStep(step = state.missionCreate?.step) {
 }
 
 function moveMissionCreateStep(direction) {
-  const current = Math.max(0, Math.min(3, Number(state.missionCreate?.step || 0)));
+  const current = Math.max(0, Math.min(2, Number(state.missionCreate?.step || 0)));
   if (direction > 0) {
     const error = validateMissionCreateStep(current);
     if (error) { if (missionCreateStatus) missionCreateStatus.textContent = error; return false; }
   }
-  state.missionCreate.step = Math.max(0, Math.min(3, current + Number(direction || 0)));
+  state.missionCreate.step = Math.max(0, Math.min(2, current + Number(direction || 0)));
   if (missionCreateStatus) missionCreateStatus.textContent = "";
   renderMissionCreateStep(direction);
   window.setTimeout(() => {
@@ -12950,9 +12989,7 @@ function renderMissionAdjustState() {
   const adjustQuestion = adjustModal?.querySelector(".mission-modal-explainer h2");
   if (adjustEyebrow) adjustEyebrow.textContent = limit ? "Editar limite" : "Editar meta";
   if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite diário?" : "Qual será a meta diária?";
-  if (missionAdjustTimeSummary) {
-    missionAdjustTimeSummary.textContent = `1 missão leva ${formatMissionDurationValue(state.missionAdjust?.unitDurationSeconds || DEFAULT_MISSION_DURATION_SECONDS)}`;
-  }
+
   missionAdjustMinusButton?.classList.remove("active");
   missionAdjustPlusButton?.classList.add("active");
 }
@@ -12969,7 +13006,7 @@ function openMissionCreateModal() {
     timeConfigured: true
   };
   renderFriendAssignmentButtons();
-  if (missionCreateTimeSummary) missionCreateTimeSummary.textContent = `1 missão leva ${formatMissionDurationValue(DEFAULT_MISSION_DURATION_SECONDS)}`;
+
   renderMissionCreateStep();
   openModal("missionCreateModal");
 }
@@ -13006,11 +13043,9 @@ function renderMissionProgressState() {
     missionProgressHint.textContent = "";
   }
   if (missionProgressConfirmButton) {
-    missionProgressConfirmButton.disabled = false;
+    missionProgressConfirmButton.disabled = deltaValue === 0;
     missionProgressConfirmButton.classList.toggle("is-update", deltaValue !== 0);
-    missionProgressConfirmButton.innerHTML = deltaValue === 0
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR</span>'
-      : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"}</span>`;
+    missionProgressConfirmButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">${deltaValue < 0 ? "SUBTRAIR" : "ADICIONAR"}</span>`;
   }
   missionProgressMinusButton?.classList.remove("active");
   missionProgressPlusButton?.classList.add("active");
@@ -13959,6 +13994,21 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
   return { ratio: safeRatio, width, background };
 }
 
+function formatLimitLastProgress(goal) {
+  const lastProgressMs = new Date(goal?.lastProgressAt || "").getTime();
+  if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcação ainda";
+  const elapsedMinutes = Math.max(0, Math.floor((getServerNowMs() - lastProgressMs) / 60000));
+  if (elapsedMinutes < 1) return "Última vez agora";
+  if (elapsedMinutes < 60) return `Última vez em ${elapsedMinutes}min`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `Última vez em ${elapsedHours}h`;
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  if (elapsedDays < 30) return `Última vez em ${elapsedDays} ${elapsedDays === 1 ? "dia" : "dias"}`;
+  const elapsedMonths = Math.floor(elapsedDays / 30);
+  if (elapsedDays < 365) return `Última vez em ${elapsedMonths} ${elapsedMonths === 1 ? "mês" : "meses"}`;
+  const elapsedYears = Math.floor(elapsedDays / 365);
+  return `Última vez em ${elapsedYears} ${elapsedYears === 1 ? "ano" : "anos"}`;
+}
 function formatMissionRangeProgress(progress, days) {
   const total = Math.max(0, Math.trunc(Number(progress || 0)));
   const average = total / Math.max(1, Number(days || 1));
@@ -13983,7 +14033,7 @@ function createMissionCard(goal, initialPercent = null) {
     : dailyVariantProgress
       ? dailyVariantProgress.label
       : limit
-        ? `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))} · ${Math.round(limitVisual.ratio)}% do limite esperado`
+        ? formatLimitLastProgress(goal)
         : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
@@ -15365,6 +15415,8 @@ actionCategoryGrid?.addEventListener("click", (event) => {
   if (!button) return;
   actionCategorySelectionId = normalizeTaskCategoryId(button.dataset.categoryId);
   state.startDecisionContext.categoryManuallySelected = true;
+  state.wizard.categoryResolved = true;
+  state.wizard.categoryThinking = false;
   state.wizard.categoryId = actionCategorySelectionId;
   state.wizard.categoryName = getTaskCategoryName(actionCategorySelectionId);
   renderActionCategoryPicker();
@@ -15378,6 +15430,8 @@ actionCategoryGrid?.addEventListener("click", (event) => {
 confirmActionCategoryModal?.addEventListener("click", () => {
   if (!actionCategorySelectionId) return;
   state.startDecisionContext.categoryManuallySelected = true;
+  state.wizard.categoryResolved = true;
+  state.wizard.categoryThinking = false;
   state.wizard.categoryId = normalizeTaskCategoryId(actionCategorySelectionId);
   state.wizard.categoryName = getTaskCategoryName(state.wizard.categoryId);
   renderActionCategoryPicker();
@@ -15393,17 +15447,22 @@ taskTitle?.addEventListener("input", () => {
   }
   const title = taskTitle.value.trim();
   state.startDecisionContext.categoryManuallySelected = false;
+  state.wizard.categoryResolved = false;
+  state.wizard.categoryThinking = Boolean(title);
+  state.wizard.svgIconUrl = "";
+  state.wizard.svgIconLabel = "";
   if (!title) {
     state.wizard.categoryId = "planejamento";
     state.wizard.categoryName = "Propósito";
-    state.wizard.svgIconUrl = "";
-    state.wizard.svgIconLabel = "";
     renderActionCategoryPicker();
+    if (isTaskComposerMode()) renderTaskComposerModal();
     return;
   }
+  renderActionCategoryPicker();
+  if (isTaskComposerMode()) renderTaskComposerModal();
   actionCategoryInterpretTimer = window.setTimeout(() => {
     void interpretActionCategoryFromTitle(title);
-  }, 3000);
+  }, 900);
 });
 closePlatformWizardButton?.addEventListener("click", closePlatformWizard);
 platformNameMicButton?.addEventListener("click", () => {
@@ -16000,7 +16059,7 @@ missionTitleInput?.addEventListener("input", () => { if (missionCreateStatus) mi
 missionTargetInput?.addEventListener("input", () => { if (missionCreateStatus) missionCreateStatus.textContent = ""; });
 missionCreateConfirmButton?.addEventListener("click", () => {
   void (async () => {
-    if (Number(state.missionCreate?.step || 0) < 3) {
+    if (Number(state.missionCreate?.step || 0) < 2) {
       moveMissionCreateStep(1);
       return;
     }
@@ -16009,11 +16068,7 @@ missionCreateConfirmButton?.addEventListener("click", () => {
     const goalKind = normalizeMissionKind(state.missionCreate?.goalKind);
     const stepError = validateMissionCreateStep(2);
     if (stepError) { if (missionCreateStatus) missionCreateStatus.textContent = stepError; return; }
-    if (!state.missionCreate?.timeConfigured) {
-      if (missionCreateStatus) missionCreateStatus.textContent = "Defina o tempo por unidade antes de criar.";
-      openMissionTimeModal("create");
-      return;
-    }
+
     if (state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "mission") {
       const proposal = { type: "mission", goalKind, title, targetValue, unitDurationSeconds: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), svgIconUrl: "", svgIconLabel: "" };
       state.tutorProposalDraft = { active: false, type: "" };
@@ -16386,11 +16441,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
   if (!goalId) {
     return;
   }
-  if (deltaValue === 0) {
-    closeModal("missionProgressModal");
-    void openMissionRunModal(goalId);
-    return;
-  }
+  if (deltaValue === 0) return;
 
   const rollback = {
     missions: (state.missions || []).map((item) => ({ ...item })),

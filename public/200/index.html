@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260724-actions-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260724-aspect-mission-v2" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -363,8 +363,8 @@
           <span>Definir música</span>
         </button>
         <button class="start-decision-task-meta start-decision-meta-btn start-decision-aspect-btn" type="button" id="startDecisionAspectLabel">
-          <img src="/200/aspect-icons/proposito.svg" alt="" aria-hidden="true" />
-          <span>Propósito</span>
+          <img src="/200/icons/plataformas.svg" alt="" aria-hidden="true" />
+          <span>Aspecto</span>
         </button>
       </div>
       <div class="start-decision-bottom">
@@ -496,8 +496,11 @@
             <label class="step-label" for="taskTitle">Titulo da Tarefa</label>
             <input id="taskTitle" class="text-field" name="title" autocomplete="off" maxlength="80" />
             <button class="category-picker-trigger" type="button" id="actionCategoryTrigger" aria-label="Selecionar categoria">
-              <img class="task-avatar" id="actionCategoryPreviewIcon" src="/200/avatars/rose.png" alt="Categoria da tarefa" />
-              <span id="actionCategoryPreviewLabel">Propósito</span>
+              <span class="action-category-icon-stage">
+                <img class="task-avatar" id="actionCategoryPreviewIcon" src="/200/icons/plataformas.svg" alt="Aspecto da tarefa" />
+                <span class="action-category-thinking-loop" aria-hidden="true"></span>
+              </span>
+              <span id="actionCategoryPreviewLabel">Aspecto</span>
             </button>
           </section>
 
@@ -1370,15 +1373,6 @@
             <p id="missionCreateTargetCopy">Defina a meta diária que mostrará o seu progresso.</p>
             <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Ex.: 8 vezes por dia" />
           </section>
-          <section class="mission-guide-step" data-mission-create-step="3" aria-labelledby="missionCreateTimeStep">
-            <span class="mission-guide-number">3</span>
-            <h2 id="missionCreateTimeStep">Quanto tempo leva uma vez?</h2>
-            <p id="missionCreateTimeCopy">Escolha a duração de uma execução para o relógio acompanhar cada atividade.</p>
-            <button class="mission-guide-time-button" type="button" id="openMissionCreateTimeButton" aria-label="Definir quanto tempo leva uma missão">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1 1 0 0 1 1 1v3.3l2.5 1.5a1 1 0 1 1-1 1.8l-3-1.8a1 1 0 0 1-.5-.86V8.2a1 1 0 0 1 1-1Zm0-5.2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z" fill="currentColor"/></svg>
-              <span class="history-mission-time-summary" id="missionCreateTimeSummary">Definir tempo por missão</span>
-            </button>
-          </section>
         </div>
         <p class="finance-status" id="missionCreateStatus" aria-live="polite"></p>
       </div>
@@ -1419,16 +1413,13 @@
           <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="5">+5</button>
           <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="10">+10</button>
         </div>
-        <div class="history-mission-time-summary" id="missionAdjustTimeSummary">Tempo por unidade: 0 min</div>
+
         <p class="finance-status" id="missionAdjustHint" aria-live="polite">Meta diária 1x</p>
         <p class="finance-status" id="missionAdjustStatus" aria-live="polite"></p>
       </div>
-      <div class="history-mission-modal-footer history-mission-modal-footer-four">
+      <div class="history-mission-modal-footer history-mission-modal-footer-three">
         <button class="history-mission-footer-icon history-mission-footer-icon-blue" type="button" id="openMissionVariantsButton" aria-label="Abrir micro-tarefas da missão">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h14v2H6V5Zm0 6h14v2H6v-2Zm0 6h14v2H6v-2ZM3 5h2v2H3V5Zm0 6h2v2H3v-2Zm0 6h2v2H3v-2Z" fill="currentColor"/></svg>
-        </button>
-        <button class="history-mission-footer-icon history-mission-footer-icon-blue" type="button" id="openMissionAdjustTimeButton" aria-label="Editar tempo">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.2a1 1 0 0 1 1 1v3.3l2.5 1.5a1 1 0 1 1-1 1.8l-3-1.8a1 1 0 0 1-.5-.86V8.2a1 1 0 0 1 1-1Zm0-5.2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z" fill="currentColor"/></svg>
         </button>
         <button class="history-mission-footer-icon history-mission-footer-icon-green" type="button" id="missionAdjustConfirm" aria-label="Salvar número">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z" fill="currentColor"/></svg>
@@ -1747,7 +1738,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260724-actions-v1"></script>
+  <script type="module" src="/200/project.js?v=20260724-aspect-mission-v2"></script>
 </body>
 </html>
 

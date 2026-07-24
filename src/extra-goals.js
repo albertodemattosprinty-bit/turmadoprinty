@@ -118,6 +118,7 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
     unitDurationMinutes,
     unitDurationSeconds,
     progressValue,
+    lastProgressAt: row.last_progress_at ? new Date(row.last_progress_at).toISOString() : null,
     remainingValue: Math.max(0, targetValue - progressValue),
     percent: Math.max(0, Math.min(100, Math.round((progressValue / targetValue) * 100))),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
@@ -291,6 +292,7 @@ export async function ensureExtraGoalsSchema() {
       svg_icon_label text not null default '',
       progress_value integer not null default 0,
       progress_date date,
+      last_progress_at timestamptz,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     );
@@ -300,6 +302,7 @@ export async function ensureExtraGoalsSchema() {
   await query("update extra_goals set goal_kind = 'goal' where goal_kind is null or goal_kind not in ('goal', 'limit');");
   await query("alter table extra_goals add column if not exists progress_value integer not null default 0;");
   await query("alter table extra_goals add column if not exists progress_date date;");
+  await query("alter table extra_goals add column if not exists last_progress_at timestamptz;");
   await query("alter table extra_goals add column if not exists unit_duration_minutes integer not null default 0;");
   await query("alter table extra_goals add column if not exists unit_duration_seconds integer not null default 0;");
   await query("update extra_goals set unit_duration_seconds = unit_duration_minutes * 60 where unit_duration_seconds <= 0 and unit_duration_minutes > 0;");
@@ -620,6 +623,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
         progress_value,
         progress_date,
         to_char(progress_date, 'YYYY-MM-DD') as progress_date_key,
+        last_progress_at,
         created_at,
         updated_at
       from extra_goals
@@ -768,6 +772,7 @@ export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_
         progress_value,
         progress_date,
         to_char(progress_date, 'YYYY-MM-DD') as progress_date_key,
+        last_progress_at,
         created_at,
         updated_at
       from extra_goals
@@ -856,12 +861,13 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
       update extra_goals
       set progress_value = $4,
           progress_date = $5::date,
+          last_progress_at = case when $6 > 0 then now() else last_progress_at end,
           updated_at = now()
       where id = $1
         and user_id = $2
         and assigned_profile = $3
     `,
-    [safeGoalId, userId, normalizedProfile, nextProgress, dateKey]
+    [safeGoalId, userId, normalizedProfile, nextProgress, dateKey, safeDelta]
   );
   const safeVariantIds = [...new Set([
     ...(Array.isArray(variantIds) ? variantIds : []),
