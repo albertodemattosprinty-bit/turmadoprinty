@@ -239,6 +239,11 @@ const metricPeriodModal = document.getElementById("metricPeriodModal");
 const metricPeriodOptions = document.getElementById("metricPeriodOptions");
 const metricPeriodHint = document.getElementById("metricPeriodHint");
 const metricPeriodStatus = document.getElementById("metricPeriodStatus");
+const actionDateModal = document.getElementById("actionDateModal");
+const actionDateDay = document.getElementById("actionDateDay");
+const actionDateMonth = document.getElementById("actionDateMonth");
+const actionDateYear = document.getElementById("actionDateYear");
+const actionDateConfirm = document.getElementById("actionDateConfirm");
 const statsAllMissionsButton = document.getElementById("statsAllMissionsButton");
 const statsMissionSummary = document.getElementById("statsMissionSummary");
 const statsMissionTotal = document.getElementById("statsMissionTotal");
@@ -491,6 +496,7 @@ const missionScopeNextButton = document.getElementById("missionScopeNextButton")
 const missionPeriodButton = document.getElementById("missionPeriodButton");
 const openMissionCreateHeroButton = document.getElementById("openMissionCreateHero");
 const openMissionCreateButton = document.getElementById("openMissionCreateButton");
+const openMissionCreateFloatingButton = document.getElementById("openMissionCreateFloatingButton");
 const missionKindToggle = document.getElementById("missionKindToggle");
 const missionKindToggleLabel = document.getElementById("missionKindToggleLabel");
 const missionKindIcon = document.getElementById("missionKindIcon");
@@ -1066,6 +1072,7 @@ const state = {
   statsPeriodDays: 1,
   historySpan: { loaded: false, loading: false, maxDays: 1, firstOccurredAt: null, originSource: "none" },
   metricPeriodTarget: "",
+  actionDatePickerKey: "",
   forceHomeOverview: false,
   platformOffset: 0,
   statsScopeIndex: 0,
@@ -2357,27 +2364,56 @@ function missionNotificationId(value) {
 
 async function scheduleMissionNotifications() {
   const notifications = window.Capacitor?.Plugins?.LocalNotifications || null;
-  if (!state.options.missionNotificationsEnabled || !notifications?.schedule) return;
+  if (!notifications) return;
   try {
     const pending = await notifications.getPending?.();
-    const previous = (pending?.notifications || []).filter((item) => item?.extra?.kind === "project200-mission-active-time");
-    if (previous.length && notifications.cancel) await notifications.cancel({ notifications: previous.map((item) => ({ id: item.id })) });
+    const previous = (pending?.notifications || []).filter((item) => [
+      "project200-mission-active-time",
+      "project200-action-upcoming"
+    ].includes(item?.extra?.kind));
+    if (previous.length && notifications.cancel) {
+      await notifications.cancel({ notifications: previous.map((item) => ({ id: item.id })) });
+    }
+    if (!state.options.missionNotificationsEnabled || !notifications.schedule) return;
+
     const nowMs = getServerNowMs();
     const scheduled = [];
-    buildMissionInstallments({ availableOnly: false, nowMs }).forEach((entry) => {
-      [{ tier: "orange", offset: 60 }, { tier: "red", offset: 180 }].forEach(({ tier, offset }) => {
-        const atMs = entry.dueAtMs + (offset * 60000);
-        if (atMs <= nowMs || scheduled.length >= 48) return;
+    const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
+    if (mode === "dynamic") {
+      const activeWindow = getActiveTimeWindow(nowMs);
+      for (let slot = 1; slot <= 12; slot += 1) {
+        const atMs = activeWindow.startMs + Math.round((activeWindow.durationMinutes * 60000 * slot) / 12);
+        if (atMs <= nowMs || atMs > activeWindow.endMs) continue;
+        const overdueCount = buildMissionInstallments({ availableOnly: false, nowMs: atMs })
+          .filter((entry) => Number(entry.delayMinutes || 0) > 15)
+          .length;
+        if (overdueCount < 1) continue;
         scheduled.push({
-          id: missionNotificationId(`${entry.id}-${tier}`),
-          title: tier === "red" ? "Missão muito atrasada" : "Missão atrasada",
-          body: `${entry.title} · parcela ${entry.installmentNumber} de ${entry.target}`,
+          id: missionNotificationId(`mission-summary-${activeWindow.dateKey}-${slot}`),
+          title: "Missões iLife",
+          body: `Você tem ${overdueCount} ${overdueCount === 1 ? "missão atrasada" : "missões atrasadas"}`,
           channelId: "ilife-missions",
           schedule: { at: new Date(atMs) },
-          extra: { kind: "project200-mission-active-time", goalId: entry.goalId, tier }
+          extra: { kind: "project200-mission-active-time", overdueCount, slot }
         });
+      }
+    }
+
+    getVisibleActions().forEach((action) => {
+      if (normalizeActionStatus(action?.status) !== actionStatuses.pending) return;
+      const startMs = new Date(action?.startAt).getTime();
+      const reminderMs = startMs - (15 * 60000);
+      if (!Number.isFinite(startMs) || reminderMs <= nowMs || scheduled.length >= 60) return;
+      scheduled.push({
+        id: missionNotificationId(`action-upcoming-${action.id}-${action.startAt}`),
+        title: "Próxima tarefa",
+        body: `Tarefa ${String(action.title || "programada").trim()} em 15 minutos`,
+        channelId: "ilife-missions",
+        schedule: { at: new Date(reminderMs) },
+        extra: { kind: "project200-action-upcoming", actionId: action.id }
       });
     });
+
     if (scheduled.length) await notifications.schedule({ notifications: scheduled });
   } catch {}
 }
@@ -2385,7 +2421,7 @@ async function scheduleMissionNotifications() {
 function renderActionsMissionFilter() {
   if (!actionsMissionFilterButton) return;
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  const isAvailable = Boolean(getToken()) && state.activeOffset === 0 && mode !== "hide";
+  const isAvailable = Boolean(getToken()) && mode !== "hide";
   actionsMissionFilterButton.hidden = !isAvailable;
   const filterActive = mode === "dynamic" ? state.actionsDynamicMissionsVisible : state.actionsMissionOnly;
   actionsMissionFilterButton.classList.toggle("is-filtering", filterActive);
@@ -2401,7 +2437,7 @@ function renderActionsMissionFilter() {
   if (actionsMissionOverdueBadge) {
     actionsMissionOverdueBadge.hidden = overdueCount < 1;
     actionsMissionOverdueBadge.textContent = overdueCount > 99 ? "99+" : String(overdueCount);
-    actionsMissionOverdueBadge.setAttribute("aria-label", `${overdueCount} parcelas atrasadas`);
+    actionsMissionOverdueBadge.setAttribute("aria-label", `${overdueCount} missões atrasadas`);
   }
 }
 function getAvailableMissionById(goalId) {
@@ -5956,7 +5992,7 @@ function openModal(id) {
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
 
-  if (id === "actionsModal") state.actionPeriodDays = 1;
+  if (id === "actionsModal") { state.actionPeriodDays = 1; state.activeOffset = 0; }
   if (id === "historyModal") { state.missionPeriodDays = 1; state.missionKindFilter = "goal"; }
   if (id === "statsModal") state.statsPeriodDays = 1;
 
@@ -6575,8 +6611,73 @@ async function saveFinanceNotes() {
   }
 }
 
+function isActionsMissionViewActive() {
+  const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  return mode === "dynamic" ? state.actionsDynamicMissionsVisible : mode === "separate" && state.actionsMissionOnly;
+}
+
+function getActionDatePickerParts() {
+  const dateKey = state.actionDatePickerKey || getProjectDateKey(dateFromOffset(state.activeOffset));
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return { year, month, day };
+}
+
+function setActionDatePickerParts(year, month, day) {
+  const normalizedMonth = new Date(Date.UTC(year, month - 1, 1));
+  const nextYear = normalizedMonth.getUTCFullYear();
+  const nextMonth = normalizedMonth.getUTCMonth() + 1;
+  const maxDay = new Date(Date.UTC(nextYear, nextMonth, 0)).getUTCDate();
+  state.actionDatePickerKey = `${nextYear}-${nextMonth}-${Math.max(1, Math.min(maxDay, day))}`;
+  renderActionDatePicker();
+}
+
+function renderActionDatePicker() {
+  const { year, month, day } = getActionDatePickerParts();
+  if (actionDateDay) actionDateDay.textContent = String(day).padStart(2, "0");
+  if (actionDateMonth) actionDateMonth.textContent = monthLabels[Math.max(0, Math.min(11, month - 1))];
+  if (actionDateYear) actionDateYear.textContent = String(year);
+}
+
+function shiftActionDatePicker(part, delta) {
+  const { year, month, day } = getActionDatePickerParts();
+  if (part === "day") {
+    state.actionDatePickerKey = addDaysToDateKey(state.actionDatePickerKey, delta);
+    renderActionDatePicker();
+    return;
+  }
+  if (part === "month") setActionDatePickerParts(year, month + delta, day);
+  if (part === "year") setActionDatePickerParts(year + delta, month, day);
+}
+
+function openActionDateSelector() {
+  state.actionDatePickerKey = getProjectDateKey(dateFromOffset(state.activeOffset));
+  renderActionDatePicker();
+  openModal("actionDateModal");
+}
+
+async function applyActionDateSelection() {
+  const todayKey = getProjectDateKey(new Date(getServerNowMs()));
+  const selectedKey = state.actionDatePickerKey || todayKey;
+  const toUtcDay = (dateKey) => {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  state.activeOffset = Math.round((toUtcDay(selectedKey) - toUtcDay(todayKey)) / 86400000);
+  state.actionPeriodDays = 1;
+  closeModal("actionDateModal");
+  renderDateHeader();
+  await loadActions();
+  await loadActionMissions();
+}
+
 function renderDateHeader() {
-  if (activeDateLabel) activeDateLabel.textContent = formatMetricPeriodLabel(state.actionPeriodDays);
+  if (!activeDateLabel) return;
+  if (isActionsMissionViewActive() || state.activeOffset === 0) {
+    activeDateLabel.textContent = "Hoje";
+    return;
+  }
+  const parts = getProjectDateTimeParts(dateFromOffset(state.activeOffset));
+  activeDateLabel.textContent = `${String(parts.day).padStart(2, "0")} ${monthLabels[parts.month - 1]} ${parts.year}`;
 }
 
 function formatActionPeriodTime(value) {
@@ -6598,20 +6699,15 @@ function renderActions() {
     return;
   }
 
-  const dynamicMissionEntries = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
-    && state.actionsDynamicMissionsVisible
-    && state.activeOffset === 0
-    ? buildMissionInstallments()
-    : [];
-  const timelineEntries = [...buildActionTimelineEntries(), ...dynamicMissionEntries]
+  const showDynamicMissionView = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
+    && state.actionsDynamicMissionsVisible;
+  const dynamicMissionEntries = showDynamicMissionView ? buildMissionInstallments() : [];
+  const timelineEntries = (showDynamicMissionView ? dynamicMissionEntries : buildActionTimelineEntries())
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
-  const showMissionsSuccess = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
-    && state.actionsDynamicMissionsVisible
-    && state.activeOffset === 0
-    && dynamicMissionEntries.length === 0;
+  const showMissionsSuccess = showDynamicMissionView && dynamicMissionEntries.length === 0;
 
   if (showMissionsSuccess) {
-    actionsList.insertAdjacentHTML("beforeend", '<section class="actions-missions-success" aria-label="Tudo em dia com suas missões"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7.8 12.2 2.7 2.7 5.8-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><strong>Tudo em dia com suas missões</strong></section>');
+    actionsList.insertAdjacentHTML("beforeend", '<section class="actions-missions-success" aria-label="Tudo em dia com suas missões"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7.8 12.2 2.7 2.7 5.8-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><strong><span>Tudo em dia com</span><span>suas missões</span></strong></section>');
   }
   if (!timelineEntries.length && !showMissionsSuccess) {
     actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse período.</div>';
@@ -6635,7 +6731,7 @@ function renderActions() {
         ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: missionIcon.categoryIcon })}
         <div class="task-main">
           <div class="task-title">${escapeHtml(action.title)}</div>
-          <div class="task-assignee task-duration">Parcela ${action.installmentNumber} de ${action.target}</div>
+          <div class="task-assignee task-duration">${action.installmentNumber} de ${action.target}</div>
         </div>
         <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
       `;
@@ -6708,7 +6804,7 @@ function renderActions() {
   });
 
   renderActionsProgress();
-  if (state.actionsMissionOnly) {
+  if (isActionsMissionViewActive()) {
     actionsProgress.hidden = true;
   }
   renderHomeRunningTask();
@@ -6879,6 +6975,7 @@ async function loadActions(options = {}) {
       state.runtimeState = null;
     }
     renderActions();
+    if (state.activeOffset === 0) void scheduleMissionNotifications();
     registerDayCloseEventIfNeeded();
   } catch (error) {
     state.homeSnapshotReady = false;
@@ -15183,9 +15280,25 @@ document.querySelectorAll("[data-close-modal]").forEach((button) => {
 
 document.querySelectorAll("[data-metric-period-target]").forEach((button) => {
   button.addEventListener("click", () => {
-    void openMetricPeriodSelector(String(button.dataset.metricPeriodTarget || "actions"));
+    const target = String(button.dataset.metricPeriodTarget || "actions");
+    if (target !== "actions") {
+      void openMetricPeriodSelector(target);
+      return;
+    }
+    if (isActionsMissionViewActive()) {
+      state.activeOffset = 0;
+      state.actionPeriodDays = 1;
+      renderDateHeader();
+      renderActions();
+      return;
+    }
+    openActionDateSelector();
   });
 });
+document.querySelectorAll("[data-action-date-part][data-action-date-delta]").forEach((button) => {
+  button.addEventListener("click", () => shiftActionDatePicker(String(button.dataset.actionDatePart || "day"), Number(button.dataset.actionDateDelta || 0)));
+});
+actionDateConfirm?.addEventListener("click", () => { void applyActionDateSelection(); });
 metricPeriodOptions?.addEventListener("click", (event) => {
   const option = event.target.closest("[data-metric-period-days]");
   if (!option) return;
@@ -15209,7 +15322,10 @@ openActionWizardButton.addEventListener("click", () => {
     redirectToProject200Login();
     return;
   }
-
+  if (isActionsMissionViewActive()) {
+    openMissionCreateModal();
+    return;
+  }
   openTaskComposer();
 });
 
@@ -15859,6 +15975,7 @@ statsAspectLinksConfirmSaveButton?.addEventListener("click", () => void saveStat
 
 openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
 openMissionCreateButton?.addEventListener("click", openMissionCreateModal);
+openMissionCreateFloatingButton?.addEventListener("click", openMissionCreateModal);
 missionScopePrevButton?.addEventListener("click", () => {
   void shiftMissionHistoryScope(-1);
 });
@@ -16942,9 +17059,15 @@ actionsMissionFilterButton?.addEventListener("click", () => {
   if (mode === "hide") return;
   if (mode === "dynamic") {
     state.actionsDynamicMissionsVisible = !state.actionsDynamicMissionsVisible;
+    if (state.actionsDynamicMissionsVisible) {
+      state.activeOffset = 0;
+      state.actionPeriodDays = 1;
+      void loadActionMissions();
+    }
   } else {
     state.actionsMissionOnly = !state.actionsMissionOnly;
   }
+  renderDateHeader();
   renderActions();
   window.requestAnimationFrame(() => {
     const target = mode === "separate" && state.actionsMissionOnly ? actionsMissionsPanel : actionsList;

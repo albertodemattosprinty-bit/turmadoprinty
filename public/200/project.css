@@ -11559,3 +11559,98 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
   .mission-kind-toggle { left: calc(50% + 29px); }
   .aspect-selector-panel { padding-inline: 14px; }
 }
+
+/* Contextual mission controls, exact action date and native-tap cleanup. */
+#actionsModal .actions-mission-filter-btn,
+#actionsModal .actions-mission-filter-btn img,
+#actionsModal .actions-mission-toggle {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#actionsModal .actions-mission-filter-btn.is-filtering { opacity: 1; }
+#actionsModal .actions-mission-filter-btn img { opacity: 1 !important; pointer-events: none; }
+#actionsModal .actions-mission-toggle { pointer-events: auto; cursor: pointer; }
+.actions-missions-success strong {
+  display: grid;
+  gap: 0;
+  font-size: clamp(1.31rem, 4.375vw, 1.69rem);
+  line-height: 1.2;
+}
+.actions-missions-success strong span { display: block; }
+
+#historyModal .missions-floating-add {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 28;
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #29c86d, #11954a);
+  color: #fff !important;
+  box-shadow: 0 16px 34px rgba(11, 136, 62, 0.38);
+  cursor: pointer;
+}
+#historyModal .missions-floating-add svg {
+  width: 38px;
+  height: 38px;
+  color: #fff !important;
+  fill: currentColor;
+}
+#historyModal .history-missions-list { padding-bottom: 102px; }
+
+#actionDateModal.workspace-modal {
+  z-index: 2700;
+  align-items: center;
+  justify-items: center;
+  padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+  background: rgba(2, 8, 23, .62) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(.82);
+  backdrop-filter: blur(18px) saturate(.82);
+}
+#actionDateModal.workspace-modal.active { display: grid; }
+.action-date-panel {
+  width: min(100%, 480px);
+  padding: 22px;
+  border: 1px solid rgba(148, 163, 184, .2);
+  border-radius: 28px;
+  background: linear-gradient(160deg, rgba(15, 28, 55, .98), rgba(7, 16, 34, .98));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, .42);
+}
+.action-date-rows { display: grid; gap: 12px; margin: 24px 0; }
+.action-date-row {
+  display: grid;
+  grid-template-columns: minmax(68px, .7fr) 48px minmax(112px, 1.3fr) 48px;
+  align-items: center;
+  gap: 8px;
+  min-height: 66px;
+  padding: 8px 10px 8px 18px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 19px;
+  background: rgba(30, 48, 82, .72);
+  color: #fff;
+}
+.action-date-row > span { color: rgba(255,255,255,.62); font-size: .78rem; font-weight: 900; text-transform: uppercase; }
+.action-date-row > strong { text-align: center; font-size: 1.05rem; font-weight: 950; }
+.action-date-row > button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, .17);
+  color: #fff;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.action-date-row > button svg { width: 24px; height: 24px; }
+.action-date-confirm { width: 100%; min-height: 54px; }
