@@ -6,8 +6,8 @@
   <title>Projeto 200</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260724-dynamic-settlement-v1" />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/200/project.css?v=20260724-native-keyboard-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -374,6 +374,10 @@
       <input type="time" id="startDecisionStartInput" hidden />
       <input type="time" id="startDecisionEndInput" hidden />
       <input type="date" id="startDecisionDateInput" hidden />
+    </div>
+    <div class="project-native-keyboard" id="projectNativeKeyboard" aria-hidden="true" aria-label="Teclado do iLife">
+      <div class="project-native-keyboard-grip" aria-hidden="true"></div>
+      <div class="project-native-keyboard-rows" id="projectNativeKeyboardRows"></div>
     </div>
   </section>
   <section class="workspace-modal simple-modal" id="startConflictModal" aria-hidden="true" aria-label="Conflito de tarefa em andamento">
@@ -1748,7 +1752,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260724-dynamic-settlement-v1"></script>
+  <script type="module" src="/200/project.js?v=20260724-native-keyboard-v1"></script>
 </body>
 </html>
 

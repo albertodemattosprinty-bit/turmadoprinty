@@ -324,6 +324,8 @@ const wizardBackButton = document.getElementById("wizardBack");
 const wizardNextButton = document.getElementById("wizardNext");
 const wizardMessage = document.getElementById("wizardMessage");
 const taskTitle = document.getElementById("taskTitle");
+const projectNativeKeyboard = document.getElementById("projectNativeKeyboard");
+const projectNativeKeyboardRows = document.getElementById("projectNativeKeyboardRows");
 const actionCategoryTrigger = document.getElementById("actionCategoryTrigger");
 const actionCategoryPreviewIcon = document.getElementById("actionCategoryPreviewIcon");
 const actionCategoryPreviewLabel = document.getElementById("actionCategoryPreviewLabel");
@@ -1361,6 +1363,11 @@ const state = {
     fieldToFocus: "",
     dirty: false,
     categoryManuallySelected: false
+  },
+  nativeKeyboard: {
+    open: false,
+    layout: "letters",
+    shift: true
   },
   uiAnchors: {
     actionsCurrentCentered: false,
@@ -7713,6 +7720,7 @@ function getCurrentTimelineEntry(nowMs, exceptId = "") {
 }
 
 function closeStartDecisionModalWith(value) {
+  closeProjectNativeKeyboard({ commit: false, immediate: true });
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
   closeModal(startDecisionModal);
@@ -7791,6 +7799,147 @@ function renderTaskComposerMeta(button, iconMarkup, label, placeholder = false) 
   button.classList.toggle("is-placeholder", Boolean(placeholder));
 }
 
+function shouldUseProjectNativeKeyboard() {
+  const capacitorNative = Boolean(
+    window.Capacitor?.isNativePlatform?.()
+    || (window.Capacitor?.getPlatform?.() && window.Capacitor.getPlatform() !== "web")
+  );
+  const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(String(window.navigator?.userAgent || ""));
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches === true;
+  return capacitorNative || mobileUserAgent || (coarsePointer && window.innerWidth <= 1100);
+}
+
+function getProjectNativeKeyboardRows() {
+  const symbols = state.nativeKeyboard?.layout === "symbols";
+  if (symbols) {
+    return [
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+      ["@", "#", "$", "&", "*", "-", "+", "=", "(", ")"],
+      [
+        { action: "letters", label: "ABC", className: "is-command" },
+        ",", ".", "?", "!", "'", "\"", "/",
+        { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" },
+        { action: "return", label: "retorno", className: "is-command is-return" }
+      ]
+    ];
+  }
+  const shifted = Boolean(state.nativeKeyboard?.shift);
+  const letter = (value) => shifted ? value.toUpperCase() : value;
+  return [
+    [..."qwertyuiop"].map(letter),
+    [..."asdfghjkl"].map(letter),
+    [
+      { action: "shift", label: "⇧", className: `is-command${shifted ? " is-active" : ""}`, ariaLabel: "Maiúsculas" },
+      ...[..."zxcvbnm"].map(letter),
+      { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" }
+    ],
+    [
+      { action: "symbols", label: "123", className: "is-command" },
+      { action: "space", label: "espaço", className: "is-space" },
+      { action: "return", label: "retorno", className: "is-command is-return" }
+    ]
+  ];
+}
+
+function renderProjectNativeKeyboard() {
+  if (!projectNativeKeyboardRows || !projectNativeKeyboard) return;
+  projectNativeKeyboard.classList.toggle("is-symbols", state.nativeKeyboard?.layout === "symbols");
+  projectNativeKeyboardRows.innerHTML = "";
+  getProjectNativeKeyboardRows().forEach((row) => {
+    const rowElement = document.createElement("div");
+    rowElement.className = "project-native-keyboard-row";
+    row.forEach((entry) => {
+      const descriptor = typeof entry === "string" ? { value: entry, label: entry } : entry;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `project-native-key ${descriptor.className || ""}`.trim();
+      button.textContent = descriptor.label || descriptor.value || "";
+      button.dataset.nativeKeyboardAction = descriptor.action || "character";
+      if (descriptor.value != null) button.dataset.nativeKeyboardValue = descriptor.value;
+      button.setAttribute("aria-label", descriptor.ariaLabel || descriptor.label || descriptor.value || "Tecla");
+      rowElement.appendChild(button);
+    });
+    projectNativeKeyboardRows.appendChild(rowElement);
+  });
+}
+
+function openProjectNativeKeyboard() {
+  if (!shouldUseProjectNativeKeyboard() || !projectNativeKeyboard) return false;
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  state.nativeKeyboard.open = true;
+  state.nativeKeyboard.layout = "letters";
+  state.nativeKeyboard.shift = !String(taskTitle?.value || "").trim();
+  projectNativeKeyboard.setAttribute("aria-hidden", "false");
+  renderProjectNativeKeyboard();
+  document.body.classList.add("project-native-keyboard-open");
+  window.requestAnimationFrame(() => projectNativeKeyboard.classList.add("is-open"));
+  renderTaskComposerModal();
+  return true;
+}
+
+function closeProjectNativeKeyboard({ commit = true, immediate = false } = {}) {
+  if (!projectNativeKeyboard) return;
+  state.nativeKeyboard.open = false;
+  document.body.classList.remove("project-native-keyboard-open");
+  projectNativeKeyboard.classList.remove("is-open");
+  const finish = () => projectNativeKeyboard.setAttribute("aria-hidden", "true");
+  if (immediate) finish();
+  else window.setTimeout(finish, 500);
+  if (commit && taskTitle) {
+    const trimmed = String(taskTitle.value || "").trim().slice(0, 80);
+    if (trimmed !== taskTitle.value) {
+      taskTitle.value = trimmed;
+      taskTitle.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+  if (isTaskComposerMode()) renderTaskComposerModal();
+}
+
+function updateTaskTitleFromNativeKeyboard(nextValue) {
+  if (!taskTitle) return;
+  taskTitle.value = String(nextValue || "").slice(0, 80);
+  markTaskComposerDirty();
+  taskTitle.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function handleProjectNativeKeyboardAction(action, value = "") {
+  const current = String(taskTitle?.value || "");
+  if (action === "shift") {
+    state.nativeKeyboard.shift = !state.nativeKeyboard.shift;
+    renderProjectNativeKeyboard();
+    return;
+  }
+  if (action === "symbols") {
+    state.nativeKeyboard.layout = "symbols";
+    renderProjectNativeKeyboard();
+    return;
+  }
+  if (action === "letters") {
+    state.nativeKeyboard.layout = "letters";
+    renderProjectNativeKeyboard();
+    return;
+  }
+  if (action === "backspace") {
+    updateTaskTitleFromNativeKeyboard(Array.from(current).slice(0, -1).join(""));
+    return;
+  }
+  if (action === "space") {
+    if (current && !current.endsWith(" ")) updateTaskTitleFromNativeKeyboard(`${current} `);
+    return;
+  }
+  if (action === "return") {
+    closeProjectNativeKeyboard({ commit: true });
+    return;
+  }
+  if (action === "character" && value) {
+    updateTaskTitleFromNativeKeyboard(`${current}${value}`);
+    if (state.nativeKeyboard.layout === "letters" && state.nativeKeyboard.shift) {
+      state.nativeKeyboard.shift = false;
+      renderProjectNativeKeyboard();
+    }
+  }
+}
+
 function renderTaskComposerModal() {
   if (!startDecisionContent || !startDecisionTaskTitle) {
     return;
@@ -7805,7 +7954,9 @@ function renderTaskComposerModal() {
   startDecisionTaskTitle.classList.toggle("is-placeholder", !titleValue);
   startDecisionTaskTitle.style.cursor = "pointer";
   if (startDecisionTitleHint) {
-    startDecisionTitleHint.hidden = !awaitingTitle;
+    const keyboardOpen = Boolean(state.nativeKeyboard?.open);
+    startDecisionTitleHint.textContent = keyboardOpen ? "Digite o nome da tarefa" : "Toque para inserir";
+    startDecisionTitleHint.hidden = !awaitingTitle && !keyboardOpen;
   }
   if (closeStartDecisionModal) {
     closeStartDecisionModal.hidden = false;
@@ -7944,6 +8095,7 @@ function openTaskComposerFieldEditor(field) {
     return;
   }
   if (field === "title") {
+    if (openProjectNativeKeyboard()) return;
     const nextTitle = window.prompt("Nome da tarefa:", String(taskTitle?.value || "").trim());
     if (nextTitle == null) return;
     if (taskTitle) {
@@ -17694,6 +17846,11 @@ project200ExportUsernameInput?.addEventListener("keydown", (event) => {
   }
   event.preventDefault();
   void submitProject200Export();
+});
+projectNativeKeyboardRows?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-native-keyboard-action]");
+  if (!(button instanceof HTMLButtonElement)) return;
+  handleProjectNativeKeyboardAction(button.dataset.nativeKeyboardAction || "character", button.dataset.nativeKeyboardValue || "");
 });
 startDecisionTaskTitle?.addEventListener("click", () => {
   if (isTaskComposerMode()) {
