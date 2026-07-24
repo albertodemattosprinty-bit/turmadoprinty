@@ -505,6 +505,9 @@ const missionKindIcon = document.getElementById("missionKindIcon");
 const missionTitleInput = document.getElementById("missionTitleInput");
 const missionTargetInput = document.getElementById("missionTargetInput");
 const missionCreateTargetStep = document.getElementById("missionCreateTargetStep");
+const missionCreateFinalStepTitle = document.getElementById("missionCreateFinalStepTitle");
+const missionCreateLimitIntervalPanel = document.getElementById("missionCreateLimitIntervalPanel");
+const missionCreateTimePanel = document.getElementById("missionCreateTimePanel");
 const missionLimitExampleTitle = document.getElementById("missionLimitExampleTitle");
 const missionLimitIntervalPrevButton = document.getElementById("missionLimitIntervalPrev");
 const missionLimitIntervalLabel = document.getElementById("missionLimitIntervalLabel");
@@ -7814,12 +7817,16 @@ function getProjectNativeKeyboardRows() {
   if (symbols) {
     return [
       ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-      ["@", "#", "$", "&", "*", "-", "+", "=", "(", ")"],
+      ["@", "#", "$", "&", "*", "-", "+", "=", "%"],
+      [
+        { action: "noop", label: "⇧", className: "is-command", ariaLabel: "Maiúsculas indisponíveis em números" },
+        "(", ")", "/", "\\", ":", ";", "\"",
+        { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" }
+      ],
       [
         { action: "letters", label: "ABC", className: "is-command" },
-        ",", ".", "?", "!", "'", "\"", "/",
-        { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" },
-        { action: "return", label: "retorno", className: "is-command is-return" }
+        { action: "space", label: "espaço", className: "is-space" },
+        { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar" }
       ]
     ];
   }
@@ -7836,7 +7843,7 @@ function getProjectNativeKeyboardRows() {
     [
       { action: "symbols", label: "123", className: "is-command" },
       { action: "space", label: "espaço", className: "is-space" },
-      { action: "return", label: "retorno", className: "is-command is-return" }
+      { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar" }
     ]
   ];
 }
@@ -13142,7 +13149,7 @@ function renderMissionKindFilter() {
 
 function renderMissionCreateStep(direction = 0) {
   const kind = state.missionCreate.goalKind;
-  const maxStep = kind === "limit" ? 3 : 2;
+  const maxStep = kind ? 3 : 2;
   const step = Math.max(0, Math.min(maxStep, Math.trunc(Number(state.missionCreate?.step || 0))));
   state.missionCreate.step = step;
   missionCreateSlider?.querySelectorAll("[data-mission-create-step]").forEach((panel) => {
@@ -13168,7 +13175,13 @@ function renderMissionCreateStep(direction = 0) {
   if (missionCreateTargetStep) missionCreateTargetStep.textContent = kind === "limit" ? "Quantas vezes?" : "Quantas vezes por dia?";
   if (missionCreateTargetCopy) missionCreateTargetCopy.textContent = kind === "limit" ? "Defina quantas ocorrências cabem no intervalo. Limites nunca somam pontos." : "Defina a meta diária que mostrará o seu progresso.";
   if (missionTargetInput) missionTargetInput.placeholder = kind === "limit" ? "Ex.: 3 vezes" : "Ex.: 8 vezes por dia";
-  if (openMissionCreateTimeButton) openMissionCreateTimeButton.hidden = kind === "limit";
+  const limitCreation = kind === "limit";
+  if (missionCreateFinalStepTitle) missionCreateFinalStepTitle.textContent = limitCreation ? "Qual é o intervalo?" : "Quanto tempo leva?";
+  if (missionCreateLimitIntervalPanel) missionCreateLimitIntervalPanel.hidden = !limitCreation;
+  if (missionCreateTimePanel) missionCreateTimePanel.hidden = limitCreation;
+  if (openMissionCreateTimeButton) openMissionCreateTimeButton.hidden = limitCreation;
+  if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = "Defina quanto tempo leva cada execução desta missão.";
+  if (missionCreateTimeSummary) missionCreateTimeSummary.textContent = formatMissionDurationValue(normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds));
   const interval = getSelectedLimitInterval();
   if (missionLimitIntervalLabel) missionLimitIntervalLabel.textContent = interval.label;
   if (missionLimitIntervalPrevButton) missionLimitIntervalPrevButton.disabled = Number(state.missionCreate?.limitIntervalIndex || 0) <= 0;
@@ -13193,7 +13206,7 @@ function validateMissionCreateStep(step = state.missionCreate?.step) {
 }
 
 function moveMissionCreateStep(direction) {
-  const maxStep = state.missionCreate?.goalKind === "limit" ? 3 : 2;
+  const maxStep = state.missionCreate?.goalKind ? 3 : 2;
   const current = Math.max(0, Math.min(maxStep, Number(state.missionCreate?.step || 0)));
   if (direction > 0) {
     const error = validateMissionCreateStep(current);
@@ -16349,7 +16362,7 @@ missionLimitIntervalNextButton?.addEventListener("click", () => {
 });
 missionCreateConfirmButton?.addEventListener("click", () => {
   void (async () => {
-    const createMaxStep = state.missionCreate?.goalKind === "limit" ? 3 : 2;
+    const createMaxStep = 3;
     if (Number(state.missionCreate?.step || 0) < createMaxStep) {
       moveMissionCreateStep(1);
       return;
@@ -16848,6 +16861,7 @@ missionQuickAssignGrid?.addEventListener("click", (event) => {
   assignMissionQuickSlot(String(button.dataset.missionQuickSlotAssign || ""));
 });
 openMissionCreateTimeButton?.addEventListener("click", () => {
+  if (normalizeMissionKind(state.missionCreate?.goalKind) === "limit") return;
   openMissionTimeModal("create");
 });
 openMissionVariantsButton?.addEventListener("click", () => {
@@ -16890,7 +16904,7 @@ missionTimeConfirmButton?.addEventListener("click", () => {
     state.missionCreate.unitDurationSeconds = safeValue;
     state.missionCreate.timeConfigured = true;
     if (missionCreateTimeSummary) {
-      missionCreateTimeSummary.textContent = `1 missão leva ${formatMissionDurationValue(safeValue)}`;
+      missionCreateTimeSummary.textContent = formatMissionDurationValue(safeValue);
     }
     if (missionCreateStatus) {
       missionCreateStatus.textContent = `Tempo definido: ${formatMissionUnitDurationLabel(safeValue)}.`;

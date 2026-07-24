@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=20260724-native-keyboard-v1" />
+  <link rel="stylesheet" href="/200/project.css?v=20260724-mission-duration-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -1377,14 +1377,24 @@
             <p id="missionCreateTargetCopy">Defina a meta diária que mostrará o seu progresso.</p>
             <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Ex.: 8 vezes por dia" />
           </section>
-          <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="3" aria-labelledby="missionCreateIntervalStep">
+          <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="3" aria-labelledby="missionCreateFinalStepTitle">
             <span class="mission-guide-number">3</span>
-            <h2 id="missionCreateIntervalStep">Qual é o intervalo?</h2>
-            <p class="mission-limit-example"><strong id="missionLimitExampleTitle">3 Pizza</strong> a cada</p>
-            <div class="mission-limit-interval-picker" role="group" aria-label="Intervalo do limite">
-              <button type="button" id="missionLimitIntervalPrev" aria-label="Intervalo anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-              <strong id="missionLimitIntervalLabel">Dia</strong>
-              <button type="button" id="missionLimitIntervalNext" aria-label="Próximo intervalo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <h2 id="missionCreateFinalStepTitle">Quanto tempo leva?</h2>
+            <div id="missionCreateLimitIntervalPanel" hidden>
+              <p class="mission-limit-example"><strong id="missionLimitExampleTitle">3 Pizza</strong> a cada</p>
+              <div class="mission-limit-interval-picker" role="group" aria-label="Intervalo do limite">
+                <button type="button" id="missionLimitIntervalPrev" aria-label="Intervalo anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                <strong id="missionLimitIntervalLabel">Dia</strong>
+                <button type="button" id="missionLimitIntervalNext" aria-label="Próximo intervalo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </div>
+            </div>
+            <div class="mission-create-time-panel" id="missionCreateTimePanel">
+              <p id="missionCreateTimeCopy">Defina quanto tempo leva cada execução desta missão.</p>
+              <button class="mission-create-time-button" type="button" id="openMissionCreateTimeButton">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg>
+                <span><small>Tempo por missão</small><strong id="missionCreateTimeSummary">30 segundos</strong></span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>
+              </button>
             </div>
           </section>
         </div>
@@ -1752,7 +1762,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260724-native-keyboard-v1"></script>
+  <script type="module" src="/200/project.js?v=20260724-mission-duration-v1"></script>
 </body>
 </html>
 

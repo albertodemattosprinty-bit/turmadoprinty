@@ -11928,3 +11928,57 @@ body.project-native-keyboard-open #startDecisionModal .start-decision-bottom {
     border-radius: 6px;
   }
 }
+
+
+/* A duração pertence somente às Metas/Missões; Limites usam intervalo. */
+.mission-create-time-panel {
+  width: min(100%, 460px);
+  margin: 0 auto;
+}
+.mission-create-time-panel[hidden],
+#missionCreateLimitIntervalPanel[hidden] {
+  display: none !important;
+}
+.mission-create-time-panel > p {
+  margin: 0 0 18px;
+}
+.mission-create-time-button {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 88px;
+  padding: 14px 18px;
+  border: 1px solid rgba(75, 140, 255, .52);
+  border-radius: 22px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(38, 104, 236, .92), rgba(36, 82, 184, .82));
+  box-shadow: 0 16px 36px rgba(19, 70, 168, .3);
+  text-align: left;
+}
+.mission-create-time-button > svg:first-child {
+  width: 42px;
+  height: 42px;
+}
+.mission-create-time-button > svg:last-child {
+  width: 24px;
+  height: 24px;
+  opacity: .78;
+}
+.mission-create-time-button span {
+  display: grid;
+  gap: 3px;
+}
+.mission-create-time-button small {
+  color: rgba(255, 255, 255, .72);
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.mission-create-time-button strong {
+  color: #fff;
+  font-size: clamp(1.25rem, 5vw, 1.7rem);
+  font-weight: 950;
+}
