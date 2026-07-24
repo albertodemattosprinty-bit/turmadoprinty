@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=20260721-home-onboarding-v2";
-import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260722-message-notifications-v1";
+import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260724-chat-avatar-v1";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
 
 import {
@@ -326,6 +326,10 @@ const wizardMessage = document.getElementById("wizardMessage");
 const taskTitle = document.getElementById("taskTitle");
 const projectNativeKeyboard = document.getElementById("projectNativeKeyboard");
 const projectNativeKeyboardRows = document.getElementById("projectNativeKeyboardRows");
+const marinChatModal = document.getElementById("marinChatModal");
+const marinChatForm = document.getElementById("marinChatForm");
+const marinChatInput = document.getElementById("marinChatInput");
+const marinChatComposer = document.querySelector(".marin-chat-composer");
 const actionCategoryTrigger = document.getElementById("actionCategoryTrigger");
 const actionCategoryPreviewIcon = document.getElementById("actionCategoryPreviewIcon");
 const actionCategoryPreviewLabel = document.getElementById("actionCategoryPreviewLabel");
@@ -1370,7 +1374,8 @@ const state = {
   nativeKeyboard: {
     open: false,
     layout: "letters",
-    shift: true
+    shift: true,
+    target: "task"
   },
   uiAnchors: {
     actionsCurrentCentered: false,
@@ -1823,6 +1828,7 @@ function applySelectedProfile(profile) {
   renderProfileFooterVisibility();
   renderHomeRunningTask();
   renderRunningMissionQuickButtons();
+  project200TutorsUi?.refreshHeader?.();
 }
 
 function renderHomeProfileHero() {
@@ -7870,47 +7876,75 @@ function renderProjectNativeKeyboard() {
   });
 }
 
-function openProjectNativeKeyboard() {
+function getProjectNativeKeyboardTarget() {
+  return state.nativeKeyboard?.target === "chat" ? marinChatInput : taskTitle;
+}
+
+function syncProjectNativeKeyboardHeight() {
+  if (!projectNativeKeyboard) return;
+  const height = Math.ceil(projectNativeKeyboard.getBoundingClientRect().height || 0);
+  if (height > 0) {
+    document.documentElement.style.setProperty("--project-native-keyboard-height", height + "px");
+  }
+}
+
+function openProjectNativeKeyboard(target = "task") {
   if (!shouldUseProjectNativeKeyboard() || !projectNativeKeyboard) return false;
+  const normalizedTarget = target === "chat" ? "chat" : "task";
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   state.nativeKeyboard.open = true;
+  state.nativeKeyboard.target = normalizedTarget;
   state.nativeKeyboard.layout = "letters";
-  state.nativeKeyboard.shift = !String(taskTitle?.value || "").trim();
+  state.nativeKeyboard.shift = !String((normalizedTarget === "chat" ? marinChatInput : taskTitle)?.value || "").trim();
   projectNativeKeyboard.setAttribute("aria-hidden", "false");
+  projectNativeKeyboard.dataset.keyboardTarget = normalizedTarget;
   renderProjectNativeKeyboard();
   document.body.classList.add("project-native-keyboard-open");
-  window.requestAnimationFrame(() => projectNativeKeyboard.classList.add("is-open"));
-  renderTaskComposerModal();
+  document.body.classList.toggle("project-native-keyboard-chat-open", normalizedTarget === "chat");
+  window.requestAnimationFrame(() => {
+    syncProjectNativeKeyboardHeight();
+    projectNativeKeyboard.classList.add("is-open");
+  });
+  if (normalizedTarget === "task") renderTaskComposerModal();
   return true;
 }
 
 function closeProjectNativeKeyboard({ commit = true, immediate = false } = {}) {
   if (!projectNativeKeyboard) return;
+  const closingTarget = state.nativeKeyboard?.target || "task";
   state.nativeKeyboard.open = false;
-  document.body.classList.remove("project-native-keyboard-open");
+  document.body.classList.remove("project-native-keyboard-open", "project-native-keyboard-chat-open");
   projectNativeKeyboard.classList.remove("is-open");
-  const finish = () => projectNativeKeyboard.setAttribute("aria-hidden", "true");
+  const finish = () => {
+    if (!state.nativeKeyboard.open) {
+      projectNativeKeyboard.setAttribute("aria-hidden", "true");
+      delete projectNativeKeyboard.dataset.keyboardTarget;
+    }
+  };
   if (immediate) finish();
   else window.setTimeout(finish, 500);
-  if (commit && taskTitle) {
+  if (commit && closingTarget === "task" && taskTitle) {
     const trimmed = String(taskTitle.value || "").trim().slice(0, 80);
     if (trimmed !== taskTitle.value) {
       taskTitle.value = trimmed;
       taskTitle.dispatchEvent(new Event("input", { bubbles: true }));
     }
   }
-  if (isTaskComposerMode()) renderTaskComposerModal();
+  if (closingTarget === "task" && isTaskComposerMode()) renderTaskComposerModal();
 }
 
-function updateTaskTitleFromNativeKeyboard(nextValue) {
-  if (!taskTitle) return;
-  taskTitle.value = String(nextValue || "").slice(0, 80);
-  markTaskComposerDirty();
-  taskTitle.dispatchEvent(new Event("input", { bubbles: true }));
+function updateProjectNativeKeyboardTarget(nextValue) {
+  const target = getProjectNativeKeyboardTarget();
+  if (!target) return;
+  const maxLength = state.nativeKeyboard?.target === "chat" ? 4000 : 80;
+  target.value = String(nextValue || "").slice(0, maxLength);
+  if (state.nativeKeyboard?.target === "task") markTaskComposerDirty();
+  target.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 function handleProjectNativeKeyboardAction(action, value = "") {
-  const current = String(taskTitle?.value || "");
+  const target = getProjectNativeKeyboardTarget();
+  const current = String(target?.value || "");
   if (action === "shift") {
     state.nativeKeyboard.shift = !state.nativeKeyboard.shift;
     renderProjectNativeKeyboard();
@@ -7927,24 +7961,58 @@ function handleProjectNativeKeyboardAction(action, value = "") {
     return;
   }
   if (action === "backspace") {
-    updateTaskTitleFromNativeKeyboard(Array.from(current).slice(0, -1).join(""));
+    updateProjectNativeKeyboardTarget(Array.from(current).slice(0, -1).join(""));
     return;
   }
   if (action === "space") {
-    if (current && !current.endsWith(" ")) updateTaskTitleFromNativeKeyboard(`${current} `);
+    if (current && !current.endsWith(" ")) updateProjectNativeKeyboardTarget(`${current} `);
     return;
   }
   if (action === "return") {
+    if (state.nativeKeyboard?.target === "chat") {
+      if (String(marinChatInput?.value || "").trim()) marinChatForm?.requestSubmit();
+      return;
+    }
     closeProjectNativeKeyboard({ commit: true });
     return;
   }
   if (action === "character" && value) {
-    updateTaskTitleFromNativeKeyboard(`${current}${value}`);
+    updateProjectNativeKeyboardTarget(`${current}${value}`);
     if (state.nativeKeyboard.layout === "letters" && state.nativeKeyboard.shift) {
       state.nativeKeyboard.shift = false;
       renderProjectNativeKeyboard();
     }
   }
+}
+
+function initializeProjectNativeChatKeyboard() {
+  if (!marinChatInput || !marinChatComposer || !marinChatModal || !shouldUseProjectNativeKeyboard()) return;
+  marinChatInput.readOnly = true;
+  marinChatInput.inputMode = "none";
+  marinChatInput.setAttribute("data-native-keyboard-input", "true");
+
+  const openChatKeyboard = (event) => {
+    event?.preventDefault?.();
+    openProjectNativeKeyboard("chat");
+  };
+  marinChatInput.addEventListener("pointerdown", openChatKeyboard);
+  marinChatInput.addEventListener("click", openChatKeyboard);
+  marinChatInput.addEventListener("focus", openChatKeyboard);
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!state.nativeKeyboard?.open || state.nativeKeyboard?.target !== "chat") return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (projectNativeKeyboard?.contains(target) || marinChatComposer.contains(target)) return;
+    closeProjectNativeKeyboard({ commit: false });
+  }, true);
+
+  marinChatModal.querySelectorAll("[data-close-modal]").forEach((button) => {
+    button.addEventListener("click", () => closeProjectNativeKeyboard({ commit: false, immediate: true }));
+  });
+  window.addEventListener("resize", () => {
+    if (state.nativeKeyboard?.open) syncProjectNativeKeyboardHeight();
+  });
 }
 
 function renderTaskComposerModal() {
@@ -8759,6 +8827,7 @@ async function loadProject200Profiles() {
   const payload = await apiRequestWithTimeout("/api/200/profiles", {}, 7000);
   state.profiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
   applySelectedProfile(readSelectedProfile());
+  project200TutorsUi?.refreshHeader?.();
   renderProfileFooter();
   renderHistorySpeakerSelectionOptions();
 }
@@ -18038,12 +18107,14 @@ project200TutorsUi = initializeProject200TutorsUi({
   openModal,
   closeModal,
   getProfileName: () => String(state.selectedProfile || getDefaultProfileName()).trim(),
+  getCurrentProfileAvatar: () => getProfileAvatarPath(getProfileByName(state.selectedProfile) || getDefaultProfile()),
   onRequestProposal: openTutorProposalComposer,
   getNotificationPreferences: () => ({
     enabled: Boolean(state.options.messageNotificationsEnabled),
     soundEnabled: Boolean(state.options.messageNotificationSoundEnabled)
   })
 });
+initializeProjectNativeChatKeyboard();
 const project200OnboardingUi = initializeProject200OnboardingUi({
   getToken,
   getUser: () => state.authUser,

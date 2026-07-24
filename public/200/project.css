@@ -9948,13 +9948,13 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
 
 .marin-chat-identity strong {
   color: var(--white);
-  font-size: 1.05rem;
+  font-size: 1.365rem;
 }
 
 .marin-chat-identity small {
   margin-top: 1px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.884rem;
 }
 
 .marin-chat-messages {
@@ -9972,7 +9972,7 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   margin: auto;
   width: min(88%, 380px);
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 1.144rem;
   line-height: 1.5;
   text-align: center;
 }
@@ -9983,7 +9983,7 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   border-radius: 20px;
   padding: 11px 14px;
   color: #fff;
-  font-size: 0.94rem;
+  font-size: 1.222rem;
   line-height: 1.42;
   overflow-wrap: anywhere;
   animation: marinMessageIn 180ms ease-out both;
@@ -10061,7 +10061,7 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
 .marin-proposal-title {
   display: block;
   color: #ffe26a;
-  font-size: 0.84rem;
+  font-size: 1.092rem;
   font-weight: 800;
   line-height: 1.2;
 }
@@ -10078,7 +10078,7 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   display: block;
   margin-top: 4px;
   color: rgba(255, 255, 255, 0.92);
-  font-size: 0.75rem;
+  font-size: 0.975rem;
   line-height: 1.3;
 }
 
@@ -10112,7 +10112,7 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   min-height: 20px;
   padding: 0 18px 5px;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 0.72rem;
+  font-size: 0.936rem;
 }
 
 .marin-chat-status.is-thinking::after {
@@ -10155,7 +10155,7 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   background: rgba(255, 255, 255, 0.09);
   color: var(--white);
   outline: none;
-  font: 500 0.92rem/1.35 "Exo 2", sans-serif;
+  font: 500 1.196rem/1.35 "Exo 2", sans-serif;
 }
 
 .marin-chat-composer textarea::placeholder {
@@ -11808,10 +11808,10 @@ body[data-background-theme="white"] .mission-limit-interval-picker > strong {
 }
 
 
-/* Teclado iLife: primeira versão exclusiva do compositor de tarefas mobile. */
+/* Teclado iLife compartilhado por tarefas e pelo chat mobile. */
 .project-native-keyboard {
   position: fixed;
-  z-index: 260;
+  z-index: 3900;
   left: 50%;
   bottom: 0;
   width: min(100%, 720px);
@@ -11908,6 +11908,28 @@ body.project-native-keyboard-open #startDecisionModal .start-decision-bottom {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+@keyframes marinChatKeyboardComposerIn {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+body.project-native-keyboard-chat-open .marin-chat-composer {
+  position: fixed;
+  z-index: 3899;
+  left: 50%;
+  bottom: var(--project-native-keyboard-height, 250px);
+  width: min(100%, 720px);
+  padding-bottom: 10px;
+  border-radius: 18px 18px 0 0;
+  background: rgba(7, 18, 43, .96);
+  box-shadow: 0 -12px 34px rgba(0, 0, 0, .24);
+  animation: marinChatKeyboardComposerIn 500ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+body.project-native-keyboard-chat-open .marin-chat-messages {
+  padding-bottom: calc(var(--project-native-keyboard-height, 250px) + 82px);
 }
 
 @media (min-width: 1101px) {

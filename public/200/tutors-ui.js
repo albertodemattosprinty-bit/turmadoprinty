@@ -5,6 +5,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     closeModal,
     showFloatingNotice,
     getProfileName,
+    getCurrentProfileAvatar,
     onRequestProposal,
     getNotificationPreferences
   } = dependencies;
@@ -326,7 +327,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     if (!state.human || !state.activeTutor) {
       if (elements.proposalButton) elements.proposalButton.hidden = true;
       if (elements.chatType) elements.chatType.textContent = "IA do iLife";
-      if (elements.chatPersonButton) elements.chatPersonButton.innerHTML = defaultPersonMarkup;
+      if (elements.chatPersonButton) {
+        const currentAvatar = String(typeof getCurrentProfileAvatar === "function" ? getCurrentProfileAvatar() : "").trim();
+        elements.chatPersonButton.innerHTML = currentAvatar
+          ? `<img class="marin-chat-contact-avatar" src="${currentAvatar.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")}" alt="Seu avatar">`
+          : defaultPersonMarkup;
+      }
       return;
     }
     const name = String(state.activeTutor.name || "Tutor");
@@ -886,6 +892,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     isHumanActive: () => Boolean(state.human && activeContactId()),
     refreshNotificationPreferences,
     primeNotificationSound,
+    refreshHeader: updateHeader,
     stop: () => {
       stopPolling();
       stopInboxPolling();
