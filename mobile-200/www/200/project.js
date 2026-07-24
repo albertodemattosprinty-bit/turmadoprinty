@@ -7037,7 +7037,7 @@ async function toggleActionStatus(actionId, options = {}) {
     }
   }
   if (currentStatus === actionStatuses.inProgress && !options.skipEndConfirm) {
-    openModal("runningTaskModal");
+    openPrimaryRunningSurface({ overview: false });
     closeActionsModalWithFade();
     return;
   }
@@ -7059,7 +7059,7 @@ async function toggleActionStatus(actionId, options = {}) {
       resetRunningCompletionState();
       state.runningLocalStarts[String(targetId)] = getServerNowMs();
       await autoPlayRunningTaskDefaultPreference(updated);
-      openModal("runningTaskModal");
+      openPrimaryRunningSurface({ overview: false });
       closeActionsModalWithFade();
     }
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
