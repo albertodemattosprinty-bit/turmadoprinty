@@ -14613,14 +14613,14 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
     const intervalValue = Math.max(1, Math.trunc(Number(goal?.limitIntervalValue || 1)));
     const intervalUnit = String(goal?.limitIntervalUnit || "day").trim().toLowerCase();
     let elapsedFraction;
+    let startsFromEarlyProgress = false;
     if (intervalValue === 1 && intervalUnit === "day") {
       const activeWindow = getActiveTimeWindow(nowMs);
       const firstProgressMs = new Date(goal?.limitFirstProgressAt || "").getTime();
-      const effectiveStartMs = Number.isFinite(firstProgressMs)
+      startsFromEarlyProgress = Number.isFinite(firstProgressMs)
         && firstProgressMs < activeWindow.startMs
-        && firstProgressMs < activeWindow.endMs
-        ? firstProgressMs
-        : activeWindow.startMs;
+        && firstProgressMs < activeWindow.endMs;
+      const effectiveStartMs = startsFromEarlyProgress ? firstProgressMs : activeWindow.startMs;
       elapsedFraction = Math.max(0, Math.min(
         1,
         (nowMs - effectiveStartMs) / Math.max(1, activeWindow.endMs - effectiveStartMs)
@@ -14632,7 +14632,7 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
         ? Math.max(0, Math.min(1, (nowMs - startMs) / (endMs - startMs)))
         : 1;
     }
-    const expectedLimitNow = target * elapsedFraction;
+    const expectedLimitNow = Math.min(target, (target * elapsedFraction) + (startsFromEarlyProgress ? 1 : 0));
     ratio = progress <= 0
       ? 0
       : expectedLimitNow > 0
