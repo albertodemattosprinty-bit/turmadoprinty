@@ -1,5 +1,6 @@
 import { db, query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
+import { getProject200ConfirmedSleepOverlapSeconds } from "./project200-sleep.js";
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
 const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
@@ -247,6 +248,8 @@ function normalizeExtraGoalRow(row, dateKey = toDateKey()) {
     unitDurationSeconds,
     limitIntervalValue,
     limitIntervalUnit,
+    countSleepTime: row.count_sleep_time !== false,
+    sleepExcludedSeconds: 0,
     limitCycleStartedAt: limitCycle.start.toISOString(),
     limitCycleEndsAt: limitCycle.end.toISOString(),
     progressValue,
@@ -424,6 +427,7 @@ export async function ensureExtraGoalsSchema() {
       limit_interval_value integer not null default 1,
       limit_interval_unit text not null default 'day',
       limit_cycle_started_at timestamptz not null default now(),
+      count_sleep_time boolean not null default true,
       svg_icon_url text not null default '',
       svg_icon_label text not null default '',
       progress_value integer not null default 0,
@@ -446,6 +450,7 @@ export async function ensureExtraGoalsSchema() {
   await query("alter table extra_goals add column if not exists limit_interval_value integer not null default 1;");
   await query("alter table extra_goals add column if not exists limit_interval_unit text not null default 'day';");
   await query("alter table extra_goals add column if not exists limit_cycle_started_at timestamptz not null default now();");
+  await query("alter table extra_goals add column if not exists count_sleep_time boolean not null default true;");
   await query("update extra_goals set limit_interval_value = 1 where limit_interval_value is null or limit_interval_value < 1;");
   await query("update extra_goals set limit_interval_unit = 'day' where limit_interval_unit is null or limit_interval_unit not in ('day', 'week', 'month', 'year');");
   await query("update extra_goals set unit_duration_seconds = unit_duration_minutes * 60 where unit_duration_seconds <= 0 and unit_duration_minutes > 0;");
@@ -811,6 +816,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
         limit_interval_value,
         limit_interval_unit,
         limit_cycle_started_at,
+        count_sleep_time,
         svg_icon_url,
         svg_icon_label,
         progress_value,
@@ -850,14 +856,18 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     }
     variantsByGoalId.get(goalId).push(normalizeExtraGoalVariantRow(row));
   }
-  const goalsWithVariants = goals.map((goal) => {
+  const goalsWithVariants = await Promise.all(goals.map(async (goal) => {
     const variants = variantsByGoalId.get(String(goal.id || "").trim()) || [];
+    const sleepExcludedSeconds = goal.goalKind === "limit" && goal.countSleepTime === false && goal.lastProgressAt
+      ? await getProject200ConfirmedSleepOverlapSeconds(userId, normalizedProfile, goal.lastProgressAt, new Date())
+      : 0;
     return {
       ...goal,
+      sleepExcludedSeconds,
       variantCount: variants.length,
       variants
     };
-  });
+  }));
   await syncCurrentExtraGoalHistory(userId, goalsWithVariants, dateKey);
   return goalsWithVariants;
 }
@@ -964,6 +974,7 @@ export async function getExtraGoalById(userId, profileName = PROJECT200_DEFAULT_
         limit_interval_value,
         limit_interval_unit,
         limit_cycle_started_at,
+        count_sleep_time,
         svg_icon_url,
         svg_icon_label,
         progress_value,
@@ -1314,6 +1325,9 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   const nextUnitDurationMinutes = Math.max(0, Math.trunc(safeNextUnitDurationSeconds / 60));
   const nextLimitIntervalValue = Math.max(1, Math.min(999, Math.trunc(Number(payload?.limitIntervalValue ?? currentGoal?.limitIntervalValue ?? 1) || 1)));
   const nextLimitIntervalUnit = normalizeLimitIntervalUnit(payload?.limitIntervalUnit ?? currentGoal?.limitIntervalUnit);
+  const nextCountSleepTime = nextGoalKind === "limit"
+    ? (payload?.countSleepTime === undefined ? currentGoal?.countSleepTime !== false : payload.countSleepTime !== false)
+    : true;
   if (!nextTargetValue) {
     throw new Error("Informe a unidade diaria da missao.");
   }
@@ -1326,14 +1340,15 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
           unit_duration_seconds = $7,
           limit_interval_value = $8,
           limit_interval_unit = $9,
-          svg_icon_url = $10,
-          svg_icon_label = $11,
+          count_sleep_time = $10,
+          svg_icon_url = $11,
+          svg_icon_label = $12,
           updated_at = now()
       where id = $1
         and user_id = $2
         and assigned_profile = $3
     `,
-    [safeGoalId, userId, normalizedProfile, nextCategoryId, nextTargetValue, nextUnitDurationMinutes, safeNextUnitDurationSeconds, nextLimitIntervalValue, nextLimitIntervalUnit, svgIconUrl, svgIconLabel]
+    [safeGoalId, userId, normalizedProfile, nextCategoryId, nextTargetValue, nextUnitDurationMinutes, safeNextUnitDurationSeconds, nextLimitIntervalValue, nextLimitIntervalUnit, nextCountSleepTime, svgIconUrl, svgIconLabel]
   );
   if (svgIconUrl && currentTitle) {
     await saveExtraGoalSvgDefault(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);

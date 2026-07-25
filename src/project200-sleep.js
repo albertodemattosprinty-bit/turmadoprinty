@@ -23,7 +23,7 @@ function getProjectTimeParts(value = new Date()) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false
+    hourCycle: "h23"
   });
   const parts = formatter.formatToParts(safeDate);
   const read = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
@@ -44,6 +44,28 @@ function toProjectDateKey(value = new Date()) {
   }
   const parts = getProjectTimeParts(value);
   return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+function getProjectTimeZoneOffsetMinutes(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: PROJECT200_TIME_ZONE,
+    timeZoneName: "shortOffset"
+  });
+  const zoneName = formatter.formatToParts(safeDate).find((part) => part.type === "timeZoneName")?.value || "GMT-03:00";
+  const match = zoneName.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/i);
+  if (!match) return -180;
+  const sign = match[1] === "-" ? -1 : 1;
+  return sign * ((Number(match[2] || 0) * 60) + Number(match[3] || 0));
+}
+
+function projectDateKeyToDate(dateKey, hour = 0, minute = 0) {
+  const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return new Date(Number.NaN);
+  const guessUtcMs = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), hour, minute, 0, 0);
+  const offsetMinutes = getProjectTimeZoneOffsetMinutes(new Date(guessUtcMs));
+  return new Date(guessUtcMs - (offsetMinutes * 60000));
 }
 
 function addDaysToDateKey(dateKey, amount) {
@@ -106,7 +128,7 @@ async function getActiveSleepSessionRow(userId, profileName) {
   const profile = normalizeProfileName(profileName);
   const result = await query(
     `
-      select id, assigned_profile, delay_minutes, scheduled_start_at, status
+      select id, assigned_profile, delay_minutes, scheduled_start_at, status, created_at
       from project200_sleep_sessions
       where user_id = $1
         and assigned_profile = $2
@@ -312,6 +334,76 @@ export async function getProject200SleepTotalMinutesForRange(userId, range = {})
   return Math.max(0, Math.trunc(Number(result.rows[0]?.total_minutes || 0) || 0));
 }
 
+export async function getProject200SleepRequirement(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, nowValue = new Date()) {
+  await ensureProject200SleepSchema();
+  const profile = normalizeProfileName(profileName);
+  const now = nowValue instanceof Date && !Number.isNaN(nowValue.getTime()) ? nowValue : new Date();
+  const parts = getProjectTimeParts(now);
+  const sleepDate = toProjectDateKey(now);
+  const totalMinutes = await getSleepDailyTotal(userId, profile, sleepDate);
+  const activeSession = await getActiveSleepSessionRow(userId, profile);
+  return {
+    profileName: profile,
+    sleepDate,
+    totalMinutes,
+    hasActiveSession: Boolean(activeSession?.id),
+    required: parts.hour >= 8 && totalMinutes <= 0 && !activeSession?.id,
+    defaultMinutes: 360,
+    stepMinutes: 15,
+    serverNow: now.toISOString()
+  };
+}
+
+export async function getProject200ConfirmedSleepOverlapSeconds(
+  userId,
+  profileName = PROJECT200_DEFAULT_PROFILE_NAME,
+  fromValue,
+  toValue = new Date()
+) {
+  const profile = normalizeProfileName(profileName);
+  const from = new Date(fromValue || "");
+  const to = new Date(toValue || new Date());
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return 0;
+  const fromDateKey = addDaysToDateKey(toProjectDateKey(from), -1);
+  const toDateKey = addDaysToDateKey(toProjectDateKey(to), 1);
+  const result = await query(
+    `
+      select
+        sleep_user.sleep_date::text as sleep_date,
+        sleep_user.total_minutes,
+        sleep_user.source_session_id,
+        session.completed_at
+      from "sono-user" sleep_user
+      left join project200_sleep_sessions session
+        on session.id = sleep_user.source_session_id
+       and session.user_id = sleep_user.user_id
+       and session.assigned_profile = sleep_user.assigned_profile
+       and session.status = 'completed'
+      where sleep_user.user_id = $1
+        and sleep_user.assigned_profile = $2
+        and sleep_user.total_minutes > 0
+        and sleep_user.sleep_date >= $3::date
+        and sleep_user.sleep_date <= $4::date
+      order by sleep_user.sleep_date asc
+    `,
+    [userId, profile, fromDateKey, toDateKey]
+  );
+  let overlapMs = 0;
+  for (const row of result.rows) {
+    const creditedMinutes = clampSavedMinutes(row.total_minutes);
+    if (!creditedMinutes) continue;
+    const sessionEnd = row.completed_at ? new Date(row.completed_at) : null;
+    const manualEnd = projectDateKeyToDate(String(row.sleep_date || "").slice(0, 10), 8, 0);
+    const periodEnd = sessionEnd && !Number.isNaN(sessionEnd.getTime()) ? sessionEnd : manualEnd;
+    if (Number.isNaN(periodEnd.getTime())) continue;
+    const periodStart = new Date(periodEnd.getTime() - (creditedMinutes * 60000));
+    const clippedStart = Math.max(from.getTime(), periodStart.getTime());
+    const clippedEnd = Math.min(to.getTime(), periodEnd.getTime());
+    if (clippedEnd > clippedStart) overlapMs += clippedEnd - clippedStart;
+  }
+  return Math.max(0, Math.floor(overlapMs / 1000));
+}
+
 export async function listProject200SleepHistory(userId, payload = {}) {
   await ensureProject200SleepSchema();
   const profileName = normalizeProfileName(payload?.profileName);
@@ -354,7 +446,9 @@ export async function updateProject200SleepHistoryEntry(userId, payload = {}) {
        (user_id, assigned_profile, sleep_date, total_minutes, source_session_id, created_at, updated_at)
      values ($1, $2, $3::date, $4, null, now(), now())
      on conflict (user_id, assigned_profile, sleep_date) do update
-       set total_minutes = excluded.total_minutes, updated_at = now()
+       set total_minutes = excluded.total_minutes,
+           source_session_id = null,
+           updated_at = now()
      returning sleep_date::text as sleep_date, total_minutes`,
     [userId, profileName, sleepDate, totalMinutes]
   );

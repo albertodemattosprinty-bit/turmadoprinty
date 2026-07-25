@@ -1207,6 +1207,30 @@
       </div>
     </section>
 
+  <section class="workspace-modal sleep-required-modal" id="sleepRequiredModal" aria-hidden="true" aria-label="Registrar sono de hoje">
+    <div class="sleep-required-shell">
+      <div class="sleep-required-brand">
+        <span>iLife</span>
+        <strong>SONO</strong>
+      </div>
+      <div class="sleep-required-copy">
+        <h1>Quanto você dormiu?</h1>
+        <p>Antes de continuar, registre somente o sono de hoje.</p>
+      </div>
+      <div class="sleep-required-picker">
+        <button type="button" id="sleepRequiredPrev" aria-label="Diminuir 15 minutos">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.8 5.8-6.2 6.2 6.2 6.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <strong id="sleepRequiredValue">6 horas</strong>
+        <button type="button" id="sleepRequiredNext" aria-label="Aumentar 15 minutos">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 5.8 6.2 6.2-6.2 6.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <button class="primary-btn sleep-required-save" type="button" id="sleepRequiredSave">SALVAR SONO</button>
+      <p class="sleep-modal-feedback" id="sleepRequiredStatus" aria-live="polite"></p>
+    </div>
+  </section>
+
   <section class="workspace-modal sleep-music-picker-modal" id="sleepMusicPickerModal" aria-hidden="true" aria-label="Escolher música para o sono">
     <div class="sleep-music-picker-shell">
       <header class="sleep-music-picker-header">
@@ -1438,6 +1462,16 @@
           <button class="history-mission-preset-btn" type="button" data-mission-adjust-add="10">+10</button>
         </div>
 
+        <label class="mission-limit-sleep-option" id="missionLimitSleepOption" hidden>
+          <input type="checkbox" id="missionLimitCountSleepTime" checked />
+          <span class="mission-limit-sleep-check" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m6 12.5 4 4L18.5 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span>
+            <strong>Contabilizar tempo dormindo</strong>
+            <small>Desmarque para pausar apenas o “Última vez” durante o sono confirmado.</small>
+          </span>
+        </label>
         <p class="finance-status" id="missionAdjustHint" aria-live="polite">Meta diária 1x</p>
         <p class="finance-status" id="missionAdjustStatus" aria-live="polite"></p>
       </div>
@@ -1790,7 +1824,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260724-limit-duration-precision-v1"></script>
+  <script type="module" src="/200/project.js?v=20260724-sleep-aware-limits-v1"></script>
 </body>
 </html>
 

@@ -303,6 +303,12 @@ const sleepModalControls = document.getElementById("sleepModalControls");
 const sleepContinueButton = document.getElementById("sleepContinueButton");
 const sleepFinishButton = document.getElementById("sleepFinishButton");
 const sleepAbortButton = document.getElementById("sleepAbortButton");
+const sleepRequiredModal = document.getElementById("sleepRequiredModal");
+const sleepRequiredPrevButton = document.getElementById("sleepRequiredPrev");
+const sleepRequiredValue = document.getElementById("sleepRequiredValue");
+const sleepRequiredNextButton = document.getElementById("sleepRequiredNext");
+const sleepRequiredSaveButton = document.getElementById("sleepRequiredSave");
+const sleepRequiredStatus = document.getElementById("sleepRequiredStatus");
 const sleepMusicToggleButton = document.getElementById("sleepMusicToggleButton");
 const sleepMusicPickerModal = document.getElementById("sleepMusicPickerModal");
 const sleepMusicPickerClose = document.getElementById("sleepMusicPickerClose");
@@ -542,6 +548,8 @@ const missionAdjustMinusButton = document.getElementById("missionAdjustMinus");
 const missionAdjustPlusButton = document.getElementById("missionAdjustPlus");
 const missionAdjustValue = document.getElementById("missionAdjustValue");
 const missionAdjustHint = document.getElementById("missionAdjustHint");
+const missionLimitSleepOption = document.getElementById("missionLimitSleepOption");
+const missionLimitCountSleepTime = document.getElementById("missionLimitCountSleepTime");
 const missionAdjustTimeSummary = document.getElementById("missionAdjustTimeSummary");
 const missionAdjustStatus = document.getElementById("missionAdjustStatus");
 const openMissionVariantsButton = document.getElementById("openMissionVariantsButton");
@@ -1155,6 +1163,16 @@ const state = {
     lastPhase: "",
     fadeStarted: false
   },
+  sleepRequirement: {
+    checked: false,
+    checking: false,
+    required: false,
+    sleepDate: "",
+    minutes: 360,
+    saving: false,
+    checkedAt: 0,
+    profileName: ""
+  },
   social: {
     scopeKey: "today",
     loading: false,
@@ -1196,7 +1214,8 @@ const state = {
     goalId: "",
     goalKind: "goal",
     targetValue: 1,
-    unitDurationSeconds: 30
+    unitDurationSeconds: 30,
+    countSleepTime: true
   },
   missionCreate: {
     goalKind: "",
@@ -1846,6 +1865,9 @@ function applySelectedProfile(profile) {
   const matched = getProfileByName(profile);
   const next = matched?.name || getDefaultProfileName();
   state.selectedProfile = next;
+  state.sleepRequirement.checked = false;
+  state.sleepRequirement.checkedAt = 0;
+  state.sleepRequirement.profileName = next;
   loadMissionQuickSlots(next);
   loadStatsAspectConfig(next);
   document.body.dataset.profile = next;
@@ -6153,6 +6175,9 @@ function closeModal(modal) {
     modal = document.getElementById(modal);
   }
   if (!modal) {
+    return;
+  }
+  if (modal.id === "sleepRequiredModal" && state.sleepRequirement?.required) {
     return;
   }
 
@@ -12145,6 +12170,89 @@ async function hydrateSleepSession(profileName = state.selectedProfile || getDef
   }
 }
 
+function renderSleepRequirementModal() {
+  const minutes = Math.max(15, Math.min(720, Math.round(Number(state.sleepRequirement?.minutes || 360) / 15) * 15));
+  state.sleepRequirement.minutes = minutes;
+  if (sleepRequiredValue) sleepRequiredValue.textContent = formatMinutesHuman(minutes);
+  if (sleepRequiredPrevButton) sleepRequiredPrevButton.disabled = minutes <= 15;
+  if (sleepRequiredNextButton) sleepRequiredNextButton.disabled = minutes >= 720;
+  if (sleepRequiredSaveButton) sleepRequiredSaveButton.disabled = Boolean(state.sleepRequirement?.saving);
+}
+
+function shiftSleepRequirementMinutes(direction) {
+  state.sleepRequirement.minutes = Math.max(15, Math.min(720, Number(state.sleepRequirement?.minutes || 360) + (Number(direction || 0) * 15)));
+  renderSleepRequirementModal();
+}
+
+async function checkSleepRequirementAfterInteraction() {
+  if (
+    !getToken()
+    || !state.authUser
+    || !state.homeSnapshotReady
+    || state.authUser?.onboardingRequired
+    || state.project200Onboarding?.required
+    || project200OnboardingUi?.isActive?.()
+    || state.sleepRequirement?.checking
+    || state.sleepRequirement?.required
+  ) return;
+  const profile = normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName;
+  const recentlyChecked = state.sleepRequirement.checked
+    && state.sleepRequirement.profileName === profile
+    && (Date.now() - Number(state.sleepRequirement.checkedAt || 0)) < 60000;
+  if (recentlyChecked) return;
+  state.sleepRequirement.checking = true;
+  try {
+    const payload = await apiRequest(`/api/200/sleep-required?profile=${encodeURIComponent(profile)}`, {
+      skipGlobalLoading: true
+    });
+    const requirement = payload?.requirement || {};
+    state.sleepRequirement.checked = true;
+    state.sleepRequirement.checkedAt = Date.now();
+    state.sleepRequirement.profileName = profile;
+    state.sleepRequirement.sleepDate = String(requirement.sleepDate || "");
+    state.sleepRequirement.minutes = Math.max(15, Number(requirement.defaultMinutes || 360));
+    state.sleepRequirement.required = Boolean(requirement.required);
+    if (state.sleepRequirement.required) {
+      if (sleepRequiredStatus) sleepRequiredStatus.textContent = "";
+      renderSleepRequirementModal();
+      openModal("sleepRequiredModal");
+    }
+  } catch {
+    state.sleepRequirement.checked = false;
+  } finally {
+    state.sleepRequirement.checking = false;
+  }
+}
+
+async function saveRequiredSleep() {
+  const sleepDate = String(state.sleepRequirement?.sleepDate || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sleepDate) || state.sleepRequirement?.saving) return;
+  state.sleepRequirement.saving = true;
+  renderSleepRequirementModal();
+  if (sleepRequiredStatus) sleepRequiredStatus.textContent = "Salvando sono de hoje...";
+  try {
+    const profile = normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName;
+    await apiRequest(`/api/200/sleep-history/${encodeURIComponent(sleepDate)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, totalMinutes: state.sleepRequirement.minutes }),
+      skipGlobalLoading: true
+    });
+    state.sleepRequirement.required = false;
+    state.sleepRequirement.checked = true;
+    state.sleepRequirement.checkedAt = Date.now();
+    closeModal("sleepRequiredModal");
+    await Promise.allSettled([loadMissions(), loadActionMissions(), loadStatsSummary()]);
+    renderMissions();
+    renderActions();
+  } catch (error) {
+    if (sleepRequiredStatus) sleepRequiredStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar o sono.";
+  } finally {
+    state.sleepRequirement.saving = false;
+    renderSleepRequirementModal();
+  }
+}
+
 async function openSleepModal() {
   state.sleepModal.controlsVisible = false;
   if (sleepModalFeedback) {
@@ -13455,6 +13563,8 @@ function renderMissionAdjustState() {
   const adjustQuestion = adjustModal?.querySelector(".mission-modal-explainer h2");
   if (adjustEyebrow) adjustEyebrow.textContent = limit ? "Editar limite" : "Editar meta";
   if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite?" : "Qual será a meta diária?";
+  if (missionLimitSleepOption) missionLimitSleepOption.hidden = !limit;
+  if (missionLimitCountSleepTime) missionLimitCountSleepTime.checked = state.missionAdjust?.countSleepTime !== false;
 
   missionAdjustMinusButton?.classList.remove("active");
   missionAdjustPlusButton?.classList.add("active");
@@ -13497,6 +13607,7 @@ function openMissionAdjustModal(goalId) {
     goalKind: normalizeMissionKind(goal.goalKind),
     targetValue: Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1)),
     unitDurationSeconds: isLimitGoal(goal) ? 0 : getMissionUnitDurationSeconds(goal),
+    countSleepTime: goal.countSleepTime !== false,
     limitIntervalValue: Math.max(1, Math.trunc(Number(goal.limitIntervalValue || 1))),
     limitIntervalUnit: String(goal.limitIntervalUnit || "day")
   };
@@ -14553,7 +14664,10 @@ function formatLimitElapsedDuration(totalSeconds) {
 function formatLimitLastProgress(goal) {
   const lastProgressMs = new Date(goal?.lastProgressAt || "").getTime();
   if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcação ainda";
-  const elapsedSeconds = Math.max(0, Math.floor((getServerNowMs() - lastProgressMs) / 1000));
+  const excludedSleepSeconds = goal?.countSleepTime === false
+    ? Math.max(0, Math.floor(Number(goal?.sleepExcludedSeconds || 0)))
+    : 0;
+  const elapsedSeconds = Math.max(0, Math.floor((getServerNowMs() - lastProgressMs) / 1000) - excludedSleepSeconds);
   if (elapsedSeconds < 60) return "Última vez agora";
   return `Última vez em ${formatLimitElapsedDuration(elapsedSeconds)}`;
 }
@@ -16914,6 +17028,10 @@ missionAdjustPlusButton?.addEventListener("click", () => {
   state.missionAdjust.targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) + 1);
   renderMissionAdjustState();
 });
+missionLimitCountSleepTime?.addEventListener("change", () => {
+  state.missionAdjust.countSleepTime = Boolean(missionLimitCountSleepTime.checked);
+  renderMissionAdjustState();
+});
 
 statsAspectTargetMinusButton?.addEventListener("click", () => {
   state.statsAspectModal.targetMinutes = Math.max(1, Math.trunc(Number(state.statsAspectModal.targetMinutes || 1) || 1) - 1);
@@ -17124,6 +17242,9 @@ sleepMusicPickerStop?.addEventListener("click", () => {
 sleepModalCloseButton?.addEventListener("click", () => {
   closeModal("sleepModal");
 });
+sleepRequiredPrevButton?.addEventListener("click", () => shiftSleepRequirementMinutes(-1));
+sleepRequiredNextButton?.addEventListener("click", () => shiftSleepRequirementMinutes(1));
+sleepRequiredSaveButton?.addEventListener("click", () => void saveRequiredSleep());
 
 sleepHistoryCloseButton?.addEventListener("click", () => closeModal("sleepHistoryModal"));
 sleepHistoryList?.addEventListener("click", (event) => {
@@ -17281,6 +17402,7 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
           unitDurationSeconds: normalizeMissionKind(state.missionAdjust?.goalKind) === "limit" ? 0 : normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
           limitIntervalValue: Math.max(1, Math.trunc(Number(state.missionAdjust?.limitIntervalValue || 1))),
           limitIntervalUnit: String(state.missionAdjust?.limitIntervalUnit || "day"),
+          countSleepTime: state.missionAdjust?.countSleepTime !== false,
           svgIconUrl: String(goal?.svgIconUrl || "").trim(),
           svgIconLabel: String(goal?.svgIconLabel || "").trim()
         })
@@ -18638,6 +18760,10 @@ document.addEventListener("selectstart", (event) => {
   if (isEditableTarget(event.target)) return;
   event.preventDefault();
 });
+document.addEventListener("pointerdown", (event) => {
+  if (event.target.closest("#sleepRequiredModal")) return;
+  void checkSleepRequirementAfterInteraction();
+}, true);
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);
 historyDeleteWordButton?.addEventListener("pointerdown", startDeleteHold);
