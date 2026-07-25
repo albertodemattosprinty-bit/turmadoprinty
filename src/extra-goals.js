@@ -842,6 +842,21 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
       }
       return String(left.title || "").localeCompare(String(right.title || ""), "pt-BR");
     });
+  const firstLimitProgressResult = await query(`
+    select goal_id, min(occurred_at) as first_progress_at
+    from extra_goal_progress_events
+    where user_id = $1
+      and assigned_profile = $2
+      and deleted_at is null
+      and (occurred_at at time zone '${EXTRA_GOALS_TIME_ZONE}')::date = $3::date
+    group by goal_id
+  `, [userId, normalizedProfile, dateKey]);
+  const firstLimitProgressByGoalId = new Map(
+    firstLimitProgressResult.rows.map((row) => [
+      String(row.goal_id || "").trim(),
+      row.first_progress_at ? new Date(row.first_progress_at).toISOString() : null
+    ])
+  );
   const variantsResult = await query(`
     select id, goal_id, title, interval_value, interval_unit, last_completed_at, created_at, updated_at
     from extra_goal_variants
@@ -864,6 +879,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     return {
       ...goal,
       sleepExcludedSeconds,
+      limitFirstProgressAt: firstLimitProgressByGoalId.get(String(goal.id || "").trim()) || null,
       variantCount: variants.length,
       variants
     };

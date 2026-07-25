@@ -14615,9 +14615,15 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
     let elapsedFraction;
     if (intervalValue === 1 && intervalUnit === "day") {
       const activeWindow = getActiveTimeWindow(nowMs);
+      const firstProgressMs = new Date(goal?.limitFirstProgressAt || "").getTime();
+      const effectiveStartMs = Number.isFinite(firstProgressMs)
+        && firstProgressMs < activeWindow.startMs
+        && firstProgressMs < activeWindow.endMs
+        ? firstProgressMs
+        : activeWindow.startMs;
       elapsedFraction = Math.max(0, Math.min(
         1,
-        (nowMs - activeWindow.startMs) / Math.max(1, activeWindow.endMs - activeWindow.startMs)
+        (nowMs - effectiveStartMs) / Math.max(1, activeWindow.endMs - effectiveStartMs)
       ));
     } else {
       const startMs = new Date(goal?.limitCycleStartedAt || goal?.createdAt || "").getTime();
@@ -14627,15 +14633,22 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
         : 1;
     }
     const expectedLimitNow = target * elapsedFraction;
-    ratio = progress <= 0 ? 0 : expectedLimitNow > 0 ? (progress / expectedLimitNow) * 100 : 400;
+    ratio = progress <= 0
+      ? 0
+      : expectedLimitNow > 0
+        ? (progress / expectedLimitNow) * 100
+        : (progress / target) * 100;
   }
-  const safeRatio = Math.max(0, Math.min(400, ratio));
-  const width = Math.min(100, 40 + (Math.min(100, safeRatio) * 0.6));
-  const blackCoverage = safeRatio > 200 ? Math.min(100, (safeRatio - 200) / 2) : 0;
+  const organicRatio = Math.max(0, Number.isFinite(ratio) ? ratio : 0);
+  const visualRatio = Math.min(400, organicRatio);
+  const width = Math.min(100, 40 + (Math.min(100, visualRatio) * 0.6));
+  const blackCoverage = visualRatio > 200 ? Math.min(100, (visualRatio - 200) / 2) : 0;
   const background = blackCoverage > 0
     ? `linear-gradient(90deg, #050505 0 ${blackCoverage}%, #e23b3b ${blackCoverage}% 100%)`
-    : interpolateLimitColor(safeRatio);
-  return { ratio: safeRatio, width, background };
+    : interpolateLimitColor(visualRatio);
+  const labelTone = interpolateLimitColor(visualRatio);
+  const labelBackground = `linear-gradient(90deg, ${labelTone} 0%, ${labelTone} 18%, transparent 100%)`;
+  return { ratio: organicRatio, width, background, labelBackground };
 }
 
 function formatLimitElapsedDuration(totalSeconds) {
@@ -14900,7 +14913,7 @@ function createMissionCard(goal, initialPercent = null) {
       <div class="history-mission-card-info">
         ${goalIcon ? buildTaskAvatarMarkup(goalIcon.src, goalIcon.alt, { categoryIcon: goalIcon.categoryIcon }) : ""}
         <div><h3 class="history-mission-card-title">${escapeHtml(String(goal.title || (limit ? "Limite" : "Meta")))}${hasMicrotasks ? '<svg class="history-mission-folder-icon" viewBox="0 0 24 24" aria-label="Meta com microtarefas" role="img"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg>' : ""}</h3>
-        <div class="history-mission-card-progress${showLimitRatio ? " is-limit-ratio" : ""}"${showLimitRatio ? ` style="background:${limitVisual.background};"` : ""}>${escapeHtml(progressLabel)}</div></div>
+        <div class="history-mission-card-progress${showLimitRatio ? " is-limit-ratio" : ""}"${showLimitRatio ? ` style="background:${limitVisual.labelBackground};"` : ""}>${escapeHtml(progressLabel)}</div></div>
       </div>
       <div class="history-mission-card-actions"><button class="history-mission-card-edit" type="button" data-mission-goal-edit="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Editar ${String(goal.title || (limit ? "limite" : "meta"))}`)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg></button></div>
     </div>

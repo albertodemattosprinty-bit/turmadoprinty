@@ -11830,10 +11830,13 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
   font-size: clamp(1.18rem, 4.8vw, 1.72rem);
   font-weight: 850;
 }
-.mission-limit-example strong,
-.history-mission-card.is-limit .history-mission-card-title {
+.mission-limit-example strong {
   color: #ff8418 !important;
   text-shadow: 0 0 18px rgba(255, 132, 24, 0.2);
+}
+.history-mission-card.is-limit .history-mission-card-title {
+  color: #fff !important;
+  text-shadow: none;
 }
 .mission-limit-interval-picker {
   display: grid;
@@ -11867,10 +11870,10 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
   text-align: center;
 }
 .history-mission-card-progress.is-limit-ratio {
-  color: transparent !important;
-  background-clip: text !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent;
+  color: #fff !important;
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
+  -webkit-text-fill-color: #fff;
 }
 body[data-background-theme="white"] .mission-limit-interval-picker > strong {
   color: #242b35;
