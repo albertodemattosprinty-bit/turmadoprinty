@@ -175,19 +175,46 @@ export function initializeProject200MarinUi(dependencies = {}) {
     }
   }
 
+  const ASPECT_ICONS = Object.freeze({
+    sono: "/200/aspect-icons/sono.svg",
+    alimentacao: "/200/aspect-icons/alimentacao.svg",
+    hidratacao: "/200/aspect-icons/hidratacao.svg",
+    aprendizado: "/200/aspect-icons/aprendizado.svg",
+    trabalho: "/200/aspect-icons/trabalho.svg",
+    casa: "/200/aspect-icons/casa.svg",
+    exercicios: "/200/aspect-icons/exercicios.svg",
+    social: "/200/aspect-icons/social.svg",
+    planejamento: "/200/aspect-icons/proposito.svg",
+    higiene: "/200/aspect-icons/higiene.svg",
+    lazer: "/200/aspect-icons/lazer.svg",
+    aspecto: "/200/aspect-icons/familia.svg"
+  });
+
   function proposalMeta(proposal) {
     if (proposal.type === "action") {
       const dateLine = proposal.dateLabel || (proposal.startAt ? new Date(proposal.startAt).toLocaleDateString("pt-BR") : "");
       const timeLine = proposal.timeLabel || (proposal.durationMinutes ? proposal.durationMinutes + " minutos" : "");
       return [dateLine, timeLine].filter(Boolean);
     }
-    if (proposal.type === "mission") {
+    if (proposal.type === "mission" || proposal.type === "limit") {
       const amount = Number(proposal.targetValue || 1);
       const itemLabel = amount === 1 ? "1 item" : amount + " itens";
+      if (proposal.type === "limit") {
+        const units = { day: "dia", week: "semana", month: "mes", year: "ano" };
+        const interval = Number(proposal.limitIntervalValue || 1);
+        return [itemLabel + " a cada " + interval + " " + (units[proposal.limitIntervalUnit] || "dia")].filter(Boolean);
+      }
       const durationLabel = Number(proposal.unitDurationMinutes || 0) > 0
         ? proposal.unitDurationMinutes + " minutos por item"
         : "";
       return [itemLabel, durationLabel].filter(Boolean);
+    }
+    if (proposal.type === "aspect") {
+      const links = Array.isArray(proposal.missionGoalIds) ? proposal.missionGoalIds.length : 0;
+      return [
+        links ? links + (links === 1 ? " missao vinculada" : " missoes vinculadas") : "Acoes do aspecto",
+        proposal.useManualTarget ? proposal.targetMinutes + " minutos de meta manual" : ""
+      ].filter(Boolean);
     }
     const nature = proposal.financeKind === "INCOME" ? "Entrada" : "Saída";
     const money = typeof formatMoney === "function" ? formatMoney(Number(proposal.amountCents || 0)) : "";
@@ -196,8 +223,28 @@ export function initializeProject200MarinUi(dependencies = {}) {
 
   function proposalIcon(proposal) {
     if (proposal.type === "action") return "/200/icons/acts.svg";
-    if (proposal.type === "mission") return "/200/icons/target.svg";
+    if (proposal.type === "mission" || proposal.type === "limit") return "/200/icons/target.svg";
+    if (proposal.type === "aspect" || proposal.type === "context") {
+      return ASPECT_ICONS[proposal.aspectId] || "/200/icons/target.svg";
+    }
     return "/200/icons/financas.svg";
+  }
+
+  function createDataLine(proposal) {
+    const line = document.createElement("div");
+    line.className = "marin-data-line";
+    const icon = document.createElement("img");
+    icon.className = "marin-data-line-icon";
+    icon.src = proposalIcon(proposal);
+    icon.alt = "";
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = proposal.title;
+    const summary = document.createElement("span");
+    summary.textContent = proposal.summary;
+    copy.append(title, summary);
+    line.append(icon, copy);
+    return line;
   }
 
   function createProposalCard(message, proposal) {
@@ -205,6 +252,8 @@ export function initializeProject200MarinUi(dependencies = {}) {
     button.type = "button";
     button.className = "marin-proposal-card";
     button.classList.toggle("is-finance", proposal.type === "finance");
+    button.classList.toggle("is-limit", proposal.type === "limit");
+    button.classList.toggle("is-aspect", proposal.type === "aspect");
     button.classList.toggle("is-finance-income", proposal.type === "finance" && proposal.financeKind === "INCOME");
     button.classList.toggle("is-finance-expense", proposal.type === "finance" && proposal.financeKind !== "INCOME");
     button.classList.toggle("is-applied", Boolean(proposal._applied));
@@ -249,6 +298,13 @@ export function initializeProject200MarinUi(dependencies = {}) {
     }
 
     state.messages.forEach((message) => {
+      const proposals = Array.isArray(message.proposals) ? message.proposals : [];
+      if (message.role === "assistant") {
+        proposals
+          .filter((proposal) => proposal?.type === "context")
+          .slice(0, 3)
+          .forEach((proposal) => elements.messages.appendChild(createDataLine(proposal)));
+      }
       const bubble = document.createElement("article");
       bubble.className = "marin-message " + (message.role === "user" ? "is-user" : "is-assistant");
       const copy = document.createElement("div");
@@ -257,10 +313,11 @@ export function initializeProject200MarinUi(dependencies = {}) {
       bubble.appendChild(copy);
       elements.messages.appendChild(bubble);
 
-      if (message.role === "assistant" && Array.isArray(message.proposals) && message.proposals.length) {
+      const actionable = proposals.filter((proposal) => proposal?.type !== "context").slice(0, 8);
+      if (message.role === "assistant" && actionable.length) {
         const list = document.createElement("div");
         list.className = "marin-proposal-list";
-        message.proposals.slice(0, 8).forEach((proposal) => list.appendChild(createProposalCard(message, proposal)));
+        actionable.forEach((proposal) => list.appendChild(createProposalCard(message, proposal)));
         elements.messages.appendChild(list);
       }
     });

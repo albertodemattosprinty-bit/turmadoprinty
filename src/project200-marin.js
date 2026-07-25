@@ -298,7 +298,7 @@ export async function appendProject200MarinMessage(userId, conversationId, paylo
   const role = payload?.role === "assistant" ? "assistant" : "user";
   const content = String(payload?.content || "").trim();
   if (!content) throw new Error("Mensagem vazia.");
-  const proposals = Array.isArray(payload?.proposals) ? payload.proposals.slice(0, 8) : [];
+  const proposals = Array.isArray(payload?.proposals) ? payload.proposals.slice(0, 12) : [];
   const messageId = crypto.randomUUID();
   const [contentEncrypted, proposalsEncrypted] = await Promise.all([
     encryptUserJson(userId, content, messageEncryptionContext(messageId, "content")),

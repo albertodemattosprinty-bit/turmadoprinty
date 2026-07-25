@@ -3403,9 +3403,23 @@ const PROJECT200_MARIN_ASPECT_IDS = new Set([
 const PROJECT200_MARIN_REPLY_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["message", "proposals"],
+  required: ["message", "dataLines", "proposals"],
   properties: {
     message: { type: "string", maxLength: 400 },
+    dataLines: {
+      type: "array",
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["aspectId", "title", "summary"],
+        properties: {
+          aspectId: { type: ["string", "null"] },
+          title: { type: "string", minLength: 2, maxLength: 70 },
+          summary: { type: "string", minLength: 2, maxLength: 150 }
+        }
+      }
+    },
     proposals: {
       type: "array",
       maxItems: 8,
@@ -3416,10 +3430,12 @@ const PROJECT200_MARIN_REPLY_SCHEMA = {
           "type", "title", "description", "aspectId", "dateLabel", "timeLabel",
           "startAt", "endAt", "durationMinutes", "targetValue", "unitDurationMinutes",
           "financeKind", "amountCents", "settlementType", "scheduleMode",
-          "scheduleFrequency", "scheduleConfig", "startsOn", "endsOn"
+          "scheduleFrequency", "scheduleConfig", "startsOn", "endsOn",
+          "limitIntervalValue", "limitIntervalUnit", "missionGoalIds",
+          "targetMinutes", "useManualTarget"
         ],
         properties: {
-          type: { type: "string", enum: ["action", "mission", "finance"] },
+          type: { type: "string", enum: ["action", "mission", "limit", "aspect", "finance"] },
           title: { type: "string", minLength: 2, maxLength: 90 },
           description: { type: ["string", "null"], maxLength: 180 },
           aspectId: { type: ["string", "null"] },
@@ -3430,6 +3446,11 @@ const PROJECT200_MARIN_REPLY_SCHEMA = {
           durationMinutes: { type: ["integer", "null"], minimum: 1, maximum: 1440 },
           targetValue: { type: ["integer", "null"], minimum: 1, maximum: 10000 },
           unitDurationMinutes: { type: ["integer", "null"], minimum: 0, maximum: 1440 },
+          limitIntervalValue: { type: ["integer", "null"], minimum: 1, maximum: 999 },
+          limitIntervalUnit: { type: ["string", "null"], enum: ["day", "week", "month", "year", null] },
+          missionGoalIds: { type: "array", items: { type: "string" }, maxItems: 50 },
+          targetMinutes: { type: ["integer", "null"], minimum: 1, maximum: 100000 },
+          useManualTarget: { type: ["boolean", "null"] },
           financeKind: { type: ["string", "null"], enum: ["INCOME", "EXPENSE", null] },
           amountCents: { type: ["integer", "null"], minimum: 1 },
           settlementType: { type: ["string", "null"], enum: ["CASH", "FUTURE", null] },
@@ -3482,17 +3503,25 @@ function shortenProject200MarinMessage(value) {
   return (boundary > 280 ? clipped.slice(0, boundary) : clipped).trimEnd() + "...";
 }
 
+function normalizeProject200MarinSearchText(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function detectProject200MarinContextAreas(message) {
-  const normalized = String(message || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const normalized = normalizeProject200MarinSearchText(message);
   const areas = new Set();
   if (/\b(dinheiro|financ|entrada|saida|receb|pagar|pagamento|divida|credito|debito|conta|renda|salario|valor|reais)\b/.test(normalized)) areas.add("finance");
   if (/\b(missao|missoes|meta|habito|objetivo|vezes|repetir|progresso)\b/.test(normalized)) areas.add("missions");
-  if (/\b(acao|acoes|tarefa|tarefas|agenda|rotina|horario|hora|minuto|hoje|amanha|semana)\b/.test(normalized)) areas.add("actions");
-  if (/\b(estatistica|aspecto|barra|ponto|pontos|evolucao|desempenho|qualidade de vida|como estou|minha vida)\b/.test(normalized)) areas.add("stats");
-  if (/\b(plano de vida|planejar minha vida|organizar minha vida)\b/.test(normalized)) {
+  if (/\b(limite|limites|vicio|vicios|impulso|impulsos|ultima vez|recorde|recordes)\b/.test(normalized)) areas.add("limits");
+  if (/\b(acao|acoes|tarefa|tarefas|agenda|rotina|horario|hora|minuto|hoje|amanha|semana|escovacao|escovar|dentes)\b/.test(normalized)) areas.add("actions");
+  if (/\b(estatistica|aspecto|aspectos|barra|ponto|pontos|evolucao|desempenho|qualidade de vida|como estou|minha vida|sono|alimentacao|hidratacao|aprendizado|trabalho|casa|exercicio|exercicios|social|proposito|planejamento|higiene|lazer|familia|escovacao|escovar|dentes)\b/.test(normalized)) areas.add("stats");
+  if (/\b(media|medias|historico|historia|ultimos|dias|semanal|mensal|desde|periodo|frequencia|consistencia|tendencia)\b/.test(normalized)) areas.add("history");
+  if (/\b(plano de vida|planejar minha vida|organizar minha vida|analise tudo|analisar tudo|visao completa|todos os meus dados)\b/.test(normalized)) {
     areas.add("actions");
     areas.add("missions");
+    areas.add("limits");
     areas.add("stats");
+    areas.add("history");
   }
   return [...areas];
 }
@@ -3508,7 +3537,68 @@ function chooseProject200MarinModel(message, areas) {
   return { model: PROJECT200_MARIN_MODEL_LUNA, reason: "fast-conversation", effort: "none" };
 }
 
-async function buildProject200MarinUserContext(user, profileName, areas) {
+function getProject200MarinHistoryDays(message) {
+  const normalized = normalizeProject200MarinSearchText(message);
+  const explicit = normalized.match(/\b(\d{1,4})\s*dias?\b/);
+  if (explicit) return Math.max(1, Math.min(3650, Number(explicit[1]) || 7));
+  if (/\b(ano|anual|12 meses)\b/.test(normalized)) return 365;
+  if (/\b(6 meses|seis meses)\b/.test(normalized)) return 180;
+  if (/\b(mes|mensal|30 dias)\b/.test(normalized)) return 30;
+  if (/\b(15 dias|quinze dias)\b/.test(normalized)) return 15;
+  return 7;
+}
+
+async function getProject200MarinActionHistory(userId, profileName, days) {
+  const result = await query(
+    `
+      select
+        lower(trim(a.title)) as title_key,
+        min(a.title) as title,
+        min(coalesce(nullif(trim(a.category_id), ''), 'planejamento')) as aspect_id,
+        count(*)::int as scheduled_count,
+        count(*) filter (where upper(coalesce(o.status, 'PENDING')) = 'COMPLETED')::int as completed_count,
+        count(distinct (a.start_at at time zone $4)::date)::int as scheduled_days,
+        count(distinct (o.completed_at at time zone $4)::date)
+          filter (where upper(coalesce(o.status, 'PENDING')) = 'COMPLETED')::int as completed_days,
+        coalesce(sum(extract(epoch from (a.end_at - a.start_at)) / 60.0), 0)::numeric as planned_minutes,
+        coalesce(sum(
+          extract(epoch from (a.end_at - a.start_at)) / 60.0
+          * greatest(0, least(100, case
+              when upper(coalesce(o.status, 'PENDING')) = 'COMPLETED' then 100
+              else coalesce(o.completion_percent, 0)
+            end)) / 100.0
+        ), 0)::numeric as completed_minutes,
+        min(a.start_at) as first_at,
+        max(coalesce(o.completed_at, a.start_at)) as last_at
+      from actions a
+      left join action_status_overrides o
+        on o.user_id = a.user_id and o.action_id = a.id
+      where a.user_id = $1
+        and lower(trim(a.assignee)) = $2
+        and a.start_at >= now() - ($3::int * interval '1 day')
+      group by lower(trim(a.title))
+      order by completed_minutes desc, scheduled_count desc
+      limit 100
+    `,
+    [userId, String(profileName || "").trim().toLowerCase(), days, PROJECT200_TIME_ZONE]
+  );
+  return result.rows.map((row) => ({
+    title: row.title,
+    aspectId: row.aspect_id,
+    days,
+    scheduledCount: Number(row.scheduled_count || 0),
+    completedCount: Number(row.completed_count || 0),
+    completedDays: Number(row.completed_days || 0),
+    averageCompletionsPerDay: Number((Number(row.completed_count || 0) / days).toFixed(2)),
+    plannedMinutes: Math.round(Number(row.planned_minutes || 0)),
+    completedMinutes: Math.round(Number(row.completed_minutes || 0)),
+    averageCompletedMinutesPerDay: Number((Number(row.completed_minutes || 0) / days).toFixed(2)),
+    firstAt: row.first_at ? new Date(row.first_at).toISOString() : null,
+    lastAt: row.last_at ? new Date(row.last_at).toISOString() : null
+  }));
+}
+
+async function buildProject200MarinUserContext(user, profileName, areas, message = "") {
   const serverNow = new Date();
   const serverClock = new Intl.DateTimeFormat("pt-BR", {
     timeZone: PROJECT200_TIME_ZONE,
@@ -3516,6 +3606,8 @@ async function buildProject200MarinUserContext(user, profileName, areas) {
     timeStyle: "short"
   }).format(serverNow);
   const pointTotals = await getProject200UserPointTotals(user.id);
+  const wantsHistory = areas.includes("history");
+  const historyDays = getProject200MarinHistoryDays(message);
 
   const context = {
     profile: profileName,
@@ -3529,35 +3621,114 @@ async function buildProject200MarinUserContext(user, profileName, areas) {
       today: pointTotals.today,
       total: pointTotals.total
     },
-    loadedAreas: areas
+    loadedAreas: areas,
+    queryPolicy: wantsHistory
+      ? "Historico seletivo agregado no PostgreSQL para esta pergunta."
+      : "Somente estado atual necessario para esta pergunta."
   };
   const todayKey = context.today;
   const from = new Date(todayKey + "T00:00:00-03:00");
   const to = new Date(from.getTime() + (8 * 24 * 60 * 60 * 1000));
   const profileNeedle = String(profileName || "").trim().toLowerCase();
 
-  await Promise.all(areas.map(async (area) => {
+  const requestedAreas = areas.filter((area) => area !== "history");
+  await Promise.all(requestedAreas.map(async (area) => {
     if (area === "actions") {
-      const actions = await listUserActions(user.id, { from: from.toISOString(), to: to.toISOString() });
-      context.actions = actions
-        .filter((action) => String(action?.assignee || "").trim().toLowerCase() === profileNeedle)
-        .slice(0, 40)
-        .map((action) => ({
-          title: action.title,
-          aspectId: action.categoryId || "",
-          startAt: action.startAt,
-          endAt: action.endAt,
-          status: action.status
-        }));
+      if (wantsHistory) {
+        context.actionHistory = await getProject200MarinActionHistory(user.id, profileName, historyDays);
+      } else {
+        const actions = await listUserActions(user.id, { from: from.toISOString(), to: to.toISOString() });
+        context.actions = actions
+          .filter((action) => String(action?.assignee || "").trim().toLowerCase() === profileNeedle)
+          .slice(0, 40)
+          .map((action) => ({
+            title: action.title,
+            aspectId: action.categoryId || "",
+            startAt: action.startAt,
+            endAt: action.endAt,
+            status: action.status
+          }));
+      }
     }
     if (area === "missions") {
       const scoped = await listExtraGoalsByScope(user.id, profileName, "today");
-      context.missions = (Array.isArray(scoped?.goals) ? scoped.goals : []).slice(0, 40).map((goal) => ({
-        title: goal.title,
-        targetValue: goal.targetValue,
-        progressValue: goal.progressValue,
-        unitDurationMinutes: goal.unitDurationMinutes
-      }));
+      context.missions = (Array.isArray(scoped?.goals) ? scoped.goals : [])
+        .filter((goal) => goal?.goalKind !== "limit")
+        .slice(0, 60)
+        .map((goal) => ({
+          id: goal.id,
+          title: goal.title,
+          aspectId: goal.categoryId || "",
+          targetValue: goal.targetValue,
+          progressValue: goal.progressValue,
+          unitDurationMinutes: goal.unitDurationMinutes
+        }));
+      if (wantsHistory) {
+        const historical = await listExtraGoalsByScope(user.id, profileName, `days-${historyDays}`);
+        context.missionHistory = (Array.isArray(historical?.goals) ? historical.goals : [])
+          .filter((goal) => goal?.goalKind !== "limit")
+          .slice(0, 60)
+          .map((goal) => ({
+            id: goal.id,
+            title: goal.title,
+            aspectId: goal.categoryId || "",
+            days: historyDays,
+            total: goal.progressValue,
+            dailyAverage: Number((Number(goal.progressValue || 0) / historyDays).toFixed(2)),
+            targetTotal: goal.targetValue,
+            completionPercent: goal.percent
+          }));
+      }
+    }
+    if (area === "limits") {
+      const [scoped, historyResult] = await Promise.all([
+        listExtraGoalsByScope(user.id, profileName, "today"),
+        query(
+          `
+            select
+              event.goal_id,
+              count(*)::int as event_count,
+              coalesce(sum(event.delta_value), 0)::int as all_time_total,
+              coalesce(sum(event.delta_value) filter (
+                where event.occurred_at >= now() - interval '7 days'
+              ), 0)::int as last7_total,
+              max(event.occurred_at) as last_event_at
+            from extra_goal_progress_events event
+            join extra_goals goal
+              on goal.id = event.goal_id
+             and goal.user_id = event.user_id
+             and goal.assigned_profile = event.assigned_profile
+            where event.user_id = $1
+              and event.assigned_profile = $2
+              and event.deleted_at is null
+              and goal.goal_kind = 'limit'
+            group by event.goal_id
+          `,
+          [user.id, profileName]
+        )
+      ]);
+      const historyByGoal = new Map(historyResult.rows.map((row) => [String(row.goal_id), row]));
+      context.limits = (Array.isArray(scoped?.goals) ? scoped.goals : [])
+        .filter((goal) => goal?.goalKind === "limit")
+        .slice(0, 60)
+        .map((goal) => {
+          const history = historyByGoal.get(String(goal.id)) || {};
+          const last7Total = Number(history.last7_total || 0);
+          return {
+            id: goal.id,
+            title: goal.title,
+            aspectId: goal.categoryId || "",
+            targetValue: goal.targetValue,
+            intervalValue: goal.limitIntervalValue,
+            intervalUnit: goal.limitIntervalUnit,
+            currentValue: goal.progressValue,
+            lastProgressAt: goal.lastProgressAt || (history.last_event_at ? new Date(history.last_event_at).toISOString() : null),
+            allTimeTotal: Number(history.all_time_total || 0),
+            last7Total,
+            last7DailyAverage: Number((last7Total / 7).toFixed(2)),
+            eventCount: Number(history.event_count || 0)
+          };
+        });
     }
     if (area === "finance") {
       const finance = await summarizeProject200FinanceLedgerMonth(user.id, todayKey.slice(0, 7));
@@ -3571,11 +3742,16 @@ async function buildProject200MarinUserContext(user, profileName, areas) {
       };
     }
     if (area === "stats") {
-      const stats = await getStatsSummary(user.id, "today");
+      const [stats, aspectConfig] = await Promise.all([
+        getStatsSummary(user.id, wantsHistory ? `days-${historyDays}` : "today"),
+        getProject200StatsAspectConfig(user.id, profileName)
+      ]);
       context.stats = {
+        range: stats?.rangeLabel || (wantsHistory ? `${historyDays} dias` : "Hoje"),
         totals: stats?.totals || {},
         byCategory: stats?.byCategory || {},
-        byCategoryPlanned: stats?.byCategoryPlanned || {}
+        byCategoryPlanned: stats?.byCategoryPlanned || {},
+        aspectConfig
       };
     }
   }));
@@ -3605,10 +3781,22 @@ function normalizeProject200MarinDateOnly(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
 }
 
+function sanitizeProject200MarinDataLines(rawLines) {
+  return (Array.isArray(rawLines) ? rawLines : []).slice(0, 3).flatMap((raw) => {
+    const title = String(raw?.title || "").trim().slice(0, 70);
+    const summary = String(raw?.summary || "").trim().slice(0, 150);
+    if (title.length < 2 || summary.length < 2) return [];
+    const aspectId = PROJECT200_MARIN_ASPECT_IDS.has(String(raw?.aspectId || "").trim().toLowerCase())
+      ? String(raw.aspectId).trim().toLowerCase()
+      : "planejamento";
+    return [{ key: crypto.randomUUID(), type: "context", title, summary, aspectId }];
+  });
+}
+
 function sanitizeProject200MarinProposals(rawProposals) {
   const proposals = [];
   for (const raw of Array.isArray(rawProposals) ? rawProposals.slice(0, 8) : []) {
-    const type = ["action", "mission", "finance"].includes(raw?.type) ? raw.type : "";
+    const type = ["action", "mission", "limit", "aspect", "finance"].includes(raw?.type) ? raw.type : "";
     const title = String(raw?.title || "").trim().slice(0, 90);
     if (!type || title.length < 2) continue;
 
@@ -3633,12 +3821,33 @@ function sanitizeProject200MarinProposals(rawProposals) {
       proposal.durationMinutes = Math.max(1, Math.min(1440, Math.round((endAt - startAt) / 60000)));
     }
 
-    if (type === "mission") {
+    if (type === "mission" || type === "limit") {
       proposal.aspectId = PROJECT200_MARIN_ASPECT_IDS.has(String(raw?.aspectId || "").trim().toLowerCase())
         ? String(raw.aspectId).trim().toLowerCase()
         : "planejamento";
       proposal.targetValue = Math.max(1, Math.min(10000, Math.trunc(Number(raw?.targetValue) || 1)));
-      proposal.unitDurationMinutes = Math.max(0, Math.min(1440, Math.trunc(Number(raw?.unitDurationMinutes) || 0)));
+      proposal.unitDurationMinutes = type === "limit"
+        ? 0
+        : Math.max(1, Math.min(1440, Math.trunc(Number(raw?.unitDurationMinutes) || 1)));
+      if (type === "limit") {
+        proposal.goalKind = "limit";
+        proposal.limitIntervalValue = Math.max(1, Math.min(999, Math.trunc(Number(raw?.limitIntervalValue) || 1)));
+        proposal.limitIntervalUnit = ["day", "week", "month", "year"].includes(String(raw?.limitIntervalUnit || "").trim().toLowerCase())
+          ? String(raw.limitIntervalUnit).trim().toLowerCase()
+          : "day";
+      }
+    }
+
+    if (type === "aspect") {
+      proposal.aspectId = PROJECT200_MARIN_ASPECT_IDS.has(String(raw?.aspectId || "").trim().toLowerCase())
+        ? String(raw.aspectId).trim().toLowerCase()
+        : "";
+      if (!proposal.aspectId) continue;
+      proposal.targetMinutes = Math.max(1, Math.min(100000, Math.trunc(Number(raw?.targetMinutes) || 1)));
+      proposal.missionGoalIds = [...new Set((Array.isArray(raw?.missionGoalIds) ? raw.missionGoalIds : [])
+        .map((value) => String(value || "").trim())
+        .filter((value) => /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value)))].slice(0, 50);
+      proposal.useManualTarget = Boolean(raw?.useManualTarget);
     }
 
     if (type === "finance") {
@@ -3680,6 +3889,9 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "Quando o prompt geral disser Marin, entenda como o papel da IA do iLife; apresente-se sempre como " + personaName + ".",
     "",
     "LIMITES OPERACIONAIS:",
+    "- Use type limit para propor um limite: quantidade maxima e intervalo day, week, month ou year. Limites nunca tem cronometro.",
+    "- Use type aspect somente quando o usuario pedir para configurar Estatisticas. Acoes daquele aspecto ja entram automaticamente; missionGoalIds vincula missoes; useManualTarget e targetMinutes ativam a meta manual.",
+    "- dataLines serve apenas para resumir dados reais presentes no contexto. Nunca gere dataLines numa conversa sem dados carregados e nunca invente uma media.",
     "- Nunca diga que já gravou algo. Você somente oferece cartões; o usuário precisa tocar para confirmar.",
     "- Não crie microtarefas de missões.",
     "- Não invente datas, horários, valores ou durações. Se faltar dado obrigatório, pergunte antes e retorne proposals vazio.",
@@ -3824,7 +4036,21 @@ async function handleProject200MarinMessageRequest(request, response) {
     await appendProject200MarinMessage(user.id, conversation.id, { role: "user", content });
     const history = await listProject200MarinMessages(user.id, profileName, personaKey, 24);
     const areas = detectProject200MarinContextAreas(content);
-    const context = await buildProject200MarinUserContext(user, profileName, areas);
+    const domainAreas = areas.filter((area) => area !== "history");
+    if (!domainAreas.length && areas.includes("history")) {
+      const previousUserText = history.messages
+        .filter((message) => message.role === "user" && String(message.content || "").trim() !== content)
+        .slice(-2)
+        .map((message) => message.content)
+        .join(" ");
+      for (const inherited of detectProject200MarinContextAreas(previousUserText)) {
+        if (inherited !== "history" && !areas.includes(inherited)) areas.push(inherited);
+      }
+      if (areas.every((area) => area === "history")) {
+        areas.push("actions", "missions", "limits", "stats");
+      }
+    }
+    const context = await buildProject200MarinUserContext(user, profileName, areas, content);
     const generated = await requestProject200MarinReply({
       apiKey,
       user,
@@ -3837,7 +4063,11 @@ async function handleProject200MarinMessageRequest(request, response) {
     route = generated.route;
     const replyText = shortenProject200MarinMessage(generated.reply?.message)
       || "Quero entender melhor. Me conta um pouco mais?";
-    const proposals = sanitizeProject200MarinProposals(generated.reply?.proposals);
+    const dataLines = sanitizeProject200MarinDataLines(generated.reply?.dataLines);
+    const proposals = [
+      ...dataLines,
+      ...sanitizeProject200MarinProposals(generated.reply?.proposals)
+    ];
     const saved = await appendProject200MarinMessage(user.id, conversation.id, {
       role: "assistant",
       content: replyText,
@@ -3911,11 +4141,11 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
         occurrences: [{ startAt: proposal.startAt, endAt: proposal.endAt }]
       });
       entityId = actions[0]?.id || null;
-    } else if (proposal.type === "mission") {
+    } else if (proposal.type === "mission" || proposal.type === "limit") {
       const goals = await createExtraGoal(user.id, profileName, {
         title: proposal.title,
         categoryId: proposal.aspectId || proposal.categoryId || "planejamento",
-        goalKind: proposal.goalKind,
+        goalKind: proposal.type === "limit" ? "limit" : "goal",
         targetValue: proposal.targetValue,
         unitDurationSeconds: proposal.unitDurationSeconds,
         unitDurationMinutes: proposal.unitDurationMinutes,
@@ -3923,6 +4153,13 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
         limitIntervalUnit: proposal.limitIntervalUnit
       });
       entityId = [...goals].reverse().find((goal) => String(goal.title || "") === proposal.title)?.id || null;
+    } else if (proposal.type === "aspect") {
+      const config = await updateProject200StatsAspectConfig(user.id, profileName, proposal.aspectId, {
+        targetMinutes: proposal.targetMinutes,
+        missionGoalIds: proposal.missionGoalIds,
+        useManualTarget: proposal.useManualTarget
+      });
+      entityId = String(config?.[proposal.aspectId]?.aspectId || proposal.aspectId);
     } else if (proposal.type === "finance") {
       const item = await createProject200FinanceItem(user.id, {
         title: proposal.title,

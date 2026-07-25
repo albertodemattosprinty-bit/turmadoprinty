@@ -10015,6 +10015,51 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   white-space: pre-wrap;
 }
 
+.marin-data-line {
+  width: min(92%, 620px);
+  min-height: 52px;
+  align-self: flex-start;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 15px;
+  background: rgba(5, 19, 52, 0.58);
+  color: #fff;
+}
+
+.marin-data-line-icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.marin-data-line > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.marin-data-line strong,
+.marin-data-line span span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marin-data-line strong {
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.marin-data-line span span {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.88rem;
+}
+
 .marin-proposal-list {
   width: min(92%, 620px);
   align-self: flex-start;
@@ -10068,6 +10113,14 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
 
 .marin-proposal-card.is-finance-income .marin-proposal-title {
   color: #61efa6;
+}
+
+.marin-proposal-card.is-limit .marin-proposal-title {
+  color: #ff9c3f;
+}
+
+.marin-proposal-card.is-aspect .marin-proposal-title {
+  color: #77b9ff;
 }
 
 .marin-proposal-card.is-finance-expense .marin-proposal-title {
@@ -10229,6 +10282,19 @@ body[data-background-theme="white"] :is(
   background: rgba(255, 255, 255, 0.72);
   color: #2f3640;
   border-color: rgba(47, 54, 64, 0.12);
+}
+
+body[data-background-theme="white"] .marin-data-line {
+  border-color: rgba(17, 33, 62, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+body[data-background-theme="white"] .marin-data-line strong {
+  color: #102144;
+}
+
+body[data-background-theme="white"] .marin-data-line span span {
+  color: rgba(16, 33, 68, 0.76);
 }
 
 body[data-background-theme="white"] .marin-proposal-meta {
