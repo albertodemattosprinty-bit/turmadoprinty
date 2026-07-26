@@ -303,12 +303,15 @@ const sleepModalControls = document.getElementById("sleepModalControls");
 const sleepContinueButton = document.getElementById("sleepContinueButton");
 const sleepFinishButton = document.getElementById("sleepFinishButton");
 const sleepAbortButton = document.getElementById("sleepAbortButton");
-const sleepRequiredModal = document.getElementById("sleepRequiredModal");
-const sleepRequiredPrevButton = document.getElementById("sleepRequiredPrev");
-const sleepRequiredValue = document.getElementById("sleepRequiredValue");
-const sleepRequiredNextButton = document.getElementById("sleepRequiredNext");
-const sleepRequiredSaveButton = document.getElementById("sleepRequiredSave");
-const sleepRequiredStatus = document.getElementById("sleepRequiredStatus");
+const sleepFinalizeModal = document.getElementById("sleepFinalizeModal");
+const sleepFinalizeHoursMinus = document.getElementById("sleepFinalizeHoursMinus");
+const sleepFinalizeHoursValue = document.getElementById("sleepFinalizeHoursValue");
+const sleepFinalizeHoursPlus = document.getElementById("sleepFinalizeHoursPlus");
+const sleepFinalizeMinutesMinus = document.getElementById("sleepFinalizeMinutesMinus");
+const sleepFinalizeMinutesValue = document.getElementById("sleepFinalizeMinutesValue");
+const sleepFinalizeMinutesPlus = document.getElementById("sleepFinalizeMinutesPlus");
+const sleepFinalizeSave = document.getElementById("sleepFinalizeSave");
+const sleepFinalizeStatus = document.getElementById("sleepFinalizeStatus");
 const sleepMusicToggleButton = document.getElementById("sleepMusicToggleButton");
 const sleepMusicPickerModal = document.getElementById("sleepMusicPickerModal");
 const sleepMusicPickerClose = document.getElementById("sleepMusicPickerClose");
@@ -916,6 +919,9 @@ const backgroundThemeModes = [
 let financeTimer = null;
 let platformMetricsTicker = null;
 let sleepModalTicker = null;
+let sleepFinalizeMinuteHoldTimer = null;
+let sleepFinalizeMinuteHoldInterval = null;
+let sleepFinalizeMinuteHoldTriggered = false;
 let longPressTimer = null;
 let longPressHandledActionId = "";
 let platformLongPressTimer = null;
@@ -1154,6 +1160,8 @@ const state = {
     delayIndex: 0,
     session: null,
     controlsVisible: false,
+    finalizeMinutes: 0,
+    finalizeSaving: false,
     musicEnabled: false,
     musicLoading: false,
     musicTrackIndex: 0,
@@ -1163,14 +1171,9 @@ const state = {
     lastPhase: "",
     fadeStarted: false
   },
-  sleepRequirement: {
+  sleepSessionGate: {
     checked: false,
     checking: false,
-    required: false,
-    sleepDate: "",
-    minutes: 360,
-    saving: false,
-    checkedAt: 0,
     profileName: ""
   },
   social: {
@@ -1865,9 +1868,9 @@ function applySelectedProfile(profile) {
   const matched = getProfileByName(profile);
   const next = matched?.name || getDefaultProfileName();
   state.selectedProfile = next;
-  state.sleepRequirement.checked = false;
-  state.sleepRequirement.checkedAt = 0;
-  state.sleepRequirement.profileName = next;
+  state.sleepSessionGate.checked = false;
+  state.sleepSessionGate.checking = false;
+  state.sleepSessionGate.profileName = next;
   loadMissionQuickSlots(next);
   loadStatsAspectConfig(next);
   document.body.dataset.profile = next;
@@ -6177,7 +6180,7 @@ function closeModal(modal) {
   if (!modal) {
     return;
   }
-  if (modal.id === "sleepRequiredModal" && state.sleepRequirement?.required) {
+  if (["sleepModal", "sleepFinalizeModal"].includes(modal.id) && state.sleepModal?.session) {
     return;
   }
 
@@ -12153,10 +12156,13 @@ async function hydrateSleepSession(profileName = state.selectedProfile || getDef
     renderSleepModalState();
     return null;
   }
+  const profile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
   try {
-    const payload = await apiRequest(`/api/200/sleep-session?profile=${encodeURIComponent(normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName)}`, {
+    const payload = await apiRequest(`/api/200/sleep-session?profile=${encodeURIComponent(profile)}`, {
       skipGlobalLoading: options?.skipGlobalLoading === true
     });
+    state.sleepSessionGate.checked = true;
+    state.sleepSessionGate.profileName = profile;
     state.sleepModal.session = payload?.session || null;
     renderSleepModalState();
     return state.sleepModal.session;
@@ -12170,21 +12176,59 @@ async function hydrateSleepSession(profileName = state.selectedProfile || getDef
   }
 }
 
-function renderSleepRequirementModal() {
-  const minutes = Math.max(15, Math.min(720, Math.round(Number(state.sleepRequirement?.minutes || 360) / 15) * 15));
-  state.sleepRequirement.minutes = minutes;
-  if (sleepRequiredValue) sleepRequiredValue.textContent = formatMinutesHuman(minutes);
-  if (sleepRequiredPrevButton) sleepRequiredPrevButton.disabled = minutes <= 15;
-  if (sleepRequiredNextButton) sleepRequiredNextButton.disabled = minutes >= 720;
-  if (sleepRequiredSaveButton) sleepRequiredSaveButton.disabled = Boolean(state.sleepRequirement?.saving);
+function renderSleepFinalizeModal() {
+  const totalMinutes = Math.max(0, Math.min(720, Math.trunc(Number(state.sleepModal?.finalizeMinutes || 0))));
+  state.sleepModal.finalizeMinutes = totalMinutes;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (sleepFinalizeHoursValue) sleepFinalizeHoursValue.textContent = `${hours}h`;
+  if (sleepFinalizeMinutesValue) sleepFinalizeMinutesValue.textContent = `${minutes} min`;
+  if (sleepFinalizeHoursMinus) sleepFinalizeHoursMinus.disabled = totalMinutes < 60 || state.sleepModal.finalizeSaving;
+  if (sleepFinalizeHoursPlus) sleepFinalizeHoursPlus.disabled = totalMinutes + 60 > 720 || state.sleepModal.finalizeSaving;
+  if (sleepFinalizeMinutesMinus) sleepFinalizeMinutesMinus.disabled = totalMinutes <= 0 || state.sleepModal.finalizeSaving;
+  if (sleepFinalizeMinutesPlus) sleepFinalizeMinutesPlus.disabled = totalMinutes >= 720 || state.sleepModal.finalizeSaving;
+  if (sleepFinalizeSave) sleepFinalizeSave.disabled = Boolean(state.sleepModal.finalizeSaving);
 }
 
-function shiftSleepRequirementMinutes(direction) {
-  state.sleepRequirement.minutes = Math.max(15, Math.min(720, Number(state.sleepRequirement?.minutes || 360) + (Number(direction || 0) * 15)));
-  renderSleepRequirementModal();
+function shiftSleepFinalizeMinutes(amount) {
+  if (state.sleepModal?.finalizeSaving) return;
+  state.sleepModal.finalizeMinutes = Math.max(0, Math.min(720, Math.trunc(Number(state.sleepModal?.finalizeMinutes || 0)) + Math.trunc(Number(amount || 0))));
+  renderSleepFinalizeModal();
 }
 
-async function checkSleepRequirementAfterInteraction() {
+function stopSleepFinalizeMinuteHold(preserveClick = true) {
+  if (sleepFinalizeMinuteHoldTimer) window.clearTimeout(sleepFinalizeMinuteHoldTimer);
+  if (sleepFinalizeMinuteHoldInterval) window.clearInterval(sleepFinalizeMinuteHoldInterval);
+  sleepFinalizeMinuteHoldTimer = null;
+  sleepFinalizeMinuteHoldInterval = null;
+  if (!preserveClick) sleepFinalizeMinuteHoldTriggered = false;
+}
+
+function startSleepFinalizeMinuteHold(direction) {
+  stopSleepFinalizeMinuteHold(false);
+  sleepFinalizeMinuteHoldTimer = window.setTimeout(() => {
+    sleepFinalizeMinuteHoldTriggered = true;
+    shiftSleepFinalizeMinutes(direction);
+    sleepFinalizeMinuteHoldInterval = window.setInterval(() => shiftSleepFinalizeMinutes(direction), 200);
+  }, 300);
+}
+
+function isMissingActiveSleepSessionError(error) {
+  const message = String(error instanceof Error ? error.message : error || "").toLocaleLowerCase("pt-BR");
+  return message.includes("nenhuma sess") && message.includes("sono ativa");
+}
+
+function openSleepFinalizeModal() {
+  const session = getComputedSleepSessionSnapshot(state.sleepModal?.session);
+  if (!session || session.phase !== "sleeping") return;
+  state.sleepModal.finalizeMinutes = Math.max(0, Math.min(720, Math.trunc(Number(session.trackedMinutes || 0))));
+  state.sleepModal.finalizeSaving = false;
+  if (sleepFinalizeStatus) sleepFinalizeStatus.textContent = "";
+  renderSleepFinalizeModal();
+  openModal("sleepFinalizeModal");
+}
+
+async function checkOpenSleepSessionAfterInteraction() {
   if (
     !getToken()
     || !state.authUser
@@ -12192,67 +12236,36 @@ async function checkSleepRequirementAfterInteraction() {
     || state.authUser?.onboardingRequired
     || state.project200Onboarding?.required
     || project200OnboardingUi?.isActive?.()
-    || state.sleepRequirement?.checking
-    || state.sleepRequirement?.required
+    || state.sleepSessionGate?.checking
   ) return;
+  if (state.sleepModal?.session) {
+    state.sleepModal.controlsVisible = true;
+    renderSleepModalState();
+    openModal("sleepModal");
+    return;
+  }
   const profile = normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName;
-  const recentlyChecked = state.sleepRequirement.checked
-    && state.sleepRequirement.profileName === profile
-    && (Date.now() - Number(state.sleepRequirement.checkedAt || 0)) < 60000;
-  if (recentlyChecked) return;
-  state.sleepRequirement.checking = true;
+  if (state.sleepSessionGate.checked && state.sleepSessionGate.profileName === profile) return;
+  state.sleepSessionGate.checking = true;
   try {
-    const payload = await apiRequest(`/api/200/sleep-required?profile=${encodeURIComponent(profile)}`, {
+    const payload = await apiRequest(`/api/200/sleep-session?profile=${encodeURIComponent(profile)}`, {
       skipGlobalLoading: true
     });
-    const requirement = payload?.requirement || {};
-    state.sleepRequirement.checked = true;
-    state.sleepRequirement.checkedAt = Date.now();
-    state.sleepRequirement.profileName = profile;
-    state.sleepRequirement.sleepDate = String(requirement.sleepDate || "");
-    state.sleepRequirement.minutes = Math.max(15, Number(requirement.defaultMinutes || 360));
-    state.sleepRequirement.required = Boolean(requirement.required);
-    if (state.sleepRequirement.required) {
-      if (sleepRequiredStatus) sleepRequiredStatus.textContent = "";
-      renderSleepRequirementModal();
-      openModal("sleepRequiredModal");
+    state.sleepSessionGate.checked = true;
+    state.sleepSessionGate.profileName = profile;
+    state.sleepModal.session = payload?.session || null;
+    if (state.sleepModal.session) {
+      state.sleepModal.controlsVisible = true;
+      renderSleepModalState();
+      openModal("sleepModal");
+      if (state.sleepModal?.musicEnabled) void syncSleepFrequencyPlayback();
     }
   } catch {
-    state.sleepRequirement.checked = false;
+    state.sleepSessionGate.checked = false;
   } finally {
-    state.sleepRequirement.checking = false;
+    state.sleepSessionGate.checking = false;
   }
 }
-
-async function saveRequiredSleep() {
-  const sleepDate = String(state.sleepRequirement?.sleepDate || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(sleepDate) || state.sleepRequirement?.saving) return;
-  state.sleepRequirement.saving = true;
-  renderSleepRequirementModal();
-  if (sleepRequiredStatus) sleepRequiredStatus.textContent = "Salvando sono de hoje...";
-  try {
-    const profile = normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName;
-    await apiRequest(`/api/200/sleep-history/${encodeURIComponent(sleepDate)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile, totalMinutes: state.sleepRequirement.minutes }),
-      skipGlobalLoading: true
-    });
-    state.sleepRequirement.required = false;
-    state.sleepRequirement.checked = true;
-    state.sleepRequirement.checkedAt = Date.now();
-    closeModal("sleepRequiredModal");
-    await Promise.allSettled([loadMissions(), loadActionMissions(), loadStatsSummary()]);
-    renderMissions();
-    renderActions();
-  } catch (error) {
-    if (sleepRequiredStatus) sleepRequiredStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar o sono.";
-  } finally {
-    state.sleepRequirement.saving = false;
-    renderSleepRequirementModal();
-  }
-}
-
 async function openSleepModal() {
   state.sleepModal.controlsVisible = false;
   if (sleepModalFeedback) {
@@ -12610,12 +12623,17 @@ async function startSleepSessionFlow() {
 }
 
 async function finishSleepSessionFlow() {
+  if (!state.sleepModal?.session || state.sleepModal?.finalizeSaving) return;
+  state.sleepModal.finalizeSaving = true;
+  renderSleepFinalizeModal();
+  if (sleepFinalizeStatus) sleepFinalizeStatus.textContent = "Salvando o tempo de sono...";
   try {
     const payload = await apiRequest("/api/200/sleep-session/finish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        profile: normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName
+        profile: normalizeAssigneeName(state.selectedProfile || getDefaultProfileName()) || defaultProjectProfileName,
+        savedMinutes: state.sleepModal.finalizeMinutes
       }),
       skipGlobalLoading: false
     });
@@ -12623,15 +12641,27 @@ async function finishSleepSessionFlow() {
     state.sleepModal.controlsVisible = false;
     await stopSleepFrequencyPlayback();
     await loadStatsSummary();
+    closeModal("sleepFinalizeModal");
     closeModal("sleepModal");
     closeModal("statsAspectModal");
     if (statsAspectStatus) {
       statsAspectStatus.textContent = `Sono salvo: ${formatMinutesHuman(payload?.savedMinutes || 0)}.`;
     }
   } catch (error) {
-    if (sleepSessionSubtitle) {
-      sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao encerrar o sono.";
+    if (isMissingActiveSleepSessionError(error)) {
+      state.sleepModal.session = null;
+      state.sleepModal.controlsVisible = false;
+      await stopSleepFrequencyPlayback();
+      closeModal("sleepFinalizeModal");
+      closeModal("sleepModal");
+      return;
     }
+    if (sleepFinalizeStatus) {
+      sleepFinalizeStatus.textContent = error instanceof Error ? error.message : "Falha ao encerrar o sono.";
+    }
+  } finally {
+    state.sleepModal.finalizeSaving = false;
+    renderSleepFinalizeModal();
   }
 }
 
@@ -12651,6 +12681,14 @@ async function abortSleepSessionFlow() {
     renderSleepModalState();
     closeModal("sleepModal");
   } catch (error) {
+    if (isMissingActiveSleepSessionError(error)) {
+      state.sleepModal.session = null;
+      state.sleepModal.controlsVisible = false;
+      await stopSleepFrequencyPlayback();
+      renderSleepModalState();
+      closeModal("sleepModal");
+      return;
+    }
     if (sleepSessionSubtitle) {
       sleepSessionSubtitle.textContent = error instanceof Error ? error.message : "Falha ao abortar o sono.";
     }
@@ -14754,6 +14792,7 @@ function renderLimitHistoryModal() {
             <div class="limit-history-record-copy">
               <strong>${escapeHtml(formatLimitElapsedDuration(record.durationSeconds))}</strong>
               <span>${escapeHtml(formatLimitHistoryDate(record.fromAt))} → ${escapeHtml(formatLimitHistoryDate(record.toAt))}</span>
+              ${Number(record.sleepExcludedSeconds || 0) > 0 ? `<span>Sono descontado: ${escapeHtml(formatLimitElapsedDuration(record.sleepExcludedSeconds))}</span>` : ""}
             </div>
           </article>
         `).join("")
@@ -17255,9 +17294,28 @@ sleepMusicPickerStop?.addEventListener("click", () => {
 sleepModalCloseButton?.addEventListener("click", () => {
   closeModal("sleepModal");
 });
-sleepRequiredPrevButton?.addEventListener("click", () => shiftSleepRequirementMinutes(-1));
-sleepRequiredNextButton?.addEventListener("click", () => shiftSleepRequirementMinutes(1));
-sleepRequiredSaveButton?.addEventListener("click", () => void saveRequiredSleep());
+sleepFinalizeHoursMinus?.addEventListener("click", () => shiftSleepFinalizeMinutes(-60));
+sleepFinalizeHoursPlus?.addEventListener("click", () => shiftSleepFinalizeMinutes(60));
+[
+  [sleepFinalizeMinutesMinus, -1],
+  [sleepFinalizeMinutesPlus, 1]
+].forEach(([button, direction]) => {
+  button?.addEventListener("click", (event) => {
+    if (event.detail === 0) shiftSleepFinalizeMinutes(direction);
+  });
+  button?.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    startSleepFinalizeMinuteHold(direction);
+  });
+  button?.addEventListener("pointerup", () => {
+    const wasHeld = sleepFinalizeMinuteHoldTriggered;
+    stopSleepFinalizeMinuteHold(false);
+    if (!wasHeld) shiftSleepFinalizeMinutes(direction);
+  });
+  button?.addEventListener("pointerleave", () => stopSleepFinalizeMinuteHold(false));
+  button?.addEventListener("pointercancel", () => stopSleepFinalizeMinuteHold(false));
+});
+sleepFinalizeSave?.addEventListener("click", () => void finishSleepSessionFlow());
 
 sleepHistoryCloseButton?.addEventListener("click", () => closeModal("sleepHistoryModal"));
 sleepHistoryList?.addEventListener("click", (event) => {
@@ -17290,7 +17348,7 @@ sleepContinueButton?.addEventListener("click", () => {
 });
 
 sleepFinishButton?.addEventListener("click", () => {
-  void finishSleepSessionFlow();
+  openSleepFinalizeModal();
 });
 
 sleepAbortButton?.addEventListener("click", () => {
@@ -18774,8 +18832,8 @@ document.addEventListener("selectstart", (event) => {
   event.preventDefault();
 });
 document.addEventListener("pointerdown", (event) => {
-  if (event.target.closest("#sleepRequiredModal")) return;
-  void checkSleepRequirementAfterInteraction();
+  if (event.target.closest("#sleepModal, #sleepFinalizeModal, #homeSleepButton, #runningHomeSleepButton")) return;
+  void checkOpenSleepSessionAfterInteraction();
 }, true);
 
 historyDeleteWordButton?.addEventListener("click", cutLastWord);

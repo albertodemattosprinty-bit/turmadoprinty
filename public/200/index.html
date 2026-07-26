@@ -1207,30 +1207,29 @@
       </div>
     </section>
 
-  <section class="workspace-modal sleep-required-modal" id="sleepRequiredModal" aria-hidden="true" aria-label="Registrar sono de hoje">
-    <div class="sleep-required-shell">
-      <div class="sleep-required-brand">
-        <span>iLife</span>
-        <strong>SONO</strong>
+  <section class="workspace-modal sleep-finalize-modal" id="sleepFinalizeModal" aria-hidden="true" aria-label="Adicionar o tempo de sono">
+    <div class="sleep-finalize-shell">
+      <header class="sleep-finalize-header">
+        <span>iLife Sono</span>
+        <h1>Adicione o tempo de sono</h1>
+        <p>Ajuste o tempo real que deve ser contabilizado.</p>
+      </header>
+      <div class="sleep-finalize-pickers" aria-label="Tempo de sono">
+        <div class="sleep-finalize-picker-row">
+          <button type="button" id="sleepFinalizeHoursMinus" aria-label="Diminuir uma hora">−</button>
+          <strong id="sleepFinalizeHoursValue">3h</strong>
+          <button type="button" id="sleepFinalizeHoursPlus" aria-label="Adicionar uma hora">+</button>
+        </div>
+        <div class="sleep-finalize-picker-row sleep-finalize-minutes-row">
+          <button type="button" id="sleepFinalizeMinutesMinus" aria-label="Diminuir um minuto">−</button>
+          <strong id="sleepFinalizeMinutesValue">12 min</strong>
+          <button type="button" id="sleepFinalizeMinutesPlus" aria-label="Adicionar um minuto">+</button>
+        </div>
       </div>
-      <div class="sleep-required-copy">
-        <h1>Quanto você dormiu?</h1>
-        <p>Antes de continuar, registre somente o sono de hoje.</p>
-      </div>
-      <div class="sleep-required-picker">
-        <button type="button" id="sleepRequiredPrev" aria-label="Diminuir 15 minutos">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.8 5.8-6.2 6.2 6.2 6.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <strong id="sleepRequiredValue">6 horas</strong>
-        <button type="button" id="sleepRequiredNext" aria-label="Aumentar 15 minutos">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 5.8 6.2 6.2-6.2 6.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-      <button class="primary-btn sleep-required-save" type="button" id="sleepRequiredSave">SALVAR SONO</button>
-      <p class="sleep-modal-feedback" id="sleepRequiredStatus" aria-live="polite"></p>
+      <button class="primary-btn sleep-finalize-save" type="button" id="sleepFinalizeSave">CONCLUIR SONO</button>
+      <p class="sleep-modal-feedback" id="sleepFinalizeStatus" aria-live="polite"></p>
     </div>
   </section>
-
   <section class="workspace-modal sleep-music-picker-modal" id="sleepMusicPickerModal" aria-hidden="true" aria-label="Escolher música para o sono">
     <div class="sleep-music-picker-shell">
       <header class="sleep-music-picker-header">

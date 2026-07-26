@@ -55,7 +55,7 @@ import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugify
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
-import { abortProject200SleepSession, getProject200SleepRequirement, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
+import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -13218,21 +13218,6 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "GET" && pathname === "/api/200/sleep-required") {
-    try {
-      const user = await requireAuth(request, response);
-      if (!user) return;
-      const profile = requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME;
-      const requirement = await getProject200SleepRequirement(user.id, profile);
-      sendJson(response, 200, { ok: true, requirement });
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel verificar o sono de hoje."
-      });
-    }
-    return;
-  }
-
   if (request.method === "GET" && pathname === "/api/200/sleep-session") {
     try {
       const user = await requireAuth(request, response);
@@ -13285,7 +13270,8 @@ const server = http.createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const result = await finishProject200SleepSession(user.id, {
         profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME,
-        completedAt: body?.completedAt
+        completedAt: body?.completedAt,
+        savedMinutes: body?.savedMinutes
       });
       sendJson(response, 200, { ok: true, ...result });
     } catch (error) {

@@ -1,6 +1,6 @@
 import { db, query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
-import { getProject200ConfirmedSleepOverlapSeconds } from "./project200-sleep.js";
+import { getProject200ConfirmedSleepOverlapSeconds, subtractProject200ConfirmedSleepFromIntervals } from "./project200-sleep.js";
 
 const EXTRA_GOALS_TIME_ZONE = "America/Sao_Paulo";
 const EXTRA_GOAL_MAX_DURATION_SECONDS = 180 * 60;
@@ -161,20 +161,27 @@ function normalizeExtraGoalProgressEventRow(row, latestId = "") {
   };
 }
 
-function buildExtraGoalBestIntervals(events = []) {
+async function buildExtraGoalBestIntervals(userId, profileName, events = []) {
   const chronological = [...events]
     .filter((event) => event?.occurredAt)
     .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
-  return chronological.slice(1).map((event, index) => {
+  const intervals = chronological.slice(1).map((event, index) => {
     const previous = chronological[index];
     const fromMs = new Date(previous.occurredAt).getTime();
     const toMs = new Date(event.occurredAt).getTime();
     return {
+      fromEventId: previous.id,
+      toEventId: event.id,
       fromAt: previous.occurredAt,
       toAt: event.occurredAt,
-      durationSeconds: Math.max(0, Math.floor((toMs - fromMs) / 1000))
+      grossDurationSeconds: Math.max(0, Math.floor((toMs - fromMs) / 1000))
     };
-  }).sort((left, right) => right.durationSeconds - left.durationSeconds).slice(0, 10);
+  });
+  const netIntervals = await subtractProject200ConfirmedSleepFromIntervals(userId, profileName, intervals);
+  return netIntervals
+    .filter((interval) => interval.durationSeconds > 0)
+    .sort((left, right) => right.durationSeconds - left.durationSeconds)
+    .slice(0, 10);
 }
 
 function normalizeExtraGoalVariantRow(row) {
@@ -1186,7 +1193,7 @@ export async function listExtraGoalProgressEvents(userId, profileName = PROJECT2
   return {
     goal,
     events,
-    bestIntervals: buildExtraGoalBestIntervals(events)
+    bestIntervals: await buildExtraGoalBestIntervals(userId, normalizedProfile, events)
   };
 }
 

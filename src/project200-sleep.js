@@ -253,10 +253,12 @@ export async function finishProject200SleepSession(userId, payload = {}) {
   const trackedMinutes = completedAt > scheduledStartAt
     ? Math.max(0, Math.floor((completedAt.getTime() - scheduledStartAt.getTime()) / 60000))
     : 0;
-  const savedMinutes = clampSavedMinutes(trackedMinutes);
+  const savedMinutes = payload?.savedMinutes === undefined
+    ? clampSavedMinutes(trackedMinutes)
+    : clampSavedMinutes(payload.savedMinutes);
   const sleepDateKey = getSleepWakeDateKey(completedAt);
 
-  await query(
+  const completedResult = await query(
     `
       update project200_sleep_sessions
       set status = 'completed',
@@ -266,9 +268,14 @@ export async function finishProject200SleepSession(userId, payload = {}) {
           updated_at = now()
       where user_id = $1
         and id = $2
+        and status = 'active'
+      returning id
     `,
     [userId, session.id, completedAt.toISOString(), sleepDateKey, savedMinutes]
   );
+  if (!completedResult.rows[0]?.id) {
+    throw new Error("Nenhuma sessão de sono ativa.");
+  }
 
   if (savedMinutes > 0) {
     await query(
@@ -303,7 +310,7 @@ export async function abortProject200SleepSession(userId, payload = {}) {
   if (!session?.id) {
     throw new Error("Nenhuma sessão de sono ativa.");
   }
-  await query(
+  const abortedResult = await query(
     `
       update project200_sleep_sessions
       set status = 'aborted',
@@ -311,9 +318,14 @@ export async function abortProject200SleepSession(userId, payload = {}) {
           updated_at = now()
       where user_id = $1
         and id = $2
+        and status = 'active'
+      returning id
     `,
     [userId, session.id]
   );
+  if (!abortedResult.rows[0]?.id) {
+    throw new Error("Nenhuma sessão de sono ativa.");
+  }
   return { ok: true };
 }
 
@@ -334,24 +346,84 @@ export async function getProject200SleepTotalMinutesForRange(userId, range = {})
   return Math.max(0, Math.trunc(Number(result.rows[0]?.total_minutes || 0) || 0));
 }
 
-export async function getProject200SleepRequirement(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME, nowValue = new Date()) {
+async function loadProject200ConfirmedSleepPeriods(userId, profileName, from, to) {
   await ensureProject200SleepSchema();
   const profile = normalizeProfileName(profileName);
-  const now = nowValue instanceof Date && !Number.isNaN(nowValue.getTime()) ? nowValue : new Date();
-  const parts = getProjectTimeParts(now);
-  const sleepDate = toProjectDateKey(now);
-  const totalMinutes = await getSleepDailyTotal(userId, profile, sleepDate);
-  const activeSession = await getActiveSleepSessionRow(userId, profile);
-  return {
-    profileName: profile,
-    sleepDate,
-    totalMinutes,
-    hasActiveSession: Boolean(activeSession?.id),
-    required: parts.hour >= 8 && totalMinutes <= 0 && !activeSession?.id,
-    defaultMinutes: 360,
-    stepMinutes: 15,
-    serverNow: now.toISOString()
-  };
+  const fromDateKey = addDaysToDateKey(toProjectDateKey(from), -1);
+  const toDateKey = addDaysToDateKey(toProjectDateKey(to), 1);
+  const result = await query(
+    `
+      select periods.sleep_date, periods.total_minutes, periods.completed_at
+      from (
+        select
+          session.finalized_sleep_date::text as sleep_date,
+          session.saved_minutes as total_minutes,
+          session.completed_at
+        from project200_sleep_sessions session
+        where session.user_id = $1
+          and session.assigned_profile = $2
+          and session.status = 'completed'
+          and session.saved_minutes > 0
+          and session.finalized_sleep_date >= $3::date
+          and session.finalized_sleep_date <= $4::date
+          and not exists (
+            select 1
+            from "sono-user" manual_sleep
+            where manual_sleep.user_id = session.user_id
+              and manual_sleep.assigned_profile = session.assigned_profile
+              and manual_sleep.sleep_date = session.finalized_sleep_date
+              and manual_sleep.source_session_id is null
+          )
+        union all
+        select
+          sleep_user.sleep_date::text as sleep_date,
+          sleep_user.total_minutes,
+          null::timestamptz as completed_at
+        from "sono-user" sleep_user
+        where sleep_user.user_id = $1
+          and sleep_user.assigned_profile = $2
+          and sleep_user.source_session_id is null
+          and sleep_user.total_minutes > 0
+          and sleep_user.sleep_date >= $3::date
+          and sleep_user.sleep_date <= $4::date
+      ) periods
+      order by periods.sleep_date asc, periods.completed_at asc nulls last
+    `,
+    [userId, profile, fromDateKey, toDateKey]
+  );
+  const periods = [];
+  for (const row of result.rows) {
+    const creditedMinutes = clampSavedMinutes(row.total_minutes);
+    if (!creditedMinutes) continue;
+    const sessionEnd = row.completed_at ? new Date(row.completed_at) : null;
+    const manualEnd = projectDateKeyToDate(String(row.sleep_date || "").slice(0, 10), 8, 0);
+    const periodEnd = sessionEnd && !Number.isNaN(sessionEnd.getTime()) ? sessionEnd : manualEnd;
+    if (Number.isNaN(periodEnd.getTime())) continue;
+    periods.push({
+      startMs: periodEnd.getTime() - (creditedMinutes * 60000),
+      endMs: periodEnd.getTime()
+    });
+  }
+  periods.sort((left, right) => left.startMs - right.startMs);
+  return periods.reduce((merged, period) => {
+    const previous = merged[merged.length - 1];
+    if (previous && period.startMs <= previous.endMs) {
+      previous.endMs = Math.max(previous.endMs, period.endMs);
+    } else {
+      merged.push({ ...period });
+    }
+    return merged;
+  }, []);
+}
+
+function getProject200SleepOverlapSecondsForPeriods(periods, fromMs, toMs) {
+  let overlapMs = 0;
+  for (const period of periods) {
+    const clippedStart = Math.max(fromMs, period.startMs);
+    const clippedEnd = Math.min(toMs, period.endMs);
+    if (clippedEnd > clippedStart) overlapMs += clippedEnd - clippedStart;
+  }
+  return Math.max(0, Math.floor(overlapMs / 1000));
 }
 
 export async function getProject200ConfirmedSleepOverlapSeconds(
@@ -360,50 +432,38 @@ export async function getProject200ConfirmedSleepOverlapSeconds(
   fromValue,
   toValue = new Date()
 ) {
-  const profile = normalizeProfileName(profileName);
   const from = new Date(fromValue || "");
   const to = new Date(toValue || new Date());
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return 0;
-  const fromDateKey = addDaysToDateKey(toProjectDateKey(from), -1);
-  const toDateKey = addDaysToDateKey(toProjectDateKey(to), 1);
-  const result = await query(
-    `
-      select
-        sleep_user.sleep_date::text as sleep_date,
-        sleep_user.total_minutes,
-        sleep_user.source_session_id,
-        session.completed_at
-      from "sono-user" sleep_user
-      left join project200_sleep_sessions session
-        on session.id = sleep_user.source_session_id
-       and session.user_id = sleep_user.user_id
-       and session.assigned_profile = sleep_user.assigned_profile
-       and session.status = 'completed'
-      where sleep_user.user_id = $1
-        and sleep_user.assigned_profile = $2
-        and sleep_user.total_minutes > 0
-        and sleep_user.sleep_date >= $3::date
-        and sleep_user.sleep_date <= $4::date
-      order by sleep_user.sleep_date asc
-    `,
-    [userId, profile, fromDateKey, toDateKey]
-  );
-  let overlapMs = 0;
-  for (const row of result.rows) {
-    const creditedMinutes = clampSavedMinutes(row.total_minutes);
-    if (!creditedMinutes) continue;
-    const sessionEnd = row.completed_at ? new Date(row.completed_at) : null;
-    const manualEnd = projectDateKeyToDate(String(row.sleep_date || "").slice(0, 10), 8, 0);
-    const periodEnd = sessionEnd && !Number.isNaN(sessionEnd.getTime()) ? sessionEnd : manualEnd;
-    if (Number.isNaN(periodEnd.getTime())) continue;
-    const periodStart = new Date(periodEnd.getTime() - (creditedMinutes * 60000));
-    const clippedStart = Math.max(from.getTime(), periodStart.getTime());
-    const clippedEnd = Math.min(to.getTime(), periodEnd.getTime());
-    if (clippedEnd > clippedStart) overlapMs += clippedEnd - clippedStart;
-  }
-  return Math.max(0, Math.floor(overlapMs / 1000));
+  const periods = await loadProject200ConfirmedSleepPeriods(userId, profileName, from, to);
+  return getProject200SleepOverlapSecondsForPeriods(periods, from.getTime(), to.getTime());
 }
 
+export async function subtractProject200ConfirmedSleepFromIntervals(
+  userId,
+  profileName = PROJECT200_DEFAULT_PROFILE_NAME,
+  intervals = []
+) {
+  const normalized = (Array.isArray(intervals) ? intervals : []).map((interval) => ({
+    ...interval,
+    fromMs: new Date(interval?.fromAt || "").getTime(),
+    toMs: new Date(interval?.toAt || "").getTime()
+  })).filter((interval) => Number.isFinite(interval.fromMs) && Number.isFinite(interval.toMs) && interval.toMs > interval.fromMs);
+  if (!normalized.length) return [];
+  const rangeStart = new Date(Math.min(...normalized.map((interval) => interval.fromMs)));
+  const rangeEnd = new Date(Math.max(...normalized.map((interval) => interval.toMs)));
+  const periods = await loadProject200ConfirmedSleepPeriods(userId, profileName, rangeStart, rangeEnd);
+  return normalized.map(({ fromMs, toMs, ...interval }) => {
+    const grossDurationSeconds = Math.max(0, Math.floor(Number(interval.grossDurationSeconds) || ((toMs - fromMs) / 1000)));
+    const sleepExcludedSeconds = Math.min(grossDurationSeconds, getProject200SleepOverlapSecondsForPeriods(periods, fromMs, toMs));
+    return {
+      ...interval,
+      grossDurationSeconds,
+      sleepExcludedSeconds,
+      durationSeconds: Math.max(0, grossDurationSeconds - sleepExcludedSeconds)
+    };
+  });
+}
 export async function listProject200SleepHistory(userId, payload = {}) {
   await ensureProject200SleepSchema();
   const profileName = normalizeProfileName(payload?.profileName);
