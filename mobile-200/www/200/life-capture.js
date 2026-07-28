@@ -1,77 +1,1236 @@
-(() => {
-  const FILTER = 'saturate(1.08) contrast(1.04) brightness(1.03)';
-  const DB_NAME = 'project200-life-captures';
-  const STORE = 'captures';
-  const state = { mode: 'photo', stream: null, raf: 0, recorder: null, chunks: [], recording: false, recordingStartedAt: 0, pending: null, galleryFilter: 'all', titleRecorder: null, titleStream: null, titleAudioContext: null, titleAnalyser: null, titleTimer: 0, titleLastSpeechAt: 0 };
-  const byId = (id) => document.getElementById(id);
-  const fmt = (iso) => {
-    const d = new Date(iso || Date.now());
-    const day = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    return `${day} · ${time}`;
+ï»¿(() => {
+  const FILTER = "saturate(1.08) contrast(1.04) brightness(1.03)";
+  const DB_NAME = "project200-life-captures";
+  const STORE_NAME = "captures";
+  const PROFILE_KEY = "project_200_profile_v1";
+  const MEDIA_PREFIX = "[[ILIFE_MEDIA:";
+  const MEDIA_SUFFIX = "]]";
+  const state = {
+    mode: "photo",
+    facingMode: "environment",
+    stream: null,
+    raf: 0,
+    recorder: null,
+    chunks: [],
+    recording: false,
+    recordingStartedAt: 0,
+    pending: null,
+    captures: [],
+    activeIndex: 0,
+    noteCaptureId: "",
+    shareCaptureId: "",
+    dragStartX: 0,
+    dragDeltaX: 0,
+    dragging: false,
+    titleRecorder: null,
+    titleStream: null,
+    titleTimer: 0,
+    titleAnalyser: null,
+    titleAudioContext: null,
+    titleLastSpeechAt: 0,
+    noteRecorder: null,
+    noteStream: null,
+    noteTimer: 0,
+    noteAnalyser: null,
+    noteAudioContext: null,
+    noteLastSpeechAt: 0
   };
-  const defaultTitle = (kind, iso) => `${kind === 'video' ? 'Vídeo' : 'Foto'} ${fmt(iso)}`;
-  const inject = () => {
-    if (byId('lifeCaptureOverlay')) return;
-    const host = document.createElement('div');
+
+  const byId = (id) => document.getElementById(id);
+  const safeText = (value, fallback = "") => String(value ?? fallback);
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+  function formatDate(iso) {
+    const date = new Date(iso || Date.now());
+    const day = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    return `${day}  ${time}`;
+  }
+
+  function defaultTitle(kind, iso) {
+    return `${kind === "video" ? "Video" : "Foto"} ${formatDate(iso)}`;
+  }
+
+  function currentProfile() {
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      if (!raw) return "Usuario";
+      const parsed = JSON.parse(raw);
+      return safeText(parsed?.name || parsed?.profileName || parsed?.username || "Usuario").trim() || "Usuario";
+    } catch {
+      return "Usuario";
+    }
+  }
+
+  function inject() {
+    if (byId("lifeCaptureOverlay")) return;
+    const host = document.createElement("div");
     host.innerHTML = `
       <section class="life-capture-overlay" id="lifeCaptureOverlay" aria-hidden="true">
         <div class="life-capture-shell">
-          <header class="life-capture-head"><div class="life-capture-head-copy"><span class="life-capture-eyebrow">Memória iLife</span><strong id="lifeCaptureModeLabel">Foto</strong></div><button class="life-capture-close" type="button" data-life-close="capture" aria-label="Fechar câmera"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></header>
-          <div class="life-capture-stage"><div class="life-capture-preview-frame"><video id="lifeCapturePreview" autoplay playsinline muted></video><canvas id="lifeCaptureCanvas" width="720" height="720" hidden></canvas></div></div>
-          <p class="life-capture-status" id="lifeCaptureStatus">Abrindo câmera…</p>
-          <footer class="life-capture-footer"><button class="life-capture-album-button" id="lifeCaptureAlbumButton" type="button" aria-label="Abrir álbum"><span class="life-capture-album-thumb" id="lifeCaptureAlbumThumb"><svg viewBox="0 0 24 24"><path d="M4 5h5l1.4 1.8H20a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4.5v6h11v-6Z" fill="currentColor"/></svg></span></button><button class="life-capture-trigger" id="lifeCaptureTriggerButton" type="button" aria-label="Capturar foto"><span class="life-capture-trigger-ring"></span><span class="life-capture-trigger-core"></span></button><button class="life-capture-mode-button" id="lifeCaptureModeButton" type="button" aria-label="Trocar para vídeo"><span class="life-capture-mode-icon" id="lifeCaptureModeIcon"></span></button></footer>
+          <header class="life-capture-head">
+            <div class="life-capture-head-copy">
+              <span class="life-capture-kicker">Camera</span>
+              <h2 class="life-capture-title" id="lifeCaptureModeLabel">Foto</h2>
+            </div>
+            <button class="life-capture-close" type="button" data-life-close="capture" aria-label="Fechar camera">
+              <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </header>
+          <div class="life-capture-stage">
+            <div class="life-capture-preview-frame">
+              <video id="lifeCapturePreview" autoplay playsinline muted></video>
+              <canvas id="lifeCaptureCanvas" width="720" height="720" hidden></canvas>
+            </div>
+          </div>
+          <p class="life-capture-status" id="lifeCaptureStatus">Abrindo camera...</p>
+          <footer class="life-capture-footer">
+            <button class="life-capture-icon-btn" id="lifeCaptureAlbumButton" type="button" aria-label="Abrir album">
+              <span class="life-capture-thumb" id="lifeCaptureAlbumThumb">
+                <svg viewBox="0 0 24 24"><path d="M4 5h5l1.4 1.8H20a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4.5v6h11v-6Z" fill="currentColor"/></svg>
+              </span>
+            </button>
+            <button class="life-capture-trigger" id="lifeCaptureTriggerButton" type="button" aria-label="Capturar">
+              <span class="life-capture-trigger-ring"></span>
+              <span class="life-capture-trigger-core"></span>
+            </button>
+            <div class="life-capture-capture-tools">
+              <button class="life-capture-mode-btn" id="lifeCaptureModeButton" type="button" aria-label="Trocar foto ou video"></button>
+              <button class="life-capture-switch-btn" id="lifeCaptureSwitchButton" type="button" aria-label="Trocar camera">
+                <svg viewBox="0 0 24 24"><path d="M16 4h2.5A3.5 3.5 0 0 1 22 7.5V10m-14 10H5.5A3.5 3.5 0 0 1 2 16.5V14m4 6 3-3-3-3m12-10-3 3 3 3M8 7h8a3 3 0 1 1 0 6H8a3 3 0 1 1 0-6Zm0 4h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </footer>
         </div>
       </section>
-      <section class="life-capture-overlay" id="lifeCaptureGalleryOverlay" aria-hidden="true">
-        <div class="life-capture-gallery-shell"><header class="life-capture-gallery-head"><div><span class="life-capture-eyebrow">Memória iLife</span><h2>Fotos e vídeos</h2></div><button class="life-capture-close" type="button" data-life-close="gallery" aria-label="Fechar álbum"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></header><div class="life-capture-gallery-filters"><button class="life-capture-filter active" data-life-filter="all" type="button">Tudo</button><button class="life-capture-filter" data-life-filter="photo" type="button">Fotos</button><button class="life-capture-filter" data-life-filter="video" type="button">Vídeos</button></div><div class="life-capture-gallery-list" id="lifeCaptureGalleryList"></div></div>
-      </section>
+
       <section class="life-capture-overlay" id="lifeCaptureSaveOverlay" aria-hidden="true">
-        <div class="life-capture-save-shell"><header class="life-capture-gallery-head"><div><span class="life-capture-eyebrow">Memória iLife</span><h2>Adicione um nome</h2></div><button class="life-capture-close" type="button" data-life-close="save" aria-label="Fechar etapa"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></header><div class="life-capture-save-preview"><img id="lifeCaptureSaveImage" alt="Prévia" hidden /><video id="lifeCaptureSaveVideo" controls playsinline hidden></video><button class="life-capture-save-mic" id="lifeCaptureSaveMicButton" type="button" aria-label="Falar o nome"><svg viewBox="0 0 24 24"><path d="M12 15.2a3.6 3.6 0 0 0 3.6-3.6V6.6a3.6 3.6 0 1 0-7.2 0v5a3.6 3.6 0 0 0 3.6 3.6Zm-5.4-3.8a5.4 5.4 0 0 0 10.8 0M12 18.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div><label class="life-capture-save-title-wrap"><input class="life-capture-save-title" id="lifeCaptureTitleInput" type="text" maxlength="80" placeholder="Dê um nome para esse momento" /></label><p class="life-capture-status life-capture-save-status" id="lifeCaptureSaveStatus"></p><button class="primary-btn life-capture-save-button" id="lifeCaptureSaveButton" type="button">Salvar</button></div>
-      </section>`;
+        <div class="life-capture-save-shell">
+          <header class="life-capture-save-head">
+            <div class="life-capture-head-copy">
+              <span class="life-capture-kicker">Adicione um nome</span>
+              <h2 class="life-capture-title">Seu momento</h2>
+            </div>
+            <button class="life-capture-close" type="button" data-life-close="save" aria-label="Fechar etapa">
+              <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </header>
+          <div class="life-capture-save-preview">
+            <img id="lifeCaptureSaveImage" alt="Previa da foto" hidden />
+            <video id="lifeCaptureSaveVideo" playsinline muted loop hidden></video>
+            <button class="life-capture-save-mic" id="lifeCaptureSaveMicButton" type="button" aria-label="Falar o nome">
+              <svg viewBox="0 0 24 24"><path d="M12 15.2a3.6 3.6 0 0 0 3.6-3.6V6.6a3.6 3.6 0 1 0-7.2 0v5a3.6 3.6 0 0 0 3.6 3.6Zm-5.4-3.8a5.4 5.4 0 0 0 10.8 0M12 18.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <label class="life-capture-save-title-wrap">
+            <input class="life-capture-save-title" id="lifeCaptureTitleInput" type="text" maxlength="80" placeholder="De um nome para esse momento" />
+          </label>
+          <p class="life-capture-status" id="lifeCaptureSaveStatus"></p>
+          <button class="primary-btn life-capture-save-button" id="lifeCaptureSaveButton" type="button">Salvar</button>
+        </div>
+      </section>
+
+      <section class="life-capture-overlay" id="lifeCaptureViewerOverlay" aria-hidden="true">
+        <div class="life-capture-viewer-shell">
+          <div class="life-capture-viewer-viewport" id="lifeCaptureViewerViewport">
+            <div class="life-capture-viewer-track" id="lifeCaptureViewerTrack"></div>
+          </div>
+          <div class="life-capture-viewer-footer">
+            <button class="life-capture-toolbar-btn" id="lifeCaptureNoteButton" type="button" aria-label="Adicionar nota">
+              <svg viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="life-capture-toolbar-btn" id="lifeCaptureFullscreenButton" type="button" aria-label="Ver em tela cheia">
+              <svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button class="life-capture-toolbar-btn" id="lifeCaptureViewerCloseButton" type="button" aria-label="Fechar visualizacao">
+              <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="life-capture-focus-overlay" id="lifeCaptureFocusOverlay" aria-hidden="true">
+        <button class="life-capture-close" id="lifeCaptureFocusCloseButton" type="button" aria-label="Fechar tela cheia" style="position:absolute;top:max(18px,env(safe-area-inset-top,0px));right:18px;z-index:4;">
+          <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="life-capture-focus-media" id="lifeCaptureFocusMedia"></div>
+      </section>
+
+      <section class="life-capture-overlay" id="lifeCaptureNoteOverlay" aria-hidden="true">
+        <div class="life-capture-note-shell">
+          <header class="life-capture-note-head">
+            <div class="life-capture-head-copy">
+              <span class="life-capture-kicker">Notas da memoria</span>
+              <h2 class="life-capture-title">Texto ou voz</h2>
+            </div>
+            <button class="life-capture-close" type="button" data-life-close="note" aria-label="Fechar nota">
+              <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </header>
+          <label class="life-capture-note-field">
+            <textarea class="life-capture-note-text" id="lifeCaptureNoteInput" placeholder="Escreva ou dite uma nota para esse momento"></textarea>
+          </label>
+          <div class="life-capture-note-actions">
+            <button class="life-capture-note-mic" id="lifeCaptureNoteMicButton" type="button" aria-label="Gravar nota por voz">
+              <svg viewBox="0 0 24 24"><path d="M12 15.2a3.6 3.6 0 0 0 3.6-3.6V6.6a3.6 3.6 0 1 0-7.2 0v5a3.6 3.6 0 0 0 3.6 3.6Zm-5.4-3.8a5.4 5.4 0 0 0 10.8 0M12 18.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button class="primary-btn life-capture-note-save" id="lifeCaptureNoteSaveButton" type="button">Salvar nota</button>
+          </div>
+          <p class="life-capture-status" id="lifeCaptureNoteStatus"></p>
+        </div>
+      </section>
+
+      <section class="life-capture-overlay" id="lifeCaptureShareOverlay" aria-hidden="true">
+        <div class="life-capture-share-shell">
+          <header class="life-capture-share-head">
+            <div class="life-capture-head-copy">
+              <span class="life-capture-kicker">Compartilhar</span>
+              <h2 class="life-capture-title">Enviar para o chat</h2>
+            </div>
+            <button class="life-capture-close" type="button" data-life-close="share" aria-label="Fechar compartilhar">
+              <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </header>
+          <div class="life-capture-share-list" id="lifeCaptureShareList"></div>
+          <p class="life-capture-share-status" id="lifeCaptureShareStatus"></p>
+        </div>
+      </section>
+    `;
     document.body.appendChild(host);
-  };
-  const setModeUi = () => {
-    byId('lifeCaptureModeLabel').textContent = state.mode === 'video' ? 'Vídeo' : 'Foto';
-    byId('lifeCaptureModeIcon').innerHTML = state.mode === 'video'
-      ? '<svg viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h7A2.5 2.5 0 0 1 16 7.5v1.2l4.1-2.4c.8-.46 1.9.1 1.9 1.02v9.4c0 .92-1.1 1.48-1.9 1.02L16 15.3v1.2A2.5 2.5 0 0 1 13.5 19h-7A2.5 2.5 0 0 1 4 16.5Z" fill="currentColor"/></svg>'
-      : '<svg viewBox="0 0 24 24"><path d="M6 7h2.2l1.5-2h8.6l1.5 2H22a1 1 0 0 1 1 1v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V8a1 1 0 0 1 1-1Zm6 3.2a4.8 4.8 0 1 0 4.8 4.8 4.8 4.8 0 0 0-4.8-4.8Z" fill="currentColor"/></svg>';
-    byId('lifeCaptureTriggerButton').classList.toggle('is-recording', state.recording);
-  };
-  const status = (msg) => { const el = byId('lifeCaptureStatus'); if (el) el.textContent = msg || ''; };
-  const show = (id) => { const el = byId(id); if (el) { el.classList.add('active'); el.setAttribute('aria-hidden', 'false'); } };
-  const hide = (id) => { const el = byId(id); if (el) { el.classList.remove('active'); el.setAttribute('aria-hidden', 'true'); } };
-  const db = () => new Promise((resolve, reject) => { const req = indexedDB.open(DB_NAME, 1); req.onupgradeneeded = () => { const d = req.result; if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' }); }; req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
-  const allItems = async () => { const d = await db(); return new Promise((resolve, reject) => { const req = d.transaction(STORE, 'readonly').objectStore(STORE).getAll(); req.onsuccess = () => resolve((req.result || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))); req.onerror = () => reject(req.error); }); };
-  const putItem = async (item) => { const d = await db(); return new Promise((resolve, reject) => { const req = d.transaction(STORE, 'readwrite').objectStore(STORE).put(item); req.onsuccess = () => resolve(item); req.onerror = () => reject(req.error); }); };
-  const stopPreview = () => { if (state.raf) cancelAnimationFrame(state.raf); state.raf = 0; const v = byId('lifeCapturePreview'); try { v.pause(); } catch {} v.srcObject = null; if (state.stream) state.stream.getTracks().forEach((t) => t.stop()); state.stream = null; };
-  const draw = () => { const v = byId('lifeCapturePreview'); const c = byId('lifeCaptureCanvas'); const ctx = c.getContext('2d', { alpha: false }); if (!v.videoWidth || !v.videoHeight) { state.raf = requestAnimationFrame(draw); return; } const side = Math.min(v.videoWidth, v.videoHeight); const x = (v.videoWidth - side) / 2; const y = (v.videoHeight - side) / 2; ctx.clearRect(0,0,c.width,c.height); ctx.filter = FILTER; ctx.drawImage(v, x, y, side, side, 0, 0, c.width, c.height); state.raf = requestAnimationFrame(draw); };
-  const startPreview = async () => { const v = byId('lifeCapturePreview'); state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true }); v.srcObject = state.stream; await v.play().catch(() => {}); draw(); status(state.mode === 'video' ? 'Vídeo em 720p com moldura 1x1.' : 'Foto com filtro padrão ativo.'); };
-  const blobFromCanvas = () => new Promise((resolve, reject) => byId('lifeCaptureCanvas').toBlob((b) => b ? resolve(b) : reject(new Error('Falha ao gerar mídia.')), 'image/webp', .84));
-  const dataUrl = (blob) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result || '')); r.onerror = () => reject(r.error); r.readAsDataURL(blob); });
-  const stopTitleMic = () => { if (state.titleTimer) clearInterval(state.titleTimer); state.titleTimer = 0; if (state.titleRecorder && state.titleRecorder.state !== 'inactive') state.titleRecorder.stop(); state.titleRecorder = null; if (state.titleStream) state.titleStream.getTracks().forEach((t) => t.stop()); state.titleStream = null; if (state.titleAudioContext) try { state.titleAudioContext.close(); } catch {} state.titleAudioContext = null; state.titleAnalyser = null; byId('lifeCaptureSaveMicButton')?.classList.remove('is-recording'); };
-  const prepareSave = (capture) => { state.pending = capture; const img = byId('lifeCaptureSaveImage'); const vid = byId('lifeCaptureSaveVideo'); const input = byId('lifeCaptureTitleInput'); const saveStatus = byId('lifeCaptureSaveStatus'); saveStatus.textContent = ''; input.value = ''; input.placeholder = defaultTitle(capture.kind, capture.createdAt); if (capture.kind === 'photo') { img.hidden = false; img.src = capture.previewDataUrl; vid.hidden = true; vid.pause(); vid.removeAttribute('src'); vid.load(); } else { img.hidden = true; vid.hidden = false; vid.src = URL.createObjectURL(capture.mediaBlob); vid.load(); } show('lifeCaptureSaveOverlay'); setTimeout(() => input.focus(), 30); };
-  const capturePhoto = async () => { status('Capturando foto…'); const mediaBlob = await blobFromCanvas(); const previewDataUrl = await dataUrl(mediaBlob); stopPreview(); prepareSave({ id: `life-${Date.now()}`, kind: 'photo', createdAt: new Date().toISOString(), mimeType: 'image/webp', mediaBlob, previewDataUrl }); };
-  const previewForVideo = async (blob) => { const url = URL.createObjectURL(blob); const v = document.createElement('video'); v.src = url; v.muted = true; await new Promise((resolve) => { v.onloadeddata = resolve; }); v.currentTime = .05; await new Promise((resolve) => { v.onseeked = resolve; setTimeout(resolve, 200); }); const c = document.createElement('canvas'); c.width = 480; c.height = 480; const ctx = c.getContext('2d', { alpha: false }); ctx.filter = FILTER; ctx.drawImage(v, 0, 0, c.width, c.height); URL.revokeObjectURL(url); return c.toDataURL('image/webp', .78); };
-  const toggleVideo = async () => { const btn = byId('lifeCaptureTriggerButton'); if (!state.recording) { const stream = byId('lifeCaptureCanvas').captureStream(30); const track = state.stream?.getAudioTracks?.()[0]; if (track) try { stream.addTrack(track.clone()); } catch {} state.chunks = []; state.recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm' }); state.recording = true; state.recordingStartedAt = Date.now(); setModeUi(); status('Gravando vídeo… toque novamente para parar.'); state.recorder.ondataavailable = (e) => e.data?.size && state.chunks.push(e.data); state.recorder.onstop = async () => { state.recording = false; setModeUi(); const mediaBlob = new Blob(state.chunks, { type: state.recorder.mimeType || 'video/webm' }); const previewDataUrl = await previewForVideo(mediaBlob); stopPreview(); prepareSave({ id: `life-${Date.now()}`, kind: 'video', createdAt: new Date().toISOString(), mimeType: mediaBlob.type || 'video/webm', mediaBlob, previewDataUrl, durationMs: Date.now() - state.recordingStartedAt }); }; state.recorder.start(); btn.classList.add('is-recording'); return; } state.recorder?.stop(); btn.classList.remove('is-recording'); };
-  const renderThumb = async () => { const thumb = byId('lifeCaptureAlbumThumb'); if (!thumb) return; const latest = (await allItems())[0]; if (!latest?.previewDataUrl) { thumb.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 5h5l1.4 1.8H20a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4.5v6h11v-6Z" fill="currentColor"/></svg>'; return; } thumb.innerHTML = `<img src="${latest.previewDataUrl}" alt="Última memória" />`; };
-  const renderGallery = async () => { const list = byId('lifeCaptureGalleryList'); list.innerHTML = ''; const items = (await allItems()).filter((item) => state.galleryFilter === 'all' || item.kind === state.galleryFilter); document.querySelectorAll('[data-life-filter]').forEach((b) => b.classList.toggle('active', b.dataset.lifeFilter === state.galleryFilter)); if (!items.length) { list.innerHTML = '<div class="life-capture-empty">Sua memória ainda está vazia. Capture seu primeiro momento.</div>'; return; } items.forEach((item) => { const card = document.createElement('article'); card.className = 'life-capture-gallery-card'; const media = document.createElement(item.kind === 'video' ? 'video' : 'img'); if (item.kind === 'video') { media.src = URL.createObjectURL(item.mediaBlob); media.controls = true; media.playsInline = true; } else { media.src = item.previewDataUrl; media.alt = item.title || 'Memória'; } const meta = document.createElement('div'); meta.className = 'life-capture-gallery-meta'; meta.innerHTML = `<strong></strong><span>${fmt(item.createdAt)}</span>`; meta.querySelector('strong').textContent = item.title || defaultTitle(item.kind, item.createdAt); card.append(media, meta); list.append(card); }); };
-  const openCapture = async () => { inject(); setModeUi(); show('lifeCaptureOverlay'); await renderThumb(); try { await startPreview(); } catch (e) { status(e?.message || 'Falha ao abrir a câmera.'); } };
-  const savePending = async () => { const input = byId('lifeCaptureTitleInput'); const saveStatus = byId('lifeCaptureSaveStatus'); if (!state.pending) return; saveStatus.textContent = 'Salvando no aparelho…'; await putItem({ ...state.pending, title: String(input.value || '').trim() || defaultTitle(state.pending.kind, state.pending.createdAt) }); state.pending = null; saveStatus.textContent = 'Memória salva.'; await renderThumb(); await renderGallery(); setTimeout(async () => { hide('lifeCaptureSaveOverlay'); show('lifeCaptureOverlay'); try { await startPreview(); } catch (e) { status(e?.message || 'Falha ao reabrir a câmera.'); } }, 180); };
-  const transcribeTitle = async () => { const saveStatus = byId('lifeCaptureSaveStatus'); const input = byId('lifeCaptureTitleInput'); try { state.titleStream = await navigator.mediaDevices.getUserMedia({ audio: true }); state.titleAudioContext = new AudioContext(); const source = state.titleAudioContext.createMediaStreamSource(state.titleStream); state.titleAnalyser = state.titleAudioContext.createAnalyser(); state.titleAnalyser.fftSize = 2048; source.connect(state.titleAnalyser); const chunks = []; state.titleRecorder = new MediaRecorder(state.titleStream, { mimeType: 'audio/webm' }); state.titleRecorder.ondataavailable = (e) => e.data?.size && chunks.push(e.data); state.titleRecorder.onstop = async () => { const blob = new Blob(chunks, { type: 'audio/webm' }); if (!blob.size) { stopTitleMic(); return; } saveStatus.textContent = 'Transcrevendo…'; const base64 = await blob.arrayBuffer().then((b) => btoa(String.fromCharCode(...new Uint8Array(b)))); const res = await fetch('/api/audio/transcribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audioBase64: base64, mimeType: 'audio/webm', fileName: 'life-capture-title.webm' }) }); const json = await res.json(); input.value = String(json?.text || '').trim().slice(0, 80); saveStatus.textContent = input.value ? 'Nome preenchido.' : 'Sem texto captado.'; stopTitleMic(); }; state.titleRecorder.start(); byId('lifeCaptureSaveMicButton').classList.add('is-recording'); saveStatus.textContent = 'Gravando o nome…'; state.titleLastSpeechAt = Date.now(); state.titleTimer = setInterval(() => { if (!state.titleAnalyser) return; const buffer = new Uint8Array(state.titleAnalyser.fftSize); state.titleAnalyser.getByteTimeDomainData(buffer); let sum = 0; for (let i = 0; i < buffer.length; i += 1) { const v = (buffer[i] - 128) / 128; sum += v * v; } if (Math.sqrt(sum / buffer.length) > .02) state.titleLastSpeechAt = Date.now(); if (Date.now() - state.titleLastSpeechAt > 1800) state.titleRecorder?.stop(); }, 120); } catch (e) { saveStatus.textContent = e?.message || 'Falha no microfone.'; stopTitleMic(); } };
-  document.addEventListener('click', async (event) => {
-    const target = event.target.closest('button');
-    if (!target) return;
-    if (target.id === 'lifeCaptureHomeButton') void openCapture();
-    if (target.dataset.lifeClose === 'capture') { stopPreview(); hide('lifeCaptureOverlay'); }
-    if (target.dataset.lifeClose === 'gallery') { hide('lifeCaptureGalleryOverlay'); show('lifeCaptureOverlay'); try { await startPreview(); } catch {} }
-    if (target.dataset.lifeClose === 'save') { state.pending = null; stopTitleMic(); hide('lifeCaptureSaveOverlay'); show('lifeCaptureOverlay'); try { await startPreview(); } catch {} }
-    if (target.id === 'lifeCaptureModeButton') { if (state.recording) return; state.mode = state.mode === 'photo' ? 'video' : 'photo'; setModeUi(); status(state.mode === 'video' ? 'Vídeo em 720p com moldura 1x1.' : 'Foto com filtro padrão ativo.'); }
-    if (target.id === 'lifeCaptureTriggerButton') { try { if (state.mode === 'video') await toggleVideo(); else await capturePhoto(); } catch (e) { status(e?.message || 'Falha na captura.'); } }
-    if (target.id === 'lifeCaptureAlbumButton') { stopPreview(); await renderGallery(); hide('lifeCaptureOverlay'); show('lifeCaptureGalleryOverlay'); }
-    if (target.id === 'lifeCaptureSaveButton') void savePending().catch((e) => { byId('lifeCaptureSaveStatus').textContent = e?.message || 'Falha ao salvar.'; });
-    if (target.id === 'lifeCaptureSaveMicButton') void transcribeTitle();
-    if (target.dataset.lifeFilter) { state.galleryFilter = target.dataset.lifeFilter; await renderGallery(); }
+  }
+
+  function setStatus(message = "") {
+    const element = byId("lifeCaptureStatus");
+    if (element) element.textContent = message;
+  }
+
+  function setSaveStatus(message = "") {
+    const element = byId("lifeCaptureSaveStatus");
+    if (element) element.textContent = message;
+  }
+
+  function setNoteStatus(message = "") {
+    const element = byId("lifeCaptureNoteStatus");
+    if (element) element.textContent = message;
+  }
+
+  function setShareStatus(message = "") {
+    const element = byId("lifeCaptureShareStatus");
+    if (element) element.textContent = message;
+  }
+
+  function show(id) {
+    const element = byId(id);
+    if (!element) return;
+    element.classList.add("active");
+    element.setAttribute("aria-hidden", "false");
+  }
+
+  function hide(id) {
+    const element = byId(id);
+    if (!element) return;
+    element.classList.remove("active");
+    element.setAttribute("aria-hidden", "true");
+  }
+
+  function openDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: "id" });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function loadCaptures() {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll();
+      request.onsuccess = () => {
+        const items = Array.isArray(request.result) ? request.result.slice() : [];
+        items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        resolve(items);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function saveCapture(item) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(item);
+      request.onsuccess = () => resolve(item);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function refreshCaptures() {
+    state.captures = await loadCaptures();
+    state.activeIndex = clamp(state.activeIndex, 0, Math.max(state.captures.length - 1, 0));
+    await renderAlbumThumb();
+    renderViewer();
+  }
+
+  function getActiveCapture() {
+    return state.captures[state.activeIndex] || null;
+  }
+
+  function stopPreview() {
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.raf = 0;
+    const preview = byId("lifeCapturePreview");
+    try {
+      preview?.pause();
+    } catch {}
+    if (preview) preview.srcObject = null;
+    if (state.stream) state.stream.getTracks().forEach((track) => track.stop());
+    state.stream = null;
+  }
+
+  function drawPreviewFrame() {
+    const preview = byId("lifeCapturePreview");
+    const canvas = byId("lifeCaptureCanvas");
+    if (!(preview && canvas)) return;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!preview.videoWidth || !preview.videoHeight || !context) {
+      state.raf = requestAnimationFrame(drawPreviewFrame);
+      return;
+    }
+    const side = Math.min(preview.videoWidth, preview.videoHeight);
+    const sourceX = (preview.videoWidth - side) / 2;
+    const sourceY = (preview.videoHeight - side) / 2;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.filter = FILTER;
+    context.drawImage(preview, sourceX, sourceY, side, side, 0, 0, canvas.width, canvas.height);
+    state.raf = requestAnimationFrame(drawPreviewFrame);
+  }
+
+  async function startPreview() {
+    stopPreview();
+    const preview = byId("lifeCapturePreview");
+    if (!preview) return;
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: state.facingMode },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: true
+    });
+    preview.srcObject = state.stream;
+    await preview.play().catch(() => {});
+    drawPreviewFrame();
+    setStatus(state.mode === "video" ? "Video 720p ativo." : "Foto 720p ativa.");
+  }
+
+  function setModeUi() {
+    const label = byId("lifeCaptureModeLabel");
+    const modeButton = byId("lifeCaptureModeButton");
+    const trigger = byId("lifeCaptureTriggerButton");
+    if (label) label.textContent = state.mode === "video" ? "Video" : "Foto";
+    if (modeButton) {
+      modeButton.innerHTML = state.mode === "video"
+        ? '<svg viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h7A2.5 2.5 0 0 1 16 7.5v1.2l4.1-2.4c.8-.46 1.9.1 1.9 1.02v9.4c0 .92-1.1 1.48-1.9 1.02L16 15.3v1.2A2.5 2.5 0 0 1 13.5 19h-7A2.5 2.5 0 0 1 4 16.5Z" fill="currentColor"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M6 7h2.2l1.5-2h8.6l1.5 2H22a1 1 0 0 1 1 1v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V8a1 1 0 0 1 1-1Zm6 3.2a4.8 4.8 0 1 0 4.8 4.8 4.8 4.8 0 0 0-4.8-4.8Z" fill="currentColor"/></svg>';
+    }
+    trigger?.classList.toggle("is-recording", state.recording);
+  }
+
+  function canvasBlob() {
+    const canvas = byId("lifeCaptureCanvas");
+    return new Promise((resolve, reject) => {
+      canvas?.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Falha ao gerar a imagem."));
+      }, "image/webp", 0.86);
+    });
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(safeText(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function videoPreviewFromBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    video.src = url;
+    video.muted = true;
+    video.playsInline = true;
+    await new Promise((resolve) => {
+      video.onloadeddata = resolve;
+      setTimeout(resolve, 500);
+    });
+    try {
+      video.currentTime = 0.05;
+    } catch {}
+    await new Promise((resolve) => {
+      video.onseeked = resolve;
+      setTimeout(resolve, 250);
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = 720;
+    canvas.height = 720;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (context) {
+      context.filter = FILTER;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    }
+    URL.revokeObjectURL(url);
+    return canvas.toDataURL("image/webp", 0.82);
+  }
+
+  function prepareSave(capture) {
+    state.pending = capture;
+    const image = byId("lifeCaptureSaveImage");
+    const video = byId("lifeCaptureSaveVideo");
+    const input = byId("lifeCaptureTitleInput");
+    setSaveStatus("");
+    if (input) {
+      input.value = safeText(capture.title);
+      input.placeholder = defaultTitle(capture.kind, capture.createdAt);
+    }
+    if (capture.kind === "photo") {
+      if (image) {
+        image.hidden = false;
+        image.src = capture.previewDataUrl;
+      }
+      if (video) {
+        video.hidden = true;
+        try { video.pause(); } catch {}
+        video.removeAttribute("src");
+        video.load();
+      }
+    } else {
+      if (image) image.hidden = true;
+      if (video) {
+        video.hidden = false;
+        video.poster = capture.previewDataUrl;
+        video.src = URL.createObjectURL(capture.mediaBlob);
+        video.load();
+        video.play().catch(() => {});
+      }
+    }
+    hide("lifeCaptureOverlay");
+    show("lifeCaptureSaveOverlay");
+    setTimeout(() => input?.focus(), 40);
+  }
+
+  async function capturePhoto() {
+    setStatus("Capturando foto...");
+    const mediaBlob = await canvasBlob();
+    const previewDataUrl = await blobToDataUrl(mediaBlob);
+    stopPreview();
+    prepareSave({
+      id: `life-${Date.now()}`,
+      kind: "photo",
+      createdAt: new Date().toISOString(),
+      mimeType: "image/webp",
+      mediaBlob,
+      previewDataUrl,
+      noteText: ""
+    });
+  }
+
+  async function toggleVideoRecording() {
+    const trigger = byId("lifeCaptureTriggerButton");
+    if (!state.recording) {
+      const canvas = byId("lifeCaptureCanvas");
+      const stream = canvas.captureStream(30);
+      const audioTrack = state.stream?.getAudioTracks?.()[0];
+      if (audioTrack) {
+        try {
+          stream.addTrack(audioTrack.clone());
+        } catch {}
+      }
+      state.chunks = [];
+      state.recorder = new MediaRecorder(
+        stream,
+        {
+          mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+            ? "video/webm;codecs=vp8,opus"
+            : "video/webm"
+        }
+      );
+      state.recording = true;
+      state.recordingStartedAt = Date.now();
+      setModeUi();
+      setStatus("Gravando video...");
+      state.recorder.ondataavailable = (event) => {
+        if (event.data?.size) state.chunks.push(event.data);
+      };
+      state.recorder.onstop = async () => {
+        state.recording = false;
+        setModeUi();
+        const mimeType = safeText(state.recorder?.mimeType || "video/webm");
+        const mediaBlob = new Blob(state.chunks, { type: mimeType });
+        const previewDataUrl = await videoPreviewFromBlob(mediaBlob);
+        stopPreview();
+        prepareSave({
+          id: `life-${Date.now()}`,
+          kind: "video",
+          createdAt: new Date().toISOString(),
+          mimeType,
+          mediaBlob,
+          previewDataUrl,
+          durationMs: Date.now() - state.recordingStartedAt,
+          noteText: ""
+        });
+      };
+      state.recorder.start();
+      trigger?.classList.add("is-recording");
+      return;
+    }
+    trigger?.classList.remove("is-recording");
+    state.recorder?.stop();
+  }
+
+  async function renderAlbumThumb() {
+    const thumb = byId("lifeCaptureAlbumThumb");
+    if (!thumb) return;
+    const latest = state.captures[0];
+    if (!latest?.previewDataUrl) {
+      thumb.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 5h5l1.4 1.8H20a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4.5v6h11v-6Z" fill="currentColor"/></svg>';
+      return;
+    }
+    thumb.innerHTML = `<img src="${latest.previewDataUrl}" alt="Ultimo item" />`;
+  }
+
+  function pauseViewerVideos() {
+    document.querySelectorAll("#lifeCaptureViewerTrack video").forEach((video) => {
+      try { video.pause(); } catch {}
+    });
+  }
+
+  function updateViewerTransform(withTransition = true) {
+    const track = byId("lifeCaptureViewerTrack");
+    if (!track) return;
+    track.style.transition = withTransition ? "transform .32s cubic-bezier(.22,.61,.36,1)" : "none";
+    const base = -(state.activeIndex * window.innerWidth);
+    track.style.transform = `translate3d(${base + state.dragDeltaX}px,0,0)`;
+    updateViewerMediaPlayback();
+  }
+
+  function renderViewer() {
+    const track = byId("lifeCaptureViewerTrack");
+    if (!track) return;
+    track.replaceChildren();
+    if (!state.captures.length) {
+      const empty = document.createElement("div");
+      empty.className = "life-capture-viewer-slide";
+      empty.innerHTML = '<div class="life-capture-empty">Sua memoria ainda esta vazia.</div>';
+      track.appendChild(empty);
+      updateViewerTransform();
+      return;
+    }
+    state.captures.forEach((capture) => {
+      const slide = document.createElement("article");
+      slide.className = "life-capture-viewer-slide";
+      slide.dataset.captureId = capture.id;
+
+      const media = document.createElement("div");
+      media.className = "life-capture-viewer-media";
+
+      if (capture.noteText) {
+        const badge = document.createElement("button");
+        badge.className = "life-capture-viewer-badge";
+        badge.type = "button";
+        badge.dataset.captureNote = capture.id;
+        badge.ariaLabel = "Abrir nota";
+        badge.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+        media.appendChild(badge);
+      }
+
+      const share = document.createElement("button");
+      share.className = "life-capture-viewer-share";
+      share.type = "button";
+      share.dataset.captureShare = capture.id;
+      share.ariaLabel = "Compartilhar no chat";
+      share.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 8a3 3 0 1 0-2.8-4H13a3 3 0 0 0 .2 1.1L7.9 8.2a3 3 0 1 0 0 7.6l5.3 3.1A3 3 0 1 0 14 17a2.9 2.9 0 0 0-.2-1l-5.4-3.2a2.9 2.9 0 0 0 0-1.6l5.4-3.2A3 3 0 0 0 16 8Z" fill="currentColor"/></svg>';
+      media.appendChild(share);
+
+      if (capture.kind === "video") {
+        const video = document.createElement("video");
+        video.dataset.captureVideo = capture.id;
+        video.dataset.captureKind = "video";
+        video.poster = capture.previewDataUrl;
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        video.src = URL.createObjectURL(capture.mediaBlob);
+        video.addEventListener("loadeddata", () => {
+          try {
+            video.currentTime = 0.05;
+          } catch {}
+        }, { once: true });
+        video.addEventListener("click", () => openFocus(capture.id));
+        media.appendChild(video);
+      } else {
+        const image = document.createElement("img");
+        image.src = capture.previewDataUrl;
+        image.alt = safeText(capture.title || defaultTitle(capture.kind, capture.createdAt));
+        image.addEventListener("click", () => openFocus(capture.id));
+        media.appendChild(image);
+      }
+
+      slide.appendChild(media);
+      track.appendChild(slide);
+    });
+    updateViewerTransform();
+  }
+
+  function updateViewerMediaPlayback() {
+    pauseViewerVideos();
+    const capture = getActiveCapture();
+    if (!capture || capture.kind !== "video") return;
+    const video = document.querySelector(`#lifeCaptureViewerTrack video[data-capture-video="${CSS.escape(capture.id)}"]`);
+    if (video instanceof HTMLVideoElement) {
+      video.play().catch(() => {});
+    }
+  }
+
+  function openViewer() {
+    stopPreview();
+    hide("lifeCaptureOverlay");
+    show("lifeCaptureViewerOverlay");
+    renderViewer();
+    updateViewerTransform();
+  }
+
+  function closeViewer() {
+    pauseViewerVideos();
+    hide("lifeCaptureViewerOverlay");
+    show("lifeCaptureOverlay");
+    startPreview().catch((error) => {
+      setStatus(error instanceof Error ? error.message : "Falha ao reabrir a camera.");
+    });
+  }
+
+  function findCaptureById(id) {
+    return state.captures.find((capture) => String(capture.id) === String(id)) || null;
+  }
+
+  function openFocus(captureId) {
+    const capture = findCaptureById(captureId) || getActiveCapture();
+    const host = byId("lifeCaptureFocusMedia");
+    if (!(capture && host)) return;
+    host.replaceChildren();
+    if (capture.kind === "video") {
+      const video = document.createElement("video");
+      video.poster = capture.previewDataUrl;
+      video.src = URL.createObjectURL(capture.mediaBlob);
+      video.controls = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      host.appendChild(video);
+    } else {
+      const image = document.createElement("img");
+      image.src = capture.previewDataUrl;
+      image.alt = safeText(capture.title || "Memoria");
+      host.appendChild(image);
+    }
+    show("lifeCaptureFocusOverlay");
+  }
+
+  function openSharedFocus(payload) {
+    const host = byId("lifeCaptureFocusMedia");
+    if (!host) return;
+    host.replaceChildren();
+    const image = document.createElement("img");
+    image.src = safeText(payload?.previewDataUrl);
+    image.alt = safeText(payload?.title || "Midia compartilhada");
+    host.appendChild(image);
+    show("lifeCaptureFocusOverlay");
+  }
+
+  function closeFocus() {
+    const host = byId("lifeCaptureFocusMedia");
+    host?.replaceChildren();
+    hide("lifeCaptureFocusOverlay");
+  }
+
+  function openNote(captureId) {
+    const capture = findCaptureById(captureId) || getActiveCapture();
+    if (!capture) return;
+    state.noteCaptureId = capture.id;
+    const input = byId("lifeCaptureNoteInput");
+    if (input) input.value = safeText(capture.noteText || "");
+    setNoteStatus("");
+    show("lifeCaptureNoteOverlay");
+    setTimeout(() => input?.focus(), 40);
+  }
+
+  function closeNote() {
+    stopNoteMic();
+    hide("lifeCaptureNoteOverlay");
+  }
+
+  async function persistCapturePatch(captureId, patch) {
+    const capture = findCaptureById(captureId);
+    if (!capture) return null;
+    const updated = { ...capture, ...patch };
+    await saveCapture(updated);
+    await refreshCaptures();
+    return updated;
+  }
+
+  async function saveNote() {
+    const capture = findCaptureById(state.noteCaptureId) || getActiveCapture();
+    if (!capture) return;
+    const input = byId("lifeCaptureNoteInput");
+    setNoteStatus("Salvando nota...");
+    await persistCapturePatch(capture.id, { noteText: safeText(input?.value).trim() });
+    setNoteStatus("Nota salva.");
+    closeNote();
+  }
+
+  function encodeUtf8Base64(text) {
+    const bytes = new TextEncoder().encode(safeText(text));
+    let binary = "";
+    bytes.forEach((value) => { binary += String.fromCharCode(value); });
+    return window.btoa(binary);
+  }
+
+  function buildSharePayload(capture) {
+    return {
+      kind: capture.kind,
+      title: safeText(capture.title || defaultTitle(capture.kind, capture.createdAt)),
+      previewDataUrl: safeText(capture.previewDataUrl),
+      dateLabel: formatDate(capture.createdAt),
+      noteText: safeText(capture.noteText || "")
+    };
+  }
+
+  function buildShareMessage(capture) {
+    return `${MEDIA_PREFIX}${encodeUtf8Base64(JSON.stringify(buildSharePayload(capture)))}${MEDIA_SUFFIX}`;
+  }
+
+  async function loadShareContacts() {
+    const response = await fetch("/api/200/tutors", { credentials: "same-origin" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(safeText(payload?.error || "Nao foi possivel carregar os contatos."));
+    return {
+      tutors: Array.isArray(payload?.tutors) ? payload.tutors : [],
+      friends: Array.isArray(payload?.friends) ? payload.friends : []
+    };
+  }
+
+  async function ensureTutor(friend) {
+    const response = await fetch("/api/200/tutors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ tutorUserId: friend.userId })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(safeText(payload?.error || "Nao foi possivel adicionar esse contato."));
+    return Array.isArray(payload?.tutors) ? payload.tutors : [];
+  }
+
+  async function shareToMarin(capture) {
+    const response = await fetch("/api/200/marin/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        profile: currentProfile(),
+        personaKey: "marin",
+        content: buildShareMessage(capture)
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(safeText(payload?.error || "Nao foi possivel compartilhar com a Marin."));
+  }
+
+  async function shareToTutor(contactId, capture) {
+    const response = await fetch(`/api/200/tutors/${encodeURIComponent(contactId)}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ content: buildShareMessage(capture) })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(safeText(payload?.error || "Nao foi possivel compartilhar com esse contato."));
+  }
+
+  async function openShare(captureId) {
+    const capture = findCaptureById(captureId) || getActiveCapture();
+    if (!capture) return;
+    state.shareCaptureId = capture.id;
+    const list = byId("lifeCaptureShareList");
+    if (!list) return;
+    list.replaceChildren();
+    setShareStatus("Carregando contatos...");
+    show("lifeCaptureShareOverlay");
+
+    const marinButton = document.createElement("button");
+    marinButton.className = "life-capture-share-card";
+    marinButton.type = "button";
+    marinButton.innerHTML = `
+      <svg viewBox="0 0 24 24"><path d="M4 5h16v10H8l-4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span><strong>Marin IA</strong><small>Enviar como mensagem no chat</small></span>
+    `;
+    marinButton.addEventListener("click", async () => {
+      try {
+        setShareStatus("Enviando para Marin...");
+        await shareToMarin(capture);
+        setShareStatus("Enviado para Marin.");
+      } catch (error) {
+        setShareStatus(error instanceof Error ? error.message : "Falha ao enviar.");
+      }
+    });
+    list.appendChild(marinButton);
+
+    try {
+      const directory = await loadShareContacts();
+      const entries = [];
+      directory.tutors.forEach((tutor) => {
+        entries.push({
+          type: "tutor",
+          id: safeText(tutor.contactId || tutor.id),
+          title: safeText(tutor.displayName || tutor.name || tutor.username || "Contato"),
+          subtitle: "Tutor ativo"
+        });
+      });
+      directory.friends.forEach((friend) => {
+        if (friend.isTutor) return;
+        entries.push({
+          type: "friend",
+          friend,
+          title: safeText(friend.displayName || friend.name || friend.username || "Amigo"),
+          subtitle: safeText(friend.username ? `@${friend.username}` : "Adicionar e enviar")
+        });
+      });
+
+      if (!entries.length) {
+        setShareStatus("Nenhum amigo disponivel ainda.");
+        return;
+      }
+
+      entries.forEach((entry) => {
+        const button = document.createElement("button");
+        button.className = "life-capture-share-card";
+        button.type = "button";
+        button.innerHTML = `
+          <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2-8 4.5V21h16v-2.5C20 16 16.42 14 12 14Z" fill="currentColor"/></svg>
+          <span><strong>${entry.title}</strong><small>${entry.subtitle}</small></span>
+        `;
+        button.addEventListener("click", async () => {
+          try {
+            if (entry.type === "friend") {
+              setShareStatus("Adicionando contato...");
+              const tutors = await ensureTutor(entry.friend);
+              const tutor = tutors.find((item) => String(item.contactUserId || "") === String(entry.friend.userId || ""));
+              if (!tutor) throw new Error("Nao foi possivel preparar esse contato.");
+              setShareStatus("Enviando...");
+              await shareToTutor(safeText(tutor.contactId || tutor.id), capture);
+            } else {
+              setShareStatus("Enviando...");
+              await shareToTutor(entry.id, capture);
+            }
+            setShareStatus("Mensagem enviada.");
+          } catch (error) {
+            setShareStatus(error instanceof Error ? error.message : "Falha ao compartilhar.");
+          }
+        });
+        list.appendChild(button);
+      });
+
+      setShareStatus(capture.kind === "video" ? "Videos entram no chat como card com capa." : "");
+    } catch (error) {
+      setShareStatus(error instanceof Error ? error.message : "Falha ao carregar contatos.");
+    }
+  }
+
+  function stopTitleMic() {
+    if (state.titleTimer) clearInterval(state.titleTimer);
+    state.titleTimer = 0;
+    if (state.titleRecorder && state.titleRecorder.state !== "inactive") state.titleRecorder.stop();
+    state.titleRecorder = null;
+    if (state.titleStream) state.titleStream.getTracks().forEach((track) => track.stop());
+    state.titleStream = null;
+    if (state.titleAudioContext) {
+      try { state.titleAudioContext.close(); } catch {}
+    }
+    state.titleAudioContext = null;
+    state.titleAnalyser = null;
+    byId("lifeCaptureSaveMicButton")?.classList.remove("is-recording");
+  }
+
+  async function transcribeBlob(blob, fileName) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    bytes.forEach((value) => { binary += String.fromCharCode(value); });
+    const response = await fetch("/api/audio/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        audioBase64: window.btoa(binary),
+        mimeType: safeText(blob.type || "audio/webm"),
+        fileName
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(safeText(payload?.error || "Nao foi possivel transcrever."));
+    return safeText(payload?.text || "").trim();
+  }
+
+  async function startTitleMic() {
+    const input = byId("lifeCaptureTitleInput");
+    try {
+      state.titleStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.titleAudioContext = new AudioContext();
+      const source = state.titleAudioContext.createMediaStreamSource(state.titleStream);
+      state.titleAnalyser = state.titleAudioContext.createAnalyser();
+      state.titleAnalyser.fftSize = 2048;
+      source.connect(state.titleAnalyser);
+      const chunks = [];
+      state.titleRecorder = new MediaRecorder(state.titleStream, { mimeType: "audio/webm" });
+      state.titleRecorder.ondataavailable = (event) => {
+        if (event.data?.size) chunks.push(event.data);
+      };
+      state.titleRecorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        if (!blob.size) {
+          stopTitleMic();
+          return;
+        }
+        setSaveStatus("Transcrevendo nome...");
+        try {
+          const text = await transcribeBlob(blob, "life-capture-title.webm");
+          if (input) input.value = text.slice(0, 80);
+          setSaveStatus(text ? "Nome preenchido." : "Nada captado.");
+        } catch (error) {
+          setSaveStatus(error instanceof Error ? error.message : "Falha ao transcrever.");
+        }
+        stopTitleMic();
+      };
+      state.titleRecorder.start();
+      byId("lifeCaptureSaveMicButton")?.classList.add("is-recording");
+      setSaveStatus("Gravando nome...");
+      state.titleLastSpeechAt = Date.now();
+      state.titleTimer = window.setInterval(() => {
+        if (!state.titleAnalyser) return;
+        const buffer = new Uint8Array(state.titleAnalyser.fftSize);
+        state.titleAnalyser.getByteTimeDomainData(buffer);
+        let sum = 0;
+        for (let index = 0; index < buffer.length; index += 1) {
+          const value = (buffer[index] - 128) / 128;
+          sum += value * value;
+        }
+        if (Math.sqrt(sum / buffer.length) > 0.02) state.titleLastSpeechAt = Date.now();
+        if (Date.now() - state.titleLastSpeechAt > 1800) state.titleRecorder?.stop();
+      }, 120);
+    } catch (error) {
+      setSaveStatus(error instanceof Error ? error.message : "Falha no microfone.");
+      stopTitleMic();
+    }
+  }
+
+  function stopNoteMic() {
+    if (state.noteTimer) clearInterval(state.noteTimer);
+    state.noteTimer = 0;
+    if (state.noteRecorder && state.noteRecorder.state !== "inactive") state.noteRecorder.stop();
+    state.noteRecorder = null;
+    if (state.noteStream) state.noteStream.getTracks().forEach((track) => track.stop());
+    state.noteStream = null;
+    if (state.noteAudioContext) {
+      try { state.noteAudioContext.close(); } catch {}
+    }
+    state.noteAudioContext = null;
+    state.noteAnalyser = null;
+    byId("lifeCaptureNoteMicButton")?.classList.remove("is-recording");
+  }
+
+  async function startNoteMic() {
+    const input = byId("lifeCaptureNoteInput");
+    try {
+      state.noteStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.noteAudioContext = new AudioContext();
+      const source = state.noteAudioContext.createMediaStreamSource(state.noteStream);
+      state.noteAnalyser = state.noteAudioContext.createAnalyser();
+      state.noteAnalyser.fftSize = 2048;
+      source.connect(state.noteAnalyser);
+      const chunks = [];
+      state.noteRecorder = new MediaRecorder(state.noteStream, { mimeType: "audio/webm" });
+      state.noteRecorder.ondataavailable = (event) => {
+        if (event.data?.size) chunks.push(event.data);
+      };
+      state.noteRecorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        if (!blob.size) {
+          stopNoteMic();
+          return;
+        }
+        setNoteStatus("Transcrevendo nota...");
+        try {
+          const text = await transcribeBlob(blob, "life-capture-note.webm");
+          const prefix = safeText(input?.value).trim();
+          const merged = [prefix, text].filter(Boolean).join(prefix && text ? "\n\n" : "");
+          if (input) input.value = merged;
+          setNoteStatus(text ? "Nota adicionada." : "Nada captado.");
+        } catch (error) {
+          setNoteStatus(error instanceof Error ? error.message : "Falha ao transcrever.");
+        }
+        stopNoteMic();
+      };
+      state.noteRecorder.start();
+      byId("lifeCaptureNoteMicButton")?.classList.add("is-recording");
+      setNoteStatus("Gravando nota...");
+      state.noteLastSpeechAt = Date.now();
+      state.noteTimer = window.setInterval(() => {
+        if (!state.noteAnalyser) return;
+        const buffer = new Uint8Array(state.noteAnalyser.fftSize);
+        state.noteAnalyser.getByteTimeDomainData(buffer);
+        let sum = 0;
+        for (let index = 0; index < buffer.length; index += 1) {
+          const value = (buffer[index] - 128) / 128;
+          sum += value * value;
+        }
+        if (Math.sqrt(sum / buffer.length) > 0.02) state.noteLastSpeechAt = Date.now();
+        if (Date.now() - state.noteLastSpeechAt > 1800) state.noteRecorder?.stop();
+      }, 120);
+    } catch (error) {
+      setNoteStatus(error instanceof Error ? error.message : "Falha no microfone.");
+      stopNoteMic();
+    }
+  }
+
+  async function savePending() {
+    const input = byId("lifeCaptureTitleInput");
+    const capture = state.pending;
+    if (!capture) return;
+    setSaveStatus("Salvando...");
+    const item = {
+      ...capture,
+      title: safeText(input?.value).trim() || defaultTitle(capture.kind, capture.createdAt)
+    };
+    await saveCapture(item);
+    state.pending = null;
+    setSaveStatus("Salvo.");
+    hide("lifeCaptureSaveOverlay");
+    await refreshCaptures();
+    show("lifeCaptureOverlay");
+    await startPreview();
+  }
+
+  function bindSwipe() {
+    const viewport = byId("lifeCaptureViewerViewport");
+    if (!viewport || viewport.dataset.lifeBound === "true") return;
+    viewport.dataset.lifeBound = "true";
+
+    viewport.addEventListener("pointerdown", (event) => {
+      if (!state.captures.length) return;
+      state.dragging = true;
+      state.dragStartX = event.clientX;
+      state.dragDeltaX = 0;
+      updateViewerTransform(false);
+    });
+
+    viewport.addEventListener("pointermove", (event) => {
+      if (!state.dragging) return;
+      state.dragDeltaX = event.clientX - state.dragStartX;
+      updateViewerTransform(false);
+    });
+
+    const finishSwipe = () => {
+      if (!state.dragging) return;
+      const threshold = Math.max(56, window.innerWidth * 0.12);
+      if (state.dragDeltaX <= -threshold) state.activeIndex = clamp(state.activeIndex + 1, 0, state.captures.length - 1);
+      if (state.dragDeltaX >= threshold) state.activeIndex = clamp(state.activeIndex - 1, 0, state.captures.length - 1);
+      state.dragging = false;
+      state.dragDeltaX = 0;
+      updateViewerTransform(true);
+    };
+
+    viewport.addEventListener("pointerup", finishSwipe);
+    viewport.addEventListener("pointercancel", finishSwipe);
+    viewport.addEventListener("pointerleave", finishSwipe);
+  }
+
+  async function openCapture() {
+    inject();
+    bindSwipe();
+    setModeUi();
+    show("lifeCaptureOverlay");
+    await refreshCaptures();
+    try {
+      await startPreview();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Falha ao abrir a camera.");
+    }
+  }
+
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+
+    if (button.id === "lifeCaptureHomeButton") {
+      void openCapture();
+      return;
+    }
+
+    if (button.dataset.lifeClose === "capture") {
+      stopPreview();
+      hide("lifeCaptureOverlay");
+      return;
+    }
+
+    if (button.dataset.lifeClose === "save") {
+      state.pending = null;
+      stopTitleMic();
+      hide("lifeCaptureSaveOverlay");
+      show("lifeCaptureOverlay");
+      startPreview().catch(() => {});
+      return;
+    }
+
+    if (button.dataset.lifeClose === "note") {
+      closeNote();
+      return;
+    }
+
+    if (button.dataset.lifeClose === "share") {
+      hide("lifeCaptureShareOverlay");
+      setShareStatus("");
+      return;
+    }
+
+    if (button.id === "lifeCaptureModeButton") {
+      if (state.recording) return;
+      state.mode = state.mode === "photo" ? "video" : "photo";
+      setModeUi();
+      setStatus(state.mode === "video" ? "Video 720p ativo." : "Foto 720p ativa.");
+      return;
+    }
+
+    if (button.id === "lifeCaptureSwitchButton") {
+      if (state.recording) return;
+      state.facingMode = state.facingMode === "environment" ? "user" : "environment";
+      setStatus(state.facingMode === "user" ? "Camera frontal ativa." : "Camera traseira ativa.");
+      startPreview().catch((error) => {
+        setStatus(error instanceof Error ? error.message : "Falha ao trocar camera.");
+      });
+      return;
+    }
+
+    if (button.id === "lifeCaptureTriggerButton") {
+      try {
+        if (state.mode === "video") await toggleVideoRecording();
+        else await capturePhoto();
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Falha na captura.");
+      }
+      return;
+    }
+
+    if (button.id === "lifeCaptureAlbumButton") {
+      openViewer();
+      return;
+    }
+
+    if (button.id === "lifeCaptureSaveMicButton") {
+      if (state.titleRecorder) stopTitleMic();
+      else void startTitleMic();
+      return;
+    }
+
+    if (button.id === "lifeCaptureSaveButton") {
+      void savePending().catch((error) => {
+        setSaveStatus(error instanceof Error ? error.message : "Falha ao salvar.");
+      });
+      return;
+    }
+
+    if (button.id === "lifeCaptureViewerCloseButton") {
+      closeViewer();
+      return;
+    }
+
+    if (button.id === "lifeCaptureFullscreenButton") {
+      const capture = getActiveCapture();
+      if (capture) openFocus(capture.id);
+      return;
+    }
+
+    if (button.id === "lifeCaptureFocusCloseButton") {
+      closeFocus();
+      return;
+    }
+
+    if (button.id === "lifeCaptureNoteButton") {
+      const capture = getActiveCapture();
+      if (capture) openNote(capture.id);
+      return;
+    }
+
+    if (button.id === "lifeCaptureNoteMicButton") {
+      if (state.noteRecorder) stopNoteMic();
+      else void startNoteMic();
+      return;
+    }
+
+    if (button.id === "lifeCaptureNoteSaveButton") {
+      void saveNote().catch((error) => {
+        setNoteStatus(error instanceof Error ? error.message : "Falha ao salvar a nota.");
+      });
+      return;
+    }
+
+    if (button.dataset.captureNote) {
+      openNote(button.dataset.captureNote);
+      return;
+    }
+
+    if (button.dataset.captureShare) {
+      void openShare(button.dataset.captureShare);
+    }
   });
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { hide('lifeCaptureSaveOverlay'); hide('lifeCaptureGalleryOverlay'); stopPreview(); hide('lifeCaptureOverlay'); } if (event.key === 'Enter' && document.activeElement === byId('lifeCaptureTitleInput')) { event.preventDefault(); void savePending(); } });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeFocus();
+      closeNote();
+      hide("lifeCaptureShareOverlay");
+      if (byId("lifeCaptureViewerOverlay")?.classList.contains("active")) {
+        closeViewer();
+      } else {
+        stopPreview();
+        hide("lifeCaptureSaveOverlay");
+        hide("lifeCaptureOverlay");
+      }
+    }
+    if (event.key === "ArrowRight" && byId("lifeCaptureViewerOverlay")?.classList.contains("active") && state.captures.length) {
+      state.activeIndex = clamp(state.activeIndex + 1, 0, state.captures.length - 1);
+      updateViewerTransform(true);
+    }
+    if (event.key === "ArrowLeft" && byId("lifeCaptureViewerOverlay")?.classList.contains("active") && state.captures.length) {
+      state.activeIndex = clamp(state.activeIndex - 1, 0, state.captures.length - 1);
+      updateViewerTransform(true);
+    }
+    if (event.key === "Enter" && document.activeElement === byId("lifeCaptureTitleInput")) {
+      event.preventDefault();
+      void savePending();
+    }
+  });
+
+  window.addEventListener("project200:life-capture-open-shared", (event) => {
+    openSharedFocus(event.detail);
+  });
+
+  inject();
+  bindSwipe();
+  setModeUi();
+  void refreshCaptures();
 })();
