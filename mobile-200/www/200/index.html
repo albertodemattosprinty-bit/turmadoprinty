@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/200/project.css?v=20260724-limit-history-v1" />
+  <link rel="stylesheet" href="/200/life-capture.css?v=20260728-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
 </head>
 <body data-background-theme="edge">
@@ -179,6 +180,7 @@
         </svg>
         <div class="running-task-percent" id="runningTaskPercent"></div>
         <div class="running-idle-greeting" id="runningIdleGreeting">Bom dia</div>
+        <button class="life-capture-home-entry" type="button" id="lifeCaptureHomeButton" aria-label="Abrir câmera da memória"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h2.2l1.5-2h8.6l1.5 2H22a1 1 0 0 1 1 1v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V8a1 1 0 0 1 1-1Zm6 3.2a4.8 4.8 0 1 0 4.8 4.8 4.8 4.8 0 0 0-4.8-4.8Zm0 2a2.8 2.8 0 1 1-2.8 2.8 2.8 2.8 0 0 1 2.8-2.8Z" fill="currentColor"/></svg></button>
         <button class="running-circle-toggle running-circle-toggle-right" id="runningModeTimeBtn" type="button" aria-label="Mostrar tempo">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8Zm1 3h-2v5.4l4 2.4 1-1.7-3-1.8Z"/></svg>
         </button>
@@ -1829,6 +1831,7 @@
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
   <script type="module" src="/200/project.js?v=0.7.0"></script>
+  <script src="/200/life-capture.js?v=20260728-v1"></script>
 </body>
 </html>
 
