@@ -34,7 +34,8 @@
     noteTimer: 0,
     noteAnalyser: null,
     noteAudioContext: null,
-    noteLastSpeechAt: 0
+    noteLastSpeechAt: 0,
+    previewReady: false
   };
 
   const byId = (id) => document.getElementById(id);
@@ -79,7 +80,10 @@
             </button>
           </header>
           <div class="life-capture-stage">
-            <div class="life-capture-preview-frame">
+            <div class="life-capture-preview-frame" id="lifeCapturePreviewFrame">
+              <div class="life-capture-preview-placeholder" id="lifeCapturePreviewPlaceholder" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M6 7h2.2l1.5-2h8.6l1.5 2H22a1 1 0 0 1 1 1v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V8a1 1 0 0 1 1-1Zm6 3.2a4.8 4.8 0 1 0 4.8 4.8 4.8 4.8 0 0 0-4.8-4.8Z" fill="currentColor"/></svg>
+              </div>
               <video id="lifeCapturePreview" autoplay playsinline muted></video>
               <canvas id="lifeCaptureCanvas" width="720" height="720" hidden></canvas>
             </div>
@@ -366,9 +370,18 @@
     return state.captures[state.activeIndex] || null;
   }
 
+  function syncPreviewPlaceholder() {
+    const frame = byId("lifeCapturePreviewFrame");
+    const placeholder = byId("lifeCapturePreviewPlaceholder");
+    if (frame) frame.classList.toggle("is-ready", !!state.previewReady);
+    if (placeholder) placeholder.hidden = !!state.previewReady;
+  }
+
   function stopPreview() {
     if (state.raf) cancelAnimationFrame(state.raf);
     state.raf = 0;
+    state.previewReady = false;
+    syncPreviewPlaceholder();
     const preview = byId("lifeCapturePreview");
     try {
       preview?.pause();
@@ -384,15 +397,27 @@
     if (!(preview && canvas)) return;
     const context = canvas.getContext("2d", { alpha: false });
     if (!preview.videoWidth || !preview.videoHeight || !context) {
+      state.previewReady = false;
+      syncPreviewPlaceholder();
       state.raf = requestAnimationFrame(drawPreviewFrame);
       return;
+    }
+    if (!state.previewReady) {
+      state.previewReady = true;
+      syncPreviewPlaceholder();
     }
     const side = Math.min(preview.videoWidth, preview.videoHeight);
     const sourceX = (preview.videoWidth - side) / 2;
     const sourceY = (preview.videoHeight - side) / 2;
     context.clearRect(0, 0, canvas.width, canvas.height);
+    context.save();
     context.filter = FILTER;
+    if (state.facingMode === "user") {
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
+    }
     context.drawImage(preview, sourceX, sourceY, side, side, 0, 0, canvas.width, canvas.height);
+    context.restore();
     state.raf = requestAnimationFrame(drawPreviewFrame);
   }
 
@@ -408,8 +433,10 @@
       },
       audio: true
     });
+    state.previewReady = false;
+    syncPreviewPlaceholder();
     preview.srcObject = state.stream;
-    preview.style.transform = "scaleX(-1)";
+    preview.style.transform = "none";
     await preview.play().catch(() => {});
     drawPreviewFrame();
     setStatus(state.mode === "video" ? "Video 720p ativo." : "Foto 720p ativa.");
@@ -425,7 +452,9 @@
         ? '<svg viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h7A2.5 2.5 0 0 1 16 7.5v1.2l4.1-2.4c.8-.46 1.9.1 1.9 1.02v9.4c0 .92-1.1 1.48-1.9 1.02L16 15.3v1.2A2.5 2.5 0 0 1 13.5 19h-7A2.5 2.5 0 0 1 4 16.5Z" fill="currentColor"/></svg>'
         : '<svg viewBox="0 0 24 24"><path d="M6 7h2.2l1.5-2h8.6l1.5 2H22a1 1 0 0 1 1 1v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V8a1 1 0 0 1 1-1Zm6 3.2a4.8 4.8 0 1 0 4.8 4.8 4.8 4.8 0 0 0-4.8-4.8Z" fill="currentColor"/></svg>';
     }
-    document.querySelector('#lifeCaptureOverlay .life-capture-shell')?.classList.toggle('is-video-mode', state.mode === 'video');
+    const captureShell = document.querySelector('#lifeCaptureOverlay .life-capture-shell');
+    captureShell?.classList.toggle('is-video-mode', state.mode === 'video');
+    captureShell?.classList.toggle('is-photo-mode', state.mode === 'photo');
     trigger?.classList.toggle("is-recording", state.recording);
   }
 
@@ -820,9 +849,15 @@
   async function loadShareContacts() {
     const response = await fetch("/api/200/tutors", { credentials: "same-origin" });
     const payload = await readJsonResponse(response, "Nao foi possivel carregar os contatos.");
+    const tutors = Array.isArray(payload?.tutors) ? payload.tutors : [];
+    const friends = Array.isArray(payload?.friends) ? payload.friends : [];
+    const tutorIds = new Set(tutors.map((item) => String(item.contactUserId || item.userId || item.id || "")));
     return {
-      tutors: Array.isArray(payload?.tutors) ? payload.tutors : [],
-      friends: Array.isArray(payload?.friends) ? payload.friends : []
+      tutors,
+      friends: friends.filter((friend) => {
+        const friendId = String(friend?.userId || friend?.id || "");
+        return !tutorIds.has(friendId);
+      })
     };
   }
 
@@ -903,7 +938,6 @@
         });
       });
       directory.friends.forEach((friend) => {
-        if (friend.isTutor) return;
         entries.push({
           type: "friend",
           friend,
