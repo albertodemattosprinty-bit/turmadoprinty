@@ -5,6 +5,7 @@
   const PROFILE_KEY = "project_200_profile_v1";
   const MEDIA_PREFIX = "[[ILIFE_MEDIA:";
   const MEDIA_SUFFIX = "]]";
+  const TOKEN_KEY = "turma_do_printy_token";
   const state = {
     mode: "photo",
     facingMode: "environment",
@@ -62,6 +63,30 @@
     } catch {
       return "Usuario";
     }
+  }
+
+  function readTokenCookie() {
+    try {
+      const match = document.cookie.match(/(?:^|; )turma_do_printy_token=([^;]+)/);
+      return safeText(match ? decodeURIComponent(match[1]) : "").trim();
+    } catch {
+      return "";
+    }
+  }
+
+  function getAuthToken() {
+    try {
+      const localToken = safeText(window.localStorage.getItem(TOKEN_KEY)).trim();
+      if (localToken) return localToken;
+    } catch {}
+    return readTokenCookie();
+  }
+
+  function withAuthHeaders(headers = {}) {
+    const next = { ...headers };
+    const token = getAuthToken();
+    if (token) next.Authorization = 'Bearer ' + token;
+    return next;
   }
 
   function inject() {
@@ -320,7 +345,7 @@
       const previewParts = dataUrlParts(capture.previewDataUrl);
       const response = await fetch('/api/200/life-captures/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
         credentials: 'same-origin',
         body: JSON.stringify({
           kind: capture.kind,
@@ -454,7 +479,6 @@
     }
     const captureShell = document.querySelector('#lifeCaptureOverlay .life-capture-shell');
     captureShell?.classList.toggle('is-video-mode', state.mode === 'video');
-    captureShell?.classList.toggle('is-photo-mode', state.mode === 'photo');
     trigger?.classList.toggle("is-recording", state.recording);
   }
 
@@ -680,17 +704,20 @@
         video.dataset.captureVideo = capture.id;
         video.dataset.captureKind = "video";
         video.poster = buildCapturePreviewUrl(capture);
-        video.loop = true;
+        video.muted = true;
         video.playsInline = true;
         video.preload = "metadata";
-        video.controls = true;
+        video.controls = false;
+        video.disablePictureInPicture = true;
         const mediaUrl = buildCaptureMediaUrl(capture);
         video.src = mediaUrl || URL.createObjectURL(capture.mediaBlob);
         video.addEventListener("loadeddata", () => {
           try {
             video.currentTime = 0.05;
+            video.pause();
           } catch {}
         }, { once: true });
+        video.addEventListener("click", () => openFocus(capture.id));
         media.appendChild(video);
       } else {
         const image = document.createElement("img");
@@ -708,12 +735,6 @@
 
   function updateViewerMediaPlayback() {
     pauseViewerVideos();
-    const capture = getActiveCapture();
-    if (!capture || capture.kind !== "video") return;
-    const video = document.querySelector(`#lifeCaptureViewerTrack video[data-capture-video="${CSS.escape(capture.id)}"]`);
-    if (video instanceof HTMLVideoElement) {
-      video.play().catch(() => {});
-    }
   }
 
   function openViewer() {
@@ -847,7 +868,7 @@
   }
 
   async function loadShareContacts() {
-    const response = await fetch("/api/200/tutors", { credentials: "same-origin" });
+    const response = await fetch("/api/200/tutors", { credentials: "same-origin", headers: withAuthHeaders() });
     const payload = await readJsonResponse(response, "Nao foi possivel carregar os contatos.");
     const tutors = Array.isArray(payload?.tutors) ? payload.tutors : [];
     const friends = Array.isArray(payload?.friends) ? payload.friends : [];
@@ -864,7 +885,7 @@
   async function ensureTutor(friend) {
     const response = await fetch("/api/200/tutors", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: withAuthHeaders({ "Content-Type": "application/json" }),
       credentials: "same-origin",
       body: JSON.stringify({ tutorUserId: friend.userId })
     });
@@ -876,7 +897,7 @@
     const ready = await ensureCaptureUploaded(capture);
     const response = await fetch("/api/200/marin/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: withAuthHeaders({ "Content-Type": "application/json" }),
       credentials: "same-origin",
       body: JSON.stringify({
         profile: currentProfile(),
@@ -891,7 +912,7 @@
     const ready = await ensureCaptureUploaded(capture);
     const response = await fetch(`/api/200/tutors/${encodeURIComponent(contactId)}/messages`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: withAuthHeaders({ "Content-Type": "application/json" }),
       credentials: "same-origin",
       body: JSON.stringify({ content: buildShareMessage(ready || capture) })
     });
