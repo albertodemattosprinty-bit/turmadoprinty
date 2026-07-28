@@ -1,4 +1,4 @@
-import "./src/load-env.js";
+﻿import "./src/load-env.js";
 
 import { createReadStream, existsSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -118,7 +118,7 @@ const publicDir = path.join(__dirname, "public");
 const imagesDir = path.join(__dirname, "images");
 const eduSongsDir = path.join(__dirname, "musicas Edu");
 const contextFilePath = path.join(__dirname, "contexto.txt");
-const contentDir = path.join(__dirname, "ConteÃºdo");
+const contentDir = path.join(__dirname, "ConteÃƒÂºdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
@@ -1070,7 +1070,7 @@ async function listProject200MusicStations() {
       .filter((station) => Array.isArray(station?.tracks) && station.tracks.length > 0)
       .map((station) => ({
         id: String(station?.id || "").trim(),
-        name: String(station?.name || "").trim() || "Estação",
+        name: String(station?.name || "").trim() || "EstaÃ§Ã£o",
         tracks: station.tracks
           .filter((track) => String(track?.url || "").trim())
           .map((track) => ({
@@ -1088,11 +1088,11 @@ async function listProject200MusicStations() {
 
   const prefix = "Music/";
   const fallbackStations = [
-    { name: "Estação 1", tracks: [] },
-    { name: "Estação 2", tracks: [] },
-    { name: "Estação 3", tracks: [] },
-    { name: "Estação 4", tracks: [] },
-    { name: "Estação 5", tracks: [] }
+    { name: "EstaÃ§Ã£o 1", tracks: [] },
+    { name: "EstaÃ§Ã£o 2", tracks: [] },
+    { name: "EstaÃ§Ã£o 3", tracks: [] },
+    { name: "EstaÃ§Ã£o 4", tracks: [] },
+    { name: "EstaÃ§Ã£o 5", tracks: [] }
   ];
 
   try {
@@ -1109,7 +1109,7 @@ async function listProject200MusicStations() {
       const relative = key.slice(prefix.length);
       if (!relative) continue;
       const parts = relative.split("/").filter(Boolean);
-      const stationName = parts.length > 1 ? parts[0] : "Estação 1";
+      const stationName = parts.length > 1 ? parts[0] : "EstaÃ§Ã£o 1";
       const fileName = parts[parts.length - 1];
       const trackNameRaw = fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Faixa";
       if (!grouped.has(stationName)) grouped.set(stationName, []);
@@ -1442,21 +1442,21 @@ function normalizeStoreCatalogText(value) {
 }
 
 const MINI_PRODUCT_ALBUM_ALIASES = {
-  [normalizeStoreCatalogText("Coletânea de dia das mães")]: [
-    "De repente mãe",
-    "Mãe inesquecível",
-    "Simplesmente Mãe",
-    "Um presente chamado mãe"
+  [normalizeStoreCatalogText("ColetÃ¢nea de dia das mÃ£es")]: [
+    "De repente mÃ£e",
+    "MÃ£e inesquecÃ­vel",
+    "Simplesmente MÃ£e",
+    "Um presente chamado mÃ£e"
   ],
-  [normalizeStoreCatalogText("Coletânea de Dia dos Pais")]: [
+  [normalizeStoreCatalogText("ColetÃ¢nea de Dia dos Pais")]: [
     "Aprendi com meu Pai",
     "Meu pai, meu amigo"
   ],
-  [normalizeStoreCatalogText("Coletânea de Natal")]: [
-    "É Natal",
+  [normalizeStoreCatalogText("ColetÃ¢nea de Natal")]: [
+    "Ã‰ Natal",
     "A Verdadeira Historia do Natal",
     "Jesus, a alegria do Natal",
-    "Já Nasceu",
+    "JÃ¡ Nasceu",
     "O nascimento do Rei",
     "O Sentido do Natal 2",
     "Um presente para todos",
@@ -1534,7 +1534,7 @@ function buildMiniBackedStoreTracks(product, library) {
         albumCharacters: normalizeMiniMediaAlbumCharacters(album?.characters),
         coverUrl: String(song?.coverImageUrl || album?.coverImageUrl || "").trim(),
         sourceAlbumId: String(album?.id || "").trim(),
-        sourceAlbumTitle: String(album?.title || "").trim() || String(product?.name || "").trim() || "Álbum",
+        sourceAlbumTitle: String(album?.title || "").trim() || String(product?.name || "").trim() || "Ãlbum",
         sourceSongId: String(song?.id || "").trim(),
         sourceSongGlobalId: String(song?.globalId || "").trim(),
         songJsonUrl: String(song?.songJsonUrl || "").trim(),
@@ -1796,7 +1796,7 @@ function buildLyricsTextFromSyncLines(lines) {
 }
 
 function startsWithUppercaseWord(word) {
-  return /^[A-ZÀ-Ý][\p{L}\p{M}'’-]*$/u.test(String(word || "").trim());
+  return /^[A-ZÃ€-Ã][\p{L}\p{M}'â€™-]*$/u.test(String(word || "").trim());
 }
 
 function splitTextIntoShortLyricsLines(text, maxChars = 30) {
@@ -3202,7 +3202,7 @@ async function handleProject200TextOrganize(request, response) {
       messages: [
         {
           role: "system",
-          content: "VocÃª organiza textos em pt-BR. Corrija apenas grafia/pontuaÃ§Ã£o, sem mudar a ideia. Crie um tÃ­tulo curto (atÃ© 60 chars). Responda JSON puro: {\"title\":\"...\",\"text\":\"...\"}."
+          content: "VocÃƒÂª organiza textos em pt-BR. Corrija apenas grafia/pontuaÃƒÂ§ÃƒÂ£o, sem mudar a ideia. Crie um tÃƒÂ­tulo curto (atÃƒÂ© 60 chars). Responda JSON puro: {\"title\":\"...\",\"text\":\"...\"}."
         },
         {
           role: "user",
@@ -3884,7 +3884,7 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
   const instructions = [
     prompts.generalPrompt,
     "",
-    "PERSONALIDADE VISÍVEL: " + personaName,
+    "PERSONALIDADE VISÃVEL: " + personaName,
     String(persona?.prompt || ""),
     "Quando o prompt geral disser Marin, entenda como o papel da IA do iLife; apresente-se sempre como " + personaName + ".",
     "",
@@ -3892,16 +3892,16 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "- Use type limit para propor um limite: quantidade maxima e intervalo day, week, month ou year. Limites nunca tem cronometro.",
     "- Use type aspect somente quando o usuario pedir para configurar Estatisticas. Acoes daquele aspecto ja entram automaticamente; missionGoalIds vincula missoes; useManualTarget e targetMinutes ativam a meta manual.",
     "- dataLines serve apenas para resumir dados reais presentes no contexto. Nunca gere dataLines numa conversa sem dados carregados e nunca invente uma media.",
-    "- Nunca diga que já gravou algo. Você somente oferece cartões; o usuário precisa tocar para confirmar.",
-    "- Não crie microtarefas de missões.",
-    "- Não invente datas, horários, valores ou durações. Se faltar dado obrigatório, pergunte antes e retorne proposals vazio.",
-    "- Ações usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto. Sono nunca é atribuído a uma ação.",
-    "- Ambiente mapeia para casa. Propósito usa planejamento. Família usa aspecto e nunca social.",
-    "- Preserve sono, alimentação, saúde, segurança, autonomia e limites físicos. Disciplina nunca significa privação perigosa.",
-    "- Não substitua orientação médica, jurídica ou financeira profissional.",
-    "- A resposta textual tem no máximo 400 caracteres e as propostas no máximo 8.",
+    "- Nunca diga que jÃ¡ gravou algo. VocÃª somente oferece cartÃµes; o usuÃ¡rio precisa tocar para confirmar.",
+    "- NÃ£o crie microtarefas de missÃµes.",
+    "- NÃ£o invente datas, horÃ¡rios, valores ou duraÃ§Ãµes. Se faltar dado obrigatÃ³rio, pergunte antes e retorne proposals vazio.",
+    "- AÃ§Ãµes usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto. Sono nunca Ã© atribuÃ­do a uma aÃ§Ã£o.",
+    "- Ambiente mapeia para casa. PropÃ³sito usa planejamento. FamÃ­lia usa aspecto e nunca social.",
+    "- Preserve sono, alimentaÃ§Ã£o, saÃºde, seguranÃ§a, autonomia e limites fÃ­sicos. Disciplina nunca significa privaÃ§Ã£o perigosa.",
+    "- NÃ£o substitua orientaÃ§Ã£o mÃ©dica, jurÃ­dica ou financeira profissional.",
+    "- A resposta textual tem no mÃ¡ximo 400 caracteres e as propostas no mÃ¡ximo 8.",
     "",
-    "CONTEXTO DO USUÁRIO CARREGADO SOMENTE PARA ESTA PERGUNTA:",
+    "CONTEXTO DO USUÃRIO CARREGADO SOMENTE PARA ESTA PERGUNTA:",
     JSON.stringify(context)
   ].join("\n");
 
@@ -3945,7 +3945,7 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     requestError.latencyMs = Date.now() - startedAt;
     throw requestError;
   }
-  if (!parsedResponse.data) throw new Error("A OpenAI devolveu uma resposta inválida.");
+  if (!parsedResponse.data) throw new Error("A OpenAI devolveu uma resposta invÃ¡lida.");
   return {
     payload: parsedResponse.data,
     reply: parseProject200MarinReply(parsedResponse.data),
@@ -3975,7 +3975,7 @@ async function handleProject200MarinBootstrapRequest(request, response) {
       messages: chat.messages
     });
   } catch (error) {
-    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível abrir o Marin." });
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel abrir o Marin." });
   }
 }
 
@@ -3994,7 +3994,7 @@ async function handleProject200MarinPersonaRequest(request, response) {
       messages: chat.messages
     });
   } catch (error) {
-    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível trocar a personalidade." });
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel trocar a personalidade." });
   }
 }
 
@@ -4006,7 +4006,85 @@ async function handleProject200MarinPromptRequest(request, response) {
     const prompt = await updateProject200MarinPrompt(admin.id, body?.key, body?.prompt);
     sendJson(response, 200, { ok: true, prompt });
   } catch (error) {
-    sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível salvar o prompt." });
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel salvar o prompt." });
+  }
+}
+
+async function handleProject200LifeCaptureUploadRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const kind = String(body?.kind || "photo").trim().toLowerCase() === "video" ? "video" : "photo";
+    const mimeType = String(body?.mimeType || "").trim().toLowerCase();
+    const fileBase64 = String(body?.fileBase64 || "").trim();
+    const previewBase64 = String(body?.previewBase64 || "").trim();
+    if (!mimeType || !fileBase64) throw new Error("Envie o arquivo principal da captura.");
+
+    const extensionByMime = {
+      "image/webp": "webp",
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "video/webm": "webm",
+      "video/mp4": "mp4",
+      "video/ogg": "ogv"
+    };
+    const extension = extensionByMime[mimeType];
+    if (!extension) throw new Error("Formato de midia ainda nao suportado.");
+
+    const mediaBuffer = Buffer.from(fileBase64, "base64");
+    if (!mediaBuffer.length) throw new Error("O arquivo enviado esta vazio.");
+    if (mediaBuffer.length > 40 * 1024 * 1024) throw new Error("A captura esta acima do limite de 40 MB.");
+
+    const usernamePart = String(user.username || user.id || "usuario").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "usuario";
+    const now = new Date();
+    const year = String(now.getFullYear());
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const baseKey = `project200/life-captures/${usernamePart}/${year}/${month}/${day}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const mediaKey = `${baseKey}.${extension}`;
+
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: mediaKey,
+      Body: mediaBuffer,
+      ContentType: mimeType,
+      CacheControl: "public, max-age=31536000, immutable"
+    }));
+
+    let previewKey = "";
+    let previewUrl = "";
+    if (previewBase64) {
+      const previewBuffer = Buffer.from(previewBase64, "base64");
+      if (previewBuffer.length) {
+        previewKey = `${baseKey}-preview.webp`;
+        await getR2Client().send(new PutObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: previewKey,
+          Body: previewBuffer,
+          ContentType: "image/webp",
+          CacheControl: "public, max-age=31536000, immutable"
+        }));
+        previewUrl = buildPublicR2UrlFromKey(previewKey);
+      }
+    }
+
+    sendJson(response, 201, {
+      ok: true,
+      asset: {
+        kind,
+        key: mediaKey,
+        url: buildPublicR2UrlFromKey(mediaKey),
+        previewKey,
+        previewUrl,
+        sizeBytes: mediaBuffer.length,
+        mimeType
+      }
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel enviar a captura para o R2."
+    });
   }
 }
 
@@ -4015,7 +4093,7 @@ async function handleProject200MarinMessageRequest(request, response) {
   if (!user) return;
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    sendJson(response, 503, { error: "OPENAI_API_KEY não configurada no backend." });
+    sendJson(response, 503, { error: "OPENAI_API_KEY nÃ£o configurada no backend." });
     return;
   }
 
@@ -4101,7 +4179,7 @@ async function handleProject200MarinMessageRequest(request, response) {
       }).catch(() => {});
     }
     sendJson(response, Number(error?.statusCode) || 500, {
-      error: error instanceof Error ? error.message : "Não foi possível conversar agora.",
+      error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel conversar agora.",
       details: error?.details || undefined
     });
   }
@@ -4115,9 +4193,9 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
     const body = await readJsonBody(request);
     const profileName = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const message = await getProject200MarinMessage(user.id, messageId);
-    if (!message || message.role !== "assistant") throw new Error("Mensagem da IA não encontrada.");
+    if (!message || message.role !== "assistant") throw new Error("Mensagem da IA nÃ£o encontrada.");
     const proposal = message.proposals.find((entry) => String(entry?.key || "") === String(proposalKey || ""));
-    if (!proposal) throw new Error("Proposta não encontrada.");
+    if (!proposal) throw new Error("Proposta nÃ£o encontrada.");
     claim = await claimProject200MarinProposal(user.id, messageId, proposal.key, proposal.type);
     if (!claim.claimed) {
       const status = String(claim.application?.status || "");
@@ -4174,7 +4252,7 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
       });
       entityId = item.id || null;
     } else {
-      throw new Error("Tipo de proposta inválido.");
+      throw new Error("Tipo de proposta invÃ¡lido.");
     }
 
     await finishProject200MarinProposal(user.id, messageId, proposal.key, entityId);
@@ -4184,7 +4262,7 @@ async function handleProject200MarinProposalApplyRequest(request, response, mess
       await failProject200MarinProposal(user.id, messageId, proposalKey, error instanceof Error ? error.message : "Falha").catch(() => {});
     }
     sendJson(response, error?.code === "ACTION_OVERLAP" ? 409 : 400, {
-      error: error instanceof Error ? error.message : "Não foi possível ativar a proposta."
+      error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel ativar a proposta."
     });
   }
 }
@@ -4421,7 +4499,7 @@ async function handleProject200ActiveTimeRequest(request, response) {
     sendJson(response, 200, { ok: true, activeTime });
   } catch (error) {
     sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Não foi possível atualizar o tempo ativo."
+      error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel atualizar o tempo ativo."
     });
   }
 }
@@ -4443,7 +4521,7 @@ async function handleProject200MissionOrderRequest(request, response) {
     sendJson(response, 200, { ok: true, ...order });
   } catch (error) {
     sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Não foi possível atualizar a lista de missões."
+      error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel atualizar a lista de missÃµes."
     });
   }
 }
@@ -4581,7 +4659,7 @@ async function handleExtraGoalProgressHistoryRequest(request, response, goalId, 
     sendJson(response, 200, { ok: true, profile: selectedProfile, history });
   } catch (error) {
     sendJson(response, 400, {
-      error: error instanceof Error ? error.message : "Não foi possível atualizar o histórico."
+      error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel atualizar o histÃ³rico."
     });
   }
 }
@@ -4799,17 +4877,17 @@ async function handleProject200ActionInterpret(request, response) {
 
 const PROJECT200_TASK_CATEGORIES = [
   { aspectId: "20000000-0000-4000-8000-000000000001", id: "sono", name: "Sono" },
-  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "Alimentação" },
-  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "Hidratação" },
+  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "AlimentaÃ§Ã£o" },
+  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "HidrataÃ§Ã£o" },
   { aspectId: "20000000-0000-4000-8000-000000000004", id: "aprendizado", name: "Aprendizado" },
   { aspectId: "20000000-0000-4000-8000-000000000005", id: "trabalho", name: "Trabalho" },
   { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa" },
-  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios" },
+  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "ExercÃ­cios" },
   { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social" },
-  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Propósito" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "PropÃ³sito" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer" },
-  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família" }
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "FamÃ­lia" }
 ];
 const PROJECT200_TASK_ASSIGNABLE_CATEGORIES = PROJECT200_TASK_CATEGORIES.filter((item) => item.id !== "sono");
 
@@ -4824,7 +4902,7 @@ function inferProject200CategoryLocally(title) {
   if (/\b(cafe|almoco|jantar|comida|comer|refeicao|lanche|cozinhar|aliment)\b/.test(normalized)) return pick("alimentacao");
   if (/\b(estudar|estudo|ler|leitura|curso|aula|escola|revisao|aprender|habilidade|treinar idioma|praticar idioma)\b/.test(normalized)) return pick("aprendizado");
   if (/\b(reuniao|projeto|cliente|entrega|trabalho|emprego|profissao|expediente|task)\b/.test(normalized)) return pick("trabalho");
-  if (/\b(familia|familiar|filho|filha|pai|mae|esposa|marido|irmao|irma|avo|avó)\b/.test(normalized)) return pick("aspecto");
+  if (/\b(familia|familiar|filho|filha|pai|mae|esposa|marido|irmao|irma|avo|avÃ³)\b/.test(normalized)) return pick("aspecto");
   if (/\b(escovar|banho|higiene|barba|cabelo|dente|unha|lavar rosto|lavar roupa|ir ao banheiro|sanitario)\b/.test(normalized)) return pick("higiene");
   if (/\b(arrumar|faxina|limpar|manutencao|consertar|organizar casa|cozinha|quarto|banheiro|casa|ambiente|lixo)\b/.test(normalized)) return pick("casa");
   if (/\b(treino|academia|corrida|caminhada|alongamento|exercicio|flexao|agachamento|esporte)\b/.test(normalized)) return pick("exercicios");
@@ -4863,7 +4941,7 @@ async function suggestProject200SvgAsset(text, options = {}) {
       messages: [
         {
           role: "system",
-          content: `Escolha somente um SVG para ${kind} com base no texto. Responda JSON puro {"id":"..."} usando apenas um dos ids listados. Prefira o SVG mais concreto, útil e visualmente intuitivo.`
+          content: `Escolha somente um SVG para ${kind} com base no texto. Responda JSON puro {"id":"..."} usando apenas um dos ids listados. Prefira o SVG mais concreto, Ãºtil e visualmente intuitivo.`
         },
         {
           role: "user",
@@ -4905,7 +4983,7 @@ async function handleProject200ActionCategorize(request, response) {
   }
   const title = String(body?.title || "").trim();
   if (title.length < 2) {
-    sendJson(response, 400, { error: "Título ausente." });
+    sendJson(response, 400, { error: "TÃ­tulo ausente." });
     return;
   }
 
@@ -4925,7 +5003,7 @@ async function handleProject200ActionCategorize(request, response) {
       messages: [
         {
           role: "system",
-          content: `Classifique o título em exatamente UM aspecto permitido e responda somente JSON: {"categoryId":"...","categoryName":"..."}. Sono é proibido para tarefas. Regras: alimentação cobre qualquer ação de comer; hidratação cobre beber água; aprendizado cobre escola, cursos e habilidades; trabalho cobre atividades profissionais; casa cobre ambiente, arrumação e manutenção; exercícios cobre atividade física; social cobre amigos, mensagens e encontros, nunca família; propósito cobre igreja, oração, meditação, atenção plena, ação social e o que transcende as outras categorias; higiene cobre banheiro, banho, rosto, dentes, unhas, barba e roupas; lazer cobre diversão; família cobre somente relações familiares. Aspectos permitidos: ${PROJECT200_TASK_ASSIGNABLE_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
+          content: `Classifique o tÃ­tulo em exatamente UM aspecto permitido e responda somente JSON: {"categoryId":"...","categoryName":"..."}. Sono Ã© proibido para tarefas. Regras: alimentaÃ§Ã£o cobre qualquer aÃ§Ã£o de comer; hidrataÃ§Ã£o cobre beber Ã¡gua; aprendizado cobre escola, cursos e habilidades; trabalho cobre atividades profissionais; casa cobre ambiente, arrumaÃ§Ã£o e manutenÃ§Ã£o; exercÃ­cios cobre atividade fÃ­sica; social cobre amigos, mensagens e encontros, nunca famÃ­lia; propÃ³sito cobre igreja, oraÃ§Ã£o, meditaÃ§Ã£o, atenÃ§Ã£o plena, aÃ§Ã£o social e o que transcende as outras categorias; higiene cobre banheiro, banho, rosto, dentes, unhas, barba e roupas; lazer cobre diversÃ£o; famÃ­lia cobre somente relaÃ§Ãµes familiares. Aspectos permitidos: ${PROJECT200_TASK_ASSIGNABLE_CATEGORIES.map((c) => `${c.id}=${c.name}`).join("; ")}.`
         },
         { role: "user", content: title.slice(0, 180) }
       ]
@@ -5062,7 +5140,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
   const durationText = durationMinutes > 0 ? `${durationMinutes} minutos` : "a definir";
 
   const model = "gpt-5.1";
-  const themePrompt = theme || "aula infantil cristã";
+  const themePrompt = theme || "aula infantil cristÃ£";
   const authUser = await getOptionalAuthUser(request);
   const sharedContext = await getContextPrompt();
 
@@ -5095,7 +5173,7 @@ async function handleMiniLessonPlanGenerate(request, response) {
         "O resultado deve ter cerca de 4000 caracteres no total, com minimo de 3200 e maximo de 4500, em portugues do Brasil.",
         "A resposta deve ter uma introducao curta que conecte todos os blocos e depois um texto principal em 3 a 5 paragrafos, cada um com um subtitulo simples e claro.",
         "Cada paragrafo deve conversar com o tempo do bloco e com o contexto da aula, sem soar como uma lista de cards.",
-        "Não trate os blocos como cards independentes; faça o texto soar como uma aula unica, coesa e legível.",
+        "NÃ£o trate os blocos como cards independentes; faÃ§a o texto soar como uma aula unica, coesa e legÃ­vel.",
         "Responda em JSON puro com as chaves mainTitle, intro, content e parts.",
         "O campo content deve conter o texto consolidado completo da aula em paragrafos.",
         "Se quiser, parts pode repetir esses paragrafos para compatibilidade, mas o front vai priorizar content."
@@ -5394,7 +5472,7 @@ function formatProject200ActionLine(action, now) {
   const endLabel = end && !Number.isNaN(end.getTime()) ? end.toLocaleTimeString("pt-BR", timeFormat) : "--:--";
   let badge = "pendente";
   if (status === "COMPLETED") {
-    badge = "concluída";
+    badge = "concluÃ­da";
   } else if (status === "IN_PROGRESS") {
     badge = "em andamento";
   } else if (start && start.getTime() < now.getTime()) {
@@ -5408,7 +5486,7 @@ function clipProject200Text(value, maxLength = 140) {
   if (!cleaned) {
     return "";
   }
-  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1).trim()}…` : cleaned;
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1).trim()}â€¦` : cleaned;
 }
 
 function formatProject200CompletedActionLine(action) {
@@ -5822,7 +5900,7 @@ function buildMiniCourseMapPage({ courseTitle, courseOverview, chapters, style =
         String(chapter.title || "").trim(),
         chapter.subtitle ? String(chapter.subtitle).trim() : "",
         chapter.logline ? String(chapter.logline).trim() : ""
-      ].filter(Boolean).join(" • ")
+      ].filter(Boolean).join(" â€¢ ")
     }))
   }, 0, "course-map");
 }
@@ -6030,7 +6108,7 @@ function buildMiniCourseFailureDebugPayload({ job, failure }) {
 }
 
 function buildMiniCourseChunkLabel(chunk, chunkIndex, totalChunks) {
-  return `Bloco ${chunkIndex + 1}/${totalChunks} • páginas ${chunk.startPageNumber}-${chunk.endPageNumber}`;
+  return `Bloco ${chunkIndex + 1}/${totalChunks} â€¢ pÃ¡ginas ${chunk.startPageNumber}-${chunk.endPageNumber}`;
 }
 
 async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, context, pageCount, chapterCount = 1, courseStyle = "course", onProgress } = {}) {
@@ -6149,7 +6227,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     const chapterLabel = `Capitulo ${chapterMeta.chapterNumber}/${safeChapterCount}`;
 
     for (let attemptIndex = 0; attemptIndex < maxChapterAttempts; attemptIndex += 1) {
-      const attemptLabel = `${chapterLabel} • tentativa ${attemptIndex + 1}/${maxChapterAttempts}`;
+      const attemptLabel = `${chapterLabel} â€¢ tentativa ${attemptIndex + 1}/${maxChapterAttempts}`;
       const retryInstruction = attemptIndex === 0
         ? ""
         : [
@@ -6162,7 +6240,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
           "Se alguma pagina for final, entregue exatamente 3 paragrafos completos."
         ].join(" ");
 
-      await reportProgress(generatedPageCountBefore, `${attemptLabel}: solicitando conteúdo para a IA...`);
+      await reportProgress(generatedPageCountBefore, `${attemptLabel}: solicitando conteÃºdo para a IA...`);
 
       try {
         const attempt = await createCourseChapterAttempt({ blueprint, chapterMeta, courseMainTitle, courseOverview, courseMapText, extraUserInstruction: retryInstruction });
@@ -6175,7 +6253,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
         const issuesText = attempt.evaluation.issues.slice(0, 3).join(" ");
         await reportProgress(
           generatedPageCountBefore,
-          `${attemptLabel}: a IA devolveu ${attempt.evaluation.validCount}/${minimumValidPages} páginas válidas.${issuesText ? ` ${issuesText}` : ""}${attemptIndex < maxChapterAttempts - 1 ? " Vamos tentar novamente." : ""}`
+          `${attemptLabel}: a IA devolveu ${attempt.evaluation.validCount}/${minimumValidPages} pÃ¡ginas vÃ¡lidas.${issuesText ? ` ${issuesText}` : ""}${attemptIndex < maxChapterAttempts - 1 ? " Vamos tentar novamente." : ""}`
         );
       } catch (error) {
         lastError = error;
@@ -6190,7 +6268,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
     if (lastAttempt) {
       throw new MiniCourseGenerationError(
         "A IA nao devolveu conteudo suficiente para concluir o curso.",
-        `${chapterLabel}. ${lastAttempt.evaluation.issues.slice(0, 4).join(" ") || "A IA continuou devolvendo páginas vazias ou fracas após as tentativas."}`,
+        `${chapterLabel}. ${lastAttempt.evaluation.issues.slice(0, 4).join(" ") || "A IA continuou devolvendo pÃ¡ginas vazias ou fracas apÃ³s as tentativas."}`,
         generatedPageCountBefore,
         {
           stage: "chapter_validation",
@@ -6207,7 +6285,7 @@ async function generateMiniCourseDraft({ apiKey, model = "gpt-5.1", title, conte
 
     throw new MiniCourseGenerationError(
       "A IA nao devolveu conteudo suficiente para concluir o curso.",
-      `${chapterLabel}. ${lastError instanceof Error ? lastError.message : "A IA falhou repetidamente sem retornar conteúdo utilizável."}`,
+      `${chapterLabel}. ${lastError instanceof Error ? lastError.message : "A IA falhou repetidamente sem retornar conteÃºdo utilizÃ¡vel."}`,
       generatedPageCountBefore,
       {
         stage: "chapter_request",
@@ -6314,7 +6392,7 @@ async function processMiniCourseJobsQueue() {
       try {
         await updateMiniCourseJobProgress(job.id, {
           generatedPageCount: 0,
-          feedback: `Preparando ${job.requestedPageCount} páginas em ${job.requestedChapterCount} capítulos no ${buildMiniCourseStyleLabel(job.requestedCourseStyle)} com ${normalizeMiniCourseGeneratorModel(job.requestedModel)}...`
+          feedback: `Preparando ${job.requestedPageCount} pÃ¡ginas em ${job.requestedChapterCount} capÃ­tulos no ${buildMiniCourseStyleLabel(job.requestedCourseStyle)} com ${normalizeMiniCourseGeneratorModel(job.requestedModel)}...`
         });
 
         const draft = await generateMiniCourseDraft({
@@ -6354,7 +6432,7 @@ async function processMiniCourseJobsQueue() {
           ? error
           : new MiniCourseGenerationError(
             error instanceof Error ? error.message : "Nao foi possivel gerar o curso.",
-            "A geração falhou antes de salvar o curso. Verifique o bloco informado e a mensagem técnica abaixo.",
+            "A geraÃ§Ã£o falhou antes de salvar o curso. Verifique o bloco informado e a mensagem tÃ©cnica abaixo.",
             0
           );
 
@@ -6849,7 +6927,7 @@ async function handleMiniMediaTrackUploadRequest(request, response, albumId, tra
       id: safeTrackId,
       globalId: existingIndex >= 0 ? album.songs[existingIndex].globalId : "",
       title: songTitle,
-      subtitle: `${album.title} • faixa ${trackOrder + 1}`,
+      subtitle: `${album.title} â€¢ faixa ${trackOrder + 1}`,
       key,
       playbackSongId: existingIndex >= 0 ? album.songs[existingIndex].playbackSongId : "",
       lyricsKey: existingIndex >= 0 ? album.songs[existingIndex].lyricsKey : "",
@@ -7830,7 +7908,7 @@ async function handleMiniMediaAlbumCoverGenerateRequest(request, response, album
         `Use a imagem enviada como referencia principal do album "${album.title}".`,
         "Recrie uma nova imagem com fidelidade maxima ao enquadramento, personagens, objetos, cores, luz, fundo, estilo artistico e atmosfera.",
         "Nao invente elementos novos, nao mude o tema e nao simplifique a composicao.",
-        "Entregue uma nova versao visualmente muito proxima da capa original, mais limpa e nítida."
+        "Entregue uma nova versao visualmente muito proxima da capa original, mais limpa e nÃ­tida."
       ].join(" ")
     );
     formData.append("size", "1024x1536");
@@ -8100,7 +8178,7 @@ async function handleMiniCourseCoverGenerateRequest(request, response, courseId)
       `Crie uma capa vertical original em proporcao 2:3 para o curso "${String(existingCourse.title || "Curso").trim()}".`,
       existingCourse.context ? `Contexto do curso: ${String(existingCourse.context).trim()}.` : "",
       existingCourse.coverImagePrompt ? `Direcao visual sugerida: ${String(existingCourse.coverImagePrompt).trim()}.` : "",
-      "A arte deve parecer premium, acolhedora, nítida e apropriada para um curso cristao infantil ou de formacao de professores.",
+      "A arte deve parecer premium, acolhedora, nÃ­tida e apropriada para um curso cristao infantil ou de formacao de professores.",
       "Nao escreva titulo, letras, tipografia, selo ou texto na imagem.",
       uploadedReferenceBuffer?.length ? "Use a imagem enviada apenas como referencia de estilo, paleta, clima, composicao e nivel de detalhe." : "",
       uploadedReferenceBuffer?.length ? "Nao replique exatamente a imagem enviada e nao copie personagens, poses, enquadramento ou elementos de forma identica." : "",
@@ -8238,8 +8316,8 @@ async function handleMiniCourseVisibilityRequest(request, response, courseId) {
       user: sanitizeUser(adminUser),
       course: updatedCourse,
       feedback: updatedCourse.isVisible === false
-        ? "Curso ocultado do público com sucesso."
-        : "Curso visível ao público novamente."
+        ? "Curso ocultado do pÃºblico com sucesso."
+        : "Curso visÃ­vel ao pÃºblico novamente."
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -8271,7 +8349,7 @@ function buildMiniCourseQuizSourceText(course) {
   ];
 
   if (pages.length > selectedIndexes.length) {
-    lines.push(`Resumo parcial para quiz: usando ${selectedIndexes.length} de ${pages.length} páginas distribuídas pelo curso para manter a geração estável.`);
+    lines.push(`Resumo parcial para quiz: usando ${selectedIndexes.length} de ${pages.length} pÃ¡ginas distribuÃ­das pelo curso para manter a geraÃ§Ã£o estÃ¡vel.`);
   }
 
   selectedIndexes.forEach((pageIndex) => {
@@ -8761,7 +8839,7 @@ async function handleMiniCourseGenerateRequest(request, response) {
     sendJson(response, 202, {
       ok: true,
       job,
-      feedback: `Curso solicitado com ${pageCount} páginas de conteúdo, ${chapterCount} capítulos e ${buildMiniCourseStyleLabel(courseStyle)} usando ${model}. Ele entrou na fila de geração.`
+      feedback: `Curso solicitado com ${pageCount} pÃ¡ginas de conteÃºdo, ${chapterCount} capÃ­tulos e ${buildMiniCourseStyleLabel(courseStyle)} usando ${model}. Ele entrou na fila de geraÃ§Ã£o.`
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -11571,6 +11649,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/200/life-captures/upload") {
+    await handleProject200LifeCaptureUploadRequest(request, response);
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/escrever/paragraphs") {
     await handleEscreverParagraphsList(request, response);
     return;
@@ -12439,7 +12522,7 @@ const server = http.createServer(async (request, response) => {
         .trim();
 
       if (!rawInput || rawInput.length < 2) {
-        sendJson(response, 400, { error: "Informe um nome de usuário válido." });
+        sendJson(response, 400, { error: "Informe um nome de usuÃ¡rio vÃ¡lido." });
         return;
       }
 
@@ -12466,7 +12549,7 @@ const server = http.createServer(async (request, response) => {
       const targetUser = searchResult.rows[0] || null;
 
       if (!targetUser) {
-        sendJson(response, 404, { error: "Usuário não encontrado no banco principal." });
+        sendJson(response, 404, { error: "UsuÃ¡rio nÃ£o encontrado no banco principal." });
         return;
       }
 
@@ -12480,7 +12563,7 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 500, {
-        error: error instanceof Error ? error.message : "Erro ao buscar usuário."
+        error: error instanceof Error ? error.message : "Erro ao buscar usuÃ¡rio."
       });
     }
     return;
@@ -12584,13 +12667,13 @@ const server = http.createServer(async (request, response) => {
       const assignedProfile = await resolveProject200ProfileName(authUser.id, body.profile, { fallbackToDefault: false });
 
       if (!usernameInput || usernameInput.length < 2) {
-        sendJson(response, 400, { error: "Nome de usuário inválido." });
+        sendJson(response, 400, { error: "Nome de usuÃ¡rio invÃ¡lido." });
         return;
       }
       const targetUser = await findUserByUsernameOrNameInput(usernameInput);
 
       if (!targetUser) {
-        sendJson(response, 404, { error: "Usuário não encontrado no banco principal." });
+        sendJson(response, 404, { error: "UsuÃ¡rio nÃ£o encontrado no banco principal." });
         return;
       }
 
@@ -12618,7 +12701,7 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 500, {
-        error: error instanceof Error ? error.message : "Erro ao salvar vínculo."
+        error: error instanceof Error ? error.message : "Erro ao salvar vÃ­nculo."
       });
     }
     return;
@@ -12635,7 +12718,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, profiles });
     } catch (error) {
       sendJson(response, 500, {
-        error: error instanceof Error ? error.message : "Erro ao carregar usuários."
+        error: error instanceof Error ? error.message : "Erro ao carregar usuÃ¡rios."
       });
     }
     return;
@@ -12653,7 +12736,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 201, { ok: true, profile });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Erro ao criar usuário."
+        error: error instanceof Error ? error.message : "Erro ao criar usuÃ¡rio."
       });
     }
     return;
@@ -12732,7 +12815,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, ...result });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Erro ao excluir usuário."
+        error: error instanceof Error ? error.message : "Erro ao excluir usuÃ¡rio."
       });
     }
     return;
@@ -12748,13 +12831,13 @@ const server = http.createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const usernameInput = String(body?.username || "").trim();
       if (!usernameInput) {
-        sendJson(response, 400, { error: "Digite o nome de usuário da conta destino." });
+        sendJson(response, 400, { error: "Digite o nome de usuÃ¡rio da conta destino." });
         return;
       }
 
       const targetUser = await findUserByUsernameOrNameInput(usernameInput);
       if (!targetUser) {
-        sendJson(response, 404, { error: "Usuário destino não encontrado." });
+        sendJson(response, 404, { error: "UsuÃ¡rio destino nÃ£o encontrado." });
         return;
       }
 
@@ -12773,13 +12856,13 @@ const server = http.createServer(async (request, response) => {
         targetUser: {
           id: targetUser.id,
           username: targetUser.username || null,
-          name: targetUser.name || targetUser.username || "Usuário"
+          name: targetUser.name || targetUser.username || "UsuÃ¡rio"
         },
         summary
       });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Não foi possível exportar os dados do /200."
+        error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel exportar os dados do /200."
       });
     }
     return;
@@ -12815,7 +12898,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, ...span });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Não foi possível carregar o período disponível."
+        error: error instanceof Error ? error.message : "NÃ£o foi possÃ­vel carregar o perÃ­odo disponÃ­vel."
       });
     }
     return;
@@ -12942,7 +13025,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, ...personalized, defaults: result.defaults });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel salvar o padrão."
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar o padrÃ£o."
       });
     }
     return;
@@ -13196,7 +13279,7 @@ const server = http.createServer(async (request, response) => {
       });
       sendJson(response, 200, { ok: true, entries });
     } catch (error) {
-      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar o histórico de sono." });
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar o histÃ³rico de sono." });
     }
     return;
   }
@@ -13231,7 +13314,7 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, session });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel carregar a sessão de sono."
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar a sessÃ£o de sono."
       });
     }
     return;
@@ -13361,7 +13444,7 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel confirmar o lanÃ§amento."
+        error: error instanceof Error ? error.message : "Nao foi possivel confirmar o lanÃƒÂ§amento."
       });
     }
     return;
@@ -13433,7 +13516,7 @@ const server = http.createServer(async (request, response) => {
       });
     } catch (error) {
       sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel apagar os lanÃ§amentos."
+        error: error instanceof Error ? error.message : "Nao foi possivel apagar os lanÃƒÂ§amentos."
       });
     }
     return;
@@ -13461,7 +13544,7 @@ const server = http.createServer(async (request, response) => {
       const isOverlap = error?.code === "ACTION_OVERLAP";
       if (assignedToFriend && isOverlap) {
         sendJson(response, 409, {
-          error: "Este horário não está disponível para o amigo.",
+          error: "Este horÃ¡rio nÃ£o estÃ¡ disponÃ­vel para o amigo.",
           code: "ACTION_OVERLAP"
         });
         return;
@@ -13834,5 +13917,6 @@ void ensureProject200OnboardingSchema().catch((error) => {
 server.listen(PORT, () => {
   console.log(`Servidor online em http://localhost:${PORT}`);
 });
+
 
 

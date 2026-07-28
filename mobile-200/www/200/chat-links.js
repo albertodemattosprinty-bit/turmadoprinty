@@ -1,4 +1,4 @@
-const CHAT_URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+/giu;
+﻿const CHAT_URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+/giu;
 const TRAILING_URL_PUNCTUATION = /[.,!?;:)\]}]+$/u;
 const ILIFE_MEDIA_PREFIX = "[[ILIFE_MEDIA:";
 const ILIFE_MEDIA_SUFFIX = "]]";
@@ -69,16 +69,31 @@ function renderPlainText(container, text) {
 }
 
 function createMediaCard(payload) {
-  if (!(payload && payload.previewDataUrl)) return null;
+  const previewUrl = String(payload?.previewUrl || payload?.previewRemoteUrl || payload?.previewDataUrl || "");
+  const mediaUrl = String(payload?.mediaUrl || payload?.remoteUrl || "");
+  if (!previewUrl && !mediaUrl) return null;
+
   const card = document.createElement("div");
   card.className = "marin-message-media-card";
 
   const trigger = document.createElement("button");
   trigger.type = "button";
-  const image = document.createElement("img");
-  image.src = String(payload.previewDataUrl || "");
-  image.alt = String(payload.title || "Memoria compartilhada");
-  trigger.appendChild(image);
+
+  if (String(payload?.kind || "") === "video" && mediaUrl) {
+    const video = document.createElement("video");
+    video.src = mediaUrl;
+    video.poster = previewUrl;
+    video.playsInline = true;
+    video.controls = true;
+    video.preload = "metadata";
+    trigger.appendChild(video);
+  } else {
+    const image = document.createElement("img");
+    image.src = previewUrl || mediaUrl;
+    image.alt = String(payload?.title || "Memoria compartilhada");
+    trigger.appendChild(image);
+  }
+
   trigger.addEventListener("click", () => {
     window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
   });
@@ -86,11 +101,11 @@ function createMediaCard(payload) {
   const meta = document.createElement("div");
   meta.className = "marin-message-media-meta";
   const title = document.createElement("strong");
-  title.textContent = String(payload.title || "Memoria compartilhada");
+  title.textContent = String(payload?.title || "Memoria compartilhada");
   const date = document.createElement("span");
-  date.textContent = String(payload.dateLabel || "");
+  date.textContent = String(payload?.dateLabel || "");
   meta.append(title, date);
-  if (payload.noteText) {
+  if (payload?.noteText) {
     const note = document.createElement("span");
     note.textContent = String(payload.noteText);
     meta.append(note);
@@ -112,3 +127,4 @@ export function renderChatMessageContent(container, content) {
   }
   renderPlainText(container, text);
 }
+
