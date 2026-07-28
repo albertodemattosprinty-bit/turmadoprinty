@@ -1,3 +1,5 @@
+import { renderChatMessageContent } from "./chat-links.js?v=0.7.0";
+
 export function initializeProject200TutorsUi(dependencies = {}) {
   const {
     apiRequest,
@@ -453,7 +455,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       }
       const copy = document.createElement("div");
       copy.className = "marin-message-copy";
-      copy.textContent = String(message.content || "");
+      renderChatMessageContent(copy, message.content);
       bubble.appendChild(copy);
       elements.messages.appendChild(bubble);
       if (Array.isArray(message.proposals) && message.proposals.length) {

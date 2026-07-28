@@ -158,7 +158,7 @@
         </button>
       </div>
       <div class="running-home-brand">
-        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" aria-label="Abrir onboarding do iLife" />
+        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" data-app-version="0.7" aria-label="Baixar atualização mais recente do iLife, versão atual 0.7" title="Baixar atualização do iLife · versão 0.7" />
         <button class="marin-home-entry" type="button" id="marinHomeEntryButton" aria-label="Conversar com Marin">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
@@ -341,7 +341,7 @@
       <div class="start-decision-top">
         <div class="start-decision-top-spacer" aria-hidden="true"></div>
         <div class="start-decision-title-wrap">
-          <h1 class="start-decision-task-title" id="startDecisionTaskTitle">Tarefa X</h1>
+          <input class="start-decision-task-title" id="startDecisionTaskTitle" type="text" inputmode="text" autocomplete="off" maxlength="80" value="Tarefa X" aria-label="Nome da tarefa" />
           <p class="start-decision-title-hint" id="startDecisionTitleHint" hidden>Toque para inserir</p>
         </div>
       </div>
@@ -716,6 +716,11 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.8A3.2 3.2 0 1 0 12 15.2 3.2 3.2 0 0 0 12 8.8Zm9 3.2-.9-.5a8.8 8.8 0 0 0-.3-1.2l.7-.8a1 1 0 0 0-.1-1.4l-1-1a1 1 0 0 0-1.4-.1l-.8.7q-.57-.18-1.2-.3L15 3a1 1 0 0 0-1-.8h-2a1 1 0 0 0-1 .8l-.5.9q-.62.12-1.2.3l-.8-.7a1 1 0 0 0-1.4.1l-1 1a1 1 0 0 0-.1 1.4l.7.8q-.18.57-.3 1.2L3 11a1 1 0 0 0-.8 1v2a1 1 0 0 0 .8 1l.9.5q.12.62.3 1.2l-.7.8a1 1 0 0 0 .1 1.4l1 1a1 1 0 0 0 1.4.1l.8-.7q.57.18 1.2.3l.5.9a1 1 0 0 0 1 .8h2a1 1 0 0 0 1-.8l.5-.9q.62-.12 1.2-.3l.8.7a1 1 0 0 0 1.4-.1l1-1a1 1 0 0 0 .1-1.4l-.7-.8q.18-.57.3-1.2l.9-.5a1 1 0 0 0 .8-1v-2A1 1 0 0 0 21 12Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
         <span>Opções</span>
       </div>
+      <button class="running-music-default-option options-toggle-btn" type="button" id="toggleAppKeyboardOption">
+        <span class="running-music-default-top">Escolher o teclado usado em mensagens, missões, ações e outros campos</span>
+        <strong>Teclado</strong>
+        <span class="running-music-default-bottom" id="toggleAppKeyboardHint">Do aparelho</span>
+      </button>
       <button class="running-music-default-option options-toggle-btn" type="button" id="toggleFreeTimeOption">
         <span class="running-music-default-top">Mostrar ou ocultar na lista e no fluxo</span>
         <strong>Tempo livre</strong>
@@ -1385,13 +1390,13 @@
             <span class="mission-guide-number">1</span>
             <h2 id="missionCreateNameStep">Nome da missão</h2>
             <p id="missionCreateNameCopy" hidden></p>
-            <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" inputmode="none" placeholder="Digite o nome" />
+            <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" inputmode="text" placeholder="Digite o nome" />
           </section>
           <section class="mission-guide-step" data-mission-create-step="2" aria-labelledby="missionCreateTargetStep">
             <span class="mission-guide-number">2</span>
             <h2 id="missionCreateTargetStep">Quantas vezes por dia?</h2>
             <p id="missionCreateTargetCopy" hidden></p>
-            <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="none" maxlength="6" pattern="[0-9]*" autocomplete="off" placeholder="Digite um número" />
+            <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off" placeholder="Digite um número" />
           </section>
           <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="3" aria-labelledby="missionCreateFinalStepTitle">
             <span class="mission-guide-number">3</span>
@@ -1823,7 +1828,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=20260724-sleep-aware-limits-v1"></script>
+  <script type="module" src="/200/project.js?v=0.7.0"></script>
 </body>
 </html>
 

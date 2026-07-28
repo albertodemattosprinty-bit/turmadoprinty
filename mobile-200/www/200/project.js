@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
-import { initializeProject200MarinUi } from "./marin.js?v=20260721-home-onboarding-v2";
-import { initializeProject200TutorsUi } from "./tutors-ui.js?v=20260724-chat-avatar-v1";
+import { initializeProject200MarinUi } from "./marin.js?v=0.7.0-chat-links";
+import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.7.0-chat-links";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
 
 import {
@@ -12,6 +12,8 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
+const project200AppVersion = "0.7";
+const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 const optionsConfigKey = "project_200_options_v1";
 let optionsConfigLoadPromise = null;
@@ -436,6 +438,8 @@ const constitutionTextView = document.getElementById("constitutionTextView");
 const constitutionMessage = document.getElementById("constitutionMessage");
 const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
+const toggleAppKeyboardOptionButton = document.getElementById("toggleAppKeyboardOption");
+const toggleAppKeyboardHint = document.getElementById("toggleAppKeyboardHint");
 const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption");
 const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
 const toggleMissionActionsOptionButton = document.getElementById("toggleMissionActionsOption");
@@ -1322,6 +1326,7 @@ const state = {
     messageNotificationsEnabled: false,
     messageNotificationSoundEnabled: false,
     missionNotificationsEnabled: false,
+    useAppKeyboard: false,
   },
   svgAssets: [],
   svgSelector: {
@@ -7920,13 +7925,31 @@ function renderTaskComposerMeta(button, iconMarkup, label, placeholder = false) 
 }
 
 function shouldUseProjectNativeKeyboard() {
-  const capacitorNative = Boolean(
-    window.Capacitor?.isNativePlatform?.()
-    || (window.Capacitor?.getPlatform?.() && window.Capacitor.getPlatform() !== "web")
-  );
-  const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile/i.test(String(window.navigator?.userAgent || ""));
-  const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches === true;
-  return capacitorNative || mobileUserAgent || (coarsePointer && window.innerWidth <= 1100);
+  return state.options?.useAppKeyboard === true;
+}
+
+function applyProjectKeyboardPreference() {
+  const useAppKeyboard = shouldUseProjectNativeKeyboard();
+  if (!useAppKeyboard && state.nativeKeyboard?.open) {
+    closeProjectNativeKeyboard({ commit: false, immediate: true });
+  }
+  const configureInput = (input, nativeInputMode = "text") => {
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return;
+    input.readOnly = useAppKeyboard;
+    input.inputMode = useAppKeyboard ? "none" : nativeInputMode;
+    if (useAppKeyboard) input.setAttribute("data-native-keyboard-input", "true");
+    else input.removeAttribute("data-native-keyboard-input");
+  };
+  configureInput(marinChatInput, "text");
+  configureInput(missionTitleInput, "text");
+  configureInput(missionTargetInput, "numeric");
+  if (startDecisionTaskTitle instanceof HTMLInputElement) {
+    const editableWithDevice = isTaskComposerMode() && !useAppKeyboard;
+    startDecisionTaskTitle.readOnly = !editableWithDevice;
+    startDecisionTaskTitle.inputMode = useAppKeyboard ? "none" : "text";
+    if (useAppKeyboard) startDecisionTaskTitle.setAttribute("data-native-keyboard-input", "true");
+    else startDecisionTaskTitle.removeAttribute("data-native-keyboard-input");
+  }
 }
 
 function getProjectNativeKeyboardRows() {
@@ -8130,12 +8153,10 @@ function handleProjectNativeKeyboardAction(action, value = "") {
 }
 
 function initializeProjectNativeChatKeyboard() {
-  if (!marinChatInput || !marinChatComposer || !marinChatModal || !shouldUseProjectNativeKeyboard()) return;
-  marinChatInput.readOnly = true;
-  marinChatInput.inputMode = "none";
-  marinChatInput.setAttribute("data-native-keyboard-input", "true");
+  if (!marinChatInput || !marinChatComposer || !marinChatModal) return;
 
   const openChatKeyboard = (event) => {
+    if (!shouldUseProjectNativeKeyboard()) return;
     event?.preventDefault?.();
     openProjectNativeKeyboard("chat");
   };
@@ -8160,14 +8181,10 @@ function initializeProjectNativeChatKeyboard() {
 }
 
 function initializeProjectNativeMissionKeyboard() {
-  if (!missionTitleInput || !missionTargetInput || !shouldUseProjectNativeKeyboard()) return;
-  [missionTitleInput, missionTargetInput].forEach((input) => {
-    input.readOnly = true;
-    input.inputMode = "none";
-    input.setAttribute("data-native-keyboard-input", "true");
-  });
+  if (!missionTitleInput || !missionTargetInput) return;
   const bind = (input, target) => {
     const open = (event) => {
+      if (!shouldUseProjectNativeKeyboard()) return;
       event?.preventDefault?.();
       openProjectNativeKeyboard(target);
     };
@@ -8186,12 +8203,18 @@ function renderTaskComposerModal() {
   const mode = state.startDecisionContext.mode;
   const untouchedCreate = mode === "create" && !state.startDecisionContext.dirty;
   startDecisionContent.id = mode === "create" ? "create-task" : "edit-task";
-  const titleValue = String(taskTitle?.value || "").trim();
+  const rawTitleValue = String(taskTitle?.value || "").slice(0, 80);
+  const titleValue = rawTitleValue.trim();
   const awaitingTitle = mode === "create" && !titleValue;
   startDecisionContent.classList.toggle("is-awaiting-title", awaitingTitle);
-  startDecisionTaskTitle.textContent = titleValue || "Inserir nome da tarefa";
+  if (startDecisionTaskTitle instanceof HTMLInputElement) {
+    if (startDecisionTaskTitle.value !== rawTitleValue) startDecisionTaskTitle.value = rawTitleValue;
+    startDecisionTaskTitle.placeholder = "Inserir nome da tarefa";
+  } else {
+    startDecisionTaskTitle.textContent = titleValue || "Inserir nome da tarefa";
+  }
   startDecisionTaskTitle.classList.toggle("is-placeholder", !titleValue);
-  startDecisionTaskTitle.style.cursor = "pointer";
+  applyProjectKeyboardPreference();
   if (startDecisionTitleHint) {
     const keyboardOpen = Boolean(state.nativeKeyboard?.open);
     startDecisionTitleHint.textContent = keyboardOpen ? "Digite o nome da tarefa" : "Toque para inserir";
@@ -8335,15 +8358,13 @@ function openTaskComposerFieldEditor(field) {
   }
   if (field === "title") {
     if (openProjectNativeKeyboard()) return;
-    const nextTitle = window.prompt("Nome da tarefa:", String(taskTitle?.value || "").trim());
-    if (nextTitle == null) return;
-    if (taskTitle) {
-      taskTitle.value = String(nextTitle).trim().slice(0, 80);
+    if (startDecisionTaskTitle instanceof HTMLInputElement) {
+      applyProjectKeyboardPreference();
+      startDecisionTaskTitle.focus();
+      const end = startDecisionTaskTitle.value.length;
+      startDecisionTaskTitle.setSelectionRange?.(end, end);
+      return;
     }
-    state.startDecisionContext.categoryManuallySelected = false;
-    markTaskComposerDirty();
-    renderTaskComposerModal();
-    void interpretActionCategoryFromTitle(taskTitle?.value || "");
     return;
   }
   if (field === "start" || field === "end") {
@@ -8513,7 +8534,13 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
       closeStartDecisionModal.hidden = false;
     }
     if (startDecisionTaskTitle) {
-      startDecisionTaskTitle.textContent = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
+      const displayTitle = formatActionTitleForDisplay(targetAction?.title || "Tarefa");
+      if (startDecisionTaskTitle instanceof HTMLInputElement) {
+        startDecisionTaskTitle.value = displayTitle;
+        startDecisionTaskTitle.readOnly = true;
+      } else {
+        startDecisionTaskTitle.textContent = displayTitle;
+      }
       startDecisionTaskTitle.classList.remove("is-placeholder");
     }
     if (startDecisionStartAt) {
@@ -13542,8 +13569,8 @@ function renderMissionCreateStep(direction = 0) {
     const name = String(missionTitleInput?.value || "Limite").trim() || "Limite";
     missionLimitExampleTitle.textContent = `${amount} ${name}`;
   }
+  const keyboardTarget = step === 1 ? "mission-title" : step === 2 ? "mission-target" : "";
   if (shouldUseProjectNativeKeyboard()) {
-    const keyboardTarget = step === 1 ? "mission-title" : step === 2 ? "mission-target" : "";
     const missionKeyboardOpen = String(state.nativeKeyboard?.target || "").startsWith("mission-");
     if (keyboardTarget && (!state.nativeKeyboard?.open || state.nativeKeyboard?.target !== keyboardTarget)) {
       window.setTimeout(() => {
@@ -13551,6 +13578,15 @@ function renderMissionCreateStep(direction = 0) {
       }, direction === 0 ? 40 : 180);
     } else if (!keyboardTarget && missionKeyboardOpen) {
       closeProjectNativeKeyboard({ commit: false });
+    }
+  } else {
+    const input = keyboardTarget === "mission-title" ? missionTitleInput : keyboardTarget === "mission-target" ? missionTargetInput : null;
+    if (input && document.activeElement !== input) {
+      window.setTimeout(() => {
+        if (Number(state.missionCreate?.step || 0) === step && !shouldUseProjectNativeKeyboard()) input.focus({ preventScroll: true });
+      }, direction === 0 ? 40 : 180);
+    } else if (!input && [missionTitleInput, missionTargetInput].includes(document.activeElement)) {
+      document.activeElement.blur();
     }
   }
   if (direction !== 0) {
@@ -15907,6 +15943,7 @@ async function loadOptionsConfig() {
       state.options.messageNotificationsEnabled = parsed.messageNotificationsEnabled === true;
       state.options.messageNotificationSoundEnabled = parsed.messageNotificationSoundEnabled === true;
       state.options.missionNotificationsEnabled = parsed.missionNotificationsEnabled === true;
+      state.options.useAppKeyboard = parsed.useAppKeyboard === true;
     } catch {
       state.options.showFreeTime = true;
       state.options.missionActionsMode = "separate";
@@ -15919,8 +15956,10 @@ async function loadOptionsConfig() {
       state.options.messageNotificationsEnabled = false;
       state.options.messageNotificationSoundEnabled = false;
       state.options.missionNotificationsEnabled = false;
+      state.options.useAppKeyboard = false;
     }
     applyBackgroundTheme();
+    applyProjectKeyboardPreference();
   })();
   return optionsConfigLoadPromise;
 }
@@ -15937,7 +15976,8 @@ function saveOptionsConfig() {
     stopMusicOnFinish: Boolean(state.options.stopMusicOnFinish),
     messageNotificationsEnabled: Boolean(state.options.messageNotificationsEnabled),
     messageNotificationSoundEnabled: Boolean(state.options.messageNotificationSoundEnabled),
-    missionNotificationsEnabled: Boolean(state.options.missionNotificationsEnabled)
+    missionNotificationsEnabled: Boolean(state.options.missionNotificationsEnabled),
+    useAppKeyboard: Boolean(state.options.useAppKeyboard)
   });
   try {
     window.localStorage.setItem(optionsConfigKey, serialized);
@@ -16107,6 +16147,10 @@ function registerScreenLockActivity() {
 function renderOptionsModal() {
   const optionsContent = document.querySelector("#optionsModal .options-content");
   const previousScrollTop = Number(optionsContent?.scrollTop || 0);
+  if (toggleAppKeyboardHint) {
+    toggleAppKeyboardHint.textContent = state.options.useAppKeyboard ? "Do iLife" : "Do aparelho";
+  }
+  toggleAppKeyboardOptionButton?.classList.toggle("is-off", !state.options.useAppKeyboard);
   if (toggleFreeTimeHint) {
     toggleFreeTimeHint.textContent = state.options.showFreeTime ? "Mostrando" : "Ocultando";
   }
@@ -18215,6 +18259,12 @@ actionsMissionsList?.addEventListener("keydown", (event) => {
   document.body.classList.add("actions-mission-editor-open");
   openMissionProgressModal(String(card.dataset.actionsMissionGoalId || ""));
 });
+toggleAppKeyboardOptionButton?.addEventListener("click", () => {
+  state.options.useAppKeyboard = !state.options.useAppKeyboard;
+  saveOptionsConfig();
+  applyProjectKeyboardPreference();
+  renderOptionsModal();
+});
 toggleFreeTimeOptionButton?.addEventListener("click", () => {
   state.options.showFreeTime = !state.options.showFreeTime;
   saveOptionsConfig();
@@ -18495,35 +18545,49 @@ saveActiveTimeButton?.addEventListener("click", () => {
     }
   })();
 });
-async function openProject200OnboardingFromLogo() {
-  if (project200OnboardingUi.isActive()) return;
-  if (!getToken()) {
-    redirectToProject200Login();
-    return;
-  }
+let project200ApkDownloadBusy = false;
+
+function downloadLatestProject200App() {
+  if (project200ApkDownloadBusy) return;
+  project200ApkDownloadBusy = true;
   runningHomeLogoButton?.classList.add("is-loading");
   runningHomeLogoButton?.setAttribute("aria-busy", "true");
+
   try {
-    const onboarding = await project200OnboardingUi.start();
-    state.project200Onboarding = onboarding;
-    if (state.authUser) state.authUser.onboardingRequired = true;
+    const downloadUrl = new URL(project200LatestDebugApkUrl);
+    downloadUrl.searchParams.set("download", "1");
+    downloadUrl.searchParams.set("v", project200AppVersion);
+    downloadUrl.searchParams.set("t", String(Date.now()));
+
+    if (typeof showFloatingNotice === "function") showFloatingNotice(`Baixando a atualização do iLife · versão ${project200AppVersion}`);
+
+    const downloadLink = document.createElement("a");
+    downloadLink.href = downloadUrl.toString();
+    downloadLink.download = `iLife-Mindset-v${project200AppVersion}-debug.apk`;
+    downloadLink.rel = "noopener noreferrer";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nao foi possivel abrir o onboarding.";
+    const message = error instanceof Error ? error.message : "Não foi possível baixar a atualização.";
     console.error(message);
     window.alert(message);
   } finally {
-    runningHomeLogoButton?.classList.remove("is-loading");
-    runningHomeLogoButton?.removeAttribute("aria-busy");
+    window.setTimeout(() => {
+      project200ApkDownloadBusy = false;
+      runningHomeLogoButton?.classList.remove("is-loading");
+      runningHomeLogoButton?.removeAttribute("aria-busy");
+    }, 800);
   }
 }
 
 runningHomeLogoButton?.addEventListener("click", () => {
-  void openProject200OnboardingFromLogo();
+  downloadLatestProject200App();
 });
 runningHomeLogoButton?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
-  void openProject200OnboardingFromLogo();
+  downloadLatestProject200App();
 });
 
 homeRunningSurfaceButton?.addEventListener("click", () => {
@@ -18616,7 +18680,7 @@ projectNativeKeyboardRows?.addEventListener("click", (event) => {
 });
 startDecisionTaskTitle?.addEventListener("click", () => {
   if (isTaskComposerMode()) {
-    openTaskComposerFieldEditor("title");
+    if (shouldUseProjectNativeKeyboard()) openTaskComposerFieldEditor("title");
     return;
   }
   const action = findActionById(state.startDecisionContext.actionId);
@@ -18625,6 +18689,19 @@ startDecisionTaskTitle?.addEventListener("click", () => {
   }
   closeStartDecisionModalWith("cancel");
   openTaskComposer(action, { fieldToFocus: "title" });
+});
+startDecisionTaskTitle?.addEventListener("input", () => {
+  if (!isTaskComposerMode() || shouldUseProjectNativeKeyboard() || !(startDecisionTaskTitle instanceof HTMLInputElement) || !taskTitle) return;
+  const nextTitle = startDecisionTaskTitle.value.slice(0, 80);
+  if (taskTitle.value === nextTitle) return;
+  taskTitle.value = nextTitle;
+  markTaskComposerDirty();
+  taskTitle.dispatchEvent(new Event("input", { bubbles: true }));
+});
+startDecisionTaskTitle?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || shouldUseProjectNativeKeyboard() || !isTaskComposerMode()) return;
+  event.preventDefault();
+  startDecisionTaskTitle.blur();
 });
 startDecisionStartAt?.addEventListener("click", () => {
   if (isTaskComposerMode()) {
@@ -18796,6 +18873,7 @@ project200TutorsUi = initializeProject200TutorsUi({
 });
 initializeProjectNativeChatKeyboard();
 initializeProjectNativeMissionKeyboard();
+applyProjectKeyboardPreference();
 const project200OnboardingUi = initializeProject200OnboardingUi({
   getToken,
   getUser: () => state.authUser,

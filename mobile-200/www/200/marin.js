@@ -1,3 +1,5 @@
+import { renderChatMessageContent } from "./chat-links.js?v=0.7.0";
+
 const DEFAULT_PERSONAS = [
   { key: "marin", name: "Marin", avatar: "/200/agents/marin.svg" },
   { key: "peter", name: "Peter", avatar: "/200/agents/peter.svg" },
@@ -309,7 +311,7 @@ export function initializeProject200MarinUi(dependencies = {}) {
       bubble.className = "marin-message " + (message.role === "user" ? "is-user" : "is-assistant");
       const copy = document.createElement("div");
       copy.className = "marin-message-copy";
-      copy.textContent = String(message.content || "");
+      renderChatMessageContent(copy, message.content);
       bubble.appendChild(copy);
       elements.messages.appendChild(bubble);
 

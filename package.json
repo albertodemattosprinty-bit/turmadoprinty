@@ -9,6 +9,7 @@
     "start": "node server.js",
     "test:privacy": "node --test test/privacy-crypto.test.js",
     "migrate:project200:privacy": "node scripts/migrate-project200-private-data.js",
+    "upload:project200:apk:r2": "node scripts/upload-project200-apk-r2.js",
     "cap:sync:android": "npx cap sync android",
     "cap:open:android": "npx cap open android",
     "cap:run:android": "npx cap run android"

@@ -2506,11 +2506,22 @@ body.running-music-standalone #actionsModal .actions-list {
 .start-decision-task-title {
   margin: 0;
   width: min(100%, 760px);
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  appearance: none;
+  font: inherit;
   font-size: clamp(1.5rem, 3.8vw, 2.4rem);
   line-height: 1.02;
   font-weight: 900;
   color: #fff;
+  text-align: center;
   text-wrap: balance;
+  cursor: text;
+}
+
+.start-decision-task-title[readonly] {
   cursor: pointer;
 }
 
@@ -9975,6 +9986,50 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   font-size: 1.144rem;
   line-height: 1.5;
   text-align: center;
+}
+
+.marin-message-link {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 1px;
+  padding: 7px 11px 7px 8px;
+  border: 1px solid rgba(145, 210, 255, 0.48);
+  border-radius: 13px;
+  background: linear-gradient(105deg, #0877e8 0%, #19a7ef 48%, #315ee8 100%);
+  box-shadow: 0 8px 24px rgba(4, 91, 201, 0.28);
+  color: #fff;
+  font-weight: 750;
+  line-height: 1.25;
+  text-decoration: none;
+  vertical-align: middle;
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+}
+
+.marin-message-link:hover,
+.marin-message-link:focus-visible {
+  outline: none;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 11px 28px rgba(4, 91, 201, 0.36);
+}
+
+.marin-message-link-globe {
+  flex: 0 0 auto;
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 1rem;
+}
+
+.marin-message-link-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .marin-message {
