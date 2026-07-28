@@ -78,13 +78,15 @@ function createMediaCard(payload) {
 
   const trigger = document.createElement("button");
   trigger.type = "button";
+  trigger.className = "marin-message-media-trigger";
 
   if (String(payload?.kind || "") === "video" && mediaUrl) {
     const video = document.createElement("video");
     video.src = mediaUrl;
     video.poster = previewUrl;
     video.playsInline = true;
-    video.controls = true;
+    video.controls = false;
+    video.muted = true;
     video.preload = "metadata";
     trigger.appendChild(video);
   } else {
@@ -98,20 +100,23 @@ function createMediaCard(payload) {
     window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
   });
 
-  const meta = document.createElement("div");
-  meta.className = "marin-message-media-meta";
-  const title = document.createElement("strong");
-  title.textContent = String(payload?.title || "Memoria compartilhada");
-  const date = document.createElement("span");
-  date.textContent = String(payload?.dateLabel || "");
-  meta.append(title, date);
-  if (payload?.noteText) {
-    const note = document.createElement("span");
-    note.textContent = String(payload.noteText);
-    meta.append(note);
+  card.appendChild(trigger);
+
+  const captionParts = [String(payload?.title || "").trim(), String(payload?.noteText || "").trim()].filter(Boolean);
+  if (captionParts.length) {
+    const meta = document.createElement("div");
+    meta.className = "marin-message-media-meta";
+    const title = document.createElement("strong");
+    title.textContent = captionParts[0];
+    meta.appendChild(title);
+    if (captionParts[1]) {
+      const note = document.createElement("span");
+      note.textContent = captionParts[1];
+      meta.appendChild(note);
+    }
+    card.appendChild(meta);
   }
 
-  card.append(trigger, meta);
   return card;
 }
 

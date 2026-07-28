@@ -10048,6 +10048,47 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   animation: none;
 }
 
+.marin-message-media-card {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 280px);
+}
+
+.marin-message-media-trigger {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.marin-message-media-card img,
+.marin-message-media-card video {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  border-radius: 18px;
+  background: #061334;
+}
+
+.marin-message-media-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.marin-message-media-meta strong {
+  font-size: 0.96rem;
+  line-height: 1.25;
+}
+
+.marin-message-media-meta span {
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: rgba(255,255,255,0.86);
+}
+
 @keyframes marinMessageIn {
   from { opacity: 0; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }

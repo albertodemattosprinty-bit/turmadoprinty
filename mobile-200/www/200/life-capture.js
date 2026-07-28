@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const FILTER = "saturate(1.08) contrast(1.04) brightness(1.03)";
   const DB_NAME = "project200-life-captures";
   const STORE_NAME = "captures";
@@ -297,6 +297,42 @@
     });
   }
 
+  async function saveCapturesBatch(items) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      for (const item of Array.isArray(items) ? items : []) {
+        if (item?.id) store.put(item);
+      }
+      transaction.oncomplete = () => resolve(items || []);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  }
+
+  async function fetchServerCaptures() {
+    const response = await fetch('/api/200/life-captures', {
+      method: 'GET',
+      headers: withAuthHeaders(),
+      credentials: 'same-origin'
+    });
+    const payload = await readJsonResponse(response, 'Nao foi possivel carregar sua memoria.');
+    return Array.isArray(payload?.captures) ? payload.captures : [];
+  }
+
+  async function patchServerCapture(captureId, patch = {}) {
+    if (!captureId) return null;
+    const response = await fetch('/api/200/life-captures/' + encodeURIComponent(String(captureId)), {
+      method: 'PATCH',
+      headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
+      credentials: 'same-origin',
+      body: JSON.stringify(patch)
+    });
+    const payload = await readJsonResponse(response, 'Nao foi possivel atualizar a captura.');
+    return payload?.capture || null;
+  }
+
   async function readJsonResponse(response, fallbackMessage) {
     const text = await response.text();
     let payload = null;
@@ -348,7 +384,13 @@
         headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
         credentials: 'same-origin',
         body: JSON.stringify({
+          captureId: capture.id,
           kind: capture.kind,
+          title: safeText(capture.title || ''),
+          noteText: safeText(capture.noteText || ''),
+          createdAt: capture.createdAt,
+          durationMs: Number(capture.durationMs || 0),
+          metadata: capture.metadata && typeof capture.metadata === 'object' ? capture.metadata : {},
           mimeType: safeText(capture.mimeType || capture.mediaBlob.type || ''),
           fileBase64: mediaBase64,
           previewBase64: previewParts.base64
@@ -356,16 +398,18 @@
       });
       const payload = await readJsonResponse(response, 'Nao foi possivel enviar a midia.');
       const asset = payload?.asset || {};
+      const serverCapture = payload?.capture && typeof payload.capture === 'object' ? payload.capture : null;
       const updated = {
         ...capture,
-        remoteUrl: safeText(asset.url || capture.remoteUrl || ''),
-        mediaUrl: safeText(asset.url || capture.mediaUrl || ''),
-        previewRemoteUrl: safeText(asset.previewUrl || capture.previewRemoteUrl || ''),
-        previewUrl: safeText(asset.previewUrl || capture.previewUrl || ''),
-        uploadKey: safeText(asset.key || capture.uploadKey || ''),
-        previewKey: safeText(asset.previewKey || capture.previewKey || ''),
-        sizeBytes: Number.isFinite(asset.sizeBytes) ? Number(asset.sizeBytes) : (capture.sizeBytes || capture.mediaBlob.size || 0),
-        uploadedAt: new Date().toISOString()
+        ...(serverCapture || {}),
+        remoteUrl: safeText(serverCapture?.remoteUrl || asset.url || capture.remoteUrl || ''),
+        mediaUrl: safeText(serverCapture?.mediaUrl || asset.url || capture.mediaUrl || ''),
+        previewRemoteUrl: safeText(serverCapture?.previewRemoteUrl || asset.previewUrl || capture.previewRemoteUrl || ''),
+        previewUrl: safeText(serverCapture?.previewUrl || asset.previewUrl || capture.previewUrl || ''),
+        uploadKey: safeText(serverCapture?.uploadKey || asset.key || capture.uploadKey || ''),
+        previewKey: safeText(serverCapture?.previewKey || asset.previewKey || capture.previewKey || ''),
+        sizeBytes: Number.isFinite(serverCapture?.sizeBytes) ? Number(serverCapture.sizeBytes) : (Number.isFinite(asset.sizeBytes) ? Number(asset.sizeBytes) : (capture.sizeBytes || capture.mediaBlob.size || 0)),
+        uploadedAt: safeText(serverCapture?.uploadedAt || new Date().toISOString())
       };
       await saveCapture(updated);
       const active = getActiveCapture();
@@ -385,7 +429,20 @@
   }
 
   async function refreshCaptures() {
-    state.captures = await loadCaptures();
+    let items = [];
+    try {
+      const remote = await fetchServerCaptures();
+      if (Array.isArray(remote) && remote.length) {
+        items = remote.slice();
+        await saveCapturesBatch(items);
+      } else {
+        items = await loadCaptures();
+      }
+    } catch {
+      items = await loadCaptures();
+    }
+    items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    state.captures = items;
     state.activeIndex = clamp(state.activeIndex, 0, Math.max(state.captures.length - 1, 0));
     await renderAlbumThumb();
     renderViewer();
@@ -836,8 +893,16 @@
     const capture = findCaptureById(state.noteCaptureId) || getActiveCapture();
     if (!capture) return;
     const input = byId("lifeCaptureNoteInput");
+    const nextNote = safeText(input?.value).trim();
     setNoteStatus("Salvando nota...");
-    await persistCapturePatch(capture.id, { noteText: safeText(input?.value).trim() });
+    await persistCapturePatch(capture.id, { noteText: nextNote });
+    try {
+      const serverCapture = await patchServerCapture(capture.id, { noteText: nextNote });
+      if (serverCapture) {
+        await saveCapture({ ...(findCaptureById(capture.id) || capture), ...serverCapture });
+        await refreshCaptures();
+      }
+    } catch {}
     setNoteStatus("Nota salva.");
     closeNote();
   }
@@ -868,16 +933,27 @@
   }
 
   async function loadShareContacts() {
-    const response = await fetch("/api/200/tutors", { credentials: "same-origin", headers: withAuthHeaders() });
-    const payload = await readJsonResponse(response, "Nao foi possivel carregar os contatos.");
-    const tutors = Array.isArray(payload?.tutors) ? payload.tutors : [];
-    const friends = Array.isArray(payload?.friends) ? payload.friends : [];
-    const tutorIds = new Set(tutors.map((item) => String(item.contactUserId || item.userId || item.id || "")));
+    const [tutorsResponse, friendsResponse] = await Promise.all([
+      fetch("/api/200/tutors", { credentials: "same-origin", headers: withAuthHeaders() }),
+      fetch("/api/200/friends?scope=today", { credentials: "same-origin", headers: withAuthHeaders() })
+    ]);
+    const tutorsPayload = await readJsonResponse(tutorsResponse, "Nao foi possivel carregar os contatos.");
+    const friendsPayload = await readJsonResponse(friendsResponse, "Nao foi possivel carregar os amigos.");
+    const tutors = Array.isArray(tutorsPayload?.tutors) ? tutorsPayload.tutors : [];
+    const mergedFriends = new Map();
+    const pushFriend = (friend) => {
+      const friendId = String(friend?.userId || friend?.id || "").trim();
+      if (!friendId) return;
+      if (!mergedFriends.has(friendId)) mergedFriends.set(friendId, friend);
+    };
+    (Array.isArray(tutorsPayload?.friends) ? tutorsPayload.friends : []).forEach(pushFriend);
+    (Array.isArray(friendsPayload?.friends) ? friendsPayload.friends : []).forEach(pushFriend);
+    const tutorIds = new Set(tutors.map((item) => String(item.contactUserId || item.userId || item.id || "").trim()));
     return {
       tutors,
-      friends: friends.filter((friend) => {
-        const friendId = String(friend?.userId || friend?.id || "");
-        return !tutorIds.has(friendId);
+      friends: [...mergedFriends.values()].filter((friend) => {
+        const friendId = String(friend?.userId || friend?.id || "").trim();
+        return friendId && !tutorIds.has(friendId);
       })
     };
   }
@@ -1169,7 +1245,8 @@
     setSaveStatus("Salvando...");
     const item = {
       ...capture,
-      title: safeText(input?.value).trim() || defaultTitle(capture.kind, capture.createdAt)
+      title: safeText(input?.value).trim() || defaultTitle(capture.kind, capture.createdAt),
+      metadata: capture.metadata && typeof capture.metadata === 'object' ? capture.metadata : {}
     };
     await saveCapture(item);
     state.pending = null;
