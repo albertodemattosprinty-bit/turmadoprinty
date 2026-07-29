@@ -1922,6 +1922,71 @@
       return;
     }
 
+    if (button.dataset.audioMode) {
+      setAudioMode(button.dataset.audioMode);
+      return;
+    }
+
+    if (button.dataset.textMode) {
+      setTextMode(button.dataset.textMode);
+      return;
+    }
+
+    if (button.id === "lifeCaptureAudioRecordButton") {
+      void toggleAudioRecording().catch((error) => {
+        stopAudioRecording();
+        setAudioStatus(error instanceof Error ? error.message : "Falha ao gravar audio.");
+      });
+      return;
+    }
+
+    if (button.id === "lifeCaptureAudioNewButton") {
+      stopAudioRecording();
+      setAudioMode("record");
+      setAudioStatus("Nova gravacao pronta.");
+      return;
+    }
+
+    if (button.id === "lifeCaptureAudioDeleteButton") {
+      void deleteLatestMemory("audio").catch((error) => {
+        setAudioStatus(error instanceof Error ? error.message : "Falha ao excluir audio.");
+      });
+      return;
+    }
+
+    if (button.id === "lifeCaptureTextSaveButton") {
+      void saveTextMemory().catch((error) => {
+        setTextStatus(error instanceof Error ? error.message : "Falha ao salvar texto.");
+      });
+      return;
+    }
+
+    if (button.id === "lifeCaptureTextNewButton") {
+      const input = byId("lifeCaptureTextInput");
+      if (input) input.value = "";
+      setTextMode("write");
+      setTextStatus("Nova nota pronta.");
+      return;
+    }
+
+    if (button.id === "lifeCaptureTextDeleteButton") {
+      void deleteLatestMemory("text").catch((error) => {
+        setTextStatus(error instanceof Error ? error.message : "Falha ao excluir texto.");
+      });
+      return;
+    }
+
+    if (button.dataset.memoryOpen) {
+      const index = state.captures.findIndex((capture) => String(capture.id) === String(button.dataset.memoryOpen));
+      if (index >= 0) state.activeIndex = index;
+      hide("lifeCaptureAudioOverlay");
+      hide("lifeCaptureTextOverlay");
+      show("lifeCaptureViewerOverlay");
+      renderViewer();
+      updateViewerTransform();
+      return;
+    }
+
     if (button.dataset.captureUpload) {
       void uploadCaptureNow(button.dataset.captureUpload);
       return;
