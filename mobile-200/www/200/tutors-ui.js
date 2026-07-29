@@ -161,20 +161,89 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     return window.btoa(binary);
   }
 
-  function buildAudioShareMessage(asset, durationMs) {
+  function buildMediaShareMessage(asset, options = {}) {
+    const kind = String(options.kind || asset?.kind || "").trim().toLowerCase();
+    const title = String(options.title || asset?.title || (kind === "video" ? "Video do chat" : kind === "photo" ? "Imagem do chat" : "Audio do chat"));
+    const mediaUrl = String(asset?.url || asset?.mediaUrl || asset?.remoteUrl || "");
     const payload = {
-      kind: "audio",
-      title: "Audio do chat",
-      mediaUrl: String(asset?.url || asset?.mediaUrl || ""),
-      remoteUrl: String(asset?.url || asset?.mediaUrl || ""),
-      durationMs: Math.max(0, Number(durationMs || 0)),
-      sizeBytes: Math.max(0, Number(asset?.sizeBytes || 0)),
+      kind,
+      title,
+      previewDataUrl: String(options.previewDataUrl || ""),
+      previewUrl: String(asset?.previewUrl || asset?.previewRemoteUrl || ""),
+      mediaUrl,
+      remoteUrl: mediaUrl,
+      durationMs: Math.max(0, Number(options.durationMs || asset?.durationMs || 0)),
+      sizeBytes: Math.max(0, Number(asset?.sizeBytes || options.sizeBytes || 0)),
       dateLabel: new Date().toLocaleDateString("pt-BR"),
       noteText: ""
     };
     return "[[ILIFE_MEDIA:" + encodeUtf8Base64(JSON.stringify(payload)) + "]]";
   }
 
+  function buildAudioShareMessage(asset, durationMs) {
+    return buildMediaShareMessage(asset, { kind: "audio", title: "Audio do chat", durationMs });
+  }
+
+  function fileToBase64(file) {
+    return blobToBase64(file);
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error || new Error("Falha ao ler anexo."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function attachmentKind(file) {
+    const type = String(file?.type || "").toLowerCase();
+    if (type.startsWith("audio/")) return "audio";
+    if (type.startsWith("video/")) return "video";
+    if (type.startsWith("image/")) return "photo";
+    return "";
+  }
+
+  function attachmentTitle(file, kind) {
+    const name = String(file?.name || "").trim().replace(/\.[^.]+$/, "");
+    if (name) return name.slice(0, 80);
+    if (kind === "video") return "Video do chat";
+    if (kind === "photo") return "Imagem do chat";
+    return "Audio do chat";
+  }
+
+  async function uploadChatAttachment(file) {
+    const kind = attachmentKind(file);
+    if (!kind) throw new Error("Envie audio, video ou imagem.");
+    if (Number(file?.size || 0) > 20 * 1024 * 1024) throw new Error("O anexo precisa ter ate 20 MB.");
+    const mimeType = String(file.type || "").split(";")[0];
+    if (!mimeType) throw new Error("Arquivo sem tipo valido.");
+    const previewDataUrl = "";
+    const payload = await apiRequest("/api/200/life-captures/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind,
+        title: attachmentTitle(file, kind),
+        noteText: "",
+        createdAt: new Date().toISOString(),
+        durationMs: 0,
+        metadata: { source: "project200-human-chat-attachment", fileName: String(file.name || "") },
+        mimeType,
+        fileBase64: await fileToBase64(file),
+        previewBase64: ""
+      }),
+      skipGlobalLoading: true
+    });
+    return {
+      asset: payload?.asset || payload?.capture || null,
+      kind,
+      title: attachmentTitle(file, kind),
+      previewDataUrl,
+      sizeBytes: Number(file.size || 0)
+    };
+  }
   async function uploadChatAudio(blob, durationMs) {
     const mimeType = String(blob?.type || "audio/ogg").split(";")[0] || "audio/ogg";
     const fileBase64 = await blobToBase64(blob);
@@ -941,6 +1010,46 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     await startAudioRecording();
   }
 
+  async function sendAttachment(file) {
+    const contactId = activeContactId();
+    if (!state.human || !contactId || state.attaching) return;
+    state.attaching = true;
+    if (elements.attach) elements.attach.disabled = true;
+    setStatus("Enviando anexo...");
+    try {
+      const uploaded = await uploadChatAttachment(file);
+      const mediaUrl = String(uploaded.asset?.url || uploaded.asset?.mediaUrl || "");
+      if (!mediaUrl) throw new Error("Anexo enviado sem URL publica.");
+      const payload = await apiRequest("/api/200/tutors/" + encodeURIComponent(contactId) + "/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: buildMediaShareMessage(uploaded.asset, {
+            kind: uploaded.kind,
+            title: uploaded.title,
+            previewDataUrl: uploaded.previewDataUrl,
+            sizeBytes: uploaded.sizeBytes
+          })
+        }),
+        skipGlobalLoading: true
+      });
+      if (payload?.message) state.messages.push(payload.message);
+      renderMessages({
+        animateMessageIds: new Set(payload?.message?.id ? [String(payload.message.id)] : [])
+      });
+      setStatus("");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Nao foi possivel enviar o anexo.");
+    } finally {
+      state.attaching = false;
+      if (elements.attach) elements.attach.disabled = false;
+      if (elements.fileInput) elements.fileInput.value = "";
+    }
+  }
+
+  function firstSupportedFile(fileList) {
+    return [...(fileList || [])].find((file) => attachmentKind(file)) || null;
+  }
   async function sendMessage() {
     const content = String(elements.input?.value || "").trim();
     const contactId = activeContactId();
@@ -1074,6 +1183,35 @@ export function initializeProject200TutorsUi(dependencies = {}) {
   elements.proposalAction?.addEventListener("click", () => requestProposal("action"));
   elements.proposalMission?.addEventListener("click", () => requestProposal("mission"));
 
+  elements.attach?.addEventListener("click", (event) => {
+    if (!state.human) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    elements.fileInput?.click();
+  }, true);
+  elements.fileInput?.addEventListener("change", () => {
+    const file = firstSupportedFile(elements.fileInput?.files);
+    if (file) void sendAttachment(file);
+  });
+  elements.chatModal?.addEventListener("dragover", (event) => {
+    if (!state.human || state.attaching) return;
+    if (!firstSupportedFile(event.dataTransfer?.files)) return;
+    event.preventDefault();
+    elements.chatModal.classList.add("is-attachment-dragging");
+  });
+  elements.chatModal?.addEventListener("dragleave", (event) => {
+    if (!elements.chatModal?.contains(event.relatedTarget)) {
+      elements.chatModal?.classList.remove("is-attachment-dragging");
+    }
+  });
+  elements.chatModal?.addEventListener("drop", (event) => {
+    if (!state.human || state.attaching) return;
+    const file = firstSupportedFile(event.dataTransfer?.files);
+    if (!file) return;
+    event.preventDefault();
+    elements.chatModal?.classList.remove("is-attachment-dragging");
+    void sendAttachment(file);
+  });
   elements.form?.addEventListener("submit", (event) => {
     if (!state.human) return;
     event.preventDefault();

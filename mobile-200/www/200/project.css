@@ -12869,3 +12869,66 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
     min-width: min(92vw, calc(100vw - 30px));
   }
 }
+
+/* Chat attachments: clip inside composer input and drop target. */
+.marin-chat-input-wrap {
+  position: relative;
+  min-width: 0;
+  display: block;
+}
+
+.marin-chat-input-wrap textarea {
+  padding-right: 48px !important;
+}
+
+.marin-chat-attach {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.72;
+  z-index: 2;
+}
+
+.marin-chat-attach svg {
+  width: 21px;
+  height: 21px;
+}
+
+.marin-chat-attach:disabled {
+  opacity: 0.36;
+}
+
+.marin-chat-composer.is-recording .marin-chat-attach {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.marin-chat-modal.is-attachment-dragging .marin-chat-messages {
+  outline: 2px dashed color-mix(in srgb, var(--white) 56%, transparent);
+  outline-offset: -12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.marin-chat-modal.is-attachment-dragging .marin-chat-messages::after {
+  content: "Solte para enviar";
+  position: sticky;
+  bottom: 16px;
+  align-self: center;
+  width: fit-content;
+  margin: auto auto 0;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(4, 14, 39, 0.72);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 850;
+  pointer-events: none;
+}

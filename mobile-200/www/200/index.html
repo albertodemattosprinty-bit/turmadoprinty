@@ -1813,7 +1813,13 @@
       <main class="marin-chat-messages" id="marinChatMessages" aria-live="polite"></main>
       <div class="marin-chat-status" id="marinChatStatus" aria-live="polite"></div>
       <form class="marin-chat-composer" id="marinChatForm">
-        <textarea id="marinChatInput" rows="1" maxlength="4000" enterkeyhint="send" placeholder="Converse sobre sua vida..." aria-label="Mensagem"></textarea>
+        <span class="marin-chat-input-wrap">
+          <textarea id="marinChatInput" rows="1" maxlength="4000" enterkeyhint="send" placeholder="Converse sobre sua vida..." aria-label="Mensagem"></textarea>
+          <button class="marin-chat-attach" type="button" id="marinChatAttachButton" aria-label="Anexar audio, video ou imagem">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 12.5 5.9-5.9a3 3 0 0 1 4.2 4.2l-7.2 7.2a4.5 4.5 0 0 1-6.4-6.4l7.4-7.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <input class="marin-chat-file" type="file" id="marinChatFileInput" accept="audio/*,video/*,image/*" hidden />
+        </span>
         <button class="marin-chat-send" type="submit" id="marinChatSendButton" aria-label="Enviar mensagem">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 20 18-8L3 4v6l12 2-12 2z"/></svg>
         </button>
