@@ -9,7 +9,8 @@ function normalizeId(value) {
 }
 
 function normalizeKind(value) {
-  return String(value || "photo").trim().toLowerCase() === "video" ? "video" : "photo";
+  const kind = String(value || "photo").trim().toLowerCase();
+  return new Set(["photo", "video", "audio", "text"]).has(kind) ? kind : "photo";
 }
 
 export async function ensureProject200LifeCapturesSchema() {

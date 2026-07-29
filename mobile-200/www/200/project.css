@@ -10088,6 +10088,8 @@ body[data-background-theme="white"] :is(.points-update-delta, .points-update-del
   line-height: 1.35;
   color: rgba(255,255,255,0.86);
 }
+.marin-message-audio-card{display:flex;align-items:center;gap:9px;width:min(100%,280px);border-radius:999px;padding:8px 12px;background:#f1f2f4;color:#1f2937;box-shadow:none}.marin-message-audio-button{width:24px;height:24px;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;color:#263241;font-size:.82rem}.marin-message-audio-wave{display:flex;align-items:center;gap:3px;min-width:118px}.marin-message-audio-wave i{width:3px;border-radius:999px;background:#657180;height:10px}.marin-message-audio-wave i:nth-child(2n){height:18px}.marin-message-audio-wave i:nth-child(3n){height:24px}.marin-message-audio-duration{font-size:.72rem;color:#596575;font-weight:800}.marin-message-text-card{display:grid;gap:8px;width:min(100%,280px);border-radius:18px;padding:12px 14px;background:rgba(255,255,255,.1);color:inherit}.marin-message-text-card strong{font-size:.95rem}.marin-message-text-card p{margin:0;white-space:pre-wrap;line-height:1.4;color:var(--soft)}
+
 
 @keyframes marinMessageIn {
   from { opacity: 0; transform: translateY(7px); }

@@ -15,6 +15,11 @@
     chunks: [],
     recording: false,
     recordingStartedAt: 0,
+    audioRecorder: null,
+    audioStream: null,
+    audioChunks: [],
+    audioRecording: false,
+    audioStartedAt: 0,
     pending: null,
     captures: [],
     uploads: new Map(),
@@ -62,6 +67,13 @@
     return (value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 1 : 2) + " MB";
   }
 
+  function formatDuration(ms) {
+    const totalSeconds = Math.max(0, Math.round(Number(ms || 0) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = String(totalSeconds % 60).padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  }
+
   function formatDate(iso) {
     const date = new Date(iso || Date.now());
     const day = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -70,7 +82,8 @@
   }
 
   function defaultTitle(kind, iso) {
-    return `${kind === "video" ? "Video" : "Foto"} ${formatDate(iso)}`;
+    const labels = { video: "Video", photo: "Foto", audio: "Audio", text: "Nota" };
+    return `${labels[kind] || "Memoria"} ${formatDate(iso)}`;
   }
 
   function currentProfile() {
@@ -246,6 +259,25 @@
         </div>
       </section>
 
+      <section class="life-capture-overlay" id="lifeCaptureAudioOverlay" aria-hidden="true">
+        <div class="life-capture-audio-shell">
+          <header class="life-capture-audio-head"><div class="life-capture-head-copy"><span class="life-capture-kicker">Memorias em audio</span><h2 class="life-capture-title">Gravar ou ouvir</h2></div><button class="life-capture-close" type="button" data-life-close="audio" aria-label="Fechar audio"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></header>
+          <div class="life-capture-memory-toggle" role="group" aria-label="Modo de audio"><button class="is-active" type="button" data-audio-mode="record">Gravar</button><button type="button" data-audio-mode="listen">Ouvir</button></div>
+          <div class="life-capture-audio-panel" id="lifeCaptureAudioRecordPanel"><button class="life-capture-round-side" id="lifeCaptureAudioNewButton" type="button" aria-label="Nova gravacao">+</button><button class="life-capture-audio-record" id="lifeCaptureAudioRecordButton" type="button" aria-label="Gravar audio"><svg viewBox="0 0 24 24"><path d="M12 15.2a3.6 3.6 0 0 0 3.6-3.6V6.6a3.6 3.6 0 1 0-7.2 0v5a3.6 3.6 0 0 0 3.6 3.6Zm-5.4-3.8a5.4 5.4 0 0 0 10.8 0M12 18.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><button class="life-capture-round-side" id="lifeCaptureAudioDeleteButton" type="button" aria-label="Excluir ultimo audio"><svg viewBox="0 0 24 24"><path d="M6 7h12m-10 0 .7 13h6.6L16 7M10 7V5h4v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+          <div class="life-capture-memory-list" id="lifeCaptureAudioList" hidden></div><p class="life-capture-status" id="lifeCaptureAudioStatus"></p>
+        </div>
+      </section>
+
+      <section class="life-capture-overlay" id="lifeCaptureTextOverlay" aria-hidden="true">
+        <div class="life-capture-text-shell">
+          <header class="life-capture-note-head"><div class="life-capture-head-copy"><span class="life-capture-kicker">Memorias em texto</span><h2 class="life-capture-title">Escrever ou ler</h2></div><button class="life-capture-close" type="button" data-life-close="text" aria-label="Fechar textos"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></header>
+          <div class="life-capture-memory-toggle" role="group" aria-label="Modo de texto"><button class="is-active" type="button" data-text-mode="write">Escrever</button><button type="button" data-text-mode="read">Ler</button></div>
+          <label class="life-capture-note-field" id="lifeCaptureTextField"><textarea class="life-capture-note-text" id="lifeCaptureTextInput" maxlength="4000" placeholder="Escreva uma memoria para guardar na nuvem"></textarea></label>
+          <div class="life-capture-note-actions" id="lifeCaptureTextActions"><button class="life-capture-round-side" id="lifeCaptureTextNewButton" type="button" aria-label="Nova nota">+</button><button class="primary-btn life-capture-note-save" id="lifeCaptureTextSaveButton" type="button">Salvar texto</button><button class="life-capture-round-side" id="lifeCaptureTextDeleteButton" type="button" aria-label="Excluir ultimo texto"><svg viewBox="0 0 24 24"><path d="M6 7h12m-10 0 .7 13h6.6L16 7M10 7V5h4v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+          <div class="life-capture-memory-list" id="lifeCaptureTextList" hidden></div><p class="life-capture-status" id="lifeCaptureTextStatus"></p>
+        </div>
+      </section>
+
       <section class="life-capture-overlay" id="lifeCaptureShareOverlay" aria-hidden="true">
         <div class="life-capture-share-shell">
           <header class="life-capture-share-head">
@@ -282,6 +314,16 @@
 
   function setShareStatus(message = "") {
     const element = byId("lifeCaptureShareStatus");
+    if (element) element.textContent = message;
+  }
+
+  function setAudioStatus(message = "") {
+    const element = byId("lifeCaptureAudioStatus");
+    if (element) element.textContent = message;
+  }
+
+  function setTextStatus(message = "") {
+    const element = byId("lifeCaptureTextStatus");
     if (element) element.textContent = message;
   }
 
@@ -331,6 +373,17 @@
     return new Promise((resolve, reject) => {
       const request = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(item);
       request.onsuccess = () => resolve(item);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function deleteCapture(captureId) {
+    const id = safeText(captureId);
+    if (!id) return;
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).delete(id);
+      request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
   }
@@ -444,7 +497,7 @@
 
   async function ensureCaptureUploaded(capture) {
     if (!capture?.id) return capture;
-    if (buildCaptureMediaUrl(capture) && buildCapturePreviewUrl(capture)) return capture;
+    if (buildCaptureMediaUrl(capture) && (capture.kind === "audio" || capture.kind === "text" || buildCapturePreviewUrl(capture))) return capture;
     if (state.uploads.has(capture.id)) return state.uploads.get(capture.id);
     state.uploadingIds.add(String(capture.id));
     setUploadError(capture.id, "");
@@ -978,6 +1031,24 @@
         }, { once: true });
         video.addEventListener("click", () => openFocus(capture.id));
         media.appendChild(video);
+      } else if (capture.kind === "audio") {
+        const audioCard = document.createElement("button");
+        audioCard.type = "button";
+        audioCard.className = "life-capture-memory-display life-capture-audio-display";
+        audioCard.innerHTML = '<span class="life-capture-audio-play">▶</span><span class="life-capture-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><strong></strong><small></small>';
+        audioCard.querySelector("strong").textContent = safeText(capture.title || defaultTitle("audio", capture.createdAt));
+        audioCard.querySelector("small").textContent = formatDuration(capture.durationMs);
+        audioCard.addEventListener("click", () => openFocus(capture.id));
+        media.appendChild(audioCard);
+      } else if (capture.kind === "text") {
+        const textCard = document.createElement("button");
+        textCard.type = "button";
+        textCard.className = "life-capture-memory-display life-capture-text-display";
+        textCard.innerHTML = '<strong></strong><p></p><small>Toque para abrir</small>';
+        textCard.querySelector("strong").textContent = safeText(capture.title || defaultTitle("text", capture.createdAt));
+        textCard.querySelector("p").textContent = safeText(capture.noteText || "");
+        textCard.addEventListener("click", () => openFocus(capture.id));
+        media.appendChild(textCard);
       } else {
         const image = document.createElement("img");
         image.src = buildCapturePreviewUrl(capture) || buildCaptureMediaUrl(capture);
@@ -1030,9 +1101,31 @@
       video.playsInline = true;
       video.autoplay = true;
       host.appendChild(video);
+    } else if (capture.kind === "audio") {
+      const panel = document.createElement("div");
+      panel.className = "life-capture-focus-card life-capture-focus-audio";
+      const title = document.createElement("strong");
+      title.textContent = safeText(capture.title || defaultTitle("audio", capture.createdAt));
+      const audio = document.createElement("audio");
+      audio.src = buildCaptureMediaUrl(capture) || (capture.mediaBlob instanceof Blob ? URL.createObjectURL(capture.mediaBlob) : "");
+      audio.controls = true;
+      audio.autoplay = true;
+      const meta = document.createElement("small");
+      meta.textContent = formatDuration(capture.durationMs);
+      panel.append(title, audio, meta);
+      host.appendChild(panel);
+    } else if (capture.kind === "text") {
+      const panel = document.createElement("div");
+      panel.className = "life-capture-focus-card life-capture-focus-text";
+      const title = document.createElement("strong");
+      title.textContent = safeText(capture.title || defaultTitle("text", capture.createdAt));
+      const text = document.createElement("p");
+      text.textContent = safeText(capture.noteText || "");
+      panel.append(title, text);
+      host.appendChild(panel);
     } else {
       const image = document.createElement("img");
-      image.src = buildCapturePreviewUrl(capture);
+      image.src = buildCapturePreviewUrl(capture) || buildCaptureMediaUrl(capture);
       image.alt = safeText(capture.title || "Memoria");
       host.appendChild(image);
     }
@@ -1051,9 +1144,31 @@
       video.playsInline = true;
       video.autoplay = true;
       host.appendChild(video);
+    } else if (safeText(payload?.kind) === "audio" && safeText(payload?.mediaUrl)) {
+      const panel = document.createElement("div");
+      panel.className = "life-capture-focus-card life-capture-focus-audio";
+      const title = document.createElement("strong");
+      title.textContent = safeText(payload?.title || "Audio compartilhado");
+      const audio = document.createElement("audio");
+      audio.src = safeText(payload?.mediaUrl);
+      audio.controls = true;
+      audio.autoplay = true;
+      const meta = document.createElement("small");
+      meta.textContent = formatDuration(Number(payload?.durationMs || 0));
+      panel.append(title, audio, meta);
+      host.appendChild(panel);
+    } else if (safeText(payload?.kind) === "text") {
+      const panel = document.createElement("div");
+      panel.className = "life-capture-focus-card life-capture-focus-text";
+      const title = document.createElement("strong");
+      title.textContent = safeText(payload?.title || "Texto compartilhado");
+      const text = document.createElement("p");
+      text.textContent = safeText(payload?.noteText || "");
+      panel.append(title, text);
+      host.appendChild(panel);
     } else {
       const image = document.createElement("img");
-      image.src = safeText(payload?.previewUrl || payload?.previewDataUrl);
+      image.src = safeText(payload?.previewUrl || payload?.previewDataUrl || payload?.mediaUrl);
       image.alt = safeText(payload?.title || "Midia compartilhada");
       host.appendChild(image);
     }
@@ -1252,9 +1367,9 @@
             const contactUserId = safeText(tutor?.contactUserId || entry.friend?.userId || entry.friend?.id);
             if (!contactUserId) throw new Error("Nao foi possivel preparar esse contato.");
             setShareStatus("Subindo/confirmando midia no R2...");
-            await ensureCaptureUploaded(capture);
+            const readyCapture = await ensureCaptureUploaded(capture);
             setShareStatus("Enviando mensagem para amigo...");
-            await shareToTutor(contactUserId, capture);
+            await shareToTutor(contactUserId, readyCapture || capture);
             setShareStatus("Mensagem enviada.");
           } catch (error) {
             setShareStatus("Compartilhar amigo: " + (error instanceof Error ? error.message : "falha inesperada."));
@@ -1273,9 +1388,9 @@
       marinButton.addEventListener("click", async () => {
         try {
           setShareStatus("Subindo/confirmando midia no R2...");
-          await ensureCaptureUploaded(capture);
+          const readyCapture = await ensureCaptureUploaded(capture);
           setShareStatus("Enviando mensagem para Marin...");
-          await shareToMarin(capture);
+          await shareToMarin(readyCapture || capture);
           setShareStatus("Enviado para Marin.");
         } catch (error) {
           setShareStatus("Compartilhar Marin: " + (error instanceof Error ? error.message : "falha inesperada."));
@@ -1443,6 +1558,155 @@
     }
   }
 
+  function getRecorderMime(candidates) {
+    for (const mime of candidates) {
+      if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported?.(mime)) return mime;
+    }
+    return candidates[candidates.length - 1] || "";
+  }
+
+  async function saveCaptureAndUpload(item, statusSetter = setStatus) {
+    await saveCapture(item);
+    await refreshCaptures();
+    statusSetter("Salvo localmente. Enviando para nuvem...");
+    ensureCaptureUploaded(item).then(() => statusSetter("Memoria salva na nuvem.")).catch((error) => {
+      const message = error instanceof Error ? error.message : "Falha ao salvar na nuvem.";
+      setUploadError(item.id, message);
+      statusSetter(message);
+      renderViewer();
+    });
+  }
+
+
+  function stopAudioRecording() {
+    if (state.audioRecorder && state.audioRecorder.state !== "inactive") {
+      try { state.audioRecorder.stop(); } catch {}
+    }
+    state.audioRecorder = null;
+    state.audioChunks = [];
+    state.audioRecording = false;
+    if (state.audioStream) state.audioStream.getTracks().forEach((track) => track.stop());
+    state.audioStream = null;
+    byId("lifeCaptureAudioRecordButton")?.classList.remove("is-recording");
+  }
+
+  function setAudioMode(mode) {
+    const record = mode !== "listen";
+    byId("lifeCaptureAudioRecordPanel")?.toggleAttribute("hidden", !record);
+    byId("lifeCaptureAudioList")?.toggleAttribute("hidden", record);
+    document.querySelectorAll("[data-audio-mode]").forEach((button) => button.classList.toggle("is-active", button.dataset.audioMode === (record ? "record" : "listen")));
+    if (!record) renderAudioList();
+  }
+
+  function setTextMode(mode) {
+    const write = mode !== "read";
+    byId("lifeCaptureTextField")?.toggleAttribute("hidden", !write);
+    byId("lifeCaptureTextActions")?.toggleAttribute("hidden", !write);
+    byId("lifeCaptureTextList")?.toggleAttribute("hidden", write);
+    document.querySelectorAll("[data-text-mode]").forEach((button) => button.classList.toggle("is-active", button.dataset.textMode === (write ? "write" : "read")));
+    if (!write) renderTextList();
+  }
+
+  async function openAudioMemory() {
+    await refreshCaptures();
+    setAudioMode("record");
+    setAudioStatus("Toque no botao vermelho para gravar.");
+    show("lifeCaptureAudioOverlay");
+  }
+
+  async function openTextMemory() {
+    await refreshCaptures();
+    setTextMode("write");
+    setTextStatus("Escreva e salve para mandar ao R2/Postgres.");
+    show("lifeCaptureTextOverlay");
+    setTimeout(() => byId("lifeCaptureTextInput")?.focus(), 60);
+  }
+
+  async function toggleAudioRecording() {
+    const button = byId("lifeCaptureAudioRecordButton");
+    if (!state.audioRecording) {
+      state.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = getRecorderMime(["audio/ogg;codecs=opus", "audio/webm;codecs=opus", "audio/webm"]);
+      state.audioChunks = [];
+      state.audioRecorder = new MediaRecorder(state.audioStream, mimeType ? { mimeType } : undefined);
+      state.audioRecording = true;
+      state.audioStartedAt = Date.now();
+      button?.classList.add("is-recording");
+      setAudioStatus("Gravando audio...");
+      state.audioRecorder.ondataavailable = (event) => { if (event.data?.size) state.audioChunks.push(event.data); };
+      state.audioRecorder.onstop = async () => {
+        const recordedMime = normalizeMimeType(state.audioRecorder?.mimeType || mimeType || "audio/ogg");
+        const mediaBlob = new Blob(state.audioChunks, { type: recordedMime || "audio/ogg" });
+        state.audioStream?.getTracks?.().forEach((track) => track.stop());
+        state.audioStream = null;
+        state.audioRecording = false;
+        button?.classList.remove("is-recording");
+        if (!mediaBlob.size) { setAudioStatus("Audio vazio: nada foi gravado."); return; }
+        const createdAt = new Date().toISOString();
+        const item = { id: "life-audio-" + Date.now(), kind: "audio", title: defaultTitle("audio", createdAt), createdAt, mimeType: recordedMime || "audio/ogg", mediaBlob, noteText: "", durationMs: Date.now() - state.audioStartedAt, metadata: { source: "audio-memory" } };
+        await saveCaptureAndUpload(item, setAudioStatus);
+        renderAudioList();
+      };
+      state.audioRecorder.start();
+      return;
+    }
+    setAudioStatus("Finalizando audio...");
+    state.audioRecorder?.stop();
+  }
+
+  async function saveTextMemory() {
+    const input = byId("lifeCaptureTextInput");
+    const text = safeText(input?.value).trim();
+    if (!text) { setTextStatus("Escreva algo antes de salvar."); return; }
+    const createdAt = new Date().toISOString();
+    const title = text.split(/\n+/)[0].slice(0, 80) || defaultTitle("text", createdAt);
+    const mediaBlob = new Blob([text], { type: "text/plain" });
+    const item = { id: "life-text-" + Date.now(), kind: "text", title, createdAt, mimeType: "text/plain", mediaBlob, noteText: text, durationMs: 0, metadata: { source: "text-memory" } };
+    if (input) input.value = "";
+    await saveCaptureAndUpload(item, setTextStatus);
+    renderTextList();
+  }
+
+  function createMemoryListCard(item) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "life-capture-memory-card";
+    card.dataset.memoryOpen = item.id;
+    const title = safeText(item.title || defaultTitle(item.kind, item.createdAt));
+    const detail = item.kind === "audio" ? (formatDuration(item.durationMs) + " audio") : safeText(item.noteText).slice(0, 120);
+    card.innerHTML = '<strong></strong><small></small>';
+    card.querySelector("strong").textContent = title;
+    card.querySelector("small").textContent = detail;
+    return card;
+  }
+
+  function renderAudioList() {
+    const list = byId("lifeCaptureAudioList");
+    if (!list) return;
+    list.replaceChildren();
+    const items = state.captures.filter((item) => item.kind === "audio");
+    if (!items.length) { list.innerHTML = '<div class="life-capture-empty"><strong>Nenhum audio ainda.</strong><small>Grave o primeiro audio para guardar na nuvem.</small></div>'; return; }
+    items.forEach((item) => list.appendChild(createMemoryListCard(item)));
+  }
+
+  function renderTextList() {
+    const list = byId("lifeCaptureTextList");
+    if (!list) return;
+    list.replaceChildren();
+    const items = state.captures.filter((item) => item.kind === "text");
+    if (!items.length) { list.innerHTML = '<div class="life-capture-empty"><strong>Nenhum texto ainda.</strong><small>Escreva uma nota para guardar no R2/Postgres.</small></div>'; return; }
+    items.forEach((item) => list.appendChild(createMemoryListCard(item)));
+  }
+
+  async function deleteLatestMemory(kind) {
+    const item = state.captures.find((capture) => capture.kind === kind);
+    if (!item) { (kind === "audio" ? setAudioStatus : setTextStatus)("Nada para excluir ainda."); return; }
+    await deleteCapture(item.id);
+    await refreshCaptures();
+    if (kind === "audio") { renderAudioList(); setAudioStatus("Ultimo audio excluido localmente."); }
+    else { renderTextList(); setTextStatus("Ultimo texto excluido localmente."); }
+  }
+
   async function savePending() {
     const input = byId("lifeCaptureTitleInput");
     const capture = state.pending;
@@ -1529,6 +1793,16 @@
       return;
     }
 
+    if (button.id === "lifeCaptureAudioHomeButton") {
+      void openAudioMemory();
+      return;
+    }
+
+    if (button.id === "lifeCaptureTextHomeButton") {
+      void openTextMemory();
+      return;
+    }
+
     if (button.dataset.lifeClose === "capture") {
       stopPreview();
       hide("lifeCaptureOverlay");
@@ -1546,6 +1820,18 @@
 
     if (button.dataset.lifeClose === "note") {
       closeNote();
+      return;
+    }
+
+    if (button.dataset.lifeClose === "audio") {
+      stopAudioRecording();
+      hide("lifeCaptureAudioOverlay");
+      return;
+    }
+
+    if (button.dataset.lifeClose === "text") {
+      hide("lifeCaptureTextOverlay");
+      setTextStatus("");
       return;
     }
 
@@ -1655,7 +1941,10 @@
     if (event.key === "Escape") {
       closeFocus();
       closeNote();
+      stopAudioRecording();
       hide("lifeCaptureShareOverlay");
+      hide("lifeCaptureAudioOverlay");
+      hide("lifeCaptureTextOverlay");
       if (byId("lifeCaptureViewerOverlay")?.classList.contains("active")) {
         closeViewer();
       } else {

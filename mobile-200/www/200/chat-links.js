@@ -40,6 +40,13 @@ function decodeUtf8Base64(input) {
   return new TextDecoder().decode(bytes);
 }
 
+function formatMediaDuration(ms) {
+  const total = Math.max(0, Math.round(Number(ms || 0) / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = String(total % 60).padStart(2, "0");
+  return minutes + ":" + seconds;
+}
+
 function parseMediaPayload(text) {
   const value = String(text || "").trim();
   if (!value.startsWith(ILIFE_MEDIA_PREFIX) || !value.endsWith(ILIFE_MEDIA_SUFFIX)) return null;
@@ -69,9 +76,60 @@ function renderPlainText(container, text) {
 }
 
 function createMediaCard(payload) {
+  const kind = String(payload?.kind || "").trim().toLowerCase();
   const previewUrl = String(payload?.previewUrl || payload?.previewRemoteUrl || payload?.previewDataUrl || "");
   const mediaUrl = String(payload?.mediaUrl || payload?.remoteUrl || "");
-  if (!previewUrl && !mediaUrl) return null;
+  const noteText = String(payload?.noteText || "").trim();
+  if (!previewUrl && !mediaUrl && kind !== "text") return null;
+
+  if (kind === "audio" && mediaUrl) {
+    const card = document.createElement("div");
+    card.className = "marin-message-audio-card";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "marin-message-audio-button";
+    button.textContent = "▶";
+    button.setAttribute("aria-label", "Reproduzir audio");
+    const wave = document.createElement("span");
+    wave.className = "marin-message-audio-wave";
+    wave.setAttribute("aria-hidden", "true");
+    wave.innerHTML = "<i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>";
+    const duration = document.createElement("span");
+    duration.className = "marin-message-audio-duration";
+    duration.textContent = formatMediaDuration(payload?.durationMs || 0);
+    const audio = new Audio(mediaUrl);
+    audio.preload = "metadata";
+    audio.addEventListener("loadedmetadata", () => { duration.textContent = formatMediaDuration(audio.duration * 1000); });
+    audio.addEventListener("ended", () => { button.textContent = "▶"; });
+    button.addEventListener("click", () => {
+      if (audio.paused) {
+        audio.play().then(() => { button.textContent = "❚❚"; }).catch(() => {});
+      } else {
+        audio.pause();
+        button.textContent = "▶";
+      }
+    });
+    card.addEventListener("dblclick", () => {
+      window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
+    });
+    card.append(button, wave, duration);
+    return card;
+  }
+
+  if (kind === "text") {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "marin-message-text-card";
+    const title = document.createElement("strong");
+    title.textContent = String(payload?.title || "Nota compartilhada");
+    const body = document.createElement("p");
+    body.textContent = noteText || mediaUrl || "Texto compartilhado";
+    card.append(title, body);
+    card.addEventListener("click", () => {
+      window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
+    });
+    return card;
+  }
 
   const card = document.createElement("div");
   card.className = "marin-message-media-card";
@@ -80,7 +138,7 @@ function createMediaCard(payload) {
   trigger.type = "button";
   trigger.className = "marin-message-media-trigger";
 
-  if (String(payload?.kind || "") === "video" && mediaUrl) {
+  if (kind === "video" && mediaUrl) {
     const video = document.createElement("video");
     video.src = mediaUrl;
     video.poster = previewUrl;
@@ -102,7 +160,7 @@ function createMediaCard(payload) {
 
   card.appendChild(trigger);
 
-  const captionParts = [String(payload?.title || "").trim(), String(payload?.noteText || "").trim()].filter(Boolean);
+  const captionParts = [String(payload?.title || "").trim(), noteText].filter(Boolean);
   if (captionParts.length) {
     const meta = document.createElement("div");
     meta.className = "marin-message-media-meta";

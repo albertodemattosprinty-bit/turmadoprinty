@@ -4053,7 +4053,8 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
     const createdAt = body?.createdAt ? new Date(body.createdAt) : new Date();
     const durationMs = Math.max(0, Math.trunc(Number(body?.durationMs || 0) || 0));
     const metadata = body?.metadata && typeof body.metadata === "object" ? body.metadata : {};
-    const kind = String(body?.kind || "photo").trim().toLowerCase() === "video" ? "video" : "photo";
+    const rawKind = String(body?.kind || "photo").trim().toLowerCase();
+    const kind = new Set(["photo", "video", "audio", "text"]).has(rawKind) ? rawKind : "photo";
     const mimeType = String(body?.mimeType || "").split(";")[0].trim().toLowerCase();
     const fileBase64 = String(body?.fileBase64 || "").trim();
     const previewBase64 = String(body?.previewBase64 || "").trim();
@@ -4066,7 +4067,11 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
       "image/png": "png",
       "video/webm": "webm",
       "video/mp4": "mp4",
-      "video/ogg": "ogv"
+      "video/ogg": "ogv",
+      "audio/ogg": "ogg",
+      "audio/webm": "webm",
+      "audio/mpeg": "mp3",
+      "text/plain": "txt"
     };
     const extension = extensionByMime[mimeType];
     if (!extension) throw new Error("Formato de midia ainda nao suportado.");
