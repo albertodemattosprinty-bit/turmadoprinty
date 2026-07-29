@@ -12521,6 +12521,7 @@ body[data-background-theme="white"] .mission-limit-sleep-option small { color:rg
   position: relative;
   width: 100%;
   min-width: 0;
+  transform: translateY(-10px);
 }
 
 #actionsModal .actions-dynamic-mission-track {
@@ -12559,22 +12560,23 @@ body[data-background-theme="white"] .mission-limit-sleep-option small { color:rg
   white-space: nowrap;
 }
 
-#actionsModal .actions-dynamic-mission-card .history-mission-progress-track {
-  height: 10px;
+#actionsModal .actions-dynamic-mission-card .history-mission-card-top {
+  grid-template-columns: minmax(0, 1fr);
 }
 
-#actionsModal .actions-dynamic-mission-counter {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.88);
-  background: rgba(0, 0, 0, 0.22);
-  font-size: 0.72rem;
-  font-weight: 850;
-  pointer-events: none;
+#actionsModal .actions-dynamic-mission-card .history-mission-card-actions {
+  display: none;
 }
+
+#actionsModal .actions-dynamic-mission-card .history-mission-progress-track {
+  height: 10px;
+  grid-column: 1 / -1;
+}
+
+#actionsModal .actions-dynamic-mission-card .history-mission-progress-fill {
+  background: rgb(var(--mission-delay-rgb, 36, 97, 206)) !important;
+}
+
 
 body[data-background-theme="light"] #actionsModal .history-mission-card.actions-dynamic-mission-card,
 body[data-background-theme="white"] #actionsModal .history-mission-card.actions-dynamic-mission-card {

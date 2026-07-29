@@ -6845,19 +6845,23 @@ function createActionsDynamicMissionDeck(entries = []) {
     card.style.setProperty('--mission-delay-darkness', String(visual.darkness || 0));
     card.setAttribute('role', 'button');
     card.tabIndex = 0;
+    card.querySelector('.history-mission-card-actions')?.remove();
     track.appendChild(card);
   });
   deck.appendChild(track);
   if (deckEntries.length > 1) {
-    const counter = document.createElement('div');
-    counter.className = 'actions-dynamic-mission-counter';
-    counter.textContent = '1 de ' + deckEntries.length;
-    track.addEventListener('scroll', () => {
-      const width = Math.max(1, track.getBoundingClientRect().width);
-      const current = Math.min(deckEntries.length, Math.max(1, Math.round(track.scrollLeft / width) + 1));
-      counter.textContent = current + ' de ' + deckEntries.length;
-    }, { passive: true });
-    deck.appendChild(counter);
+    let activeIndex = 0;
+    const slideTimer = window.setInterval(() => {
+      if (!deck.isConnected) {
+        window.clearInterval(slideTimer);
+        return;
+      }
+      activeIndex = (activeIndex + 1) % deckEntries.length;
+      track.scrollTo({
+        left: activeIndex * Math.max(1, track.getBoundingClientRect().width),
+        behavior: 'smooth'
+      });
+    }, 2000);
   }
   return deck;
 }
