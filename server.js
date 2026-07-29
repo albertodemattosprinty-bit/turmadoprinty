@@ -4054,7 +4054,7 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
     const durationMs = Math.max(0, Math.trunc(Number(body?.durationMs || 0) || 0));
     const metadata = body?.metadata && typeof body.metadata === "object" ? body.metadata : {};
     const kind = String(body?.kind || "photo").trim().toLowerCase() === "video" ? "video" : "photo";
-    const mimeType = String(body?.mimeType || "").trim().toLowerCase();
+    const mimeType = String(body?.mimeType || "").split(";")[0].trim().toLowerCase();
     const fileBase64 = String(body?.fileBase64 || "").trim();
     const previewBase64 = String(body?.previewBase64 || "").trim();
     if (!mimeType || !fileBase64) throw new Error("Envie o arquivo principal da captura.");

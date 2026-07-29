@@ -18,6 +18,8 @@
     pending: null,
     captures: [],
     uploads: new Map(),
+    uploadingIds: new Set(),
+    uploadPulseIds: new Set(),
     activeIndex: 0,
     noteCaptureId: "",
     shareCaptureId: "",
@@ -49,6 +51,9 @@
   const byId = (id) => document.getElementById(id);
   const safeText = (value, fallback = "") => String(value ?? fallback);
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  function normalizeMimeType(value) {
+    return safeText(value).split(";")[0].trim().toLowerCase();
+  }
 
   function formatDate(iso) {
     const date = new Date(iso || Date.now());
@@ -384,7 +389,7 @@
   }
 
   function dataUrlParts(dataUrl) {
-    const match = /^data:([^;]+);base64,(.+)$/i.exec(safeText(dataUrl));
+    const match = /^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/i.exec(safeText(dataUrl));
     if (!match) return { mimeType: '', base64: '' };
     return { mimeType: safeText(match[1]), base64: safeText(match[2]) };
   }
@@ -402,10 +407,24 @@
     return safeText(capture?.remoteUrl || capture?.mediaUrl || '');
   }
 
+  function pulseUploadDone(captureId) {
+    const id = safeText(captureId);
+    if (!id) return;
+    state.uploadingIds.delete(id);
+    state.uploadPulseIds.add(id);
+    renderViewer();
+    window.setTimeout(() => {
+      state.uploadPulseIds.delete(id);
+      renderViewer();
+    }, 500);
+  }
+
   async function ensureCaptureUploaded(capture) {
     if (!capture?.id) return capture;
     if (buildCaptureMediaUrl(capture) && buildCapturePreviewUrl(capture)) return capture;
     if (state.uploads.has(capture.id)) return state.uploads.get(capture.id);
+    state.uploadingIds.add(String(capture.id));
+    renderViewer();
     const uploadPromise = (async () => {
       if (!(capture.mediaBlob instanceof Blob)) return capture;
       const mediaBase64 = await blobToBase64(capture.mediaBlob);
@@ -422,7 +441,7 @@
           createdAt: capture.createdAt,
           durationMs: Number(capture.durationMs || 0),
           metadata: capture.metadata && typeof capture.metadata === 'object' ? capture.metadata : {},
-          mimeType: safeText(capture.mimeType || capture.mediaBlob.type || ''),
+          mimeType: normalizeMimeType(capture.mimeType || capture.mediaBlob.type || ''),
           fileBase64: mediaBase64,
           previewBase64: previewParts.base64
         })
@@ -451,8 +470,13 @@
         state.activeIndex = nextIndex;
         updateViewerTransform();
       }
+      pulseUploadDone(capture.id);
       return findCaptureById(capture.id) || updated;
-    })().finally(() => {
+    })().catch((error) => {
+      state.uploadingIds.delete(String(capture.id));
+      renderViewer();
+      throw error;
+    }).finally(() => {
       state.uploads.delete(capture.id);
     });
     state.uploads.set(capture.id, uploadPromise);
@@ -609,7 +633,8 @@
     state.previewReady = false;
     syncPreviewPlaceholder();
     preview.srcObject = state.stream;
-    preview.style.transform = "none";
+    preview.style.transform = state.facingMode === "user" ? "scaleX(-1)" : "none";
+    preview.style.transformOrigin = "center center";
     await preview.play().catch(() => {});
     drawPreviewFrame();
     setStatus(state.mode === "video" ? "Video 720p ativo." : "Foto 720p ativa.");
@@ -768,7 +793,7 @@
           id: `life-${Date.now()}`,
           kind: "video",
           createdAt: new Date().toISOString(),
-          mimeType,
+          mimeType: normalizeMimeType(mimeType),
           mediaBlob,
           previewDataUrl,
           durationMs: Date.now() - state.recordingStartedAt,
@@ -855,12 +880,14 @@
 
       const uploaded = Boolean(buildCaptureMediaUrl(capture));
       const upload = document.createElement("button");
-      upload.className = "life-capture-viewer-upload" + (uploaded ? " is-uploaded" : "");
+      const uploading = state.uploadingIds.has(String(capture.id));
+      const pulsing = state.uploadPulseIds.has(String(capture.id));
+      upload.className = "life-capture-viewer-upload" + (uploading ? " is-uploading" : "") + ((uploaded || pulsing) ? " is-uploaded" : "") + (pulsing ? " is-upload-done" : "");
       upload.type = "button";
       upload.dataset.captureUpload = capture.id;
-      upload.ariaLabel = uploaded ? "Memoria salva no R2" : "Salvar memoria no R2";
+      upload.ariaLabel = uploading ? "Salvando memoria no R2" : (uploaded ? "Memoria salva no R2" : "Salvar memoria no R2");
       upload.title = upload.ariaLabel;
-      upload.innerHTML = uploaded
+      upload.innerHTML = (uploaded || pulsing)
         ? '<svg viewBox="0 0 24 24"><path d="M20 17.5A4.5 4.5 0 0 0 15.5 13H15a6 6 0 1 0-11.3 3.2A3.5 3.5 0 0 0 5.5 23H19a3 3 0 0 0 1-5.8Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m9 17 2 2 4-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         : '<svg viewBox="0 0 24 24"><path d="M20 17.5A4.5 4.5 0 0 0 15.5 13H15a6 6 0 1 0-11.3 3.2A3.5 3.5 0 0 0 5.5 23H19a3 3 0 0 0 1-5.8Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 18V9m0 0-3 3m3-3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       media.appendChild(upload);
@@ -1384,7 +1411,10 @@
     hide("lifeCaptureSaveOverlay");
     await refreshCaptures();
     queueMicrotask(() => {
-      ensureCaptureUploaded(item).catch(() => {});
+      ensureCaptureUploaded(item).catch((error) => {
+        state.memoryDiagnostics.lastUploadError = error instanceof Error ? error.message : "Falha ao salvar na nuvem depois do save.";
+        renderViewer();
+      });
     });
     show("lifeCaptureOverlay");
     await startPreview();
