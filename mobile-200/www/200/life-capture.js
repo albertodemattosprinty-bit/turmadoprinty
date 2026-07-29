@@ -334,16 +334,14 @@
   }
 
   async function readJsonResponse(response, fallbackMessage) {
-    const text = await response.text();
+    const responseText = await response.text();
     let payload = null;
-    if (text) {
+    if (responseText) {
       try {
-        payload = JSON.parse(text);
+        payload = JSON.parse(responseText);
       } catch {
-        if (!response.ok) {
-          const plain = text.replace(/<[^>]+>/g, ' ').replace(/s+/g, ' ').trim();
-          throw new Error(plain || fallbackMessage || 'Resposta invalida do servidor.');
-        }
+        const plain = responseText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        throw new Error(plain || fallbackMessage || 'Resposta invalida do servidor.');
       }
     }
     if (!response.ok) {
@@ -429,23 +427,44 @@
   }
 
   async function refreshCaptures() {
-    let items = [];
+    let local = [];
+    let remote = [];
     try {
-      const remote = await fetchServerCaptures();
-      if (Array.isArray(remote) && remote.length) {
-        items = remote.slice();
-        await saveCapturesBatch(items);
-      } else {
-        items = await loadCaptures();
-      }
+      local = await loadCaptures();
     } catch {
-      items = await loadCaptures();
+      local = [];
     }
+    try {
+      remote = await fetchServerCaptures();
+      if (Array.isArray(remote) && remote.length) await saveCapturesBatch(remote);
+    } catch {
+      remote = [];
+    }
+    const byCaptureId = new Map();
+    local.forEach((item) => {
+      if (item?.id) byCaptureId.set(String(item.id), item);
+    });
+    (Array.isArray(remote) ? remote : []).forEach((item) => {
+      if (!item?.id) return;
+      byCaptureId.set(String(item.id), { ...(byCaptureId.get(String(item.id)) || {}), ...item });
+    });
+    const items = [...byCaptureId.values()];
     items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     state.captures = items;
     state.activeIndex = clamp(state.activeIndex, 0, Math.max(state.captures.length - 1, 0));
     await renderAlbumThumb();
     renderViewer();
+  }
+
+  function queuePendingUploads() {
+    state.captures.forEach((capture) => {
+      if (!capture?.id) return;
+      if (buildCaptureMediaUrl(capture)) return;
+      if (!(capture.mediaBlob instanceof Blob)) return;
+      queueMicrotask(() => {
+        ensureCaptureUploaded(capture).catch(() => {});
+      });
+    });
   }
 
   function getActiveCapture() {
@@ -933,40 +952,51 @@
   }
 
   async function loadShareContacts() {
-    const [tutorsResponse, friendsResponse] = await Promise.all([
-      fetch("/api/200/tutors", { credentials: "same-origin", headers: withAuthHeaders() }),
+    const [friendsResult, tutorsResult] = await Promise.allSettled([
       fetch("/api/200/friends?scope=today", { credentials: "same-origin", headers: withAuthHeaders() })
+        .then((response) => readJsonResponse(response, "Nao foi possivel carregar os amigos.")),
+      fetch("/api/200/tutors", { credentials: "same-origin", headers: withAuthHeaders() })
+        .then((response) => readJsonResponse(response, "Nao foi possivel carregar os contatos."))
     ]);
-    const tutorsPayload = await readJsonResponse(tutorsResponse, "Nao foi possivel carregar os contatos.");
-    const friendsPayload = await readJsonResponse(friendsResponse, "Nao foi possivel carregar os amigos.");
+    if (friendsResult.status === "rejected" && tutorsResult.status === "rejected") {
+      throw friendsResult.reason || tutorsResult.reason;
+    }
+    const friendsPayload = friendsResult.status === "fulfilled" ? friendsResult.value : {};
+    const tutorsPayload = tutorsResult.status === "fulfilled" ? tutorsResult.value : {};
     const tutors = Array.isArray(tutorsPayload?.tutors) ? tutorsPayload.tutors : [];
+    const tutorByUserId = new Map(tutors.map((item) => [
+      String(item?.contactUserId || item?.userId || item?.id || "").trim(),
+      item
+    ]).filter(([id]) => id));
     const mergedFriends = new Map();
     const pushFriend = (friend) => {
-      const friendId = String(friend?.userId || friend?.id || "").trim();
+      const friendId = String(friend?.userId || friend?.contactUserId || friend?.id || "").trim();
       if (!friendId) return;
-      if (!mergedFriends.has(friendId)) mergedFriends.set(friendId, friend);
+      const tutor = tutorByUserId.get(friendId);
+      mergedFriends.set(friendId, { ...(mergedFriends.get(friendId) || {}), ...friend, userId: friendId, tutor });
     };
-    (Array.isArray(tutorsPayload?.friends) ? tutorsPayload.friends : []).forEach(pushFriend);
     (Array.isArray(friendsPayload?.friends) ? friendsPayload.friends : []).forEach(pushFriend);
-    const tutorIds = new Set(tutors.map((item) => String(item.contactUserId || item.userId || item.id || "").trim()));
-    return {
-      tutors,
-      friends: [...mergedFriends.values()].filter((friend) => {
-        const friendId = String(friend?.userId || friend?.id || "").trim();
-        return friendId && !tutorIds.has(friendId);
-      })
-    };
+    (Array.isArray(tutorsPayload?.friends) ? tutorsPayload.friends : []).forEach(pushFriend);
+    tutors.forEach((tutor) => pushFriend({
+      ...tutor,
+      userId: String(tutor?.contactUserId || tutor?.userId || tutor?.id || "").trim()
+    }));
+    return { tutors, friends: [...mergedFriends.values()] };
   }
 
   async function ensureTutor(friend) {
+    const friendId = String(friend?.userId || friend?.contactUserId || friend?.id || "").trim();
+    if (!friendId) throw new Error("Amigo invalido.");
+    if (friend?.tutor) return friend.tutor;
     const response = await fetch("/api/200/tutors", {
       method: "POST",
       headers: withAuthHeaders({ "Content-Type": "application/json" }),
       credentials: "same-origin",
-      body: JSON.stringify({ tutorUserId: friend.userId })
+      body: JSON.stringify({ tutorUserId: friendId })
     });
     const payload = await readJsonResponse(response, "Nao foi possivel adicionar esse contato.");
-    return Array.isArray(payload?.tutors) ? payload.tutors : [];
+    const tutors = Array.isArray(payload?.tutors) ? payload.tutors : [];
+    return tutors.find((item) => String(item?.contactUserId || item?.userId || item?.id || "").trim() === friendId) || { contactUserId: friendId };
   }
 
   async function shareToMarin(capture) {
@@ -1005,47 +1035,17 @@
     setShareStatus("Carregando contatos...");
     show("lifeCaptureShareOverlay");
 
-    const marinButton = document.createElement("button");
-    marinButton.className = "life-capture-share-card";
-    marinButton.type = "button";
-    marinButton.innerHTML = `
-      <svg viewBox="0 0 24 24"><path d="M4 5h16v10H8l-4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-      <span><strong>Marin IA</strong><small>Enviar como mensagem no chat</small></span>
-    `;
-    marinButton.addEventListener("click", async () => {
-      try {
-        setShareStatus("Enviando para Marin...");
-        await shareToMarin(capture);
-        setShareStatus("Enviado para Marin.");
-      } catch (error) {
-        setShareStatus(error instanceof Error ? error.message : "Falha ao enviar.");
-      }
-    });
-    list.appendChild(marinButton);
-
     try {
       const directory = await loadShareContacts();
-      const entries = [];
-      directory.tutors.forEach((tutor) => {
-        entries.push({
-          type: "tutor",
-          id: safeText(tutor.contactId || tutor.id),
-          title: safeText(tutor.displayName || tutor.name || tutor.username || "Contato"),
-          subtitle: "Tutor ativo"
-        });
-      });
-      directory.friends.forEach((friend) => {
-        entries.push({
-          type: "friend",
-          friend,
-          title: safeText(friend.displayName || friend.name || friend.username || "Amigo"),
-          subtitle: safeText(friend.username ? `@${friend.username}` : "Adicionar e enviar")
-        });
-      });
+      const entries = directory.friends.map((friend) => ({
+        type: "friend",
+        friend,
+        title: safeText(friend.displayName || friend.name || friend.username || "Amigo"),
+        subtitle: safeText(friend.username ? `@${friend.username}` : "Enviar no chat")
+      }));
 
       if (!entries.length) {
         setShareStatus("Nenhum amigo disponivel ainda.");
-        return;
       }
 
       entries.forEach((entry) => {
@@ -1058,17 +1058,12 @@
         `;
         button.addEventListener("click", async () => {
           try {
-            if (entry.type === "friend") {
-              setShareStatus("Adicionando contato...");
-              const tutors = await ensureTutor(entry.friend);
-              const tutor = tutors.find((item) => String(item.contactUserId || "") === String(entry.friend.userId || ""));
-              if (!tutor) throw new Error("Nao foi possivel preparar esse contato.");
-              setShareStatus("Enviando...");
-              await shareToTutor(safeText(tutor.contactId || tutor.id), capture);
-            } else {
-              setShareStatus("Enviando...");
-              await shareToTutor(entry.id, capture);
-            }
+            setShareStatus("Preparando chat...");
+            const tutor = await ensureTutor(entry.friend);
+            const contactUserId = safeText(tutor?.contactUserId || entry.friend?.userId || entry.friend?.id);
+            if (!contactUserId) throw new Error("Nao foi possivel preparar esse contato.");
+            setShareStatus("Enviando...");
+            await shareToTutor(contactUserId, capture);
             setShareStatus("Mensagem enviada.");
           } catch (error) {
             setShareStatus(error instanceof Error ? error.message : "Falha ao compartilhar.");
@@ -1076,6 +1071,24 @@
         });
         list.appendChild(button);
       });
+
+      const marinButton = document.createElement("button");
+      marinButton.className = "life-capture-share-card";
+      marinButton.type = "button";
+      marinButton.innerHTML = `
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v10H8l-4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span><strong>Marin IA</strong><small>Enviar para o chat da IA</small></span>
+      `;
+      marinButton.addEventListener("click", async () => {
+        try {
+          setShareStatus("Enviando para Marin...");
+          await shareToMarin(capture);
+          setShareStatus("Enviado para Marin.");
+        } catch (error) {
+          setShareStatus(error instanceof Error ? error.message : "Falha ao enviar.");
+        }
+      });
+      list.appendChild(marinButton);
 
       setShareStatus(capture.kind === "video" ? "Videos entram no chat como card com capa." : "");
     } catch (error) {
@@ -1300,6 +1313,7 @@
     setModeUi();
     show("lifeCaptureOverlay");
     await refreshCaptures();
+    queuePendingUploads();
     try {
       await startPreview();
     } catch (error) {
