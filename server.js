@@ -69,6 +69,7 @@ import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200Sv
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
+import { listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 
@@ -4010,16 +4011,54 @@ async function handleProject200MarinPromptRequest(request, response) {
   }
 }
 
+async function handleProject200LifeCaptureListRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const captures = await listProject200LifeCaptures(user.id);
+    sendJson(response, 200, { ok: true, captures });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar sua memoria."
+    });
+  }
+}
+
+async function handleProject200LifeCapturePatchRequest(request, response, captureId) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const capture = await patchProject200LifeCapture(user.id, captureId, body || {});
+    if (!capture) {
+      sendJson(response, 404, { error: "Captura nao encontrada." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, capture });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel atualizar a captura."
+    });
+  }
+}
+
 async function handleProject200LifeCaptureUploadRequest(request, response) {
   const user = await requireAuth(request, response);
   if (!user) return;
   try {
     const body = await readJsonBody(request);
+    const captureId = String(body?.captureId || "").trim();
+    const title = String(body?.title || "").trim();
+    const noteText = String(body?.noteText || "").trim();
+    const createdAt = body?.createdAt ? new Date(body.createdAt) : new Date();
+    const durationMs = Math.max(0, Math.trunc(Number(body?.durationMs || 0) || 0));
+    const metadata = body?.metadata && typeof body.metadata === "object" ? body.metadata : {};
     const kind = String(body?.kind || "photo").trim().toLowerCase() === "video" ? "video" : "photo";
     const mimeType = String(body?.mimeType || "").trim().toLowerCase();
     const fileBase64 = String(body?.fileBase64 || "").trim();
     const previewBase64 = String(body?.previewBase64 || "").trim();
     if (!mimeType || !fileBase64) throw new Error("Envie o arquivo principal da captura.");
+    if (Number.isNaN(createdAt.getTime())) throw new Error("Data da captura invalida.");
 
     const extensionByMime = {
       "image/webp": "webp",
@@ -4041,8 +4080,8 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
     const year = String(now.getFullYear());
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
-    const baseKey = `project200/life-captures/${usernamePart}/${year}/${month}/${day}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const mediaKey = `${baseKey}.${extension}`;
+    const baseKey = "project200/life-captures/" + usernamePart + "/" + year + "/" + month + "/" + day + "/" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
+    const mediaKey = baseKey + "." + extension;
 
     await getR2Client().send(new PutObjectCommand({
       Bucket: R2_BUCKET_NAME,
@@ -4057,7 +4096,7 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
     if (previewBase64) {
       const previewBuffer = Buffer.from(previewBase64, "base64");
       if (previewBuffer.length) {
-        previewKey = `${baseKey}-preview.webp`;
+        previewKey = baseKey + "-preview.webp";
         await getR2Client().send(new PutObjectCommand({
           Bucket: R2_BUCKET_NAME,
           Key: previewKey,
@@ -4069,17 +4108,35 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
       }
     }
 
+    const mediaUrl = buildPublicR2UrlFromKey(mediaKey);
+    const capture = await upsertProject200LifeCapture(user.id, {
+      id: captureId,
+      kind,
+      title,
+      noteText,
+      createdAt: createdAt.toISOString(),
+      mimeType,
+      mediaKey,
+      mediaUrl,
+      previewKey,
+      previewUrl,
+      sizeBytes: mediaBuffer.length,
+      durationMs,
+      metadata
+    });
+
     sendJson(response, 201, {
       ok: true,
       asset: {
         kind,
         key: mediaKey,
-        url: buildPublicR2UrlFromKey(mediaKey),
+        url: mediaUrl,
         previewKey,
         previewUrl,
         sizeBytes: mediaBuffer.length,
         mimeType
-      }
+      },
+      capture
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -4087,7 +4144,6 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
     });
   }
 }
-
 async function handleProject200MarinMessageRequest(request, response) {
   const user = await requireAuth(request, response);
   if (!user) return;
@@ -11646,6 +11702,17 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleAudioTranscription(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/life-captures") {
+    await handleProject200LifeCaptureListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/life-captures\/[^/]+$/)) {
+    const captureId = decodeURIComponent(pathname.replace(/^\/api\/200\/life-captures\/([^/]+)$/, "$1"));
+    await handleProject200LifeCapturePatchRequest(request, response, captureId);
     return;
   }
 
