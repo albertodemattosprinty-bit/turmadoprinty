@@ -12516,3 +12516,67 @@ body[data-background-theme="light"] .mission-limit-sleep-option,
 body[data-background-theme="white"] .mission-limit-sleep-option { color:#343a40; border-color:rgba(52,58,64,.14); background:rgba(52,58,64,.045); }
 body[data-background-theme="light"] .mission-limit-sleep-option small,
 body[data-background-theme="white"] .mission-limit-sleep-option small { color:rgba(52,58,64,.62); }
+
+#actionsModal .actions-dynamic-mission-deck {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+#actionsModal .actions-dynamic-mission-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+#actionsModal .actions-dynamic-mission-track::-webkit-scrollbar {
+  display: none;
+}
+
+#actionsModal .history-mission-card.actions-dynamic-mission-card {
+  min-width: 0;
+  border-radius: 16px;
+  scroll-snap-align: start;
+  cursor: pointer;
+  background: linear-gradient(90deg, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.94) 0%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.72) 52%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.06) 100%);
+}
+
+#actionsModal .history-mission-card.actions-dynamic-mission-card.mission-dynamic-extreme {
+  background: linear-gradient(90deg, rgba(220, 42, 42, 0.96) 0%, rgba(130, 20, 20, 0.94) 42%, rgba(10, 10, 12, calc(0.35 + (var(--mission-delay-darkness, 0) * 0.63))) 76%, rgba(0, 0, 0, 0.04) 100%);
+}
+
+#actionsModal .actions-dynamic-mission-card .history-mission-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#actionsModal .actions-dynamic-mission-card .history-mission-progress-track {
+  height: 10px;
+}
+
+#actionsModal .actions-dynamic-mission-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 0.72rem;
+  font-weight: 850;
+  pointer-events: none;
+}
+
+body[data-background-theme="light"] #actionsModal .history-mission-card.actions-dynamic-mission-card,
+body[data-background-theme="white"] #actionsModal .history-mission-card.actions-dynamic-mission-card {
+  color: #fff;
+}

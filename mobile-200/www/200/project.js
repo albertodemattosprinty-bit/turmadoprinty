@@ -6810,6 +6810,75 @@ function animateDynamicMissionSettlement(goalId, completedCount = 1) {
     }, 900);
   });
 }
+
+function buildActionsDynamicMissionDeckEntries(entries = []) {
+  const byGoalId = new Map();
+  entries.forEach((entry) => {
+    if (!entry?.goal || isLimitGoal(entry.goal)) return;
+    const goalId = String(entry.goalId || entry.goal?.id || '').trim();
+    if (!goalId) return;
+    const current = byGoalId.get(goalId);
+    if (!current || Number(entry.dueAtMs || 0) < Number(current.dueAtMs || 0)) {
+      byGoalId.set(goalId, entry);
+    }
+  });
+  return [...byGoalId.values()]
+    .sort((left, right) => Number(left.dueAtMs || 0) - Number(right.dueAtMs || 0) || String(left.title || '').localeCompare(String(right.title || ''), 'pt-BR'));
+}
+
+function createActionsDynamicMissionDeck(entries = []) {
+  const deckEntries = buildActionsDynamicMissionDeckEntries(entries);
+  if (!deckEntries.length) return null;
+  const deck = document.createElement('section');
+  deck.className = 'actions-dynamic-mission-deck';
+  deck.setAttribute('aria-label', 'Metas próximas ou atrasadas');
+  const track = document.createElement('div');
+  track.className = 'actions-dynamic-mission-track';
+  deckEntries.forEach((entry, index) => {
+    const card = createMissionCard(entry.goal);
+    const visual = getMissionInstallmentVisual(entry.delayMinutes);
+    card.classList.add('actions-dynamic-mission-card', visual.className);
+    card.dataset.missionGoalId = String(entry.goalId || '');
+    card.dataset.missionInstallment = String(entry.installmentNumber || '');
+    card.dataset.missionDeckIndex = String(index + 1);
+    card.style.setProperty('--mission-delay-rgb', visual.rgb);
+    card.style.setProperty('--mission-delay-darkness', String(visual.darkness || 0));
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    track.appendChild(card);
+  });
+  deck.appendChild(track);
+  if (deckEntries.length > 1) {
+    const counter = document.createElement('div');
+    counter.className = 'actions-dynamic-mission-counter';
+    counter.textContent = '1 de ' + deckEntries.length;
+    track.addEventListener('scroll', () => {
+      const width = Math.max(1, track.getBoundingClientRect().width);
+      const current = Math.min(deckEntries.length, Math.max(1, Math.round(track.scrollLeft / width) + 1));
+      counter.textContent = current + ' de ' + deckEntries.length;
+    }, { passive: true });
+    deck.appendChild(counter);
+  }
+  return deck;
+}
+
+function getActionsDynamicMissionDeckInsertIndex(entries = [], nowMs = getServerNowMs()) {
+  let lastPastIndex = -1;
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (entry?.kind === 'free') continue;
+    const status = normalizeActionStatus(entry?.status);
+    const startMs = new Date(entry?.startAt || '').getTime();
+    const endMs = new Date(entry?.endAt || '').getTime();
+    const isCurrent = status === actionStatuses.inProgress
+      || (status !== actionStatuses.completed && Number.isFinite(startMs) && Number.isFinite(endMs) && nowMs >= startMs && nowMs < endMs);
+    if (isCurrent) return index;
+    if (Number.isFinite(startMs) && startMs <= nowMs) {
+      lastPastIndex = index;
+    }
+  }
+  return lastPastIndex >= 0 ? lastPastIndex + 1 : 0;
+}
 function renderActions() {
   actionsList.innerHTML = "";
   actionsAuthAlert.hidden = Boolean(getToken());
@@ -6822,20 +6891,28 @@ function renderActions() {
     return;
   }
 
-  const showDynamicMissionView = normalizeMissionActionsMode(state.options.missionActionsMode) === "dynamic"
-    && state.actionsDynamicMissionsVisible;
+  const missionActionsMode = normalizeMissionActionsMode(state.options.missionActionsMode);
+  const showDynamicMissionView = missionActionsMode === "dynamic" && state.actionsDynamicMissionsVisible;
   const dynamicMissionEntries = showDynamicMissionView ? buildMissionInstallments() : [];
+  const compactDynamicMissionEntries = !showDynamicMissionView && missionActionsMode === "dynamic"
+    ? buildMissionInstallments()
+    : [];
   const timelineEntries = (showDynamicMissionView ? dynamicMissionEntries : buildActionTimelineEntries())
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
   const showMissionsSuccess = showDynamicMissionView && dynamicMissionEntries.length === 0;
+  const compactMissionDeck = createActionsDynamicMissionDeck(compactDynamicMissionEntries);
+  const compactMissionDeckInsertIndex = compactMissionDeck ? getActionsDynamicMissionDeckInsertIndex(timelineEntries) : -1;
 
   if (showMissionsSuccess) {
     actionsList.insertAdjacentHTML("beforeend", '<section class="actions-missions-success" aria-label="Tudo em dia com suas missões"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7.8 12.2 2.7 2.7 5.8-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><strong><span>Tudo em dia com</span><span>suas missões</span></strong></section>');
   }
-  if (!timelineEntries.length && !showMissionsSuccess) {
+  if (!timelineEntries.length && !showMissionsSuccess && !compactMissionDeck) {
     actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse período.</div>';
   }
-  timelineEntries.forEach((action) => {
+  timelineEntries.forEach((action, actionIndex) => {
+    if (compactMissionDeck && actionIndex === compactMissionDeckInsertIndex) {
+      actionsList.appendChild(compactMissionDeck);
+    }
     const slotOwner = state.selectedProfile;
     const slotAvatar = getActionAvatarPath(slotOwner);
 
@@ -6926,6 +7003,9 @@ function renderActions() {
     }
   });
 
+  if (compactMissionDeck && compactMissionDeckInsertIndex >= timelineEntries.length) {
+    actionsList.appendChild(compactMissionDeck);
+  }
   renderActionsProgress();
   if (isActionsMissionViewActive()) {
     actionsProgress.hidden = true;
@@ -16759,8 +16839,16 @@ actionsList.addEventListener("pointerleave", endActionLongPress);
 actionsList.addEventListener("pointercancel", endActionLongPress);
 
 actionsList.addEventListener("click", async (event) => {
+  const missionEditButton = event.target.closest("[data-mission-goal-edit]");
+  if (missionEditButton) {
+    event.stopPropagation();
+    document.body.classList.add("actions-mission-editor-open");
+    openMissionAdjustModal(String(missionEditButton.dataset.missionGoalEdit || ""));
+    return;
+  }
   const missionRow = event.target.closest("[data-mission-goal-id]");
   if (missionRow) {
+    document.body.classList.add("actions-mission-editor-open");
     openMissionProgressModal(String(missionRow.dataset.missionGoalId || ""));
     return;
   }
@@ -16858,6 +16946,13 @@ actionsList.addEventListener("keydown", async (event) => {
     return;
   }
 
+  const missionRow = event.target.closest("[data-mission-goal-id]");
+  if (missionRow && !event.target.closest("button")) {
+    event.preventDefault();
+    document.body.classList.add("actions-mission-editor-open");
+    openMissionProgressModal(String(missionRow.dataset.missionGoalId || ""));
+    return;
+  }
   const row = event.target.closest("[data-action-id]");
 
   if (!row) {
