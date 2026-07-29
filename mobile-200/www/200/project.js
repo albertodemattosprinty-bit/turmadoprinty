@@ -1,4 +1,4 @@
-import { getApiUrl } from "../api.js";
+﻿import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=0.7.0-chat-links";
 import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.7.0-chat-links";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
@@ -24,13 +24,13 @@ const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
 const missionActionsModes = ["separate", "dynamic", "hide"];
 const missionActionsModeLabels = new Map([
-  ["hide", "Não mostrar"],
+  ["hide", "NÃ£o mostrar"],
   ["separate", "Janela separada"],
-  ["dynamic", "Dinâmico"]
+  ["dynamic", "DinÃ¢mico"]
 ]);
 const taskBeepOptionLabels = new Map([
   [0, "Nenhum"],
-  [3, "Três vezes"],
+  [3, "TrÃªs vezes"],
   [5, "Cinco vezes"],
   [10, "Dez vezes"]
 ]);
@@ -42,9 +42,9 @@ const actionStatuses = {
   completed: "COMPLETED"
 };
 const missionQuickDefinitions = [
-  { key: "water", label: "Água", defaultTitle: "Beber água", targetValue: 8 },
+  { key: "water", label: "Ãgua", defaultTitle: "Beber Ã¡gua", targetValue: 8 },
   { key: "store", label: "Objeto", defaultTitle: "Guardar 6 itens", targetValue: 6 },
-  { key: "read", label: "Livro", defaultTitle: "Ler uma página", targetValue: 6 },
+  { key: "read", label: "Livro", defaultTitle: "Ler uma pÃ¡gina", targetValue: 6 },
   { key: "brush", label: "Dente", defaultTitle: "Escovar os dentes", targetValue: 3 }
 ];
 const runningMissionQuickToneKeys = ["water", "store", "read", "brush", "energy", "sun"];
@@ -63,17 +63,17 @@ const statsScopes = [
 ];
 const statsPointCategories = [
   { aspectId: "20000000-0000-4000-8000-000000000001", id: "sono", name: "Sono", targetPoints: 420, icon: "/200/aspect-icons/sono.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "Alimentação", targetPoints: 30, icon: "/200/aspect-icons/alimentacao.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "Hidratação", targetPoints: 15, icon: "/200/aspect-icons/hidratacao.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "AlimentaÃ§Ã£o", targetPoints: 30, icon: "/200/aspect-icons/alimentacao.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "HidrataÃ§Ã£o", targetPoints: 15, icon: "/200/aspect-icons/hidratacao.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000004", id: "aprendizado", name: "Aprendizado", targetPoints: 60, icon: "/200/aspect-icons/aprendizado.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000005", id: "trabalho", name: "Trabalho", targetPoints: 360, icon: "/200/aspect-icons/trabalho.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa", targetPoints: 120, icon: "/200/aspect-icons/casa.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "ExercÃ­cios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social", targetPoints: 30, icon: "/200/aspect-icons/social.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Propósito", targetPoints: 30, icon: "/200/aspect-icons/proposito.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "PropÃ³sito", targetPoints: 30, icon: "/200/aspect-icons/proposito.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene", targetPoints: 15, icon: "/200/aspect-icons/higiene.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer", targetPoints: 90, icon: "/200/aspect-icons/lazer.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família", targetPoints: 30, icon: "/200/aspect-icons/familia.svg" }
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "FamÃ­lia", targetPoints: 30, icon: "/200/aspect-icons/familia.svg" }
 ];
 const sleepDelayOptions = [0, 5, 15, 30, 60];
 const avatarPresetToPath = {
@@ -118,7 +118,7 @@ const platformCategoryIconByName = {
   Imprevistos: "/200/icons/imprevistos.svg",
   "Emprestimos e Juros": "/200/icons/emprestimos-juros.svg"
 };
-const constitutionDefaultText = "O Projeto Família é o nosso principal e mais importante projeto, ele visa bem estar, segurança em um projeto contínuo de longo prazo, todos os envolvidos se comprometem a concluir de boa vontade as propostas descritas no projeto";
+const constitutionDefaultText = "O Projeto FamÃ­lia Ã© o nosso principal e mais importante projeto, ele visa bem estar, seguranÃ§a em um projeto contÃ­nuo de longo prazo, todos os envolvidos se comprometem a concluir de boa vontade as propostas descritas no projeto";
 const financePeriods = [
   { key: "total", label: "Total" },
   { key: "today", label: "Hoje" },
@@ -139,8 +139,8 @@ const financePeriods = [
   { key: "month-12", label: "Dezembro" }
 ];
 const weekdayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
-const monthlyOrdinalLabels = ["Primeira", "Segunda", "Terceira", "Quarta", "Última"];
-const monthlyWeekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+const monthlyOrdinalLabels = ["Primeira", "Segunda", "Terceira", "Quarta", "Ãšltima"];
+const monthlyWeekdayLabels = ["Domingo", "Segunda-feira", "TerÃ§a-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "SÃ¡bado"];
 const recurrenceDays = {
   none: [],
   daily: [0, 1, 2, 3, 4, 5, 6],
@@ -1231,7 +1231,7 @@ const state = {
     timeConfigured: true,
     limitIntervalIndex: 0,
     categoryId: "planejamento",
-    categoryName: "Propósito",
+    categoryName: "PropÃ³sito",
     categoryResolved: false,
     categoryThinking: false,
     categoryManuallySelected: false
@@ -1706,7 +1706,7 @@ function beginGlobalLoading(iconSrc = "") {
     window.__project200LoadingShownAt = Date.now();
     globalLoadingTimedOut = false;
     if (globalLoadingIcon) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
-    if (globalLoadingCopy) globalLoadingCopy.textContent = "Carregando informações...";
+    if (globalLoadingCopy) globalLoadingCopy.textContent = "Carregando informaÃ§Ãµes...";
     if (globalLoadingOverlay) {
       globalLoadingOverlay.style.removeProperty("display");
       globalLoadingOverlay.hidden = false;
@@ -1947,7 +1947,7 @@ function renderProfileManageOverlay() {
     profileManageTitle.textContent = `Gerenciar ${profile.name}`;
   }
   if (profileManageTargetLabel) {
-    profileManageTargetLabel.textContent = `Usuário selecionado: ${profile.name}`;
+    profileManageTargetLabel.textContent = `UsuÃ¡rio selecionado: ${profile.name}`;
   }
   if (profileReassignSelect) {
     profileReassignSelect.innerHTML = getProfilesList().map((item) => `
@@ -1955,7 +1955,7 @@ function renderProfileManageOverlay() {
     `).join("");
   }
   if (profileReassignTargetHint) {
-    profileReassignTargetHint.textContent = `Destino: ${selectedProfile?.name || state.selectedProfile || "usuário selecionado"}`;
+    profileReassignTargetHint.textContent = `Destino: ${selectedProfile?.name || state.selectedProfile || "usuÃ¡rio selecionado"}`;
   }
   const canDelete = String(profileDeleteConfirmInput?.value || "").trim() === "Excluir";
   profileDeleteConfirmButton?.classList.toggle("is-disabled", !canDelete);
@@ -2228,7 +2228,7 @@ function getAlphabeticalMissionOrderUnits() {
       return Array.from({ length: target }, (_, index) => ({
         unitKey: `${String(goal?.id || "")}:${index + 1}`,
         goalId: String(goal?.id || ""),
-        title: String(goal?.title || "Missão"),
+        title: String(goal?.title || "MissÃ£o"),
         installmentNumber: index + 1,
         target
       }));
@@ -2273,7 +2273,7 @@ function buildMissionScheduleUnits(nowMs = getServerNowMs()) {
       return Array.from({ length: target }, (_, index) => ({
         unitKey: `${String(goal?.id || "")}:${index + 1}`,
         goalId: String(goal?.id || ""),
-        title: String(goal?.title || "Missão"),
+        title: String(goal?.title || "MissÃ£o"),
         installmentNumber: index + 1,
         target,
         goal,
@@ -2308,7 +2308,7 @@ function formatMissionOrderTime(minutes) {
 
 function getMissionOrderPeriod(minutes) {
   const safe = ((Math.round(Number(minutes || 0)) % 1440) + 1440) % 1440;
-  if (safe >= 4 * 60 && safe < 12 * 60) return { key: "morning", label: "manhã" };
+  if (safe >= 4 * 60 && safe < 12 * 60) return { key: "morning", label: "manhÃ£" };
   if (safe >= 12 * 60 && safe < 18 * 60) return { key: "afternoon", label: "tarde" };
   return { key: "night", label: "noite" };
 }
@@ -2330,14 +2330,14 @@ function renderMissionOrderModal() {
   if (!missionOrderList) return;
   const units = getScheduledMissionOrderUnits();
   if (missionOrderSummary) {
-    missionOrderSummary.textContent = `${units.length} ${units.length === 1 ? "parcela" : "parcelas"} de missões com 1 a 3 repetições entre ${activeMinutesToLabel(state.activeTime.startMinutes)} e ${activeMinutesToLabel(state.activeTime.endMinutes)}.`;
+    missionOrderSummary.textContent = `${units.length} ${units.length === 1 ? "parcela" : "parcelas"} de missÃµes com 1 a 3 repetiÃ§Ãµes entre ${activeMinutesToLabel(state.activeTime.startMinutes)} e ${activeMinutesToLabel(state.activeTime.endMinutes)}.`;
   }
   if (state.missionOrder.loading) {
-    missionOrderList.innerHTML = '<div class="empty-state">Organizando missões…</div>';
+    missionOrderList.innerHTML = '<div class="empty-state">Organizando missÃµesâ€¦</div>';
     return;
   }
   if (!units.length) {
-    missionOrderList.innerHTML = '<div class="empty-state">Nenhuma missão de 1 a 3 repetições.</div>';
+    missionOrderList.innerHTML = '<div class="empty-state">Nenhuma missÃ£o de 1 a 3 repetiÃ§Ãµes.</div>';
     return;
   }
   missionOrderList.innerHTML = units.map((unit, index) => {
@@ -2372,7 +2372,7 @@ async function loadMissionOrder({ silent = false } = {}) {
 async function persistMissionOrder() {
   if (state.missionOrder.saving) return;
   state.missionOrder.saving = true;
-  if (missionOrderStatus) missionOrderStatus.textContent = "Salvando ordem…";
+  if (missionOrderStatus) missionOrderStatus.textContent = "Salvando ordemâ€¦";
   try {
     const payload = await apiRequest("/api/200/mission-order", {
       method: "PUT",
@@ -2430,7 +2430,7 @@ async function requestMissionNotificationPermission() {
     if (permission?.display !== "granted") permission = await notifications.requestPermissions();
     if (permission?.display !== "granted") return false;
     if (notifications.createChannel) {
-      await notifications.createChannel({ id: "ilife-missions", name: "Missões iLife", description: "Alertas de missões atrasadas", importance: 5, visibility: 1, vibration: true });
+      await notifications.createChannel({ id: "ilife-missions", name: "MissÃµes iLife", description: "Alertas de missÃµes atrasadas", importance: 5, visibility: 1, vibration: true });
     }
     return true;
   } catch {
@@ -2472,8 +2472,8 @@ async function scheduleMissionNotifications() {
         if (overdueCount < 1) continue;
         scheduled.push({
           id: missionNotificationId(`mission-summary-${activeWindow.dateKey}-${slot}`),
-          title: "Missões iLife",
-          body: `Você tem ${overdueCount} ${overdueCount === 1 ? "missão atrasada" : "missões atrasadas"}`,
+          title: "MissÃµes iLife",
+          body: `VocÃª tem ${overdueCount} ${overdueCount === 1 ? "missÃ£o atrasada" : "missÃµes atrasadas"}`,
           channelId: "ilife-missions",
           schedule: { at: new Date(atMs) },
           extra: { kind: "project200-mission-active-time", overdueCount, slot }
@@ -2488,7 +2488,7 @@ async function scheduleMissionNotifications() {
       if (!Number.isFinite(startMs) || reminderMs <= nowMs || scheduled.length >= 60) return;
       scheduled.push({
         id: missionNotificationId(`action-upcoming-${action.id}-${action.startAt}`),
-        title: "Próxima tarefa",
+        title: "PrÃ³xima tarefa",
         body: `Tarefa ${String(action.title || "programada").trim()} em 15 minutos`,
         channelId: "ilife-missions",
         schedule: { at: new Date(reminderMs) },
@@ -2509,8 +2509,8 @@ function renderActionsMissionFilter() {
   actionsMissionFilterButton.classList.toggle("is-filtering", filterActive);
   actionsMissionFilterButton.classList.toggle("is-dynamic", mode === "dynamic");
   actionsMissionFilterButton.setAttribute("aria-label", mode === "dynamic"
-    ? (state.actionsDynamicMissionsVisible ? "Ocultar missões dinâmicas" : "Mostrar missões dinâmicas")
-    : (state.actionsMissionOnly ? "Voltar para a lista de ações" : "Abrir missões"));
+    ? (state.actionsDynamicMissionsVisible ? "Ocultar missÃµes dinÃ¢micas" : "Mostrar missÃµes dinÃ¢micas")
+    : (state.actionsMissionOnly ? "Voltar para a lista de aÃ§Ãµes" : "Abrir missÃµes"));
   actionsMissionFilterButton.setAttribute("aria-controls", "actionsMissionsPanel");
   actionsMissionFilterButton.setAttribute("aria-expanded", filterActive ? "true" : "false");
   const overdueCount = mode === "dynamic"
@@ -2519,7 +2519,7 @@ function renderActionsMissionFilter() {
   if (actionsMissionOverdueBadge) {
     actionsMissionOverdueBadge.hidden = overdueCount < 1;
     actionsMissionOverdueBadge.textContent = overdueCount > 99 ? "99+" : String(overdueCount);
-    actionsMissionOverdueBadge.setAttribute("aria-label", `${overdueCount} missões atrasadas`);
+    actionsMissionOverdueBadge.setAttribute("aria-label", `${overdueCount} missÃµes atrasadas`);
   }
 }
 function getAvailableMissionById(goalId) {
@@ -2585,7 +2585,7 @@ function renderActionsMissionsPanel() {
   const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => !isLimitGoal(goal));
   actionsMissionsList.innerHTML = "";
   if (!goals.length) {
-    actionsMissionsList.innerHTML = '<div class="empty-state">Você não tem missões para hoje.</div>';
+    actionsMissionsList.innerHTML = '<div class="empty-state">VocÃª nÃ£o tem missÃµes para hoje.</div>';
     return;
   }
 
@@ -2603,15 +2603,15 @@ function renderActionsMissionsPanel() {
     card.setAttribute("role", "button");
     card.tabIndex = 0;
     card.innerHTML = `
-      <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
+      <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ãcone da missÃ£o"))}" />
       <div class="actions-mission-card-copy">
-        <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
+        <h3>${escapeHtml(String(goal?.title || "MissÃ£o"))}</h3>
         <p>${progress.progress} de ${progress.target}</p>
       </div>
-      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
+      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missÃ£o"))}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
       </button>
-      <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
+      <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missÃ£o"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
         <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
       </div>
     `;
@@ -3175,7 +3175,7 @@ function renderRunningCompletionNextView() {
   if (runningTaskMinutesLeft) {
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     runningTaskMinutesLeft.classList.add("is-bonus");
-    runningTaskMinutesLeft.textContent = "Próxima";
+    runningTaskMinutesLeft.textContent = "PrÃ³xima";
   }
   setRunningRingPercent(state.runningCompletion.progressValue);
   if (runningTaskPercent) {
@@ -3186,7 +3186,7 @@ function renderRunningCompletionNextView() {
     const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextOfNext));
   } else {
-    setRunningNextDisplay("Sem próxima tarefa", 0);
+    setRunningNextDisplay("Sem prÃ³xima tarefa", 0);
   }
   if (runningTaskListButton) runningTaskListButton.hidden = false;
   if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
@@ -3415,8 +3415,8 @@ function renderSleepMusicToggleState() {
   sleepMusicToggleButton.setAttribute(
     "aria-label",
     isActive && selectedName
-      ? `Escolher música do sono. Tocando ${selectedName}`
-      : "Escolher música da rádio Ambience"
+      ? `Escolher mÃºsica do sono. Tocando ${selectedName}`
+      : "Escolher mÃºsica da rÃ¡dio Ambience"
   );
 }
 
@@ -3476,7 +3476,7 @@ function renderSleepMusicPicker(station) {
   const tracks = getShuffledSleepAmbienceTracks(station);
   const selectedUrl = normalizeRunningTrackUrl(state.sleepModal?.selectedTrackUrl || "");
   if (!tracks.length) {
-    sleepMusicPickerList.innerHTML = '<div class="empty-state">Nenhuma faixa Ambience disponível.</div>';
+    sleepMusicPickerList.innerHTML = '<div class="empty-state">Nenhuma faixa Ambience disponÃ­vel.</div>';
     return;
   }
   sleepMusicPickerList.innerHTML = tracks.map((track) => {
@@ -3491,7 +3491,7 @@ function renderSleepMusicPicker(station) {
           <svg viewBox="0 0 24 24"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg>
         </span>
         <span><strong>${escapeHtml(String(track?.name || "Faixa"))}</strong><small>Ambience</small></span>
-        <span class="sleep-music-picker-check" aria-hidden="true">✓</span>
+        <span class="sleep-music-picker-check" aria-hidden="true">âœ“</span>
       </button>
     `;
   }).join("");
@@ -3507,7 +3507,7 @@ async function openSleepMusicPicker() {
   const station = await loadSleepAmbienceStation();
   renderSleepMusicPicker(station);
   if (sleepMusicPickerStatus) {
-    sleepMusicPickerStatus.textContent = station ? "A faixa escolhida tocará até o fade-out do sono." : "Não foi possível carregar Ambience.";
+    sleepMusicPickerStatus.textContent = station ? "A faixa escolhida tocarÃ¡ atÃ© o fade-out do sono." : "NÃ£o foi possÃ­vel carregar Ambience.";
   }
 }
 
@@ -3919,7 +3919,7 @@ function renderHomeRunningTask() {
     syncHomeWidget({
       percent: state.runningCompletion.displayPercent,
       centerMarkup: formatRunningPercentMarkup(state.runningCompletion.displayPercent),
-      ariaLabel: "Painel da rotina em conclusão"
+      ariaLabel: "Painel da rotina em conclusÃ£o"
     });
     if (state.runningCompletion.phase === "celebration") {
       renderRunningCompletionCelebration();
@@ -4025,18 +4025,18 @@ function renderHomeRunningTask() {
       : formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
     if (homeRunningDatePrimary) {
-      homeRunningDatePrimary.textContent = "Próxima tarefa";
+      homeRunningDatePrimary.textContent = "PrÃ³xima tarefa";
     }
     if (homeRunningDateSecondary) {
       homeRunningDateSecondary.textContent = nextLabel;
     }
   } else {
-    setRunningNextDisplay("Sem próxima tarefa", 0);
+    setRunningNextDisplay("Sem prÃ³xima tarefa", 0);
     if (homeRunningDatePrimary) {
-      homeRunningDatePrimary.textContent = "Próxima tarefa";
+      homeRunningDatePrimary.textContent = "PrÃ³xima tarefa";
     }
     if (homeRunningDateSecondary) {
-      homeRunningDateSecondary.textContent = "Sem próxima tarefa";
+      homeRunningDateSecondary.textContent = "Sem prÃ³xima tarefa";
     }
   }
   setHomeTaskTitle(formatActionTitleForDisplay(action.title), true);
@@ -4057,10 +4057,10 @@ function renderHomeRunningTask() {
     percent,
     centerMarkup: runningCenterMarkup,
     ariaLabel: `${formatActionTitleForDisplay(action.title)} em andamento`,
-    primaryLine: "Próxima tarefa",
+    primaryLine: "PrÃ³xima tarefa",
     secondaryLine: nextAction
       ? (nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title))
-      : "Sem próxima tarefa",
+      : "Sem prÃ³xima tarefa",
     useCalendarDate: false
   });
   renderRunningMusicPlayer();
@@ -4546,7 +4546,7 @@ function renderRunningMusicPlayer() {
   const isPlaying = Boolean(runningAudio && !runningAudio.paused && track?.url && normalizeRunningTrackUrl(runningAudio.currentSrc || runningAudio.src || "") === normalizeRunningTrackUrl(track.url));
 
   if (runningPlayerStation) {
-    runningPlayerStation.textContent = String(station?.name || "Carregando rádios");
+    runningPlayerStation.textContent = String(station?.name || "Carregando rÃ¡dios");
   }
 
   if (runningPlayerTrack) {
@@ -4564,7 +4564,7 @@ function renderRunningMusicPlayer() {
   runningPlayerRepeat?.classList.toggle("active", isPlaying);
   runningPlayerRepeat?.classList.toggle("is-playing", isPlaying);
   runningPlayerRepeat?.classList.toggle("is-disabled", !track?.url);
-  runningPlayerRepeat?.setAttribute("aria-label", isPlaying ? "Pausar música" : "Reproduzir música");
+  runningPlayerRepeat?.setAttribute("aria-label", isPlaying ? "Pausar mÃºsica" : "Reproduzir mÃºsica");
   if (runningPlayerRepeat) {
     runningPlayerRepeat.innerHTML = isPlaying
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z" fill="currentColor"/></svg>'
@@ -4580,7 +4580,7 @@ function renderRunningMusicPlayer() {
   runningPlayerNext?.classList.toggle("is-disabled", !hasTrackNavigation);
 
   if (runningMusicListStation) {
-    runningMusicListStation.textContent = String(station?.name || "Estação");
+    runningMusicListStation.textContent = String(station?.name || "EstaÃ§Ã£o");
   }
 
   if (runningMusicListModal?.classList.contains("active")) {
@@ -4685,7 +4685,7 @@ function renderRunningMusicList() {
   const defaultStationName = preference?.mode === "station" ? String(preference.stationName || "").trim() : "";
 
   if (!tracks.length) {
-    runningMusicListItems.innerHTML = '<div class="empty-state">Nenhuma música disponível nesta estação.</div>';
+    runningMusicListItems.innerHTML = '<div class="empty-state">Nenhuma mÃºsica disponÃ­vel nesta estaÃ§Ã£o.</div>';
     return;
   }
 
@@ -4705,13 +4705,13 @@ function renderRunningMusicList() {
         </span>
         <span class="running-music-track-main">
           <strong>${escapeHtml(String(item.name || "Faixa"))}</strong>
-          <span>${escapeHtml(String(station?.name || "Estação"))}</span>
+          <span>${escapeHtml(String(station?.name || "EstaÃ§Ã£o"))}</span>
         </span>
         <span class="running-music-track-actions">
-          <button class="running-music-track-hide" type="button" data-hide-track="${escapeHtml(String(item.url || ""))}" aria-label="${isHidden ? "Mostrar música" : "Ocultar música"}">
+          <button class="running-music-track-hide" type="button" data-hide-track="${escapeHtml(String(item.url || ""))}" aria-label="${isHidden ? "Mostrar mÃºsica" : "Ocultar mÃºsica"}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20 20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </button>
-          <button class="running-music-track-loop" type="button" data-loop-track="${escapeHtml(String(item.url || ""))}" aria-label="${isLooping ? "Desativar repetição" : "Repetir música"}">
+          <button class="running-music-track-loop" type="button" data-loop-track="${escapeHtml(String(item.url || ""))}" aria-label="${isLooping ? "Desativar repetiÃ§Ã£o" : "Repetir mÃºsica"}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17H7l2.6 2.6L8.2 21 3 15.8 8.2 10.6l1.4 1.4L7 14h10a3 3 0 0 0 0-6h-1V6h1a5 5 0 0 1 0 10ZM7 7h10l-2.6-2.6L15.8 3 21 8.2 15.8 13.4l-1.4-1.4L17 10H7a3 3 0 0 0 0 6h1v2H7a5 5 0 0 1 0-10Z" fill="currentColor"/></svg>
           </button>
           <svg class="running-music-track-heart" viewBox="0 0 24 24"><path d="M12 21.35 10.55 20C5.4 15.4 2 12.4 2 8.5A5.5 5.5 0 0 1 7.5 3C9.24 3 10.92 3.81 12 5.08 13.08 3.81 14.76 3 16.5 3A5.5 5.5 0 0 1 22 8.5c0 3.9-3.4 6.9-8.55 11.5z"/></svg>
@@ -4793,7 +4793,7 @@ async function openRunningMusicListModal() {
   if (!state.runningPlayer.stationsLoaded
     || !Array.isArray(state.runningPlayer.stations)
     || state.runningPlayer.stations.length < 2) {
-    runningMusicListItems.innerHTML = '<div class="empty-state">Carregando estações...</div>';
+    runningMusicListItems.innerHTML = '<div class="empty-state">Carregando estaÃ§Ãµes...</div>';
     try {
       await loadRunningMusicStations();
     } catch {
@@ -4844,9 +4844,9 @@ async function toggleRunningTrackFavorite() {
     renderRunningMusicPlayer();
     renderRunningMusicList();
     if (favorite) {
-      showFloatingNotice("Música adicionada aos favoritos.");
+      showFloatingNotice("MÃºsica adicionada aos favoritos.");
     } else {
-      showFloatingNotice("Música removida dos favoritos.");
+      showFloatingNotice("MÃºsica removida dos favoritos.");
     }
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar favorito.");
@@ -4914,21 +4914,21 @@ function openRunningMusicDefaultModal() {
   }
 
   if (!taskTitle) {
-    showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
+    showFloatingNotice("Abra uma tarefa em andamento para definir o padrÃ£o.");
     return;
   }
 
   if (runningMusicDefaultStationName) {
-    runningMusicDefaultStationName.textContent = String(station.name || "Estação");
+    runningMusicDefaultStationName.textContent = String(station.name || "EstaÃ§Ã£o");
   }
   if (runningMusicDefaultTrackName) {
-    runningMusicDefaultTrackName.textContent = String(track?.name || "Música atual");
+    runningMusicDefaultTrackName.textContent = String(track?.name || "MÃºsica atual");
   }
   if (runningMusicDefaultStationHint) {
-    runningMusicDefaultStationHint.innerHTML = `estação padrão para<br>${escapeHtml(taskTitle)}`;
+    runningMusicDefaultStationHint.innerHTML = `estaÃ§Ã£o padrÃ£o para<br>${escapeHtml(taskTitle)}`;
   }
   if (runningMusicDefaultTrackHint) {
-    runningMusicDefaultTrackHint.innerHTML = `música padrão para<br>${escapeHtml(taskTitle)}`;
+    runningMusicDefaultTrackHint.innerHTML = `mÃºsica padrÃ£o para<br>${escapeHtml(taskTitle)}`;
   }
 
   closeModal("runningMusicDefaultChoiceModal");
@@ -4947,8 +4947,8 @@ function openRunningMusicDefaultChoiceModal() {
 
   if (runningMusicDefaultChoiceCopy) {
     runningMusicDefaultChoiceCopy.innerHTML = preference.mode === "station"
-      ? `Padrão salvo: estação <strong>${escapeHtml(preference.stationName || "Estação")}</strong><br>para ${escapeHtml(taskTitle)}`
-      : `Padrão salvo: música <strong>${escapeHtml(preference.trackName || "Música")}</strong><br>para ${escapeHtml(taskTitle)}`;
+      ? `PadrÃ£o salvo: estaÃ§Ã£o <strong>${escapeHtml(preference.stationName || "EstaÃ§Ã£o")}</strong><br>para ${escapeHtml(taskTitle)}`
+      : `PadrÃ£o salvo: mÃºsica <strong>${escapeHtml(preference.trackName || "MÃºsica")}</strong><br>para ${escapeHtml(taskTitle)}`;
   }
 
   openModal("runningMusicDefaultChoiceModal");
@@ -4975,7 +4975,7 @@ async function executeRunningTaskDefaultPreference() {
   }
 
   if (nextStationIndex < 0) {
-    showFloatingNotice("Nao encontrei o padrão salvo para esta tarefa.");
+    showFloatingNotice("Nao encontrei o padrÃ£o salvo para esta tarefa.");
     return;
   }
 
@@ -5020,13 +5020,13 @@ async function saveRunningTaskDefault(mode = "track") {
   }
 
   if (!taskTitle) {
-    showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
+    showFloatingNotice("Abra uma tarefa em andamento para definir o padrÃ£o.");
     return;
   }
 
   const safeMode = mode === "station" ? "station" : "track";
   if (safeMode === "track" && !track?.url) {
-    showFloatingNotice("Escolha uma música válida.");
+    showFloatingNotice("Escolha uma mÃºsica vÃ¡lida.");
     return;
   }
 
@@ -5054,9 +5054,9 @@ async function saveRunningTaskDefault(mode = "track") {
     closeModal("runningMusicDefaultChoiceModal");
     state.runningPlayer.configurationMode = false;
     state.runningPlayer.configurationTaskTitle = "";
-    showFloatingNotice(safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão.");
+    showFloatingNotice(safeMode === "station" ? "EstaÃ§Ã£o definida como padrÃ£o." : "MÃºsica definida como padrÃ£o.");
   } catch (error) {
-    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrÃ£o.");
   }
 }
 
@@ -5241,7 +5241,7 @@ async function loadMetricHistorySpan() {
     ["actions", "missions", "stats"].forEach((target) => setMetricPeriodDays(target, getMetricPeriodDays(target)));
   } catch (error) {
     state.historySpan.loading = false;
-    if (metricPeriodStatus) metricPeriodStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar períodos.";
+    if (metricPeriodStatus) metricPeriodStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar perÃ­odos.";
   }
 }
 
@@ -5252,8 +5252,8 @@ function renderMetricPeriodModal() {
   metricPeriodOptions.innerHTML = options.map((days) => `<button type="button" class="metric-period-option${days === selectedDays ? " is-active" : ""}" data-metric-period-days="${days}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${escapeHtml(formatMetricPeriodLabel(days))}</span></button>`).join("");
   if (metricPeriodHint) {
     metricPeriodHint.textContent = state.historySpan.firstOccurredAt
-      ? `Disponível desde o início das suas métricas · ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
-      : "O período cresce a partir do seu primeiro ponto.";
+      ? `DisponÃ­vel desde o inÃ­cio das suas mÃ©tricas Â· ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
+      : "O perÃ­odo cresce a partir do seu primeiro ponto.";
   }
 }
 
@@ -5329,7 +5329,7 @@ function formatMinutesHuman(totalMinutesValue) {
 }
 
 function formatHomeDateTime(now = new Date()) {
-  const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const months = ["Janeiro", "Fevereiro", "MarÃ§o", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const day = now.getDate();
   const month = months[now.getMonth()] || "";
   const hour = now.getHours();
@@ -5435,13 +5435,13 @@ function getActionDisplayIcon(action) {
   if (svgIconUrl) {
     return {
       src: svgIconUrl,
-      alt: String(action?.svgIconLabel || action?.title || "Ícone da tarefa"),
+      alt: String(action?.svgIconLabel || action?.title || "Ãcone da tarefa"),
       categoryIcon: true
     };
   }
   return {
     src: defaultTaskSvgPath,
-    alt: "Ícone padrão da tarefa",
+    alt: "Ãcone padrÃ£o da tarefa",
     categoryIcon: true
   };
 }
@@ -5451,13 +5451,13 @@ function getMissionDisplayIcon(goal) {
   if (svgIconUrl) {
     return {
       src: svgIconUrl,
-      alt: String(goal?.svgIconLabel || goal?.title || "Ícone da missão"),
+      alt: String(goal?.svgIconLabel || goal?.title || "Ãcone da missÃ£o"),
       categoryIcon: true
     };
   }
   return {
     src: defaultMissionSvgPath,
-    alt: String(goal?.title || "Ícone da missão"),
+    alt: String(goal?.title || "Ãcone da missÃ£o"),
     categoryIcon: true
   };
 }
@@ -5476,7 +5476,7 @@ function buildTaskAvatarMarkup(src, alt, options = {}) {
 
 function getTaskCategoryName(categoryId) {
   const normalized = normalizeTaskCategoryId(categoryId);
-  return taskCategoryMap.get(normalized)?.name || "Propósito";
+  return taskCategoryMap.get(normalized)?.name || "PropÃ³sito";
 }
 
 function normalizeTaskCategoryId(categoryId) {
@@ -5579,7 +5579,7 @@ function buildInitialWizardState() {
     endHour: end.getHours(),
     endMinute: end.getMinutes(),
     categoryId: "planejamento",
-    categoryName: "Propósito",
+    categoryName: "PropÃ³sito",
     categoryResolved: false,
     categoryThinking: false,
     svgIconUrl: "",
@@ -5653,7 +5653,7 @@ async function apiRequestWithTimeout(path, options = {}, timeoutMs = 12000) {
     });
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error("A interpretação demorou demais.");
+      throw new Error("A interpretaÃ§Ã£o demorou demais.");
     }
     throw error;
   } finally {
@@ -5720,40 +5720,19 @@ function inferFinanceEntryLocally(text) {
   };
 }
 
-const ilifeFinanceScheduleModes = ["ONCE", "RECURRING", "FINITE"];
-const ilifeFinanceAttentionScopes = [
-  { key: "today", label: "Pendências para hoje", empty: "Nenhuma pendência para hoje" },
-  { key: "next3", label: "Próximos 3 dias", empty: "Nenhuma pendência nos próximos 3 dias" },
-  { key: "week", label: "Esta semana", empty: "Nenhuma pendência nesta semana" },
-  { key: "month", label: "Este mês", empty: "Nenhuma pendência neste mês" }
-];
-const ilifeFinanceScheduleModeLabels = {
-  ONCE: ["Uma vez", "Define uma data única"],
-  RECURRING: ["Recorrente", "Continua sem data final"],
-  FINITE: ["Finito", "Repete até a data definida"]
-};
-const ilifeFinanceFrequencies = ["MONTHLY", "WEEKLY", "CUSTOM"];
-const ilifeFinanceFrequencyLabels = { MONTHLY: "Mensal", WEEKLY: "Semanal", CUSTOM: "Personalizado" };
-const ilifeFinanceCustomModes = ["MONTHLY", "WEEKLY", "DAILY"];
-const ilifeFinanceCustomModeLabels = { MONTHLY: "Mensal", WEEKLY: "Semanal", DAILY: "Diário" };
-const ilifeFinanceWeekdayNames = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+
+const ilifeFinanceDateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" });
+
+function getIlifeFinanceEl(id) {
+  return document.getElementById(id);
+}
 
 function buildIlifeFinanceWizard(kind) {
   const today = getProjectTodayDateKey();
   return {
     kind: kind === "EXPENSE" ? "EXPENSE" : "INCOME",
-    step: "details",
-    settlementType: "CASH",
-    scheduleMode: "ONCE",
-    scheduleFrequency: "MONTHLY",
-    dayOfMonth: Number(today.slice(8, 10)),
-    weekday: projectDateKeyToDate(today).getDay(),
-    startsOn: addDaysToDateKey(today, 1),
-    endsOn: addDaysToDateKey(today, 30),
-    customMode: "MONTHLY",
-    customDaysOfMonth: [],
-    customWeekdays: [],
-    customDates: []
+    settlementType: "FUTURE",
+    startsOn: today
   };
 }
 
@@ -5769,97 +5748,125 @@ function getIlifeFinanceMonthName() {
 function parseIlifeFinanceAmount(value) {
   const raw = String(value || "").trim().replace(/\s/g, "");
   if (!raw) return 0;
-  let normalized = raw;
-  if (raw.includes(",")) normalized = raw.replace(/\./g, "").replace(",", ".");
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
   const amount = Number(normalized.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) : 0;
 }
 
 function formatIlifeFinanceDate(dateKey) {
   if (!dateKey) return "";
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
-    .format(new Date(`${dateKey}T12:00:00Z`));
+  return ilifeFinanceDateFormatter.format(new Date(`${dateKey}T12:00:00Z`));
 }
 
-function getActiveIlifeFinanceAttentionScope() {
-  return ilifeFinanceAttentionScopes[state.ilifeFinance.attentionScopeIndex] || ilifeFinanceAttentionScopes[0];
+function formatIlifeFinanceMoney(cents) {
+  if (state.ilifeFinance.valuesVisible === false) return "R$ â€¢â€¢â€¢â€¢â€¢";
+  return formatMoney(Number(cents || 0));
 }
 
-function getIlifeFinanceAttentionEndKey(scopeKey, todayKey) {
-  if (scopeKey === "next3") return addDaysToDateKey(todayKey, 2);
-  if (scopeKey === "week") {
-    const weekday = projectDateKeyToDate(todayKey, 12).getDay();
-    return addDaysToDateKey(todayKey, weekday === 0 ? 0 : 7 - weekday);
-  }
-  if (scopeKey === "month") {
-    const [year, month] = todayKey.split("-").map(Number);
-    const lastDay = new Date(year, month, 0).getDate();
-    return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  }
-  return todayKey;
-}
-
-function getIlifeFinanceAttentionEntries(summary) {
-  const scope = getActiveIlifeFinanceAttentionScope();
-  const today = getProjectTodayDateKey();
-  const end = getIlifeFinanceAttentionEndKey(scope.key, today);
-  return (Array.isArray(summary?.attentionEntries) ? summary.attentionEntries : [])
-    .filter((entry) => entry.dueOn >= today && entry.dueOn <= end);
-}
-
-function moveIlifeFinanceAttentionScope() {
-  state.ilifeFinance.attentionScopeIndex = (state.ilifeFinance.attentionScopeIndex + 1) % ilifeFinanceAttentionScopes.length;
-  renderIlifeFinanceSummary();
+function setIlifeFinanceToast(message) {
+  const toast = getIlifeFinanceEl("ilifeFinanceToast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add("is-visible");
+  window.clearTimeout(state.ilifeFinance.toastTimer);
+  state.ilifeFinance.toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 2400);
 }
 
 function renderIlifeFinanceSummary() {
   const summary = state.ilifeFinance.summary || {};
+  const entries = Array.isArray(summary.entries) ? summary.entries : [];
+  const scheduledEntries = entries.filter((entry) => entry.status === "SCHEDULED" && entry.settlementType === "FUTURE");
+  const incomeEntries = scheduledEntries.filter((entry) => entry.kind === "INCOME");
+  const expenseEntries = scheduledEntries.filter((entry) => entry.kind === "EXPENSE");
+  const balanceCents = Number(summary.balanceCents || 0);
+  const incomeCents = Number(summary.incomeCents || 0);
+  const expenseCents = Number(summary.expenseCents || 0);
+  const projectedCents = balanceCents + incomeCents - expenseCents;
   const monthName = getIlifeFinanceMonthName();
-  if (ilifeFinanceMonthLabel) ilifeFinanceMonthLabel.textContent = monthName;
-  if (ilifeFinanceIncomeMonth) ilifeFinanceIncomeMonth.textContent = monthName;
-  if (ilifeFinanceExpenseMonth) ilifeFinanceExpenseMonth.textContent = monthName;
-  if (ilifeFinanceCurrentBalance) ilifeFinanceCurrentBalance.textContent = formatMoney(summary.balanceCents || 0);
-  if (ilifeFinanceExpectedIncome) ilifeFinanceExpectedIncome.textContent = formatMoney(summary.incomeCents || 0);
-  if (ilifeFinanceExpectedExpense) ilifeFinanceExpectedExpense.textContent = formatMoney(summary.expenseCents || 0);
-  if (!ilifeFinanceTodayContent || !ilifeFinanceAttentionTitle) return;
 
-  const scope = getActiveIlifeFinanceAttentionScope();
-  const attentionEntries = getIlifeFinanceAttentionEntries(summary);
-  const nextScope = ilifeFinanceAttentionScopes[(state.ilifeFinance.attentionScopeIndex + 1) % ilifeFinanceAttentionScopes.length];
-  if (ilifeFinanceAttentionCycle) ilifeFinanceAttentionCycle.setAttribute("aria-label", `Mostrar ${nextScope.label.toLowerCase()}`);
-  if (!summary.hasAny) {
-    ilifeFinanceAttentionTitle.textContent = "Seu painel financeiro começa aqui";
-    ilifeFinanceTodayContent.innerHTML = '<p>Primeiro vamos registrar uma entrada ou saída.</p>';
-    return;
+  const monthLabel = getIlifeFinanceEl("ilifeFinanceMonthLabel");
+  const currentBalance = getIlifeFinanceEl("ilifeFinanceCurrentBalance");
+  const projectedBalance = getIlifeFinanceEl("ilifeFinanceProjectedBalance");
+  const expectedIncome = getIlifeFinanceEl("ilifeFinanceExpectedIncome");
+  const expectedExpense = getIlifeFinanceEl("ilifeFinanceExpectedExpense");
+  const freeMoney = getIlifeFinanceEl("ilifeFinanceFreeMoney");
+  const incomeMonth = getIlifeFinanceEl("ilifeFinanceIncomeMonth");
+  const expenseMonth = getIlifeFinanceEl("ilifeFinanceExpenseMonth");
+  const healthPill = getIlifeFinanceEl("ilifeFinanceHealthPill");
+  const agenda = getIlifeFinanceEl("ilifeFinanceTodayContent");
+  const list = getIlifeFinanceEl("ilifeFinanceTransactionList");
+  const toggle = getIlifeFinanceEl("ilifeFinanceToggleMoney");
+
+  if (monthLabel) monthLabel.textContent = monthName;
+  if (currentBalance) currentBalance.textContent = formatIlifeFinanceMoney(balanceCents);
+  if (projectedBalance) projectedBalance.textContent = formatIlifeFinanceMoney(projectedCents);
+  if (expectedIncome) expectedIncome.textContent = formatIlifeFinanceMoney(incomeCents);
+  if (expectedExpense) expectedExpense.textContent = formatIlifeFinanceMoney(expenseCents);
+  if (freeMoney) freeMoney.textContent = formatIlifeFinanceMoney(projectedCents);
+  if (incomeMonth) incomeMonth.textContent = `${incomeEntries.length} ${incomeEntries.length === 1 ? "lanÃ§amento" : "lanÃ§amentos"}`;
+  if (expenseMonth) expenseMonth.textContent = `${expenseEntries.length} ${expenseEntries.length === 1 ? "lanÃ§amento" : "lanÃ§amentos"}`;
+  if (toggle) toggle.textContent = state.ilifeFinance.valuesVisible === false ? "â—‹" : "â—‰";
+
+  if (healthPill) {
+    healthPill.classList.toggle("is-warning", projectedCents < 0);
+    healthPill.classList.toggle("is-watch", projectedCents >= 0 && expenseCents > incomeCents + Math.round(balanceCents * 0.65));
+    healthPill.textContent = projectedCents < 0 ? "AtenÃ§Ã£o" : expenseCents > incomeCents + Math.round(balanceCents * 0.65) ? "Acompanhar" : "Organizado";
   }
-  if (!attentionEntries.length) {
-    ilifeFinanceAttentionTitle.textContent = scope.empty;
-    ilifeFinanceTodayContent.innerHTML = '<p>Os próximos compromissos continuam organizados na sua agenda financeira.</p>';
-    return;
+
+  const today = getProjectTodayDateKey();
+  const attentionEntries = (Array.isArray(summary.attentionEntries) ? summary.attentionEntries : [])
+    .filter((entry) => entry.status === "SCHEDULED")
+    .sort((a, b) => String(a.dueOn || "").localeCompare(String(b.dueOn || "")));
+  const next = attentionEntries[0];
+  if (agenda) {
+    if (!summary.hasAny) {
+      agenda.innerHTML = '<div class="finance-nano-empty"><span>âœ“</span><div><small>AGENDA FINANCEIRA</small><strong>Seu painel financeiro comeÃ§a aqui</strong><p>Primeiro vamos registrar uma entrada ou saÃ­da.</p></div></div>';
+    } else if (!next) {
+      agenda.innerHTML = '<div class="finance-nano-empty"><span>âœ“</span><div><small>AGENDA FINANCEIRA</small><strong>Nenhuma pendÃªncia neste mÃªs</strong><p>Os prÃ³ximos compromissos aparecem aqui, em ordem de data.</p></div></div>';
+    } else {
+      const dueOn = String(next.dueOn || "");
+      const days = Math.ceil((projectDateKeyToDate(dueOn, 12) - projectDateKeyToDate(today, 12)) / 86400000);
+      const timing = days === 0 ? "Hoje" : days === 1 ? "AmanhÃ£" : days > 1 ? `Em ${days} dias` : formatIlifeFinanceDate(dueOn);
+      const income = next.kind === "INCOME";
+      agenda.innerHTML = `<div class="finance-nano-empty"><span>${income ? "â†™" : "â†—"}</span><div><small>${escapeHtml(timing.toUpperCase())} Â· ${escapeHtml(formatIlifeFinanceDate(dueOn).toUpperCase())}</small><strong>${escapeHtml(next.title || "LanÃ§amento")}</strong><p>${income ? "Entrada prevista" : "Pagamento previsto"} Â· <b>${income ? "+" : "-"} ${escapeHtml(formatIlifeFinanceMoney(next.amountCents || 0))}</b></p></div></div>`;
+    }
   }
-  ilifeFinanceAttentionTitle.textContent = scope.label;
-  ilifeFinanceTodayContent.innerHTML = `<div class="ilife-finance-today-list">${attentionEntries.map((entry) => {
-    const income = entry.kind === "INCOME";
-    const dateMeta = scope.key === "today" ? "" : ` · ${formatIlifeFinanceDate(entry.dueOn)}`;
-    return `<article class="ilife-finance-today-item ${income ? "income" : "expense"}"><span><b>${escapeHtml(entry.title)}</b><small>${income ? "Entrada" : "Saída"} prevista${escapeHtml(dateMeta)}</small></span><strong>${income ? "+" : "−"} ${escapeHtml(formatMoney(entry.amountCents || 0))}</strong></article>`;
-  }).join("")}</div>`;
+
+  if (list) {
+    if (!entries.length) {
+      list.innerHTML = '<div class="finance-nano-list-empty">Nenhuma movimentaÃ§Ã£o neste mÃªs.</div>';
+    } else {
+      list.innerHTML = [...entries]
+        .sort((a, b) => String(b.dueOn || "").localeCompare(String(a.dueOn || "")))
+        .slice(0, 8)
+        .map((entry) => {
+          const expense = entry.kind === "EXPENSE";
+          const settled = entry.status === "SETTLED";
+          return `<article class="finance-nano-transaction ${expense ? "is-expense" : ""}"><div>${expense ? "â†—" : "â†™"}</div><span><strong>${escapeHtml(entry.title || "LanÃ§amento")}</strong><small>${escapeHtml(formatIlifeFinanceDate(entry.dueOn))} Â· ${settled ? "REALIZADO" : "PREVISTO"}</small></span><b>${expense ? "-" : "+"} ${escapeHtml(formatIlifeFinanceMoney(entry.amountCents || 0))}</b></article>`;
+        }).join("");
+    }
+  }
 }
 
 async function loadIlifeFinanceLedger() {
-  if (ilifeFinanceMonthLabel) ilifeFinanceMonthLabel.textContent = getIlifeFinanceMonthName();
+  if (getIlifeFinanceEl("ilifeFinanceMonthLabel")) getIlifeFinanceEl("ilifeFinanceMonthLabel").textContent = getIlifeFinanceMonthName();
   if (!getToken()) {
     if (ilifeFinanceStatus) ilifeFinanceStatus.innerHTML = 'Entre para salvar e consultar sua carteira. <a href="/log?next=/200">Entrar</a>';
     return;
   }
-  if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "Carregando seu mês...";
+  if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "Carregando seu mÃªs...";
   try {
     const payload = await apiRequest(`/api/200/finance/ledger?month=${encodeURIComponent(getIlifeFinanceMonthKey())}`);
     state.ilifeFinance.summary = payload?.summary || null;
     renderIlifeFinanceSummary();
     if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "";
   } catch (error) {
-    if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar sua carteira.";
+    if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel carregar sua carteira.";
   }
+}
+
+function setIlifeFinanceAddMenu() {
+  state.ilifeFinance.addMenuOpen = false;
 }
 
 function moveIlifeFinanceMonth(direction) {
@@ -5869,33 +5876,31 @@ function moveIlifeFinanceMonth(direction) {
   void loadIlifeFinanceLedger();
 }
 
-function setIlifeFinanceAddMenu(open) {
-  state.ilifeFinance.addMenuOpen = Boolean(open);
-  if (ilifeFinanceAddMenu) ilifeFinanceAddMenu.hidden = !state.ilifeFinance.addMenuOpen;
-  if (ilifeFinanceAddButton) ilifeFinanceAddButton.setAttribute("aria-expanded", state.ilifeFinance.addMenuOpen ? "true" : "false");
-}
-
 function openIlifeFinanceWizard(kind) {
   state.ilifeFinance.wizard = buildIlifeFinanceWizard(kind);
-  setIlifeFinanceAddMenu(false);
-  if (ilifeFinanceTitleInput) ilifeFinanceTitleInput.value = "";
-  if (ilifeFinanceAmountInput) ilifeFinanceAmountInput.value = "";
-  if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "";
+  const titleInput = getIlifeFinanceEl("ilifeFinanceTitleInput");
+  const amountInput = getIlifeFinanceEl("ilifeFinanceAmountInput");
+  const dateInput = getIlifeFinanceEl("ilifeFinanceOnceDate");
+  const settlement = getIlifeFinanceEl("ilifeFinanceSettlementSelect");
+  const recurring = getIlifeFinanceEl("ilifeFinanceRecurring");
+  if (titleInput) titleInput.value = "";
+  if (amountInput) amountInput.value = "";
+  if (dateInput) dateInput.value = getProjectTodayDateKey();
+  if (settlement) settlement.value = "FUTURE";
+  if (recurring) recurring.checked = false;
   if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "";
+  renderIlifeFinanceWizard();
   if (ilifeFinanceEntryWizard) {
     ilifeFinanceEntryWizard.hidden = false;
+    ilifeFinanceEntryWizard.classList.add("is-open");
     ilifeFinanceEntryWizard.setAttribute("aria-hidden", "false");
   }
-  renderIlifeFinanceWizard();
-  window.setTimeout(() => ilifeFinanceTitleInput?.focus(), 50);
+  window.setTimeout(() => amountInput?.focus(), 80);
 }
 
 function closeIlifeFinanceWizard() {
-  if (ilifeFinanceCustomModal) {
-    ilifeFinanceCustomModal.hidden = true;
-    ilifeFinanceCustomModal.setAttribute("aria-hidden", "true");
-  }
   if (ilifeFinanceEntryWizard) {
+    ilifeFinanceEntryWizard.classList.remove("is-open");
     ilifeFinanceEntryWizard.hidden = true;
     ilifeFinanceEntryWizard.setAttribute("aria-hidden", "true");
   }
@@ -5906,137 +5911,53 @@ function renderIlifeFinanceWizard() {
   const wizard = state.ilifeFinance.wizard;
   if (!wizard) return;
   const income = wizard.kind === "INCOME";
-  if (ilifeFinanceWizardKicker) ilifeFinanceWizardKicker.textContent = income ? "Entrada" : "Saída";
-  if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = income ? "Adicionar dinheiro" : "Crédito ou débito";
-  if (ilifeFinanceFutureHint) ilifeFinanceFutureHint.textContent = income ? "Dinheiro ainda não caiu" : "Crédito ou dívida";
-  if (ilifeFinanceDetailsStep) ilifeFinanceDetailsStep.hidden = wizard.step !== "details";
-  if (ilifeFinanceScheduleStep) ilifeFinanceScheduleStep.hidden = wizard.step !== "schedule";
-  document.querySelectorAll("[data-ilife-settlement]").forEach((button) => button.classList.toggle("active", button.dataset.ilifeSettlement === wizard.settlementType));
-  if (wizard.step !== "schedule") return;
-
-  if (ilifeFinanceScheduleQuestion) ilifeFinanceScheduleQuestion.textContent = income ? "Que dia é o recebimento?" : "Que dia será o pagamento?";
-  const [modeLabel, modeHint] = ilifeFinanceScheduleModeLabels[wizard.scheduleMode];
-  if (ilifeFinanceModeLabel) ilifeFinanceModeLabel.textContent = modeLabel;
-  if (ilifeFinanceModeHint) ilifeFinanceModeHint.textContent = modeHint;
-  if (ilifeFinanceFrequencyLabel) ilifeFinanceFrequencyLabel.textContent = ilifeFinanceFrequencyLabels[wizard.scheduleFrequency];
-  const once = wizard.scheduleMode === "ONCE";
-  if (ilifeFinanceFrequencyRow) ilifeFinanceFrequencyRow.classList.toggle("is-disabled", once);
-  if (ilifeFinanceValueRow) ilifeFinanceValueRow.classList.toggle("is-disabled", once || wizard.scheduleFrequency === "CUSTOM");
-  if (ilifeFinanceOnceDateWrap) ilifeFinanceOnceDateWrap.hidden = !once;
-  if (ilifeFinanceOnceDate) ilifeFinanceOnceDate.value = wizard.startsOn;
-  if (ilifeFinanceEndDateWrap) ilifeFinanceEndDateWrap.hidden = wizard.scheduleMode !== "FINITE";
-  if (ilifeFinanceEndDate) ilifeFinanceEndDate.value = wizard.endsOn;
-  if (ilifeFinanceCustomOpen) ilifeFinanceCustomOpen.hidden = once || wizard.scheduleFrequency !== "CUSTOM";
-
-  if (wizard.scheduleFrequency === "WEEKLY") {
-    if (ilifeFinanceValueLabel) ilifeFinanceValueLabel.textContent = ilifeFinanceWeekdayNames[wizard.weekday];
-    if (ilifeFinanceValueHint) ilifeFinanceValueHint.textContent = "Toda semana";
-  } else if (wizard.scheduleFrequency === "CUSTOM") {
-    if (ilifeFinanceValueLabel) ilifeFinanceValueLabel.textContent = "Dias escolhidos";
-    if (ilifeFinanceValueHint) ilifeFinanceValueHint.textContent = ilifeFinanceCustomModeLabels[wizard.customMode];
-  } else {
-    if (ilifeFinanceValueLabel) ilifeFinanceValueLabel.textContent = `Dia ${wizard.dayOfMonth}`;
-    if (ilifeFinanceValueHint) ilifeFinanceValueHint.textContent = "Todo mês";
-  }
-}
-
-function cycleIlifeFinanceOption(type, direction) {
-  const wizard = state.ilifeFinance.wizard;
-  if (!wizard) return;
-  if (type === "mode") {
-    const index = ilifeFinanceScheduleModes.indexOf(wizard.scheduleMode);
-    wizard.scheduleMode = ilifeFinanceScheduleModes[(index + direction + ilifeFinanceScheduleModes.length) % ilifeFinanceScheduleModes.length];
-  } else if (type === "frequency" && wizard.scheduleMode !== "ONCE") {
-    const index = ilifeFinanceFrequencies.indexOf(wizard.scheduleFrequency);
-    wizard.scheduleFrequency = ilifeFinanceFrequencies[(index + direction + ilifeFinanceFrequencies.length) % ilifeFinanceFrequencies.length];
-  } else if (type === "value" && wizard.scheduleMode !== "ONCE") {
-    if (wizard.scheduleFrequency === "MONTHLY") wizard.dayOfMonth = ((wizard.dayOfMonth - 1 + direction + 31) % 31) + 1;
-    if (wizard.scheduleFrequency === "WEEKLY") wizard.weekday = (wizard.weekday + direction + 7) % 7;
-  }
-  renderIlifeFinanceWizard();
-}
-
-function renderIlifeFinanceCustom() {
-  const wizard = state.ilifeFinance.wizard;
-  if (!wizard) return;
-  if (ilifeFinanceCustomTitle) ilifeFinanceCustomTitle.textContent = ilifeFinanceCustomModeLabels[wizard.customMode];
-  if (ilifeFinanceCustomMonthly) ilifeFinanceCustomMonthly.hidden = wizard.customMode !== "MONTHLY";
-  if (ilifeFinanceCustomWeekly) ilifeFinanceCustomWeekly.hidden = wizard.customMode !== "WEEKLY";
-  if (ilifeFinanceCustomDaily) ilifeFinanceCustomDaily.hidden = wizard.customMode !== "DAILY";
-  if (ilifeFinanceMonthDays) ilifeFinanceMonthDays.innerHTML = Array.from({ length: 31 }, (_, index) => {
-    const day = index + 1;
-    return `<button type="button" class="${wizard.customDaysOfMonth.includes(day) ? "active" : ""}" data-ilife-month-day="${day}">${day}</button>`;
-  }).join("");
-  if (ilifeFinanceWeekDays) ilifeFinanceWeekDays.innerHTML = ilifeFinanceWeekdayNames.map((label, day) => `<button type="button" class="${wizard.customWeekdays.includes(day) ? "active" : ""}" data-ilife-weekday="${day}">${label}</button>`).join("");
-  if (ilifeFinanceCustomDates) ilifeFinanceCustomDates.innerHTML = wizard.customDates.map((date) => `<button type="button" data-ilife-remove-date="${escapeHtml(date)}">${escapeHtml(formatIlifeFinanceDate(date))} ×</button>`).join("");
-}
-
-function openIlifeFinanceCustom() {
-  if (!state.ilifeFinance.wizard || !ilifeFinanceCustomModal) return;
-  ilifeFinanceCustomModal.hidden = false;
-  ilifeFinanceCustomModal.setAttribute("aria-hidden", "false");
-  if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "";
-  renderIlifeFinanceCustom();
-}
-
-function closeIlifeFinanceCustom() {
-  if (!ilifeFinanceCustomModal) return;
-  ilifeFinanceCustomModal.hidden = true;
-  ilifeFinanceCustomModal.setAttribute("aria-hidden", "true");
+  if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = income ? "Nova entrada" : "Nova saÃ­da";
+  document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.ilifeFinanceKindSwitch === wizard.kind);
+  });
 }
 
 function buildIlifeFinancePayload() {
-  const wizard = state.ilifeFinance.wizard;
-  const payload = {
-    title: String(ilifeFinanceTitleInput?.value || "").trim(),
-    amountCents: parseIlifeFinanceAmount(ilifeFinanceAmountInput?.value),
+  const wizard = state.ilifeFinance.wizard || buildIlifeFinanceWizard("INCOME");
+  const settlementType = String(getIlifeFinanceEl("ilifeFinanceSettlementSelect")?.value || "FUTURE").toUpperCase();
+  const startsOn = getIlifeFinanceEl("ilifeFinanceOnceDate")?.value || getProjectTodayDateKey();
+  const recurring = Boolean(getIlifeFinanceEl("ilifeFinanceRecurring")?.checked);
+  const endsOn = getIlifeFinanceEl("ilifeFinanceEndDate")?.value || null;
+  return {
+    title: String(getIlifeFinanceEl("ilifeFinanceTitleInput")?.value || "").trim(),
+    amountCents: parseIlifeFinanceAmount(getIlifeFinanceEl("ilifeFinanceAmountInput")?.value),
+    accountName: String(getIlifeFinanceEl("ilifeFinanceAccountSelect")?.value || "Conta principal"),
+    category: String(getIlifeFinanceEl("ilifeFinanceCategorySelect")?.value || "Outros"),
     kind: wizard.kind,
-    settlementType: wizard.settlementType,
-    scheduleMode: wizard.settlementType === "CASH" ? "ONCE" : wizard.scheduleMode,
-    scheduleFrequency: wizard.scheduleMode === "ONCE" ? "NONE" : wizard.scheduleFrequency,
-    startsOn: wizard.settlementType === "CASH" ? getProjectTodayDateKey() : wizard.startsOn,
-    endsOn: wizard.scheduleMode === "FINITE" ? wizard.endsOn : null,
-    scheduleConfig: {}
+    settlementType: settlementType === "CASH" ? "CASH" : "FUTURE",
+    scheduleMode: recurring ? (endsOn ? "FINITE" : "RECURRING") : "ONCE",
+    scheduleFrequency: recurring ? "MONTHLY" : "NONE",
+    startsOn,
+    endsOn: recurring ? endsOn : null,
+    scheduleConfig: recurring ? { daysOfMonth: [Number(startsOn.slice(8, 10))] } : {}
   };
-  if (wizard.scheduleFrequency === "MONTHLY") payload.scheduleConfig.daysOfMonth = [wizard.dayOfMonth];
-  if (wizard.scheduleFrequency === "WEEKLY") payload.scheduleConfig.weekdays = [wizard.weekday];
-  if (wizard.scheduleFrequency === "CUSTOM") payload.scheduleConfig = {
-    customMode: wizard.customMode,
-    daysOfMonth: wizard.customDaysOfMonth,
-    weekdays: wizard.customWeekdays,
-    dates: wizard.customDates
-  };
-  return payload;
 }
 
 async function saveIlifeFinanceItem() {
-  const wizard = state.ilifeFinance.wizard;
-  if (!wizard) return;
   const payload = buildIlifeFinancePayload();
   if (!payload.title) {
-    const target = wizard.step === "details" ? ilifeFinanceDetailsStatus : ilifeFinanceWizardStatus;
-    if (target) target.textContent = "Digite uma descrição.";
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Digite uma descriÃ§Ã£o.";
     return;
   }
   if (!payload.amountCents) {
-    const target = wizard.step === "details" ? ilifeFinanceDetailsStatus : ilifeFinanceWizardStatus;
-    if (target) target.textContent = "Digite um valor válido.";
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Digite um valor vÃ¡lido.";
     return;
   }
-  if (wizard.scheduleMode === "FINITE" && (!wizard.endsOn || wizard.endsOn < wizard.startsOn)) {
+  if (!payload.startsOn) {
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Escolha a data.";
+    return;
+  }
+  if (payload.endsOn && payload.endsOn < payload.startsOn) {
     if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Escolha uma data final depois da data inicial.";
     return;
   }
-  if (wizard.scheduleFrequency === "CUSTOM") {
-    const hasCustom = wizard.customMode === "MONTHLY" ? wizard.customDaysOfMonth.length : wizard.customMode === "WEEKLY" ? wizard.customWeekdays.length : wizard.customDates.length;
-    if (!hasCustom) {
-      if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Escolha os dias personalizados.";
-      return;
-    }
-  }
   if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Salvando...";
   if (ilifeFinanceSave) ilifeFinanceSave.disabled = true;
-  if (ilifeFinanceDetailsNext) ilifeFinanceDetailsNext.disabled = true;
   try {
     await apiRequest("/api/200/finance/ledger", {
       method: "POST",
@@ -6045,12 +5966,11 @@ async function saveIlifeFinanceItem() {
     });
     closeIlifeFinanceWizard();
     await loadIlifeFinanceLedger();
+    setIlifeFinanceToast("LanÃ§amento salvo no seu mÃªs.");
   } catch (error) {
-    const target = wizard.step === "details" ? ilifeFinanceDetailsStatus : ilifeFinanceWizardStatus;
-    if (target) target.textContent = error instanceof Error ? error.message : "Não foi possível salvar.";
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel salvar.";
   } finally {
     if (ilifeFinanceSave) ilifeFinanceSave.disabled = false;
-    if (ilifeFinanceDetailsNext) ilifeFinanceDetailsNext.disabled = false;
   }
 }
 
@@ -6433,7 +6353,7 @@ function renderConstitution() {
   constitutionAuthAlert.hidden = hasToken;
 
   const current = getActiveConstitutionVersion();
-  const label = current?.label || "Versão 1";
+  const label = current?.label || "VersÃ£o 1";
   constitutionVersionLabel.textContent = label;
   constitutionTextView.textContent = current?.text || constitutionDefaultText;
 
@@ -6466,7 +6386,7 @@ async function loadConstitution() {
     state.constitutionVersions = [{
       id: "local-default",
       versionNumber: 1,
-      label: "Versão 1",
+      label: "VersÃ£o 1",
       text: constitutionDefaultText,
       approvals: {}
     }];
@@ -6483,7 +6403,7 @@ async function loadConstitution() {
       : [{
         id: "local-default",
         versionNumber: 1,
-        label: "Versão 1",
+        label: "VersÃ£o 1",
         text: constitutionDefaultText,
         approvals: {}
       }];
@@ -6549,7 +6469,7 @@ async function approveConstitution(approver) {
     return;
   }
 
-  const ok = window.confirm(`${approver}: Concordar com essa versão?`);
+  const ok = window.confirm(`${approver}: Concordar com essa versÃ£o?`);
   if (!ok) {
     return;
   }
@@ -6831,7 +6751,7 @@ function createActionsDynamicMissionDeck(entries = []) {
   if (!deckEntries.length) return null;
   const deck = document.createElement('section');
   deck.className = 'actions-dynamic-mission-deck';
-  deck.setAttribute('aria-label', 'Metas próximas ou atrasadas');
+  deck.setAttribute('aria-label', 'Metas prÃ³ximas ou atrasadas');
   const track = document.createElement('div');
   track.className = 'actions-dynamic-mission-track';
   deckEntries.forEach((entry, index) => {
@@ -6908,10 +6828,10 @@ function renderActions() {
   const compactMissionDeckInsertIndex = compactMissionDeck ? getActionsDynamicMissionDeckInsertIndex(timelineEntries) : -1;
 
   if (showMissionsSuccess) {
-    actionsList.insertAdjacentHTML("beforeend", '<section class="actions-missions-success" aria-label="Tudo em dia com suas missões"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7.8 12.2 2.7 2.7 5.8-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><strong><span>Tudo em dia com</span><span>suas missões</span></strong></section>');
+    actionsList.insertAdjacentHTML("beforeend", '<section class="actions-missions-success" aria-label="Tudo em dia com suas missÃµes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7.8 12.2 2.7 2.7 5.8-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><strong><span>Tudo em dia com</span><span>suas missÃµes</span></strong></section>');
   }
   if (!timelineEntries.length && !showMissionsSuccess && !compactMissionDeck) {
-    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse período.</div>';
+    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse perÃ­odo.</div>';
   }
   timelineEntries.forEach((action, actionIndex) => {
     if (compactMissionDeck && actionIndex === compactMissionDeckInsertIndex) {
@@ -6997,7 +6917,7 @@ function renderActions() {
       ${buildTaskAvatarMarkup(actionIcon.src, actionIcon.alt, { categoryIcon: actionIcon.categoryIcon })}
       <div class="task-main">
         <div class="task-title">${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
-        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}${status === actionStatuses.paused ? ` · ${getActionStoredCompletionPercent(action)}%` : ""}</div>
+        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}${status === actionStatuses.paused ? ` Â· ${getActionStoredCompletionPercent(action)}%` : ""}</div>
       </div>
       <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
     `;
@@ -7332,7 +7252,7 @@ function renderFriendAssignmentButton(button, friend, label) {
 
 function renderFriendAssignmentButtons() {
   renderFriendAssignmentButton(actionFriendAssignButton, state.friendAssignment.action, "Criar tarefa");
-  renderFriendAssignmentButton(missionFriendAssignButton, state.friendAssignment.mission, "Criar missão");
+  renderFriendAssignmentButton(missionFriendAssignButton, state.friendAssignment.mission, "Criar missÃ£o");
 }
 
 function renderFriendAssignmentList() {
@@ -7345,7 +7265,7 @@ function renderFriendAssignmentList() {
   selfButton.type = "button";
   selfButton.className = `friend-assignment-card${selected ? "" : " is-selected"}`;
   selfButton.dataset.friendAssignmentSelf = "true";
-  selfButton.innerHTML = '<span class="friend-assignment-avatar friend-assignment-avatar-self">EU</span><span><strong>Para mim</strong><small>Salvar na minha própria conta</small></span>';
+  selfButton.innerHTML = '<span class="friend-assignment-avatar friend-assignment-avatar-self">EU</span><span><strong>Para mim</strong><small>Salvar na minha prÃ³pria conta</small></span>';
   friendAssignmentList.appendChild(selfButton);
 
   for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
@@ -7362,7 +7282,7 @@ function renderFriendAssignmentList() {
   }
 
   if (!(Array.isArray(state.social?.friends) && state.social.friends.length) && friendAssignmentStatus) {
-    friendAssignmentStatus.textContent = "Você ainda não tem amigos com convite aceito.";
+    friendAssignmentStatus.textContent = "VocÃª ainda nÃ£o tem amigos com convite aceito.";
   }
 }
 
@@ -7370,7 +7290,7 @@ async function openFriendAssignmentPicker(mode) {
   state.friendAssignment.mode = mode === "mission" ? "mission" : "action";
   if (friendAssignmentTitle) {
     friendAssignmentTitle.textContent = state.friendAssignment.mode === "mission"
-      ? "Criar missão para"
+      ? "Criar missÃ£o para"
       : "Criar tarefa para";
   }
   if (friendAssignmentStatus) friendAssignmentStatus.textContent = "Carregando amigos...";
@@ -7383,7 +7303,7 @@ async function openFriendAssignmentPicker(mode) {
     renderFriendAssignmentList();
   } catch (error) {
     if (friendAssignmentStatus) {
-      friendAssignmentStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar seus amigos.";
+      friendAssignmentStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel carregar seus amigos.";
     }
   }
 }
@@ -7599,7 +7519,7 @@ function renderMissionCreateCategoryPicker() {
   missionCreateCategoryTrigger.classList.toggle("is-unresolved", !resolved && !thinking);
   if (missionCreateCategoryIcon) {
     missionCreateCategoryIcon.src = resolved ? getTaskCategoryIconPath(categoryId) : "/200/icons/plataformas.svg";
-    missionCreateCategoryIcon.alt = thinking ? "Definindo aspecto" : resolved ? getTaskCategoryName(categoryId) : "Aspecto da missão";
+    missionCreateCategoryIcon.alt = thinking ? "Definindo aspecto" : resolved ? getTaskCategoryName(categoryId) : "Aspecto da missÃ£o";
   }
   setActionCategoryLabel(
     missionCreateCategoryLabel,
@@ -7683,7 +7603,7 @@ function setSvgSelectorPreview(url = "", label = "") {
     return;
   }
   svgSelectorPreview.src = String(url || "").trim() || defaultTaskSvgPath;
-  svgSelectorPreview.alt = label || "Preview do ícone";
+  svgSelectorPreview.alt = label || "Preview do Ã­cone";
 }
 
 function renderSvgSelectorModal() {
@@ -7703,8 +7623,8 @@ function renderSvgSelectorModal() {
     button.type = "button";
     button.className = `svg-selector-item${selectedUrl === assetUrl ? " is-selected" : ""}`;
     button.dataset.svgUrl = assetUrl;
-    button.dataset.svgLabel = String(asset?.label || asset?.id || "Ícone").trim();
-    button.innerHTML = buildTaskAvatarMarkup(assetUrl, String(asset?.label || "Ícone"), { categoryIcon: true });
+    button.dataset.svgLabel = String(asset?.label || asset?.id || "Ãcone").trim();
+    button.innerHTML = buildTaskAvatarMarkup(assetUrl, String(asset?.label || "Ãcone"), { categoryIcon: true });
     svgSelectorGrid.appendChild(button);
   });
   setSvgSelectorPreview(selectedUrl, String(state.svgSelector?.selectedLabel || "").trim());
@@ -7714,24 +7634,24 @@ async function openSvgSelectorModal(targetKind, targetId) {
   state.svgSelector.targetKind = String(targetKind || "").trim();
   state.svgSelector.targetId = String(targetId || "").trim();
   if (svgSelectorTitle) {
-    svgSelectorTitle.textContent = targetKind === "mission" ? "Ícone da missão" : "Ícone da tarefa";
+    svgSelectorTitle.textContent = targetKind === "mission" ? "Ãcone da missÃ£o" : "Ãcone da tarefa";
   }
   if (svgSelectorHint) {
     svgSelectorHint.textContent = targetKind === "mission"
-      ? "Escolha um ícone da biblioteca para salvar nesta missão."
-      : "Escolha um ícone da biblioteca para salvar nesta tarefa.";
+      ? "Escolha um Ã­cone da biblioteca para salvar nesta missÃ£o."
+      : "Escolha um Ã­cone da biblioteca para salvar nesta tarefa.";
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Carregando ícones...";
+    svgSelectorStatus.textContent = "Carregando Ã­cones...";
   }
   if (targetKind === "mission") {
     const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === String(targetId || ""));
     state.svgSelector.selectedUrl = String(goal?.svgIconUrl || "").trim() || defaultMissionSvgPath;
-    state.svgSelector.selectedLabel = String(goal?.svgIconLabel || goal?.title || "Ícone da missão").trim();
+    state.svgSelector.selectedLabel = String(goal?.svgIconLabel || goal?.title || "Ãcone da missÃ£o").trim();
   } else {
     const action = (Array.isArray(state.actions) ? state.actions : []).find((item) => String(item.id || "") === String(targetId || ""));
     state.svgSelector.selectedUrl = String(action?.svgIconUrl || "").trim() || defaultTaskSvgPath;
-    state.svgSelector.selectedLabel = String(action?.svgIconLabel || action?.title || "Ícone da tarefa").trim();
+    state.svgSelector.selectedLabel = String(action?.svgIconLabel || action?.title || "Ãcone da tarefa").trim();
   }
   renderSvgSelectorModal();
   openModal("svgSelectorModal");
@@ -7751,7 +7671,7 @@ async function saveSvgSelectorChoice() {
     return;
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Salvando ícone...";
+    svgSelectorStatus.textContent = "Salvando Ã­cone...";
   }
   if (targetKind === "mission") {
     const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === targetId);
@@ -7794,7 +7714,7 @@ async function saveSvgSelectorChoice() {
     }
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Ícone salvo.";
+    svgSelectorStatus.textContent = "Ãcone salvo.";
   }
   window.setTimeout(() => closeModal("svgSelectorModal"), 180);
 }
@@ -7871,8 +7791,8 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     finalize: "Concluir?",
     restore: "Restaurar tarefa",
     delete: "Excluir microtarefa?",
-    delete_mission: "Excluir missão inteira?",
-    delete_progress_event: "Remover última movimentação?"
+    delete_mission: "Excluir missÃ£o inteira?",
+    delete_progress_event: "Remover Ãºltima movimentaÃ§Ã£o?"
   };
   const buttonMap = {
     giveup: "Desistir",
@@ -7880,7 +7800,7 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     finalize: "Concluir",
     restore: "Restaurar tarefa",
     delete: "Excluir",
-    delete_mission: "Excluir missão",
+    delete_mission: "Excluir missÃ£o",
     delete_progress_event: "Remover"
   };
   const classMap = {
@@ -7973,7 +7893,7 @@ function closeStartConflictModal(value = "cancel") {
 
 function formatActionMusicInlineLabel(action) {
   const label = formatActionMusicDecisionLabel(action);
-  return label.replace(/^Música padrão da atividade:\s*/i, "").trim() || "Definir música";
+  return label.replace(/^MÃºsica padrÃ£o da atividade:\s*/i, "").trim() || "Definir mÃºsica";
 }
 
 function buildPendingStartActionButtons(targetAction) {
@@ -8042,12 +7962,12 @@ function getProjectNativeKeyboardRows() {
     return [
       ["1", "2", "3", { action: "noop", label: "-", className: "is-command is-future-key" }],
       ["4", "5", "6", { action: "clear", label: "x", className: "is-command is-clear", ariaLabel: "Apagar tudo" }],
-      ["7", "8", "9", { action: "backspace", label: "<", className: "is-command", ariaLabel: "Apagar um número" }],
+      ["7", "8", "9", { action: "backspace", label: "<", className: "is-command", ariaLabel: "Apagar um nÃºmero" }],
       [
         { action: "noop", label: ",", className: "is-command is-future-key" },
         "0",
         { action: "noop", label: ".", className: "is-command is-future-key" },
-        { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar e avançar" }
+        { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar e avanÃ§ar" }
       ]
     ];
   }
@@ -8057,13 +7977,13 @@ function getProjectNativeKeyboardRows() {
       ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
       ["@", "#", "$", "&", "*", "-", "+", "=", "%"],
       [
-        { action: "noop", label: "⇧", className: "is-command", ariaLabel: "Maiúsculas indisponíveis em números" },
+        { action: "noop", label: "â‡§", className: "is-command", ariaLabel: "MaiÃºsculas indisponÃ­veis em nÃºmeros" },
         "(", ")", "/", "\\", ":", ";", "\"",
-        { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" }
+        { action: "backspace", label: "âŒ«", className: "is-command", ariaLabel: "Apagar" }
       ],
       [
         { action: "letters", label: "ABC", className: "is-command" },
-        { action: "space", label: "espaço", className: "is-space" },
+        { action: "space", label: "espaÃ§o", className: "is-space" },
         { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar" }
       ]
     ];
@@ -8074,13 +7994,13 @@ function getProjectNativeKeyboardRows() {
     [..."qwertyuiop"].map(letter),
     [..."asdfghjkl"].map(letter),
     [
-      { action: "shift", label: "⇧", className: `is-command${shifted ? " is-active" : ""}`, ariaLabel: "Maiúsculas" },
+      { action: "shift", label: "â‡§", className: `is-command${shifted ? " is-active" : ""}`, ariaLabel: "MaiÃºsculas" },
       ...[..."zxcvbnm"].map(letter),
-      { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" }
+      { action: "backspace", label: "âŒ«", className: "is-command", ariaLabel: "Apagar" }
     ],
     [
       { action: "symbols", label: "123", className: "is-command" },
-      { action: "space", label: "espaço", className: "is-space" },
+      { action: "space", label: "espaÃ§o", className: "is-space" },
       { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar" }
     ]
   ];
@@ -8311,13 +8231,13 @@ function renderTaskComposerModal() {
   renderTaskComposerMeta(
     startDecisionStartAt,
     startDecisionStartAt?.querySelector("svg")?.outerHTML || "",
-    untouchedCreate ? "Inserir horário inicial" : `${String(state.wizard.startHour).padStart(2, "0")}:${String(state.wizard.startMinute).padStart(2, "0")}`,
+    untouchedCreate ? "Inserir horÃ¡rio inicial" : `${String(state.wizard.startHour).padStart(2, "0")}:${String(state.wizard.startMinute).padStart(2, "0")}`,
     untouchedCreate
   );
   renderTaskComposerMeta(
     startDecisionEndAt,
     startDecisionEndAt?.querySelector("svg")?.outerHTML || "",
-    untouchedCreate ? "Inserir horário final" : `${String(state.wizard.endHour).padStart(2, "0")}:${String(state.wizard.endMinute).padStart(2, "0")}`,
+    untouchedCreate ? "Inserir horÃ¡rio final" : `${String(state.wizard.endHour).padStart(2, "0")}:${String(state.wizard.endMinute).padStart(2, "0")}`,
     untouchedCreate
   );
   const repeatLabel = untouchedCreate ? "Inserir uma data" : formatTaskComposerDateLabel();
@@ -8330,7 +8250,7 @@ function renderTaskComposerModal() {
   renderTaskComposerMeta(
     startDecisionMusicLabel,
     startDecisionMusicLabel?.querySelector("svg")?.outerHTML || "",
-    formatActionMusicInlineLabel(findActionById(state.startDecisionContext.actionId)) || "Definir música",
+    formatActionMusicInlineLabel(findActionById(state.startDecisionContext.actionId)) || "Definir mÃºsica",
     false
   );
   const categoryThinking = Boolean(state.wizard.categoryThinking) && !state.startDecisionContext.categoryManuallySelected;
@@ -8350,7 +8270,7 @@ function renderTaskComposerModal() {
     const primary = document.createElement("button");
     primary.type = "button";
     primary.className = "decision-btn decision-btn-start";
-    primary.innerHTML = `<span>${mode === "create" ? "Criar tarefa" : "Salvar edição"}</span>`;
+    primary.innerHTML = `<span>${mode === "create" ? "Criar tarefa" : "Salvar ediÃ§Ã£o"}</span>`;
     primary.disabled = !titleValue || categoryThinking || !categoryResolved;
     primary.addEventListener("click", () => {
       void saveTaskComposer();
@@ -8566,13 +8486,13 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   state.startConflict.nextActionId = String(nextAction?.id || "");
   const currentTitle = formatActionTitleForDisplay(currentAction?.title || "Tarefa");
   if (startConflictCurrentTitle) {
-    startConflictCurrentTitle.textContent = `${currentTitle} está em andamento`;
+    startConflictCurrentTitle.textContent = `${currentTitle} estÃ¡ em andamento`;
   }
   if (startConflictQuestion) {
-    startConflictQuestion.textContent = `Você concluiu ${currentTitle}?`;
+    startConflictQuestion.textContent = `VocÃª concluiu ${currentTitle}?`;
   }
   if (startConflictNextTitle) {
-    startConflictNextTitle.textContent = `Próxima: ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
+    startConflictNextTitle.textContent = `PrÃ³xima: ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
   }
   document.body.appendChild(startConflictModal);
   document.body.classList.add("start-conflict-open");
@@ -8705,7 +8625,7 @@ function closePostponeReplaceModalView() {
 
 function formatPostponeDayLabel(offset) {
   if (offset === 0) return "Hoje";
-  if (offset === 1) return "Amanhã";
+  if (offset === 1) return "AmanhÃ£";
   return formatDateLabel(dateFromOffset(offset));
 }
 
@@ -8814,16 +8734,16 @@ function updatePostponeFeedback() {
   postponeFeedback.classList.remove("is-error");
   if (!draft.fitFound) {
     postponeFeedback.classList.add("is-error");
-    postponeFeedback.textContent = "Sem horários livres";
+    postponeFeedback.textContent = "Sem horÃ¡rios livres";
     if (confirmPostponeTask) {
       confirmPostponeTask.disabled = true;
       confirmPostponeTask.classList.remove("is-replace");
-      confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg><span>Sem horários livres</span>';
+      confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg><span>Sem horÃ¡rios livres</span>';
     }
     return;
   }
   if (!overlaps.length) {
-    postponeFeedback.textContent = `Disponível: inicia ${formatHourChip(draft.startAt.toISOString())}`;
+    postponeFeedback.textContent = `DisponÃ­vel: inicia ${formatHourChip(draft.startAt.toISOString())}`;
     if (confirmPostponeTask) {
       confirmPostponeTask.disabled = false;
       confirmPostponeTask.classList.remove("is-replace");
@@ -9178,7 +9098,7 @@ async function createProject200ProfileFromModal() {
   const name = String(project200CreateProfileNameInput?.value || "").trim();
   if (!name) {
     if (project200CreateProfileMessage) {
-      project200CreateProfileMessage.textContent = "Digite o nome do usuário.";
+      project200CreateProfileMessage.textContent = "Digite o nome do usuÃ¡rio.";
     }
     return;
   }
@@ -9481,7 +9401,7 @@ async function submitProfileSvgSuggestion() {
       renderProfileAvatarModal();
     }
     if (profileAvatarMessage) {
-      profileAvatarMessage.textContent = `SVG escolhido: ${String(payload?.asset?.label || "ícone")}.`;
+      profileAvatarMessage.textContent = `SVG escolhido: ${String(payload?.asset?.label || "Ã­cone")}.`;
     }
   } catch (error) {
     if (profileAvatarMessage) {
@@ -9593,7 +9513,7 @@ async function reassignManagedProfileTasks() {
   });
   if (profileManageMessage) {
     profileManageMessage.textContent = payload?.summary
-      ? `${payload.summary.movedTasks} tarefa(s) de ${payload.summary.sourceProfileName} agora estão com ${payload.summary.targetProfileName}.`
+      ? `${payload.summary.movedTasks} tarefa(s) de ${payload.summary.sourceProfileName} agora estÃ£o com ${payload.summary.targetProfileName}.`
       : "";
   }
   await loadActions();
@@ -9664,9 +9584,9 @@ function renderTimePickers() {
 
     container.innerHTML = `
       <div class="native-time-picker">
-        <button class="native-time-trigger" type="button" data-open-native-time="${type}" aria-label="Escolher horário ${type === "start" ? "inicial" : "final"}">
+        <button class="native-time-trigger" type="button" data-open-native-time="${type}" aria-label="Escolher horÃ¡rio ${type === "start" ? "inicial" : "final"}">
           <strong>${timeValue}</strong>
-          <span>Toque para abrir o relógio</span>
+          <span>Toque para abrir o relÃ³gio</span>
         </button>
         <input class="native-time-input" type="time" value="${timeValue}" step="60" data-native-time-input="${type}" aria-hidden="true" tabindex="-1" />
       </div>
@@ -9938,13 +9858,13 @@ function renderOverlapWizard() {
   } else {
     const item = state.overlapItems[state.overlapIndex % state.overlapItems.length];
     overlapTaskTitle.textContent = String(item.title || "Tarefa");
-    overlapTaskRange.textContent = `${formatHourChip(item.startAt)} às ${formatHourChip(item.endAt)}`;
+    overlapTaskRange.textContent = `${formatHourChip(item.startAt)} Ã s ${formatHourChip(item.endAt)}`;
   }
   if (state.overlapCandidateStarts.length) {
     const startIso = state.overlapCandidateStarts[state.overlapCandidateIndex % state.overlapCandidateStarts.length];
     overlapFreeStartLabel.textContent = formatHourChip(startIso);
   } else {
-    overlapFreeStartLabel.textContent = "Sem horário";
+    overlapFreeStartLabel.textContent = "Sem horÃ¡rio";
   }
 }
 
@@ -10050,7 +9970,7 @@ async function saveAction() {
       let replaceOverlaps = false;
       const decision = await openOverlapWizard(overlaps, occurrences);
       if (!decision || decision.type === "cancel") {
-        wizardMessage.textContent = "Ajuste o horário para continuar.";
+        wizardMessage.textContent = "Ajuste o horÃ¡rio para continuar.";
         return;
       }
       if (decision.type === "change_time") {
@@ -10141,7 +10061,7 @@ async function saveAction() {
         state.wizard.forceReplaceOverlaps = false;
         return saveAction();
       }
-      wizardMessage.textContent = "Ajuste o horário para continuar.";
+      wizardMessage.textContent = "Ajuste o horÃ¡rio para continuar.";
       return;
     }
     state.wizard.forceReplaceOverlaps = false;
@@ -10169,7 +10089,7 @@ async function openActionLongPressMenu(actionId) {
     return;
   }
 
-  const choice = window.prompt("Opções da tarefa:\n1 - Excluir\n2 - Editar", "2");
+  const choice = window.prompt("OpÃ§Ãµes da tarefa:\n1 - Excluir\n2 - Editar", "2");
   if (choice == null) {
     return;
   }
@@ -10347,11 +10267,11 @@ async function manualFinishAction(actionId) {
   const startedAt = parseTimeToIso(target.startAt, manualStartTimeInput.value);
   const completedAt = parseTimeToIso(target.startAt, manualEndTimeInput.value);
   if (!startedAt || !completedAt) {
-    actionStatusManualMessage.textContent = "Preencha início e fim.";
+    actionStatusManualMessage.textContent = "Preencha inÃ­cio e fim.";
     return;
   }
   if (new Date(completedAt).getTime() <= new Date(startedAt).getTime()) {
-    actionStatusManualMessage.textContent = "Fim precisa ser após início.";
+    actionStatusManualMessage.textContent = "Fim precisa ser apÃ³s inÃ­cio.";
     return;
   }
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
@@ -10408,7 +10328,7 @@ function renderPlatformDateHeader() {
 }
 
 function getPlatformKindLabel(kind) {
-  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "Saída";
+  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "SaÃ­da";
 }
 
 function getPlatformStatusClass(entry) {
@@ -10436,7 +10356,7 @@ function renderPlatformBalance() {
     : formatMoney(state.platformBalanceCents);
 
   if (togglePlatformBalanceButton) {
-    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "•";
+    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "â€¢";
   }
 }
 
@@ -10472,12 +10392,12 @@ function renderPlatformEntries() {
   platformEntriesList.innerHTML = "";
 
   if (!getToken()) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanças.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanÃ§as.</div>';
     return;
   }
 
   if (!state.platformEntries.length) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Sem lançamentos nessa data.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Sem lanÃ§amentos nessa data.</div>';
     return;
   }
 
@@ -10516,7 +10436,7 @@ function renderPlatformEntries() {
     row.dataset.entryName = String(entry.name || "");
     row.innerHTML = `
       <div class="task-title">
-        ${isDebit ? `<img class="platform-entry-icon" src="${categoryIcon}" alt="Saída" loading="lazy" />` : ""}
+        ${isDebit ? `<img class="platform-entry-icon" src="${categoryIcon}" alt="SaÃ­da" loading="lazy" />` : ""}
         <span>${escapeHtml(entry.name)}</span>
       </div>
       <div class="platform-entry-value">${escapeHtml(formatMoney(signed))}</div>
@@ -10600,7 +10520,7 @@ async function createPlatformEntryFromVoiceInterpret(text) {
     entry = inferFinanceEntryLocally(text);
   }
   if (!entry) {
-    throw new Error("Sem interpretação.");
+    throw new Error("Sem interpretaÃ§Ã£o.");
   }
   if (String(entry.recurrenceType || "").toUpperCase() !== "RECURRING" && /\bdia\s+\d{1,2}\b/i.test(text)) {
     entry.recurrenceType = "RECURRING";
@@ -10645,11 +10565,11 @@ function openFinanceEntryConfirm(entry, categoryLabel) {
     const icon = platformCategoryIconByName[String(entry.category || "").trim()] || "/200/icons/financas.svg";
     financeEntryConfirmCard.classList.toggle("platform-entry-income", kind === "INCOME");
     financeEntryConfirmCard.classList.toggle("platform-entry-debit", kind !== "INCOME");
-    financeEntryConfirmName.innerHTML = `<img class="platform-entry-icon" src="${icon}" alt="" aria-hidden="true" /><span>${escapeHtml(entry.name || "Lançamento")}</span>`;
+    financeEntryConfirmName.innerHTML = `<img class="platform-entry-icon" src="${icon}" alt="" aria-hidden="true" /><span>${escapeHtml(entry.name || "LanÃ§amento")}</span>`;
     financeEntryConfirmValue.textContent = formatMoney(value);
     const recurrenceMeta = String(entry.recurrenceType || "").toUpperCase() === "RECURRING"
-      ? `Tag: ${categoryLabel} • Data: dia ${Math.max(1, Math.min(31, Number(entry.recurrenceDayOfMonth || 1)))}`
-      : `Tag: ${categoryLabel} • Data: ${formatDateLabel(dateFromOffset(state.platformOffset))}`;
+      ? `Tag: ${categoryLabel} â€¢ Data: dia ${Math.max(1, Math.min(31, Number(entry.recurrenceDayOfMonth || 1)))}`
+      : `Tag: ${categoryLabel} â€¢ Data: ${formatDateLabel(dateFromOffset(state.platformOffset))}`;
     financeEntryConfirmMeta.textContent = recurrenceMeta;
     financeEntryConfirmWizard.classList.add("active");
     financeEntryConfirmWizard.setAttribute("aria-hidden", "false");
@@ -10696,7 +10616,7 @@ function formatRepeatLabel(repeatRule, repeatDays) {
   if (repeatRule === "monthly_custom") {
     return `Toda ${monthlyOrdinalLabels[state.wizard.monthlyOrdinalIndex]} ${monthlyWeekdayLabels[state.wizard.monthlyWeekdayIndex]}`;
   }
-  return "Data única";
+  return "Data Ãºnica";
 }
 
 function formatActionMusicDecisionLabel(action) {
@@ -10706,12 +10626,12 @@ function formatActionMusicDecisionLabel(action) {
   const stationName = String(action?.musicStationName || preference?.stationName || "").trim();
   const trackName = String(action?.musicTrackName || preference?.trackName || "").trim();
   if (mode === "station" && stationName) {
-    return `Música padrão da atividade: ${stationName}`;
+    return `MÃºsica padrÃ£o da atividade: ${stationName}`;
   }
   if (trackName) {
-    return `Música padrão da atividade: ${trackName}`;
+    return `MÃºsica padrÃ£o da atividade: ${trackName}`;
   }
-  return "Definir música";
+  return "Definir mÃºsica";
 }
 
 function renderActionAiConfirmation(payload) {
@@ -10773,7 +10693,7 @@ function applyPendingInterpretedActionAndContinue() {
 
 async function startActionMic() {
   if (actionMediaRecorder && actionMediaRecorder.state !== "inactive") {
-    actionVoiceStatus.textContent = "Microfone já está ouvindo...";
+    actionVoiceStatus.textContent = "Microfone jÃ¡ estÃ¡ ouvindo...";
     return;
   }
 
@@ -10796,7 +10716,7 @@ async function startActionMic() {
     actionMediaRecorder.onstop = async () => {
       const blob = new Blob(chunks, { type: "audio/webm" });
       if (!blob.size) {
-        actionVoiceStatus.textContent = "Sem áudio captado.";
+        actionVoiceStatus.textContent = "Sem Ã¡udio captado.";
         return;
       }
       try {
@@ -10827,7 +10747,7 @@ async function startActionMic() {
           actionVoiceStatus.textContent = "Tarefa pronta. Confirme abaixo.";
         }
       } catch (error) {
-        actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretação.";
+        actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretaÃ§Ã£o.";
       }
     };
     actionMediaRecorder.start();
@@ -11033,7 +10953,7 @@ const DEFAULT_MISSION_DURATION_SECONDS = 30;
 const LIMIT_INTERVAL_OPTIONS = [
   { value: 1, unit: "day", label: "Dia" },
   { value: 1, unit: "week", label: "Semana" },
-  { value: 1, unit: "month", label: "Mês" },
+  { value: 1, unit: "month", label: "MÃªs" },
   { value: 1, unit: "year", label: "Ano" },
   ...Array.from({ length: 998 }, (_, index) => {
     const value = index + 2;
@@ -11051,7 +10971,7 @@ function formatLimitInterval(value, unit) {
   const labels = {
     day: amount === 1 ? "Dia" : "Dias",
     week: amount === 1 ? "Semana" : "Semanas",
-    month: amount === 1 ? "Mês" : "Meses",
+    month: amount === 1 ? "MÃªs" : "Meses",
     year: amount === 1 ? "Ano" : "Anos"
   };
   return amount === 1 ? labels[unit] || "Dia" : `${amount} ${labels[unit] || "Dias"}`;
@@ -11090,7 +11010,7 @@ function formatMissionUnitDurationLabel(seconds) {
 }
 
 function formatMissionTimePromptLabel(title) {
-  const safeTitle = String(title || "esta missão").trim() || "esta missão";
+  const safeTitle = String(title || "esta missÃ£o").trim() || "esta missÃ£o";
   return `Quanto tempo leva 1 ${safeTitle}?`;
 }
 
@@ -11134,7 +11054,7 @@ function buildStatsPointEntry(category, byCategory = {}, configOverride = null) 
     missionTargetMinutes,
     useManualTarget: config.useManualTarget,
     missionGoalIds: missionGoals.map((goal) => String(goal.id || "")),
-    missionTitles: missionGoals.map((goal) => String(goal.title || "Missão")).filter(Boolean)
+    missionTitles: missionGoals.map((goal) => String(goal.title || "MissÃ£o")).filter(Boolean)
   };
 }
 
@@ -11171,13 +11091,13 @@ function renderStatsAspectModalState() {
     statsAspectManualTargetToggle.hidden = isSleepCategory;
     statsAspectManualTargetToggle.classList.toggle("is-active", useManualTarget);
     statsAspectManualTargetToggle.setAttribute("aria-pressed", useManualTarget ? "true" : "false");
-    statsAspectManualTargetToggle.setAttribute("aria-label", useManualTarget ? "Usar soma de ações e missões" : "Usar tempo definido como meta");
+    statsAspectManualTargetToggle.setAttribute("aria-label", useManualTarget ? "Usar soma de aÃ§Ãµes e missÃµes" : "Usar tempo definido como meta");
   }
   if (statsAspectManualTargetCopy) {
     statsAspectManualTargetCopy.hidden = isSleepCategory;
     statsAspectManualTargetCopy.textContent = useManualTarget
-      ? "O tempo acima é a meta esperada."
-      : "A meta esperada soma Ações + Missões.";
+      ? "O tempo acima Ã© a meta esperada."
+      : "A meta esperada soma AÃ§Ãµes + MissÃµes.";
   }
   if (statsAspectTaskLabel) {
     statsAspectTaskLabel.textContent = isSleepCategory ? "Sono registrado:" : "Tarefas:";
@@ -11189,25 +11109,25 @@ function renderStatsAspectModalState() {
   }
   if (statsAspectProgressSummary) {
     const linkedMissionLabel = Array.isArray(currentEntry.missionTitles) && currentEntry.missionTitles.length
-      ? `${currentEntry.percent}% · ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)} · ${currentEntry.missionTitles.join(" + ")}`
-      : `${currentEntry.percent}% · ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)}`;
+      ? `${currentEntry.percent}% Â· ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)} Â· ${currentEntry.missionTitles.join(" + ")}`
+      : `${currentEntry.percent}% Â· ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)}`;
     statsAspectProgressSummary.textContent = linkedMissionLabel;
   }
   if (statsAspectLinkedGoalsLabel) {
-    statsAspectLinkedGoalsLabel.textContent = isSleepCategory ? "Controle:" : "Missões vinculadas:";
+    statsAspectLinkedGoalsLabel.textContent = isSleepCategory ? "Controle:" : "MissÃµes vinculadas:";
   }
   if (statsAspectLinkedGoalsValue) {
     const titles = Array.isArray(currentEntry.missionTitles) ? currentEntry.missionTitles.filter(Boolean) : [];
     statsAspectLinkedGoalsValue.textContent = isSleepCategory
-      ? "Independente de tarefas e missões"
+      ? "Independente de tarefas e missÃµes"
       : (titles.length ? titles.join(" + ") : "Nenhuma");
   }
   if (statsAspectMissionAssignLabel) {
-    statsAspectMissionAssignLabel.textContent = `Selecione uma ou mais missões para controlar ${category.name}.`;
+    statsAspectMissionAssignLabel.textContent = `Selecione uma ou mais missÃµes para controlar ${category.name}.`;
   }
   if (openStatsAspectMissionAssignButton) {
     openStatsAspectMissionAssignButton.classList.toggle("is-sleep", isSleepCategory);
-    openStatsAspectMissionAssignButton.setAttribute("aria-label", isSleepCategory ? "Abrir modal do sono" : "Atribuir missão");
+    openStatsAspectMissionAssignButton.setAttribute("aria-label", isSleepCategory ? "Abrir modal do sono" : "Atribuir missÃ£o");
     openStatsAspectMissionAssignButton.innerHTML = isSleepCategory
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.4A8.8 8.8 0 0 1 9.6 3.8a9.2 9.2 0 1 0 10.6 10.6z" fill="currentColor"/></svg>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>';
@@ -11241,10 +11161,10 @@ function renderStatsAspectMissionOptions() {
   const missions = (Array.isArray(state.missions) ? state.missions : []).filter((goal) => !isLimitGoal(goal));
   const selectedGoals = missions.filter((goal) => selectedIds.has(String(goal.id || "")));
   statsAspectMissionSelectedSummary.textContent = selectedGoals.length
-    ? `Vinculadas: ${selectedGoals.map((goal) => String(goal.title || "Missão")).join(" + ")}`
-    : "Nenhuma missão vinculada.";
+    ? `Vinculadas: ${selectedGoals.map((goal) => String(goal.title || "MissÃ£o")).join(" + ")}`
+    : "Nenhuma missÃ£o vinculada.";
   if (!missions.length) {
-    statsAspectMissionOptions.innerHTML = '<div class="empty-state">Sem missões cadastradas.</div>';
+    statsAspectMissionOptions.innerHTML = '<div class="empty-state">Sem missÃµes cadastradas.</div>';
     return;
   }
   const items = missions.map((goal) => {
@@ -11256,7 +11176,7 @@ function renderStatsAspectMissionOptions() {
     return `
       <button class="stats-aspect-mission-option${isActive ? " is-active" : ""}" type="button" data-stats-mission-option="${escapeHtml(goalId)}">
         <div class="stats-aspect-mission-option-head">
-          <strong>${escapeHtml(String(goal.title || "Missão"))}</strong>
+          <strong>${escapeHtml(String(goal.title || "MissÃ£o"))}</strong>
           <span>${escapeHtml(`${progress}/${target}`)}</span>
         </div>
         <div class="stats-aspect-mission-option-progress" aria-hidden="true">
@@ -11344,16 +11264,16 @@ function renderStatsAspectLinksModal() {
   const category = statsPointCategories.find((item) => item.id === categoryId) || null;
   const actions = Array.isArray(state.statsAspectLinks?.actions) ? state.statsAspectLinks.actions : [];
   const missions = Array.isArray(state.statsAspectLinks?.missions) ? state.statsAspectLinks.missions : [];
-  if (statsAspectLinksTitle) statsAspectLinksTitle.textContent = allMissionsMode ? "Todas as missões" : (category?.name || "Aspecto");
+  if (statsAspectLinksTitle) statsAspectLinksTitle.textContent = allMissionsMode ? "Todas as missÃµes" : (category?.name || "Aspecto");
   if (statsAspectLinksPeriod) {
     const scopeLabel = getActiveStatsScope()?.label || "Hoje";
     statsAspectLinksPeriod.textContent = allMissionsMode
-      ? `Hoje · ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`
-      : `${scopeLabel} · ${actions.length} ${actions.length === 1 ? "ação" : "ações"} · ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`;
+      ? `Hoje Â· ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`
+      : `${scopeLabel} Â· ${actions.length} ${actions.length === 1 ? "aÃ§Ã£o" : "aÃ§Ãµes"} Â· ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`;
   }
   if (!statsAspectLinksList) return;
   if (state.statsAspectLinks?.loading) {
-    statsAspectLinksList.innerHTML = '<div class="empty-state">Carregando vínculos...</div>';
+    statsAspectLinksList.innerHTML = '<div class="empty-state">Carregando vÃ­nculos...</div>';
     return;
   }
   const actionRows = actions.map((action) => {
@@ -11361,7 +11281,7 @@ function renderStatsAspectLinksModal() {
     const delta = getStatsAspectLinkDraftDelta("action", action?.id);
     return `<article class="stats-aspect-link-card${delta ? " has-change" : ""}">
       <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
-      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(action?.title || "Ação"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getActionDurationMinutes(action) * 60))}</small></div>
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(action?.title || "AÃ§Ã£o"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getActionDurationMinutes(action) * 60))}</small></div>
       ${buildStatsAspectLinkAdjuster("action", action)}
     </article>`;
   });
@@ -11370,14 +11290,14 @@ function renderStatsAspectLinksModal() {
     const delta = getStatsAspectLinkDraftDelta("mission", goal?.id);
     return `<article class="stats-aspect-link-card is-mission${delta ? " has-change" : ""}">
       <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
-      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(goal?.title || "Missão"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getMissionUnitDurationSeconds(goal)))}</small></div>
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(goal?.title || "MissÃ£o"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getMissionUnitDurationSeconds(goal)))}</small></div>
       ${buildStatsAspectLinkAdjuster("mission", goal)}
     </article>`;
   });
   const rows = [...actionRows, ...missionRows];
   statsAspectLinksList.innerHTML = rows.length
     ? rows.join("")
-    : `<div class="empty-state">${allMissionsMode ? "Nenhuma missão vinculada aos aspectos." : "Nenhuma ação ou missão vinculada neste período."}</div>`;
+    : `<div class="empty-state">${allMissionsMode ? "Nenhuma missÃ£o vinculada aos aspectos." : "Nenhuma aÃ§Ã£o ou missÃ£o vinculada neste perÃ­odo."}</div>`;
 }
 
 async function openStatsAspectLinksModal(categoryId) {
@@ -11642,13 +11562,13 @@ function createStatsMissionRow(entry) {
   row.innerHTML = `
     <div class="task-main">
       <div class="task-title">${escapeHtml(String(entry.title || "Missao"))}</div>
-      <div class="task-assignee">${escapeHtml(`${Number(entry.progressCount || 0)} de ${Number(entry.targetCount || 0)} • ${progressPercent}%`)}</div>
+      <div class="task-assignee">${escapeHtml(`${Number(entry.progressCount || 0)} de ${Number(entry.targetCount || 0)} â€¢ ${progressPercent}%`)}</div>
       <div class="stats-mission-progress" aria-hidden="true">
         <div class="stats-mission-progress-fill" style="width:${progressPercent}%;"></div>
       </div>
     </div>
     <div class="stats-mission-actions">
-      <button class="stats-mission-btn stats-mission-btn-delete" type="button" data-mission-delete="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(entry.title || "missao")}`)}">×</button>
+      <button class="stats-mission-btn stats-mission-btn-delete" type="button" data-mission-delete="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(entry.title || "missao")}`)}">Ã—</button>
       <button class="stats-mission-btn stats-mission-btn-plus" type="button" data-mission-plus="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Adicionar progresso em ${String(entry.title || "missao")}`)}">+</button>
     </div>
   `;
@@ -11690,11 +11610,11 @@ function renderStatsRanking() {
     row.innerHTML = `
       <div class="stats-avatar-wrap">
         <img class="task-avatar" src="${getStatsAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
-        <span class="stats-rank-badge">${index + 1}º</span>
+        <span class="stats-rank-badge">${index + 1}Âº</span>
       </div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${entry.lateStartMinutes > 0 ? `${entry.completed} pontos • atraso ${entry.lateStartMinutes}m` : `${entry.completed} pontos`}</div>
+        <div class="task-assignee">${entry.lateStartMinutes > 0 ? `${entry.completed} pontos â€¢ atraso ${entry.lateStartMinutes}m` : `${entry.completed} pontos`}</div>
       </div>
     `;
     statsRankingList.appendChild(row);
@@ -11815,7 +11735,7 @@ async function savePlatformEntry() {
       throw new Error("Informe o nome.");
     }
     if (!Number.isFinite(value) || value <= 0) {
-      throw new Error("Informe um valor válido.");
+      throw new Error("Informe um valor vÃ¡lido.");
     }
 
     await apiRequest("/api/platform/entries", {
@@ -11835,7 +11755,7 @@ async function savePlatformEntry() {
     closePlatformWizard();
     await loadPlatformFinance();
   } catch (error) {
-    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lançamento.";
+    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lanÃ§amento.";
   }
 }
 
@@ -11897,7 +11817,7 @@ function formatSleepHistoryDate(dateKey) {
 function renderSleepHistoryEntries(entries = []) {
   if (!sleepHistoryList) return;
   if (!entries.length) {
-    sleepHistoryList.innerHTML = '<div class="empty-state">Ainda não há registros de sono.</div>';
+    sleepHistoryList.innerHTML = '<div class="empty-state">Ainda nÃ£o hÃ¡ registros de sono.</div>';
     return;
   }
   sleepHistoryList.innerHTML = entries.map((entry) => {
@@ -11952,7 +11872,7 @@ async function loadMissions() {
       missionStatus.textContent = "";
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao carregar missões.";
+    const message = error instanceof Error ? error.message : "Falha ao carregar missÃµes.";
     if (/usuario invalido/i.test(message)) {
       await loadProject200Profiles().catch(() => null);
       applySelectedProfile(getDefaultProfileName());
@@ -11968,7 +11888,7 @@ async function loadMissions() {
       } catch (retryError) {
         state.missions = [];
         if (missionStatus) {
-          missionStatus.textContent = retryError instanceof Error ? retryError.message : "Falha ao carregar missões.";
+          missionStatus.textContent = retryError instanceof Error ? retryError.message : "Falha ao carregar missÃµes.";
         }
         return;
       }
@@ -12139,7 +12059,7 @@ async function hydrateStatsAspectConfig(profileName = state.selectedProfile || g
 async function persistStatsAspectConfig(categoryId, profileName = state.selectedProfile || getDefaultProfileName()) {
   const normalizedCategoryId = String(categoryId || "").trim().toLowerCase();
   if (!normalizedCategoryId) {
-    throw new Error("Categoria inválida.");
+    throw new Error("Categoria invÃ¡lida.");
   }
   const normalizedProfile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
   const payload = buildStatsAspectConfigPayload(normalizedCategoryId);
@@ -12219,7 +12139,7 @@ function renderSleepModalState() {
       sleepDelayLabel.textContent = formatSleepDelayLabel(getCurrentSleepDelayMinutes());
     }
     if (sleepModalSetupSubtitle) {
-      sleepModalSetupSubtitle.textContent = "Escolha em quanto tempo quer começar a dormir";
+      sleepModalSetupSubtitle.textContent = "Escolha em quanto tempo quer comeÃ§ar a dormir";
     }
     return;
   }
@@ -12234,7 +12154,7 @@ function renderSleepModalState() {
   }
   if (sleepSessionSubtitle) {
     if (session.phase === "countdown") {
-      sleepSessionSubtitle.textContent = "Contagem regressiva até o início do sono.";
+      sleepSessionSubtitle.textContent = "Contagem regressiva atÃ© o inÃ­cio do sono.";
     } else if (session.trackedMinutes >= 480) {
       sleepSessionSubtitle.textContent = "Toque na tela para continuar, encerrar ou abortar o sono.";
     } else {
@@ -12243,8 +12163,8 @@ function renderSleepModalState() {
   }
   if (sleepSessionCap) {
     sleepSessionCap.textContent = session.trackedMinutes > 720
-      ? `Máximo contabilizado: 12h • exibindo ${formatMinutesHuman(session.trackedMinutes)}`
-      : "Máximo contabilizado: 12h";
+      ? `MÃ¡ximo contabilizado: 12h â€¢ exibindo ${formatMinutesHuman(session.trackedMinutes)}`
+      : "MÃ¡ximo contabilizado: 12h";
   }
   if (sleepFinishButton) {
     sleepFinishButton.hidden = session.phase !== "sleeping";
@@ -12423,7 +12343,7 @@ function renderSocialModal() {
     socialInviteForm.hidden = !state.social.inviteComposerOpen;
   }
   if (socialInviteToggleButton) {
-    socialInviteToggleButton.textContent = state.social.inviteComposerOpen ? "×" : "+";
+    socialInviteToggleButton.textContent = state.social.inviteComposerOpen ? "Ã—" : "+";
   }
   const rankedUsers = [];
   if (state.social?.self) {
@@ -12455,9 +12375,9 @@ function renderSocialModal() {
         : `<div class="social-card-side"><div class="social-card-score"><strong>${points}</strong></div><button class="social-card-message" type="button" data-social-message-user-id="${escapeHtml(String(entry.userId || ""))}" aria-label="Conversar com ${escapeHtml(String(entry.name || "amigo"))}">${socialMessageSvg}</button></div>`;
       cards.push(`
         <article class="social-card ${entry.isSelf ? "social-card--self" : "social-card--friend"}">
-          <div class="social-card-avatar">${renderSocialCardAvatar(entry)}<span class="social-card-rank">${escapeHtml(`${index + 1}º`)}</span></div>
+          <div class="social-card-avatar">${renderSocialCardAvatar(entry)}<span class="social-card-rank">${escapeHtml(`${index + 1}Âº`)}</span></div>
           <div class="social-card-body">
-            <div class="social-card-name">${escapeHtml(String(entry.name || "Você"))}</div>
+            <div class="social-card-name">${escapeHtml(String(entry.name || "VocÃª"))}</div>
             ${secondaryCopy ? `<div class="social-card-copy">${secondaryCopy}</div>` : ""}
           </div>
           ${actionMarkup}
@@ -12996,7 +12916,7 @@ function showRunningMissionQuickFocus(goal, key) {
     runningMissionQuickFocusIcon.src = String(goal.svgIconUrl || "").trim() || `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
   }
   if (runningMissionQuickFocusTitle) {
-    runningMissionQuickFocusTitle.textContent = String(goal.title || "Missão");
+    runningMissionQuickFocusTitle.textContent = String(goal.title || "MissÃ£o");
   }
   if (runningMissionQuickFocusProgressFill) {
     runningMissionQuickFocusProgressFill.style.background = color;
@@ -13060,7 +12980,7 @@ function renderRunningMissionQuickButtons() {
     .slice()
     .sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "pt-BR"));
   if (!goals.length) {
-    runningMissionQuickGrid.innerHTML = '<div class="running-mission-quick-empty">Nenhuma missão rápida disponível.</div>';
+    runningMissionQuickGrid.innerHTML = '<div class="running-mission-quick-empty">Nenhuma missÃ£o rÃ¡pida disponÃ­vel.</div>';
     return;
   }
   runningMissionQuickGrid.innerHTML = goals.map((goal, index) => {
@@ -13077,8 +12997,8 @@ function renderRunningMissionQuickButtons() {
         type="button"
         data-mission-quick-goal-id="${escapeHtml(String(goal.id || ""))}"
         data-mission-quick-tone="${escapeHtml(visualKey)}"
-        aria-label="${escapeHtml(String(goal.title || "Missão"))}"
-        title="${escapeHtml(`${String(goal.title || "Missão")}: ${progress} de ${target}`)}"
+        aria-label="${escapeHtml(String(goal.title || "MissÃ£o"))}"
+        title="${escapeHtml(`${String(goal.title || "MissÃ£o")}: ${progress} de ${target}`)}"
         style="--mission-quick-color:${escapeHtml(getMissionQuickThemeColor(visualKey))};"
       >
         <span class="running-mission-quick-card-badge">${escapeHtml(String(progress))}</span>
@@ -13097,7 +13017,7 @@ function renderRunningMissionQuickButtons() {
             <img class="running-mission-quick-card-icon" src="${escapeHtml(iconPath)}" alt="" aria-hidden="true" />
           </span>
         </span>
-        <span class="running-mission-quick-card-title">${escapeHtml(String(goal.title || "Missão"))}</span>
+        <span class="running-mission-quick-card-title">${escapeHtml(String(goal.title || "MissÃ£o"))}</span>
       </button>
     `;
   }).join("");
@@ -13215,7 +13135,7 @@ function queueRunningMissionQuickIncrement(goal) {
         renderMissions();
         renderRunningMissionQuickButtons();
         if (runningMissionQuickFeedback) {
-          runningMissionQuickFeedback.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
+          runningMissionQuickFeedback.textContent = error instanceof Error ? error.message : "Falha ao atualizar missÃ£o.";
         }
       }
     });
@@ -13257,7 +13177,7 @@ function handleRunningMissionQuickTap(key) {
   const goal = getMissionQuickGoalById(key);
   if (!goal) {
     if (runningMissionQuickFeedback) {
-      runningMissionQuickFeedback.textContent = "Missão não encontrada.";
+      runningMissionQuickFeedback.textContent = "MissÃ£o nÃ£o encontrada.";
     }
     return;
   }
@@ -13291,10 +13211,10 @@ function assignMissionQuickSlot(slotKey) {
   persistMissionQuickSlots();
   renderRunningMissionQuickButtons();
   if (missionAdjustStatus) {
-    missionAdjustStatus.textContent = `${goal.title} agora está no acesso rápido ${definition.label}.`;
+    missionAdjustStatus.textContent = `${goal.title} agora estÃ¡ no acesso rÃ¡pido ${definition.label}.`;
   }
   if (missionQuickAssignStatus) {
-    missionQuickAssignStatus.textContent = `${goal.title} agora está no acesso rápido ${definition.label}.`;
+    missionQuickAssignStatus.textContent = `${goal.title} agora estÃ¡ no acesso rÃ¡pido ${definition.label}.`;
   }
 }
 
@@ -13339,13 +13259,13 @@ async function saveTaskComposer() {
       const decision = await openOverlapWizard(overlaps, occurrences);
       if (!decision || decision.type === "cancel") {
         if (startDecisionMessage) {
-          startDecisionMessage.textContent = "Ajuste o horário para continuar.";
+          startDecisionMessage.textContent = "Ajuste o horÃ¡rio para continuar.";
         }
         return;
       }
       if (decision.type === "change_time") {
         if (startDecisionMessage) {
-          startDecisionMessage.textContent = "Escolha outro horário.";
+          startDecisionMessage.textContent = "Escolha outro horÃ¡rio.";
         }
         return;
       }
@@ -13415,7 +13335,7 @@ async function saveTaskComposer() {
         state.wizard.forceReplaceOverlaps = false;
         return saveTaskComposer();
       }
-      if (startDecisionMessage) startDecisionMessage.textContent = decision?.type === "change_time" ? "Escolha outro horário." : "Ajuste o horário para continuar.";
+      if (startDecisionMessage) startDecisionMessage.textContent = decision?.type === "change_time" ? "Escolha outro horÃ¡rio." : "Ajuste o horÃ¡rio para continuar.";
       return;
     }
     state.wizard.forceReplaceOverlaps = false;
@@ -13450,7 +13370,7 @@ async function submitQuickTaskStart(conflictMode = "") {
     return;
   }
   if (quickTaskStatus) {
-    quickTaskStatus.textContent = "Iniciando tarefa rápida...";
+    quickTaskStatus.textContent = "Iniciando tarefa rÃ¡pida...";
   }
   if (quickTaskStartButton) {
     quickTaskStartButton.disabled = true;
@@ -13473,7 +13393,7 @@ async function submitQuickTaskStart(conflictMode = "") {
     }
   } catch (error) {
     if (quickTaskStatus) {
-      quickTaskStatus.textContent = error instanceof Error ? error.message : "Falha ao iniciar a tarefa rápida.";
+      quickTaskStatus.textContent = error instanceof Error ? error.message : "Falha ao iniciar a tarefa rÃ¡pida.";
     }
   } finally {
     if (quickTaskStartButton) {
@@ -13530,9 +13450,9 @@ function buildSystemMessage(entry) {
   const task = `<strong>${escapeHtml(entry.taskTitle || "Tarefa")}</strong>`;
   if (entry.type === "start") {
     if (Number(entry.lateStartMinutes || 0) > 0) {
-      return `${person} começou ${task} com ${Number(entry.lateStartMinutes)} minutos de atraso`;
+      return `${person} comeÃ§ou ${task} com ${Number(entry.lateStartMinutes)} minutos de atraso`;
     }
-    return `${person} começou ${task}`;
+    return `${person} comeÃ§ou ${task}`;
   }
   if (entry.type === "pause") {
     return `${person} pausou ${task}`;
@@ -13544,10 +13464,10 @@ function buildSystemMessage(entry) {
     return `${person} finalizou ${task}`;
   }
   if (entry.type === "star") {
-    return `${person} completou a missão diária`;
+    return `${person} completou a missÃ£o diÃ¡ria`;
   }
   if (entry.type === "day_close") {
-    return `${person} não concluiu <strong>${entry.pendingCount}</strong> tarefas, encerrou com <strong>${entry.percent}%</strong>`;
+    return `${person} nÃ£o concluiu <strong>${entry.pendingCount}</strong> tarefas, encerrou com <strong>${entry.percent}%</strong>`;
   }
   return `${person} atualizou ${task}`;
 }
@@ -13580,7 +13500,7 @@ function renderHistoryTimeline() {
     .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 
   if (!merged.length) {
-    historyTimelineList.innerHTML = '<div class="empty-state">Sem histórico nesse dia.</div>';
+    historyTimelineList.innerHTML = '<div class="empty-state">Sem histÃ³rico nesse dia.</div>';
     return;
   }
 
@@ -13656,16 +13576,16 @@ function renderMissionCreateStep(direction = 0) {
   modal?.classList.toggle("is-limit-creation", kind === "limit");
   modal?.classList.toggle("is-compact-stage", step > 0);
   const nameStepTitle = document.getElementById("missionCreateNameStep");
-  if (nameStepTitle) nameStepTitle.textContent = kind === "limit" ? "Nome do limite" : "Nome da missão";
+  if (nameStepTitle) nameStepTitle.textContent = kind === "limit" ? "Nome do limite" : "Nome da missÃ£o";
   if (missionCreateTargetStep) missionCreateTargetStep.textContent = kind === "limit" ? "Quantas vezes?" : "Quantas vezes por dia?";
-  if (missionTargetInput) missionTargetInput.placeholder = "Digite um número";
+  if (missionTargetInput) missionTargetInput.placeholder = "Digite um nÃºmero";
   const limitCreation = kind === "limit";
-  if (missionCreateFinalStepTitle) missionCreateFinalStepTitle.textContent = limitCreation ? "Qual é o intervalo?" : "Quanto tempo leva?";
+  if (missionCreateFinalStepTitle) missionCreateFinalStepTitle.textContent = limitCreation ? "Qual Ã© o intervalo?" : "Quanto tempo leva?";
   if (missionCreateLimitIntervalPanel) missionCreateLimitIntervalPanel.hidden = !limitCreation;
   if (missionCreateTimePanel) missionCreateTimePanel.hidden = limitCreation;
   if (openMissionCreateTimeButton) openMissionCreateTimeButton.hidden = limitCreation;
   renderMissionCreateCategoryPicker();
-  if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = "Defina quanto tempo leva cada execução desta missão.";
+  if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = "Defina quanto tempo leva cada execuÃ§Ã£o desta missÃ£o.";
   if (missionCreateTimeSummary) missionCreateTimeSummary.textContent = formatMissionDurationValue(normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds));
   const interval = getSelectedLimitInterval();
   if (missionLimitIntervalLabel) missionLimitIntervalLabel.textContent = interval.label;
@@ -13706,8 +13626,8 @@ function renderMissionCreateStep(direction = 0) {
 function validateMissionCreateStep(step = state.missionCreate?.step) {
   if (step === 0 && !state.missionCreate?.goalKind) return "Escolha Meta ou Limite.";
   if (step === 1 && !String(missionTitleInput?.value || "").trim()) return "Digite o nome.";
-  if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diária.";
-  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && state.missionCreate?.categoryThinking) return "Aguarde a definição do aspecto.";
+  if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diÃ¡ria.";
+  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && state.missionCreate?.categoryThinking) return "Aguarde a definiÃ§Ã£o do aspecto.";
   if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && !state.missionCreate?.categoryResolved) return "Escolha um aspecto.";
   return "";
 }
@@ -13738,12 +13658,12 @@ function renderMissionAdjustState() {
   const limit = normalizeMissionKind(state.missionAdjust?.goalKind) === "limit";
   if (missionAdjustHint) missionAdjustHint.textContent = limit
     ? `Limite ${targetValue}x a cada ${formatLimitInterval(state.missionAdjust?.limitIntervalValue, state.missionAdjust?.limitIntervalUnit).toLocaleLowerCase("pt-BR")}`
-    : `Meta diária ${targetValue}x`;
+    : `Meta diÃ¡ria ${targetValue}x`;
   const adjustModal = document.getElementById("missionAdjustModal");
   const adjustEyebrow = adjustModal?.querySelector(".mission-modal-eyebrow");
   const adjustQuestion = adjustModal?.querySelector(".mission-modal-explainer h2");
   if (adjustEyebrow) adjustEyebrow.textContent = limit ? "Editar limite" : "Editar meta";
-  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite?" : "Qual será a meta diária?";
+  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual serÃ¡ o limite?" : "Qual serÃ¡ a meta diÃ¡ria?";
   if (missionLimitSleepOption) missionLimitSleepOption.hidden = !limit;
   if (missionLimitCountSleepTime) missionLimitCountSleepTime.checked = state.missionAdjust?.countSleepTime !== false;
 
@@ -13767,7 +13687,7 @@ function openMissionCreateModal() {
     timeConfigured: true,
     limitIntervalIndex: 0,
     categoryId: "planejamento",
-    categoryName: "Propósito",
+    categoryName: "PropÃ³sito",
     categoryResolved: false,
     categoryThinking: false,
     categoryManuallySelected: false
@@ -13793,7 +13713,7 @@ function openMissionAdjustModal(goalId) {
     limitIntervalUnit: String(goal.limitIntervalUnit || "day")
   };
   if (missionAdjustTitle) {
-    missionAdjustTitle.textContent = String(goal.title || "Missão");
+    missionAdjustTitle.textContent = String(goal.title || "MissÃ£o");
   }
   if (missionAdjustStatus) {
     missionAdjustStatus.textContent = "";
@@ -13819,7 +13739,7 @@ function renderMissionProgressState() {
     const showAdd = limit || hasUpdate;
     missionProgressConfirmButton.disabled = false;
     missionProgressConfirmButton.classList.toggle("is-update", showAdd);
-    missionProgressConfirmButton.setAttribute("aria-label", showAdd ? "Atualizar progresso" : "Iniciar missão");
+    missionProgressConfirmButton.setAttribute("aria-label", showAdd ? "Atualizar progresso" : "Iniciar missÃ£o");
     missionProgressConfirmButton.innerHTML = showAdd
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">ADICIONAR</span>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR</span>';
@@ -13849,14 +13769,14 @@ function openMissionTimeModal(mode) {
   if (safeMode === "create") {
     state.missionTime = {
       mode: "create",
-      title: String(missionTitleInput?.value || "").trim() || "esta missão",
+      title: String(missionTitleInput?.value || "").trim() || "esta missÃ£o",
       value: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds)
     };
   } else {
     const goal = getAvailableMissionById(state.missionAdjust?.goalId);
     state.missionTime = {
       mode: "adjust",
-      title: String(goal?.title || missionAdjustTitle?.textContent || "esta missão").trim(),
+      title: String(goal?.title || missionAdjustTitle?.textContent || "esta missÃ£o").trim(),
       value: normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds)
     };
   }
@@ -14274,7 +14194,7 @@ function restartMissionRunLocally() {
   void resumeRunningMusicAfterMissionExtension();
   const completed = Math.max(1, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1));
   if (completed >= MISSION_RUN_MAX_CYCLES) {
-    if (missionRunStatus) missionRunStatus.textContent = `O máximo é de ${MISSION_RUN_MAX_CYCLES} ciclos. Toque em Finalizar para receber os pontos.`;
+    if (missionRunStatus) missionRunStatus.textContent = `O mÃ¡ximo Ã© de ${MISSION_RUN_MAX_CYCLES} ciclos. Toque em Finalizar para receber os pontos.`;
     return;
   }
   state.missionRun.completedCycles = completed;
@@ -14322,7 +14242,7 @@ function renderMissionRunState() {
   const percent = Math.round(percentPrecise);
   const circumference = 301.59;
   if (missionRunTitle) {
-    missionRunTitle.textContent = String(goal.title || "Missão");
+    missionRunTitle.textContent = String(goal.title || "MissÃ£o");
   }
   if (missionRunTitleIcon) {
     const icon = getMissionDisplayIcon(goal);
@@ -14339,11 +14259,11 @@ function renderMissionRunState() {
     missionRunClock.innerHTML = formatRunningCenter(percent, percentPrecise, remainingSeconds / 60, remainingSeconds, centerMode === "percent");
   }
   if (missionRunStatus) {
-    missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missão não tem tempo definido.";
+    missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missÃ£o nÃ£o tem tempo definido.";
   }
   syncRunningMinuteCueSchedule(
     `mission:${goalId}:cycle:${normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex)}`,
-    String(goal.title || "Missão"),
+    String(goal.title || "MissÃ£o"),
     remainingSeconds
   );
   renderMissionRunCycleCount();
@@ -14493,12 +14413,12 @@ function renderMissionVariants() {
   const cycleChooseMode = state.missionVariants.mode === "cycle-choose";
   const cycleSelectionTarget = normalizeMissionRunCycleTarget(state.missionVariants.cycleSelectionTarget);
   const cycleSelections = Array.isArray(state.missionVariants.cycleSelections) ? state.missionVariants.cycleSelections : [];
-  if (missionVariantsKicker) missionVariantsKicker.textContent = chooseMode ? "Antes de iniciar" : "Micro-tarefas da missão";
+  if (missionVariantsKicker) missionVariantsKicker.textContent = chooseMode ? "Antes de iniciar" : "Micro-tarefas da missÃ£o";
   if (missionVariantsTitle) {
     missionVariantsTitle.textContent = cycleChooseMode
       ? `Escolha a micro-tarefa do ciclo ${Math.min(cycleSelections.length + 1, cycleSelectionTarget)}`
       : chooseMode
-        ? "Qual micro-tarefa você vai fazer?"
+        ? "Qual micro-tarefa vocÃª vai fazer?"
         : (getMissionRunGoalById(state.missionVariants.goalId)?.title || "Lista de micro-tarefas");
   }
   if (missionVariantCycleSelection) {
@@ -14510,7 +14430,7 @@ function renderMissionVariants() {
   if (missionVariantAddButton) missionVariantAddButton.hidden = chooseMode || editorOpen;
   if (missionVariantEditor) missionVariantEditor.hidden = !editorOpen;
   if (missionVariantSortButton) {
-    const sortModeLabel = state.missionVariants.sortMode === "priority" ? "Prioridade" : "Usuário";
+    const sortModeLabel = state.missionVariants.sortMode === "priority" ? "Prioridade" : "UsuÃ¡rio";
     missionVariantSortButton.hidden = editorOpen;
     missionVariantSortButton.setAttribute("aria-expanded", state.missionVariants.sortMenuOpen ? "true" : "false");
     missionVariantSortButton.setAttribute("aria-label", `Ordenar por: ${sortModeLabel}`);
@@ -14538,8 +14458,8 @@ function renderMissionVariants() {
         : timing.percent;
     const unitLabel = variant.intervalUnit === "hours" ? `${variant.intervalValue}h` : `${variant.intervalValue} ${variant.intervalValue === 1 ? "dia" : "dias"}`;
     return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
-      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} · ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
-      ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
+      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} Â· ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
+      ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">Ã—</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
   }).join("") : '<div class="empty-state">Adicione micro-tarefas diferentes para controlar seus prazos.</div>';
@@ -14611,7 +14531,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   state.missionRun.musicStoppedOnFinish = false;
   state.missionRun.musicWasPlayingAtFinish = false;
   state.missionRun.previousTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
-  state.runningPlayer.currentTaskTitle = String(goal.title || "Missão").trim();
+  state.runningPlayer.currentTaskTitle = String(goal.title || "MissÃ£o").trim();
   if (missionRunConfirm) {
     missionRunConfirm.hidden = true;
   }
@@ -14627,7 +14547,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   const missionGoalId = String(goal.id || "");
   void loadRunningMusicStations().then(() => {
     if (!isMissionRunModalOpen() || String(state.missionRun.goalId || "") !== missionGoalId) return;
-    return autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "Missão") });
+    return autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "MissÃ£o") });
   });
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
@@ -14729,9 +14649,9 @@ async function finalizeMissionRun(triggerButton = null) {
     renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
     state.missionRun.finalizing = false;
-    showFloatingNotice(error instanceof Error ? error.message : "Falha ao concluir missão.");
+    showFloatingNotice(error instanceof Error ? error.message : "Falha ao concluir missÃ£o.");
     if (missionRunStatus) {
-      missionRunStatus.textContent = error instanceof Error ? error.message : "Falha ao concluir missão.";
+      missionRunStatus.textContent = error instanceof Error ? error.message : "Falha ao concluir missÃ£o.";
     }
   } finally {
     finishLoading?.();
@@ -14754,7 +14674,7 @@ function openMissionProgressModal(goalId) {
     baseValue: Math.max(0, Math.trunc(Number(goal.progressValue || 0) || 0))
   };
   if (missionProgressTitle) {
-    missionProgressTitle.textContent = String(goal.title || "Missão");
+    missionProgressTitle.textContent = String(goal.title || "MissÃ£o");
   }
   if (missionProgressIcon) {
     missionProgressIcon.src = goalIcon.src;
@@ -14839,7 +14759,7 @@ function formatLimitElapsedDuration(totalSeconds) {
 
   const durationUnits = [
     { minutes: 365 * 24 * 60, singular: "ano", plural: "anos" },
-    { minutes: 30 * 24 * 60, singular: "mês", plural: "meses" },
+    { minutes: 30 * 24 * 60, singular: "mÃªs", plural: "meses" },
     { minutes: 24 * 60, singular: "dia", plural: "dias" },
     { minutes: 60, singular: "hora", plural: "horas" },
     { minutes: 1, singular: "minuto", plural: "minutos" }
@@ -14857,18 +14777,18 @@ function formatLimitElapsedDuration(totalSeconds) {
 
 function formatLimitLastProgress(goal) {
   const lastProgressMs = new Date(goal?.lastProgressAt || "").getTime();
-  if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcação ainda";
+  if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcaÃ§Ã£o ainda";
   const excludedSleepSeconds = goal?.countSleepTime === false
     ? Math.max(0, Math.floor(Number(goal?.sleepExcludedSeconds || 0)))
     : 0;
   const elapsedSeconds = Math.max(0, Math.floor((getServerNowMs() - lastProgressMs) / 1000) - excludedSleepSeconds);
-  if (elapsedSeconds < 60) return "Última vez agora";
-  return `Última vez em ${formatLimitElapsedDuration(elapsedSeconds)}`;
+  if (elapsedSeconds < 60) return "Ãšltima vez agora";
+  return `Ãšltima vez em ${formatLimitElapsedDuration(elapsedSeconds)}`;
 }
 function getLimitHistoryDateParts(value) {
   const date = new Date(value || "");
   if (Number.isNaN(date.getTime())) {
-    return { dateInput: "", timeInput: "", dateLabel: "Data indisponível", timeLabel: "--h--" };
+    return { dateInput: "", timeInput: "", dateLabel: "Data indisponÃ­vel", timeLabel: "--h--" };
   }
   const parts = getProjectDateTimeParts(date);
   const dateInput = `${parts.year}-${parts.month}-${parts.day}`;
@@ -14923,7 +14843,7 @@ function renderLimitHistoryModal() {
   limitHistoryModeToggle.setAttribute("aria-pressed", recordsMode ? "true" : "false");
   if (limitHistoryTitle) limitHistoryTitle.textContent = state.limitHistory?.title || "Limite";
   if (state.limitHistory?.loading) {
-    limitHistoryList.innerHTML = '<div class="limit-history-empty">Carregando histórico...</div>';
+    limitHistoryList.innerHTML = '<div class="limit-history-empty">Carregando histÃ³rico...</div>';
     return;
   }
   if (recordsMode) {
@@ -14934,12 +14854,12 @@ function renderLimitHistoryModal() {
             <span class="limit-history-record-rank">#${index + 1}</span>
             <div class="limit-history-record-copy">
               <strong>${escapeHtml(formatLimitElapsedDuration(record.durationSeconds))}</strong>
-              <span>${escapeHtml(formatLimitHistoryDate(record.fromAt))} → ${escapeHtml(formatLimitHistoryDate(record.toAt))}</span>
+              <span>${escapeHtml(formatLimitHistoryDate(record.fromAt))} â†’ ${escapeHtml(formatLimitHistoryDate(record.toAt))}</span>
               ${Number(record.sleepExcludedSeconds || 0) > 0 ? `<span>Sono descontado: ${escapeHtml(formatLimitElapsedDuration(record.sleepExcludedSeconds))}</span>` : ""}
             </div>
           </article>
         `).join("")
-      : '<div class="limit-history-empty">Ainda não existem dois registros<br>para calcular um intervalo.</div>';
+      : '<div class="limit-history-empty">Ainda nÃ£o existem dois registros<br>para calcular um intervalo.</div>';
     return;
   }
   const events = Array.isArray(state.limitHistory?.events) ? state.limitHistory.events : [];
@@ -14951,12 +14871,12 @@ function renderLimitHistoryModal() {
             <article class="limit-history-entry is-latest is-editing" data-limit-history-event="${escapeHtml(String(event.id || ""))}">
               <div class="limit-history-editor">
                 <div class="limit-history-editor-quantity">
-                  <button type="button" data-limit-history-edit-step="-1" aria-label="Diminuir quantidade">−</button>
+                  <button type="button" data-limit-history-edit-step="-1" aria-label="Diminuir quantidade">âˆ’</button>
                   <strong>${Math.max(1, Number(state.limitHistory.editValue || 1))}</strong>
                   <button type="button" data-limit-history-edit-step="1" aria-label="Aumentar quantidade">+</button>
                 </div>
                 <label>Dia<input type="date" data-limit-history-edit-date value="${escapeHtml(state.limitHistory.editDate || "")}"></label>
-                <label>Horário<input type="time" data-limit-history-edit-time value="${escapeHtml(state.limitHistory.editTime || "")}"></label>
+                <label>HorÃ¡rio<input type="time" data-limit-history-edit-time value="${escapeHtml(state.limitHistory.editTime || "")}"></label>
                 <button class="limit-history-save" type="button" data-limit-history-save>Salvar</button>
               </div>
             </article>
@@ -14966,20 +14886,20 @@ function renderLimitHistoryModal() {
           <article class="limit-history-entry${event.isLatest ? " is-latest" : ""}" data-limit-history-event="${escapeHtml(String(event.id || ""))}">
             <div class="limit-history-entry-copy">
               <strong>${Math.max(1, Number(event.value || 1))} ${escapeHtml(state.limitHistory?.title || "Limite")} <i>|</i> ${escapeHtml(formatLimitHistoryDate(event.occurredAt))}</strong>
-              ${event.editedAt ? "<span>Atualização corrigida</span>" : ""}
+              ${event.editedAt ? "<span>AtualizaÃ§Ã£o corrigida</span>" : ""}
             </div>
             <div class="limit-history-entry-actions">
-              <button type="button" data-limit-history-edit ${event.isLatest ? "" : "disabled"} aria-label="Editar movimentação">
+              <button type="button" data-limit-history-edit ${event.isLatest ? "" : "disabled"} aria-label="Editar movimentaÃ§Ã£o">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.8-.8 4 4-.8L18.9 8.3l-3.2-3.2L4 16.8Zm13-13 3.2 3.2 1.1-1.1a1.4 1.4 0 0 0 0-2l-1.2-1.2a1.4 1.4 0 0 0-2 0L17 3.8Z" fill="currentColor"/></svg>
               </button>
-              <button type="button" data-limit-history-delete ${event.isLatest ? "" : "disabled"} aria-label="Remover movimentação">
+              <button type="button" data-limit-history-delete ${event.isLatest ? "" : "disabled"} aria-label="Remover movimentaÃ§Ã£o">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10l-.7 14H7.7L7 7Zm2-4h6l1 2h4v2H4V5h4l1-2Z" fill="currentColor"/></svg>
               </button>
             </div>
           </article>
         `;
       }).join("")
-    : '<div class="limit-history-empty">Nenhuma movimentação registrada ainda.</div>';
+    : '<div class="limit-history-empty">Nenhuma movimentaÃ§Ã£o registrada ainda.</div>';
 }
 
 async function loadLimitHistory() {
@@ -14996,7 +14916,7 @@ async function loadLimitHistory() {
     state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
     state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
   } catch (error) {
-    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar.";
+    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel carregar.";
   } finally {
     state.limitHistory.loading = false;
     renderLimitHistoryModal();
@@ -15026,7 +14946,7 @@ function openLimitHistoryModal(goalId) {
 async function mutateLimitHistoryEvent(eventId, method, value = 0, occurredAt = "") {
   const goalId = String(state.limitHistory?.goalId || "").trim();
   if (!goalId || !eventId) return;
-  if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Removendo última movimentação..." : "Salvando correção...";
+  if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Removendo Ãºltima movimentaÃ§Ã£o..." : "Salvando correÃ§Ã£o...";
   try {
     const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
     const payload = await apiRequest(
@@ -15044,10 +14964,10 @@ async function mutateLimitHistoryEvent(eventId, method, value = 0, occurredAt = 
     state.limitHistory.editingEventId = "";
     state.limitHistory.editDate = "";
     state.limitHistory.editTime = "";
-    if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Movimentação removida." : "Movimentação corrigida.";
+    if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "MovimentaÃ§Ã£o removida." : "MovimentaÃ§Ã£o corrigida.";
     renderLimitHistoryModal();
   } catch (error) {
-    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "Não foi possível atualizar.";
+    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel atualizar.";
   }
 }
 
@@ -15111,7 +15031,7 @@ function renderMissions() {
   const previousProgress = new Map([...(missionList?.querySelectorAll("[data-goal-id]") || [])].map((card) => [String(card.dataset.goalId || ""), Number(card.dataset.progressPercent)]));
   renderMissionScopeControls();
   renderMissionKindFilter();
-  if (missionsEmptyText) missionsEmptyText.textContent = showingLimits ? "Você não tem limites" : "Você não tem metas";
+  if (missionsEmptyText) missionsEmptyText.textContent = showingLimits ? "VocÃª nÃ£o tem limites" : "VocÃª nÃ£o tem metas";
   if (missionsEmpty) missionsEmpty.hidden = goals.length > 0;
   if (missionList) { missionList.hidden = goals.length === 0; missionList.innerHTML = ""; }
   if (missionsFooter) missionsFooter.hidden = false;
@@ -15252,7 +15172,7 @@ function openHistoryTextComposer() {
   };
   historyTextComposer.classList.add("active");
   historyTextComposer.setAttribute("aria-hidden", "false");
-  historyVoiceStatus.textContent = "Aguardando gravação...";
+  historyVoiceStatus.textContent = "Aguardando gravaÃ§Ã£o...";
   historyMicButton?.classList.remove("mic-active");
   historyMicButton?.classList.add("mic-idle");
   setHistoryTextStep(1);
@@ -15319,7 +15239,7 @@ async function refineHistoryTextWithAi(rawText) {
     body: JSON.stringify({ text: rawText })
   });
   return {
-    title: String(payload.title || "Texto sem título"),
+    title: String(payload.title || "Texto sem tÃ­tulo"),
     text: String(payload.text || rawText)
   };
 }
@@ -15414,7 +15334,7 @@ async function startHistoryMic() {
         historyLastSpeechAt = Date.now();
       }
       if (Date.now() - historyLastSpeechAt >= 2000) {
-        historyVoiceStatus.textContent = "Silêncio detectado. Encerrando...";
+        historyVoiceStatus.textContent = "SilÃªncio detectado. Encerrando...";
         stopHistoryMic();
       }
     }, 120);
@@ -15470,7 +15390,7 @@ async function startPlatformNameMic() {
     platformNameMediaRecorder.onstop = async () => {
       const blob = new Blob(chunks, { type: "audio/webm" });
       if (!blob.size) {
-        platformWizardMessage.textContent = "Sem áudio captado.";
+        platformWizardMessage.textContent = "Sem Ã¡udio captado.";
         return;
       }
       try {
@@ -15482,14 +15402,14 @@ async function startPlatformNameMic() {
         });
         const spoken = String(transcribed?.text || "").trim();
         if (!spoken) {
-          platformWizardMessage.textContent = "Não consegui transcrever sua fala.";
+          platformWizardMessage.textContent = "NÃ£o consegui transcrever sua fala.";
           return;
         }
         platformNameInput.value = spoken;
         platformNameInput.dispatchEvent(new Event("input", { bubbles: true }));
         platformWizardMessage.textContent = "Texto transcrito.";
       } catch (error) {
-        platformWizardMessage.textContent = error instanceof Error ? error.message : "Falha na transcrição.";
+        platformWizardMessage.textContent = error instanceof Error ? error.message : "Falha na transcriÃ§Ã£o.";
       }
     };
     platformNameMediaRecorder.start();
@@ -15512,7 +15432,7 @@ async function startPlatformNameMic() {
         platformNameLastSpeechAt = Date.now();
       }
       if (Date.now() - platformNameLastSpeechAt >= 2000) {
-        platformWizardMessage.textContent = "Silêncio detectado. Transcrevendo...";
+        platformWizardMessage.textContent = "SilÃªncio detectado. Transcrevendo...";
         stopPlatformNameMic();
       }
     }, 120);
@@ -15725,7 +15645,7 @@ function registerNativeBackButtonHandler() {
 
 function isAuthErrorMessage(message) {
   const text = String(message || "").trim().toLowerCase();
-  return text.includes("sessao invalida") || text.includes("sessão inválida") || text.includes("token ausente");
+  return text.includes("sessao invalida") || text.includes("sessÃ£o invÃ¡lida") || text.includes("token ausente");
 }
 
 function openProject200LoginOverlay(message = "") {
@@ -15857,83 +15777,46 @@ document.querySelectorAll("[data-open-modal]").forEach((button) => {
   });
 });
 
-ilifeFinanceAddButton?.addEventListener("click", () => setIlifeFinanceAddMenu(!state.ilifeFinance.addMenuOpen));
-ilifeFinanceAddMenu?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-ilife-finance-kind]");
-  if (button) openIlifeFinanceWizard(button.dataset.ilifeFinanceKind);
+document.querySelectorAll("[data-ilife-finance-kind]").forEach((button) => {
+  button.addEventListener("click", () => openIlifeFinanceWizard(button.dataset.ilifeFinanceKind));
 });
-ilifeFinanceAttentionCycle?.addEventListener("click", moveIlifeFinanceAttentionScope);
+document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (!state.ilifeFinance.wizard) state.ilifeFinance.wizard = buildIlifeFinanceWizard(button.dataset.ilifeFinanceKindSwitch);
+    state.ilifeFinance.wizard.kind = button.dataset.ilifeFinanceKindSwitch === "EXPENSE" ? "EXPENSE" : "INCOME";
+    renderIlifeFinanceWizard();
+  });
+});
+getIlifeFinanceEl("ilifeFinanceFab")?.addEventListener("click", () => openIlifeFinanceWizard("INCOME"));
+getIlifeFinanceEl("ilifeFinanceToggleMoney")?.addEventListener("click", () => {
+  state.ilifeFinance.valuesVisible = state.ilifeFinance.valuesVisible === false;
+  renderIlifeFinanceSummary();
+});
+getIlifeFinanceEl("ilifeFinanceMonthToday")?.addEventListener("click", () => {
+  const now = new Date();
+  state.ilifeFinance.monthCursor = new Date(now.getFullYear(), now.getMonth(), 1);
+  void loadIlifeFinanceLedger();
+});
 ilifeFinanceMonthPrev?.addEventListener("click", () => moveIlifeFinanceMonth(-1));
 ilifeFinanceMonthNext?.addEventListener("click", () => moveIlifeFinanceMonth(1));
 ilifeFinanceWizardClose?.addEventListener("click", closeIlifeFinanceWizard);
-document.querySelectorAll("[data-ilife-settlement]").forEach((button) => button.addEventListener("click", () => {
-  if (!state.ilifeFinance.wizard) return;
-  state.ilifeFinance.wizard.settlementType = button.dataset.ilifeSettlement;
-  renderIlifeFinanceWizard();
-}));
-ilifeFinanceDetailsNext?.addEventListener("click", () => {
-  const wizard = state.ilifeFinance.wizard;
-  if (!wizard) return;
-  if (!String(ilifeFinanceTitleInput?.value || "").trim()) { if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "Digite uma descrição."; return; }
-  if (!parseIlifeFinanceAmount(ilifeFinanceAmountInput?.value)) { if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "Digite um valor válido."; return; }
-  if (ilifeFinanceDetailsStatus) ilifeFinanceDetailsStatus.textContent = "";
-  if (wizard.settlementType === "CASH") void saveIlifeFinanceItem();
-  else { wizard.step = "schedule"; renderIlifeFinanceWizard(); }
+ilifeFinanceEntryWizard?.addEventListener("click", (event) => {
+  if (event.target === ilifeFinanceEntryWizard) closeIlifeFinanceWizard();
 });
-document.querySelectorAll("[data-ilife-cycle]").forEach((button) => button.addEventListener("click", () => cycleIlifeFinanceOption(button.dataset.ilifeCycle, Number(button.dataset.direction || 1))));
-ilifeFinanceOnceDate?.addEventListener("change", () => { if (state.ilifeFinance.wizard && ilifeFinanceOnceDate.value) state.ilifeFinance.wizard.startsOn = ilifeFinanceOnceDate.value; });
-ilifeFinanceEndDate?.addEventListener("change", () => { if (state.ilifeFinance.wizard && ilifeFinanceEndDate.value) state.ilifeFinance.wizard.endsOn = ilifeFinanceEndDate.value; });
-ilifeFinanceScheduleBack?.addEventListener("click", () => { if (state.ilifeFinance.wizard) { state.ilifeFinance.wizard.step = "details"; renderIlifeFinanceWizard(); } });
-ilifeFinanceSave?.addEventListener("click", () => void saveIlifeFinanceItem());
-ilifeFinanceCustomOpen?.addEventListener("click", openIlifeFinanceCustom);
-document.querySelectorAll("[data-ilife-custom-direction]").forEach((button) => button.addEventListener("click", () => {
-  const wizard = state.ilifeFinance.wizard;
-  if (!wizard) return;
-  const index = ilifeFinanceCustomModes.indexOf(wizard.customMode);
-  wizard.customMode = ilifeFinanceCustomModes[(index + Number(button.dataset.ilifeCustomDirection || 1) + ilifeFinanceCustomModes.length) % ilifeFinanceCustomModes.length];
-  renderIlifeFinanceCustom();
-}));
-ilifeFinanceMonthDays?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-ilife-month-day]");
-  const wizard = state.ilifeFinance.wizard;
-  if (!button || !wizard) return;
-  const day = Number(button.dataset.ilifeMonthDay);
-  wizard.customDaysOfMonth = wizard.customDaysOfMonth.includes(day) ? wizard.customDaysOfMonth.filter((value) => value !== day) : [...wizard.customDaysOfMonth, day].sort((a,b) => a-b);
-  renderIlifeFinanceCustom();
+getIlifeFinanceEl("ilifeFinanceForm")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void saveIlifeFinanceItem();
 });
-ilifeFinanceWeekDays?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-ilife-weekday]");
-  const wizard = state.ilifeFinance.wizard;
-  if (!button || !wizard) return;
-  const day = Number(button.dataset.ilifeWeekday);
-  wizard.customWeekdays = wizard.customWeekdays.includes(day) ? wizard.customWeekdays.filter((value) => value !== day) : [...wizard.customWeekdays, day].sort((a,b) => a-b);
-  renderIlifeFinanceCustom();
+getIlifeFinanceEl("ilifeFinanceRecurring")?.addEventListener("change", (event) => {
+  const wrap = getIlifeFinanceEl("ilifeFinanceEndDateWrap");
+  if (wrap) wrap.hidden = !event.currentTarget.checked;
 });
-ilifeFinanceCustomDateAdd?.addEventListener("click", () => {
-  const wizard = state.ilifeFinance.wizard;
-  const date = ilifeFinanceCustomDateInput?.value;
-  if (!wizard || !date) { if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "Escolha uma data."; return; }
-  wizard.customDates = [...new Set([...wizard.customDates, date])].sort();
-  if (ilifeFinanceCustomDateInput) ilifeFinanceCustomDateInput.value = "";
-  if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "";
-  renderIlifeFinanceCustom();
-});
-ilifeFinanceCustomDates?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-ilife-remove-date]");
-  const wizard = state.ilifeFinance.wizard;
-  if (!button || !wizard) return;
-  wizard.customDates = wizard.customDates.filter((date) => date !== button.dataset.ilifeRemoveDate);
-  renderIlifeFinanceCustom();
-});
-ilifeFinanceCustomCancel?.addEventListener("click", closeIlifeFinanceCustom);
-ilifeFinanceCustomApply?.addEventListener("click", () => {
-  const wizard = state.ilifeFinance.wizard;
-  if (!wizard) return;
-  const count = wizard.customMode === "MONTHLY" ? wizard.customDaysOfMonth.length : wizard.customMode === "WEEKLY" ? wizard.customWeekdays.length : wizard.customDates.length;
-  if (!count) { if (ilifeFinanceCustomStatus) ilifeFinanceCustomStatus.textContent = "Escolha pelo menos uma opção."; return; }
-  closeIlifeFinanceCustom();
-  renderIlifeFinanceWizard();
-});
+getIlifeFinanceEl("ilifeFinanceTransferAction")?.addEventListener("click", () => setIlifeFinanceToast("TransferÃªncias entram na prÃ³xima tela: origem, destino e valor."));
+getIlifeFinanceEl("ilifeFinanceAccountsAction")?.addEventListener("click", () => setIlifeFinanceToast("Aqui vocÃª conecta contas, carteira e reservas."));
+getIlifeFinanceEl("ilifeFinanceSummaryInfo")?.addEventListener("click", () => setIlifeFinanceToast("Saldo atual fica separado da previsÃ£o, para nÃ£o misturar dinheiro existente com o que ainda vai entrar."));
+getIlifeFinanceEl("ilifeFinanceAgendaButton")?.addEventListener("click", () => setIlifeFinanceToast("Agenda completa: vencidos, hoje, prÃ³ximos dias e restante do mÃªs."));
+getIlifeFinanceEl("ilifeFinanceFilterButton")?.addEventListener("click", () => setIlifeFinanceToast("Filtros sugeridos: tipo, situaÃ§Ã£o, conta e categoria."));
+getIlifeFinanceEl("ilifeFinanceCalendarButton")?.addEventListener("click", () => setIlifeFinanceToast("CalendÃ¡rio mensal pronto para conectar ao seletor de data."));
 
 document.querySelectorAll("[data-switch-modal]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -16272,7 +16155,7 @@ toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode 
   if (activeTimeStatus && !state.activeTime.saving) {
     const duration = getActiveTimeDurationMinutes();
     const durationLabel = duration % 60 ? `${Math.floor(duration / 60)}h ${duration % 60}min` : `${duration / 60} horas`;
-    activeTimeStatus.textContent = `${activeMinutesToLabel(state.activeTime.startMinutes)}–${activeMinutesToLabel(state.activeTime.endMinutes)} · ${durationLabel} ativas`;
+    activeTimeStatus.textContent = `${activeMinutesToLabel(state.activeTime.startMinutes)}â€“${activeMinutesToLabel(state.activeTime.endMinutes)} Â· ${durationLabel} ativas`;
   }
   if (saveActiveTimeButton) saveActiveTimeButton.disabled = Boolean(state.activeTime.saving);
   if (toggleTaskBeepHint) {
@@ -16332,14 +16215,14 @@ function renderProject200ExportSuccess(payload) {
   const actionsCount = Number(payload?.summary?.actions || 0);
   const historyCount = Number(payload?.summary?.historyEntries || 0);
   const financeCount = Number(payload?.summary?.financeOccurrences || 0);
-  project200ExportMessage.textContent = `Exportado para ${targetName}: ${actionsCount} tarefas, ${historyCount} históricos e ${financeCount} lançamentos/copias financeiras.`;
+  project200ExportMessage.textContent = `Exportado para ${targetName}: ${actionsCount} tarefas, ${historyCount} histÃ³ricos e ${financeCount} lanÃ§amentos/copias financeiras.`;
 }
 
 async function submitProject200Export() {
   const username = String(project200ExportUsernameInput?.value || "").trim();
   if (!username) {
     if (project200ExportMessage) {
-      project200ExportMessage.textContent = "Digite o nome de usuário da conta destino.";
+      project200ExportMessage.textContent = "Digite o nome de usuÃ¡rio da conta destino.";
     }
     return;
   }
@@ -16527,7 +16410,7 @@ taskTitle?.addEventListener("input", () => {
   state.wizard.svgIconLabel = "";
   if (!title) {
     state.wizard.categoryId = "planejamento";
-    state.wizard.categoryName = "Propósito";
+    state.wizard.categoryName = "PropÃ³sito";
     renderActionCategoryPicker();
     if (isTaskComposerMode()) renderTaskComposerModal();
     return;
@@ -16593,7 +16476,7 @@ platformWizardBackButton?.addEventListener("click", () => {
 platformWizardNextButton?.addEventListener("click", () => {
   platformWizardMessage.textContent = "";
   if (state.platformWizard.step === 1 && platformNameInput.value.trim().length < 2) {
-    platformWizardMessage.textContent = "Digite um nome válido.";
+    platformWizardMessage.textContent = "Digite um nome vÃ¡lido.";
     return;
   }
 
@@ -16601,7 +16484,7 @@ platformWizardNextButton?.addEventListener("click", () => {
     const raw = String(platformValueInput.value || "").replace(/\./g, "").replace(",", ".");
     const value = Number(raw);
     if (!Number.isFinite(value) || value <= 0) {
-      platformWizardMessage.textContent = "Digite um valor válido.";
+      platformWizardMessage.textContent = "Digite um valor vÃ¡lido.";
       return;
     }
   }
@@ -16916,8 +16799,8 @@ platformEntriesList?.addEventListener("click", async (event) => {
   const occurrenceId = String(row?.dataset?.occurrenceId || "").trim();
   if (occurrenceId && platformLongPressHandledOccurrenceId === occurrenceId) {
     platformLongPressHandledOccurrenceId = "";
-    const entryName = String(row?.dataset?.entryName || "lançamento");
-    const confirmedDelete = window.confirm(`Apagar este item de finanças?\n\n${entryName}`);
+    const entryName = String(row?.dataset?.entryName || "lanÃ§amento");
+    const confirmedDelete = window.confirm(`Apagar este item de finanÃ§as?\n\n${entryName}`);
     if (!confirmedDelete) {
       return;
     }
@@ -16938,7 +16821,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
     if (row && (status === "DUE_TODAY" || status === "OVERDUE")) {
       const kind = String(row.dataset.kind || "").toUpperCase();
       const amountCents = Number(row.dataset.amountCents || 0);
-      const label = row.dataset.entryName || "lançamento";
+      const label = row.dataset.entryName || "lanÃ§amento";
       const message = kind === "INCOME"
         ? `Confirmar recebimento de ${formatMoney(amountCents)} em "${label}"?`
         : `Confirmar pagamento de ${formatMoney(-amountCents)} em "${label}"?`;
@@ -16954,7 +16837,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
     return;
   }
 
-  if (!window.confirm("Excluir este lançamento recorrente? Os valores já realizados permanecem.")) {
+  if (!window.confirm("Excluir este lanÃ§amento recorrente? Os valores jÃ¡ realizados permanecem.")) {
     return;
   }
 
@@ -17160,7 +17043,7 @@ missionTitleInput?.addEventListener("input", () => {
   state.missionCreate.categoryResolved = false;
   state.missionCreate.categoryThinking = Boolean(title) && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit";
   state.missionCreate.categoryId = "planejamento";
-  state.missionCreate.categoryName = "Propósito";
+  state.missionCreate.categoryName = "PropÃ³sito";
   if (missionCreateStatus) missionCreateStatus.textContent = "";
   renderMissionCreateStep();
   if (title && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit") {
@@ -17355,7 +17238,7 @@ statsAspectMissionSaveButton?.addEventListener("click", () => {
       renderStatsAspectModalState();
     } catch (error) {
       if (statsAspectMissionStatus) {
-        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a atribuição.";
+        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a atribuiÃ§Ã£o.";
       }
     }
   })();
@@ -17381,7 +17264,7 @@ statsAspectMissionClearButton?.addEventListener("click", () => {
       renderStatsAspectModalState();
     } catch (error) {
       if (statsAspectMissionStatus) {
-        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao limpar as missões.";
+        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao limpar as missÃµes.";
       }
     }
   })();
@@ -17422,13 +17305,13 @@ async function selectSleepAmbienceTrack(track) {
   state.sleepModal.musicLoading = false;
   if (!started) {
     state.sleepModal.musicEnabled = false;
-    if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `Não foi possível iniciar ${trackName}.`;
-    if (sleepModalFeedback) sleepModalFeedback.textContent = `Não foi possível iniciar ${trackName}.`;
+    if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `NÃ£o foi possÃ­vel iniciar ${trackName}.`;
+    if (sleepModalFeedback) sleepModalFeedback.textContent = `NÃ£o foi possÃ­vel iniciar ${trackName}.`;
     renderSleepMusicToggleState();
     return;
   }
   if (sleepModalFeedback) sleepModalFeedback.textContent = "";
-  if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `${trackName} está tocando.`;
+  if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `${trackName} estÃ¡ tocando.`;
   await syncSleepFrequencyPlayback();
   renderSleepMusicToggleState();
   closeSleepMusicPicker();
@@ -17586,7 +17469,7 @@ limitHistoryList?.addEventListener("click", (event) => {
   if (event.target.closest("[data-limit-history-save]")) {
     const occurredAt = buildLimitHistoryOccurredAt(state.limitHistory.editDate, state.limitHistory.editTime);
     if (!occurredAt) {
-      if (limitHistoryStatus) limitHistoryStatus.textContent = "Informe dia e horário válidos.";
+      if (limitHistoryStatus) limitHistoryStatus.textContent = "Informe dia e horÃ¡rio vÃ¡lidos.";
       return;
     }
     void mutateLimitHistoryEvent(eventId, "PATCH", state.limitHistory.editValue, occurredAt);
@@ -17594,7 +17477,7 @@ limitHistoryList?.addEventListener("click", (event) => {
   }
   if (event.target.closest("[data-limit-history-delete]")) {
     openRunningConfirmModal("delete_progress_event", {
-      title: `+${Math.max(1, Number(entry.value || 1))} • ${formatLimitHistoryDate(entry.occurredAt)}`
+      title: `+${Math.max(1, Number(entry.value || 1))} â€¢ ${formatLimitHistoryDate(entry.occurredAt)}`
     }, () => {
       void mutateLimitHistoryEvent(eventId, "DELETE");
     });
@@ -17650,7 +17533,7 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
       renderActionsMissionsPanel();
     } catch (error) {
       if (missionAdjustStatus) {
-        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
+        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missÃ£o.";
       }
     } finally {
       finishLoading();
@@ -17732,7 +17615,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
 missionAdjustDeleteButton?.addEventListener("click", () => {
   const goalId = String(state.missionAdjust?.goalId || "").trim();
   if (!goalId) return;
-  const goal = getAvailableMissionById(goalId) || { title: "Missão" };
+  const goal = getAvailableMissionById(goalId) || { title: "MissÃ£o" };
   openRunningConfirmModal("delete_mission", goal, () => {
     void (async () => {
       const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
@@ -17758,7 +17641,7 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
         renderRunningMissionQuickButtons();
       } catch (error) {
         if (missionAdjustStatus) {
-          missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
+          missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missÃ£o.";
         }
       } finally {
         finishLoading();
@@ -18527,7 +18410,7 @@ quickTaskStartButton?.addEventListener("click", () => {
       return;
     }
     const choice = await openStartConflictModalForActions(runningAction, {
-      title: String(quickTaskTitleInput?.value || "Tarefa Rápida").trim() || "Tarefa Rápida"
+      title: String(quickTaskTitleInput?.value || "Tarefa RÃ¡pida").trim() || "Tarefa RÃ¡pida"
     });
     if (!choice || choice === "cancel") {
       return;
@@ -18642,12 +18525,12 @@ saveActiveTimeButton?.addEventListener("click", () => {
     const startMinutes = clockInputToMinutes(activeTimeStartInput?.value);
     const endMinutes = clockInputToMinutes(activeTimeEndInput?.value, { end: true });
     if (startMinutes === endMinutes) {
-      if (activeTimeStatus) activeTimeStatus.textContent = "Escolha horários diferentes.";
+      if (activeTimeStatus) activeTimeStatus.textContent = "Escolha horÃ¡rios diferentes.";
       return;
     }
     state.activeTime.saving = true;
     renderOptionsModal();
-    if (activeTimeStatus) activeTimeStatus.textContent = "Salvando no iLife…";
+    if (activeTimeStatus) activeTimeStatus.textContent = "Salvando no iLifeâ€¦";
     try {
       const payload = await apiRequest("/api/200/active-time", {
         method: "PUT",
@@ -18681,7 +18564,7 @@ function downloadLatestProject200App() {
     downloadUrl.searchParams.set("v", project200AppVersion);
     downloadUrl.searchParams.set("t", String(Date.now()));
 
-    if (typeof showFloatingNotice === "function") showFloatingNotice(`Baixando a atualização do iLife · versão ${project200AppVersion}`);
+    if (typeof showFloatingNotice === "function") showFloatingNotice(`Baixando a atualizaÃ§Ã£o do iLife Â· versÃ£o ${project200AppVersion}`);
 
     const downloadLink = document.createElement("a");
     downloadLink.href = downloadUrl.toString();
@@ -18691,7 +18574,7 @@ function downloadLatestProject200App() {
     downloadLink.click();
     downloadLink.remove();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Não foi possível baixar a atualização.";
+    const message = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel baixar a atualizaÃ§Ã£o.";
     console.error(message);
     window.alert(message);
   } finally {
@@ -19292,7 +19175,7 @@ profileDeleteConfirmButton?.addEventListener("click", () => {
       await deleteManagedProfile();
     } catch (error) {
       if (profileManageMessage) {
-        profileManageMessage.textContent = error instanceof Error ? error.message : "Falha ao excluir usuário.";
+        profileManageMessage.textContent = error instanceof Error ? error.message : "Falha ao excluir usuÃ¡rio.";
       }
     }
   })();
@@ -19326,7 +19209,7 @@ project200CreateProfileConfirmButton?.addEventListener("click", () => {
       await createProject200ProfileFromModal();
     } catch (error) {
       if (project200CreateProfileMessage) {
-        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuário.";
+        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuÃ¡rio.";
       }
     }
   })();
@@ -19336,7 +19219,7 @@ project200CreateProfileNameInput?.addEventListener("keydown", (event) => {
     event.preventDefault();
     void createProject200ProfileFromModal().catch((error) => {
       if (project200CreateProfileMessage) {
-        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuário.";
+        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuÃ¡rio.";
       }
     });
   }
@@ -19419,7 +19302,7 @@ project200LoginForm?.addEventListener("submit", (event) => {
   const username = String(project200Username?.value || "").trim();
   const password = String(project200Password?.value || "");
   if (!username || !password) {
-    if (project200LoginMessage) project200LoginMessage.textContent = "Preencha usuário e senha.";
+    if (project200LoginMessage) project200LoginMessage.textContent = "Preencha usuÃ¡rio e senha.";
     return;
   }
   if (project200LoginMessage) project200LoginMessage.textContent = "Entrando...";
@@ -19576,6 +19459,10 @@ startRunningTaskTicker();
 if (runningMusicProgressTicker) {
   window.clearInterval(runningMusicProgressTicker);
 }
+
+
+
+
 
 
 

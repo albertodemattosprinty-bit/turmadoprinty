@@ -1,4 +1,4 @@
-import { query } from "./db.js";
+﻿import { query } from "./db.js";
 
 const ITEM_KINDS = new Set(["INCOME", "EXPENSE"]);
 const SETTLEMENT_TYPES = new Set(["CASH", "FUTURE"]);
@@ -35,6 +35,11 @@ function normalizeAmountCents(value) {
     throw new Error("Valor invalido.");
   }
   return amount;
+}
+
+function normalizeShortText(value, fallback, maxLength = 80) {
+  const text = String(value || "").trim().slice(0, maxLength);
+  return text || fallback;
 }
 
 function normalizeIntegerList(values, min, max) {
@@ -165,8 +170,12 @@ function normalizeItemRow(row) {
   return {
     id: row.id,
     title: row.title,
+    accountName: row.account_name || "Conta principal",
+    category: row.category || "Outros",
     kind: row.kind,
     amountCents: Number(row.amount_cents || 0),
+    accountName: row.account_name || "Conta principal",
+    category: row.category || "Outros",
     settlementType: row.settlement_type,
     scheduleMode: row.schedule_mode,
     scheduleFrequency: row.schedule_frequency,
@@ -185,6 +194,8 @@ export async function ensureProject200FinanceLedgerSchema() {
       title text not null,
       kind text not null check (kind in ('INCOME', 'EXPENSE')),
       amount_cents bigint not null check (amount_cents > 0),
+      account_name text not null default 'Conta principal',
+      category text not null default 'Outros',
       settlement_type text not null check (settlement_type in ('CASH', 'FUTURE')),
       schedule_mode text not null check (schedule_mode in ('ONCE', 'RECURRING', 'FINITE')),
       schedule_frequency text not null default 'NONE' check (schedule_frequency in ('NONE', 'MONTHLY', 'WEEKLY', 'CUSTOM')),
@@ -196,7 +207,10 @@ export async function ensureProject200FinanceLedgerSchema() {
       updated_at timestamptz not null default now()
     );
   `);
+  await query("alter table project200_finance_items add column if not exists account_name text not null default 'Conta principal';");
+  await query("alter table project200_finance_items add column if not exists category text not null default 'Outros';");
   await query("create index if not exists idx_project200_finance_items_user_dates on project200_finance_items(user_id, starts_on, ends_on) where deleted_at is null;");
+  await query("create index if not exists idx_project200_finance_items_user_category on project200_finance_items(user_id, category) where deleted_at is null;");
   await query(`
     create table if not exists project200_finance_occurrences (
       id uuid primary key default gen_random_uuid(),
@@ -242,14 +256,16 @@ export async function createProject200FinanceItem(userId, payload) {
   const title = String(payload?.title || "").trim().slice(0, 90);
   if (title.length < 2) throw new Error("Digite uma descricao para o lancamento.");
   const amountCents = normalizeAmountCents(payload?.amountCents);
+  const accountName = normalizeShortText(payload?.accountName, "Conta principal", 80);
+  const category = normalizeShortText(payload?.category, "Outros", 80);
 
   const result = await query(`
     insert into project200_finance_items (
-      user_id, title, kind, amount_cents, settlement_type, schedule_mode,
+      user_id, title, kind, amount_cents, account_name, category, settlement_type, schedule_mode,
       schedule_frequency, schedule_config, starts_on, ends_on
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::date,$10::date)
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::date,$12::date)
     returning *
-  `, [userId, title, kind, amountCents, settlementType, scheduleMode, scheduleFrequency, JSON.stringify(scheduleConfig), startsOn, endsOn]);
+  `, [userId, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify(scheduleConfig), startsOn, endsOn]);
 
   const item = normalizeItemRow(result.rows[0]);
   if (scheduleMode === "ONCE") {
@@ -285,7 +301,7 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
   await materializeRange(userId, rangeStart, rangeEnd);
 
   const occurrencesResult = await query(`
-    select o.id, o.item_id, i.title, o.kind, o.amount_cents, o.due_on, o.status,
+    select o.id, o.item_id, i.title, i.account_name, i.category, o.kind, o.amount_cents, o.due_on, o.status,
            i.settlement_type, i.schedule_mode, i.schedule_frequency
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
@@ -296,6 +312,8 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     id: row.id,
     itemId: row.item_id,
     title: row.title,
+    accountName: row.account_name || "Conta principal",
+    category: row.category || "Outros",
     kind: row.kind,
     amountCents: Number(row.amount_cents || 0),
     dueOn: toDateOnly(row.due_on),
@@ -308,7 +326,7 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
   const attentionEnd = getProject200AttentionEndKey(today);
   await materializeRange(userId, today, attentionEnd);
   const attentionResult = await query(`
-    select o.id, o.item_id, i.title, o.kind, o.amount_cents, o.due_on, o.status,
+    select o.id, o.item_id, i.title, i.account_name, i.category, o.kind, o.amount_cents, o.due_on, o.status,
            i.settlement_type, i.schedule_mode, i.schedule_frequency
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
@@ -322,6 +340,8 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     id: row.id,
     itemId: row.item_id,
     title: row.title,
+    accountName: row.account_name || "Conta principal",
+    category: row.category || "Outros",
     kind: row.kind,
     amountCents: Number(row.amount_cents || 0),
     dueOn: toDateOnly(row.due_on),
@@ -352,3 +372,4 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     entries
   };
 }
+
