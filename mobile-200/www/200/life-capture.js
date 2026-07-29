@@ -402,8 +402,14 @@
   }
 
   async function blobToBase64(blob) {
-    const dataUrl = await blobToDataUrl(blob);
-    return dataUrlParts(dataUrl).base64;
+    if (!(blob instanceof Blob)) return "";
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const chunkSize = 0x8000;
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+    }
+    return window.btoa(binary);
   }
 
   function buildCapturePreviewUrl(capture) {
