@@ -36,7 +36,14 @@
     noteAnalyser: null,
     noteAudioContext: null,
     noteLastSpeechAt: 0,
-    previewReady: false
+    previewReady: false,
+    memoryDiagnostics: {
+      localCount: 0,
+      remoteCount: 0,
+      lastLoadError: "",
+      lastUploadError: "",
+      lastUploadAt: ""
+    }
   };
 
   const byId = (id) => document.getElementById(id);
@@ -87,6 +94,25 @@
     const token = getAuthToken();
     if (token) next.Authorization = 'Bearer ' + token;
     return next;
+  }
+
+  function getApiOrigin() {
+    const metaValue = document.querySelector('meta[name="tdp-api-base-url"]')?.getAttribute("content")?.trim();
+    if (metaValue) return metaValue.replace(/\/+$/, "");
+    const runtimeValue = typeof window.__TDP_API_BASE_URL__ === "string" ? window.__TDP_API_BASE_URL__.trim() : "";
+    if (runtimeValue) return runtimeValue.replace(/\/+$/, "");
+    const capacitor = window.Capacitor;
+    const platform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
+    const isNative = typeof capacitor?.isNativePlatform === "function" ? capacitor.isNativePlatform() : platform === "android" || platform === "ios";
+    if (isNative) return "https://www.turmadoprinty.com.br";
+    return window.location.origin.replace(/\/+$/, "");
+  }
+
+  function getApiUrl(path) {
+    if (!path) return getApiOrigin();
+    if (/^https?:\/\//i.test(path)) return path;
+    const normalizedPath = path.startsWith("/") ? path : "/" + path;
+    return getApiOrigin() + normalizedPath;
   }
 
   function inject() {
@@ -312,7 +338,7 @@
   }
 
   async function fetchServerCaptures() {
-    const response = await fetch('/api/200/life-captures', {
+    const response = await fetch(getApiUrl('/api/200/life-captures'), {
       method: 'GET',
       headers: withAuthHeaders(),
       credentials: 'same-origin'
@@ -323,7 +349,7 @@
 
   async function patchServerCapture(captureId, patch = {}) {
     if (!captureId) return null;
-    const response = await fetch('/api/200/life-captures/' + encodeURIComponent(String(captureId)), {
+    const response = await fetch(getApiUrl('/api/200/life-captures/' + encodeURIComponent(String(captureId))), {
       method: 'PATCH',
       headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'same-origin',
@@ -340,6 +366,13 @@
       try {
         payload = JSON.parse(responseText);
       } catch {
+        const normalized = responseText.toLowerCase();
+        if (normalized.includes("window.location.replace") || normalized.includes("/200/index.html")) {
+          throw new Error("A API redirecionou para /200/index.html. Verifique login/token antes de consultar R2/Postgres.");
+        }
+        if (normalized.includes("<!doctype") || normalized.includes("<html")) {
+          throw new Error("A API devolveu HTML em vez de JSON. Verifique rota, login/token ou deploy do backend.");
+        }
         const plain = responseText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
         throw new Error(plain || fallbackMessage || 'Resposta invalida do servidor.');
       }
@@ -377,7 +410,7 @@
       if (!(capture.mediaBlob instanceof Blob)) return capture;
       const mediaBase64 = await blobToBase64(capture.mediaBlob);
       const previewParts = dataUrlParts(capture.previewDataUrl);
-      const response = await fetch('/api/200/life-captures/upload', {
+      const response = await fetch(getApiUrl('/api/200/life-captures/upload'), {
         method: 'POST',
         headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
         credentials: 'same-origin',
@@ -434,11 +467,16 @@
     } catch {
       local = [];
     }
+    state.memoryDiagnostics.localCount = local.length;
     try {
       remote = await fetchServerCaptures();
+      state.memoryDiagnostics.remoteCount = Array.isArray(remote) ? remote.length : 0;
+      state.memoryDiagnostics.lastLoadError = "";
       if (Array.isArray(remote) && remote.length) await saveCapturesBatch(remote);
-    } catch {
+    } catch (error) {
       remote = [];
+      state.memoryDiagnostics.remoteCount = 0;
+      state.memoryDiagnostics.lastLoadError = error instanceof Error ? error.message : "Falha ao consultar R2/Postgres.";
     }
     const byCaptureId = new Map();
     local.forEach((item) => {
@@ -462,9 +500,43 @@
       if (buildCaptureMediaUrl(capture)) return;
       if (!(capture.mediaBlob instanceof Blob)) return;
       queueMicrotask(() => {
-        ensureCaptureUploaded(capture).catch(() => {});
+        ensureCaptureUploaded(capture).catch((error) => {
+          state.memoryDiagnostics.lastUploadError = error instanceof Error ? error.message : "Falha ao salvar no R2.";
+          renderViewer();
+        });
       });
     });
+  }
+
+  async function uploadCaptureNow(captureId) {
+    const capture = findCaptureById(captureId) || getActiveCapture();
+    if (!capture) return;
+    if (buildCaptureMediaUrl(capture)) {
+      setStatus("Essa memoria ja esta vinculada ao R2/Postgres.");
+      return;
+    }
+    if (!(capture.mediaBlob instanceof Blob)) {
+      state.memoryDiagnostics.lastUploadError = "Arquivo local indisponivel neste dispositivo. Abra no aparelho onde a captura foi criada.";
+      setStatus(state.memoryDiagnostics.lastUploadError);
+      renderViewer();
+      return;
+    }
+    try {
+      setStatus("Salvando memoria no R2...");
+      await persistCapturePatch(capture.id, { uploadStatus: "uploading", uploadError: "" });
+      const uploaded = await ensureCaptureUploaded(capture);
+      state.memoryDiagnostics.lastUploadAt = new Date().toISOString();
+      state.memoryDiagnostics.lastUploadError = "";
+      await saveCapture({ ...(findCaptureById(capture.id) || capture), ...(uploaded || {}) });
+      await refreshCaptures();
+      setStatus("Memoria salva no R2 e vinculada a sua conta.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao salvar no R2.";
+      state.memoryDiagnostics.lastUploadError = message;
+      await persistCapturePatch(capture.id, { uploadStatus: "failed", uploadError: message }).catch(() => {});
+      setStatus(message);
+      renderViewer();
+    }
   }
 
   function getActiveCapture() {
@@ -715,11 +787,12 @@
     const thumb = byId("lifeCaptureAlbumThumb");
     if (!thumb) return;
     const latest = state.captures[0];
-    if (!latest?.previewDataUrl) {
+    const previewUrl = buildCapturePreviewUrl(latest) || buildCaptureMediaUrl(latest);
+    if (!previewUrl) {
       thumb.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 5h5l1.4 1.8H20a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4.5v6h11v-6Z" fill="currentColor"/></svg>';
       return;
     }
-    thumb.innerHTML = `<img src="${buildCapturePreviewUrl(latest)}" alt="Ultimo item" />`;
+    thumb.innerHTML = `<img src="${previewUrl}" alt="Ultimo item" />`;
   }
 
   function pauseViewerVideos() {
@@ -737,6 +810,19 @@
     updateViewerMediaPlayback();
   }
 
+  function renderMemoryEmptyDetails() {
+    const tokenStatus = getAuthToken() ? "token encontrado" : "token ausente";
+    const lines = [
+      "Local: " + state.memoryDiagnostics.localCount,
+      "Postgres/R2: " + state.memoryDiagnostics.remoteCount,
+      "Sessao: " + tokenStatus
+    ];
+    if (state.memoryDiagnostics.lastLoadError) lines.push("Busca remota: " + state.memoryDiagnostics.lastLoadError);
+    if (state.memoryDiagnostics.lastUploadError) lines.push("Ultimo upload: " + state.memoryDiagnostics.lastUploadError);
+    if (state.memoryDiagnostics.lastUploadAt) lines.push("Ultimo envio: " + formatDate(state.memoryDiagnostics.lastUploadAt));
+    return lines;
+  }
+
   function renderViewer() {
     const track = byId("lifeCaptureViewerTrack");
     if (!track) return;
@@ -744,7 +830,17 @@
     if (!state.captures.length) {
       const empty = document.createElement("div");
       empty.className = "life-capture-viewer-slide";
-      empty.innerHTML = '<div class="life-capture-empty">Sua memoria ainda esta vazia.</div>';
+      const panel = document.createElement("div");
+      panel.className = "life-capture-empty";
+      const title = document.createElement("strong");
+      title.textContent = "Sua memoria ainda esta vazia.";
+      panel.appendChild(title);
+      renderMemoryEmptyDetails().forEach((line) => {
+        const detail = document.createElement("small");
+        detail.textContent = line;
+        panel.appendChild(detail);
+      });
+      empty.appendChild(panel);
       track.appendChild(empty);
       updateViewerTransform();
       return;
@@ -756,6 +852,18 @@
 
       const media = document.createElement("div");
       media.className = "life-capture-viewer-media";
+
+      const uploaded = Boolean(buildCaptureMediaUrl(capture));
+      const upload = document.createElement("button");
+      upload.className = "life-capture-viewer-upload" + (uploaded ? " is-uploaded" : "");
+      upload.type = "button";
+      upload.dataset.captureUpload = capture.id;
+      upload.ariaLabel = uploaded ? "Memoria salva no R2" : "Salvar memoria no R2";
+      upload.title = upload.ariaLabel;
+      upload.innerHTML = uploaded
+        ? '<svg viewBox="0 0 24 24"><path d="M20 17.5A4.5 4.5 0 0 0 15.5 13H15a6 6 0 1 0-11.3 3.2A3.5 3.5 0 0 0 5.5 23H19a3 3 0 0 0 1-5.8Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m9 17 2 2 4-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M20 17.5A4.5 4.5 0 0 0 15.5 13H15a6 6 0 1 0-11.3 3.2A3.5 3.5 0 0 0 5.5 23H19a3 3 0 0 0 1-5.8Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 18V9m0 0-3 3m3-3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      media.appendChild(upload);
 
       if (capture.noteText) {
         const badge = document.createElement("button");
@@ -797,7 +905,7 @@
         media.appendChild(video);
       } else {
         const image = document.createElement("img");
-        image.src = buildCapturePreviewUrl(capture);
+        image.src = buildCapturePreviewUrl(capture) || buildCaptureMediaUrl(capture);
         image.alt = safeText(capture.title || defaultTitle(capture.kind, capture.createdAt));
         image.addEventListener("click", () => openFocus(capture.id));
         media.appendChild(image);
@@ -1115,7 +1223,7 @@
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let binary = "";
     bytes.forEach((value) => { binary += String.fromCharCode(value); });
-    const response = await fetch("/api/audio/transcribe", {
+    const response = await fetch(getApiUrl("/api/audio/transcribe"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
@@ -1125,8 +1233,7 @@
         fileName
       })
     });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(safeText(payload?.error || "Nao foi possivel transcrever."));
+    const payload = await readJsonResponse(response, "Nao foi possivel transcrever o audio. Verifique login/token da sessao.");
     return safeText(payload?.text || "").trim();
   }
 
@@ -1434,6 +1541,11 @@
       void saveNote().catch((error) => {
         setNoteStatus(error instanceof Error ? error.message : "Falha ao salvar a nota.");
       });
+      return;
+    }
+
+    if (button.dataset.captureUpload) {
+      void uploadCaptureNow(button.dataset.captureUpload);
       return;
     }
 
