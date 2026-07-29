@@ -51,9 +51,10 @@
 .life-capture-viewer-upload svg{width:23px;height:23px}
 .life-capture-viewer-upload::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid transparent;pointer-events:none}
 .life-capture-viewer-upload.is-uploading::after{border-top-color:#fff;border-right-color:rgba(255,255,255,.72);animation:lifeUploadSpin .72s linear infinite}
-.life-capture-viewer-upload.is-uploaded{background:rgba(40,183,107,.78)}.life-capture-viewer-upload.is-upload-done{animation:lifeUploadDone .5s ease both}
+.life-capture-viewer-upload.is-uploaded{background:rgba(40,183,107,.78)}.life-capture-viewer-upload.is-upload-failed{background:rgba(255,91,111,.78)}.life-capture-viewer-upload.is-upload-done{animation:lifeUploadDone .5s ease both}
 .life-capture-viewer-badge{left:14px;top:calc(max(14px,env(safe-area-inset-top,0px)) + 54px)}
 .life-capture-viewer-share{right:68px}
+.life-capture-upload-hint{position:absolute;left:50%;right:auto;bottom:22px;transform:translateX(-50%);z-index:6;max-width:min(82vw,420px);padding:8px 12px;border-radius:999px;background:rgba(7,25,52,.68);color:#fff;font-size:.74rem;font-weight:800;text-align:center;line-height:1.25;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}.life-capture-upload-hint.is-error{background:rgba(255,91,111,.82)}
 .life-capture-viewer-footer{position:relative;z-index:7;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:min(100%,360px);margin:0 auto;padding:0 18px}
 .life-capture-toolbar-btn{min-height:56px;border-radius:18px;background:rgba(255,255,255,.12);display:grid;place-items:center}
 .life-capture-toolbar-btn.is-disabled{opacity:.45}

@@ -20,6 +20,7 @@
     uploads: new Map(),
     uploadingIds: new Set(),
     uploadPulseIds: new Set(),
+    uploadErrors: new Map(),
     activeIndex: 0,
     noteCaptureId: "",
     shareCaptureId: "",
@@ -53,6 +54,12 @@
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   function normalizeMimeType(value) {
     return safeText(value).split(";")[0].trim().toLowerCase();
+  }
+
+  function formatBytes(bytes) {
+    const value = Number(bytes || 0);
+    if (!Number.isFinite(value) || value <= 0) return "0 MB";
+    return (value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 1 : 2) + " MB";
   }
 
   function formatDate(iso) {
@@ -407,10 +414,20 @@
     return safeText(capture?.remoteUrl || capture?.mediaUrl || '');
   }
 
+  function setUploadError(captureId, message) {
+    const id = safeText(captureId);
+    const text = safeText(message).trim();
+    if (!id) return;
+    if (text) state.uploadErrors.set(id, text);
+    else state.uploadErrors.delete(id);
+    state.memoryDiagnostics.lastUploadError = text;
+  }
+
   function pulseUploadDone(captureId) {
     const id = safeText(captureId);
     if (!id) return;
     state.uploadingIds.delete(id);
+    state.uploadErrors.delete(id);
     state.uploadPulseIds.add(id);
     renderViewer();
     window.setTimeout(() => {
@@ -424,10 +441,15 @@
     if (buildCaptureMediaUrl(capture) && buildCapturePreviewUrl(capture)) return capture;
     if (state.uploads.has(capture.id)) return state.uploads.get(capture.id);
     state.uploadingIds.add(String(capture.id));
+    setUploadError(capture.id, "");
     renderViewer();
     const uploadPromise = (async () => {
-      if (!(capture.mediaBlob instanceof Blob)) return capture;
+      if (!(capture.mediaBlob instanceof Blob)) throw new Error("Upload " + safeText(capture.kind || "midia") + ": arquivo local indisponivel neste dispositivo.");
+      const uploadMimeType = normalizeMimeType(capture.mimeType || capture.mediaBlob.type || "");
+      if (!uploadMimeType) throw new Error("Upload " + safeText(capture.kind || "midia") + ": mimeType vazio.");
+      if (capture.mediaBlob.size > 40 * 1024 * 1024) throw new Error("Upload " + safeText(capture.kind || "midia") + ": arquivo " + formatBytes(capture.mediaBlob.size) + " acima do limite de 40 MB.");
       const mediaBase64 = await blobToBase64(capture.mediaBlob);
+      if (!mediaBase64) throw new Error("Upload " + safeText(capture.kind || "midia") + ": base64 vazio gerado pelo app.");
       const previewParts = dataUrlParts(capture.previewDataUrl);
       const response = await fetch(getApiUrl('/api/200/life-captures/upload'), {
         method: 'POST',
@@ -441,7 +463,7 @@
           createdAt: capture.createdAt,
           durationMs: Number(capture.durationMs || 0),
           metadata: capture.metadata && typeof capture.metadata === 'object' ? capture.metadata : {},
-          mimeType: normalizeMimeType(capture.mimeType || capture.mediaBlob.type || ''),
+          mimeType: uploadMimeType,
           fileBase64: mediaBase64,
           previewBase64: previewParts.base64
         })
@@ -459,7 +481,9 @@
         uploadKey: safeText(serverCapture?.uploadKey || asset.key || capture.uploadKey || ''),
         previewKey: safeText(serverCapture?.previewKey || asset.previewKey || capture.previewKey || ''),
         sizeBytes: Number.isFinite(serverCapture?.sizeBytes) ? Number(serverCapture.sizeBytes) : (Number.isFinite(asset.sizeBytes) ? Number(asset.sizeBytes) : (capture.sizeBytes || capture.mediaBlob.size || 0)),
-        uploadedAt: safeText(serverCapture?.uploadedAt || new Date().toISOString())
+        uploadedAt: safeText(serverCapture?.uploadedAt || new Date().toISOString()),
+        uploadStatus: "uploaded",
+        uploadError: ""
       };
       await saveCapture(updated);
       const active = getActiveCapture();
@@ -473,7 +497,10 @@
       pulseUploadDone(capture.id);
       return findCaptureById(capture.id) || updated;
     })().catch((error) => {
+      const message = error instanceof Error ? error.message : "Falha ao salvar no R2.";
       state.uploadingIds.delete(String(capture.id));
+      setUploadError(capture.id, message);
+      persistCapturePatch(capture.id, { uploadStatus: "failed", uploadError: message }).catch(() => {});
       renderViewer();
       throw error;
     }).finally(() => {
@@ -525,7 +552,8 @@
       if (!(capture.mediaBlob instanceof Blob)) return;
       queueMicrotask(() => {
         ensureCaptureUploaded(capture).catch((error) => {
-          state.memoryDiagnostics.lastUploadError = error instanceof Error ? error.message : "Falha ao salvar no R2.";
+          const message = error instanceof Error ? error.message : "Falha ao salvar no R2.";
+          setUploadError(capture.id, message);
           renderViewer();
         });
       });
@@ -540,7 +568,7 @@
       return;
     }
     if (!(capture.mediaBlob instanceof Blob)) {
-      state.memoryDiagnostics.lastUploadError = "Arquivo local indisponivel neste dispositivo. Abra no aparelho onde a captura foi criada.";
+      setUploadError(capture.id, "Arquivo local indisponivel neste dispositivo. Abra no aparelho onde a captura foi criada.");
       setStatus(state.memoryDiagnostics.lastUploadError);
       renderViewer();
       return;
@@ -556,7 +584,7 @@
       setStatus("Memoria salva no R2 e vinculada a sua conta.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao salvar no R2.";
-      state.memoryDiagnostics.lastUploadError = message;
+      setUploadError(capture.id, message);
       await persistCapturePatch(capture.id, { uploadStatus: "failed", uploadError: message }).catch(() => {});
       setStatus(message);
       renderViewer();
@@ -772,7 +800,9 @@
         {
           mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
             ? "video/webm;codecs=vp8,opus"
-            : "video/webm"
+            : "video/webm",
+          videoBitsPerSecond: 1200000,
+          audioBitsPerSecond: 64000
         }
       );
       state.recording = true;
@@ -786,7 +816,12 @@
         state.recording = false;
         setModeUi();
         const mimeType = safeText(state.recorder?.mimeType || "video/webm");
-        const mediaBlob = new Blob(state.chunks, { type: mimeType });
+        const mediaBlob = new Blob(state.chunks, { type: normalizeMimeType(mimeType) || "video/webm" });
+        if (!mediaBlob.size) {
+          setStatus("Video vazio: nenhum dado foi gravado.");
+          await startPreview().catch(() => {});
+          return;
+        }
         const previewDataUrl = await videoPreviewFromBlob(mediaBlob);
         stopPreview();
         prepareSave({
@@ -880,17 +915,24 @@
 
       const uploaded = Boolean(buildCaptureMediaUrl(capture));
       const upload = document.createElement("button");
+      const uploadError = safeText(state.uploadErrors.get(String(capture.id)) || capture.uploadError || "");
       const uploading = state.uploadingIds.has(String(capture.id));
       const pulsing = state.uploadPulseIds.has(String(capture.id));
-      upload.className = "life-capture-viewer-upload" + (uploading ? " is-uploading" : "") + ((uploaded || pulsing) ? " is-uploaded" : "") + (pulsing ? " is-upload-done" : "");
+      upload.className = "life-capture-viewer-upload" + (uploading ? " is-uploading" : "") + ((uploaded || pulsing) ? " is-uploaded" : "") + (uploadError ? " is-upload-failed" : "") + (pulsing ? " is-upload-done" : "");
       upload.type = "button";
       upload.dataset.captureUpload = capture.id;
-      upload.ariaLabel = uploading ? "Salvando memoria no R2" : (uploaded ? "Memoria salva no R2" : "Salvar memoria no R2");
+      upload.ariaLabel = uploadError ? uploadError : (uploading ? "Salvando memoria no R2" : (uploaded ? "Memoria salva no R2" : "Salvar memoria no R2"));
       upload.title = upload.ariaLabel;
       upload.innerHTML = (uploaded || pulsing)
         ? '<svg viewBox="0 0 24 24"><path d="M20 17.5A4.5 4.5 0 0 0 15.5 13H15a6 6 0 1 0-11.3 3.2A3.5 3.5 0 0 0 5.5 23H19a3 3 0 0 0 1-5.8Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m9 17 2 2 4-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         : '<svg viewBox="0 0 24 24"><path d="M20 17.5A4.5 4.5 0 0 0 15.5 13H15a6 6 0 1 0-11.3 3.2A3.5 3.5 0 0 0 5.5 23H19a3 3 0 0 0 1-5.8Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 18V9m0 0-3 3m3-3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       media.appendChild(upload);
+      if (uploadError || uploading) {
+        const hint = document.createElement("small");
+        hint.className = "life-capture-upload-hint" + (uploadError ? " is-error" : "");
+        hint.textContent = uploadError || "Enviando para nuvem...";
+        media.appendChild(hint);
+      }
 
       if (capture.noteText) {
         const badge = document.createElement("button");
@@ -1411,8 +1453,12 @@
     hide("lifeCaptureSaveOverlay");
     await refreshCaptures();
     queueMicrotask(() => {
-      ensureCaptureUploaded(item).catch((error) => {
-        state.memoryDiagnostics.lastUploadError = error instanceof Error ? error.message : "Falha ao salvar na nuvem depois do save.";
+      ensureCaptureUploaded(item).then(() => {
+        setStatus("Memoria salva na nuvem.");
+      }).catch((error) => {
+        const message = error instanceof Error ? error.message : "Falha ao salvar na nuvem depois do save.";
+        setUploadError(item.id, message);
+        setStatus(message);
         renderViewer();
       });
     });
