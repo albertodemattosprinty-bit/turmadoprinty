@@ -12582,3 +12582,129 @@ body[data-background-theme="light"] #actionsModal .history-mission-card.actions-
 body[data-background-theme="white"] #actionsModal .history-mission-card.actions-dynamic-mission-card {
   color: #fff;
 }
+
+/* Chat humano: midias soltas e gravacao direta no composer. */
+.marin-message-shared {
+  width: fit-content;
+  max-width: min(84%, 590px);
+  display: grid;
+  animation: marinMessageIn 180ms ease-out both;
+}
+
+.marin-message-shared.is-synced {
+  animation: none;
+}
+
+.marin-message-shared.is-user {
+  align-self: flex-end;
+  justify-items: end;
+}
+
+.marin-message-shared.is-assistant {
+  align-self: flex-start;
+  justify-items: start;
+}
+
+.marin-message-shared-content {
+  display: grid;
+  justify-items: inherit;
+  max-width: 100%;
+}
+
+.marin-message-shared .marin-message-media-card,
+.marin-message-shared .marin-message-audio-card,
+.marin-message-shared .marin-message-text-card {
+  margin: 0;
+}
+
+.marin-message-text-card {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.marin-message-text-card strong {
+  color: #fff;
+}
+
+.marin-message-text-card p {
+  max-width: min(74vw, 320px);
+  color: var(--soft);
+}
+
+.marin-chat-composer {
+  position: relative;
+  transition: background 300ms ease, border-color 300ms ease;
+}
+
+.marin-chat-composer::before {
+  content: "Gravando";
+  position: absolute;
+  left: max(20px, env(safe-area-inset-left, 0px));
+  right: 68px;
+  bottom: max(17px, env(safe-area-inset-bottom, 0px));
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 22px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1.04rem;
+  font-weight: 850;
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+  pointer-events: none;
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+.marin-chat-composer::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 54px);
+  bottom: max(30px, calc(env(safe-area-inset-bottom, 0px) + 30px));
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  border-top-color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+  animation: marinChatRecordingSpin 800ms linear infinite;
+}
+
+.marin-chat-composer.is-recording {
+  background: rgba(10, 18, 39, 0.38);
+}
+
+.marin-chat-composer.is-recording textarea {
+  opacity: 0;
+  transform: translateY(-5px) scale(0.985);
+  pointer-events: none;
+}
+
+.marin-chat-composer.is-recording::before,
+.marin-chat-composer.is-recording::after {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.marin-chat-composer textarea {
+  transition: opacity 300ms ease, transform 300ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.marin-chat-send.is-mic {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.marin-chat-send.is-recording {
+  background: linear-gradient(145deg, #ff4d67, #c91431);
+  animation: marinMicPulse 1s ease-in-out infinite;
+}
+
+@keyframes marinChatRecordingSpin {
+  to { transform: rotate(360deg); }
+}

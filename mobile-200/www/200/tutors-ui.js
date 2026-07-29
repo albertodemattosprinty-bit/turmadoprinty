@@ -1,4 +1,4 @@
-import { renderChatMessageContent } from "./chat-links.js?v=0.7.0";
+import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.7.0";
 
 export function initializeProject200TutorsUi(dependencies = {}) {
   const {
@@ -39,7 +39,8 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     unreadAvatar: document.getElementById("tutorUnreadAvatar"),
     unreadAvatarFallback: document.getElementById("tutorUnreadAvatarFallback"),
     unreadCount: document.getElementById("tutorUnreadCount"),
-    notificationAudio: document.getElementById("tutorNotificationAudio")
+    notificationAudio: document.getElementById("tutorNotificationAudio"),
+    composer: document.getElementById("marinChatForm")
   };
 
   const defaultPersonMarkup = elements.chatPersonButton?.innerHTML || "";
@@ -61,7 +62,15 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     inboxHydrated: false,
     inboxNotifications: [],
     inboxUnreadCount: 0,
-    notifiedMessageIds: new Set()
+    notifiedMessageIds: new Set(),
+    recording: false,
+    recordingStartedAt: 0,
+    recordingPointerDownAt: 0,
+    recordingWasActiveOnPress: false,
+    recordingAutoStopOnRelease: false,
+    mediaRecorder: null,
+    mediaStream: null,
+    audioChunks: []
   };
 
   function currentProfile() {
@@ -105,6 +114,82 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     return fallback;
   }
 
+  const SEND_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 20 18-8L3 4v6l12 2-12 2z"/></svg>';
+  const MIC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.2a3.6 3.6 0 0 0 3.6-3.6V6.6a3.6 3.6 0 1 0-7.2 0v5a3.6 3.6 0 0 0 3.6 3.6Zm-5.4-3.8a5.4 5.4 0 0 0 10.8 0M12 18.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  function hasTypedMessage() {
+    return Boolean(String(elements.input?.value || "").trim());
+  }
+
+  function syncComposerMode() {
+    const hasText = hasTypedMessage();
+    elements.composer?.classList.toggle("is-recording", state.recording);
+    elements.composer?.classList.toggle("has-text", hasText);
+    if (!elements.send) return;
+    elements.send.classList.toggle("is-mic", !hasText);
+    elements.send.classList.toggle("is-recording", state.recording);
+    elements.send.type = hasText ? "submit" : "button";
+    elements.send.setAttribute("aria-label", hasText ? "Enviar mensagem" : (state.recording ? "Encerrar e enviar audio" : "Gravar audio"));
+    elements.send.innerHTML = hasText ? SEND_ICON : MIC_ICON;
+  }
+
+  function chooseAudioMimeType() {
+    const options = ["audio/ogg;codecs=opus", "audio/ogg", "audio/webm;codecs=opus", "audio/webm"];
+    if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") return "";
+    return options.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+      reader.onerror = () => reject(reader.error || new Error("Falha ao ler audio."));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function encodeUtf8Base64(text) {
+    const bytes = new TextEncoder().encode(String(text || ""));
+    let binary = "";
+    bytes.forEach((value) => { binary += String.fromCharCode(value); });
+    return window.btoa(binary);
+  }
+
+  function buildAudioShareMessage(asset, durationMs) {
+    const payload = {
+      kind: "audio",
+      title: "Audio do chat",
+      mediaUrl: String(asset?.url || asset?.mediaUrl || ""),
+      remoteUrl: String(asset?.url || asset?.mediaUrl || ""),
+      durationMs: Math.max(0, Number(durationMs || 0)),
+      sizeBytes: Math.max(0, Number(asset?.sizeBytes || 0)),
+      dateLabel: new Date().toLocaleDateString("pt-BR"),
+      noteText: ""
+    };
+    return "[[ILIFE_MEDIA:" + encodeUtf8Base64(JSON.stringify(payload)) + "]]";
+  }
+
+  async function uploadChatAudio(blob, durationMs) {
+    const mimeType = String(blob?.type || "audio/ogg").split(";")[0] || "audio/ogg";
+    const fileBase64 = await blobToBase64(blob);
+    const payload = await apiRequest("/api/200/life-captures/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "audio",
+        title: "Audio do chat",
+        noteText: "",
+        createdAt: new Date().toISOString(),
+        durationMs,
+        metadata: { source: "project200-human-chat" },
+        mimeType,
+        fileBase64,
+        previewBase64: ""
+      }),
+      skipGlobalLoading: true
+    });
+    return payload?.asset || payload?.capture || null;
+  }
   function notificationPreferences() {
     const preferences = typeof getNotificationPreferences === "function" ? getNotificationPreferences() : {};
     return {
@@ -448,13 +533,16 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     }
     state.messages.forEach((message) => {
       const messageId = String(message?.id || "");
+      const isSharedMedia = isChatMediaMessage(message.content);
       const bubble = document.createElement("article");
-      bubble.className = "marin-message " + (message.role === "user" ? "is-user" : "is-assistant");
+      bubble.className = isSharedMedia
+        ? "marin-message-shared " + (message.role === "user" ? "is-user" : "is-assistant")
+        : "marin-message " + (message.role === "user" ? "is-user" : "is-assistant");
       if (!animateMessageIds.has(messageId)) {
         bubble.classList.add("is-synced");
       }
       const copy = document.createElement("div");
-      copy.className = "marin-message-copy";
+      copy.className = isSharedMedia ? "marin-message-shared-content" : "marin-message-copy";
       renderChatMessageContent(copy, message.content);
       bubble.appendChild(copy);
       elements.messages.appendChild(bubble);
@@ -674,6 +762,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     await refreshMessages({ silent: false, forceFull: !state.syncCursor });
     await acknowledgeConversation(activeContactId());
     startPolling();
+    syncComposerMode();
     window.setTimeout(() => elements.input?.focus({ preventScroll: true }), 60);
   }
 
@@ -704,6 +793,110 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     stopPolling();
     updateHeader();
     renderTutorContacts();
+  }
+
+  function stopAudioStream() {
+    if (state.mediaStream) {
+      state.mediaStream.getTracks().forEach((track) => track.stop());
+      state.mediaStream = null;
+    }
+  }
+
+  function resetRecordingUi() {
+    state.recording = false;
+    state.recordingStartedAt = 0;
+    state.recordingPointerDownAt = 0;
+    state.recordingWasActiveOnPress = false;
+    state.recordingAutoStopOnRelease = false;
+    syncComposerMode();
+  }
+
+  async function finishAudioRecording({ send = true } = {}) {
+    if (!state.mediaRecorder || state.mediaRecorder.state === "inactive") {
+      resetRecordingUi();
+      stopAudioStream();
+      return;
+    }
+    state.mediaRecorder._sendOnStop = Boolean(send);
+    state.mediaRecorder.stop();
+  }
+
+  async function startAudioRecording() {
+    if (!state.human || state.recording || state.sending || hasTypedMessage()) return;
+    const contactId = activeContactId();
+    if (!contactId) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = chooseAudioMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      state.mediaStream = stream;
+      state.mediaRecorder = recorder;
+      state.audioChunks = [];
+      state.recording = true;
+      state.recordingStartedAt = Date.now();
+      syncComposerMode();
+      setStatus("Toque no microfone para enviar.");
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data?.size) state.audioChunks.push(event.data);
+      });
+      recorder.addEventListener("stop", async () => {
+        const chunks = state.audioChunks.slice();
+        const shouldSend = recorder._sendOnStop !== false;
+        const durationMs = Math.max(0, Date.now() - state.recordingStartedAt);
+        state.audioChunks = [];
+        state.mediaRecorder = null;
+        resetRecordingUi();
+        stopAudioStream();
+        if (!shouldSend) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/ogg" });
+        if (!blob.size) {
+          setStatus("Nao ouvi nada. Tente novamente.");
+          return;
+        }
+        state.sending = true;
+        if (elements.send) elements.send.disabled = true;
+        setStatus("Enviando audio...");
+        try {
+          const asset = await uploadChatAudio(blob, durationMs);
+          const mediaUrl = String(asset?.url || asset?.mediaUrl || "");
+          if (!mediaUrl) throw new Error("Audio enviado sem URL publica.");
+          const payload = await apiRequest("/api/200/tutors/" + encodeURIComponent(contactId) + "/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: buildAudioShareMessage(asset, durationMs) }),
+            skipGlobalLoading: true
+          });
+          if (payload?.message) state.messages.push(payload.message);
+          renderMessages({
+            animateMessageIds: new Set(payload?.message?.id ? [String(payload.message.id)] : [])
+          });
+          setStatus("");
+        } catch (error) {
+          setStatus(error instanceof Error ? error.message : "Nao foi possivel enviar o audio.");
+        } finally {
+          state.sending = false;
+          if (elements.send) elements.send.disabled = false;
+          syncComposerMode();
+        }
+      });
+      recorder.start();
+    } catch (error) {
+      resetRecordingUi();
+      stopAudioStream();
+      setStatus(error instanceof Error ? error.message : "Nao foi possivel abrir o microfone.");
+    }
+  }
+
+  async function toggleAudioRecording() {
+    if (hasTypedMessage()) {
+      await sendMessage();
+      return;
+    }
+    if (state.recording) {
+      await finishAudioRecording({ send: true });
+      return;
+    }
+    await startAudioRecording();
   }
 
   async function sendMessage() {
@@ -744,6 +937,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     } finally {
       state.sending = false;
       if (elements.send) elements.send.disabled = false;
+      syncComposerMode();
     }
   }
 
@@ -842,13 +1036,47 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     if (!state.human) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    void sendMessage();
+    if (hasTypedMessage()) void sendMessage();
+    else void toggleAudioRecording();
   }, true);
+  elements.input?.addEventListener("input", syncComposerMode);
   elements.input?.addEventListener("keydown", (event) => {
     if (!state.human || event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    void sendMessage();
+    if (hasTypedMessage()) void sendMessage();
+  }, true);
+  elements.send?.addEventListener("pointerdown", (event) => {
+    if (!state.human || hasTypedMessage()) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    state.recordingPointerDownAt = Date.now();
+    state.recordingWasActiveOnPress = state.recording;
+    if (!state.recording) void startAudioRecording();
+  }, true);
+  elements.send?.addEventListener("pointerup", (event) => {
+    if (!state.human || hasTypedMessage()) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const elapsed = Date.now() - Number(state.recordingPointerDownAt || Date.now());
+    if (state.recordingWasActiveOnPress || elapsed >= 3000) {
+      void finishAudioRecording({ send: true });
+      return;
+    }
+    window.setTimeout(() => {
+      state.recordingPointerDownAt = 0;
+      state.recordingWasActiveOnPress = false;
+    }, 350);
+  }, true);
+  elements.send?.addEventListener("pointercancel", () => {
+    state.recordingPointerDownAt = 0;
+    state.recordingWasActiveOnPress = false;
+  }, true);
+  elements.send?.addEventListener("click", (event) => {
+    if (!state.human || hasTypedMessage()) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!state.recordingPointerDownAt) void toggleAudioRecording();
   }, true);
   let homePressStartedAt = 0;
   elements.homeEntry?.addEventListener("pointerdown", () => {
@@ -873,7 +1101,10 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     if (event.target.closest(".marin-persona-option")) leaveHumanMode();
   }, true);
   elements.chatModal?.querySelectorAll("[data-close-modal]").forEach((button) => {
-    button.addEventListener("click", stopPolling);
+    button.addEventListener("click", () => {
+      stopPolling();
+      void finishAudioRecording({ send: false });
+    });
   });
 
   if (elements.personaList) {
@@ -886,6 +1117,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
   }
 
   updateHeader();
+  syncComposerMode();
   void loadDirectory().catch(() => {});
 
   return {

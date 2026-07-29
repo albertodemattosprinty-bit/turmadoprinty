@@ -1,4 +1,4 @@
-﻿const CHAT_URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+/giu;
+const CHAT_URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"']+/giu;
 const TRAILING_URL_PUNCTUATION = /[.,!?;:)\]}]+$/u;
 const ILIFE_MEDIA_PREFIX = "[[ILIFE_MEDIA:";
 const ILIFE_MEDIA_SUFFIX = "]]";
@@ -58,6 +58,10 @@ function parseMediaPayload(text) {
   }
 }
 
+export function isChatMediaMessage(content) {
+  return Boolean(parseMediaPayload(content));
+}
+
 function renderPlainText(container, text) {
   let cursor = 0;
   for (const match of text.matchAll(CHAT_URL_PATTERN)) {
@@ -88,7 +92,7 @@ function createMediaCard(payload) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "marin-message-audio-button";
-    button.textContent = "▶";
+    button.textContent = "\u25b6";
     button.setAttribute("aria-label", "Reproduzir audio");
     const wave = document.createElement("span");
     wave.className = "marin-message-audio-wave";
@@ -100,14 +104,18 @@ function createMediaCard(payload) {
     const audio = new Audio(mediaUrl);
     audio.preload = "metadata";
     audio.addEventListener("loadedmetadata", () => { duration.textContent = formatMediaDuration(audio.duration * 1000); });
-    audio.addEventListener("ended", () => { button.textContent = "▶"; });
+    audio.addEventListener("ended", () => { button.textContent = "\u25b6"; });
     button.addEventListener("click", () => {
       if (audio.paused) {
-        audio.play().then(() => { button.textContent = "❚❚"; }).catch(() => {});
+        audio.play().then(() => { button.textContent = "\u275a\u275a"; }).catch(() => {});
       } else {
         audio.pause();
-        button.textContent = "▶";
+        button.textContent = "\u25b6";
       }
+    });
+    card.addEventListener("click", (event) => {
+      if (event.target.closest(".marin-message-audio-button")) return;
+      window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
     });
     card.addEventListener("dblclick", () => {
       window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
