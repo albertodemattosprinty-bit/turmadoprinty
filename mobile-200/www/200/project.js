@@ -5252,7 +5252,7 @@ function renderMetricPeriodModal() {
   metricPeriodOptions.innerHTML = options.map((days) => `<button type="button" class="metric-period-option${days === selectedDays ? " is-active" : ""}" data-metric-period-days="${days}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${escapeHtml(formatMetricPeriodLabel(days))}</span></button>`).join("");
   if (metricPeriodHint) {
     metricPeriodHint.textContent = state.historySpan.firstOccurredAt
-      ? `DisponÃ­vel desde o inÃ­cio das suas mÃ©tricas Â· ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
+      ? `DisponÃ­vel desde o inÃ­cio das suas mÃ©tricas &middot; ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
       : "O perÃ­odo cresce a partir do seu primeiro ponto.";
   }
 }
@@ -5721,6 +5721,14 @@ function inferFinanceEntryLocally(text) {
 }
 
 
+const financeNanoIcons = {
+  eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M9.9 5.4A9.7 9.7 0 0 1 12 5c6 0 9.5 7 9.5 7a16 16 0 0 1-3 4M6.4 6.8C3.8 8.7 2.5 12 2.5 12s3.5 7 9.5 7c1.4 0 2.7-.3 3.8-.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  income: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10M17 7 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  expense: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17H7V7M7 17 18 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.1 4.1L19 6.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+
 const ilifeFinanceDateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" });
 
 function getIlifeFinanceEl(id) {
@@ -5759,7 +5767,7 @@ function formatIlifeFinanceDate(dateKey) {
 }
 
 function formatIlifeFinanceMoney(cents) {
-  if (state.ilifeFinance.valuesVisible === false) return "R$ â€¢â€¢â€¢â€¢â€¢";
+  if (state.ilifeFinance.valuesVisible === false) return "R$ *****";
   return formatMoney(Number(cents || 0));
 }
 
@@ -5803,14 +5811,14 @@ function renderIlifeFinanceSummary() {
   if (expectedIncome) expectedIncome.textContent = formatIlifeFinanceMoney(incomeCents);
   if (expectedExpense) expectedExpense.textContent = formatIlifeFinanceMoney(expenseCents);
   if (freeMoney) freeMoney.textContent = formatIlifeFinanceMoney(projectedCents);
-  if (incomeMonth) incomeMonth.textContent = `${incomeEntries.length} ${incomeEntries.length === 1 ? "lanÃ§amento" : "lanÃ§amentos"}`;
-  if (expenseMonth) expenseMonth.textContent = `${expenseEntries.length} ${expenseEntries.length === 1 ? "lanÃ§amento" : "lanÃ§amentos"}`;
-  if (toggle) toggle.textContent = state.ilifeFinance.valuesVisible === false ? "â—‹" : "â—‰";
+  if (incomeMonth) incomeMonth.textContent = `${incomeEntries.length} ${incomeEntries.length === 1 ? "lan\u00e7amento" : "lan\u00e7amentos"}`;
+  if (expenseMonth) expenseMonth.textContent = `${expenseEntries.length} ${expenseEntries.length === 1 ? "lan\u00e7amento" : "lan\u00e7amentos"}`;
+  if (toggle) toggle.innerHTML = state.ilifeFinance.valuesVisible === false ? financeNanoIcons.eyeOff : financeNanoIcons.eye;
 
   if (healthPill) {
     healthPill.classList.toggle("is-warning", projectedCents < 0);
     healthPill.classList.toggle("is-watch", projectedCents >= 0 && expenseCents > incomeCents + Math.round(balanceCents * 0.65));
-    healthPill.textContent = projectedCents < 0 ? "AtenÃ§Ã£o" : expenseCents > incomeCents + Math.round(balanceCents * 0.65) ? "Acompanhar" : "Organizado";
+    healthPill.textContent = projectedCents < 0 ? "Aten\u00e7\u00e3o" : expenseCents > incomeCents + Math.round(balanceCents * 0.65) ? "Acompanhar" : "Organizado";
   }
 
   const today = getProjectTodayDateKey();
@@ -5820,21 +5828,21 @@ function renderIlifeFinanceSummary() {
   const next = attentionEntries[0];
   if (agenda) {
     if (!summary.hasAny) {
-      agenda.innerHTML = '<div class="finance-nano-empty"><span>âœ“</span><div><small>AGENDA FINANCEIRA</small><strong>Seu painel financeiro comeÃ§a aqui</strong><p>Primeiro vamos registrar uma entrada ou saÃ­da.</p></div></div>';
+      agenda.innerHTML = `<div class="finance-nano-empty"><span>${financeNanoIcons.check}</span><div><small>AGENDA FINANCEIRA</small><strong>Seu painel financeiro come&ccedil;a aqui</strong><p>Primeiro vamos registrar uma entrada ou sa&iacute;da.</p></div></div>`;
     } else if (!next) {
-      agenda.innerHTML = '<div class="finance-nano-empty"><span>âœ“</span><div><small>AGENDA FINANCEIRA</small><strong>Nenhuma pendÃªncia neste mÃªs</strong><p>Os prÃ³ximos compromissos aparecem aqui, em ordem de data.</p></div></div>';
+      agenda.innerHTML = `<div class="finance-nano-empty"><span>${financeNanoIcons.check}</span><div><small>AGENDA FINANCEIRA</small><strong>Nenhuma pend&ecirc;ncia neste m&ecirc;s</strong><p>Os pr&oacute;ximos compromissos aparecem aqui, em ordem de data.</p></div></div>`;
     } else {
       const dueOn = String(next.dueOn || "");
       const days = Math.ceil((projectDateKeyToDate(dueOn, 12) - projectDateKeyToDate(today, 12)) / 86400000);
-      const timing = days === 0 ? "Hoje" : days === 1 ? "AmanhÃ£" : days > 1 ? `Em ${days} dias` : formatIlifeFinanceDate(dueOn);
+      const timing = days === 0 ? "Hoje" : days === 1 ? "Amanh\u00e3" : days > 1 ? `Em ${days} dias` : formatIlifeFinanceDate(dueOn);
       const income = next.kind === "INCOME";
-      agenda.innerHTML = `<div class="finance-nano-empty"><span>${income ? "â†™" : "â†—"}</span><div><small>${escapeHtml(timing.toUpperCase())} Â· ${escapeHtml(formatIlifeFinanceDate(dueOn).toUpperCase())}</small><strong>${escapeHtml(next.title || "LanÃ§amento")}</strong><p>${income ? "Entrada prevista" : "Pagamento previsto"} Â· <b>${income ? "+" : "-"} ${escapeHtml(formatIlifeFinanceMoney(next.amountCents || 0))}</b></p></div></div>`;
+      agenda.innerHTML = `<div class="finance-nano-empty"><span>${income ? financeNanoIcons.income : financeNanoIcons.expense}</span><div><small>${escapeHtml(timing.toUpperCase())} &middot; ${escapeHtml(formatIlifeFinanceDate(dueOn).toUpperCase())}</small><strong>${escapeHtml(next.title || "Lan\u00e7amento")}</strong><p>${income ? "Entrada prevista" : "Pagamento previsto"} &middot; <b>${income ? "+" : "-"} ${escapeHtml(formatIlifeFinanceMoney(next.amountCents || 0))}</b></p></div></div>`;
     }
   }
 
   if (list) {
     if (!entries.length) {
-      list.innerHTML = '<div class="finance-nano-list-empty">Nenhuma movimentaÃ§Ã£o neste mÃªs.</div>';
+      list.innerHTML = '<div class="finance-nano-list-empty">Nenhuma movimenta&ccedil;&atilde;o neste m&ecirc;s.</div>';
     } else {
       list.innerHTML = [...entries]
         .sort((a, b) => String(b.dueOn || "").localeCompare(String(a.dueOn || "")))
@@ -5842,7 +5850,7 @@ function renderIlifeFinanceSummary() {
         .map((entry) => {
           const expense = entry.kind === "EXPENSE";
           const settled = entry.status === "SETTLED";
-          return `<article class="finance-nano-transaction ${expense ? "is-expense" : ""}"><div>${expense ? "â†—" : "â†™"}</div><span><strong>${escapeHtml(entry.title || "LanÃ§amento")}</strong><small>${escapeHtml(formatIlifeFinanceDate(entry.dueOn))} Â· ${settled ? "REALIZADO" : "PREVISTO"}</small></span><b>${expense ? "-" : "+"} ${escapeHtml(formatIlifeFinanceMoney(entry.amountCents || 0))}</b></article>`;
+          return `<article class="finance-nano-transaction ${expense ? "is-expense" : ""}"><div>${expense ? financeNanoIcons.expense : financeNanoIcons.income}</div><span><strong>${escapeHtml(entry.title || "Lan\u00e7amento")}</strong><small>${escapeHtml(formatIlifeFinanceDate(entry.dueOn))} &middot; ${settled ? "REALIZADO" : "PREVISTO"}</small></span><b>${expense ? "-" : "+"} ${escapeHtml(formatIlifeFinanceMoney(entry.amountCents || 0))}</b></article>`;
         }).join("");
     }
   }
@@ -5854,14 +5862,14 @@ async function loadIlifeFinanceLedger() {
     if (ilifeFinanceStatus) ilifeFinanceStatus.innerHTML = 'Entre para salvar e consultar sua carteira. <a href="/log?next=/200">Entrar</a>';
     return;
   }
-  if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "Carregando seu mÃªs...";
+  if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "Carregando seu m\u00eas...";
   try {
     const payload = await apiRequest(`/api/200/finance/ledger?month=${encodeURIComponent(getIlifeFinanceMonthKey())}`);
     state.ilifeFinance.summary = payload?.summary || null;
     renderIlifeFinanceSummary();
     if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = "";
   } catch (error) {
-    if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel carregar sua carteira.";
+    if (ilifeFinanceStatus) ilifeFinanceStatus.textContent = error instanceof Error ? error.message : "N\u00e3o foi poss\u00edvel carregar sua carteira.";
   }
 }
 
@@ -5911,7 +5919,7 @@ function renderIlifeFinanceWizard() {
   const wizard = state.ilifeFinance.wizard;
   if (!wizard) return;
   const income = wizard.kind === "INCOME";
-  if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = income ? "Nova entrada" : "Nova saÃ­da";
+  if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = income ? "Nova entrada" : "Nova sa\u00edda";
   document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.ilifeFinanceKindSwitch === wizard.kind);
   });
@@ -5941,11 +5949,11 @@ function buildIlifeFinancePayload() {
 async function saveIlifeFinanceItem() {
   const payload = buildIlifeFinancePayload();
   if (!payload.title) {
-    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Digite uma descriÃ§Ã£o.";
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Digite uma descri\u00e7\u00e3o.";
     return;
   }
   if (!payload.amountCents) {
-    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Digite um valor vÃ¡lido.";
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Digite um valor v\u00e1lido.";
     return;
   }
   if (!payload.startsOn) {
@@ -5966,9 +5974,9 @@ async function saveIlifeFinanceItem() {
     });
     closeIlifeFinanceWizard();
     await loadIlifeFinanceLedger();
-    setIlifeFinanceToast("LanÃ§amento salvo no seu mÃªs.");
+    setIlifeFinanceToast("Lan\u00e7amento salvo no seu m\u00eas.");
   } catch (error) {
-    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel salvar.";
+    if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = error instanceof Error ? error.message : "N\u00e3o foi poss\u00edvel salvar.";
   } finally {
     if (ilifeFinanceSave) ilifeFinanceSave.disabled = false;
   }
@@ -6917,7 +6925,7 @@ function renderActions() {
       ${buildTaskAvatarMarkup(actionIcon.src, actionIcon.alt, { categoryIcon: actionIcon.categoryIcon })}
       <div class="task-main">
         <div class="task-title">${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
-        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}${status === actionStatuses.paused ? ` Â· ${getActionStoredCompletionPercent(action)}%` : ""}</div>
+        <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}${status === actionStatuses.paused ? ` &middot; ${getActionStoredCompletionPercent(action)}%` : ""}</div>
       </div>
       <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
     `;
@@ -8625,7 +8633,7 @@ function closePostponeReplaceModalView() {
 
 function formatPostponeDayLabel(offset) {
   if (offset === 0) return "Hoje";
-  if (offset === 1) return "AmanhÃ£";
+  if (offset === 1) return "Amanh\u00e3";
   return formatDateLabel(dateFromOffset(offset));
 }
 
@@ -10565,7 +10573,7 @@ function openFinanceEntryConfirm(entry, categoryLabel) {
     const icon = platformCategoryIconByName[String(entry.category || "").trim()] || "/200/icons/financas.svg";
     financeEntryConfirmCard.classList.toggle("platform-entry-income", kind === "INCOME");
     financeEntryConfirmCard.classList.toggle("platform-entry-debit", kind !== "INCOME");
-    financeEntryConfirmName.innerHTML = `<img class="platform-entry-icon" src="${icon}" alt="" aria-hidden="true" /><span>${escapeHtml(entry.name || "LanÃ§amento")}</span>`;
+    financeEntryConfirmName.innerHTML = `<img class="platform-entry-icon" src="${icon}" alt="" aria-hidden="true" /><span>${escapeHtml(entry.name || "Lan\u00e7amento")}</span>`;
     financeEntryConfirmValue.textContent = formatMoney(value);
     const recurrenceMeta = String(entry.recurrenceType || "").toUpperCase() === "RECURRING"
       ? `Tag: ${categoryLabel} â€¢ Data: dia ${Math.max(1, Math.min(31, Number(entry.recurrenceDayOfMonth || 1)))}`
@@ -11109,8 +11117,8 @@ function renderStatsAspectModalState() {
   }
   if (statsAspectProgressSummary) {
     const linkedMissionLabel = Array.isArray(currentEntry.missionTitles) && currentEntry.missionTitles.length
-      ? `${currentEntry.percent}% Â· ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)} Â· ${currentEntry.missionTitles.join(" + ")}`
-      : `${currentEntry.percent}% Â· ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)}`;
+      ? `${currentEntry.percent}% &middot; ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)} &middot; ${currentEntry.missionTitles.join(" + ")}`
+      : `${currentEntry.percent}% &middot; ${formatMinutesHuman(currentEntry.points || 0)} de ${formatMinutesHuman(currentEntry.targetPoints || 0)}`;
     statsAspectProgressSummary.textContent = linkedMissionLabel;
   }
   if (statsAspectLinkedGoalsLabel) {
@@ -11268,8 +11276,8 @@ function renderStatsAspectLinksModal() {
   if (statsAspectLinksPeriod) {
     const scopeLabel = getActiveStatsScope()?.label || "Hoje";
     statsAspectLinksPeriod.textContent = allMissionsMode
-      ? `Hoje Â· ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`
-      : `${scopeLabel} Â· ${actions.length} ${actions.length === 1 ? "aÃ§Ã£o" : "aÃ§Ãµes"} Â· ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`;
+      ? `Hoje &middot; ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`
+      : `${scopeLabel} &middot; ${actions.length} ${actions.length === 1 ? "aÃ§Ã£o" : "aÃ§Ãµes"} &middot; ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`;
   }
   if (!statsAspectLinksList) return;
   if (state.statsAspectLinks?.loading) {
@@ -14458,7 +14466,7 @@ function renderMissionVariants() {
         : timing.percent;
     const unitLabel = variant.intervalUnit === "hours" ? `${variant.intervalValue}h` : `${variant.intervalValue} ${variant.intervalValue === 1 ? "dia" : "dias"}`;
     return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
-      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} Â· ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
+      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
       ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">Ã—</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
@@ -15811,12 +15819,12 @@ getIlifeFinanceEl("ilifeFinanceRecurring")?.addEventListener("change", (event) =
   const wrap = getIlifeFinanceEl("ilifeFinanceEndDateWrap");
   if (wrap) wrap.hidden = !event.currentTarget.checked;
 });
-getIlifeFinanceEl("ilifeFinanceTransferAction")?.addEventListener("click", () => setIlifeFinanceToast("TransferÃªncias entram na prÃ³xima tela: origem, destino e valor."));
-getIlifeFinanceEl("ilifeFinanceAccountsAction")?.addEventListener("click", () => setIlifeFinanceToast("Aqui vocÃª conecta contas, carteira e reservas."));
-getIlifeFinanceEl("ilifeFinanceSummaryInfo")?.addEventListener("click", () => setIlifeFinanceToast("Saldo atual fica separado da previsÃ£o, para nÃ£o misturar dinheiro existente com o que ainda vai entrar."));
-getIlifeFinanceEl("ilifeFinanceAgendaButton")?.addEventListener("click", () => setIlifeFinanceToast("Agenda completa: vencidos, hoje, prÃ³ximos dias e restante do mÃªs."));
-getIlifeFinanceEl("ilifeFinanceFilterButton")?.addEventListener("click", () => setIlifeFinanceToast("Filtros sugeridos: tipo, situaÃ§Ã£o, conta e categoria."));
-getIlifeFinanceEl("ilifeFinanceCalendarButton")?.addEventListener("click", () => setIlifeFinanceToast("CalendÃ¡rio mensal pronto para conectar ao seletor de data."));
+getIlifeFinanceEl("ilifeFinanceTransferAction")?.addEventListener("click", () => setIlifeFinanceToast("Transfer\u00eancias entram na pr\u00f3xima tela: origem, destino e valor."));
+getIlifeFinanceEl("ilifeFinanceAccountsAction")?.addEventListener("click", () => setIlifeFinanceToast("Aqui voc\u00ea conecta contas, carteira e reservas."));
+getIlifeFinanceEl("ilifeFinanceSummaryInfo")?.addEventListener("click", () => setIlifeFinanceToast("Saldo atual fica separado da previs\u00e3o, para n\u00e3o misturar dinheiro existente com o que ainda vai entrar."));
+getIlifeFinanceEl("ilifeFinanceAgendaButton")?.addEventListener("click", () => setIlifeFinanceToast("Agenda completa: vencidos, hoje, pr\u00f3ximos dias e restante do m\u00eas."));
+getIlifeFinanceEl("ilifeFinanceFilterButton")?.addEventListener("click", () => setIlifeFinanceToast("Filtros sugeridos: tipo, situa\u00e7\u00e3o, conta e categoria."));
+getIlifeFinanceEl("ilifeFinanceCalendarButton")?.addEventListener("click", () => setIlifeFinanceToast("Calend\u00e1rio mensal pronto para conectar ao seletor de data."));
 
 document.querySelectorAll("[data-switch-modal]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -16155,7 +16163,7 @@ toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode 
   if (activeTimeStatus && !state.activeTime.saving) {
     const duration = getActiveTimeDurationMinutes();
     const durationLabel = duration % 60 ? `${Math.floor(duration / 60)}h ${duration % 60}min` : `${duration / 60} horas`;
-    activeTimeStatus.textContent = `${activeMinutesToLabel(state.activeTime.startMinutes)}â€“${activeMinutesToLabel(state.activeTime.endMinutes)} Â· ${durationLabel} ativas`;
+    activeTimeStatus.textContent = `${activeMinutesToLabel(state.activeTime.startMinutes)}â€“${activeMinutesToLabel(state.activeTime.endMinutes)} &middot; ${durationLabel} ativas`;
   }
   if (saveActiveTimeButton) saveActiveTimeButton.disabled = Boolean(state.activeTime.saving);
   if (toggleTaskBeepHint) {
@@ -16484,7 +16492,7 @@ platformWizardNextButton?.addEventListener("click", () => {
     const raw = String(platformValueInput.value || "").replace(/\./g, "").replace(",", ".");
     const value = Number(raw);
     if (!Number.isFinite(value) || value <= 0) {
-      platformWizardMessage.textContent = "Digite um valor vÃ¡lido.";
+      platformWizardMessage.textContent = "Digite um valor v\u00e1lido.";
       return;
     }
   }
@@ -16799,7 +16807,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
   const occurrenceId = String(row?.dataset?.occurrenceId || "").trim();
   if (occurrenceId && platformLongPressHandledOccurrenceId === occurrenceId) {
     platformLongPressHandledOccurrenceId = "";
-    const entryName = String(row?.dataset?.entryName || "lanÃ§amento");
+    const entryName = String(row?.dataset?.entryName || "lan\u00e7amento");
     const confirmedDelete = window.confirm(`Apagar este item de finanÃ§as?\n\n${entryName}`);
     if (!confirmedDelete) {
       return;
@@ -16821,7 +16829,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
     if (row && (status === "DUE_TODAY" || status === "OVERDUE")) {
       const kind = String(row.dataset.kind || "").toUpperCase();
       const amountCents = Number(row.dataset.amountCents || 0);
-      const label = row.dataset.entryName || "lanÃ§amento";
+      const label = row.dataset.entryName || "lan\u00e7amento";
       const message = kind === "INCOME"
         ? `Confirmar recebimento de ${formatMoney(amountCents)} em "${label}"?`
         : `Confirmar pagamento de ${formatMoney(-amountCents)} em "${label}"?`;
@@ -18564,7 +18572,7 @@ function downloadLatestProject200App() {
     downloadUrl.searchParams.set("v", project200AppVersion);
     downloadUrl.searchParams.set("t", String(Date.now()));
 
-    if (typeof showFloatingNotice === "function") showFloatingNotice(`Baixando a atualizaÃ§Ã£o do iLife Â· versÃ£o ${project200AppVersion}`);
+    if (typeof showFloatingNotice === "function") showFloatingNotice(`Baixando a atualizaÃ§Ã£o do iLife &middot; versÃ£o ${project200AppVersion}`);
 
     const downloadLink = document.createElement("a");
     downloadLink.href = downloadUrl.toString();

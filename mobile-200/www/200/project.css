@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg-a: #0b3da8;
   --bg-b: #1f7ee7;
   --white: #ffffff;
@@ -96,7 +96,7 @@ body[data-background-theme="black"] {
   --ink: #d9e4ff;
 }
 
-/* Seletor unificado dos 12 aspectos e histÃ³rico editÃ¡vel de sono. */
+/* Seletor unificado dos 12 aspectos e histÃƒÂ³rico editÃƒÂ¡vel de sono. */
 .start-decision-aspect-btn img { width: 24px; height: 24px; object-fit: contain; flex: 0 0 auto; }
 .aspect-selector-modal { z-index: 2900; padding: 0; background: inherit; color: var(--white); }
 .aspect-selector-modal.active { display: block; }
@@ -11963,7 +11963,7 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
 }
 
 
-/* Limites: intervalo independente de cronômetro */
+/* Limites: intervalo independente de cronÃ´metro */
 .mission-limit-example {
   margin: 8px 0 18px;
   font-size: clamp(1.18rem, 4.8vw, 1.72rem);
@@ -12223,7 +12223,7 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-nav
 }
 
 
-/* A duração pertence somente às Metas/Missões; Limites usam intervalo. */
+/* A duraÃ§Ã£o pertence somente Ã s Metas/MissÃµes; Limites usam intervalo. */
 .mission-create-time-panel {
   width: min(100%, 460px);
   margin: 0 auto;
@@ -12287,7 +12287,7 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-nav
 }
 
 
-/* Livro-caixa imersivo dos limites e recordes sem a prática. */
+/* Livro-caixa imersivo dos limites e recordes sem a prÃ¡tica. */
 .mission-progress-history-link {
   border: 0;
   background: transparent;
@@ -12456,7 +12456,7 @@ body[data-background-theme="white"] :is(.limit-history-entry,.limit-history-reco
 }
 
 
-/* Limites conscientes do sono e registro diário obrigatório. */
+/* Limites conscientes do sono e registro diÃ¡rio obrigatÃ³rio. */
 .mission-limit-sleep-option {
   width: min(100%, 620px);
   margin: 4px auto 0;
@@ -12933,7 +12933,7 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
   pointer-events: none;
 }
 
-/* Finanças Nano: carteira verde e branca fixa em todos os temas. */
+/* Finance Nano: carteira verde e branca fixa em todos os temas. */
 .finance-nano-modal {
   --finance-nano-bg: #061817;
   --finance-nano-surface: #f4f8f7;
@@ -13375,5 +13375,51 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
 @media (max-width: 430px) {
   .finance-nano-modal { background: var(--finance-nano-surface) !important; }
   .finance-nano-shell { width: 100%; height: 100dvh; border: 0; border-radius: 0; }
+}
+
+/* Finance Nano fullscreen + SVG icon fixes. */
+.finance-nano-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  padding: 0 !important;
+  background: var(--finance-nano-surface) !important;
+  backdrop-filter: none !important;
+}
+.finance-nano-modal.active {
+  display: block !important;
+}
+.finance-nano-shell {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100dvh !important;
+  max-height: none !important;
+  min-height: 100dvh !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.finance-nano-icon-button svg,
+.finance-nano-eye svg,
+.finance-nano-action-icon svg,
+.finance-nano-month-bar button svg,
+.finance-nano-fab svg,
+.finance-nano-empty > span svg,
+.finance-nano-transaction > div svg,
+.finance-nano-sheet-head button svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.finance-nano-fab svg {
+  width: 28px;
+  height: 28px;
+}
+.finance-nano-empty > span,
+.finance-nano-transaction > div,
+.finance-nano-action-icon {
+  line-height: 1;
 }
 
