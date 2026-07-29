@@ -114,6 +114,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     return fallback;
   }
 
+  function findTutorByContactId(contactId) {
+    const normalizedContactId = String(contactId || "").trim();
+    if (!normalizedContactId) return null;
+    return state.tutors.find((entry) => String(entry.contactUserId || entry.userId || "") === normalizedContactId) || null;
+  }
+
   const SEND_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 20 18-8L3 4v6l12 2-12 2z"/></svg>';
   const MIC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.2a3.6 3.6 0 0 0 3.6-3.6V6.6a3.6 3.6 0 1 0-7.2 0v5a3.6 3.6 0 0 0 3.6 3.6Zm-5.4-3.8a5.4 5.4 0 0 0 10.8 0M12 18.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
@@ -400,12 +406,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
   async function openUnreadContact(contactId) {
     const normalizedContactId = String(contactId || "").trim();
     if (!normalizedContactId) return;
-    let tutor = state.tutors.find((entry) => String(entry.contactUserId || entry.userId || "") === normalizedContactId);
+    let tutor = findTutorByContactId(normalizedContactId);
     if (!tutor) {
       try {
         await loadDirectory();
       } catch {}
-      tutor = state.tutors.find((entry) => String(entry.contactUserId || entry.userId || "") === normalizedContactId);
+      tutor = findTutorByContactId(normalizedContactId);
     }
     if (tutor) await selectTutor(tutor);
   }
@@ -667,6 +673,42 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     } catch (error) {
       if (elements.tutorStatus) elements.tutorStatus.textContent = error instanceof Error ? error.message : "Falha ao adicionar tutor.";
     }
+  }
+
+  async function ensureHumanContact(friend) {
+    const normalizedUserId = String(friend?.userId || friend?.contactUserId || "").trim();
+    if (!normalizedUserId) {
+      throw new Error("Escolha um amigo valido.");
+    }
+    let tutor = findTutorByContactId(normalizedUserId);
+    if (tutor) {
+      return tutor;
+    }
+    await loadDirectory();
+    tutor = findTutorByContactId(normalizedUserId);
+    if (tutor) {
+      return tutor;
+    }
+    const payload = await apiRequest("/api/200/tutors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tutorUserId: normalizedUserId }),
+      skipGlobalLoading: true
+    });
+    state.tutors = Array.isArray(payload?.tutors) ? payload.tutors : [];
+    state.friends = Array.isArray(payload?.friends) ? payload.friends : [];
+    renderTutorPicker();
+    renderTutorContacts();
+    tutor = findTutorByContactId(normalizedUserId);
+    if (!tutor) {
+      throw new Error("Nao foi possivel abrir a conversa com esse amigo.");
+    }
+    return tutor;
+  }
+
+  async function openFriendChat(friend) {
+    const tutor = await ensureHumanContact(friend);
+    await selectTutor(tutor);
   }
 
   async function refreshMessages({ silent = true, forceFull = false } = {}) {
@@ -1122,6 +1164,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
 
   return {
     openChat: openHumanChat,
+    openFriendChat,
     sendHumanProposal,
     isHumanActive: () => Boolean(state.human && activeContactId()),
     refreshNotificationPreferences,

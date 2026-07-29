@@ -12412,6 +12412,8 @@ function getSocialScopeIndex() {
   return missionHistoryScopes.findIndex((item) => item.key === String(state.social?.scopeKey || "today"));
 }
 
+const socialMessageSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H9.8l-4.3 3.4V8A1.5 1.5 0 0 1 7 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 function renderSocialModal() {
   renderSocialBadge();
   renderSocialScopeFooter();
@@ -12444,14 +12446,21 @@ function renderSocialModal() {
   if (socialModalList) {
     const cards = [];
     rankedUsers.forEach((entry, index) => {
+      const points = escapeHtml(String(Math.max(0, Number(entry.points || 0))));
+      const secondaryCopy = entry.isSelf
+        ? ""
+        : (entry.username ? "@" + escapeHtml(String(entry.username)) : "Amizade aceita");
+      const actionMarkup = entry.isSelf
+        ? `<div class="social-card-score"><strong>${points}</strong></div>`
+        : `<div class="social-card-side"><div class="social-card-score"><strong>${points}</strong></div><button class="social-card-message" type="button" data-social-message-user-id="${escapeHtml(String(entry.userId || ""))}" aria-label="Conversar com ${escapeHtml(String(entry.name || "amigo"))}">${socialMessageSvg}</button></div>`;
       cards.push(`
         <article class="social-card ${entry.isSelf ? "social-card--self" : "social-card--friend"}">
           <div class="social-card-avatar">${renderSocialCardAvatar(entry)}<span class="social-card-rank">${escapeHtml(`${index + 1}º`)}</span></div>
           <div class="social-card-body">
             <div class="social-card-name">${escapeHtml(String(entry.name || "Você"))}</div>
-            <div class="social-card-copy">${entry.isSelf ? "Você" : "Pontos"}</div>
+            ${secondaryCopy ? `<div class="social-card-copy">${secondaryCopy}</div>` : ""}
           </div>
-          <div class="social-card-points">Pontos<br><strong>${escapeHtml(String(Math.max(0, Number(entry.points || 0))))}</strong></div>
+          ${actionMarkup}
         </article>
       `);
     });
@@ -12468,18 +12477,6 @@ function renderSocialModal() {
             <button class="social-card-action is-accept" type="button" data-social-accept="${escapeHtml(String(invite.id || ""))}">Aceitar</button>
             <button class="social-card-action is-reject" type="button" data-social-reject="${escapeHtml(String(invite.id || ""))}">Recusar</button>
           </div>
-        </article>
-      `);
-    }
-    for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
-      cards.push(`
-        <article class="social-card social-card--friend">
-          <div class="social-card-avatar">${renderSocialCardAvatar(friend)}</div>
-          <div class="social-card-body">
-            <div class="social-card-name">${escapeHtml(String(friend.name || "Usuario"))}</div>
-            <div class="social-card-copy">Pontos</div>
-          </div>
-          <div class="social-card-points"><strong>${escapeHtml(String(Math.max(0, Number(friend.points || 0))))}</strong></div>
         </article>
       `);
     }
@@ -12696,6 +12693,32 @@ async function respondToSocialInvite(friendshipId, action) {
   } catch (error) {
     if (socialModalStatus) {
       socialModalStatus.textContent = error instanceof Error ? error.message : "Falha ao responder convite.";
+    }
+  }
+}
+
+async function openSocialFriendChat(userId) {
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) return;
+  let friend = (Array.isArray(state.social?.friends) ? state.social.friends : [])
+    .find((entry) => String(entry?.userId || "") === normalizedUserId) || null;
+  if (!friend) {
+    const payload = await loadSocialSnapshot({ force: true, skipGlobalLoading: true, silent: true });
+    friend = (Array.isArray(payload?.friends) ? payload.friends : [])
+      .find((entry) => String(entry?.userId || "") === normalizedUserId) || null;
+  }
+  if (!friend) {
+    if (socialModalStatus) socialModalStatus.textContent = "Nao foi possivel encontrar esse amigo.";
+    return;
+  }
+  try {
+    if (socialModalStatus) socialModalStatus.textContent = "Abrindo conversa...";
+    await project200TutorsUi?.openFriendChat?.(friend);
+    if (socialModalStatus) socialModalStatus.textContent = "";
+    closeModal("socialModal");
+  } catch (error) {
+    if (socialModalStatus) {
+      socialModalStatus.textContent = error instanceof Error ? error.message : "Nao foi possivel abrir a conversa.";
     }
   }
 }
@@ -18739,6 +18762,11 @@ socialModalList?.addEventListener("click", (event) => {
   const rejectButton = event.target.closest("[data-social-reject]");
   if (rejectButton) {
     void respondToSocialInvite(String(rejectButton.dataset.socialReject || ""), "reject");
+    return;
+  }
+  const messageButton = event.target.closest("[data-social-message-user-id]");
+  if (messageButton) {
+    void openSocialFriendChat(String(messageButton.dataset.socialMessageUserId || ""));
   }
 });
 document.querySelectorAll("[data-social-scope]").forEach((button) => {
