@@ -79,6 +79,64 @@ function renderPlainText(container, text) {
   if (cursor < text.length) container.append(document.createTextNode(text.slice(cursor)));
 }
 
+function audioViewedKey(mediaUrl) {
+  let hash = 0;
+  const text = String(mediaUrl || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+  return "project200-chat-audio-viewed:" + Math.abs(hash);
+}
+
+function markAudioViewed(card, mediaUrl) {
+  card.classList.add("is-viewed");
+  try {
+    window.localStorage.setItem(audioViewedKey(mediaUrl), "1");
+  } catch {}
+}
+
+function hasAudioBeenViewed(mediaUrl) {
+  try {
+    return window.localStorage.getItem(audioViewedKey(mediaUrl)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function buildFallbackWaveform(count) {
+  return Array.from({ length: count }, (_, index) => {
+    const a = Math.sin(index * 1.7) * 0.24;
+    const b = Math.sin(index * 0.43 + 1.8) * 0.18;
+    return Math.max(0.18, Math.min(1, 0.52 + a + b));
+  });
+}
+
+async function buildAudioWaveform(mediaUrl, count) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!mediaUrl || typeof AudioContextClass === "undefined") return buildFallbackWaveform(count);
+  try {
+    const response = await fetch(mediaUrl, { mode: "cors", cache: "force-cache" });
+    if (!response.ok) throw new Error("audio fetch failed");
+    const buffer = await response.arrayBuffer();
+    const context = new AudioContextClass();
+    const decoded = await context.decodeAudioData(buffer.slice(0));
+    await context.close().catch(() => {});
+    const channel = decoded.getChannelData(0);
+    const samplesPerBar = Math.max(1, Math.floor(channel.length / count));
+    const values = [];
+    for (let bar = 0; bar < count; bar += 1) {
+      let sum = 0;
+      const start = bar * samplesPerBar;
+      const end = Math.min(channel.length, start + samplesPerBar);
+      for (let index = start; index < end; index += 1) sum += Math.abs(channel[index]);
+      values.push(Math.max(0.12, Math.min(1, (sum / Math.max(1, end - start)) * 4.8)));
+    }
+    return values;
+  } catch {
+    return buildFallbackWaveform(count);
+  }
+}
+
 function createMediaCard(payload) {
   const kind = String(payload?.kind || "").trim().toLowerCase();
   const previewUrl = String(payload?.previewUrl || payload?.previewRemoteUrl || payload?.previewDataUrl || "");
@@ -89,6 +147,7 @@ function createMediaCard(payload) {
   if (kind === "audio" && mediaUrl) {
     const card = document.createElement("div");
     card.className = "marin-message-audio-card";
+    card.classList.toggle("is-viewed", hasAudioBeenViewed(mediaUrl));
     const button = document.createElement("button");
     button.type = "button";
     button.className = "marin-message-audio-button";
@@ -96,31 +155,87 @@ function createMediaCard(payload) {
     button.setAttribute("aria-label", "Reproduzir audio");
     const wave = document.createElement("span");
     wave.className = "marin-message-audio-wave";
-    wave.setAttribute("aria-hidden", "true");
-    wave.innerHTML = "<i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>";
+    wave.setAttribute("role", "slider");
+    wave.setAttribute("aria-label", "Linha do tempo do audio");
+    wave.setAttribute("aria-valuemin", "0");
+    wave.setAttribute("aria-valuemax", "100");
+    wave.setAttribute("aria-valuenow", "0");
+    const barCount = 32;
+    const bars = Array.from({ length: barCount }, () => {
+      const bar = document.createElement("i");
+      bar.style.setProperty("--wave-level", "0.28");
+      wave.appendChild(bar);
+      return bar;
+    });
     const duration = document.createElement("span");
     duration.className = "marin-message-audio-duration";
-    duration.textContent = formatMediaDuration(payload?.durationMs || 0);
+    duration.textContent = "0:00 / " + formatMediaDuration(payload?.durationMs || 0);
     const audio = new Audio(mediaUrl);
     audio.preload = "metadata";
-    audio.addEventListener("loadedmetadata", () => { duration.textContent = formatMediaDuration(audio.duration * 1000); });
-    audio.addEventListener("ended", () => { button.textContent = "\u25b6"; });
-    button.addEventListener("click", () => {
-      if (audio.paused) {
-        audio.play().then(() => { button.textContent = "\u275a\u275a"; }).catch(() => {});
-      } else {
-        audio.pause();
-        button.textContent = "\u25b6";
-      }
+
+    const updateProgress = () => {
+      const total = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : Math.max(0, Number(payload?.durationMs || 0) / 1000);
+      const current = Math.max(0, Number(audio.currentTime || 0));
+      const ratio = total > 0 ? Math.max(0, Math.min(1, current / total)) : 0;
+      const activeBars = Math.round(ratio * bars.length);
+      bars.forEach((bar, index) => bar.classList.toggle("is-played", index < activeBars));
+      duration.textContent = formatMediaDuration(current * 1000) + " / " + formatMediaDuration(total * 1000);
+      wave.setAttribute("aria-valuenow", String(Math.round(ratio * 100)));
+    };
+
+    const seekFromClientX = (clientX) => {
+      const total = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      if (!total) return;
+      const rect = wave.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width)));
+      audio.currentTime = ratio * total;
+      updateProgress();
+    };
+
+    let scrubbing = false;
+    wave.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      scrubbing = true;
+      wave.setPointerCapture?.(event.pointerId);
+      seekFromClientX(event.clientX);
     });
-    card.addEventListener("click", (event) => {
-      if (event.target.closest(".marin-message-audio-button")) return;
-      window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
+    wave.addEventListener("pointermove", (event) => {
+      if (!scrubbing) return;
+      event.preventDefault();
+      seekFromClientX(event.clientX);
+    });
+    const endScrub = (event) => {
+      if (!scrubbing) return;
+      scrubbing = false;
+      wave.releasePointerCapture?.(event.pointerId);
+    };
+    wave.addEventListener("pointerup", endScrub);
+    wave.addEventListener("pointercancel", endScrub);
+
+    audio.addEventListener("loadedmetadata", updateProgress);
+    audio.addEventListener("timeupdate", updateProgress);
+    audio.addEventListener("play", () => {
+      button.textContent = "\u275a\u275a";
+      markAudioViewed(card, mediaUrl);
+    });
+    audio.addEventListener("pause", () => { button.textContent = "\u25b6"; });
+    audio.addEventListener("ended", () => {
+      button.textContent = "\u25b6";
+      updateProgress();
+    });
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (audio.paused) audio.play().catch(() => {});
+      else audio.pause();
     });
     card.addEventListener("dblclick", () => {
       window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
     });
+    buildAudioWaveform(mediaUrl, barCount).then((values) => {
+      values.forEach((value, index) => bars[index]?.style.setProperty("--wave-level", String(value)));
+    });
     card.append(button, wave, duration);
+    updateProgress();
     return card;
   }
 

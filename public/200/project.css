@@ -12749,3 +12749,123 @@ body[data-background-theme="white"] #actionsModal .history-mission-card.actions-
 @keyframes marinChatRecordingSpin {
   to { transform: rotate(360deg); }
 }
+
+/* Chat audio player: real timeline, invisible shell, theme-colored waveform. */
+.marin-message-audio-card {
+  --audio-player-color: currentColor;
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 520px) !important;
+  min-width: min(78vw, 360px);
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: var(--white) !important;
+  box-shadow: none !important;
+}
+
+.marin-message-shared.is-user .marin-message-audio-card,
+.marin-message.is-user .marin-message-audio-card {
+  color: #fff !important;
+}
+
+.marin-message-shared.is-assistant .marin-message-audio-card,
+.marin-message.is-assistant .marin-message-audio-card {
+  color: var(--soft) !important;
+}
+
+.marin-message-audio-card.is-viewed {
+  color: #38a5ff !important;
+}
+
+.marin-message-audio-button {
+  width: 38px !important;
+  height: 38px !important;
+  border: 1px solid color-mix(in srgb, currentColor 34%, transparent) !important;
+  border-radius: 50% !important;
+  display: grid !important;
+  place-items: center !important;
+  background: transparent !important;
+  color: currentColor !important;
+  font-size: 0.82rem !important;
+  line-height: 1 !important;
+}
+
+.marin-message-audio-wave {
+  min-width: 0 !important;
+  width: 100% !important;
+  height: 42px;
+  display: flex !important;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.marin-message-audio-wave i {
+  flex: 1 1 0;
+  min-width: 2px;
+  max-width: 6px;
+  height: calc(8px + (var(--wave-level, 0.35) * 28px)) !important;
+  border-radius: 999px;
+  background: currentColor !important;
+  opacity: 0.6;
+  transition: opacity 120ms ease, height 180ms ease, background 160ms ease;
+}
+
+.marin-message-audio-wave i.is-played {
+  opacity: 1;
+}
+
+.marin-message-audio-duration {
+  min-width: 72px;
+  color: currentColor !important;
+  font-size: 0.72rem !important;
+  font-weight: 850 !important;
+  text-align: right;
+  opacity: 0.86;
+}
+
+body[data-background-theme="white"] .marin-message-audio-card {
+  color: #2f3640 !important;
+}
+
+body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
+  color: #1677d8 !important;
+}
+
+@media (max-width: 540px) {
+  .marin-message-shared:has(.marin-message-audio-card) {
+    width: calc(100vw - 30px);
+    max-width: calc(100vw - 30px);
+  }
+
+  .marin-message-audio-card {
+    width: 100% !important;
+    min-width: 0;
+    grid-template-columns: 38px minmax(0, 1fr) 70px;
+  }
+
+  .marin-message-audio-wave {
+    gap: 2px;
+  }
+
+  .marin-message-audio-duration {
+    min-width: 66px;
+    font-size: 0.68rem !important;
+  }
+}
+
+@media (max-width: 540px) {
+  .marin-message-shared {
+    max-width: calc(100vw - 30px);
+  }
+
+  .marin-message-audio-card {
+    min-width: min(92vw, calc(100vw - 30px));
+  }
+}
