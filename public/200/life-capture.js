@@ -1061,13 +1061,16 @@
 
   async function loadShareContacts() {
     const [friendsResult, tutorsResult] = await Promise.allSettled([
-      fetch("/api/200/friends?scope=today", { credentials: "same-origin", headers: withAuthHeaders() })
-        .then((response) => readJsonResponse(response, "Nao foi possivel carregar os amigos.")),
-      fetch("/api/200/tutors", { credentials: "same-origin", headers: withAuthHeaders() })
-        .then((response) => readJsonResponse(response, "Nao foi possivel carregar os contatos."))
+      fetch(getApiUrl("/api/200/friends?scope=today"), { credentials: "same-origin", headers: withAuthHeaders() })
+        .then((response) => readJsonResponse(response, "Falha ao carregar amigos (/api/200/friends).")),
+      fetch(getApiUrl("/api/200/tutors"), { credentials: "same-origin", headers: withAuthHeaders() })
+        .then((response) => readJsonResponse(response, "Falha ao carregar chats (/api/200/tutors)."))
     ]);
+    const warnings = [];
+    if (friendsResult.status === "rejected") warnings.push("Amigos: " + (friendsResult.reason instanceof Error ? friendsResult.reason.message : "falha ao consultar."));
+    if (tutorsResult.status === "rejected") warnings.push("Chats: " + (tutorsResult.reason instanceof Error ? tutorsResult.reason.message : "falha ao consultar."));
     if (friendsResult.status === "rejected" && tutorsResult.status === "rejected") {
-      throw friendsResult.reason || tutorsResult.reason;
+      throw new Error(warnings.join(" | ") || "Falha ao carregar amigos e chats.");
     }
     const friendsPayload = friendsResult.status === "fulfilled" ? friendsResult.value : {};
     const tutorsPayload = tutorsResult.status === "fulfilled" ? tutorsResult.value : {};
@@ -1089,27 +1092,27 @@
       ...tutor,
       userId: String(tutor?.contactUserId || tutor?.userId || tutor?.id || "").trim()
     }));
-    return { tutors, friends: [...mergedFriends.values()] };
+    return { tutors, friends: [...mergedFriends.values()], warnings };
   }
 
   async function ensureTutor(friend) {
     const friendId = String(friend?.userId || friend?.contactUserId || friend?.id || "").trim();
     if (!friendId) throw new Error("Amigo invalido.");
     if (friend?.tutor) return friend.tutor;
-    const response = await fetch("/api/200/tutors", {
+    const response = await fetch(getApiUrl("/api/200/tutors"), {
       method: "POST",
       headers: withAuthHeaders({ "Content-Type": "application/json" }),
       credentials: "same-origin",
       body: JSON.stringify({ tutorUserId: friendId })
     });
-    const payload = await readJsonResponse(response, "Nao foi possivel adicionar esse contato.");
+    const payload = await readJsonResponse(response, "Falha ao preparar contato no chat (/api/200/tutors).");
     const tutors = Array.isArray(payload?.tutors) ? payload.tutors : [];
     return tutors.find((item) => String(item?.contactUserId || item?.userId || item?.id || "").trim() === friendId) || { contactUserId: friendId };
   }
 
   async function shareToMarin(capture) {
     const ready = await ensureCaptureUploaded(capture);
-    const response = await fetch("/api/200/marin/messages", {
+    const response = await fetch(getApiUrl("/api/200/marin/messages"), {
       method: "POST",
       headers: withAuthHeaders({ "Content-Type": "application/json" }),
       credentials: "same-origin",
@@ -1119,18 +1122,18 @@
         content: buildShareMessage(ready || capture)
       })
     });
-    await readJsonResponse(response, "Nao foi possivel compartilhar com a Marin.");
+    await readJsonResponse(response, "Falha ao enviar para Marin (/api/200/marin/messages).");
   }
 
   async function shareToTutor(contactId, capture) {
     const ready = await ensureCaptureUploaded(capture);
-    const response = await fetch(`/api/200/tutors/${encodeURIComponent(contactId)}/messages`, {
+    const response = await fetch(getApiUrl(`/api/200/tutors/${encodeURIComponent(contactId)}/messages`), {
       method: "POST",
       headers: withAuthHeaders({ "Content-Type": "application/json" }),
       credentials: "same-origin",
       body: JSON.stringify({ content: buildShareMessage(ready || capture) })
     });
-    await readJsonResponse(response, "Nao foi possivel compartilhar com esse contato.");
+    await readJsonResponse(response, "Falha ao enviar mensagem para amigo (/api/200/tutors/:id/messages).");
   }
 
   async function openShare(captureId) {
@@ -1145,6 +1148,7 @@
 
     try {
       const directory = await loadShareContacts();
+      const shareWarnings = Array.isArray(directory.warnings) ? directory.warnings.filter(Boolean) : [];
       const entries = directory.friends.map((friend) => ({
         type: "friend",
         friend,
@@ -1153,7 +1157,9 @@
       }));
 
       if (!entries.length) {
-        setShareStatus("Nenhum amigo disponivel ainda.");
+        setShareStatus((shareWarnings.length ? shareWarnings.join(" | ") + " | " : "") + "Nenhum amigo disponivel ainda.");
+      } else if (shareWarnings.length) {
+        setShareStatus(shareWarnings.join(" | "));
       }
 
       entries.forEach((entry) => {
@@ -1166,15 +1172,17 @@
         `;
         button.addEventListener("click", async () => {
           try {
-            setShareStatus("Preparando chat...");
+            setShareStatus("Preparando contato no chat...");
             const tutor = await ensureTutor(entry.friend);
             const contactUserId = safeText(tutor?.contactUserId || entry.friend?.userId || entry.friend?.id);
             if (!contactUserId) throw new Error("Nao foi possivel preparar esse contato.");
-            setShareStatus("Enviando...");
+            setShareStatus("Subindo/confirmando midia no R2...");
+            await ensureCaptureUploaded(capture);
+            setShareStatus("Enviando mensagem para amigo...");
             await shareToTutor(contactUserId, capture);
             setShareStatus("Mensagem enviada.");
           } catch (error) {
-            setShareStatus(error instanceof Error ? error.message : "Falha ao compartilhar.");
+            setShareStatus("Compartilhar amigo: " + (error instanceof Error ? error.message : "falha inesperada."));
           }
         });
         list.appendChild(button);
@@ -1189,18 +1197,20 @@
       `;
       marinButton.addEventListener("click", async () => {
         try {
-          setShareStatus("Enviando para Marin...");
+          setShareStatus("Subindo/confirmando midia no R2...");
+          await ensureCaptureUploaded(capture);
+          setShareStatus("Enviando mensagem para Marin...");
           await shareToMarin(capture);
           setShareStatus("Enviado para Marin.");
         } catch (error) {
-          setShareStatus(error instanceof Error ? error.message : "Falha ao enviar.");
+          setShareStatus("Compartilhar Marin: " + (error instanceof Error ? error.message : "falha inesperada."));
         }
       });
       list.appendChild(marinButton);
 
-      setShareStatus(capture.kind === "video" ? "Videos entram no chat como card com capa." : "");
+      if (!shareWarnings.length && entries.length) setShareStatus(capture.kind === "video" ? "Videos entram no chat como card com capa." : "Escolha um amigo para enviar no chat.");
     } catch (error) {
-      setShareStatus(error instanceof Error ? error.message : "Falha ao carregar contatos.");
+      setShareStatus("Carregar compartilhamento: " + (error instanceof Error ? error.message : "falha ao carregar contatos."));
     }
   }
 
