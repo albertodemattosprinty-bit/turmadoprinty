@@ -12642,6 +12642,27 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-nav
 }
 .limit-history-editor strong { text-align: center; font-size: 1.4rem; }
 .limit-history-editor .limit-history-save { padding-inline: 15px; background: linear-gradient(135deg,#2988ff,#1757ca); font-size: .78rem; }
+
+.limit-history-average {
+  min-height: 88px;
+  border: 1px solid rgba(45, 212, 191, .24);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(20,184,166,.18), rgba(7,20,48,.42));
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+}
+.limit-history-average span,
+.limit-history-average small { color: rgba(255,255,255,.62); font-size: .76rem; font-weight: 800; }
+.limit-history-average strong { font-size: clamp(1.18rem, 4vw, 1.8rem); line-height: 1.05; color: #5ef0c2; }
+.limit-history-record.is-current { border-color: rgba(34,197,94,.64); background: rgba(16,185,129,.14); box-shadow: 0 0 0 1px rgba(34,197,94,.12) inset; }
+.limit-history-record.is-current .limit-history-record-rank,
+.limit-history-record.is-current .limit-history-record-copy strong { color: #54f09a; }
+body[data-background-theme="light"] .limit-history-average,
+body[data-background-theme="white"] .limit-history-average { color:#343a40; background:rgba(20,184,166,.1); border-color:rgba(13,148,136,.25); }
+body[data-background-theme="light"] :is(.limit-history-average span,.limit-history-average small),
+body[data-background-theme="white"] :is(.limit-history-average span,.limit-history-average small) { color:rgba(52,58,64,.62); }
+
 .limit-history-record { justify-content: flex-start; }
 .limit-history-record-rank { width: 44px; color: #6ea4ff; font-size: 1.05rem; font-weight: 950; }
 .limit-history-record-copy { display: grid; gap: 4px; }

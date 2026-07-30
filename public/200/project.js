@@ -15047,6 +15047,8 @@ async function loadLimitHistory() {
     });
     state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
     state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
+    state.limitHistory.averageDurationSeconds = Math.max(0, Number(payload?.history?.averageDurationSeconds || 0));
+    state.limitHistory.intervalCount = Math.max(0, Number(payload?.history?.intervalCount || 0));
   } catch (error) {
     if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar.";
   } finally {
@@ -15064,6 +15066,8 @@ function openLimitHistoryModal(goalId) {
     mode: "history",
     events: [],
     bestIntervals: [],
+    averageDurationSeconds: 0,
+    intervalCount: 0,
     loading: true,
     editingEventId: "",
     editValue: 1,
@@ -15093,6 +15097,8 @@ async function mutateLimitHistoryEvent(eventId, method, value = 0, occurredAt = 
     syncLimitHistoryGoals(payload);
     state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
     state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
+    state.limitHistory.averageDurationSeconds = Math.max(0, Number(payload?.history?.averageDurationSeconds || 0));
+    state.limitHistory.intervalCount = Math.max(0, Number(payload?.history?.intervalCount || 0));
     state.limitHistory.editingEventId = "";
     state.limitHistory.editDate = "";
     state.limitHistory.editTime = "";

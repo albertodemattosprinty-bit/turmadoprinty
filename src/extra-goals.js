@@ -178,10 +178,17 @@ async function buildExtraGoalBestIntervals(userId, profileName, events = []) {
     };
   });
   const netIntervals = await subtractProject200ConfirmedSleepFromIntervals(userId, profileName, intervals);
-  return netIntervals
+  const rankedIntervals = netIntervals
     .filter((interval) => interval.durationSeconds > 0)
-    .sort((left, right) => right.durationSeconds - left.durationSeconds)
-    .slice(0, 10);
+    .sort((left, right) => right.durationSeconds - left.durationSeconds);
+  const averageDurationSeconds = rankedIntervals.length
+    ? Math.round(rankedIntervals.reduce((sum, interval) => sum + Number(interval.durationSeconds || 0), 0) / rankedIntervals.length)
+    : 0;
+  return {
+    bestIntervals: rankedIntervals.slice(0, 50),
+    averageDurationSeconds,
+    intervalCount: rankedIntervals.length
+  };
 }
 
 function normalizeExtraGoalVariantRow(row) {
@@ -1190,10 +1197,13 @@ export async function listExtraGoalProgressEvents(userId, profileName = PROJECT2
   );
   const latestId = String(result.rows[0]?.id || "");
   const events = result.rows.map((row) => normalizeExtraGoalProgressEventRow(row, latestId));
+  const intervalSummary = await buildExtraGoalBestIntervals(userId, normalizedProfile, events);
   return {
     goal,
     events,
-    bestIntervals: await buildExtraGoalBestIntervals(userId, normalizedProfile, events)
+    bestIntervals: intervalSummary.bestIntervals,
+    averageDurationSeconds: intervalSummary.averageDurationSeconds,
+    intervalCount: intervalSummary.intervalCount
   };
 }
 
