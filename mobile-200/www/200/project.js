@@ -18263,8 +18263,11 @@ missionVariantAddButton?.addEventListener("click", () => {
   state.missionVariants.editorOpen = true;
   state.missionVariants.sortMenuOpen = false;
   state.missionVariants.editingId = "";
+  state.missionVariants.editorStep = 1;
   state.missionVariants.intervalValue = 1;
   state.missionVariants.intervalUnit = "days";
+  state.missionVariants.unitDurationSeconds = DEFAULT_MISSION_DURATION_SECONDS;
+  state.missionVariants.nextDueOffsetDays = 0;
   if (missionVariantTitleInput) missionVariantTitleInput.value = "";
   if (missionVariantStatus) missionVariantStatus.textContent = "";
   renderMissionVariants();
@@ -18306,6 +18309,13 @@ missionVariantDaysButton?.addEventListener("click", () => { state.missionVariant
 missionVariantEditorSave?.addEventListener("click", async () => {
   const title = String(missionVariantTitleInput?.value || "").trim();
   if (!title) { if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa."; return; }
+  const editorStep = Math.max(1, Math.min(3, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
+  if (editorStep < 3) {
+    state.missionVariants.editorStep = editorStep + 1;
+    if (missionVariantStatus) missionVariantStatus.textContent = "";
+    renderMissionVariants();
+    return;
+  }
   const goalId = state.missionVariants.goalId;
   const editingId = state.missionVariants.editingId;
   const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
