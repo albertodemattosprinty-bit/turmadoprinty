@@ -2581,7 +2581,7 @@ function renderActionsMissionFilter() {
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
   const isAvailable = Boolean(getToken()) && mode !== "hide";
   actionsMissionFilterButton.hidden = !isAvailable;
-  const filterActive = mode === "dynamic" ? state.actionsDynamicMissionsVisible : state.actionsMissionOnly;
+  const filterActive = state.actionsMissionOnly;
   actionsMissionFilterButton.classList.toggle("is-filtering", filterActive);
   actionsMissionFilterButton.classList.toggle("is-dynamic", mode === "dynamic");
   actionsMissionFilterButton.setAttribute("aria-label", mode === "dynamic"
@@ -2647,7 +2647,7 @@ function animateProgressFillWidth(element, nextPercent, fromPercent = null) {
 function renderActionsMissionsPanel() {
   if (!actionsMissionsPanel || !actionsMissionsList) return;
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  const isOpen = Boolean(getToken()) && state.activeOffset === 0 && mode === "separate" && state.actionsMissionOnly;
+  const isOpen = Boolean(getToken()) && state.activeOffset === 0 && (mode === "separate" || mode === "dynamic") && state.actionsMissionOnly;
   actionsMissionsPanel.hidden = !isOpen;
   actionsList.hidden = isOpen;
   if (!isOpen) return;
@@ -2684,9 +2684,6 @@ function renderActionsMissionsPanel() {
         <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
         <p>${progress.progress} de ${progress.target}</p>
       </div>
-      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
-      </button>
       <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
         <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
       </div>
@@ -3567,7 +3564,7 @@ function renderSleepMusicPicker(station) {
           <svg viewBox="0 0 24 24"><path d="M14 5v9.2a2.8 2.8 0 1 1-2-2.68V7.2L19 6v7.2a2.8 2.8 0 1 1-2-2.68V4.4z" fill="currentColor"/></svg>
         </span>
         <span><strong>${escapeHtml(String(track?.name || "Faixa"))}</strong><small>Ambience</small></span>
-        <span class="sleep-music-picker-check" aria-hidden="true">âœ“</span>
+        <span class="sleep-music-picker-check" aria-hidden="true">✓</span>
       </button>
     `;
   }).join("");
@@ -6707,7 +6704,7 @@ async function saveFinanceNotes() {
 
 function isActionsMissionViewActive() {
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  return mode === "separate" && state.actionsMissionOnly;
+  return (mode === "separate" || mode === "dynamic") && state.actionsMissionOnly;
 }
 
 function getActionDatePickerParts() {
@@ -6887,7 +6884,7 @@ function renderActions() {
   }
 
   const missionActionsMode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  const compactDynamicMissionEntries = missionActionsMode === "dynamic" && state.actionsDynamicMissionsVisible
+  const compactDynamicMissionEntries = missionActionsMode === "dynamic" && state.actionsDynamicMissionsVisible && !state.actionsMissionOnly
     ? buildMissionInstallments()
     : [];
   const timelineEntries = buildActionTimelineEntries()
@@ -8046,9 +8043,9 @@ function getProjectNativeKeyboardRows() {
       ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
       ["@", "#", "$", "&", "*", "-", "+", "=", "%"],
       [
-        { action: "noop", label: "â‡§", className: "is-command", ariaLabel: "Maiúsculas indisponíveis em números" },
+        { action: "noop", label: "⇧", className: "is-command", ariaLabel: "Maiúsculas indisponíveis em números" },
         "(", ")", "/", "\\", ":", ";", "\"",
-        { action: "backspace", label: "âŒ«", className: "is-command", ariaLabel: "Apagar" }
+        { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" }
       ],
       [
         { action: "letters", label: "ABC", className: "is-command" },
@@ -8063,9 +8060,9 @@ function getProjectNativeKeyboardRows() {
     [..."qwertyuiop"].map(letter),
     [..."asdfghjkl"].map(letter),
     [
-      { action: "shift", label: "â‡§", className: `is-command${shifted ? " is-active" : ""}`, ariaLabel: "Maiúsculas" },
+      { action: "shift", label: "⇧", className: `is-command${shifted ? " is-active" : ""}`, ariaLabel: "Maiúsculas" },
       ...[..."zxcvbnm"].map(letter),
-      { action: "backspace", label: "âŒ«", className: "is-command", ariaLabel: "Apagar" }
+      { action: "backspace", label: "⌫", className: "is-command", ariaLabel: "Apagar" }
     ],
     [
       { action: "symbols", label: "123", className: "is-command" },
@@ -14853,7 +14850,28 @@ function interpolateLimitColor(ratio) {
 function getLimitProgressVisual(goal, historyRangeActive = false) {
   const progress = Math.max(0, Number(goal?.progressValue || 0));
   const target = Math.max(1, Number(goal?.targetValue || 1));
-  const ratio = (progress / target) * 100;
+  let ratio = (progress / target) * 100;
+  if (!historyRangeActive && progress > 0) {
+    const nowMs = getServerNowMs();
+    const intervalValue = Math.max(1, Math.trunc(Number(goal?.limitIntervalValue || 1)));
+    const intervalUnit = String(goal?.limitIntervalUnit || "day").trim().toLowerCase();
+    const cycleStartMs = new Date(goal?.limitCycleStartedAt || "").getTime();
+    const cycleEndMs = new Date(goal?.limitCycleEndsAt || "").getTime();
+    let elapsedFraction = Number.isFinite(cycleStartMs) && Number.isFinite(cycleEndMs) && cycleEndMs > cycleStartMs
+      ? Math.max(0, Math.min(1, (nowMs - cycleStartMs) / (cycleEndMs - cycleStartMs)))
+      : 1;
+    if (!(Number.isFinite(cycleStartMs) && Number.isFinite(cycleEndMs) && cycleEndMs > cycleStartMs)
+      && intervalValue === 1
+      && intervalUnit === "day") {
+      const activeWindow = getActiveTimeWindow(nowMs);
+      elapsedFraction = Math.max(0, Math.min(
+        1,
+        (nowMs - activeWindow.startMs) / Math.max(1, activeWindow.endMs - activeWindow.startMs)
+      ));
+    }
+    const expectedLimitNow = Math.max(1, Math.min(target, target * elapsedFraction));
+    ratio = (progress / expectedLimitNow) * 100;
+  }
   const organicRatio = Math.max(0, Number.isFinite(ratio) ? ratio : 0);
   const visualRatio = Math.min(400, organicRatio);
   const width = Math.min(100, 40 + (Math.min(100, visualRatio) * 0.6));
@@ -14968,7 +14986,7 @@ function renderLimitHistoryModal() {
             <span class="limit-history-record-rank">#${index + 1}</span>
             <div class="limit-history-record-copy">
               <strong>${escapeHtml(formatLimitElapsedDuration(record.durationSeconds))}</strong>
-              <span>${escapeHtml(formatLimitHistoryDate(record.fromAt))} â†’ ${escapeHtml(formatLimitHistoryDate(record.toAt))}</span>
+              <span>${escapeHtml(formatLimitHistoryDate(record.fromAt))} → ${escapeHtml(formatLimitHistoryDate(record.toAt))}</span>
               ${Number(record.sleepExcludedSeconds || 0) > 0 ? `<span>Sono descontado: ${escapeHtml(formatLimitElapsedDuration(record.sleepExcludedSeconds))}</span>` : ""}
             </div>
           </article>
@@ -14985,7 +15003,7 @@ function renderLimitHistoryModal() {
             <article class="limit-history-entry is-latest is-editing" data-limit-history-event="${escapeHtml(String(event.id || ""))}">
               <div class="limit-history-editor">
                 <div class="limit-history-editor-quantity">
-                  <button type="button" data-limit-history-edit-step="-1" aria-label="Diminuir quantidade">âˆ’</button>
+                  <button type="button" data-limit-history-edit-step="-1" aria-label="Diminuir quantidade">−</button>
                   <strong>${Math.max(1, Number(state.limitHistory.editValue || 1))}</strong>
                   <button type="button" data-limit-history-edit-step="1" aria-label="Aumentar quantidade">+</button>
                 </div>
@@ -15110,7 +15128,7 @@ function createMissionCard(goal, initialPercent = null) {
     : dailyVariantProgress
       ? dailyVariantProgress.label
       : limit
-        ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do limite` : formatLimitLastProgress(goal))
+        ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do esperado` : formatLimitLastProgress(goal))
         : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
@@ -16269,7 +16287,7 @@ toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode 
   if (activeTimeStatus && !state.activeTime.saving) {
     const duration = getActiveTimeDurationMinutes();
     const durationLabel = duration % 60 ? `${Math.floor(duration / 60)}h ${duration % 60}min` : `${duration / 60} horas`;
-    activeTimeStatus.textContent = `${activeMinutesToLabel(state.activeTime.startMinutes)}â€“${activeMinutesToLabel(state.activeTime.endMinutes)} &middot; ${durationLabel} ativas`;
+    activeTimeStatus.textContent = `${activeMinutesToLabel(state.activeTime.startMinutes)}–${activeMinutesToLabel(state.activeTime.endMinutes)} · ${durationLabel} ativas`;
   }
   if (saveActiveTimeButton) saveActiveTimeButton.disabled = Boolean(state.activeTime.saving);
   if (toggleTaskBeepHint) {
@@ -18405,16 +18423,19 @@ actionsMissionFilterButton?.addEventListener("click", (event) => {
   const toggleHit = Boolean(event.target.closest(".actions-mission-toggle"));
   if (mode === "dynamic") {
     if (!toggleHit) {
-      closeModal("actionsModal");
-      openModal("historyModal");
-      void loadMissions().then(() => renderMissions());
-      return;
-    }
-    state.actionsDynamicMissionsVisible = !state.actionsDynamicMissionsVisible;
-    if (state.actionsDynamicMissionsVisible) {
-      state.activeOffset = 0;
-      state.actionPeriodDays = 1;
-      void loadActionMissions();
+      state.actionsMissionOnly = !state.actionsMissionOnly;
+      if (state.actionsMissionOnly) {
+        state.activeOffset = 0;
+        state.actionPeriodDays = 1;
+        void loadActionMissions();
+      }
+    } else {
+      state.actionsDynamicMissionsVisible = !state.actionsDynamicMissionsVisible;
+      if (state.actionsDynamicMissionsVisible) {
+        state.activeOffset = 0;
+        state.actionPeriodDays = 1;
+        void loadActionMissions();
+      }
     }
   } else {
     state.actionsMissionOnly = !state.actionsMissionOnly;
@@ -18422,7 +18443,7 @@ actionsMissionFilterButton?.addEventListener("click", (event) => {
   renderDateHeader();
   renderActions();
   window.requestAnimationFrame(() => {
-    const target = mode === "separate" && state.actionsMissionOnly ? actionsMissionsPanel : actionsList;
+    const target = state.actionsMissionOnly ? actionsMissionsPanel : actionsList;
     target?.scrollTo({ top: 0, behavior: "smooth" });
   });
 });
