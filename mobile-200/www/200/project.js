@@ -14698,9 +14698,16 @@ function saveMissionVariantSortMode(value) {
 
 function getMissionVariantTiming(variant, nowMs = getServerNowMs()) {
   const intervalMs = Math.max(1, Number(variant?.intervalValue || 1)) * (variant?.intervalUnit === "hours" ? 3600000 : 86400000);
-  const rawReferenceMs = new Date(variant?.lastCompletedAt || variant?.createdAt || nowMs).getTime();
-  const referenceMs = Number.isFinite(rawReferenceMs) ? rawReferenceMs : nowMs;
-  const dueAtMs = referenceMs + intervalMs;
+  const rawNextDueAtMs = new Date(variant?.nextDueAt || "").getTime();
+  const dueAtMs = Number.isFinite(rawNextDueAtMs)
+    ? rawNextDueAtMs
+    : (() => {
+      const rawReferenceMs = new Date(variant?.lastCompletedAt || variant?.createdAt || nowMs).getTime();
+      const referenceMs = Number.isFinite(rawReferenceMs) ? rawReferenceMs : nowMs;
+      return referenceMs + intervalMs;
+    })();
+  const referenceMs = dueAtMs - intervalMs;
+  const elapsedMs = Math.max(0, nowMs - referenceMs);
   const signedRemainingMs = dueAtMs - nowMs;
   const remainingMs = Math.max(0, signedRemainingMs);
   const overdueMs = Math.max(0, -signedRemainingMs);
@@ -14713,16 +14720,20 @@ function getMissionVariantTiming(variant, nowMs = getServerNowMs()) {
     remainingMs,
     overdueMs,
     completedCycle,
-    percent: Math.max(0, Math.min(100, (remainingMs / intervalMs) * 100))
+    percent: Math.max(0, Math.min(100, 100 - ((elapsedMs / intervalMs) * 100)))
   };
 }
 
 function formatMissionVariantDuration(durationMs) {
   const totalSeconds = Math.max(0, Math.floor(Number(durationMs || 0) / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  if (days > 0) return `${days} ${days === 1 ? "dia" : "dias"} ${hours}h`;
+  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  if (minutes > 0) return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+  return `${seconds}s`;
 }
 
 function formatMissionVariantRemaining(timing) {
