@@ -14980,17 +14980,47 @@ function renderLimitHistoryModal() {
   }
   if (recordsMode) {
     const records = Array.isArray(state.limitHistory?.bestIntervals) ? state.limitHistory.bestIntervals : [];
-    limitHistoryList.innerHTML = records.length
-      ? records.map((record, index) => `
-          <article class="limit-history-record">
-            <span class="limit-history-record-rank">#${index + 1}</span>
+    const averageSeconds = Math.max(0, Math.round(Number(state.limitHistory?.averageDurationSeconds || 0)));
+    const events = Array.isArray(state.limitHistory?.events) ? state.limitHistory.events : [];
+    const latestEvent = events.find((event) => event?.isLatest) || events[0] || null;
+    const latestAtMs = new Date(latestEvent?.occurredAt || "").getTime();
+    const currentRecord = Number.isFinite(latestAtMs) ? {
+      isCurrent: true,
+      durationSeconds: Math.max(0, Math.floor((getServerNowMs() - latestAtMs) / 1000)),
+      fromAt: latestEvent.occurredAt,
+      toAt: new Date(getServerNowMs()).toISOString()
+    } : null;
+    const rankedRecords = currentRecord
+      ? [...records, currentRecord].sort((left, right) => Number(right.durationSeconds || 0) - Number(left.durationSeconds || 0))
+      : records;
+    const currentRank = currentRecord ? rankedRecords.findIndex((record) => record.isCurrent) + 1 : 0;
+    const visibleRecords = rankedRecords.slice(0, 50);
+    if (currentRecord && currentRank > 50) visibleRecords.push(currentRecord);
+    const averageRecord = averageSeconds > 0 ? {
+      isAverage: true,
+      durationSeconds: averageSeconds,
+      intervalCount: Math.max(0, Number(state.limitHistory?.intervalCount || records.length || 0))
+    } : null;
+    const displayRecords = averageRecord ? [averageRecord, ...visibleRecords] : visibleRecords;
+    limitHistoryList.innerHTML = displayRecords.length
+      ? displayRecords.map((record) => {
+          const rankLabel = record.isAverage ? "Média" : `#${record.isCurrent ? currentRank : (rankedRecords.indexOf(record) + 1)}`;
+          const metaLabel = record.isAverage
+            ? `Intervalo geral entre ${record.intervalCount} tempos fechados`
+            : record.isCurrent
+              ? "Tempo atual se fechar agora"
+              : `${escapeHtml(formatLimitHistoryDate(record.fromAt))} → ${escapeHtml(formatLimitHistoryDate(record.toAt))}`;
+          return `
+          <article class="limit-history-record${record.isCurrent ? " is-current" : ""}${record.isAverage ? " is-average" : ""}">
+            <span class="limit-history-record-rank">${rankLabel}</span>
             <div class="limit-history-record-copy">
               <strong>${escapeHtml(formatLimitElapsedDuration(record.durationSeconds))}</strong>
-              <span>${escapeHtml(formatLimitHistoryDate(record.fromAt))} → ${escapeHtml(formatLimitHistoryDate(record.toAt))}</span>
+              <span>${metaLabel}</span>
               ${Number(record.sleepExcludedSeconds || 0) > 0 ? `<span>Sono descontado: ${escapeHtml(formatLimitElapsedDuration(record.sleepExcludedSeconds))}</span>` : ""}
             </div>
           </article>
-        `).join("")
+        `;
+        }).join("")
       : '<div class="limit-history-empty">Ainda não existem dois registros<br>para calcular um intervalo.</div>';
     return;
   }

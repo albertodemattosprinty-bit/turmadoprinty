@@ -12656,6 +12656,9 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-nav
 .limit-history-average small { color: rgba(255,255,255,.62); font-size: .76rem; font-weight: 800; }
 .limit-history-average strong { font-size: clamp(1.18rem, 4vw, 1.8rem); line-height: 1.05; color: #5ef0c2; }
 .limit-history-record.is-current { border-color: rgba(34,197,94,.64); background: rgba(16,185,129,.14); box-shadow: 0 0 0 1px rgba(34,197,94,.12) inset; }
+.limit-history-record.is-average { border-color: rgba(45,212,191,.32); background: linear-gradient(135deg, rgba(20,184,166,.18), rgba(7,20,48,.42)); }
+.limit-history-record.is-average .limit-history-record-rank,
+.limit-history-record.is-average .limit-history-record-copy strong { color: #5ef0c2; }
 .limit-history-record.is-current .limit-history-record-rank,
 .limit-history-record.is-current .limit-history-record-copy strong { color: #54f09a; }
 body[data-background-theme="light"] .limit-history-average,
