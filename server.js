@@ -70,6 +70,7 @@ import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProje
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
 import { listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
+import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
@@ -4009,6 +4010,30 @@ async function handleProject200MarinPromptRequest(request, response) {
     sendJson(response, 200, { ok: true, prompt });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível salvar o prompt." });
+  }
+}
+
+async function handleProject200FrontTextsListRequest(request, response) {
+  try {
+    const requestUrl = new URL(request.url || "/api/200/front-texts", "http://" + (request.headers.host || "localhost"));
+    const page = requestUrl.searchParams.get("page") || "/200";
+    const scope = requestUrl.searchParams.get("scope") || "global";
+    const texts = await listProject200FrontTexts({ page, scope });
+    sendJson(response, 200, { ok: true, texts });
+  } catch (error) {
+    sendJson(response, 500, { error: error instanceof Error ? error.message : "Nao foi possivel carregar os textos globais." });
+  }
+}
+
+async function handleProject200FrontTextSaveRequest(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) return;
+  try {
+    const body = await readJsonBody(request);
+    const text = await saveProject200FrontText(adminUser.id, body);
+    sendJson(response, 200, { ok: true, text });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar o texto global." });
   }
 }
 
@@ -11708,6 +11733,16 @@ const server = http.createServer(async (request, response) => {
     }
 
     await handleAudioTranscription(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/front-texts") {
+    await handleProject200FrontTextsListRequest(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/200/front-texts") {
+    await handleProject200FrontTextSaveRequest(request, response);
     return;
   }
 
