@@ -888,23 +888,22 @@
   async function toggleVideoRecording() {
     const trigger = byId("lifeCaptureTriggerButton");
     if (!state.recording) {
-      const canvas = byId("lifeCaptureCanvas");
-      const stream = canvas.captureStream(30);
-      const audioTrack = state.stream?.getAudioTracks?.()[0];
-      if (audioTrack) {
-        try {
-          stream.addTrack(audioTrack.clone());
-        } catch {}
+      if (!state.stream?.getVideoTracks?.().length) {
+        throw new Error("Camera indisponivel para gravar video.");
       }
+      const stream = new MediaStream(state.stream.getTracks().map((track) => track.clone()));
       state.chunks = [];
+      const preferredMimeType = getRecorderMime([
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm"
+      ]);
       state.recorder = new MediaRecorder(
         stream,
         {
-          mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-            ? "video/webm;codecs=vp8,opus"
-            : "video/webm",
-          videoBitsPerSecond: 1200000,
-          audioBitsPerSecond: 64000
+          ...(preferredMimeType ? { mimeType: preferredMimeType } : {}),
+          videoBitsPerSecond: 2500000,
+          audioBitsPerSecond: 96000
         }
       );
       state.recording = true;
@@ -915,9 +914,10 @@
         if (event.data?.size) state.chunks.push(event.data);
       };
       state.recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
         state.recording = false;
         setModeUi();
-        const mimeType = safeText(state.recorder?.mimeType || "video/webm");
+        const mimeType = safeText(state.recorder?.mimeType || preferredMimeType || "video/webm");
         const mediaBlob = new Blob(state.chunks, { type: normalizeMimeType(mimeType) || "video/webm" });
         if (!mediaBlob.size) {
           setStatus("Video vazio: nenhum dado foi gravado.");
@@ -942,7 +942,12 @@
       return;
     }
     trigger?.classList.remove("is-recording");
-    state.recorder?.stop();
+    if (state.recorder?.state === "recording") {
+      try { state.recorder.requestData(); } catch {}
+      window.setTimeout(() => {
+        if (state.recorder?.state === "recording") state.recorder.stop();
+      }, 120);
+    }
   }
 
   async function renderAlbumThumb() {
