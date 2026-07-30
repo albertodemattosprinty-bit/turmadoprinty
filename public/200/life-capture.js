@@ -3,6 +3,7 @@
   const DB_NAME = "project200-life-captures";
   const STORE_NAME = "captures";
   const PROFILE_KEY = "project_200_profile_v1";
+  const LUCASM_LOCAL_PURGE_KEY = "project200-life-captures-lucasm-local-purge-v1";
   const MEDIA_PREFIX = "[[ILIFE_MEDIA:";
   const MEDIA_SUFFIX = "]]";
   const TOKEN_KEY = "turma_do_printy_token";
@@ -95,6 +96,28 @@
     } catch {
       return "Usuario";
     }
+  }
+
+  function currentProfileTokens() {
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return [
+        parsed?.name,
+        parsed?.profileName,
+        parsed?.username,
+        currentProfile()
+      ].map((value) => safeText(value).trim().toLowerCase()).filter(Boolean);
+    } catch {
+      return [currentProfile().toLowerCase()].filter(Boolean);
+    }
+  }
+
+  function shouldPurgeLucasMLocalCaptures() {
+    try {
+      if (window.localStorage.getItem(LUCASM_LOCAL_PURGE_KEY) === "1") return false;
+    } catch {}
+    return currentProfileTokens().some((token) => token === "lucasm" || token === "lucas m" || token === "lucas_m");
   }
 
   function readTokenCookie() {
@@ -388,6 +411,23 @@
     });
   }
 
+  async function clearCaptureStore() {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).clear();
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function purgeLucasMLocalCapturesIfNeeded() {
+    if (!shouldPurgeLucasMLocalCaptures()) return;
+    await clearCaptureStore();
+    try {
+      window.localStorage.setItem(LUCASM_LOCAL_PURGE_KEY, "1");
+    } catch {}
+  }
+
   async function saveCapturesBatch(items) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
@@ -572,6 +612,9 @@
   async function refreshCaptures() {
     let local = [];
     let remote = [];
+    try {
+      await purgeLucasMLocalCapturesIfNeeded();
+    } catch {}
     try {
       local = await loadCaptures();
     } catch {
