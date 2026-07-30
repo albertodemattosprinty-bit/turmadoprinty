@@ -12775,26 +12775,17 @@ body[data-background-theme="white"] .mission-limit-sleep-option small { color:rg
 
 #actionsModal .actions-dynamic-mission-track {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 100%;
-  gap: 12px;
+  align-content: start;
+  gap: 10px;
   width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
+  overflow: visible;
 }
 
-#actionsModal .actions-dynamic-mission-track::-webkit-scrollbar {
-  display: none;
-}
 
 #actionsModal .history-mission-card.actions-dynamic-mission-card {
   min-width: 0;
   border-radius: 16px;
-  scroll-snap-align: start;
   cursor: pointer;
   background: linear-gradient(90deg, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.94) 0%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.72) 52%, rgba(var(--mission-delay-rgb, 36, 97, 206), 0.06) 100%);
 }

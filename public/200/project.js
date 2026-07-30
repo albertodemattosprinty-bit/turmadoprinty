@@ -24,13 +24,13 @@ const defaultSaldoGoalCents = 1000000;
 const taskBeepOptionCycles = [0, 3, 5, 10];
 const missionActionsModes = ["separate", "dynamic", "hide"];
 const missionActionsModeLabels = new Map([
-  ["hide", "NÃ£o mostrar"],
+  ["hide", "Não mostrar"],
   ["separate", "Janela separada"],
-  ["dynamic", "DinÃ¢mico"]
+  ["dynamic", "Dinâmico"]
 ]);
 const taskBeepOptionLabels = new Map([
   [0, "Nenhum"],
-  [3, "TrÃªs vezes"],
+  [3, "Três vezes"],
   [5, "Cinco vezes"],
   [10, "Dez vezes"]
 ]);
@@ -42,9 +42,9 @@ const actionStatuses = {
   completed: "COMPLETED"
 };
 const missionQuickDefinitions = [
-  { key: "water", label: "Ãgua", defaultTitle: "Beber Ã¡gua", targetValue: 8 },
+  { key: "water", label: "Água", defaultTitle: "Beber água", targetValue: 8 },
   { key: "store", label: "Objeto", defaultTitle: "Guardar 6 itens", targetValue: 6 },
-  { key: "read", label: "Livro", defaultTitle: "Ler uma pÃ¡gina", targetValue: 6 },
+  { key: "read", label: "Livro", defaultTitle: "Ler uma página", targetValue: 6 },
   { key: "brush", label: "Dente", defaultTitle: "Escovar os dentes", targetValue: 3 }
 ];
 const runningMissionQuickToneKeys = ["water", "store", "read", "brush", "energy", "sun"];
@@ -63,17 +63,17 @@ const statsScopes = [
 ];
 const statsPointCategories = [
   { aspectId: "20000000-0000-4000-8000-000000000001", id: "sono", name: "Sono", targetPoints: 420, icon: "/200/aspect-icons/sono.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "AlimentaÃ§Ã£o", targetPoints: 30, icon: "/200/aspect-icons/alimentacao.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "HidrataÃ§Ã£o", targetPoints: 15, icon: "/200/aspect-icons/hidratacao.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000002", id: "alimentacao", name: "Alimentação", targetPoints: 30, icon: "/200/aspect-icons/alimentacao.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000003", id: "hidratacao", name: "Hidratação", targetPoints: 15, icon: "/200/aspect-icons/hidratacao.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000004", id: "aprendizado", name: "Aprendizado", targetPoints: 60, icon: "/200/aspect-icons/aprendizado.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000005", id: "trabalho", name: "Trabalho", targetPoints: 360, icon: "/200/aspect-icons/trabalho.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000006", id: "casa", name: "Casa", targetPoints: 120, icon: "/200/aspect-icons/casa.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "ExercÃ­cios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000007", id: "exercicios", name: "Exercícios", targetPoints: 30, icon: "/200/aspect-icons/exercicios.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000008", id: "social", name: "Social", targetPoints: 30, icon: "/200/aspect-icons/social.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "PropÃ³sito", targetPoints: 30, icon: "/200/aspect-icons/proposito.svg" },
+  { aspectId: "20000000-0000-4000-8000-000000000009", id: "planejamento", name: "Propósito", targetPoints: 30, icon: "/200/aspect-icons/proposito.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000010", id: "higiene", name: "Higiene", targetPoints: 15, icon: "/200/aspect-icons/higiene.svg" },
   { aspectId: "20000000-0000-4000-8000-000000000011", id: "lazer", name: "Lazer", targetPoints: 90, icon: "/200/aspect-icons/lazer.svg" },
-  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "FamÃ­lia", targetPoints: 30, icon: "/200/aspect-icons/familia.svg" }
+  { aspectId: "20000000-0000-4000-8000-000000000012", id: "aspecto", name: "Família", targetPoints: 30, icon: "/200/aspect-icons/familia.svg" }
 ];
 const sleepDelayOptions = [0, 5, 15, 30, 60];
 const avatarPresetToPath = {
@@ -118,7 +118,7 @@ const platformCategoryIconByName = {
   Imprevistos: "/200/icons/imprevistos.svg",
   "Emprestimos e Juros": "/200/icons/emprestimos-juros.svg"
 };
-const constitutionDefaultText = "O Projeto FamÃ­lia Ã© o nosso principal e mais importante projeto, ele visa bem estar, seguranÃ§a em um projeto contÃ­nuo de longo prazo, todos os envolvidos se comprometem a concluir de boa vontade as propostas descritas no projeto";
+const constitutionDefaultText = "O Projeto Família é o nosso principal e mais importante projeto, ele visa bem estar, segurança em um projeto contínuo de longo prazo, todos os envolvidos se comprometem a concluir de boa vontade as propostas descritas no projeto";
 const financePeriods = [
   { key: "total", label: "Total" },
   { key: "today", label: "Hoje" },
@@ -139,8 +139,8 @@ const financePeriods = [
   { key: "month-12", label: "Dezembro" }
 ];
 const weekdayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
-const monthlyOrdinalLabels = ["Primeira", "Segunda", "Terceira", "Quarta", "Ãšltima"];
-const monthlyWeekdayLabels = ["Domingo", "Segunda-feira", "TerÃ§a-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "SÃ¡bado"];
+const monthlyOrdinalLabels = ["Primeira", "Segunda", "Terceira", "Quarta", "Última"];
+const monthlyWeekdayLabels = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 const recurrenceDays = {
   none: [],
   daily: [0, 1, 2, 3, 4, 5, 6],
@@ -1248,7 +1248,7 @@ const state = {
     timeConfigured: true,
     limitIntervalIndex: 0,
     categoryId: "planejamento",
-    categoryName: "PropÃ³sito",
+    categoryName: "Propósito",
     categoryResolved: false,
     categoryThinking: false,
     categoryManuallySelected: false
@@ -1723,7 +1723,7 @@ function beginGlobalLoading(iconSrc = "") {
     window.__project200LoadingShownAt = Date.now();
     globalLoadingTimedOut = false;
     if (globalLoadingIcon) globalLoadingIcon.src = "/200/images/ilife-mindsetplan-home.png";
-    if (globalLoadingCopy) globalLoadingCopy.textContent = "Carregando informaÃ§Ãµes...";
+    if (globalLoadingCopy) globalLoadingCopy.textContent = "Carregando informações...";
     if (globalLoadingOverlay) {
       globalLoadingOverlay.style.removeProperty("display");
       globalLoadingOverlay.hidden = false;
@@ -1964,7 +1964,7 @@ function renderProfileManageOverlay() {
     profileManageTitle.textContent = `Gerenciar ${profile.name}`;
   }
   if (profileManageTargetLabel) {
-    profileManageTargetLabel.textContent = `UsuÃ¡rio selecionado: ${profile.name}`;
+    profileManageTargetLabel.textContent = `Usuário selecionado: ${profile.name}`;
   }
   if (profileReassignSelect) {
     profileReassignSelect.innerHTML = getProfilesList().map((item) => `
@@ -1972,7 +1972,7 @@ function renderProfileManageOverlay() {
     `).join("");
   }
   if (profileReassignTargetHint) {
-    profileReassignTargetHint.textContent = `Destino: ${selectedProfile?.name || state.selectedProfile || "usuÃ¡rio selecionado"}`;
+    profileReassignTargetHint.textContent = `Destino: ${selectedProfile?.name || state.selectedProfile || "usuário selecionado"}`;
   }
   const canDelete = String(profileDeleteConfirmInput?.value || "").trim() === "Excluir";
   profileDeleteConfirmButton?.classList.toggle("is-disabled", !canDelete);
@@ -2088,6 +2088,7 @@ function isQuickTaskAction(action) {
 
 function buildActionTimelineEntries() {
   const visibleActions = getVisibleActions()
+    .filter((action) => !isActionsTaskMutedForToday(action.id))
     .slice()
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   if (state.actionPeriodDays > 1) {
@@ -2245,7 +2246,7 @@ function getAlphabeticalMissionOrderUnits() {
       return Array.from({ length: target }, (_, index) => ({
         unitKey: `${String(goal?.id || "")}:${index + 1}`,
         goalId: String(goal?.id || ""),
-        title: String(goal?.title || "MissÃ£o"),
+        title: String(goal?.title || "Missão"),
         installmentNumber: index + 1,
         target
       }));
@@ -2290,7 +2291,7 @@ function buildMissionScheduleUnits(nowMs = getServerNowMs()) {
       return Array.from({ length: target }, (_, index) => ({
         unitKey: `${String(goal?.id || "")}:${index + 1}`,
         goalId: String(goal?.id || ""),
-        title: String(goal?.title || "MissÃ£o"),
+        title: String(goal?.title || "Missão"),
         installmentNumber: index + 1,
         target,
         goal,
@@ -2302,6 +2303,63 @@ function buildMissionScheduleUnits(nowMs = getServerNowMs()) {
     .sort((left, right) => left.dueAtMs - right.dueAtMs || left.title.localeCompare(right.title, "pt-BR"));
 }
 
+function getActionsMutedMissionsStorageKey(dateKey = getProjectTodayDateKey(), profileName = state.selectedProfile || getDefaultProfileName()) {
+  const profile = encodeURIComponent(normalizeAssigneeName(profileName) || getDefaultProfileName());
+  return `project200:actions-muted-missions:${profile}:${String(dateKey || getProjectTodayDateKey()).slice(0, 10)}`;
+}
+
+function readActionsMutedMissionIds(dateKey = getProjectTodayDateKey()) {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(getActionsMutedMissionsStorageKey(dateKey)) || '[]');
+    return new Set((Array.isArray(parsed) ? parsed : []).map((id) => String(id || '').trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function isActionsMissionMutedForDate(goalId, dateKey = getProjectTodayDateKey()) {
+  const normalizedId = String(goalId || '').trim();
+  return Boolean(normalizedId && readActionsMutedMissionIds(dateKey).has(normalizedId));
+}
+
+function muteActionsMissionForToday(goalId) {
+  const normalizedId = String(goalId || '').trim();
+  if (!normalizedId) return;
+  const dateKey = getProjectTodayDateKey();
+  const ids = readActionsMutedMissionIds(dateKey);
+  ids.add(normalizedId);
+  window.localStorage.setItem(getActionsMutedMissionsStorageKey(dateKey), JSON.stringify([...ids]));
+  renderActionsMissionFilter();
+  renderActions();
+}
+function getActionsMutedTasksStorageKey(dateKey = getProjectTodayDateKey(), profileName = state.selectedProfile || getDefaultProfileName()) {
+  const profile = encodeURIComponent(normalizeAssigneeName(profileName) || getDefaultProfileName());
+  return "project200:actions-muted-tasks:" + profile + ":" + String(dateKey || getProjectTodayDateKey()).slice(0, 10);
+}
+
+function readActionsMutedTaskIds(dateKey = getProjectTodayDateKey()) {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(getActionsMutedTasksStorageKey(dateKey)) || "[]");
+    return new Set((Array.isArray(parsed) ? parsed : []).map((id) => String(id || "").trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function isActionsTaskMutedForToday(actionId) {
+  const normalizedId = String(actionId || "").trim();
+  return Boolean(normalizedId && readActionsMutedTaskIds(getProjectTodayDateKey()).has(normalizedId));
+}
+
+function muteActionsTaskForToday(actionId) {
+  const normalizedId = String(actionId || "").trim();
+  if (!normalizedId) return;
+  const dateKey = getProjectTodayDateKey();
+  const ids = readActionsMutedTaskIds(dateKey);
+  ids.add(normalizedId);
+  window.localStorage.setItem(getActionsMutedTasksStorageKey(dateKey), JSON.stringify([...ids]));
+  renderActions();
+}
 function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs() } = {}) {
   const windowState = getActiveTimeWindow(nowMs);
   return buildMissionScheduleUnits(nowMs).map((unit) => {
@@ -2315,6 +2373,7 @@ function buildMissionInstallments({ availableOnly = true, nowMs = getServerNowMs
       delayMinutes: Math.floor((nowMs - unit.dueAtMs) / 60000)
     };
   }).filter((entry) => !entry.completed)
+    .filter((entry) => !isActionsMissionMutedForDate(entry.goalId, windowState.dateKey))
     .filter((entry) => !availableOnly || nowMs >= entry.dueAtMs - (15 * 60000))
     .sort((left, right) => left.dueAtMs - right.dueAtMs || left.title.localeCompare(right.title, "pt-BR"));
 }
@@ -2325,7 +2384,7 @@ function formatMissionOrderTime(minutes) {
 
 function getMissionOrderPeriod(minutes) {
   const safe = ((Math.round(Number(minutes || 0)) % 1440) + 1440) % 1440;
-  if (safe >= 4 * 60 && safe < 12 * 60) return { key: "morning", label: "manhÃ£" };
+  if (safe >= 4 * 60 && safe < 12 * 60) return { key: "morning", label: "manhã" };
   if (safe >= 12 * 60 && safe < 18 * 60) return { key: "afternoon", label: "tarde" };
   return { key: "night", label: "noite" };
 }
@@ -2347,14 +2406,14 @@ function renderMissionOrderModal() {
   if (!missionOrderList) return;
   const units = getScheduledMissionOrderUnits();
   if (missionOrderSummary) {
-    missionOrderSummary.textContent = `${units.length} ${units.length === 1 ? "parcela" : "parcelas"} de missÃµes com 1 a 3 repetiÃ§Ãµes entre ${activeMinutesToLabel(state.activeTime.startMinutes)} e ${activeMinutesToLabel(state.activeTime.endMinutes)}.`;
+    missionOrderSummary.textContent = `${units.length} ${units.length === 1 ? "parcela" : "parcelas"} de missões com 1 a 3 repetições entre ${activeMinutesToLabel(state.activeTime.startMinutes)} e ${activeMinutesToLabel(state.activeTime.endMinutes)}.`;
   }
   if (state.missionOrder.loading) {
-    missionOrderList.innerHTML = '<div class="empty-state">Organizando missÃµesâ€¦</div>';
+    missionOrderList.innerHTML = '<div class="empty-state">Organizando missões…</div>';
     return;
   }
   if (!units.length) {
-    missionOrderList.innerHTML = '<div class="empty-state">Nenhuma missÃ£o de 1 a 3 repetiÃ§Ãµes.</div>';
+    missionOrderList.innerHTML = '<div class="empty-state">Nenhuma missão de 1 a 3 repetições.</div>';
     return;
   }
   missionOrderList.innerHTML = units.map((unit, index) => {
@@ -2389,7 +2448,7 @@ async function loadMissionOrder({ silent = false } = {}) {
 async function persistMissionOrder() {
   if (state.missionOrder.saving) return;
   state.missionOrder.saving = true;
-  if (missionOrderStatus) missionOrderStatus.textContent = "Salvando ordemâ€¦";
+  if (missionOrderStatus) missionOrderStatus.textContent = "Salvando ordem…";
   try {
     const payload = await apiRequest("/api/200/mission-order", {
       method: "PUT",
@@ -2447,7 +2506,7 @@ async function requestMissionNotificationPermission() {
     if (permission?.display !== "granted") permission = await notifications.requestPermissions();
     if (permission?.display !== "granted") return false;
     if (notifications.createChannel) {
-      await notifications.createChannel({ id: "ilife-missions", name: "MissÃµes iLife", description: "Alertas de missÃµes atrasadas", importance: 5, visibility: 1, vibration: true });
+      await notifications.createChannel({ id: "ilife-missions", name: "Missões iLife", description: "Alertas de missões atrasadas", importance: 5, visibility: 1, vibration: true });
     }
     return true;
   } catch {
@@ -2489,8 +2548,8 @@ async function scheduleMissionNotifications() {
         if (overdueCount < 1) continue;
         scheduled.push({
           id: missionNotificationId(`mission-summary-${activeWindow.dateKey}-${slot}`),
-          title: "MissÃµes iLife",
-          body: `VocÃª tem ${overdueCount} ${overdueCount === 1 ? "missÃ£o atrasada" : "missÃµes atrasadas"}`,
+          title: "Missões iLife",
+          body: `Você tem ${overdueCount} ${overdueCount === 1 ? "missão atrasada" : "missões atrasadas"}`,
           channelId: "ilife-missions",
           schedule: { at: new Date(atMs) },
           extra: { kind: "project200-mission-active-time", overdueCount, slot }
@@ -2505,7 +2564,7 @@ async function scheduleMissionNotifications() {
       if (!Number.isFinite(startMs) || reminderMs <= nowMs || scheduled.length >= 60) return;
       scheduled.push({
         id: missionNotificationId(`action-upcoming-${action.id}-${action.startAt}`),
-        title: "PrÃ³xima tarefa",
+        title: "Próxima tarefa",
         body: `Tarefa ${String(action.title || "programada").trim()} em 15 minutos`,
         channelId: "ilife-missions",
         schedule: { at: new Date(reminderMs) },
@@ -2526,8 +2585,8 @@ function renderActionsMissionFilter() {
   actionsMissionFilterButton.classList.toggle("is-filtering", filterActive);
   actionsMissionFilterButton.classList.toggle("is-dynamic", mode === "dynamic");
   actionsMissionFilterButton.setAttribute("aria-label", mode === "dynamic"
-    ? (state.actionsDynamicMissionsVisible ? "Ocultar missÃµes dinÃ¢micas" : "Mostrar missÃµes dinÃ¢micas")
-    : (state.actionsMissionOnly ? "Voltar para a lista de aÃ§Ãµes" : "Abrir missÃµes"));
+    ? (state.actionsDynamicMissionsVisible ? "Ocultar missões dinâmicas" : "Mostrar missões dinâmicas")
+    : (state.actionsMissionOnly ? "Voltar para a lista de ações" : "Abrir missões"));
   actionsMissionFilterButton.setAttribute("aria-controls", "actionsMissionsPanel");
   actionsMissionFilterButton.setAttribute("aria-expanded", filterActive ? "true" : "false");
   const overdueCount = mode === "dynamic"
@@ -2536,7 +2595,7 @@ function renderActionsMissionFilter() {
   if (actionsMissionOverdueBadge) {
     actionsMissionOverdueBadge.hidden = overdueCount < 1;
     actionsMissionOverdueBadge.textContent = overdueCount > 99 ? "99+" : String(overdueCount);
-    actionsMissionOverdueBadge.setAttribute("aria-label", `${overdueCount} missÃµes atrasadas`);
+    actionsMissionOverdueBadge.setAttribute("aria-label", `${overdueCount} missões atrasadas`);
   }
 }
 function getAvailableMissionById(goalId) {
@@ -2602,7 +2661,7 @@ function renderActionsMissionsPanel() {
   const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => !isLimitGoal(goal));
   actionsMissionsList.innerHTML = "";
   if (!goals.length) {
-    actionsMissionsList.innerHTML = '<div class="empty-state">VocÃª nÃ£o tem missÃµes para hoje.</div>';
+    actionsMissionsList.innerHTML = '<div class="empty-state">Você não tem missões para hoje.</div>';
     return;
   }
 
@@ -2620,15 +2679,15 @@ function renderActionsMissionsPanel() {
     card.setAttribute("role", "button");
     card.tabIndex = 0;
     card.innerHTML = `
-      <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ãcone da missÃ£o"))}" />
+      <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
-        <h3>${escapeHtml(String(goal?.title || "MissÃ£o"))}</h3>
+        <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
         <p>${progress.progress} de ${progress.target}</p>
       </div>
-      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missÃ£o"))}">
+      <button class="actions-mission-card-edit" type="button" data-actions-mission-edit="${escapeHtml(goalId)}" aria-label="Editar ${escapeHtml(String(goal?.title || "missão"))}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg>
       </button>
-      <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missÃ£o"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
+      <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
         <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
       </div>
     `;
@@ -3192,7 +3251,7 @@ function renderRunningCompletionNextView() {
   if (runningTaskMinutesLeft) {
     runningTaskMinutesLeft.classList.remove("is-bonus", "is-late", "is-early");
     runningTaskMinutesLeft.classList.add("is-bonus");
-    runningTaskMinutesLeft.textContent = "PrÃ³xima";
+    runningTaskMinutesLeft.textContent = "Próxima";
   }
   setRunningRingPercent(state.runningCompletion.progressValue);
   if (runningTaskPercent) {
@@ -3203,7 +3262,7 @@ function renderRunningCompletionNextView() {
     const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextOfNext));
   } else {
-    setRunningNextDisplay("Sem prÃ³xima tarefa", 0);
+    setRunningNextDisplay("Sem próxima tarefa", 0);
   }
   if (runningTaskListButton) runningTaskListButton.hidden = false;
   if (runningTaskMusicButton) runningTaskMusicButton.hidden = false;
@@ -3432,8 +3491,8 @@ function renderSleepMusicToggleState() {
   sleepMusicToggleButton.setAttribute(
     "aria-label",
     isActive && selectedName
-      ? `Escolher mÃºsica do sono. Tocando ${selectedName}`
-      : "Escolher mÃºsica da rÃ¡dio Ambience"
+      ? `Escolher música do sono. Tocando ${selectedName}`
+      : "Escolher música da rádio Ambience"
   );
 }
 
@@ -3493,7 +3552,7 @@ function renderSleepMusicPicker(station) {
   const tracks = getShuffledSleepAmbienceTracks(station);
   const selectedUrl = normalizeRunningTrackUrl(state.sleepModal?.selectedTrackUrl || "");
   if (!tracks.length) {
-    sleepMusicPickerList.innerHTML = '<div class="empty-state">Nenhuma faixa Ambience disponÃ­vel.</div>';
+    sleepMusicPickerList.innerHTML = '<div class="empty-state">Nenhuma faixa Ambience disponível.</div>';
     return;
   }
   sleepMusicPickerList.innerHTML = tracks.map((track) => {
@@ -3524,7 +3583,7 @@ async function openSleepMusicPicker() {
   const station = await loadSleepAmbienceStation();
   renderSleepMusicPicker(station);
   if (sleepMusicPickerStatus) {
-    sleepMusicPickerStatus.textContent = station ? "A faixa escolhida tocarÃ¡ atÃ© o fade-out do sono." : "NÃ£o foi possÃ­vel carregar Ambience.";
+    sleepMusicPickerStatus.textContent = station ? "A faixa escolhida tocará até o fade-out do sono." : "Não foi possível carregar Ambience.";
   }
 }
 
@@ -3936,7 +3995,7 @@ function renderHomeRunningTask() {
     syncHomeWidget({
       percent: state.runningCompletion.displayPercent,
       centerMarkup: formatRunningPercentMarkup(state.runningCompletion.displayPercent),
-      ariaLabel: "Painel da rotina em conclusÃ£o"
+      ariaLabel: "Painel da rotina em conclusão"
     });
     if (state.runningCompletion.phase === "celebration") {
       renderRunningCompletionCelebration();
@@ -4042,18 +4101,18 @@ function renderHomeRunningTask() {
       : formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
     if (homeRunningDatePrimary) {
-      homeRunningDatePrimary.textContent = "PrÃ³xima tarefa";
+      homeRunningDatePrimary.textContent = "Próxima tarefa";
     }
     if (homeRunningDateSecondary) {
       homeRunningDateSecondary.textContent = nextLabel;
     }
   } else {
-    setRunningNextDisplay("Sem prÃ³xima tarefa", 0);
+    setRunningNextDisplay("Sem próxima tarefa", 0);
     if (homeRunningDatePrimary) {
-      homeRunningDatePrimary.textContent = "PrÃ³xima tarefa";
+      homeRunningDatePrimary.textContent = "Próxima tarefa";
     }
     if (homeRunningDateSecondary) {
-      homeRunningDateSecondary.textContent = "Sem prÃ³xima tarefa";
+      homeRunningDateSecondary.textContent = "Sem próxima tarefa";
     }
   }
   setHomeTaskTitle(formatActionTitleForDisplay(action.title), true);
@@ -4074,10 +4133,10 @@ function renderHomeRunningTask() {
     percent,
     centerMarkup: runningCenterMarkup,
     ariaLabel: `${formatActionTitleForDisplay(action.title)} em andamento`,
-    primaryLine: "PrÃ³xima tarefa",
+    primaryLine: "Próxima tarefa",
     secondaryLine: nextAction
       ? (nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title))
-      : "Sem prÃ³xima tarefa",
+      : "Sem próxima tarefa",
     useCalendarDate: false
   });
   renderRunningMusicPlayer();
@@ -4563,7 +4622,7 @@ function renderRunningMusicPlayer() {
   const isPlaying = Boolean(runningAudio && !runningAudio.paused && track?.url && normalizeRunningTrackUrl(runningAudio.currentSrc || runningAudio.src || "") === normalizeRunningTrackUrl(track.url));
 
   if (runningPlayerStation) {
-    runningPlayerStation.textContent = String(station?.name || "Carregando rÃ¡dios");
+    runningPlayerStation.textContent = String(station?.name || "Carregando rádios");
   }
 
   if (runningPlayerTrack) {
@@ -4581,7 +4640,7 @@ function renderRunningMusicPlayer() {
   runningPlayerRepeat?.classList.toggle("active", isPlaying);
   runningPlayerRepeat?.classList.toggle("is-playing", isPlaying);
   runningPlayerRepeat?.classList.toggle("is-disabled", !track?.url);
-  runningPlayerRepeat?.setAttribute("aria-label", isPlaying ? "Pausar mÃºsica" : "Reproduzir mÃºsica");
+  runningPlayerRepeat?.setAttribute("aria-label", isPlaying ? "Pausar música" : "Reproduzir música");
   if (runningPlayerRepeat) {
     runningPlayerRepeat.innerHTML = isPlaying
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z" fill="currentColor"/></svg>'
@@ -4597,7 +4656,7 @@ function renderRunningMusicPlayer() {
   runningPlayerNext?.classList.toggle("is-disabled", !hasTrackNavigation);
 
   if (runningMusicListStation) {
-    runningMusicListStation.textContent = String(station?.name || "EstaÃ§Ã£o");
+    runningMusicListStation.textContent = String(station?.name || "Estação");
   }
 
   if (runningMusicListModal?.classList.contains("active")) {
@@ -4702,7 +4761,7 @@ function renderRunningMusicList() {
   const defaultStationName = preference?.mode === "station" ? String(preference.stationName || "").trim() : "";
 
   if (!tracks.length) {
-    runningMusicListItems.innerHTML = '<div class="empty-state">Nenhuma mÃºsica disponÃ­vel nesta estaÃ§Ã£o.</div>';
+    runningMusicListItems.innerHTML = '<div class="empty-state">Nenhuma música disponível nesta estação.</div>';
     return;
   }
 
@@ -4722,13 +4781,13 @@ function renderRunningMusicList() {
         </span>
         <span class="running-music-track-main">
           <strong>${escapeHtml(String(item.name || "Faixa"))}</strong>
-          <span>${escapeHtml(String(station?.name || "EstaÃ§Ã£o"))}</span>
+          <span>${escapeHtml(String(station?.name || "Estação"))}</span>
         </span>
         <span class="running-music-track-actions">
-          <button class="running-music-track-hide" type="button" data-hide-track="${escapeHtml(String(item.url || ""))}" aria-label="${isHidden ? "Mostrar mÃºsica" : "Ocultar mÃºsica"}">
+          <button class="running-music-track-hide" type="button" data-hide-track="${escapeHtml(String(item.url || ""))}" aria-label="${isHidden ? "Mostrar música" : "Ocultar música"}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20 20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </button>
-          <button class="running-music-track-loop" type="button" data-loop-track="${escapeHtml(String(item.url || ""))}" aria-label="${isLooping ? "Desativar repetiÃ§Ã£o" : "Repetir mÃºsica"}">
+          <button class="running-music-track-loop" type="button" data-loop-track="${escapeHtml(String(item.url || ""))}" aria-label="${isLooping ? "Desativar repetição" : "Repetir música"}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17H7l2.6 2.6L8.2 21 3 15.8 8.2 10.6l1.4 1.4L7 14h10a3 3 0 0 0 0-6h-1V6h1a5 5 0 0 1 0 10ZM7 7h10l-2.6-2.6L15.8 3 21 8.2 15.8 13.4l-1.4-1.4L17 10H7a3 3 0 0 0 0 6h1v2H7a5 5 0 0 1 0-10Z" fill="currentColor"/></svg>
           </button>
           <svg class="running-music-track-heart" viewBox="0 0 24 24"><path d="M12 21.35 10.55 20C5.4 15.4 2 12.4 2 8.5A5.5 5.5 0 0 1 7.5 3C9.24 3 10.92 3.81 12 5.08 13.08 3.81 14.76 3 16.5 3A5.5 5.5 0 0 1 22 8.5c0 3.9-3.4 6.9-8.55 11.5z"/></svg>
@@ -4810,7 +4869,7 @@ async function openRunningMusicListModal() {
   if (!state.runningPlayer.stationsLoaded
     || !Array.isArray(state.runningPlayer.stations)
     || state.runningPlayer.stations.length < 2) {
-    runningMusicListItems.innerHTML = '<div class="empty-state">Carregando estaÃ§Ãµes...</div>';
+    runningMusicListItems.innerHTML = '<div class="empty-state">Carregando estações...</div>';
     try {
       await loadRunningMusicStations();
     } catch {
@@ -4861,9 +4920,9 @@ async function toggleRunningTrackFavorite() {
     renderRunningMusicPlayer();
     renderRunningMusicList();
     if (favorite) {
-      showFloatingNotice("MÃºsica adicionada aos favoritos.");
+      showFloatingNotice("Música adicionada aos favoritos.");
     } else {
-      showFloatingNotice("MÃºsica removida dos favoritos.");
+      showFloatingNotice("Música removida dos favoritos.");
     }
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar favorito.");
@@ -4931,21 +4990,21 @@ function openRunningMusicDefaultModal() {
   }
 
   if (!taskTitle) {
-    showFloatingNotice("Abra uma tarefa em andamento para definir o padrÃ£o.");
+    showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
     return;
   }
 
   if (runningMusicDefaultStationName) {
-    runningMusicDefaultStationName.textContent = String(station.name || "EstaÃ§Ã£o");
+    runningMusicDefaultStationName.textContent = String(station.name || "Estação");
   }
   if (runningMusicDefaultTrackName) {
-    runningMusicDefaultTrackName.textContent = String(track?.name || "MÃºsica atual");
+    runningMusicDefaultTrackName.textContent = String(track?.name || "Música atual");
   }
   if (runningMusicDefaultStationHint) {
-    runningMusicDefaultStationHint.innerHTML = `estaÃ§Ã£o padrÃ£o para<br>${escapeHtml(taskTitle)}`;
+    runningMusicDefaultStationHint.innerHTML = `estação padrão para<br>${escapeHtml(taskTitle)}`;
   }
   if (runningMusicDefaultTrackHint) {
-    runningMusicDefaultTrackHint.innerHTML = `mÃºsica padrÃ£o para<br>${escapeHtml(taskTitle)}`;
+    runningMusicDefaultTrackHint.innerHTML = `música padrão para<br>${escapeHtml(taskTitle)}`;
   }
 
   closeModal("runningMusicDefaultChoiceModal");
@@ -4964,8 +5023,8 @@ function openRunningMusicDefaultChoiceModal() {
 
   if (runningMusicDefaultChoiceCopy) {
     runningMusicDefaultChoiceCopy.innerHTML = preference.mode === "station"
-      ? `PadrÃ£o salvo: estaÃ§Ã£o <strong>${escapeHtml(preference.stationName || "EstaÃ§Ã£o")}</strong><br>para ${escapeHtml(taskTitle)}`
-      : `PadrÃ£o salvo: mÃºsica <strong>${escapeHtml(preference.trackName || "MÃºsica")}</strong><br>para ${escapeHtml(taskTitle)}`;
+      ? `Padrão salvo: estação <strong>${escapeHtml(preference.stationName || "Estação")}</strong><br>para ${escapeHtml(taskTitle)}`
+      : `Padrão salvo: música <strong>${escapeHtml(preference.trackName || "Música")}</strong><br>para ${escapeHtml(taskTitle)}`;
   }
 
   openModal("runningMusicDefaultChoiceModal");
@@ -4992,7 +5051,7 @@ async function executeRunningTaskDefaultPreference() {
   }
 
   if (nextStationIndex < 0) {
-    showFloatingNotice("Nao encontrei o padrÃ£o salvo para esta tarefa.");
+    showFloatingNotice("Nao encontrei o padrão salvo para esta tarefa.");
     return;
   }
 
@@ -5037,13 +5096,13 @@ async function saveRunningTaskDefault(mode = "track") {
   }
 
   if (!taskTitle) {
-    showFloatingNotice("Abra uma tarefa em andamento para definir o padrÃ£o.");
+    showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
     return;
   }
 
   const safeMode = mode === "station" ? "station" : "track";
   if (safeMode === "track" && !track?.url) {
-    showFloatingNotice("Escolha uma mÃºsica vÃ¡lida.");
+    showFloatingNotice("Escolha uma música válida.");
     return;
   }
 
@@ -5071,9 +5130,9 @@ async function saveRunningTaskDefault(mode = "track") {
     closeModal("runningMusicDefaultChoiceModal");
     state.runningPlayer.configurationMode = false;
     state.runningPlayer.configurationTaskTitle = "";
-    showFloatingNotice(safeMode === "station" ? "EstaÃ§Ã£o definida como padrÃ£o." : "MÃºsica definida como padrÃ£o.");
+    showFloatingNotice(safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão.");
   } catch (error) {
-    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrÃ£o.");
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
   }
 }
 
@@ -5258,7 +5317,7 @@ async function loadMetricHistorySpan() {
     ["actions", "missions", "stats"].forEach((target) => setMetricPeriodDays(target, getMetricPeriodDays(target)));
   } catch (error) {
     state.historySpan.loading = false;
-    if (metricPeriodStatus) metricPeriodStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar perÃ­odos.";
+    if (metricPeriodStatus) metricPeriodStatus.textContent = error instanceof Error ? error.message : "Falha ao carregar períodos.";
   }
 }
 
@@ -5269,8 +5328,8 @@ function renderMetricPeriodModal() {
   metricPeriodOptions.innerHTML = options.map((days) => `<button type="button" class="metric-period-option${days === selectedDays ? " is-active" : ""}" data-metric-period-days="${days}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${escapeHtml(formatMetricPeriodLabel(days))}</span></button>`).join("");
   if (metricPeriodHint) {
     metricPeriodHint.textContent = state.historySpan.firstOccurredAt
-      ? `DisponÃ­vel desde o inÃ­cio das suas mÃ©tricas &middot; ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
-      : "O perÃ­odo cresce a partir do seu primeiro ponto.";
+      ? `Disponível desde o início das suas métricas &middot; ${formatMetricPeriodLabel(state.historySpan.maxDays)}`
+      : "O período cresce a partir do seu primeiro ponto.";
   }
 }
 
@@ -5346,7 +5405,7 @@ function formatMinutesHuman(totalMinutesValue) {
 }
 
 function formatHomeDateTime(now = new Date()) {
-  const months = ["Janeiro", "Fevereiro", "MarÃ§o", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const day = now.getDate();
   const month = months[now.getMonth()] || "";
   const hour = now.getHours();
@@ -5452,13 +5511,13 @@ function getActionDisplayIcon(action) {
   if (svgIconUrl) {
     return {
       src: svgIconUrl,
-      alt: String(action?.svgIconLabel || action?.title || "Ãcone da tarefa"),
+      alt: String(action?.svgIconLabel || action?.title || "Ícone da tarefa"),
       categoryIcon: true
     };
   }
   return {
     src: defaultTaskSvgPath,
-    alt: "Ãcone padrÃ£o da tarefa",
+    alt: "Ícone padrão da tarefa",
     categoryIcon: true
   };
 }
@@ -5468,13 +5527,13 @@ function getMissionDisplayIcon(goal) {
   if (svgIconUrl) {
     return {
       src: svgIconUrl,
-      alt: String(goal?.svgIconLabel || goal?.title || "Ãcone da missÃ£o"),
+      alt: String(goal?.svgIconLabel || goal?.title || "Ícone da missão"),
       categoryIcon: true
     };
   }
   return {
     src: defaultMissionSvgPath,
-    alt: String(goal?.title || "Ãcone da missÃ£o"),
+    alt: String(goal?.title || "Ícone da missão"),
     categoryIcon: true
   };
 }
@@ -5493,7 +5552,7 @@ function buildTaskAvatarMarkup(src, alt, options = {}) {
 
 function getTaskCategoryName(categoryId) {
   const normalized = normalizeTaskCategoryId(categoryId);
-  return taskCategoryMap.get(normalized)?.name || "PropÃ³sito";
+  return taskCategoryMap.get(normalized)?.name || "Propósito";
 }
 
 function normalizeTaskCategoryId(categoryId) {
@@ -5596,7 +5655,7 @@ function buildInitialWizardState() {
     endHour: end.getHours(),
     endMinute: end.getMinutes(),
     categoryId: "planejamento",
-    categoryName: "PropÃ³sito",
+    categoryName: "Propósito",
     categoryResolved: false,
     categoryThinking: false,
     svgIconUrl: "",
@@ -5670,7 +5729,7 @@ async function apiRequestWithTimeout(path, options = {}, timeoutMs = 12000) {
     });
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error("A interpretaÃ§Ã£o demorou demais.");
+      throw new Error("A interpretação demorou demais.");
     }
     throw error;
   } finally {
@@ -6378,7 +6437,7 @@ function renderConstitution() {
   constitutionAuthAlert.hidden = hasToken;
 
   const current = getActiveConstitutionVersion();
-  const label = current?.label || "VersÃ£o 1";
+  const label = current?.label || "Versão 1";
   constitutionVersionLabel.textContent = label;
   constitutionTextView.textContent = current?.text || constitutionDefaultText;
 
@@ -6411,7 +6470,7 @@ async function loadConstitution() {
     state.constitutionVersions = [{
       id: "local-default",
       versionNumber: 1,
-      label: "VersÃ£o 1",
+      label: "Versão 1",
       text: constitutionDefaultText,
       approvals: {}
     }];
@@ -6428,7 +6487,7 @@ async function loadConstitution() {
       : [{
         id: "local-default",
         versionNumber: 1,
-        label: "VersÃ£o 1",
+        label: "Versão 1",
         text: constitutionDefaultText,
         approvals: {}
       }];
@@ -6494,7 +6553,7 @@ async function approveConstitution(approver) {
     return;
   }
 
-  const ok = window.confirm(`${approver}: Concordar com essa versÃ£o?`);
+  const ok = window.confirm(`${approver}: Concordar com essa versão?`);
   if (!ok) {
     return;
   }
@@ -6648,7 +6707,7 @@ async function saveFinanceNotes() {
 
 function isActionsMissionViewActive() {
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  return mode === "dynamic" ? state.actionsDynamicMissionsVisible : mode === "separate" && state.actionsMissionOnly;
+  return mode === "separate" && state.actionsMissionOnly;
 }
 
 function getActionDatePickerParts() {
@@ -6776,7 +6835,7 @@ function createActionsDynamicMissionDeck(entries = []) {
   if (!deckEntries.length) return null;
   const deck = document.createElement('section');
   deck.className = 'actions-dynamic-mission-deck';
-  deck.setAttribute('aria-label', 'Metas prÃ³ximas ou atrasadas');
+  deck.setAttribute('aria-label', 'Metas próximas ou atrasadas');
   const track = document.createElement('div');
   track.className = 'actions-dynamic-mission-track';
   deckEntries.forEach((entry, index) => {
@@ -6794,20 +6853,7 @@ function createActionsDynamicMissionDeck(entries = []) {
     track.appendChild(card);
   });
   deck.appendChild(track);
-  if (deckEntries.length > 1) {
-    let activeIndex = 0;
-    const slideTimer = window.setInterval(() => {
-      if (!deck.isConnected) {
-        window.clearInterval(slideTimer);
-        return;
-      }
-      activeIndex = (activeIndex + 1) % deckEntries.length;
-      track.scrollTo({
-        left: activeIndex * Math.max(1, track.getBoundingClientRect().width),
-        behavior: 'smooth'
-      });
-    }, 2000);
-  }
+
   return deck;
 }
 
@@ -6841,22 +6887,16 @@ function renderActions() {
   }
 
   const missionActionsMode = normalizeMissionActionsMode(state.options.missionActionsMode);
-  const showDynamicMissionView = missionActionsMode === "dynamic" && state.actionsDynamicMissionsVisible;
-  const dynamicMissionEntries = showDynamicMissionView ? buildMissionInstallments() : [];
-  const compactDynamicMissionEntries = !showDynamicMissionView && missionActionsMode === "dynamic"
+  const compactDynamicMissionEntries = missionActionsMode === "dynamic" && state.actionsDynamicMissionsVisible
     ? buildMissionInstallments()
     : [];
-  const timelineEntries = (showDynamicMissionView ? dynamicMissionEntries : buildActionTimelineEntries())
+  const timelineEntries = buildActionTimelineEntries()
     .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime());
-  const showMissionsSuccess = showDynamicMissionView && dynamicMissionEntries.length === 0;
   const compactMissionDeck = createActionsDynamicMissionDeck(compactDynamicMissionEntries);
   const compactMissionDeckInsertIndex = compactMissionDeck ? getActionsDynamicMissionDeckInsertIndex(timelineEntries) : -1;
 
-  if (showMissionsSuccess) {
-    actionsList.insertAdjacentHTML("beforeend", '<section class="actions-missions-success" aria-label="Tudo em dia com suas missÃµes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7.8 12.2 2.7 2.7 5.8-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><strong><span>Tudo em dia com</span><span>suas missÃµes</span></strong></section>');
-  }
-  if (!timelineEntries.length && !showMissionsSuccess && !compactMissionDeck) {
-    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse perÃ­odo.</div>';
+  if (!timelineEntries.length && !compactMissionDeck) {
+    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse periodo.</div>';
   }
   timelineEntries.forEach((action, actionIndex) => {
     if (compactMissionDeck && actionIndex === compactMissionDeckInsertIndex) {
@@ -7277,7 +7317,7 @@ function renderFriendAssignmentButton(button, friend, label) {
 
 function renderFriendAssignmentButtons() {
   renderFriendAssignmentButton(actionFriendAssignButton, state.friendAssignment.action, "Criar tarefa");
-  renderFriendAssignmentButton(missionFriendAssignButton, state.friendAssignment.mission, "Criar missÃ£o");
+  renderFriendAssignmentButton(missionFriendAssignButton, state.friendAssignment.mission, "Criar missão");
 }
 
 function renderFriendAssignmentList() {
@@ -7290,7 +7330,7 @@ function renderFriendAssignmentList() {
   selfButton.type = "button";
   selfButton.className = `friend-assignment-card${selected ? "" : " is-selected"}`;
   selfButton.dataset.friendAssignmentSelf = "true";
-  selfButton.innerHTML = '<span class="friend-assignment-avatar friend-assignment-avatar-self">EU</span><span><strong>Para mim</strong><small>Salvar na minha prÃ³pria conta</small></span>';
+  selfButton.innerHTML = '<span class="friend-assignment-avatar friend-assignment-avatar-self">EU</span><span><strong>Para mim</strong><small>Salvar na minha própria conta</small></span>';
   friendAssignmentList.appendChild(selfButton);
 
   for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
@@ -7307,7 +7347,7 @@ function renderFriendAssignmentList() {
   }
 
   if (!(Array.isArray(state.social?.friends) && state.social.friends.length) && friendAssignmentStatus) {
-    friendAssignmentStatus.textContent = "VocÃª ainda nÃ£o tem amigos com convite aceito.";
+    friendAssignmentStatus.textContent = "Você ainda não tem amigos com convite aceito.";
   }
 }
 
@@ -7315,7 +7355,7 @@ async function openFriendAssignmentPicker(mode) {
   state.friendAssignment.mode = mode === "mission" ? "mission" : "action";
   if (friendAssignmentTitle) {
     friendAssignmentTitle.textContent = state.friendAssignment.mode === "mission"
-      ? "Criar missÃ£o para"
+      ? "Criar missão para"
       : "Criar tarefa para";
   }
   if (friendAssignmentStatus) friendAssignmentStatus.textContent = "Carregando amigos...";
@@ -7328,7 +7368,7 @@ async function openFriendAssignmentPicker(mode) {
     renderFriendAssignmentList();
   } catch (error) {
     if (friendAssignmentStatus) {
-      friendAssignmentStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel carregar seus amigos.";
+      friendAssignmentStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar seus amigos.";
     }
   }
 }
@@ -7544,7 +7584,7 @@ function renderMissionCreateCategoryPicker() {
   missionCreateCategoryTrigger.classList.toggle("is-unresolved", !resolved && !thinking);
   if (missionCreateCategoryIcon) {
     missionCreateCategoryIcon.src = resolved ? getTaskCategoryIconPath(categoryId) : "/200/icons/plataformas.svg";
-    missionCreateCategoryIcon.alt = thinking ? "Definindo aspecto" : resolved ? getTaskCategoryName(categoryId) : "Aspecto da missÃ£o";
+    missionCreateCategoryIcon.alt = thinking ? "Definindo aspecto" : resolved ? getTaskCategoryName(categoryId) : "Aspecto da missão";
   }
   setActionCategoryLabel(
     missionCreateCategoryLabel,
@@ -7628,7 +7668,7 @@ function setSvgSelectorPreview(url = "", label = "") {
     return;
   }
   svgSelectorPreview.src = String(url || "").trim() || defaultTaskSvgPath;
-  svgSelectorPreview.alt = label || "Preview do Ã­cone";
+  svgSelectorPreview.alt = label || "Preview do ícone";
 }
 
 function renderSvgSelectorModal() {
@@ -7648,8 +7688,8 @@ function renderSvgSelectorModal() {
     button.type = "button";
     button.className = `svg-selector-item${selectedUrl === assetUrl ? " is-selected" : ""}`;
     button.dataset.svgUrl = assetUrl;
-    button.dataset.svgLabel = String(asset?.label || asset?.id || "Ãcone").trim();
-    button.innerHTML = buildTaskAvatarMarkup(assetUrl, String(asset?.label || "Ãcone"), { categoryIcon: true });
+    button.dataset.svgLabel = String(asset?.label || asset?.id || "Ícone").trim();
+    button.innerHTML = buildTaskAvatarMarkup(assetUrl, String(asset?.label || "Ícone"), { categoryIcon: true });
     svgSelectorGrid.appendChild(button);
   });
   setSvgSelectorPreview(selectedUrl, String(state.svgSelector?.selectedLabel || "").trim());
@@ -7659,24 +7699,24 @@ async function openSvgSelectorModal(targetKind, targetId) {
   state.svgSelector.targetKind = String(targetKind || "").trim();
   state.svgSelector.targetId = String(targetId || "").trim();
   if (svgSelectorTitle) {
-    svgSelectorTitle.textContent = targetKind === "mission" ? "Ãcone da missÃ£o" : "Ãcone da tarefa";
+    svgSelectorTitle.textContent = targetKind === "mission" ? "Ícone da missão" : "Ícone da tarefa";
   }
   if (svgSelectorHint) {
     svgSelectorHint.textContent = targetKind === "mission"
-      ? "Escolha um Ã­cone da biblioteca para salvar nesta missÃ£o."
-      : "Escolha um Ã­cone da biblioteca para salvar nesta tarefa.";
+      ? "Escolha um ícone da biblioteca para salvar nesta missão."
+      : "Escolha um ícone da biblioteca para salvar nesta tarefa.";
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Carregando Ã­cones...";
+    svgSelectorStatus.textContent = "Carregando ícones...";
   }
   if (targetKind === "mission") {
     const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === String(targetId || ""));
     state.svgSelector.selectedUrl = String(goal?.svgIconUrl || "").trim() || defaultMissionSvgPath;
-    state.svgSelector.selectedLabel = String(goal?.svgIconLabel || goal?.title || "Ãcone da missÃ£o").trim();
+    state.svgSelector.selectedLabel = String(goal?.svgIconLabel || goal?.title || "Ícone da missão").trim();
   } else {
     const action = (Array.isArray(state.actions) ? state.actions : []).find((item) => String(item.id || "") === String(targetId || ""));
     state.svgSelector.selectedUrl = String(action?.svgIconUrl || "").trim() || defaultTaskSvgPath;
-    state.svgSelector.selectedLabel = String(action?.svgIconLabel || action?.title || "Ãcone da tarefa").trim();
+    state.svgSelector.selectedLabel = String(action?.svgIconLabel || action?.title || "Ícone da tarefa").trim();
   }
   renderSvgSelectorModal();
   openModal("svgSelectorModal");
@@ -7696,7 +7736,7 @@ async function saveSvgSelectorChoice() {
     return;
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Salvando Ã­cone...";
+    svgSelectorStatus.textContent = "Salvando ícone...";
   }
   if (targetKind === "mission") {
     const goal = (Array.isArray(state.missions) ? state.missions : []).find((item) => String(item.id || "") === targetId);
@@ -7739,7 +7779,7 @@ async function saveSvgSelectorChoice() {
     }
   }
   if (svgSelectorStatus) {
-    svgSelectorStatus.textContent = "Ãcone salvo.";
+    svgSelectorStatus.textContent = "Ícone salvo.";
   }
   window.setTimeout(() => closeModal("svgSelectorModal"), 180);
 }
@@ -7816,8 +7856,9 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     finalize: "Concluir?",
     restore: "Restaurar tarefa",
     delete: "Excluir microtarefa?",
-    delete_mission: "Excluir missÃ£o inteira?",
-    delete_progress_event: "Remover Ãºltima movimentaÃ§Ã£o?"
+    delete_mission: "Excluir missao inteira?",
+    delete_progress_event: "Remover ultima movimentacao?",
+    mute_mission_today: "Desativar?"
   };
   const buttonMap = {
     giveup: "Desistir",
@@ -7825,8 +7866,9 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     finalize: "Concluir",
     restore: "Restaurar tarefa",
     delete: "Excluir",
-    delete_mission: "Excluir missÃ£o",
-    delete_progress_event: "Remover"
+    delete_mission: "Excluir missao",
+    delete_progress_event: "Remover",
+    mute_mission_today: "Silenciar por hoje"
   };
   const classMap = {
     giveup: "is-desistir",
@@ -7835,10 +7877,12 @@ function openRunningConfirmModal(kind, action, onConfirm, options = {}) {
     restore: "is-restaurar",
     delete: "is-excluir",
     delete_mission: "is-excluir",
-    delete_progress_event: "is-excluir"
+    delete_progress_event: "is-excluir",
+    mute_mission_today: "is-abortar"
   };
-  runningConfirmTitle.textContent = titleMap[kind] || "Desistir?";
-  runningConfirmName.textContent = String(action?.title || "Nome da tarefa");
+  const confirmSubject = String(action?.title || "Nome da tarefa").trim();
+  runningConfirmTitle.textContent = kind === "mute_mission_today" ? `Desativar ${confirmSubject}?` : (titleMap[kind] || "Desistir?");
+  runningConfirmName.textContent = kind === "mute_mission_today" ? "" : confirmSubject;
   runningConfirmPrimaryButton.textContent = buttonMap[kind] || "Desistir";
   runningConfirmPrimaryButton.className = `primary-btn running-confirm-primary ${classMap[kind] || "is-desistir"}`;
   runningConfirmBackButton.textContent = "Voltar";
@@ -7918,7 +7962,7 @@ function closeStartConflictModal(value = "cancel") {
 
 function formatActionMusicInlineLabel(action) {
   const label = formatActionMusicDecisionLabel(action);
-  return label.replace(/^MÃºsica padrÃ£o da atividade:\s*/i, "").trim() || "Definir mÃºsica";
+  return label.replace(/^Música padrão da atividade:\s*/i, "").trim() || "Definir música";
 }
 
 function buildPendingStartActionButtons(targetAction) {
@@ -7987,12 +8031,12 @@ function getProjectNativeKeyboardRows() {
     return [
       ["1", "2", "3", { action: "noop", label: "-", className: "is-command is-future-key" }],
       ["4", "5", "6", { action: "clear", label: "x", className: "is-command is-clear", ariaLabel: "Apagar tudo" }],
-      ["7", "8", "9", { action: "backspace", label: "<", className: "is-command", ariaLabel: "Apagar um nÃºmero" }],
+      ["7", "8", "9", { action: "backspace", label: "<", className: "is-command", ariaLabel: "Apagar um número" }],
       [
         { action: "noop", label: ",", className: "is-command is-future-key" },
         "0",
         { action: "noop", label: ".", className: "is-command is-future-key" },
-        { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar e avanÃ§ar" }
+        { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar e avançar" }
       ]
     ];
   }
@@ -8002,13 +8046,13 @@ function getProjectNativeKeyboardRows() {
       ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
       ["@", "#", "$", "&", "*", "-", "+", "=", "%"],
       [
-        { action: "noop", label: "â‡§", className: "is-command", ariaLabel: "MaiÃºsculas indisponÃ­veis em nÃºmeros" },
+        { action: "noop", label: "â‡§", className: "is-command", ariaLabel: "Maiúsculas indisponíveis em números" },
         "(", ")", "/", "\\", ":", ";", "\"",
         { action: "backspace", label: "âŒ«", className: "is-command", ariaLabel: "Apagar" }
       ],
       [
         { action: "letters", label: "ABC", className: "is-command" },
-        { action: "space", label: "espaÃ§o", className: "is-space" },
+        { action: "space", label: "espaço", className: "is-space" },
         { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar" }
       ]
     ];
@@ -8019,13 +8063,13 @@ function getProjectNativeKeyboardRows() {
     [..."qwertyuiop"].map(letter),
     [..."asdfghjkl"].map(letter),
     [
-      { action: "shift", label: "â‡§", className: `is-command${shifted ? " is-active" : ""}`, ariaLabel: "MaiÃºsculas" },
+      { action: "shift", label: "â‡§", className: `is-command${shifted ? " is-active" : ""}`, ariaLabel: "Maiúsculas" },
       ...[..."zxcvbnm"].map(letter),
       { action: "backspace", label: "âŒ«", className: "is-command", ariaLabel: "Apagar" }
     ],
     [
       { action: "symbols", label: "123", className: "is-command" },
-      { action: "space", label: "espaÃ§o", className: "is-space" },
+      { action: "space", label: "espaço", className: "is-space" },
       { action: "return", label: "enviar", className: "is-command is-return", ariaLabel: "Enviar" }
     ]
   ];
@@ -8256,13 +8300,13 @@ function renderTaskComposerModal() {
   renderTaskComposerMeta(
     startDecisionStartAt,
     startDecisionStartAt?.querySelector("svg")?.outerHTML || "",
-    untouchedCreate ? "Inserir horÃ¡rio inicial" : `${String(state.wizard.startHour).padStart(2, "0")}:${String(state.wizard.startMinute).padStart(2, "0")}`,
+    untouchedCreate ? "Inserir horário inicial" : `${String(state.wizard.startHour).padStart(2, "0")}:${String(state.wizard.startMinute).padStart(2, "0")}`,
     untouchedCreate
   );
   renderTaskComposerMeta(
     startDecisionEndAt,
     startDecisionEndAt?.querySelector("svg")?.outerHTML || "",
-    untouchedCreate ? "Inserir horÃ¡rio final" : `${String(state.wizard.endHour).padStart(2, "0")}:${String(state.wizard.endMinute).padStart(2, "0")}`,
+    untouchedCreate ? "Inserir horário final" : `${String(state.wizard.endHour).padStart(2, "0")}:${String(state.wizard.endMinute).padStart(2, "0")}`,
     untouchedCreate
   );
   const repeatLabel = untouchedCreate ? "Inserir uma data" : formatTaskComposerDateLabel();
@@ -8275,7 +8319,7 @@ function renderTaskComposerModal() {
   renderTaskComposerMeta(
     startDecisionMusicLabel,
     startDecisionMusicLabel?.querySelector("svg")?.outerHTML || "",
-    formatActionMusicInlineLabel(findActionById(state.startDecisionContext.actionId)) || "Definir mÃºsica",
+    formatActionMusicInlineLabel(findActionById(state.startDecisionContext.actionId)) || "Definir música",
     false
   );
   const categoryThinking = Boolean(state.wizard.categoryThinking) && !state.startDecisionContext.categoryManuallySelected;
@@ -8295,7 +8339,7 @@ function renderTaskComposerModal() {
     const primary = document.createElement("button");
     primary.type = "button";
     primary.className = "decision-btn decision-btn-start";
-    primary.innerHTML = `<span>${mode === "create" ? "Criar tarefa" : "Salvar ediÃ§Ã£o"}</span>`;
+    primary.innerHTML = `<span>${mode === "create" ? "Criar tarefa" : "Salvar edição"}</span>`;
     primary.disabled = !titleValue || categoryThinking || !categoryResolved;
     primary.addEventListener("click", () => {
       void saveTaskComposer();
@@ -8511,13 +8555,13 @@ function openStartConflictModalForActions(currentAction, nextAction) {
   state.startConflict.nextActionId = String(nextAction?.id || "");
   const currentTitle = formatActionTitleForDisplay(currentAction?.title || "Tarefa");
   if (startConflictCurrentTitle) {
-    startConflictCurrentTitle.textContent = `${currentTitle} estÃ¡ em andamento`;
+    startConflictCurrentTitle.textContent = `${currentTitle} está em andamento`;
   }
   if (startConflictQuestion) {
-    startConflictQuestion.textContent = `VocÃª concluiu ${currentTitle}?`;
+    startConflictQuestion.textContent = `Você concluiu ${currentTitle}?`;
   }
   if (startConflictNextTitle) {
-    startConflictNextTitle.textContent = `PrÃ³xima: ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
+    startConflictNextTitle.textContent = `Próxima: ${formatActionTitleForDisplay(nextAction?.title || "tarefa")}`;
   }
   document.body.appendChild(startConflictModal);
   document.body.classList.add("start-conflict-open");
@@ -8759,16 +8803,16 @@ function updatePostponeFeedback() {
   postponeFeedback.classList.remove("is-error");
   if (!draft.fitFound) {
     postponeFeedback.classList.add("is-error");
-    postponeFeedback.textContent = "Sem horÃ¡rios livres";
+    postponeFeedback.textContent = "Sem horários livres";
     if (confirmPostponeTask) {
       confirmPostponeTask.disabled = true;
       confirmPostponeTask.classList.remove("is-replace");
-      confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg><span>Sem horÃ¡rios livres</span>';
+      confirmPostponeTask.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg><span>Sem horários livres</span>';
     }
     return;
   }
   if (!overlaps.length) {
-    postponeFeedback.textContent = `DisponÃ­vel: inicia ${formatHourChip(draft.startAt.toISOString())}`;
+    postponeFeedback.textContent = `Disponível: inicia ${formatHourChip(draft.startAt.toISOString())}`;
     if (confirmPostponeTask) {
       confirmPostponeTask.disabled = false;
       confirmPostponeTask.classList.remove("is-replace");
@@ -9123,7 +9167,7 @@ async function createProject200ProfileFromModal() {
   const name = String(project200CreateProfileNameInput?.value || "").trim();
   if (!name) {
     if (project200CreateProfileMessage) {
-      project200CreateProfileMessage.textContent = "Digite o nome do usuÃ¡rio.";
+      project200CreateProfileMessage.textContent = "Digite o nome do usuário.";
     }
     return;
   }
@@ -9426,7 +9470,7 @@ async function submitProfileSvgSuggestion() {
       renderProfileAvatarModal();
     }
     if (profileAvatarMessage) {
-      profileAvatarMessage.textContent = `SVG escolhido: ${String(payload?.asset?.label || "Ã­cone")}.`;
+      profileAvatarMessage.textContent = `SVG escolhido: ${String(payload?.asset?.label || "ícone")}.`;
     }
   } catch (error) {
     if (profileAvatarMessage) {
@@ -9538,7 +9582,7 @@ async function reassignManagedProfileTasks() {
   });
   if (profileManageMessage) {
     profileManageMessage.textContent = payload?.summary
-      ? `${payload.summary.movedTasks} tarefa(s) de ${payload.summary.sourceProfileName} agora estÃ£o com ${payload.summary.targetProfileName}.`
+      ? `${payload.summary.movedTasks} tarefa(s) de ${payload.summary.sourceProfileName} agora estão com ${payload.summary.targetProfileName}.`
       : "";
   }
   await loadActions();
@@ -9609,9 +9653,9 @@ function renderTimePickers() {
 
     container.innerHTML = `
       <div class="native-time-picker">
-        <button class="native-time-trigger" type="button" data-open-native-time="${type}" aria-label="Escolher horÃ¡rio ${type === "start" ? "inicial" : "final"}">
+        <button class="native-time-trigger" type="button" data-open-native-time="${type}" aria-label="Escolher horário ${type === "start" ? "inicial" : "final"}">
           <strong>${timeValue}</strong>
-          <span>Toque para abrir o relÃ³gio</span>
+          <span>Toque para abrir o relógio</span>
         </button>
         <input class="native-time-input" type="time" value="${timeValue}" step="60" data-native-time-input="${type}" aria-hidden="true" tabindex="-1" />
       </div>
@@ -9883,13 +9927,13 @@ function renderOverlapWizard() {
   } else {
     const item = state.overlapItems[state.overlapIndex % state.overlapItems.length];
     overlapTaskTitle.textContent = String(item.title || "Tarefa");
-    overlapTaskRange.textContent = `${formatHourChip(item.startAt)} Ã s ${formatHourChip(item.endAt)}`;
+    overlapTaskRange.textContent = `${formatHourChip(item.startAt)} às ${formatHourChip(item.endAt)}`;
   }
   if (state.overlapCandidateStarts.length) {
     const startIso = state.overlapCandidateStarts[state.overlapCandidateIndex % state.overlapCandidateStarts.length];
     overlapFreeStartLabel.textContent = formatHourChip(startIso);
   } else {
-    overlapFreeStartLabel.textContent = "Sem horÃ¡rio";
+    overlapFreeStartLabel.textContent = "Sem horário";
   }
 }
 
@@ -9995,7 +10039,7 @@ async function saveAction() {
       let replaceOverlaps = false;
       const decision = await openOverlapWizard(overlaps, occurrences);
       if (!decision || decision.type === "cancel") {
-        wizardMessage.textContent = "Ajuste o horÃ¡rio para continuar.";
+        wizardMessage.textContent = "Ajuste o horário para continuar.";
         return;
       }
       if (decision.type === "change_time") {
@@ -10086,7 +10130,7 @@ async function saveAction() {
         state.wizard.forceReplaceOverlaps = false;
         return saveAction();
       }
-      wizardMessage.textContent = "Ajuste o horÃ¡rio para continuar.";
+      wizardMessage.textContent = "Ajuste o horário para continuar.";
       return;
     }
     state.wizard.forceReplaceOverlaps = false;
@@ -10114,7 +10158,7 @@ async function openActionLongPressMenu(actionId) {
     return;
   }
 
-  const choice = window.prompt("OpÃ§Ãµes da tarefa:\n1 - Excluir\n2 - Editar", "2");
+  const choice = window.prompt("Opções da tarefa:\n1 - Excluir\n2 - Editar", "2");
   if (choice == null) {
     return;
   }
@@ -10292,11 +10336,11 @@ async function manualFinishAction(actionId) {
   const startedAt = parseTimeToIso(target.startAt, manualStartTimeInput.value);
   const completedAt = parseTimeToIso(target.startAt, manualEndTimeInput.value);
   if (!startedAt || !completedAt) {
-    actionStatusManualMessage.textContent = "Preencha inÃ­cio e fim.";
+    actionStatusManualMessage.textContent = "Preencha início e fim.";
     return;
   }
   if (new Date(completedAt).getTime() <= new Date(startedAt).getTime()) {
-    actionStatusManualMessage.textContent = "Fim precisa ser apÃ³s inÃ­cio.";
+    actionStatusManualMessage.textContent = "Fim precisa ser após início.";
     return;
   }
   const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
@@ -10353,7 +10397,7 @@ function renderPlatformDateHeader() {
 }
 
 function getPlatformKindLabel(kind) {
-  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "SaÃ­da";
+  return String(kind || "").toUpperCase() === "INCOME" ? "Entrada" : "Saída";
 }
 
 function getPlatformStatusClass(entry) {
@@ -10381,7 +10425,7 @@ function renderPlatformBalance() {
     : formatMoney(state.platformBalanceCents);
 
   if (togglePlatformBalanceButton) {
-    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "â€¢";
+    togglePlatformBalanceButton.textContent = state.platformBalanceHidden ? "*" : "•";
   }
 }
 
@@ -10417,12 +10461,12 @@ function renderPlatformEntries() {
   platformEntriesList.innerHTML = "";
 
   if (!getToken()) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanÃ§as.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Entre para ver as finanças.</div>';
     return;
   }
 
   if (!state.platformEntries.length) {
-    platformEntriesList.innerHTML = '<div class="empty-state">Sem lanÃ§amentos nessa data.</div>';
+    platformEntriesList.innerHTML = '<div class="empty-state">Sem lançamentos nessa data.</div>';
     return;
   }
 
@@ -10461,7 +10505,7 @@ function renderPlatformEntries() {
     row.dataset.entryName = String(entry.name || "");
     row.innerHTML = `
       <div class="task-title">
-        ${isDebit ? `<img class="platform-entry-icon" src="${categoryIcon}" alt="SaÃ­da" loading="lazy" />` : ""}
+        ${isDebit ? `<img class="platform-entry-icon" src="${categoryIcon}" alt="Saída" loading="lazy" />` : ""}
         <span>${escapeHtml(entry.name)}</span>
       </div>
       <div class="platform-entry-value">${escapeHtml(formatMoney(signed))}</div>
@@ -10545,7 +10589,7 @@ async function createPlatformEntryFromVoiceInterpret(text) {
     entry = inferFinanceEntryLocally(text);
   }
   if (!entry) {
-    throw new Error("Sem interpretaÃ§Ã£o.");
+    throw new Error("Sem interpretação.");
   }
   if (String(entry.recurrenceType || "").toUpperCase() !== "RECURRING" && /\bdia\s+\d{1,2}\b/i.test(text)) {
     entry.recurrenceType = "RECURRING";
@@ -10593,8 +10637,8 @@ function openFinanceEntryConfirm(entry, categoryLabel) {
     financeEntryConfirmName.innerHTML = `<img class="platform-entry-icon" src="${icon}" alt="" aria-hidden="true" /><span>${escapeHtml(entry.name || "Lan\u00e7amento")}</span>`;
     financeEntryConfirmValue.textContent = formatMoney(value);
     const recurrenceMeta = String(entry.recurrenceType || "").toUpperCase() === "RECURRING"
-      ? `Tag: ${categoryLabel} â€¢ Data: dia ${Math.max(1, Math.min(31, Number(entry.recurrenceDayOfMonth || 1)))}`
-      : `Tag: ${categoryLabel} â€¢ Data: ${formatDateLabel(dateFromOffset(state.platformOffset))}`;
+      ? `Tag: ${categoryLabel} • Data: dia ${Math.max(1, Math.min(31, Number(entry.recurrenceDayOfMonth || 1)))}`
+      : `Tag: ${categoryLabel} • Data: ${formatDateLabel(dateFromOffset(state.platformOffset))}`;
     financeEntryConfirmMeta.textContent = recurrenceMeta;
     financeEntryConfirmWizard.classList.add("active");
     financeEntryConfirmWizard.setAttribute("aria-hidden", "false");
@@ -10641,7 +10685,7 @@ function formatRepeatLabel(repeatRule, repeatDays) {
   if (repeatRule === "monthly_custom") {
     return `Toda ${monthlyOrdinalLabels[state.wizard.monthlyOrdinalIndex]} ${monthlyWeekdayLabels[state.wizard.monthlyWeekdayIndex]}`;
   }
-  return "Data Ãºnica";
+  return "Data única";
 }
 
 function formatActionMusicDecisionLabel(action) {
@@ -10651,12 +10695,12 @@ function formatActionMusicDecisionLabel(action) {
   const stationName = String(action?.musicStationName || preference?.stationName || "").trim();
   const trackName = String(action?.musicTrackName || preference?.trackName || "").trim();
   if (mode === "station" && stationName) {
-    return `MÃºsica padrÃ£o da atividade: ${stationName}`;
+    return `Música padrão da atividade: ${stationName}`;
   }
   if (trackName) {
-    return `MÃºsica padrÃ£o da atividade: ${trackName}`;
+    return `Música padrão da atividade: ${trackName}`;
   }
-  return "Definir mÃºsica";
+  return "Definir música";
 }
 
 function renderActionAiConfirmation(payload) {
@@ -10718,7 +10762,7 @@ function applyPendingInterpretedActionAndContinue() {
 
 async function startActionMic() {
   if (actionMediaRecorder && actionMediaRecorder.state !== "inactive") {
-    actionVoiceStatus.textContent = "Microfone jÃ¡ estÃ¡ ouvindo...";
+    actionVoiceStatus.textContent = "Microfone já está ouvindo...";
     return;
   }
 
@@ -10741,7 +10785,7 @@ async function startActionMic() {
     actionMediaRecorder.onstop = async () => {
       const blob = new Blob(chunks, { type: "audio/webm" });
       if (!blob.size) {
-        actionVoiceStatus.textContent = "Sem Ã¡udio captado.";
+        actionVoiceStatus.textContent = "Sem áudio captado.";
         return;
       }
       try {
@@ -10772,7 +10816,7 @@ async function startActionMic() {
           actionVoiceStatus.textContent = "Tarefa pronta. Confirme abaixo.";
         }
       } catch (error) {
-        actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretaÃ§Ã£o.";
+        actionVoiceStatus.textContent = error instanceof Error ? error.message : "Falha na interpretação.";
       }
     };
     actionMediaRecorder.start();
@@ -10978,7 +11022,7 @@ const DEFAULT_MISSION_DURATION_SECONDS = 30;
 const LIMIT_INTERVAL_OPTIONS = [
   { value: 1, unit: "day", label: "Dia" },
   { value: 1, unit: "week", label: "Semana" },
-  { value: 1, unit: "month", label: "MÃªs" },
+  { value: 1, unit: "month", label: "Mês" },
   { value: 1, unit: "year", label: "Ano" },
   ...Array.from({ length: 998 }, (_, index) => {
     const value = index + 2;
@@ -10996,7 +11040,7 @@ function formatLimitInterval(value, unit) {
   const labels = {
     day: amount === 1 ? "Dia" : "Dias",
     week: amount === 1 ? "Semana" : "Semanas",
-    month: amount === 1 ? "MÃªs" : "Meses",
+    month: amount === 1 ? "Mês" : "Meses",
     year: amount === 1 ? "Ano" : "Anos"
   };
   return amount === 1 ? labels[unit] || "Dia" : `${amount} ${labels[unit] || "Dias"}`;
@@ -11035,7 +11079,7 @@ function formatMissionUnitDurationLabel(seconds) {
 }
 
 function formatMissionTimePromptLabel(title) {
-  const safeTitle = String(title || "esta missÃ£o").trim() || "esta missÃ£o";
+  const safeTitle = String(title || "esta missão").trim() || "esta missão";
   return `Quanto tempo leva 1 ${safeTitle}?`;
 }
 
@@ -11079,7 +11123,7 @@ function buildStatsPointEntry(category, byCategory = {}, configOverride = null) 
     missionTargetMinutes,
     useManualTarget: config.useManualTarget,
     missionGoalIds: missionGoals.map((goal) => String(goal.id || "")),
-    missionTitles: missionGoals.map((goal) => String(goal.title || "MissÃ£o")).filter(Boolean)
+    missionTitles: missionGoals.map((goal) => String(goal.title || "Missão")).filter(Boolean)
   };
 }
 
@@ -11116,13 +11160,13 @@ function renderStatsAspectModalState() {
     statsAspectManualTargetToggle.hidden = isSleepCategory;
     statsAspectManualTargetToggle.classList.toggle("is-active", useManualTarget);
     statsAspectManualTargetToggle.setAttribute("aria-pressed", useManualTarget ? "true" : "false");
-    statsAspectManualTargetToggle.setAttribute("aria-label", useManualTarget ? "Usar soma de aÃ§Ãµes e missÃµes" : "Usar tempo definido como meta");
+    statsAspectManualTargetToggle.setAttribute("aria-label", useManualTarget ? "Usar soma de ações e missões" : "Usar tempo definido como meta");
   }
   if (statsAspectManualTargetCopy) {
     statsAspectManualTargetCopy.hidden = isSleepCategory;
     statsAspectManualTargetCopy.textContent = useManualTarget
-      ? "O tempo acima Ã© a meta esperada."
-      : "A meta esperada soma AÃ§Ãµes + MissÃµes.";
+      ? "O tempo acima é a meta esperada."
+      : "A meta esperada soma Ações + Missões.";
   }
   if (statsAspectTaskLabel) {
     statsAspectTaskLabel.textContent = isSleepCategory ? "Sono registrado:" : "Tarefas:";
@@ -11139,20 +11183,20 @@ function renderStatsAspectModalState() {
     statsAspectProgressSummary.textContent = linkedMissionLabel;
   }
   if (statsAspectLinkedGoalsLabel) {
-    statsAspectLinkedGoalsLabel.textContent = isSleepCategory ? "Controle:" : "MissÃµes vinculadas:";
+    statsAspectLinkedGoalsLabel.textContent = isSleepCategory ? "Controle:" : "Missões vinculadas:";
   }
   if (statsAspectLinkedGoalsValue) {
     const titles = Array.isArray(currentEntry.missionTitles) ? currentEntry.missionTitles.filter(Boolean) : [];
     statsAspectLinkedGoalsValue.textContent = isSleepCategory
-      ? "Independente de tarefas e missÃµes"
+      ? "Independente de tarefas e missões"
       : (titles.length ? titles.join(" + ") : "Nenhuma");
   }
   if (statsAspectMissionAssignLabel) {
-    statsAspectMissionAssignLabel.textContent = `Selecione uma ou mais missÃµes para controlar ${category.name}.`;
+    statsAspectMissionAssignLabel.textContent = `Selecione uma ou mais missões para controlar ${category.name}.`;
   }
   if (openStatsAspectMissionAssignButton) {
     openStatsAspectMissionAssignButton.classList.toggle("is-sleep", isSleepCategory);
-    openStatsAspectMissionAssignButton.setAttribute("aria-label", isSleepCategory ? "Abrir modal do sono" : "Atribuir missÃ£o");
+    openStatsAspectMissionAssignButton.setAttribute("aria-label", isSleepCategory ? "Abrir modal do sono" : "Atribuir missão");
     openStatsAspectMissionAssignButton.innerHTML = isSleepCategory
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 14.4A8.8 8.8 0 0 1 9.6 3.8a9.2 9.2 0 1 0 10.6 10.6z" fill="currentColor"/></svg>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>';
@@ -11186,10 +11230,10 @@ function renderStatsAspectMissionOptions() {
   const missions = (Array.isArray(state.missions) ? state.missions : []).filter((goal) => !isLimitGoal(goal));
   const selectedGoals = missions.filter((goal) => selectedIds.has(String(goal.id || "")));
   statsAspectMissionSelectedSummary.textContent = selectedGoals.length
-    ? `Vinculadas: ${selectedGoals.map((goal) => String(goal.title || "MissÃ£o")).join(" + ")}`
-    : "Nenhuma missÃ£o vinculada.";
+    ? `Vinculadas: ${selectedGoals.map((goal) => String(goal.title || "Missão")).join(" + ")}`
+    : "Nenhuma missão vinculada.";
   if (!missions.length) {
-    statsAspectMissionOptions.innerHTML = '<div class="empty-state">Sem missÃµes cadastradas.</div>';
+    statsAspectMissionOptions.innerHTML = '<div class="empty-state">Sem missões cadastradas.</div>';
     return;
   }
   const items = missions.map((goal) => {
@@ -11201,7 +11245,7 @@ function renderStatsAspectMissionOptions() {
     return `
       <button class="stats-aspect-mission-option${isActive ? " is-active" : ""}" type="button" data-stats-mission-option="${escapeHtml(goalId)}">
         <div class="stats-aspect-mission-option-head">
-          <strong>${escapeHtml(String(goal.title || "MissÃ£o"))}</strong>
+          <strong>${escapeHtml(String(goal.title || "Missão"))}</strong>
           <span>${escapeHtml(`${progress}/${target}`)}</span>
         </div>
         <div class="stats-aspect-mission-option-progress" aria-hidden="true">
@@ -11289,16 +11333,16 @@ function renderStatsAspectLinksModal() {
   const category = statsPointCategories.find((item) => item.id === categoryId) || null;
   const actions = Array.isArray(state.statsAspectLinks?.actions) ? state.statsAspectLinks.actions : [];
   const missions = Array.isArray(state.statsAspectLinks?.missions) ? state.statsAspectLinks.missions : [];
-  if (statsAspectLinksTitle) statsAspectLinksTitle.textContent = allMissionsMode ? "Todas as missÃµes" : (category?.name || "Aspecto");
+  if (statsAspectLinksTitle) statsAspectLinksTitle.textContent = allMissionsMode ? "Todas as missões" : (category?.name || "Aspecto");
   if (statsAspectLinksPeriod) {
     const scopeLabel = getActiveStatsScope()?.label || "Hoje";
     statsAspectLinksPeriod.textContent = allMissionsMode
-      ? `Hoje &middot; ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`
-      : `${scopeLabel} &middot; ${actions.length} ${actions.length === 1 ? "aÃ§Ã£o" : "aÃ§Ãµes"} &middot; ${missions.length} ${missions.length === 1 ? "missÃ£o" : "missÃµes"}`;
+      ? `Hoje &middot; ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`
+      : `${scopeLabel} &middot; ${actions.length} ${actions.length === 1 ? "ação" : "ações"} &middot; ${missions.length} ${missions.length === 1 ? "missão" : "missões"}`;
   }
   if (!statsAspectLinksList) return;
   if (state.statsAspectLinks?.loading) {
-    statsAspectLinksList.innerHTML = '<div class="empty-state">Carregando vÃ­nculos...</div>';
+    statsAspectLinksList.innerHTML = '<div class="empty-state">Carregando vínculos...</div>';
     return;
   }
   const actionRows = actions.map((action) => {
@@ -11306,7 +11350,7 @@ function renderStatsAspectLinksModal() {
     const delta = getStatsAspectLinkDraftDelta("action", action?.id);
     return `<article class="stats-aspect-link-card${delta ? " has-change" : ""}">
       <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
-      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(action?.title || "AÃ§Ã£o"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getActionDurationMinutes(action) * 60))}</small></div>
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(action?.title || "Ação"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getActionDurationMinutes(action) * 60))}</small></div>
       ${buildStatsAspectLinkAdjuster("action", action)}
     </article>`;
   });
@@ -11315,14 +11359,14 @@ function renderStatsAspectLinksModal() {
     const delta = getStatsAspectLinkDraftDelta("mission", goal?.id);
     return `<article class="stats-aspect-link-card is-mission${delta ? " has-change" : ""}">
       <img class="stats-aspect-link-icon" src="${escapeHtml(icon.src)}" alt="" aria-hidden="true" />
-      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(goal?.title || "MissÃ£o"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getMissionUnitDurationSeconds(goal)))}</small></div>
+      <div class="stats-aspect-link-copy"><strong>${escapeHtml(String(goal?.title || "Missão"))}</strong><small>${escapeHtml(formatStatsLinkDuration(getMissionUnitDurationSeconds(goal)))}</small></div>
       ${buildStatsAspectLinkAdjuster("mission", goal)}
     </article>`;
   });
   const rows = [...actionRows, ...missionRows];
   statsAspectLinksList.innerHTML = rows.length
     ? rows.join("")
-    : `<div class="empty-state">${allMissionsMode ? "Nenhuma missÃ£o vinculada aos aspectos." : "Nenhuma aÃ§Ã£o ou missÃ£o vinculada neste perÃ­odo."}</div>`;
+    : `<div class="empty-state">${allMissionsMode ? "Nenhuma missão vinculada aos aspectos." : "Nenhuma ação ou missão vinculada neste período."}</div>`;
 }
 
 async function openStatsAspectLinksModal(categoryId) {
@@ -11587,13 +11631,13 @@ function createStatsMissionRow(entry) {
   row.innerHTML = `
     <div class="task-main">
       <div class="task-title">${escapeHtml(String(entry.title || "Missao"))}</div>
-      <div class="task-assignee">${escapeHtml(`${Number(entry.progressCount || 0)} de ${Number(entry.targetCount || 0)} â€¢ ${progressPercent}%`)}</div>
+      <div class="task-assignee">${escapeHtml(`${Number(entry.progressCount || 0)} de ${Number(entry.targetCount || 0)} • ${progressPercent}%`)}</div>
       <div class="stats-mission-progress" aria-hidden="true">
         <div class="stats-mission-progress-fill" style="width:${progressPercent}%;"></div>
       </div>
     </div>
     <div class="stats-mission-actions">
-      <button class="stats-mission-btn stats-mission-btn-delete" type="button" data-mission-delete="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(entry.title || "missao")}`)}">Ã—</button>
+      <button class="stats-mission-btn stats-mission-btn-delete" type="button" data-mission-delete="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Excluir ${String(entry.title || "missao")}`)}">×</button>
       <button class="stats-mission-btn stats-mission-btn-plus" type="button" data-mission-plus="${escapeHtml(String(entry.id || ""))}" aria-label="${escapeHtml(`Adicionar progresso em ${String(entry.title || "missao")}`)}">+</button>
     </div>
   `;
@@ -11635,11 +11679,11 @@ function renderStatsRanking() {
     row.innerHTML = `
       <div class="stats-avatar-wrap">
         <img class="task-avatar" src="${getStatsAvatarPath(entry.name)}" alt="${escapeHtml(`Avatar de ${entry.name}`)}" loading="lazy" />
-        <span class="stats-rank-badge">${index + 1}Âº</span>
+        <span class="stats-rank-badge">${index + 1}º</span>
       </div>
       <div class="task-main">
         <div class="task-title">${escapeHtml(entry.name)}</div>
-        <div class="task-assignee">${entry.lateStartMinutes > 0 ? `${entry.completed} pontos â€¢ atraso ${entry.lateStartMinutes}m` : `${entry.completed} pontos`}</div>
+        <div class="task-assignee">${entry.lateStartMinutes > 0 ? `${entry.completed} pontos • atraso ${entry.lateStartMinutes}m` : `${entry.completed} pontos`}</div>
       </div>
     `;
     statsRankingList.appendChild(row);
@@ -11760,7 +11804,7 @@ async function savePlatformEntry() {
       throw new Error("Informe o nome.");
     }
     if (!Number.isFinite(value) || value <= 0) {
-      throw new Error("Informe um valor vÃ¡lido.");
+      throw new Error("Informe um valor válido.");
     }
 
     await apiRequest("/api/platform/entries", {
@@ -11780,7 +11824,7 @@ async function savePlatformEntry() {
     closePlatformWizard();
     await loadPlatformFinance();
   } catch (error) {
-    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lanÃ§amento.";
+    platformWizardMessage.textContent = error instanceof Error ? error.message : "Erro ao salvar lançamento.";
   }
 }
 
@@ -11842,7 +11886,7 @@ function formatSleepHistoryDate(dateKey) {
 function renderSleepHistoryEntries(entries = []) {
   if (!sleepHistoryList) return;
   if (!entries.length) {
-    sleepHistoryList.innerHTML = '<div class="empty-state">Ainda nÃ£o hÃ¡ registros de sono.</div>';
+    sleepHistoryList.innerHTML = '<div class="empty-state">Ainda não há registros de sono.</div>';
     return;
   }
   sleepHistoryList.innerHTML = entries.map((entry) => {
@@ -11897,7 +11941,7 @@ async function loadMissions() {
       missionStatus.textContent = "";
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao carregar missÃµes.";
+    const message = error instanceof Error ? error.message : "Falha ao carregar missões.";
     if (/usuario invalido/i.test(message)) {
       await loadProject200Profiles().catch(() => null);
       applySelectedProfile(getDefaultProfileName());
@@ -11913,7 +11957,7 @@ async function loadMissions() {
       } catch (retryError) {
         state.missions = [];
         if (missionStatus) {
-          missionStatus.textContent = retryError instanceof Error ? retryError.message : "Falha ao carregar missÃµes.";
+          missionStatus.textContent = retryError instanceof Error ? retryError.message : "Falha ao carregar missões.";
         }
         return;
       }
@@ -12084,7 +12128,7 @@ async function hydrateStatsAspectConfig(profileName = state.selectedProfile || g
 async function persistStatsAspectConfig(categoryId, profileName = state.selectedProfile || getDefaultProfileName()) {
   const normalizedCategoryId = String(categoryId || "").trim().toLowerCase();
   if (!normalizedCategoryId) {
-    throw new Error("Categoria invÃ¡lida.");
+    throw new Error("Categoria inválida.");
   }
   const normalizedProfile = normalizeAssigneeName(profileName || getDefaultProfileName()) || defaultProjectProfileName;
   const payload = buildStatsAspectConfigPayload(normalizedCategoryId);
@@ -12164,7 +12208,7 @@ function renderSleepModalState() {
       sleepDelayLabel.textContent = formatSleepDelayLabel(getCurrentSleepDelayMinutes());
     }
     if (sleepModalSetupSubtitle) {
-      sleepModalSetupSubtitle.textContent = "Escolha em quanto tempo quer comeÃ§ar a dormir";
+      sleepModalSetupSubtitle.textContent = "Escolha em quanto tempo quer começar a dormir";
     }
     return;
   }
@@ -12179,7 +12223,7 @@ function renderSleepModalState() {
   }
   if (sleepSessionSubtitle) {
     if (session.phase === "countdown") {
-      sleepSessionSubtitle.textContent = "Contagem regressiva atÃ© o inÃ­cio do sono.";
+      sleepSessionSubtitle.textContent = "Contagem regressiva até o início do sono.";
     } else if (session.trackedMinutes >= 480) {
       sleepSessionSubtitle.textContent = "Toque na tela para continuar, encerrar ou abortar o sono.";
     } else {
@@ -12188,8 +12232,8 @@ function renderSleepModalState() {
   }
   if (sleepSessionCap) {
     sleepSessionCap.textContent = session.trackedMinutes > 720
-      ? `MÃ¡ximo contabilizado: 12h â€¢ exibindo ${formatMinutesHuman(session.trackedMinutes)}`
-      : "MÃ¡ximo contabilizado: 12h";
+      ? `Máximo contabilizado: 12h • exibindo ${formatMinutesHuman(session.trackedMinutes)}`
+      : "Máximo contabilizado: 12h";
   }
   if (sleepFinishButton) {
     sleepFinishButton.hidden = session.phase !== "sleeping";
@@ -13019,7 +13063,7 @@ function showRunningMissionQuickFocus(goal, key) {
     runningMissionQuickFocusIcon.src = String(goal.svgIconUrl || "").trim() || `/200/icons/mission-${key === "store" ? "store" : key === "read" ? "book" : key === "brush" ? "brush" : "water"}.svg`;
   }
   if (runningMissionQuickFocusTitle) {
-    runningMissionQuickFocusTitle.textContent = String(goal.title || "MissÃ£o");
+    runningMissionQuickFocusTitle.textContent = String(goal.title || "Missão");
   }
   if (runningMissionQuickFocusProgressFill) {
     runningMissionQuickFocusProgressFill.style.background = color;
@@ -13083,7 +13127,7 @@ function renderRunningMissionQuickButtons() {
     .slice()
     .sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "pt-BR"));
   if (!goals.length) {
-    runningMissionQuickGrid.innerHTML = '<div class="running-mission-quick-empty">Nenhuma missÃ£o rÃ¡pida disponÃ­vel.</div>';
+    runningMissionQuickGrid.innerHTML = '<div class="running-mission-quick-empty">Nenhuma missão rápida disponível.</div>';
     return;
   }
   runningMissionQuickGrid.innerHTML = goals.map((goal, index) => {
@@ -13100,8 +13144,8 @@ function renderRunningMissionQuickButtons() {
         type="button"
         data-mission-quick-goal-id="${escapeHtml(String(goal.id || ""))}"
         data-mission-quick-tone="${escapeHtml(visualKey)}"
-        aria-label="${escapeHtml(String(goal.title || "MissÃ£o"))}"
-        title="${escapeHtml(`${String(goal.title || "MissÃ£o")}: ${progress} de ${target}`)}"
+        aria-label="${escapeHtml(String(goal.title || "Missão"))}"
+        title="${escapeHtml(`${String(goal.title || "Missão")}: ${progress} de ${target}`)}"
         style="--mission-quick-color:${escapeHtml(getMissionQuickThemeColor(visualKey))};"
       >
         <span class="running-mission-quick-card-badge">${escapeHtml(String(progress))}</span>
@@ -13120,7 +13164,7 @@ function renderRunningMissionQuickButtons() {
             <img class="running-mission-quick-card-icon" src="${escapeHtml(iconPath)}" alt="" aria-hidden="true" />
           </span>
         </span>
-        <span class="running-mission-quick-card-title">${escapeHtml(String(goal.title || "MissÃ£o"))}</span>
+        <span class="running-mission-quick-card-title">${escapeHtml(String(goal.title || "Missão"))}</span>
       </button>
     `;
   }).join("");
@@ -13238,7 +13282,7 @@ function queueRunningMissionQuickIncrement(goal) {
         renderMissions();
         renderRunningMissionQuickButtons();
         if (runningMissionQuickFeedback) {
-          runningMissionQuickFeedback.textContent = error instanceof Error ? error.message : "Falha ao atualizar missÃ£o.";
+          runningMissionQuickFeedback.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
         }
       }
     });
@@ -13280,7 +13324,7 @@ function handleRunningMissionQuickTap(key) {
   const goal = getMissionQuickGoalById(key);
   if (!goal) {
     if (runningMissionQuickFeedback) {
-      runningMissionQuickFeedback.textContent = "MissÃ£o nÃ£o encontrada.";
+      runningMissionQuickFeedback.textContent = "Missão não encontrada.";
     }
     return;
   }
@@ -13314,10 +13358,10 @@ function assignMissionQuickSlot(slotKey) {
   persistMissionQuickSlots();
   renderRunningMissionQuickButtons();
   if (missionAdjustStatus) {
-    missionAdjustStatus.textContent = `${goal.title} agora estÃ¡ no acesso rÃ¡pido ${definition.label}.`;
+    missionAdjustStatus.textContent = `${goal.title} agora está no acesso rápido ${definition.label}.`;
   }
   if (missionQuickAssignStatus) {
-    missionQuickAssignStatus.textContent = `${goal.title} agora estÃ¡ no acesso rÃ¡pido ${definition.label}.`;
+    missionQuickAssignStatus.textContent = `${goal.title} agora está no acesso rápido ${definition.label}.`;
   }
 }
 
@@ -13362,13 +13406,13 @@ async function saveTaskComposer() {
       const decision = await openOverlapWizard(overlaps, occurrences);
       if (!decision || decision.type === "cancel") {
         if (startDecisionMessage) {
-          startDecisionMessage.textContent = "Ajuste o horÃ¡rio para continuar.";
+          startDecisionMessage.textContent = "Ajuste o horário para continuar.";
         }
         return;
       }
       if (decision.type === "change_time") {
         if (startDecisionMessage) {
-          startDecisionMessage.textContent = "Escolha outro horÃ¡rio.";
+          startDecisionMessage.textContent = "Escolha outro horário.";
         }
         return;
       }
@@ -13438,7 +13482,7 @@ async function saveTaskComposer() {
         state.wizard.forceReplaceOverlaps = false;
         return saveTaskComposer();
       }
-      if (startDecisionMessage) startDecisionMessage.textContent = decision?.type === "change_time" ? "Escolha outro horÃ¡rio." : "Ajuste o horÃ¡rio para continuar.";
+      if (startDecisionMessage) startDecisionMessage.textContent = decision?.type === "change_time" ? "Escolha outro horário." : "Ajuste o horário para continuar.";
       return;
     }
     state.wizard.forceReplaceOverlaps = false;
@@ -13473,7 +13517,7 @@ async function submitQuickTaskStart(conflictMode = "") {
     return;
   }
   if (quickTaskStatus) {
-    quickTaskStatus.textContent = "Iniciando tarefa rÃ¡pida...";
+    quickTaskStatus.textContent = "Iniciando tarefa rápida...";
   }
   if (quickTaskStartButton) {
     quickTaskStartButton.disabled = true;
@@ -13496,7 +13540,7 @@ async function submitQuickTaskStart(conflictMode = "") {
     }
   } catch (error) {
     if (quickTaskStatus) {
-      quickTaskStatus.textContent = error instanceof Error ? error.message : "Falha ao iniciar a tarefa rÃ¡pida.";
+      quickTaskStatus.textContent = error instanceof Error ? error.message : "Falha ao iniciar a tarefa rápida.";
     }
   } finally {
     if (quickTaskStartButton) {
@@ -13553,9 +13597,9 @@ function buildSystemMessage(entry) {
   const task = `<strong>${escapeHtml(entry.taskTitle || "Tarefa")}</strong>`;
   if (entry.type === "start") {
     if (Number(entry.lateStartMinutes || 0) > 0) {
-      return `${person} comeÃ§ou ${task} com ${Number(entry.lateStartMinutes)} minutos de atraso`;
+      return `${person} começou ${task} com ${Number(entry.lateStartMinutes)} minutos de atraso`;
     }
-    return `${person} comeÃ§ou ${task}`;
+    return `${person} começou ${task}`;
   }
   if (entry.type === "pause") {
     return `${person} pausou ${task}`;
@@ -13567,10 +13611,10 @@ function buildSystemMessage(entry) {
     return `${person} finalizou ${task}`;
   }
   if (entry.type === "star") {
-    return `${person} completou a missÃ£o diÃ¡ria`;
+    return `${person} completou a missão diária`;
   }
   if (entry.type === "day_close") {
-    return `${person} nÃ£o concluiu <strong>${entry.pendingCount}</strong> tarefas, encerrou com <strong>${entry.percent}%</strong>`;
+    return `${person} não concluiu <strong>${entry.pendingCount}</strong> tarefas, encerrou com <strong>${entry.percent}%</strong>`;
   }
   return `${person} atualizou ${task}`;
 }
@@ -13603,7 +13647,7 @@ function renderHistoryTimeline() {
     .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
 
   if (!merged.length) {
-    historyTimelineList.innerHTML = '<div class="empty-state">Sem histÃ³rico nesse dia.</div>';
+    historyTimelineList.innerHTML = '<div class="empty-state">Sem histórico nesse dia.</div>';
     return;
   }
 
@@ -13679,16 +13723,16 @@ function renderMissionCreateStep(direction = 0) {
   modal?.classList.toggle("is-limit-creation", kind === "limit");
   modal?.classList.toggle("is-compact-stage", step > 0);
   const nameStepTitle = document.getElementById("missionCreateNameStep");
-  if (nameStepTitle) nameStepTitle.textContent = kind === "limit" ? "Nome do limite" : "Nome da missÃ£o";
+  if (nameStepTitle) nameStepTitle.textContent = kind === "limit" ? "Nome do limite" : "Nome da missão";
   if (missionCreateTargetStep) missionCreateTargetStep.textContent = kind === "limit" ? "Quantas vezes?" : "Quantas vezes por dia?";
-  if (missionTargetInput) missionTargetInput.placeholder = "Digite um nÃºmero";
+  if (missionTargetInput) missionTargetInput.placeholder = "Digite um número";
   const limitCreation = kind === "limit";
-  if (missionCreateFinalStepTitle) missionCreateFinalStepTitle.textContent = limitCreation ? "Qual Ã© o intervalo?" : "Quanto tempo leva?";
+  if (missionCreateFinalStepTitle) missionCreateFinalStepTitle.textContent = limitCreation ? "Qual é o intervalo?" : "Quanto tempo leva?";
   if (missionCreateLimitIntervalPanel) missionCreateLimitIntervalPanel.hidden = !limitCreation;
   if (missionCreateTimePanel) missionCreateTimePanel.hidden = limitCreation;
   if (openMissionCreateTimeButton) openMissionCreateTimeButton.hidden = limitCreation;
   renderMissionCreateCategoryPicker();
-  if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = "Defina quanto tempo leva cada execuÃ§Ã£o desta missÃ£o.";
+  if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = "Defina quanto tempo leva cada execução desta missão.";
   if (missionCreateTimeSummary) missionCreateTimeSummary.textContent = formatMissionDurationValue(normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds));
   const interval = getSelectedLimitInterval();
   if (missionLimitIntervalLabel) missionLimitIntervalLabel.textContent = interval.label;
@@ -13729,8 +13773,8 @@ function renderMissionCreateStep(direction = 0) {
 function validateMissionCreateStep(step = state.missionCreate?.step) {
   if (step === 0 && !state.missionCreate?.goalKind) return "Escolha Meta ou Limite.";
   if (step === 1 && !String(missionTitleInput?.value || "").trim()) return "Digite o nome.";
-  if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diÃ¡ria.";
-  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && state.missionCreate?.categoryThinking) return "Aguarde a definiÃ§Ã£o do aspecto.";
+  if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diária.";
+  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && state.missionCreate?.categoryThinking) return "Aguarde a definição do aspecto.";
   if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && !state.missionCreate?.categoryResolved) return "Escolha um aspecto.";
   return "";
 }
@@ -13761,12 +13805,12 @@ function renderMissionAdjustState() {
   const limit = normalizeMissionKind(state.missionAdjust?.goalKind) === "limit";
   if (missionAdjustHint) missionAdjustHint.textContent = limit
     ? `Limite ${targetValue}x a cada ${formatLimitInterval(state.missionAdjust?.limitIntervalValue, state.missionAdjust?.limitIntervalUnit).toLocaleLowerCase("pt-BR")}`
-    : `Meta diÃ¡ria ${targetValue}x`;
+    : `Meta diária ${targetValue}x`;
   const adjustModal = document.getElementById("missionAdjustModal");
   const adjustEyebrow = adjustModal?.querySelector(".mission-modal-eyebrow");
   const adjustQuestion = adjustModal?.querySelector(".mission-modal-explainer h2");
   if (adjustEyebrow) adjustEyebrow.textContent = limit ? "Editar limite" : "Editar meta";
-  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual serÃ¡ o limite?" : "Qual serÃ¡ a meta diÃ¡ria?";
+  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite?" : "Qual será a meta diária?";
   if (missionLimitSleepOption) missionLimitSleepOption.hidden = !limit;
   if (missionLimitCountSleepTime) missionLimitCountSleepTime.checked = state.missionAdjust?.countSleepTime !== false;
 
@@ -13790,7 +13834,7 @@ function openMissionCreateModal() {
     timeConfigured: true,
     limitIntervalIndex: 0,
     categoryId: "planejamento",
-    categoryName: "PropÃ³sito",
+    categoryName: "Propósito",
     categoryResolved: false,
     categoryThinking: false,
     categoryManuallySelected: false
@@ -13816,7 +13860,7 @@ function openMissionAdjustModal(goalId) {
     limitIntervalUnit: String(goal.limitIntervalUnit || "day")
   };
   if (missionAdjustTitle) {
-    missionAdjustTitle.textContent = String(goal.title || "MissÃ£o");
+    missionAdjustTitle.textContent = String(goal.title || "Missão");
   }
   if (missionAdjustStatus) {
     missionAdjustStatus.textContent = "";
@@ -13842,7 +13886,7 @@ function renderMissionProgressState() {
     const showAdd = limit || hasUpdate;
     missionProgressConfirmButton.disabled = false;
     missionProgressConfirmButton.classList.toggle("is-update", showAdd);
-    missionProgressConfirmButton.setAttribute("aria-label", showAdd ? "Atualizar progresso" : "Iniciar missÃ£o");
+    missionProgressConfirmButton.setAttribute("aria-label", showAdd ? "Atualizar progresso" : "Iniciar missão");
     missionProgressConfirmButton.innerHTML = showAdd
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">ADICIONAR</span>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 10.6V7h-2v6.4l4.9 2.8 1-1.7Z" fill="currentColor"/></svg><span id="missionProgressConfirmLabel">INICIAR</span>';
@@ -13872,14 +13916,14 @@ function openMissionTimeModal(mode) {
   if (safeMode === "create") {
     state.missionTime = {
       mode: "create",
-      title: String(missionTitleInput?.value || "").trim() || "esta missÃ£o",
+      title: String(missionTitleInput?.value || "").trim() || "esta missão",
       value: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds)
     };
   } else {
     const goal = getAvailableMissionById(state.missionAdjust?.goalId);
     state.missionTime = {
       mode: "adjust",
-      title: String(goal?.title || missionAdjustTitle?.textContent || "esta missÃ£o").trim(),
+      title: String(goal?.title || missionAdjustTitle?.textContent || "esta missão").trim(),
       value: normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds)
     };
   }
@@ -14297,7 +14341,7 @@ function restartMissionRunLocally() {
   void resumeRunningMusicAfterMissionExtension();
   const completed = Math.max(1, Math.trunc(Number(state.missionRun.completedCycles || state.missionRun.cycleIndex || 1) || 1));
   if (completed >= MISSION_RUN_MAX_CYCLES) {
-    if (missionRunStatus) missionRunStatus.textContent = `O mÃ¡ximo Ã© de ${MISSION_RUN_MAX_CYCLES} ciclos. Toque em Finalizar para receber os pontos.`;
+    if (missionRunStatus) missionRunStatus.textContent = `O máximo é de ${MISSION_RUN_MAX_CYCLES} ciclos. Toque em Finalizar para receber os pontos.`;
     return;
   }
   state.missionRun.completedCycles = completed;
@@ -14345,7 +14389,7 @@ function renderMissionRunState() {
   const percent = Math.round(percentPrecise);
   const circumference = 301.59;
   if (missionRunTitle) {
-    missionRunTitle.textContent = String(goal.title || "MissÃ£o");
+    missionRunTitle.textContent = String(goal.title || "Missão");
   }
   if (missionRunTitleIcon) {
     const icon = getMissionDisplayIcon(goal);
@@ -14362,11 +14406,11 @@ function renderMissionRunState() {
     missionRunClock.innerHTML = formatRunningCenter(percent, percentPrecise, remainingSeconds / 60, remainingSeconds, centerMode === "percent");
   }
   if (missionRunStatus) {
-    missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missÃ£o nÃ£o tem tempo definido.";
+    missionRunStatus.textContent = durationMs > 0 ? "" : "Esta missão não tem tempo definido.";
   }
   syncRunningMinuteCueSchedule(
     `mission:${goalId}:cycle:${normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex)}`,
-    String(goal.title || "MissÃ£o"),
+    String(goal.title || "Missão"),
     remainingSeconds
   );
   renderMissionRunCycleCount();
@@ -14516,12 +14560,12 @@ function renderMissionVariants() {
   const cycleChooseMode = state.missionVariants.mode === "cycle-choose";
   const cycleSelectionTarget = normalizeMissionRunCycleTarget(state.missionVariants.cycleSelectionTarget);
   const cycleSelections = Array.isArray(state.missionVariants.cycleSelections) ? state.missionVariants.cycleSelections : [];
-  if (missionVariantsKicker) missionVariantsKicker.textContent = chooseMode ? "Antes de iniciar" : "Micro-tarefas da missÃ£o";
+  if (missionVariantsKicker) missionVariantsKicker.textContent = chooseMode ? "Antes de iniciar" : "Micro-tarefas da missão";
   if (missionVariantsTitle) {
     missionVariantsTitle.textContent = cycleChooseMode
       ? `Escolha a micro-tarefa do ciclo ${Math.min(cycleSelections.length + 1, cycleSelectionTarget)}`
       : chooseMode
-        ? "Qual micro-tarefa vocÃª vai fazer?"
+        ? "Qual micro-tarefa você vai fazer?"
         : (getMissionRunGoalById(state.missionVariants.goalId)?.title || "Lista de micro-tarefas");
   }
   if (missionVariantCycleSelection) {
@@ -14533,7 +14577,7 @@ function renderMissionVariants() {
   if (missionVariantAddButton) missionVariantAddButton.hidden = chooseMode || editorOpen;
   if (missionVariantEditor) missionVariantEditor.hidden = !editorOpen;
   if (missionVariantSortButton) {
-    const sortModeLabel = state.missionVariants.sortMode === "priority" ? "Prioridade" : "UsuÃ¡rio";
+    const sortModeLabel = state.missionVariants.sortMode === "priority" ? "Prioridade" : "Usuário";
     missionVariantSortButton.hidden = editorOpen;
     missionVariantSortButton.setAttribute("aria-expanded", state.missionVariants.sortMenuOpen ? "true" : "false");
     missionVariantSortButton.setAttribute("aria-label", `Ordenar por: ${sortModeLabel}`);
@@ -14562,7 +14606,7 @@ function renderMissionVariants() {
     const unitLabel = variant.intervalUnit === "hours" ? `${variant.intervalValue}h` : `${variant.intervalValue} ${variant.intervalValue === 1 ? "dia" : "dias"}`;
     return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
       <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
-      ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">Ã—</button>`}
+      ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
   }).join("") : '<div class="empty-state">Adicione micro-tarefas diferentes para controlar seus prazos.</div>';
@@ -14634,7 +14678,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   state.missionRun.musicStoppedOnFinish = false;
   state.missionRun.musicWasPlayingAtFinish = false;
   state.missionRun.previousTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
-  state.runningPlayer.currentTaskTitle = String(goal.title || "MissÃ£o").trim();
+  state.runningPlayer.currentTaskTitle = String(goal.title || "Missão").trim();
   if (missionRunConfirm) {
     missionRunConfirm.hidden = true;
   }
@@ -14650,7 +14694,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   const missionGoalId = String(goal.id || "");
   void loadRunningMusicStations().then(() => {
     if (!isMissionRunModalOpen() || String(state.missionRun.goalId || "") !== missionGoalId) return;
-    return autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "MissÃ£o") });
+    return autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "Missão") });
   });
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
@@ -14752,9 +14796,9 @@ async function finalizeMissionRun(triggerButton = null) {
     renderActionsMissionsPanel();
     renderRunningMissionQuickButtons();
     state.missionRun.finalizing = false;
-    showFloatingNotice(error instanceof Error ? error.message : "Falha ao concluir missÃ£o.");
+    showFloatingNotice(error instanceof Error ? error.message : "Falha ao concluir missão.");
     if (missionRunStatus) {
-      missionRunStatus.textContent = error instanceof Error ? error.message : "Falha ao concluir missÃ£o.";
+      missionRunStatus.textContent = error instanceof Error ? error.message : "Falha ao concluir missão.";
     }
   } finally {
     finishLoading?.();
@@ -14777,7 +14821,7 @@ function openMissionProgressModal(goalId) {
     baseValue: Math.max(0, Math.trunc(Number(goal.progressValue || 0) || 0))
   };
   if (missionProgressTitle) {
-    missionProgressTitle.textContent = String(goal.title || "MissÃ£o");
+    missionProgressTitle.textContent = String(goal.title || "Missão");
   }
   if (missionProgressIcon) {
     missionProgressIcon.src = goalIcon.src;
@@ -14862,7 +14906,7 @@ function formatLimitElapsedDuration(totalSeconds) {
 
   const durationUnits = [
     { minutes: 365 * 24 * 60, singular: "ano", plural: "anos" },
-    { minutes: 30 * 24 * 60, singular: "mÃªs", plural: "meses" },
+    { minutes: 30 * 24 * 60, singular: "mês", plural: "meses" },
     { minutes: 24 * 60, singular: "dia", plural: "dias" },
     { minutes: 60, singular: "hora", plural: "horas" },
     { minutes: 1, singular: "minuto", plural: "minutos" }
@@ -14880,18 +14924,18 @@ function formatLimitElapsedDuration(totalSeconds) {
 
 function formatLimitLastProgress(goal) {
   const lastProgressMs = new Date(goal?.lastProgressAt || "").getTime();
-  if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcaÃ§Ã£o ainda";
+  if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcação ainda";
   const excludedSleepSeconds = goal?.countSleepTime === false
     ? Math.max(0, Math.floor(Number(goal?.sleepExcludedSeconds || 0)))
     : 0;
   const elapsedSeconds = Math.max(0, Math.floor((getServerNowMs() - lastProgressMs) / 1000) - excludedSleepSeconds);
-  if (elapsedSeconds < 60) return "Ãšltima vez agora";
-  return `Ãšltima vez em ${formatLimitElapsedDuration(elapsedSeconds)}`;
+  if (elapsedSeconds < 60) return "Última vez agora";
+  return `Última vez em ${formatLimitElapsedDuration(elapsedSeconds)}`;
 }
 function getLimitHistoryDateParts(value) {
   const date = new Date(value || "");
   if (Number.isNaN(date.getTime())) {
-    return { dateInput: "", timeInput: "", dateLabel: "Data indisponÃ­vel", timeLabel: "--h--" };
+    return { dateInput: "", timeInput: "", dateLabel: "Data indisponível", timeLabel: "--h--" };
   }
   const parts = getProjectDateTimeParts(date);
   const dateInput = `${parts.year}-${parts.month}-${parts.day}`;
@@ -14946,7 +14990,7 @@ function renderLimitHistoryModal() {
   limitHistoryModeToggle.setAttribute("aria-pressed", recordsMode ? "true" : "false");
   if (limitHistoryTitle) limitHistoryTitle.textContent = state.limitHistory?.title || "Limite";
   if (state.limitHistory?.loading) {
-    limitHistoryList.innerHTML = '<div class="limit-history-empty">Carregando histÃ³rico...</div>';
+    limitHistoryList.innerHTML = '<div class="limit-history-empty">Carregando histórico...</div>';
     return;
   }
   if (recordsMode) {
@@ -14962,7 +15006,7 @@ function renderLimitHistoryModal() {
             </div>
           </article>
         `).join("")
-      : '<div class="limit-history-empty">Ainda nÃ£o existem dois registros<br>para calcular um intervalo.</div>';
+      : '<div class="limit-history-empty">Ainda não existem dois registros<br>para calcular um intervalo.</div>';
     return;
   }
   const events = Array.isArray(state.limitHistory?.events) ? state.limitHistory.events : [];
@@ -14979,7 +15023,7 @@ function renderLimitHistoryModal() {
                   <button type="button" data-limit-history-edit-step="1" aria-label="Aumentar quantidade">+</button>
                 </div>
                 <label>Dia<input type="date" data-limit-history-edit-date value="${escapeHtml(state.limitHistory.editDate || "")}"></label>
-                <label>HorÃ¡rio<input type="time" data-limit-history-edit-time value="${escapeHtml(state.limitHistory.editTime || "")}"></label>
+                <label>Horário<input type="time" data-limit-history-edit-time value="${escapeHtml(state.limitHistory.editTime || "")}"></label>
                 <button class="limit-history-save" type="button" data-limit-history-save>Salvar</button>
               </div>
             </article>
@@ -14989,20 +15033,20 @@ function renderLimitHistoryModal() {
           <article class="limit-history-entry${event.isLatest ? " is-latest" : ""}" data-limit-history-event="${escapeHtml(String(event.id || ""))}">
             <div class="limit-history-entry-copy">
               <strong>${Math.max(1, Number(event.value || 1))} ${escapeHtml(state.limitHistory?.title || "Limite")} <i>|</i> ${escapeHtml(formatLimitHistoryDate(event.occurredAt))}</strong>
-              ${event.editedAt ? "<span>AtualizaÃ§Ã£o corrigida</span>" : ""}
+              ${event.editedAt ? "<span>Atualização corrigida</span>" : ""}
             </div>
             <div class="limit-history-entry-actions">
-              <button type="button" data-limit-history-edit ${event.isLatest ? "" : "disabled"} aria-label="Editar movimentaÃ§Ã£o">
+              <button type="button" data-limit-history-edit ${event.isLatest ? "" : "disabled"} aria-label="Editar movimentação">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.8-.8 4 4-.8L18.9 8.3l-3.2-3.2L4 16.8Zm13-13 3.2 3.2 1.1-1.1a1.4 1.4 0 0 0 0-2l-1.2-1.2a1.4 1.4 0 0 0-2 0L17 3.8Z" fill="currentColor"/></svg>
               </button>
-              <button type="button" data-limit-history-delete ${event.isLatest ? "" : "disabled"} aria-label="Remover movimentaÃ§Ã£o">
+              <button type="button" data-limit-history-delete ${event.isLatest ? "" : "disabled"} aria-label="Remover movimentação">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10l-.7 14H7.7L7 7Zm2-4h6l1 2h4v2H4V5h4l1-2Z" fill="currentColor"/></svg>
               </button>
             </div>
           </article>
         `;
       }).join("")
-    : '<div class="limit-history-empty">Nenhuma movimentaÃ§Ã£o registrada ainda.</div>';
+    : '<div class="limit-history-empty">Nenhuma movimentação registrada ainda.</div>';
 }
 
 async function loadLimitHistory() {
@@ -15019,7 +15063,7 @@ async function loadLimitHistory() {
     state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
     state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
   } catch (error) {
-    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel carregar.";
+    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar.";
   } finally {
     state.limitHistory.loading = false;
     renderLimitHistoryModal();
@@ -15049,7 +15093,7 @@ function openLimitHistoryModal(goalId) {
 async function mutateLimitHistoryEvent(eventId, method, value = 0, occurredAt = "") {
   const goalId = String(state.limitHistory?.goalId || "").trim();
   if (!goalId || !eventId) return;
-  if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Removendo Ãºltima movimentaÃ§Ã£o..." : "Salvando correÃ§Ã£o...";
+  if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Removendo última movimentação..." : "Salvando correção...";
   try {
     const profile = String(state.selectedProfile || getDefaultProfileName()).trim();
     const payload = await apiRequest(
@@ -15067,10 +15111,10 @@ async function mutateLimitHistoryEvent(eventId, method, value = 0, occurredAt = 
     state.limitHistory.editingEventId = "";
     state.limitHistory.editDate = "";
     state.limitHistory.editTime = "";
-    if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "MovimentaÃ§Ã£o removida." : "MovimentaÃ§Ã£o corrigida.";
+    if (limitHistoryStatus) limitHistoryStatus.textContent = method === "DELETE" ? "Movimentação removida." : "Movimentação corrigida.";
     renderLimitHistoryModal();
   } catch (error) {
-    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel atualizar.";
+    if (limitHistoryStatus) limitHistoryStatus.textContent = error instanceof Error ? error.message : "Não foi possível atualizar.";
   }
 }
 
@@ -15134,7 +15178,7 @@ function renderMissions() {
   const previousProgress = new Map([...(missionList?.querySelectorAll("[data-goal-id]") || [])].map((card) => [String(card.dataset.goalId || ""), Number(card.dataset.progressPercent)]));
   renderMissionScopeControls();
   renderMissionKindFilter();
-  if (missionsEmptyText) missionsEmptyText.textContent = showingLimits ? "VocÃª nÃ£o tem limites" : "VocÃª nÃ£o tem metas";
+  if (missionsEmptyText) missionsEmptyText.textContent = showingLimits ? "Você não tem limites" : "Você não tem metas";
   if (missionsEmpty) missionsEmpty.hidden = goals.length > 0;
   if (missionList) { missionList.hidden = goals.length === 0; missionList.innerHTML = ""; }
   if (missionsFooter) missionsFooter.hidden = false;
@@ -15275,7 +15319,7 @@ function openHistoryTextComposer() {
   };
   historyTextComposer.classList.add("active");
   historyTextComposer.setAttribute("aria-hidden", "false");
-  historyVoiceStatus.textContent = "Aguardando gravaÃ§Ã£o...";
+  historyVoiceStatus.textContent = "Aguardando gravação...";
   historyMicButton?.classList.remove("mic-active");
   historyMicButton?.classList.add("mic-idle");
   setHistoryTextStep(1);
@@ -15342,7 +15386,7 @@ async function refineHistoryTextWithAi(rawText) {
     body: JSON.stringify({ text: rawText })
   });
   return {
-    title: String(payload.title || "Texto sem tÃ­tulo"),
+    title: String(payload.title || "Texto sem título"),
     text: String(payload.text || rawText)
   };
 }
@@ -15437,7 +15481,7 @@ async function startHistoryMic() {
         historyLastSpeechAt = Date.now();
       }
       if (Date.now() - historyLastSpeechAt >= 2000) {
-        historyVoiceStatus.textContent = "SilÃªncio detectado. Encerrando...";
+        historyVoiceStatus.textContent = "Silêncio detectado. Encerrando...";
         stopHistoryMic();
       }
     }, 120);
@@ -15493,7 +15537,7 @@ async function startPlatformNameMic() {
     platformNameMediaRecorder.onstop = async () => {
       const blob = new Blob(chunks, { type: "audio/webm" });
       if (!blob.size) {
-        platformWizardMessage.textContent = "Sem Ã¡udio captado.";
+        platformWizardMessage.textContent = "Sem áudio captado.";
         return;
       }
       try {
@@ -15505,14 +15549,14 @@ async function startPlatformNameMic() {
         });
         const spoken = String(transcribed?.text || "").trim();
         if (!spoken) {
-          platformWizardMessage.textContent = "NÃ£o consegui transcrever sua fala.";
+          platformWizardMessage.textContent = "Não consegui transcrever sua fala.";
           return;
         }
         platformNameInput.value = spoken;
         platformNameInput.dispatchEvent(new Event("input", { bubbles: true }));
         platformWizardMessage.textContent = "Texto transcrito.";
       } catch (error) {
-        platformWizardMessage.textContent = error instanceof Error ? error.message : "Falha na transcriÃ§Ã£o.";
+        platformWizardMessage.textContent = error instanceof Error ? error.message : "Falha na transcrição.";
       }
     };
     platformNameMediaRecorder.start();
@@ -15535,7 +15579,7 @@ async function startPlatformNameMic() {
         platformNameLastSpeechAt = Date.now();
       }
       if (Date.now() - platformNameLastSpeechAt >= 2000) {
-        platformWizardMessage.textContent = "SilÃªncio detectado. Transcrevendo...";
+        platformWizardMessage.textContent = "Silêncio detectado. Transcrevendo...";
         stopPlatformNameMic();
       }
     }, 120);
@@ -15748,7 +15792,7 @@ function registerNativeBackButtonHandler() {
 
 function isAuthErrorMessage(message) {
   const text = String(message || "").trim().toLowerCase();
-  return text.includes("sessao invalida") || text.includes("sessÃ£o invÃ¡lida") || text.includes("token ausente");
+  return text.includes("sessao invalida") || text.includes("sessão inválida") || text.includes("token ausente");
 }
 
 function openProject200LoginOverlay(message = "") {
@@ -16318,14 +16362,14 @@ function renderProject200ExportSuccess(payload) {
   const actionsCount = Number(payload?.summary?.actions || 0);
   const historyCount = Number(payload?.summary?.historyEntries || 0);
   const financeCount = Number(payload?.summary?.financeOccurrences || 0);
-  project200ExportMessage.textContent = `Exportado para ${targetName}: ${actionsCount} tarefas, ${historyCount} histÃ³ricos e ${financeCount} lanÃ§amentos/copias financeiras.`;
+  project200ExportMessage.textContent = `Exportado para ${targetName}: ${actionsCount} tarefas, ${historyCount} históricos e ${financeCount} lançamentos/copias financeiras.`;
 }
 
 async function submitProject200Export() {
   const username = String(project200ExportUsernameInput?.value || "").trim();
   if (!username) {
     if (project200ExportMessage) {
-      project200ExportMessage.textContent = "Digite o nome de usuÃ¡rio da conta destino.";
+      project200ExportMessage.textContent = "Digite o nome de usuário da conta destino.";
     }
     return;
   }
@@ -16513,7 +16557,7 @@ taskTitle?.addEventListener("input", () => {
   state.wizard.svgIconLabel = "";
   if (!title) {
     state.wizard.categoryId = "planejamento";
-    state.wizard.categoryName = "PropÃ³sito";
+    state.wizard.categoryName = "Propósito";
     renderActionCategoryPicker();
     if (isTaskComposerMode()) renderTaskComposerModal();
     return;
@@ -16579,7 +16623,7 @@ platformWizardBackButton?.addEventListener("click", () => {
 platformWizardNextButton?.addEventListener("click", () => {
   platformWizardMessage.textContent = "";
   if (state.platformWizard.step === 1 && platformNameInput.value.trim().length < 2) {
-    platformWizardMessage.textContent = "Digite um nome vÃ¡lido.";
+    platformWizardMessage.textContent = "Digite um nome válido.";
     return;
   }
 
@@ -16836,8 +16880,58 @@ actionForm.addEventListener("submit", (event) => {
   event.preventDefault();
 });
 
+let actionsSwipeState = null;
+let actionsSwipeSuppressClickUntil = 0;
+
+function openActionsMissionMuteDialog(goalId) {
+  const goal = getAvailableMissionById(goalId);
+  if (!goal) return;
+  openRunningConfirmModal("mute_mission_today", goal, () => {
+    muteActionsMissionForToday(goalId);
+  });
+}
+
+function openActionsTaskMuteDialog(actionId) {
+  const action = state.actions.find((item) => String(item.id || "") === String(actionId || ""));
+  if (!action) return;
+  openRunningConfirmModal("mute_mission_today", action, () => {
+    muteActionsTaskForToday(actionId);
+  });
+}
+
+function finishActionsSwipe(event) {
+  const swipe = actionsSwipeState;
+  actionsSwipeState = null;
+  if (!swipe) return false;
+  const dx = Number(event.clientX || 0) - swipe.x;
+  const dy = Math.abs(Number(event.clientY || 0) - swipe.y);
+  if (dx <= -70 && dy <= 42 && (swipe.goalId || swipe.actionId)) {
+    event.preventDefault();
+    actionsSwipeSuppressClickUntil = Date.now() + 500;
+    if (swipe.goalId) {
+      openActionsMissionMuteDialog(swipe.goalId);
+    } else {
+      openActionsTaskMuteDialog(swipe.actionId);
+    }
+    return true;
+  }
+  return false;
+}
+
 actionsList.addEventListener("pointerdown", (event) => {
+  const missionRow = event.target.closest("[data-mission-goal-id]");
   const row = event.target.closest("[data-action-id]");
+  actionsSwipeState = missionRow ? {
+    x: Number(event.clientX || 0),
+    y: Number(event.clientY || 0),
+    goalId: String(missionRow.dataset.missionGoalId || ""),
+    actionId: ""
+  } : (row && row.dataset.freeSlot !== "1" ? {
+    x: Number(event.clientX || 0),
+    y: Number(event.clientY || 0),
+    goalId: "",
+    actionId: String(row.dataset.actionId || "")
+  } : null);
   if (!row) {
     return;
   }
@@ -16847,11 +16941,25 @@ actionsList.addEventListener("pointerdown", (event) => {
   beginActionLongPress(row.dataset.actionId);
 });
 
-actionsList.addEventListener("pointerup", endActionLongPress);
-actionsList.addEventListener("pointerleave", endActionLongPress);
-actionsList.addEventListener("pointercancel", endActionLongPress);
+actionsList.addEventListener("pointerup", (event) => {
+  const handledSwipe = finishActionsSwipe(event);
+  endActionLongPress();
+  if (handledSwipe) return;
+});
+actionsList.addEventListener("pointerleave", (event) => {
+  finishActionsSwipe(event);
+  endActionLongPress();
+});
+actionsList.addEventListener("pointercancel", () => {
+  actionsSwipeState = null;
+  endActionLongPress();
+});
 
 actionsList.addEventListener("click", async (event) => {
+  if (Date.now() < actionsSwipeSuppressClickUntil) {
+    event.preventDefault();
+    return;
+  }
   const missionEditButton = event.target.closest("[data-mission-goal-edit]");
   if (missionEditButton) {
     event.stopPropagation();
@@ -16903,7 +17011,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
   if (occurrenceId && platformLongPressHandledOccurrenceId === occurrenceId) {
     platformLongPressHandledOccurrenceId = "";
     const entryName = String(row?.dataset?.entryName || "lan\u00e7amento");
-    const confirmedDelete = window.confirm(`Apagar este item de finanÃ§as?\n\n${entryName}`);
+    const confirmedDelete = window.confirm(`Apagar este item de finanças?\n\n${entryName}`);
     if (!confirmedDelete) {
       return;
     }
@@ -16940,7 +17048,7 @@ platformEntriesList?.addEventListener("click", async (event) => {
     return;
   }
 
-  if (!window.confirm("Excluir este lanÃ§amento recorrente? Os valores jÃ¡ realizados permanecem.")) {
+  if (!window.confirm("Excluir este lançamento recorrente? Os valores já realizados permanecem.")) {
     return;
   }
 
@@ -17146,7 +17254,7 @@ missionTitleInput?.addEventListener("input", () => {
   state.missionCreate.categoryResolved = false;
   state.missionCreate.categoryThinking = Boolean(title) && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit";
   state.missionCreate.categoryId = "planejamento";
-  state.missionCreate.categoryName = "PropÃ³sito";
+  state.missionCreate.categoryName = "Propósito";
   if (missionCreateStatus) missionCreateStatus.textContent = "";
   renderMissionCreateStep();
   if (title && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit") {
@@ -17341,7 +17449,7 @@ statsAspectMissionSaveButton?.addEventListener("click", () => {
       renderStatsAspectModalState();
     } catch (error) {
       if (statsAspectMissionStatus) {
-        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a atribuiÃ§Ã£o.";
+        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar a atribuição.";
       }
     }
   })();
@@ -17367,7 +17475,7 @@ statsAspectMissionClearButton?.addEventListener("click", () => {
       renderStatsAspectModalState();
     } catch (error) {
       if (statsAspectMissionStatus) {
-        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao limpar as missÃµes.";
+        statsAspectMissionStatus.textContent = error instanceof Error ? error.message : "Falha ao limpar as missões.";
       }
     }
   })();
@@ -17408,13 +17516,13 @@ async function selectSleepAmbienceTrack(track) {
   state.sleepModal.musicLoading = false;
   if (!started) {
     state.sleepModal.musicEnabled = false;
-    if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `NÃ£o foi possÃ­vel iniciar ${trackName}.`;
-    if (sleepModalFeedback) sleepModalFeedback.textContent = `NÃ£o foi possÃ­vel iniciar ${trackName}.`;
+    if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `Não foi possível iniciar ${trackName}.`;
+    if (sleepModalFeedback) sleepModalFeedback.textContent = `Não foi possível iniciar ${trackName}.`;
     renderSleepMusicToggleState();
     return;
   }
   if (sleepModalFeedback) sleepModalFeedback.textContent = "";
-  if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `${trackName} estÃ¡ tocando.`;
+  if (sleepMusicPickerStatus) sleepMusicPickerStatus.textContent = `${trackName} está tocando.`;
   await syncSleepFrequencyPlayback();
   renderSleepMusicToggleState();
   closeSleepMusicPicker();
@@ -17572,7 +17680,7 @@ limitHistoryList?.addEventListener("click", (event) => {
   if (event.target.closest("[data-limit-history-save]")) {
     const occurredAt = buildLimitHistoryOccurredAt(state.limitHistory.editDate, state.limitHistory.editTime);
     if (!occurredAt) {
-      if (limitHistoryStatus) limitHistoryStatus.textContent = "Informe dia e horÃ¡rio vÃ¡lidos.";
+      if (limitHistoryStatus) limitHistoryStatus.textContent = "Informe dia e horário válidos.";
       return;
     }
     void mutateLimitHistoryEvent(eventId, "PATCH", state.limitHistory.editValue, occurredAt);
@@ -17580,7 +17688,7 @@ limitHistoryList?.addEventListener("click", (event) => {
   }
   if (event.target.closest("[data-limit-history-delete]")) {
     openRunningConfirmModal("delete_progress_event", {
-      title: `+${Math.max(1, Number(entry.value || 1))} â€¢ ${formatLimitHistoryDate(entry.occurredAt)}`
+      title: `+${Math.max(1, Number(entry.value || 1))} • ${formatLimitHistoryDate(entry.occurredAt)}`
     }, () => {
       void mutateLimitHistoryEvent(eventId, "DELETE");
     });
@@ -17636,7 +17744,7 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
       renderActionsMissionsPanel();
     } catch (error) {
       if (missionAdjustStatus) {
-        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missÃ£o.";
+        missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao atualizar missão.";
       }
     } finally {
       finishLoading();
@@ -17718,7 +17826,7 @@ missionProgressConfirmButton?.addEventListener("click", () => {
 missionAdjustDeleteButton?.addEventListener("click", () => {
   const goalId = String(state.missionAdjust?.goalId || "").trim();
   if (!goalId) return;
-  const goal = getAvailableMissionById(goalId) || { title: "MissÃ£o" };
+  const goal = getAvailableMissionById(goalId) || { title: "Missão" };
   openRunningConfirmModal("delete_mission", goal, () => {
     void (async () => {
       const finishLoading = beginMissionActionLoading(missionAdjustDeleteButton);
@@ -17744,7 +17852,7 @@ missionAdjustDeleteButton?.addEventListener("click", () => {
         renderRunningMissionQuickButtons();
       } catch (error) {
         if (missionAdjustStatus) {
-          missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missÃ£o.";
+          missionAdjustStatus.textContent = error instanceof Error ? error.message : "Falha ao excluir missão.";
         }
       } finally {
         finishLoading();
@@ -18324,10 +18432,17 @@ runningMusicDefaultExecuteButton?.addEventListener("click", () => {
 runningMusicListDefaultButton?.addEventListener("click", () => {
   void saveRunningTaskDefault("track");
 });
-actionsMissionFilterButton?.addEventListener("click", () => {
+actionsMissionFilterButton?.addEventListener("click", (event) => {
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
   if (mode === "hide") return;
+  const toggleHit = Boolean(event.target.closest(".actions-mission-toggle"));
   if (mode === "dynamic") {
+    if (!toggleHit) {
+      closeModal("actionsModal");
+      openModal("historyModal");
+      void loadMissions().then(() => renderMissions());
+      return;
+    }
     state.actionsDynamicMissionsVisible = !state.actionsDynamicMissionsVisible;
     if (state.actionsDynamicMissionsVisible) {
       state.activeOffset = 0;
@@ -18513,7 +18628,7 @@ quickTaskStartButton?.addEventListener("click", () => {
       return;
     }
     const choice = await openStartConflictModalForActions(runningAction, {
-      title: String(quickTaskTitleInput?.value || "Tarefa RÃ¡pida").trim() || "Tarefa RÃ¡pida"
+      title: String(quickTaskTitleInput?.value || "Tarefa Rápida").trim() || "Tarefa Rápida"
     });
     if (!choice || choice === "cancel") {
       return;
@@ -18628,12 +18743,12 @@ saveActiveTimeButton?.addEventListener("click", () => {
     const startMinutes = clockInputToMinutes(activeTimeStartInput?.value);
     const endMinutes = clockInputToMinutes(activeTimeEndInput?.value, { end: true });
     if (startMinutes === endMinutes) {
-      if (activeTimeStatus) activeTimeStatus.textContent = "Escolha horÃ¡rios diferentes.";
+      if (activeTimeStatus) activeTimeStatus.textContent = "Escolha horários diferentes.";
       return;
     }
     state.activeTime.saving = true;
     renderOptionsModal();
-    if (activeTimeStatus) activeTimeStatus.textContent = "Salvando no iLifeâ€¦";
+    if (activeTimeStatus) activeTimeStatus.textContent = "Salvando no iLife…";
     try {
       const payload = await apiRequest("/api/200/active-time", {
         method: "PUT",
@@ -18667,7 +18782,7 @@ function downloadLatestProject200App() {
     downloadUrl.searchParams.set("v", project200AppVersion);
     downloadUrl.searchParams.set("t", String(Date.now()));
 
-    if (typeof showFloatingNotice === "function") showFloatingNotice(`Baixando a atualizaÃ§Ã£o do iLife &middot; versÃ£o ${project200AppVersion}`);
+    if (typeof showFloatingNotice === "function") showFloatingNotice(`Baixando a atualização do iLife &middot; versão ${project200AppVersion}`);
 
     const downloadLink = document.createElement("a");
     downloadLink.href = downloadUrl.toString();
@@ -18677,7 +18792,7 @@ function downloadLatestProject200App() {
     downloadLink.click();
     downloadLink.remove();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "NÃ£o foi possÃ­vel baixar a atualizaÃ§Ã£o.";
+    const message = error instanceof Error ? error.message : "Não foi possível baixar a atualização.";
     console.error(message);
     window.alert(message);
   } finally {
@@ -19339,7 +19454,7 @@ profileDeleteConfirmButton?.addEventListener("click", () => {
       await deleteManagedProfile();
     } catch (error) {
       if (profileManageMessage) {
-        profileManageMessage.textContent = error instanceof Error ? error.message : "Falha ao excluir usuÃ¡rio.";
+        profileManageMessage.textContent = error instanceof Error ? error.message : "Falha ao excluir usuário.";
       }
     }
   })();
@@ -19373,7 +19488,7 @@ project200CreateProfileConfirmButton?.addEventListener("click", () => {
       await createProject200ProfileFromModal();
     } catch (error) {
       if (project200CreateProfileMessage) {
-        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuÃ¡rio.";
+        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuário.";
       }
     }
   })();
@@ -19383,7 +19498,7 @@ project200CreateProfileNameInput?.addEventListener("keydown", (event) => {
     event.preventDefault();
     void createProject200ProfileFromModal().catch((error) => {
       if (project200CreateProfileMessage) {
-        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuÃ¡rio.";
+        project200CreateProfileMessage.textContent = error instanceof Error ? error.message : "Falha ao criar usuário.";
       }
     });
   }
@@ -19466,7 +19581,7 @@ project200LoginForm?.addEventListener("submit", (event) => {
   const username = String(project200Username?.value || "").trim();
   const password = String(project200Password?.value || "");
   if (!username || !password) {
-    if (project200LoginMessage) project200LoginMessage.textContent = "Preencha usuÃ¡rio e senha.";
+    if (project200LoginMessage) project200LoginMessage.textContent = "Preencha usuário e senha.";
     return;
   }
   if (project200LoginMessage) project200LoginMessage.textContent = "Entrando...";
