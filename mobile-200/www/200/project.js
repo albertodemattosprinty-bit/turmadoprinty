@@ -11238,23 +11238,43 @@ function formatMissionUnitDurationLabel(seconds) {
   return `${formatMissionDurationValue(seconds)} por unidade`;
 }
 
+const MISSION_VARIANT_NEXT_DUE_MAX_DAYS = 59;
+const MISSION_VARIANT_MONTH_LABELS = Object.freeze([
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+]);
+
+function normalizeMissionVariantNextDueOffset(offsetDays) {
+  return Math.max(0, Math.min(MISSION_VARIANT_NEXT_DUE_MAX_DAYS, Math.trunc(Number(offsetDays || 0) || 0)));
+}
+
+function getMissionVariantNextDueDate(offsetDays) {
+  const base = new Date(getServerNowMs());
+  const date = new Date(base);
+  date.setDate(base.getDate() + normalizeMissionVariantNextDueOffset(offsetDays));
+  return date;
+}
+
+function formatMissionVariantCalendarDate(date) {
+  const monthLabel = MISSION_VARIANT_MONTH_LABELS[date.getMonth()] || String(date.getMonth() + 1);
+  return `${date.getDate()} de ${monthLabel}`;
+}
+
 function formatMissionVariantNextDueLabel(offsetDays) {
-  const safeOffset = Math.max(0, Math.min(30, Math.trunc(Number(offsetDays || 0) || 0)));
-  if (safeOffset === 0) return { value: "Hoje", hint: "Vence hoje" };
-  if (safeOffset === 1) return { value: "Amanhã", hint: "Em 1 dia" };
-  const date = new Date(getServerNowMs() + safeOffset * 86400000);
-  return { value: `${date.getDate()} de ${date.getMonth() + 1}`, hint: `Em ${safeOffset} dias` };
+  const safeOffset = normalizeMissionVariantNextDueOffset(offsetDays);
+  if (safeOffset === 0) return { value: "Hoje", hint: formatMissionVariantCalendarDate(getMissionVariantNextDueDate(0)) };
+  if (safeOffset === 1) return { value: "Amanhã", hint: formatMissionVariantCalendarDate(getMissionVariantNextDueDate(1)) };
+  return { value: formatMissionVariantCalendarDate(getMissionVariantNextDueDate(safeOffset)), hint: `Em ${safeOffset} dias` };
 }
 
 function getMissionVariantNextDueAtIso(offsetDays) {
-  const safeOffset = Math.max(0, Math.min(30, Math.trunc(Number(offsetDays || 0) || 0)));
-  return new Date(getServerNowMs() + safeOffset * 86400000).toISOString();
+  return getMissionVariantNextDueDate(offsetDays).toISOString();
 }
 
 function getMissionVariantNextDueOffsetDays(variant) {
   const dueMs = new Date(variant?.nextDueAt || "").getTime();
   if (!Number.isFinite(dueMs)) return 0;
-  return Math.max(0, Math.min(30, Math.round((dueMs - getServerNowMs()) / 86400000)));
+  return normalizeMissionVariantNextDueOffset(Math.round((dueMs - getServerNowMs()) / 86400000));
 }
 
 function attachAddingFastControl(button, onStep) {
@@ -18301,7 +18321,7 @@ attachAddingFastControl(missionVariantNextDuePrev, (amount) => {
   renderMissionVariants();
 });
 attachAddingFastControl(missionVariantNextDueNext, (amount) => {
-  state.missionVariants.nextDueOffsetDays = Math.min(30, Number(state.missionVariants.nextDueOffsetDays || 0) + amount);
+  state.missionVariants.nextDueOffsetDays = Math.min(MISSION_VARIANT_NEXT_DUE_MAX_DAYS, Number(state.missionVariants.nextDueOffsetDays || 0) + amount);
   renderMissionVariants();
 });
 missionVariantHoursButton?.addEventListener("click", () => { state.missionVariants.intervalUnit = "hours"; renderMissionVariants(); });

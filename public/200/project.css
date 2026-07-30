@@ -12143,7 +12143,7 @@ body[data-background-theme="white"] .mission-guide-kicker { color:rgba(52,58,64,
 .start-decision-aspect-btn:disabled,
 .start-decision-actions .decision-btn:disabled { opacity:.48; cursor:default; pointer-events:none; }
 
-.history-mission-modal-footer-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.history-mission-modal-footer-three { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 #missionProgressModal .mission-progress-confirm-btn:disabled { opacity:.5; filter:saturate(.55); cursor:default; }
 
 .mission-guide-navigation {
