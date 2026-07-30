@@ -1,0 +1,65 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>iLife MindsetPlan - Atualizacao</title>
+  <link rel="stylesheet" href="/201/style.css" />
+</head>
+<body>
+  <main class="update-page">
+    <section class="download-panel" aria-labelledby="updateTitle">
+      <div class="download-art" aria-hidden="true">
+        <svg viewBox="0 0 160 160" role="img">
+          <circle cx="80" cy="80" r="72" fill="#e7f5ff" />
+          <path d="M80 30v65" stroke="#0b7285" stroke-width="14" stroke-linecap="round" />
+          <path d="M49 72l31 31 31-31" fill="none" stroke="#0b7285" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M42 122h76" stroke="#1864ab" stroke-width="14" stroke-linecap="round" />
+        </svg>
+      </div>
+      <p class="eyebrow">iLife MindsetPlan</p>
+      <h1 id="updateTitle">Atualizacao do iLife disponivel</h1>
+      <p id="updateMessage" class="message">Carregando informacoes da atualizacao...</p>
+      <div class="version-row">
+        <span>Versao minima</span>
+        <strong id="minimumVersionLabel">0.7</strong>
+      </div>
+      <a id="downloadButton" class="download-button" href="#" rel="noopener noreferrer">Baixar APK atualizado</a>
+      <p id="publicStatus" class="status" role="status"></p>
+    </section>
+
+    <section id="adminPanel" class="admin-panel" hidden aria-labelledby="adminTitle">
+      <h2 id="adminTitle">Controle admin do APK</h2>
+      <form id="adminForm">
+        <label>
+          Versao atual publicada
+          <input id="currentVersionInput" name="currentVersion" inputmode="decimal" autocomplete="off" />
+        </label>
+        <label>
+          Versao minima para abrir o /200
+          <input id="minimumVersionInput" name="minimumVersion" inputmode="decimal" autocomplete="off" />
+        </label>
+        <label>
+          Link R2 do APK atualizado
+          <input id="downloadUrlInput" name="downloadUrl" type="url" autocomplete="off" />
+        </label>
+        <label>
+          Titulo da tela
+          <input id="titleInput" name="title" autocomplete="off" />
+        </label>
+        <label>
+          Mensagem da tela de download
+          <textarea id="messageInput" name="message" rows="5"></textarea>
+        </label>
+        <label>
+          Texto do botao
+          <input id="buttonLabelInput" name="buttonLabel" autocomplete="off" />
+        </label>
+        <button class="save-button" type="submit">Salvar no Postgres</button>
+        <p id="adminStatus" class="status" role="status"></p>
+      </form>
+    </section>
+  </main>
+  <script type="module" src="/201/app.js"></script>
+</body>
+</html>

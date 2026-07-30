@@ -15,6 +15,37 @@ const tokenKey = "turma_do_printy_token";
 const project200AppVersion = "0.7";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
+
+function compareProject200Versions(left, right) {
+  const leftParts = String(left || "").trim().split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = String(right || "").trim().split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(leftParts.length, rightParts.length, 1);
+  for (let index = 0; index < length; index += 1) {
+    const leftValue = leftParts[index] || 0;
+    const rightValue = rightParts[index] || 0;
+    if (leftValue > rightValue) return 1;
+    if (leftValue < rightValue) return -1;
+  }
+  return 0;
+}
+
+async function enforceProject200MinimumAppVersion() {
+  try {
+    const response = await fetch(getApiUrl("/api/201/app-update"), { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return false;
+    const minimumVersion = String(payload?.config?.minimumVersion || "").trim();
+    if (!minimumVersion || compareProject200Versions(project200AppVersion, minimumVersion) >= 0) return false;
+    const target = new URL(getApiUrl("/201"), window.location.href);
+    target.searchParams.set("from", "200");
+    target.searchParams.set("version", project200AppVersion);
+    target.searchParams.set("minimum", minimumVersion);
+    window.location.replace(target.toString());
+    return true;
+  } catch {
+    return false;
+  }
+}
 const optionsConfigKey = "project_200_options_v1";
 let optionsConfigLoadPromise = null;
 let project200TutorsUi = null;

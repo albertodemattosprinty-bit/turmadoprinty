@@ -72,6 +72,7 @@ import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProje
 import { listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
+import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13801,6 +13802,33 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/201/app-update") {
+    try {
+      const config = await getProject201AppUpdateConfig();
+      sendJson(response, 200, { ok: true, config });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: error instanceof Error ? error.message : "Nao foi possivel carregar a atualizacao do app."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/admin/201/app-update") {
+    try {
+      const adminUser = await requireAdmin(request, response);
+      if (!adminUser) return;
+      const body = await readJsonBody(request);
+      const config = await saveProject201AppUpdateConfig(adminUser.id, body);
+      sendJson(response, 200, { ok: true, config });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel salvar a atualizacao do app."
+      });
+    }
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/admin/users") {
     await handleAdminUsersList(request, response);
     return;
@@ -13925,6 +13953,14 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && (pathname === "/200" || pathname === "/200/")) {
     const targetPath = path.join(publicDir, "200", "index.html");
+    if (existsSync(targetPath)) {
+      await serveStatic(response, targetPath);
+      return;
+    }
+  }
+
+  if (request.method === "GET" && (pathname === "/201" || pathname === "/201/")) {
+    const targetPath = path.join(publicDir, "201", "index.html");
     if (existsSync(targetPath)) {
       await serveStatic(response, targetPath);
       return;
