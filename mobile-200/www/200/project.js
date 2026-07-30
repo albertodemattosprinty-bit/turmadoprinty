@@ -1,4 +1,4 @@
-﻿import { getApiUrl } from "../api.js";
+import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=0.7.0-chat-links";
 import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.7.0-chat-links";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
@@ -831,13 +831,27 @@ const runningHomeLogoButton = document.getElementById("runningHomeLogoButton");
 const socialModal = document.getElementById("socialModal");
 const socialModalShell = document.getElementById("socialModalShell");
 const socialModalLoading = document.getElementById("socialModalLoading");
-const socialModalSubtitle = document.getElementById("socialModalSubtitle");
+const socialTopbar = document.getElementById("socialTopbar");
+const socialCloseButton = document.getElementById("socialCloseButton");
+const socialSearchButton = document.getElementById("socialSearchButton");
+const socialSearchPanel = document.getElementById("socialSearchPanel");
+const socialSearchInput = document.getElementById("socialSearchInput");
+const socialTopAddButton = document.getElementById("socialTopAddButton");
+const socialMoreButton = document.getElementById("socialMoreButton");
+const socialExitSelectionButton = document.getElementById("socialExitSelectionButton");
+const socialSelectionCount = document.getElementById("socialSelectionCount");
 const socialInviteToggleButton = document.getElementById("socialInviteToggleButton");
 const socialInviteForm = document.getElementById("socialInviteForm");
 const socialInviteInput = document.getElementById("socialInviteInput");
 const socialInviteSubmitButton = document.getElementById("socialInviteSubmitButton");
 const socialModalStatus = document.getElementById("socialModalStatus");
 const socialModalList = document.getElementById("socialModalList");
+const socialEmptyState = document.getElementById("socialEmptyState");
+const socialTotalPoints = document.getElementById("socialTotalPoints");
+const socialSummaryNote = document.getElementById("socialSummaryNote");
+const socialPeriodLabel = document.getElementById("socialPeriodLabel");
+const socialDateCaption = document.getElementById("socialDateCaption");
+const socialToast = document.getElementById("socialToast");
 const pointsUpdateModal = document.getElementById("pointsUpdateModal");
 const pointsUpdateTotal = document.getElementById("pointsUpdateTotal");
 const pointsUpdateDelta = document.getElementById("pointsUpdateDelta");
@@ -1184,6 +1198,9 @@ const state = {
     scopeKey: "today",
     loading: false,
     inviteComposerOpen: false,
+    searchOpen: false,
+    searchQuery: "",
+    selectedIds: [],
     pendingCount: 0,
     self: null,
     incomingInvites: [],
@@ -12330,76 +12347,151 @@ function renderSocialBadge() {
   });
 }
 
+function getSocialSelectedIdSet() {
+  return new Set(Array.isArray(state.social?.selectedIds) ? state.social.selectedIds : []);
+}
+
+function setSocialSelectedIds(ids = []) {
+  state.social.selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map((value) => String(value || "").trim()).filter(Boolean))];
+}
+
+function clearSocialSelection() {
+  setSocialSelectedIds([]);
+}
+
+function toggleSocialSelection(userId) {
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) return;
+  const selected = getSocialSelectedIdSet();
+  if (selected.has(normalizedUserId)) selected.delete(normalizedUserId);
+  else selected.add(normalizedUserId);
+  setSocialSelectedIds([...selected]);
+}
+
+function getSocialScopeLabel(scopeKey = "today") {
+  return missionHistoryScopes.find((item) => item.key === String(scopeKey || "today"))?.label || "Hoje";
+}
+
+function getSocialRangeCaption(scopeKey = "today") {
+  const now = new Date();
+  if (scopeKey === "today") {
+    return now.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+  }
+  const end = new Date(now);
+  const days = scopeKey === "last30" ? 30 : scopeKey === "last15" ? 15 : 7;
+  const start = new Date(now);
+  start.setDate(start.getDate() - (days - 1));
+  const short = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" });
+  return `${short.format(start)} a ${short.format(end)}`;
+}
+
+function showSocialToast(message = "") {
+  if (!socialToast) return;
+  socialToast.textContent = String(message || "");
+  socialToast.classList.remove("show");
+  window.clearTimeout(showSocialToast.timerId || 0);
+  if (!message) return;
+  window.requestAnimationFrame(() => socialToast.classList.add("show"));
+  showSocialToast.timerId = window.setTimeout(() => socialToast.classList.remove("show"), 1900);
+}
+
+function getVisibleSocialRankedUsers() {
+  const query = String(state.social?.searchQuery || "").trim().toLocaleLowerCase("pt-BR");
+  const rankedUsers = [];
+  if (state.social?.self) rankedUsers.push({ ...state.social.self, isSelf: true });
+  for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
+    rankedUsers.push({ ...friend, isSelf: false });
+  }
+  return rankedUsers
+    .filter((entry) => {
+      if (!query) return true;
+      return [entry?.name, entry?.username].some((value) => String(value || "").toLocaleLowerCase("pt-BR").includes(query));
+    })
+    .sort((left, right) => {
+      if (Number(right.points || 0) !== Number(left.points || 0)) {
+        return Number(right.points || 0) - Number(left.points || 0);
+      }
+      return String(left.name || "").localeCompare(String(right.name || ""), "pt-BR");
+    });
+}
+
 function renderSocialScopeFooter() {
   document.querySelectorAll("[data-social-scope]").forEach((button) => {
     button.classList.toggle("active", String(button.dataset.socialScope || "") === String(state.social?.scopeKey || "today"));
   });
+  if (socialPeriodLabel) socialPeriodLabel.textContent = getSocialScopeLabel(state.social?.scopeKey || "today");
+  if (socialDateCaption) socialDateCaption.textContent = getSocialRangeCaption(state.social?.scopeKey || "today");
+  const scopeIndex = getSocialScopeIndex();
+  if (socialScopePrevButton) socialScopePrevButton.disabled = scopeIndex <= 0;
+  if (socialScopeNextButton) socialScopeNextButton.disabled = scopeIndex >= missionHistoryScopes.length - 1;
 }
 
 function getSocialScopeIndex() {
   return missionHistoryScopes.findIndex((item) => item.key === String(state.social?.scopeKey || "today"));
 }
 
-const socialMessageSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H9.8l-4.3 3.4V8A1.5 1.5 0 0 1 7 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const socialMessageSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 function renderSocialModal() {
   renderSocialBadge();
   renderSocialScopeFooter();
   document.body.classList.toggle("social-modal-loading", Boolean(state.social?.loading));
   socialModalLoading && (socialModalLoading.hidden = !state.social.loading);
-  if (socialInviteForm) {
-    socialInviteForm.hidden = !state.social.inviteComposerOpen;
+  if (socialSearchPanel) socialSearchPanel.hidden = !state.social.searchOpen;
+  if (socialInviteForm) socialInviteForm.hidden = !state.social.inviteComposerOpen;
+  const selectedIds = getSocialSelectedIdSet();
+  const selectionActive = selectedIds.size > 0;
+  socialTopbar?.classList.toggle("selection", selectionActive);
+  socialTopbar?.classList.toggle("regular", !selectionActive);
+  if (socialSelectionCount) socialSelectionCount.textContent = String(selectedIds.size);
+  const rankedUsers = getVisibleSocialRankedUsers();
+  if (socialTotalPoints) {
+    socialTotalPoints.textContent = new Intl.NumberFormat("pt-BR").format(rankedUsers.reduce((sum, entry) => sum + Math.max(0, Number(entry.points || 0)), 0));
   }
-  if (socialInviteToggleButton) {
-    socialInviteToggleButton.textContent = state.social.inviteComposerOpen ? "Ã—" : "+";
-  }
-  const rankedUsers = [];
-  if (state.social?.self) {
-    rankedUsers.push({ ...state.social.self, isSelf: true });
-  }
-  for (const friend of Array.isArray(state.social?.friends) ? state.social.friends : []) {
-    rankedUsers.push({ ...friend, isSelf: false });
-  }
-  rankedUsers.sort((left, right) => {
-    if (Number(right.points || 0) !== Number(left.points || 0)) {
-      return Number(right.points || 0) - Number(left.points || 0);
-    }
-    return String(left.name || "").localeCompare(String(right.name || ""), "pt-BR");
-  });
-  const hasFriends = rankedUsers.length > 1;
-  socialModalShell?.classList.toggle("has-friends", hasFriends);
-  if (socialModalSubtitle) {
-    socialModalSubtitle.hidden = hasFriends;
+  if (socialSummaryNote) {
+    socialSummaryNote.textContent = String(state.social?.scopeKey || "today") === "today"
+      ? "Pontuação acumulada no período atual"
+      : `Pontuação acumulada em ${getSocialScopeLabel(state.social?.scopeKey || "today").toLocaleLowerCase("pt-BR")}`;
   }
   if (socialModalList) {
     const cards = [];
     rankedUsers.forEach((entry, index) => {
-      const points = escapeHtml(String(Math.max(0, Number(entry.points || 0))));
-      const secondaryCopy = entry.isSelf
-        ? ""
-        : (entry.username ? "@" + escapeHtml(String(entry.username)) : "Amizade aceita");
-      const actionMarkup = entry.isSelf
-        ? `<div class="social-card-score"><strong>${points}</strong></div>`
-        : `<div class="social-card-side"><div class="social-card-score"><strong>${points}</strong></div><button class="social-card-message" type="button" data-social-message-user-id="${escapeHtml(String(entry.userId || ""))}" aria-label="Conversar com ${escapeHtml(String(entry.name || "amigo"))}">${socialMessageSvg}</button></div>`;
+      const selected = selectedIds.has(String(entry.userId || ""));
+      const avatarUrl = String(entry?.avatarDataUrl || entry?.svgIconUrl || "").trim();
+      const avatar = avatarUrl
+        ? `<img src="${escapeHtml(avatarUrl)}" alt="">`
+        : escapeHtml(entry?.initials || String(entry?.name || "U").slice(0, 2).toUpperCase());
+      const points = new Intl.NumberFormat("pt-BR").format(Math.max(0, Number(entry.points || 0)));
+      const side = entry.isSelf
+        ? `<span class="social-trend"></span>`
+        : `<span class="social-trend">${index === 0 ? "Líder" : ""}</span><button class="social-chat-btn" type="button" data-social-message-user-id="${escapeHtml(String(entry.userId || ""))}" aria-label="Conversar com ${escapeHtml(String(entry.name || "amigo"))}">${socialMessageSvg}</button>`;
       cards.push(`
-        <article class="social-card ${entry.isSelf ? "social-card--self" : "social-card--friend"}">
-          <div class="social-card-avatar">${renderSocialCardAvatar(entry)}<span class="social-card-rank">${escapeHtml(`${index + 1}Âº`)}</span></div>
-          <div class="social-card-body">
-            <div class="social-card-name">${escapeHtml(String(entry.name || "VocÃª"))}</div>
-            ${secondaryCopy ? `<div class="social-card-copy">${secondaryCopy}</div>` : ""}
+        <article class="social-friend-row${selected ? " selected" : ""}" data-social-row-user-id="${escapeHtml(String(entry.userId || ""))}" tabindex="0" role="button" aria-label="${escapeHtml(String(entry.name || "Você"))}, ${points} pontos, posição ${index + 1}">
+          <div class="social-avatar-wrap">
+            <div class="social-avatar">${avatar}</div>
+            <span class="social-rank-badge">${escapeHtml(`${index + 1}º`)}</span>
+            <span class="social-check-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>
           </div>
-          ${actionMarkup}
+          <div class="social-friend-main">
+            <div class="social-friend-name">${escapeHtml(String(entry.name || "Você"))}</div>
+            <div class="social-friend-points"><span class="social-point-dot"></span>${points} pontos</div>
+          </div>
+          <div class="social-friend-side">${side}</div>
         </article>
       `);
     });
     for (const invite of Array.isArray(state.social?.incomingInvites) ? state.social.incomingInvites : []) {
       const fromUser = invite?.fromUser || {};
+      const avatarUrl = String(fromUser?.avatarDataUrl || fromUser?.svgIconUrl || "").trim();
+      const avatar = avatarUrl
+        ? `<img src="${escapeHtml(avatarUrl)}" alt="">`
+        : escapeHtml(fromUser?.initials || String(fromUser?.name || "U").slice(0, 2).toUpperCase());
       cards.push(`
-        <article class="social-card social-card--invite">
-          <div class="social-card-avatar">${renderSocialCardAvatar(fromUser)}</div>
-          <div class="social-card-body">
-            <div class="social-card-name">${escapeHtml(String(fromUser.name || "Usuario"))}</div>
-            <div class="social-card-copy">${escapeHtml(String(fromUser.name || "Usuario"))} quer ser seu amigo.</div>
+        <article class="social-friend-row social-friend-row--invite">
+          <div class="social-avatar-wrap"><div class="social-avatar">${avatar}</div></div>
+          <div class="social-friend-main">
+            <div class="social-friend-name">${escapeHtml(String(fromUser.name || "Usuario"))}</div>
+            <div class="social-friend-points social-friend-points--invite">quer ser seu amigo.</div>
           </div>
           <div class="social-card-actions">
             <button class="social-card-action is-accept" type="button" data-social-accept="${escapeHtml(String(invite.id || ""))}">Aceitar</button>
@@ -12408,11 +12500,10 @@ function renderSocialModal() {
         </article>
       `);
     }
-    if (!cards.length) {
-      cards.push(`<div class="social-empty-state">Nenhum item por aqui ainda.</div>`);
-    }
     socialModalList.innerHTML = cards.join("");
   }
+  const shouldShowEmpty = !rankedUsers.length && !(Array.isArray(state.social?.incomingInvites) && state.social.incomingInvites.length);
+  if (socialEmptyState) socialEmptyState.hidden = !shouldShowEmpty;
 }
 
 function animatePointsUpdateTotal(fromPoints, toPoints) {
@@ -12544,6 +12635,10 @@ async function openSocialModal() {
     socialModalStatus.textContent = "";
   }
   state.social.loading = true;
+  state.social.searchOpen = false;
+  state.social.searchQuery = "";
+  clearSocialSelection();
+  if (socialSearchInput) socialSearchInput.value = "";
   renderSocialModal();
   openModal("socialModal");
   await loadSocialSnapshot({
@@ -18624,23 +18719,42 @@ runningHomeSleepButton?.addEventListener("click", () => {
   }
   void openSleepModal();
 });
+socialCloseButton?.addEventListener("click", () => closeModal("socialModal"));
+socialSearchButton?.addEventListener("click", () => {
+  state.social.searchOpen = !state.social.searchOpen;
+  renderSocialModal();
+  if (state.social.searchOpen) window.setTimeout(() => socialSearchInput?.focus(), 40);
+});
+socialSearchInput?.addEventListener("input", (event) => {
+  state.social.searchQuery = String(event.target?.value || "");
+  renderSocialModal();
+});
 socialInviteToggleButton?.addEventListener("click", () => {
   state.social.inviteComposerOpen = !state.social.inviteComposerOpen;
-  if (socialModalStatus) {
-    socialModalStatus.textContent = "";
-  }
+  if (socialModalStatus) socialModalStatus.textContent = "";
   renderSocialModal();
-  if (state.social.inviteComposerOpen) {
-    window.setTimeout(() => socialInviteInput?.focus(), 40);
-  }
+  if (state.social.inviteComposerOpen) window.setTimeout(() => socialInviteInput?.focus(), 40);
+});
+socialTopAddButton?.addEventListener("click", () => socialInviteToggleButton?.click());
+socialMoreButton?.addEventListener("click", () => showSocialToast("Mais opções em breve"));
+socialExitSelectionButton?.addEventListener("click", () => {
+  clearSocialSelection();
+  renderSocialModal();
+});
+document.querySelectorAll("[data-social-bulk-action]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const count = Math.max(0, getSocialSelectedIdSet().size);
+    const label = button.getAttribute("aria-label") || "Ação";
+    showSocialToast(`${count} ${count === 1 ? "amigo" : "amigos"}: ${label}`);
+    clearSocialSelection();
+    renderSocialModal();
+  });
 });
 socialInviteSubmitButton?.addEventListener("click", () => {
   void submitSocialInvite();
 });
 socialInviteInput?.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter") {
-    return;
-  }
+  if (event.key !== "Enter") return;
   event.preventDefault();
   void submitSocialInvite();
 });
@@ -18658,18 +18772,60 @@ socialModalList?.addEventListener("click", (event) => {
   const messageButton = event.target.closest("[data-social-message-user-id]");
   if (messageButton) {
     void openSocialFriendChat(String(messageButton.dataset.socialMessageUserId || ""));
+    return;
   }
+  const row = event.target.closest("[data-social-row-user-id]");
+  if (!row) return;
+  const userId = String(row.dataset.socialRowUserId || "");
+  if (getSocialSelectedIdSet().size) {
+    toggleSocialSelection(userId);
+    renderSocialModal();
+    return;
+  }
+  const friend = getVisibleSocialRankedUsers().find((entry) => String(entry?.userId || "") === userId);
+  if (friend) showSocialToast(`${String(friend.name || "Amigo")}: ${new Intl.NumberFormat("pt-BR").format(Math.max(0, Number(friend.points || 0)))} pontos`);
+});
+socialModalList?.addEventListener("dblclick", (event) => {
+  const row = event.target.closest("[data-social-row-user-id]");
+  if (!row) return;
+  toggleSocialSelection(String(row.dataset.socialRowUserId || ""));
+  renderSocialModal();
+});
+socialModalList?.addEventListener("keydown", (event) => {
+  if (!(event.key === "Enter" || event.key === " ")) return;
+  const row = event.target.closest("[data-social-row-user-id]");
+  if (!row) return;
+  event.preventDefault();
+  toggleSocialSelection(String(row.dataset.socialRowUserId || ""));
+  renderSocialModal();
 });
 document.querySelectorAll("[data-social-scope]").forEach((button) => {
   button.addEventListener("click", () => {
     const nextScope = String(button.dataset.socialScope || "").trim().toLowerCase();
-    if (!nextScope || nextScope === state.social.scopeKey) {
-      return;
-    }
+    if (!nextScope || nextScope === state.social.scopeKey) return;
     state.social.scopeKey = nextScope;
+    clearSocialSelection();
     renderSocialScopeFooter();
     void loadSocialSnapshot({ force: true, skipGlobalLoading: false, silent: true });
   });
+});
+socialScopePrevButton?.addEventListener("click", () => {
+  const nextIndex = Math.max(0, getSocialScopeIndex() - 1);
+  const nextScope = missionHistoryScopes[nextIndex]?.key;
+  if (!nextScope || nextScope === state.social.scopeKey) return;
+  state.social.scopeKey = nextScope;
+  clearSocialSelection();
+  renderSocialModal();
+  void loadSocialSnapshot({ force: true, skipGlobalLoading: false, silent: true });
+});
+socialScopeNextButton?.addEventListener("click", () => {
+  const nextIndex = Math.min(missionHistoryScopes.length - 1, getSocialScopeIndex() + 1);
+  const nextScope = missionHistoryScopes[nextIndex]?.key;
+  if (!nextScope || nextScope === state.social.scopeKey) return;
+  state.social.scopeKey = nextScope;
+  clearSocialSelection();
+  renderSocialModal();
+  void loadSocialSnapshot({ force: true, skipGlobalLoading: false, silent: true });
 });
 statsRunningSurfaceButton?.addEventListener("click", () => {
   openPrimaryRunningSurface();

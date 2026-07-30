@@ -1269,38 +1269,38 @@
     </div>
   </section>
 
-  <section class="workspace-modal" id="socialModal" aria-hidden="true" aria-label="Amizades">
-      <div class="social-modal-shell" id="socialModalShell">
-        <button class="sleep-modal-close social-modal-close" type="button" data-close-modal aria-label="Fechar amizades">Fechar</button>
-        <div class="social-modal-loading" id="socialModalLoading" hidden>
-          <div class="social-modal-loading-spinner" aria-hidden="true"></div>
-          <div class="social-modal-loading-copy">Carregando amigos...</div>
-        </div>
-        <div class="social-modal-header" id="socialModalHeader">
-          <div class="social-modal-title">Amigos</div>
-          <div class="social-modal-subtitle" id="socialModalSubtitle">Convites, ranking leve e acesso rápido aos pontos do período.</div>
-        </div>
-        <div class="social-modal-plus-wrap" id="socialModalPlusWrap">
-          <button class="social-modal-plus-button" type="button" id="socialInviteToggleButton" aria-label="Adicionar amigo">+</button>
-        </div>
-        <div class="social-invite-form" id="socialInviteForm" hidden>
-          <input class="text-field social-invite-input" id="socialInviteInput" type="text" autocomplete="off" placeholder="Digite o nome do amigo" />
-          <button class="primary-btn social-invite-submit" type="button" id="socialInviteSubmitButton">Enviar convite</button>
-        </div>
-        <p class="social-modal-status" id="socialModalStatus" aria-live="polite"></p>
-        <div class="social-modal-list" id="socialModalList"></div>
-        <div class="social-scope-footer" id="socialScopeFooter" aria-label="Filtro de período">
-          <button class="social-scope-nav" type="button" id="socialScopePrevButton" aria-label="Período anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.8 5.8-6.2 6.2 6.2 6.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <div class="social-scope-chip-row">
-            <button class="social-scope-chip active" type="button" data-social-scope="today">Hoje</button>
-            <button class="social-scope-chip" type="button" data-social-scope="last7">7 dias</button>
-            <button class="social-scope-chip" type="button" data-social-scope="last15">15 dias</button>
-            <button class="social-scope-chip" type="button" data-social-scope="last30">30 dias</button>
-          </div>
-          <button class="social-scope-nav" type="button" id="socialScopeNextButton" aria-label="Próximo período"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 5.8 6.2 6.2-6.2 6.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        </div>
+  <section class="workspace-modal social-modal-workspace" id="socialModal" aria-hidden="true" aria-label="Amigos do iLife">
+    <div class="social-modal-shell" id="socialModalShell">
+      <div class="social-modal-loading" id="socialModalLoading" hidden>
+        <div class="social-modal-loading-spinner" aria-hidden="true"></div>
+        <div class="social-modal-loading-copy">Carregando amigos...</div>
       </div>
-    </section>
+      <header class="social-topbar regular" id="socialTopbar">
+        <button class="social-icon-btn regular-only" type="button" id="socialCloseButton" aria-label="Fechar amizades"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div class="social-title-wrap regular-only"><span class="social-eyebrow">iLife</span><h1 class="social-top-title">Amigos</h1></div>
+        <button class="social-icon-btn regular-only" type="button" id="socialSearchButton" aria-label="Pesquisar amigo"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.1" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.3-3.3"/></svg></button>
+        <button class="social-icon-btn regular-only social-top-add-btn" type="button" id="socialTopAddButton" aria-label="Adicionar amigo"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19c0-2.2-2-4-4.5-4S6 16.8 6 19"/><circle cx="10.5" cy="8" r="3.5"/><path d="M19 8v6M16 11h6"/></svg></button>
+        <button class="social-icon-btn regular-only" type="button" id="socialMoreButton" aria-label="Mais opções"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>
+        <button class="social-icon-btn selection-only" type="button" id="socialExitSelectionButton" aria-label="Cancelar seleção"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div class="social-selection-count selection-only" id="socialSelectionCount">0</div>
+        <div class="social-title-wrap selection-only"></div>
+        <button class="social-icon-btn selection-only" type="button" data-social-bulk-action="favorite" aria-label="Favoritar"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.5 6.5 21l1.6-6.3L3 10.5l6.7-.4L12 4l2.3 6.1 6.7.4-5.1 4.2 1.6 6.3z"/></svg></button>
+        <button class="social-icon-btn selection-only" type="button" data-social-bulk-action="mute" aria-label="Silenciar"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-9.8-4.6M6 8c0 7-3 7-3 9h12"/><path d="M10 21h4M3 3l18 18"/></svg></button>
+        <button class="social-icon-btn selection-only" type="button" data-social-bulk-action="archive" aria-label="Arquivar"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v4H4zM6 8v12h12V8M9 12h6"/></svg></button>
+        <button class="social-icon-btn selection-only" type="button" data-social-bulk-action="remove" aria-label="Remover amizade"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>
+      </header>
+      <div class="social-search-panel" id="socialSearchPanel" hidden><label class="social-search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg><input class="social-search-input" id="socialSearchInput" type="search" placeholder="Buscar amigo" autocomplete="off" /></label></div>
+      <div class="social-invite-form" id="socialInviteForm" hidden><input class="text-field social-invite-input" id="socialInviteInput" type="text" autocomplete="off" placeholder="Digite o nome do amigo" /><button class="primary-btn social-invite-submit" type="button" id="socialInviteSubmitButton">Enviar convite</button></div>
+      <section class="social-summary"><div class="social-summary-card"><div class="social-summary-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></div><div class="social-summary-copy"><div class="social-summary-label">Placar entre amigos</div><div class="social-summary-value"><span id="socialTotalPoints">0</span> pontos</div><div class="social-summary-note" id="socialSummaryNote">Pontuação acumulada no período atual</div></div></div></section>
+      <div class="social-list-label"><span>Ranking</span><span id="socialPeriodLabel">Hoje</span></div>
+      <p class="social-modal-status" id="socialModalStatus" aria-live="polite"></p>
+      <div class="social-modal-list" id="socialModalList"></div>
+      <div class="social-empty-state" id="socialEmptyState" hidden><strong>Ninguém apareceu por aqui</strong>Tente outro nome ou período.</div>
+      <button class="social-fab" type="button" id="socialInviteToggleButton" aria-label="Adicionar amigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <footer class="social-scope-footer" id="socialScopeFooter" aria-label="Filtro de período"><div class="social-period-caption" id="socialDateCaption">Hoje</div><div class="social-period-row"><button class="social-scope-nav" type="button" id="socialScopePrevButton" aria-label="Período anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="social-scope-chip active" type="button" data-social-scope="today">Hoje</button><button class="social-scope-chip" type="button" data-social-scope="last7">7 dias</button><button class="social-scope-chip" type="button" data-social-scope="last15">15 dias</button><button class="social-scope-chip" type="button" data-social-scope="last30">30 dias</button><button class="social-scope-nav" type="button" id="socialScopeNextButton" aria-label="Próximo período"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></footer>
+      <div class="social-toast" id="socialToast" role="status" aria-live="polite"></div>
+    </div>
+  </section>
 
   <section class="workspace-modal points-update-modal" id="pointsUpdateModal" aria-hidden="true" aria-label="Atualização da pontuação diária">
     <div class="points-update-shell" role="status" aria-live="polite">
