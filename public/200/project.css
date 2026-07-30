@@ -8313,6 +8313,15 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
 .mission-variant-unit-tabs button { border:1px solid rgba(255,255,255,.18); border-radius:14px; padding:13px; background:rgba(255,255,255,.07); color:#fff; font-weight:900; }
 .mission-variant-unit-tabs button.active { background:#1765d8; border-color:#5ea0ff; }
 .mission-variant-editor-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.mission-variants-kicker,
+.mission-variants-title { display:none; }
+.mission-variant-editor-step { display:grid; gap:16px; }
+.mission-variant-stage-copy { display:grid; gap:4px; text-align:center; }
+.mission-variant-stage-copy strong { color:#fff; font-size:1rem; font-weight:900; }
+.mission-variant-stage-copy span { color:rgba(255,255,255,.64); font-size:.82rem; font-weight:800; }
+.mission-variant-save-green { background:#22c55e !important; color:#fff !important; }
+.mission-variant-save-green:hover { background:#16a34a !important; }
+
 
 .history-mission-run-title-icon {
   width: clamp(48px, 13vw, 72px);

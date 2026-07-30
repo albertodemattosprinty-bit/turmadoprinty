@@ -778,6 +778,17 @@ const missionVariantTitleInput = document.getElementById("missionVariantTitleInp
 const missionVariantDeadlinePrev = document.getElementById("missionVariantDeadlinePrev");
 const missionVariantDeadlineNext = document.getElementById("missionVariantDeadlineNext");
 const missionVariantDeadlineValue = document.getElementById("missionVariantDeadlineValue");
+const missionVariantEditorStep1 = document.getElementById("missionVariantEditorStep1");
+const missionVariantEditorStep2 = document.getElementById("missionVariantEditorStep2");
+const missionVariantEditorStep3 = document.getElementById("missionVariantEditorStep3");
+const missionVariantDurationPrev = document.getElementById("missionVariantDurationPrev");
+const missionVariantDurationNext = document.getElementById("missionVariantDurationNext");
+const missionVariantDurationValue = document.getElementById("missionVariantDurationValue");
+const missionVariantDurationUnit = document.getElementById("missionVariantDurationUnit");
+const missionVariantNextDuePrev = document.getElementById("missionVariantNextDuePrev");
+const missionVariantNextDueNext = document.getElementById("missionVariantNextDueNext");
+const missionVariantNextDueValue = document.getElementById("missionVariantNextDueValue");
+const missionVariantNextDueHint = document.getElementById("missionVariantNextDueHint");
 const missionVariantHoursButton = document.getElementById("missionVariantHoursButton");
 const missionVariantDaysButton = document.getElementById("missionVariantDaysButton");
 const missionVariantStatus = document.getElementById("missionVariantStatus");
@@ -11227,6 +11238,59 @@ function formatMissionUnitDurationLabel(seconds) {
   return `${formatMissionDurationValue(seconds)} por unidade`;
 }
 
+function formatMissionVariantNextDueLabel(offsetDays) {
+  const safeOffset = Math.max(0, Math.min(30, Math.trunc(Number(offsetDays || 0) || 0)));
+  if (safeOffset === 0) return { value: "Hoje", hint: "Vence hoje" };
+  if (safeOffset === 1) return { value: "Amanhã", hint: "Em 1 dia" };
+  const date = new Date(getServerNowMs() + safeOffset * 86400000);
+  return { value: `${date.getDate()} de ${date.getMonth() + 1}`, hint: `Em ${safeOffset} dias` };
+}
+
+function getMissionVariantNextDueAtIso(offsetDays) {
+  const safeOffset = Math.max(0, Math.min(30, Math.trunc(Number(offsetDays || 0) || 0)));
+  return new Date(getServerNowMs() + safeOffset * 86400000).toISOString();
+}
+
+function getMissionVariantNextDueOffsetDays(variant) {
+  const dueMs = new Date(variant?.nextDueAt || "").getTime();
+  if (!Number.isFinite(dueMs)) return 0;
+  return Math.max(0, Math.min(30, Math.round((dueMs - getServerNowMs()) / 86400000)));
+}
+
+function attachAddingFastControl(button, onStep) {
+  if (!button || typeof onStep !== "function") return;
+  let holdTimer = null;
+  let repeatTimer = null;
+  let held = false;
+  const clear = () => {
+    if (holdTimer) window.clearTimeout(holdTimer);
+    if (repeatTimer) window.clearInterval(repeatTimer);
+    holdTimer = null;
+    repeatTimer = null;
+  };
+  button.addEventListener("pointerdown", (event) => {
+    if (button.disabled) return;
+    held = false;
+    clear();
+    try { button.setPointerCapture(event.pointerId); } catch {}
+    holdTimer = window.setTimeout(() => {
+      held = true;
+      onStep(5);
+      repeatTimer = window.setInterval(() => onStep(5), 300);
+    }, 300);
+  });
+  ["pointerup", "pointerleave", "pointercancel", "lostpointercapture"].forEach((type) => button.addEventListener(type, clear));
+  button.addEventListener("click", (event) => {
+    if (held) {
+      event.preventDefault();
+      event.stopPropagation();
+      held = false;
+      return;
+    }
+    onStep(1);
+  });
+}
+
 function formatMissionTimePromptLabel(title) {
   const safeTitle = String(title || "esta missão").trim() || "esta missão";
   return `Quanto tempo leva 1 ${safeTitle}?`;
@@ -14709,14 +14773,8 @@ function renderMissionVariants() {
   const cycleChooseMode = state.missionVariants.mode === "cycle-choose";
   const cycleSelectionTarget = normalizeMissionRunCycleTarget(state.missionVariants.cycleSelectionTarget);
   const cycleSelections = Array.isArray(state.missionVariants.cycleSelections) ? state.missionVariants.cycleSelections : [];
-  if (missionVariantsKicker) missionVariantsKicker.textContent = chooseMode ? "Antes de iniciar" : "Micro-tarefas da missão";
-  if (missionVariantsTitle) {
-    missionVariantsTitle.textContent = cycleChooseMode
-      ? `Escolha a micro-tarefa do ciclo ${Math.min(cycleSelections.length + 1, cycleSelectionTarget)}`
-      : chooseMode
-        ? "Qual micro-tarefa você vai fazer?"
-        : (getMissionRunGoalById(state.missionVariants.goalId)?.title || "Lista de micro-tarefas");
-  }
+  if (missionVariantsKicker) missionVariantsKicker.textContent = "";
+  if (missionVariantsTitle) missionVariantsTitle.textContent = "";
   if (missionVariantCycleSelection) {
     missionVariantCycleSelection.hidden = !cycleChooseMode;
     missionVariantCycleSelection.textContent = cycleChooseMode
@@ -14738,7 +14796,19 @@ function renderMissionVariants() {
       button.classList.toggle("active", button.dataset.missionVariantSort === state.missionVariants.sortMode);
     });
   }
+  const editorStep = Math.max(1, Math.min(3, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
+  if (missionVariantEditorStep1) missionVariantEditorStep1.hidden = editorStep !== 1;
+  if (missionVariantEditorStep2) missionVariantEditorStep2.hidden = editorStep !== 2;
+  if (missionVariantEditorStep3) missionVariantEditorStep3.hidden = editorStep !== 3;
+  if (missionVariantEditorCancel) missionVariantEditorCancel.textContent = editorStep > 1 ? "Voltar" : "Cancelar";
+  if (missionVariantEditorSave) missionVariantEditorSave.textContent = editorStep < 3 ? "Continuar" : "Salvar";
   if (missionVariantDeadlineValue) missionVariantDeadlineValue.textContent = String(state.missionVariants.intervalValue || 1);
+  const variantDuration = normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds);
+  if (missionVariantDurationValue) missionVariantDurationValue.textContent = variantDuration >= 60 && variantDuration % 60 === 0 ? String(variantDuration / 60) : String(variantDuration);
+  if (missionVariantDurationUnit) missionVariantDurationUnit.textContent = formatMissionUnitDurationLabel(variantDuration);
+  const nextDueLabel = formatMissionVariantNextDueLabel(state.missionVariants.nextDueOffsetDays);
+  if (missionVariantNextDueValue) missionVariantNextDueValue.textContent = nextDueLabel.value;
+  if (missionVariantNextDueHint) missionVariantNextDueHint.textContent = nextDueLabel.hint;
   missionVariantHoursButton?.classList.toggle("active", state.missionVariants.intervalUnit === "hours");
   missionVariantDaysButton?.classList.toggle("active", state.missionVariants.intervalUnit === "days");
   if (!missionVariantsList) return;
@@ -14753,8 +14823,9 @@ function renderMissionVariants() {
         ? Math.max(2, Math.min(100, (timing.overdueMs / timing.intervalMs) * 100))
         : timing.percent;
     const unitLabel = variant.intervalUnit === "hours" ? `${variant.intervalValue}h` : `${variant.intervalValue} ${variant.intervalValue === 1 ? "dia" : "dias"}`;
+    const variantDuration = normalizeMissionDurationOption(variant.unitDurationSeconds || getMissionUnitDurationSeconds(getMissionRunGoalById(state.missionVariants.goalId)) || DEFAULT_MISSION_DURATION_SECONDS);
     return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
-      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
+      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
       ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
@@ -14809,7 +14880,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   cancelMissionRunMusicFade();
   state.missionRun.goalId = String(goal.id || "");
   state.missionRun.startedAtMs = Date.now();
-  state.missionRun.durationMs = Math.max(0, getMissionUnitDurationSeconds(goal) * 1000);
+  state.missionRun.durationMs = Math.max(0, normalizeMissionDurationOption(selectedVariant?.unitDurationSeconds || getMissionUnitDurationSeconds(goal)) * 1000);
   state.missionRun.centerMode = "time";
   state.missionRun.alarmStarted = false;
   state.missionRun.finalizing = false;
@@ -17522,13 +17593,13 @@ missionCreateConfirmButton?.addEventListener("click", () => {
   })();
 });
 
-missionAdjustMinusButton?.addEventListener("click", () => {
-  state.missionAdjust.targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) - 1);
+attachAddingFastControl(missionAdjustMinusButton, (amount) => {
+  state.missionAdjust.targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) - amount);
   renderMissionAdjustState();
 });
 
-missionAdjustPlusButton?.addEventListener("click", () => {
-  state.missionAdjust.targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) + 1);
+attachAddingFastControl(missionAdjustPlusButton, (amount) => {
+  state.missionAdjust.targetValue = Math.max(1, Math.trunc(Number(state.missionAdjust.targetValue || 1) || 1) + amount);
   renderMissionAdjustState();
 });
 missionLimitCountSleepTime?.addEventListener("change", () => {
@@ -18087,16 +18158,13 @@ missionQuickAssignCloseButton?.addEventListener("click", () => {
 missionTimeCloseButton?.addEventListener("click", () => {
   closeModal("missionTimeModal");
 });
-missionTimeMinusButton?.addEventListener("click", () => {
+function moveMissionTimeBySteps(amount) {
   const currentIndex = MISSION_DURATION_OPTIONS_SECONDS.indexOf(normalizeMissionDurationOption(state.missionTime?.value));
-  state.missionTime.value = MISSION_DURATION_OPTIONS_SECONDS[Math.max(0, currentIndex - 1)];
+  state.missionTime.value = MISSION_DURATION_OPTIONS_SECONDS[Math.max(0, Math.min(MISSION_DURATION_OPTIONS_SECONDS.length - 1, currentIndex + amount))];
   renderMissionTimeState();
-});
-missionTimePlusButton?.addEventListener("click", () => {
-  const currentIndex = MISSION_DURATION_OPTIONS_SECONDS.indexOf(normalizeMissionDurationOption(state.missionTime?.value));
-  state.missionTime.value = MISSION_DURATION_OPTIONS_SECONDS[Math.min(MISSION_DURATION_OPTIONS_SECONDS.length - 1, currentIndex + 1)];
-  renderMissionTimeState();
-});
+}
+attachAddingFastControl(missionTimeMinusButton, (amount) => moveMissionTimeBySteps(-amount));
+attachAddingFastControl(missionTimePlusButton, (amount) => moveMissionTimeBySteps(amount));
 missionTimeConfirmButton?.addEventListener("click", () => {
   const safeValue = normalizeMissionDurationOption(state.missionTime?.value);
   if (state.missionTime?.mode === "create") {
@@ -18203,15 +18271,34 @@ missionVariantAddButton?.addEventListener("click", () => {
   window.setTimeout(() => missionVariantTitleInput?.focus(), 40);
 });
 missionVariantEditorCancel?.addEventListener("click", () => {
-  state.missionVariants.editorOpen = false;
+  if (Math.max(1, Number(state.missionVariants.editorStep || 1)) > 1) {
+    state.missionVariants.editorStep = Math.max(1, Number(state.missionVariants.editorStep || 1) - 1);
+  } else {
+    state.missionVariants.editorOpen = false;
+  }
   renderMissionVariants();
 });
-missionVariantDeadlinePrev?.addEventListener("click", () => {
-  state.missionVariants.intervalValue = Math.max(1, Number(state.missionVariants.intervalValue || 1) - 1);
+attachAddingFastControl(missionVariantDeadlinePrev, (amount) => {
+  state.missionVariants.intervalValue = Math.max(1, Number(state.missionVariants.intervalValue || 1) - amount);
   renderMissionVariants();
 });
-missionVariantDeadlineNext?.addEventListener("click", () => {
-  state.missionVariants.intervalValue = Math.min(999, Number(state.missionVariants.intervalValue || 1) + 1);
+attachAddingFastControl(missionVariantDeadlineNext, (amount) => {
+  state.missionVariants.intervalValue = Math.min(999, Number(state.missionVariants.intervalValue || 1) + amount);
+  renderMissionVariants();
+});
+function moveMissionVariantDurationBySteps(amount) {
+  const currentIndex = MISSION_DURATION_OPTIONS_SECONDS.indexOf(normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds));
+  state.missionVariants.unitDurationSeconds = MISSION_DURATION_OPTIONS_SECONDS[Math.max(0, Math.min(MISSION_DURATION_OPTIONS_SECONDS.length - 1, currentIndex + amount))];
+  renderMissionVariants();
+}
+attachAddingFastControl(missionVariantDurationPrev, (amount) => moveMissionVariantDurationBySteps(-amount));
+attachAddingFastControl(missionVariantDurationNext, (amount) => moveMissionVariantDurationBySteps(amount));
+attachAddingFastControl(missionVariantNextDuePrev, (amount) => {
+  state.missionVariants.nextDueOffsetDays = Math.max(0, Number(state.missionVariants.nextDueOffsetDays || 0) - amount);
+  renderMissionVariants();
+});
+attachAddingFastControl(missionVariantNextDueNext, (amount) => {
+  state.missionVariants.nextDueOffsetDays = Math.min(30, Number(state.missionVariants.nextDueOffsetDays || 0) + amount);
   renderMissionVariants();
 });
 missionVariantHoursButton?.addEventListener("click", () => { state.missionVariants.intervalUnit = "hours"; renderMissionVariants(); });
@@ -18227,7 +18314,7 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/variants${editingId ? `/${encodeURIComponent(editingId)}` : ""}`, {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit })
+      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays) })
     });
     state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
     missionVariantsCache.set(String(goalId || ""), { loadedAt: Date.now(), items: state.missionVariants.items });

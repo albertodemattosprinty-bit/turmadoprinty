@@ -192,16 +192,30 @@ async function buildExtraGoalBestIntervals(userId, profileName, events = []) {
 }
 
 function normalizeExtraGoalVariantRow(row) {
+  const unitDurationSeconds = Math.max(0, Math.trunc(Number(row.unit_duration_seconds || 0) || 0));
   return {
     id: row.id,
     goalId: row.goal_id,
     title: normalizeExtraGoalTitle(row.title),
     intervalValue: Math.max(1, Math.trunc(Number(row.interval_value || 1))),
     intervalUnit: normalizeExtraGoalVariantUnit(row.interval_unit),
+    unitDurationSeconds,
+    nextDueAt: row.next_due_at ? new Date(row.next_due_at).toISOString() : null,
     lastCompletedAt: row.last_completed_at ? new Date(row.last_completed_at).toISOString() : null,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null
   };
+}
+
+function normalizeVariantDurationSeconds(value) {
+  return Math.max(0, Math.min(10800, Math.trunc(Number(value || 0) || 0)));
+}
+
+function normalizeVariantNextDueAt(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function toDateKey(value = new Date()) {
@@ -572,6 +586,8 @@ export async function ensureExtraGoalsSchema() {
       updated_at timestamptz not null default now()
     );
   `);
+  await query("alter table extra_goal_variants add column if not exists unit_duration_seconds integer not null default 0;");
+  await query("alter table extra_goal_variants add column if not exists next_due_at timestamptz;");
   await query("create index if not exists idx_extra_goal_variants_owner on extra_goal_variants(user_id, goal_id, assigned_profile, updated_at desc);");
   await query(`
     create table if not exists project200_user_active_time (
@@ -730,7 +746,7 @@ export async function listExtraGoalVariants(userId, profileName, goalId) {
   const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
   if (!goal) throw new Error("Missao nao encontrada.");
   const result = await query(`
-    select id, goal_id, title, interval_value, interval_unit, last_completed_at, created_at, updated_at
+    select id, goal_id, title, interval_value, interval_unit, unit_duration_seconds, next_due_at, last_completed_at, created_at, updated_at
     from extra_goal_variants
     where user_id = $1 and assigned_profile = $2 and goal_id = $3
     order by updated_at desc, created_at asc
@@ -744,13 +760,15 @@ export async function createExtraGoalVariant(userId, profileName, goalId, payloa
   const title = normalizeExtraGoalTitle(payload?.title);
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
+  const unitDurationSeconds = normalizeVariantDurationSeconds(payload?.unitDurationSeconds);
+  const nextDueAt = normalizeVariantNextDueAt(payload?.nextDueAt);
   if (!title) throw new Error("Informe o nome da micro-tarefa.");
   const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
   if (!goal) throw new Error("Missao nao encontrada.");
   await query(`
-    insert into extra_goal_variants (user_id, goal_id, assigned_profile, title, interval_value, interval_unit)
-    values ($1, $2, $3, $4, $5, $6)
-  `, [userId, safeGoalId, normalizedProfile, title, intervalValue, intervalUnit]);
+    insert into extra_goal_variants (user_id, goal_id, assigned_profile, title, interval_value, interval_unit, unit_duration_seconds, next_due_at)
+    values ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)
+  `, [userId, safeGoalId, normalizedProfile, title, intervalValue, intervalUnit, unitDurationSeconds, nextDueAt]);
   return listExtraGoalVariants(userId, normalizedProfile, safeGoalId);
 }
 
@@ -760,11 +778,13 @@ export async function updateExtraGoalVariant(userId, profileName, goalId, varian
   const title = normalizeExtraGoalTitle(payload?.title);
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
+  const unitDurationSeconds = normalizeVariantDurationSeconds(payload?.unitDurationSeconds);
+  const nextDueAt = normalizeVariantNextDueAt(payload?.nextDueAt);
   if (!title) throw new Error("Informe o nome da micro-tarefa.");
   const result = await query(`
-    update extra_goal_variants set title = $5, interval_value = $6, interval_unit = $7, updated_at = now()
+    update extra_goal_variants set title = $5, interval_value = $6, interval_unit = $7, unit_duration_seconds = $8, next_due_at = $9::timestamptz, updated_at = now()
     where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2
-  `, [userId, normalizedProfile, goalId, variantId, title, intervalValue, intervalUnit]);
+  `, [userId, normalizedProfile, goalId, variantId, title, intervalValue, intervalUnit, unitDurationSeconds, nextDueAt]);
   if (!result.rowCount) throw new Error("Micro-tarefa nao encontrada.");
   return listExtraGoalVariants(userId, normalizedProfile, goalId);
 }
@@ -1162,7 +1182,10 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
   ].map((value) => String(value || "").trim()).filter(Boolean))].slice(0, EXTRA_GOAL_MAX_CYCLES);
   if (safeDelta > 0 && safeVariantIds.length) {
     await query(`
-      update extra_goal_variants set last_completed_at = now(), updated_at = now()
+      update extra_goal_variants
+      set last_completed_at = now(),
+          next_due_at = now() + (interval '1 hour' * case when interval_unit = 'hours' then interval_value else interval_value * 24 end),
+          updated_at = now()
       where id = any($4::uuid[]) and goal_id = $1 and user_id = $2 and assigned_profile = $3
     `, [safeGoalId, userId, normalizedProfile, safeVariantIds]);
   }
