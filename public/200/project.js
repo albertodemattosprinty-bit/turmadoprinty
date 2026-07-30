@@ -14907,6 +14907,19 @@ function formatLimitElapsedDuration(totalSeconds) {
   return parts.length > 1 ? `${parts[0]} e ${parts[1]}` : parts[0];
 }
 
+function formatLimitElapsedDurationDetailed(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
+  const days = Math.floor(safeSeconds / 86400);
+  const hours = Math.floor((safeSeconds % 86400) / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${days} ${days === 1 ? "dia" : "dias"}`);
+  if (hours > 0 || parts.length) parts.push(`${hours}h`);
+  parts.push(`${String(minutes).padStart(2, "0")}min`);
+  parts.push(`${String(seconds).padStart(2, "0")}s`);
+  return parts.join(" ");
+}
 function formatLimitLastProgress(goal) {
   const lastProgressMs = new Date(goal?.lastProgressAt || "").getTime();
   if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcação ainda";
@@ -14996,17 +15009,22 @@ function renderLimitHistoryModal() {
     const currentRank = currentRecord ? rankedRecords.findIndex((record) => record.isCurrent) + 1 : 0;
     const visibleRecords = rankedRecords.slice(0, 50);
     if (currentRecord && currentRank > 50) visibleRecords.push(currentRecord);
-    const averageRecord = averageSeconds > 0 ? {
+    const closedIntervalCount = Math.max(0, Number(state.limitHistory?.intervalCount || records.length || 0));
+    const dynamicAverageSeconds = closedIntervalCount > 0 || currentRecord
+      ? Math.round(((averageSeconds * closedIntervalCount) + Number(currentRecord?.durationSeconds || 0)) / (closedIntervalCount + (currentRecord ? 1 : 0)))
+      : 0;
+    const averageRecord = dynamicAverageSeconds > 0 ? {
       isAverage: true,
-      durationSeconds: averageSeconds,
-      intervalCount: Math.max(0, Number(state.limitHistory?.intervalCount || records.length || 0))
+      durationSeconds: dynamicAverageSeconds,
+      intervalCount: closedIntervalCount + (currentRecord ? 1 : 0),
+      includesCurrent: Boolean(currentRecord)
     } : null;
     const displayRecords = averageRecord ? [averageRecord, ...visibleRecords] : visibleRecords;
     limitHistoryList.innerHTML = displayRecords.length
       ? displayRecords.map((record) => {
           const rankLabel = record.isAverage ? "Média" : `#${record.isCurrent ? currentRank : (rankedRecords.indexOf(record) + 1)}`;
           const metaLabel = record.isAverage
-            ? `Intervalo geral entre ${record.intervalCount} tempos fechados`
+            ? `${record.includesCurrent ? "Média dinâmica" : "Média geral"} entre ${record.intervalCount} intervalos${record.includesCurrent ? " incluindo o atual" : " fechados"}`
             : record.isCurrent
               ? "Tempo atual se fechar agora"
               : `${escapeHtml(formatLimitHistoryDate(record.fromAt))} → ${escapeHtml(formatLimitHistoryDate(record.toAt))}`;
@@ -15014,7 +15032,7 @@ function renderLimitHistoryModal() {
           <article class="limit-history-record${record.isCurrent ? " is-current" : ""}${record.isAverage ? " is-average" : ""}">
             <span class="limit-history-record-rank">${rankLabel}</span>
             <div class="limit-history-record-copy">
-              <strong>${escapeHtml(formatLimitElapsedDuration(record.durationSeconds))}</strong>
+              <strong>${escapeHtml(record.isAverage ? formatLimitElapsedDurationDetailed(record.durationSeconds) : formatLimitElapsedDuration(record.durationSeconds))}</strong>
               <span>${metaLabel}</span>
               ${Number(record.sleepExcludedSeconds || 0) > 0 ? `<span>Sono descontado: ${escapeHtml(formatLimitElapsedDuration(record.sleepExcludedSeconds))}</span>` : ""}
             </div>
