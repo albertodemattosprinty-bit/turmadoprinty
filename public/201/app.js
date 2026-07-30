@@ -28,8 +28,35 @@ const elements = {
   buttonInput: document.getElementById("buttonLabelInput")
 };
 
+function readTokenCookie() {
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)turma_do_printy_token=([^;]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
 function getToken() {
-  return localStorage.getItem(tokenKey) || sessionStorage.getItem(tokenKey) || "";
+  const saved = localStorage.getItem(tokenKey) || sessionStorage.getItem(tokenKey) || "";
+  if (saved) return saved;
+  const cookieToken = readTokenCookie();
+  if (cookieToken) {
+    try {
+      localStorage.setItem(tokenKey, cookieToken);
+    } catch {}
+  }
+  return cookieToken;
+}
+
+function showAdminLoginPrompt(message = "Entre com uma conta ADMIN para editar a versao minima global.") {
+  elements.publicStatus.innerHTML = "";
+  const text = document.createElement("span");
+  text.textContent = message + " ";
+  const link = document.createElement("a");
+  link.href = "/log?next=/201";
+  link.textContent = "Entrar como admin";
+  elements.publicStatus.append(text, link);
 }
 
 function normalizeConfig(config) {
@@ -80,7 +107,7 @@ async function loadConfig() {
 
 async function revealAdminIfAllowed() {
   if (!getToken()) {
-    elements.publicStatus.textContent = "Entre com uma conta ADMIN para editar a versao minima global.";
+    showAdminLoginPrompt();
     return;
   }
   try {
