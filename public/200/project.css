@@ -2814,7 +2814,7 @@ body.running-music-standalone #actionsModal .actions-list {
 }
 
 #runningConfirmModal.workspace-modal {
-  z-index: 2800;
+  z-index: 14500 !important;
 }
 
 #startConflictModal.workspace-modal {

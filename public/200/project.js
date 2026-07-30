@@ -14853,40 +14853,7 @@ function interpolateLimitColor(ratio) {
 function getLimitProgressVisual(goal, historyRangeActive = false) {
   const progress = Math.max(0, Number(goal?.progressValue || 0));
   const target = Math.max(1, Number(goal?.targetValue || 1));
-  let ratio;
-  if (historyRangeActive) {
-    ratio = (progress / target) * 100;
-  } else {
-    const nowMs = getServerNowMs();
-    const intervalValue = Math.max(1, Math.trunc(Number(goal?.limitIntervalValue || 1)));
-    const intervalUnit = String(goal?.limitIntervalUnit || "day").trim().toLowerCase();
-    let elapsedFraction;
-    let startsFromEarlyProgress = false;
-    if (intervalValue === 1 && intervalUnit === "day") {
-      const activeWindow = getActiveTimeWindow(nowMs);
-      const firstProgressMs = new Date(goal?.limitFirstProgressAt || "").getTime();
-      startsFromEarlyProgress = Number.isFinite(firstProgressMs)
-        && firstProgressMs < activeWindow.startMs
-        && firstProgressMs < activeWindow.endMs;
-      const effectiveStartMs = startsFromEarlyProgress ? firstProgressMs : activeWindow.startMs;
-      elapsedFraction = Math.max(0, Math.min(
-        1,
-        (nowMs - effectiveStartMs) / Math.max(1, activeWindow.endMs - effectiveStartMs)
-      ));
-    } else {
-      const startMs = new Date(goal?.limitCycleStartedAt || goal?.createdAt || "").getTime();
-      const endMs = new Date(goal?.limitCycleEndsAt || "").getTime();
-      elapsedFraction = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
-        ? Math.max(0, Math.min(1, (nowMs - startMs) / (endMs - startMs)))
-        : 1;
-    }
-    const expectedLimitNow = Math.min(target, (target * elapsedFraction) + (startsFromEarlyProgress ? 1 : 0));
-    ratio = progress <= 0
-      ? 0
-      : expectedLimitNow > 0
-        ? (progress / expectedLimitNow) * 100
-        : (progress / target) * 100;
-  }
+  const ratio = (progress / target) * 100;
   const organicRatio = Math.max(0, Number.isFinite(ratio) ? ratio : 0);
   const visualRatio = Math.min(400, organicRatio);
   const width = Math.min(100, 40 + (Math.min(100, visualRatio) * 0.6));
@@ -15143,7 +15110,7 @@ function createMissionCard(goal, initialPercent = null) {
     : dailyVariantProgress
       ? dailyVariantProgress.label
       : limit
-        ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do esperado` : formatLimitLastProgress(goal))
+        ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do limite` : formatLimitLastProgress(goal))
         : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}`;
   const card = document.createElement("article");
   const hasInitialPercent = initialPercent !== null && initialPercent !== undefined && Number.isFinite(Number(initialPercent));
