@@ -3,8 +3,8 @@
 const CONFIG_KEY = "project200_android_update";
 
 export const PROJECT201_DEFAULT_UPDATE_CONFIG = {
-  currentVersion: "0.7",
-  minimumVersion: "0.7",
+  currentVersion: "0.71",
+  minimumVersion: "0.71",
   downloadUrl: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk",
   title: "Atualizacao do iLife disponivel",
   message: "Para continuar usando o iLife MindsetPlan com seguranca, baixe a versao mais recente do aplicativo.",

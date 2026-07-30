@@ -16,6 +16,14 @@ const project200AppVersion = "0.7";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
+function isProject200NativeApp() {
+  try {
+    return Boolean(window.Capacitor?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+}
+
 function compareProject200Versions(left, right) {
   const leftParts = String(left || "").trim().split(".").map((part) => Number.parseInt(part, 10) || 0);
   const rightParts = String(right || "").trim().split(".").map((part) => Number.parseInt(part, 10) || 0);
@@ -29,23 +37,136 @@ function compareProject200Versions(left, right) {
   return 0;
 }
 
-async function enforceProject200MinimumAppVersion() {
-  try {
-    const response = await fetch(getApiUrl("/api/201/app-update"), { cache: "no-store" });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) return false;
-    const minimumVersion = String(payload?.config?.minimumVersion || "").trim();
-    if (!minimumVersion || compareProject200Versions(project200AppVersion, minimumVersion) >= 0) return false;
-    const target = new URL(getApiUrl("/201"), window.location.href);
-    target.searchParams.set("from", "200");
-    target.searchParams.set("version", project200AppVersion);
-    target.searchParams.set("minimum", minimumVersion);
-    window.location.replace(target.toString());
-    return true;
-  } catch {
-    return false;
-  }
+function normalizeProject200AppUpdateConfig(config = {}) {
+  return {
+    currentVersion: String(config.currentVersion || project200AppVersion).trim() || project200AppVersion,
+    minimumVersion: String(config.minimumVersion || project200AppVersion).trim() || project200AppVersion,
+    downloadUrl: String(config.downloadUrl || project200LatestDebugApkUrl).trim() || project200LatestDebugApkUrl,
+    title: String(config.title || "Atualizacao obrigatoria do iLife").trim() || "Atualizacao obrigatoria do iLife",
+    message: String(config.message || "Baixe a versao mais recente do aplicativo para continuar usando o iLife MindsetPlan.").trim() || "Baixe a versao mais recente do aplicativo para continuar usando o iLife MindsetPlan.",
+    buttonLabel: String(config.buttonLabel || "Baixar APK atualizado").trim() || "Baixar APK atualizado"
+  };
 }
+
+async function loadProject200AppUpdateConfig() {
+  const response = await fetch(getApiUrl("/api/201/app-update"), { cache: "no-store" });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || "Nao foi possivel verificar a versao do app.");
+  return normalizeProject200AppUpdateConfig(payload?.config || {});
+}
+
+function isProject200AppOutdated(config) {
+  return compareProject200Versions(project200AppVersion, config?.minimumVersion) < 0;
+}
+
+function buildProject200AppDownloadUrl(config) {
+  const downloadUrl = new URL(config?.downloadUrl || project200LatestDebugApkUrl);
+  downloadUrl.searchParams.set("download", "1");
+  downloadUrl.searchParams.set("v", config?.currentVersion || config?.minimumVersion || project200AppVersion);
+  downloadUrl.searchParams.set("t", String(Date.now()));
+  return downloadUrl.toString();
+}
+
+function ensureProject200UpdateModal() {
+  let modal = document.getElementById("project200RequiredUpdateModal");
+  if (modal) return modal;
+  modal = document.createElement("section");
+  modal.id = "project200RequiredUpdateModal";
+  modal.className = "workspace-modal simple-modal project200-required-update-modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.setAttribute("aria-label", "Atualizacao obrigatoria do app");
+  modal.innerHTML = [
+    '<div class="simple-modal-content project200-required-update-content">',
+    '<div class="project200-required-update-icon" aria-hidden="true">',
+    '<svg viewBox="0 0 160 160"><circle cx="80" cy="80" r="72" fill="#e7f5ff"/><path d="M80 30v65" stroke="#0b7285" stroke-width="14" stroke-linecap="round"/><path d="M49 72l31 31 31-31" fill="none" stroke="#0b7285" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 122h76" stroke="#1864ab" stroke-width="14" stroke-linecap="round"/></svg>',
+    '</div>',
+    '<h2 id="project200RequiredUpdateTitle">Atualizacao obrigatoria do iLife</h2>',
+    '<p id="project200RequiredUpdateMessage">Baixe a versao mais recente do aplicativo para continuar.</p>',
+    '<p class="project200-required-update-version" id="project200RequiredUpdateVersion"></p>',
+    '<button class="primary-btn" type="button" id="project200RequiredUpdateDownloadButton">Baixar APK atualizado</button>',
+    '</div>'
+  ].join("");
+  document.body.appendChild(modal);
+  const style = document.createElement("style");
+  style.textContent = [
+    '.project200-required-update-modal{z-index:9999;background:rgba(9,16,24,.86);backdrop-filter:blur(8px)}',
+    '.project200-required-update-modal.active{display:flex;align-items:center;justify-content:center;padding:18px}',
+    '.project200-required-update-content{width:min(440px,100%);text-align:center;border-radius:8px;padding:28px 20px;background:#fff;color:#17212b;box-shadow:0 24px 70px rgba(0,0,0,.35)}',
+    '.project200-required-update-icon{width:min(48vw,180px);aspect-ratio:1;margin:0 auto 12px}',
+    '.project200-required-update-icon svg{width:100%;height:100%;display:block}',
+    '.project200-required-update-content h2{margin:0;font-size:clamp(1.7rem,7vw,3rem);line-height:1;letter-spacing:0}',
+    '.project200-required-update-content p{margin:14px 0 0;color:#495866;line-height:1.5}',
+    '.project200-required-update-version{font-size:.92rem;font-weight:800;color:#0b7285!important}',
+    '#project200RequiredUpdateDownloadButton{width:100%;min-height:52px;margin-top:18px;border-radius:8px}'
+  ].join('');
+  document.head.appendChild(style);
+  return modal;
+}
+
+function openProject200RequiredUpdateModal(config) {
+  const modal = ensureProject200UpdateModal();
+  const title = document.getElementById("project200RequiredUpdateTitle");
+  const message = document.getElementById("project200RequiredUpdateMessage");
+  const version = document.getElementById("project200RequiredUpdateVersion");
+  const button = document.getElementById("project200RequiredUpdateDownloadButton");
+  if (title) title.textContent = config.title;
+  if (message) message.textContent = config.message;
+  if (version) version.textContent = "Versao instalada " + project200AppVersion + " - minima " + config.minimumVersion;
+  if (button) {
+    button.textContent = config.buttonLabel;
+    button.onclick = () => triggerProject200ApkDownload(config);
+  }
+  modal.classList.add("active");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+}
+
+function triggerProject200ApkDownload(config) {
+  const downloadLink = document.createElement("a");
+  downloadLink.href = buildProject200AppDownloadUrl(config);
+  downloadLink.download = "iLife-Mindset-v" + (config.currentVersion || config.minimumVersion || project200AppVersion) + "-debug.apk";
+  downloadLink.rel = "noopener noreferrer";
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  downloadLink.remove();
+}
+
+async function checkProject200AppUpdate({ userInitiated = false } = {}) {
+  if (!isProject200NativeApp()) return false;
+  const config = await loadProject200AppUpdateConfig();
+  if (isProject200AppOutdated(config)) {
+    openProject200RequiredUpdateModal(config);
+    return true;
+  }
+  if (userInitiated && typeof showFloatingNotice === "function") {
+    showFloatingNotice("Voce ja tem o apk mais atual.");
+  }
+  return false;
+}
+
+function scheduleProject200AppUpdateChecks() {
+  if (!isProject200NativeApp()) return;
+  const now = new Date();
+  const next = new Date(now);
+  const hasPartialHour = Boolean(now.getMinutes() || now.getSeconds() || now.getMilliseconds());
+  const nextHour = Math.ceil((now.getHours() + (hasPartialHour ? 1 : 0)) / 6) * 6;
+  if (nextHour >= 24) {
+    next.setDate(next.getDate() + 1);
+    next.setHours(0, 0, 0, 0);
+  } else {
+    next.setHours(nextHour, 0, 0, 0);
+  }
+  const delay = Math.max(1000, next.getTime() - now.getTime());
+  window.setTimeout(() => {
+    void checkProject200AppUpdate();
+    scheduleProject200AppUpdateChecks();
+  }, delay);
+}
+
+async function enforceProject200MinimumAppVersion() {
+  return checkProject200AppUpdate();
+}
+
 const optionsConfigKey = "project_200_options_v1";
 let optionsConfigLoadPromise = null;
 let project200TutorsUi = null;
