@@ -155,3 +155,46 @@ textarea { resize: vertical; min-height: 118px; }
   .version-row { width: 100%; justify-content: space-between; }
   .download-button, .save-button { width: 100%; }
 }
+
+
+body.admin-mode .update-page {
+  width: min(1120px, 100%);
+}
+
+body.admin-mode .download-panel {
+  min-height: auto;
+  padding: 24px 20px;
+}
+
+body.admin-mode .download-art {
+  width: min(28vw, 132px);
+  margin-bottom: 12px;
+}
+
+body.admin-mode h1 {
+  max-width: 760px;
+  font-size: clamp(1.8rem, 5vw, 3.5rem);
+}
+
+body.admin-mode .message {
+  margin-top: 12px;
+}
+
+body.admin-mode .version-row {
+  margin: 16px 0;
+}
+
+body.admin-mode .admin-panel {
+  display: block;
+  border-color: #0b7285;
+}
+
+body.admin-mode .admin-panel h2::after {
+  content: " - global";
+  color: #0b7285;
+}
+
+body.admin-mode #minimumVersionInput {
+  border-color: #0b7285;
+  box-shadow: 0 0 0 3px rgba(11, 114, 133, 0.12);
+}

@@ -16,6 +16,7 @@ const elements = {
   minimum: document.getElementById("minimumVersionLabel"),
   download: document.getElementById("downloadButton"),
   publicStatus: document.getElementById("publicStatus"),
+  page: document.querySelector(".update-page"),
   adminPanel: document.getElementById("adminPanel"),
   adminForm: document.getElementById("adminForm"),
   adminStatus: document.getElementById("adminStatus"),
@@ -78,14 +79,24 @@ async function loadConfig() {
 }
 
 async function revealAdminIfAllowed() {
-  if (!getToken()) return;
+  if (!getToken()) {
+    elements.publicStatus.textContent = "Entre com uma conta ADMIN para editar a versao minima global.";
+    return;
+  }
   try {
     const payload = await requestJson("/api/auth/me?app=project200", { cache: "no-store" });
     if (String(payload?.user?.role || "").trim().toUpperCase() === "ADMIN") {
+      document.body.classList.add("admin-mode");
       elements.adminPanel.hidden = false;
+      elements.adminPanel.setAttribute("aria-hidden", "false");
+      elements.adminStatus.textContent = "Campos ativos para salvar a versao minima global no Postgres.";
+      elements.minimumInput.focus({ preventScroll: true });
+      return;
     }
-  } catch {
+    elements.publicStatus.textContent = "Sua conta nao tem permissao de ADMIN para editar esta pagina.";
+  } catch (error) {
     elements.adminPanel.hidden = true;
+    elements.publicStatus.textContent = error instanceof Error ? error.message : "Nao foi possivel confirmar sua sessao admin.";
   }
 }
 
