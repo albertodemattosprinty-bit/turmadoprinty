@@ -85,7 +85,7 @@ async function revealAdminIfAllowed() {
   }
   try {
     const payload = await requestJson("/api/auth/me?app=project200", { cache: "no-store" });
-    if (String(payload?.user?.role || "").trim().toUpperCase() === "ADMIN") {
+    if (payload?.user?.isAdmin || String(payload?.user?.role || "").trim().toUpperCase() === "ADMIN") {
       document.body.classList.add("admin-mode");
       elements.adminPanel.hidden = false;
       elements.adminPanel.setAttribute("aria-hidden", "false");
