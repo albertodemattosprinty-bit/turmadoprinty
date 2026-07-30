@@ -8316,6 +8316,7 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
 .mission-variants-kicker,
 .mission-variants-title { display:none; }
 .mission-variant-editor-step { display:grid; gap:16px; }
+.mission-variant-editor-step[hidden] { display:none !important; }
 .mission-variant-stage-copy { display:grid; gap:4px; text-align:center; }
 .mission-variant-stage-copy strong { color:#fff; font-size:1rem; font-weight:900; }
 .mission-variant-stage-copy span { color:rgba(255,255,255,.64); font-size:.82rem; font-weight:800; }
