@@ -12474,7 +12474,7 @@ function renderSocialModal() {
           </div>
           <div class="social-friend-main">
             <div class="social-friend-name">${escapeHtml(String(entry.name || "Você"))}</div>
-            <div class="social-friend-points"><span class="social-point-dot"></span>${points} pontos</div>
+            <div class="social-friend-points">${points} pontos</div>
           </div>
           <div class="social-friend-side">${side}</div>
         </article>

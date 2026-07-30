@@ -7976,9 +7976,9 @@ body[data-background-theme="white"] .social-scope-chip.active {
 .social-check-badge svg { width: 15px; height: 15px; }
 .social-friend-main { min-width: 0; flex: 1; }
 .social-friend-name { font-size: 16px; font-weight: 850; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-.social-friend-points { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.social-friend-points { display: flex; align-items: center; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .social-friend-points--invite { gap: 0; }
-.social-point-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--social-success); box-shadow: 0 0 0 4px rgba(30,185,128,.12); }
+
 .social-friend-side { display: flex; align-items: center; gap: 7px; }
 .social-trend { min-width: 36px; font-size: 11px; font-weight: 850; color: var(--social-success); text-align: right; }
 .social-chat-btn { width: 43px; height: 43px; border: 0; border-radius: 50%; display: grid; place-items: center; color: var(--social-blue-700); background: var(--social-blue-100); }
@@ -9144,9 +9144,9 @@ body[data-background-theme="white"] :is(.primary-btn, .decision-btn, .history-mi
 .social-check-badge svg { width: 15px; height: 15px; }
 .social-friend-main { min-width: 0; flex: 1; }
 .social-friend-name { font-size: 16px; font-weight: 850; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-.social-friend-points { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.social-friend-points { display: flex; align-items: center; margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .social-friend-points--invite { gap: 0; }
-.social-point-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--social-success); box-shadow: 0 0 0 4px rgba(30,185,128,.12); }
+
 .social-friend-side { display: flex; align-items: center; gap: 7px; }
 .social-trend { min-width: 36px; font-size: 11px; font-weight: 850; color: var(--social-success); text-align: right; }
 .social-chat-btn { width: 43px; height: 43px; border: 0; border-radius: 50%; display: grid; place-items: center; color: var(--social-blue-700); background: var(--social-blue-100); }
