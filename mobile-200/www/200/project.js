@@ -1437,6 +1437,7 @@ const state = {
     mode: "history",
     events: [],
     bestIntervals: [],
+    intervalDurationsSeconds: [],
     loading: false,
     editingEventId: "",
     editValue: 1,
@@ -15643,18 +15644,10 @@ function formatLimitHistoryDate(value) {
   return `${parts.dateLabel} | ${parts.timeLabel}`;
 }
 
-function getLimitHistoryCurrentRankFromEvents(events, currentDurationSeconds) {
+function getLimitHistoryCurrentRankFromDurations(durations, currentDurationSeconds) {
   const safeCurrent = Math.max(0, Number(currentDurationSeconds || 0));
-  const chronological = [...(Array.isArray(events) ? events : [])]
-    .filter((event) => event?.occurredAt)
-    .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
-  if (chronological.length < 2) return 1;
-  const strongerClosedIntervals = chronological.slice(1).reduce((total, event, index) => {
-    const previous = chronological[index];
-    const fromMs = new Date(previous.occurredAt || "").getTime();
-    const toMs = new Date(event.occurredAt || "").getTime();
-    const durationSeconds = Math.max(0, Math.floor((toMs - fromMs) / 1000));
-    return total + (durationSeconds > safeCurrent ? 1 : 0);
+  const strongerClosedIntervals = (Array.isArray(durations) ? durations : []).reduce((total, duration) => {
+    return total + (Math.max(0, Number(duration || 0)) > safeCurrent ? 1 : 0);
   }, 0);
   return strongerClosedIntervals + 1;
 }
@@ -15696,6 +15689,7 @@ function renderLimitHistoryModal() {
   }
   if (recordsMode) {
     const records = Array.isArray(state.limitHistory?.bestIntervals) ? state.limitHistory.bestIntervals : [];
+    const intervalDurationsSeconds = Array.isArray(state.limitHistory?.intervalDurationsSeconds) ? state.limitHistory.intervalDurationsSeconds : records.map((record) => record.durationSeconds);
     const averageSeconds = Math.max(0, Math.round(Number(state.limitHistory?.averageDurationSeconds || 0)));
     const events = Array.isArray(state.limitHistory?.events) ? state.limitHistory.events : [];
     const latestEvent = events.find((event) => event?.isLatest) || events[0] || null;
@@ -15712,7 +15706,7 @@ function renderLimitHistoryModal() {
     const rankedRecords = currentRecord
       ? [...records, currentRecord].sort((left, right) => Number(right.durationSeconds || 0) - Number(left.durationSeconds || 0))
       : records;
-    const currentRank = currentRecord ? getLimitHistoryCurrentRankFromEvents(events, currentRecord.durationSeconds) : 0;
+    const currentRank = currentRecord ? getLimitHistoryCurrentRankFromDurations(intervalDurationsSeconds, currentRecord.durationSeconds) : 0;
     const visibleRecords = rankedRecords.slice(0, 50);
     if (currentRecord && currentRank > 50) visibleRecords.push(currentRecord);
     const closedIntervalCount = Math.max(0, Number(state.limitHistory?.intervalCount || records.length || 0));
@@ -15731,7 +15725,7 @@ function renderLimitHistoryModal() {
     const displayRecords = averageRecord ? [averageRecord, ...visibleRecords] : visibleRecords;
     limitHistoryList.innerHTML = displayRecords.length
       ? displayRecords.map((record) => {
-          const rankLabel = record.isAverage ? "Média" : `#${record.isCurrent ? currentRank : (rankedRecords.indexOf(record) + 1)}`;
+          const rankLabel = record.isAverage ? "Média" : `#${record.isCurrent ? currentRank : Math.max(1, Number(record.rank || (rankedRecords.indexOf(record) + 1)))}`;
           const metaLabel = record.isAverage
             ? `${record.includesCurrent ? "Média dinâmica" : "Média geral"} entre ${record.intervalCount} intervalos${record.includesCurrent ? " incluindo o atual" : " fechados"}`
             : record.isCurrent
@@ -15805,6 +15799,7 @@ async function loadLimitHistory() {
     });
     state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
     state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
+    state.limitHistory.intervalDurationsSeconds = Array.isArray(payload?.history?.intervalDurationsSeconds) ? payload.history.intervalDurationsSeconds : [];
     state.limitHistory.averageDurationSeconds = Math.max(0, Number(payload?.history?.averageDurationSeconds || 0));
     state.limitHistory.intervalCount = Math.max(0, Number(payload?.history?.intervalCount || 0));
   } catch (error) {
@@ -15824,6 +15819,7 @@ function openLimitHistoryModal(goalId) {
     mode: "history",
     events: [],
     bestIntervals: [],
+    intervalDurationsSeconds: [],
     averageDurationSeconds: 0,
     intervalCount: 0,
     loading: true,
@@ -15855,6 +15851,7 @@ async function mutateLimitHistoryEvent(eventId, method, value = 0, occurredAt = 
     syncLimitHistoryGoals(payload);
     state.limitHistory.events = Array.isArray(payload?.history?.events) ? payload.history.events : [];
     state.limitHistory.bestIntervals = Array.isArray(payload?.history?.bestIntervals) ? payload.history.bestIntervals : [];
+    state.limitHistory.intervalDurationsSeconds = Array.isArray(payload?.history?.intervalDurationsSeconds) ? payload.history.intervalDurationsSeconds : [];
     state.limitHistory.averageDurationSeconds = Math.max(0, Number(payload?.history?.averageDurationSeconds || 0));
     state.limitHistory.intervalCount = Math.max(0, Number(payload?.history?.intervalCount || 0));
     state.limitHistory.editingEventId = "";

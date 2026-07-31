@@ -214,7 +214,8 @@ async function buildExtraGoalBestIntervals(userId, profileName, events = []) {
     ? Math.round(rankedIntervals.reduce((sum, interval) => sum + Number(interval.durationSeconds || 0), 0) / rankedIntervals.length)
     : 0;
   return {
-    bestIntervals: rankedIntervals.slice(0, 50),
+    bestIntervals: rankedIntervals.slice(0, 50).map((interval, index) => ({ ...interval, rank: index + 1 })),
+    intervalDurationsSeconds: rankedIntervals.map((interval) => Math.max(0, Number(interval.durationSeconds || 0))),
     averageDurationSeconds,
     intervalCount: rankedIntervals.length,
     eventInsights
@@ -1259,6 +1260,7 @@ export async function listExtraGoalProgressEvents(userId, profileName = PROJECT2
     goal,
     events,
     bestIntervals: intervalSummary.bestIntervals,
+    intervalDurationsSeconds: intervalSummary.intervalDurationsSeconds,
     averageDurationSeconds: intervalSummary.averageDurationSeconds,
     intervalCount: intervalSummary.intervalCount
   };
