@@ -15347,29 +15347,29 @@ function formatLimitHistoryChangePercent(value) {
   });
 }
 
-function buildLimitHistoryTrend(changePercent, referenceLabel) {
+function buildLimitHistoryTrend(changePercent) {
   if (changePercent === null || changePercent === undefined) return "";
   const safeChange = Number(changePercent);
   if (!Number.isFinite(safeChange)) return "";
   const improving = safeChange >= 0;
   const direction = improving ? "up" : "down";
-  const comparison = improving ? "maior" : "menor";
+  const sign = improving ? "+" : "-";
   const path = improving
-    ? "M12 4 5.5 10.5 7 12l4-4v12h2V8l4 4 1.5-1.5L12 4Z"
-    : "M12 20 5.5 13.5 7 12l4 4V4h2v12l4-4 1.5 1.5L12 20Z";
-  return '<span class="limit-history-trend is-' + direction + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '" fill="currentColor"/></svg><b>' + escapeHtml(formatLimitHistoryChangePercent(safeChange)) + '% ' + comparison + ' que ' + escapeHtml(referenceLabel) + '</b></span>';
+    ? "M12 4 21 19H3L12 4Z"
+    : "M12 20 3 5h18l-9 15Z";
+  return '<span class="limit-history-trend is-' + direction + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '" fill="currentColor"/></svg><b>' + sign + escapeHtml(formatLimitHistoryChangePercent(safeChange)) + '%</b></span>';
 }
 
 function buildLimitHistoryInsights(event) {
   const insight = event?.intervalInsight;
-  if (!event?.editedAt || !insight) return "";
+  if (!insight) return "";
   const intervalDuration = Math.max(0, Number(insight.intervalDurationSeconds || 0));
   const averageDuration = Math.max(0, Number(insight.averageDurationSecondsAtEvent || 0));
   if (!intervalDuration && !averageDuration) return "";
   return [
     '<div class="limit-history-insights" data-limit-history-insight>',
-    '<span data-limit-history-insight-interval>Intervalo registrado: <b>' + escapeHtml(formatLimitElapsedDuration(intervalDuration)) + '</b> ' + buildLimitHistoryTrend(insight.intervalChangePercent, "o intervalo anterior") + '</span>',
-    '<span data-limit-history-insight-average hidden>Média geral no registro: <b>' + escapeHtml(formatLimitElapsedDurationDetailed(averageDuration)) + '</b> ' + buildLimitHistoryTrend(insight.averageChangePercent, "a m?dia geral anterior") + '</span>',
+    '<span data-limit-history-insight-interval><b>' + escapeHtml(formatLimitElapsedDuration(intervalDuration)) + '</b> ' + buildLimitHistoryTrend(insight.intervalChangePercent) + '</span>',
+    '<span data-limit-history-insight-average hidden><b>' + escapeHtml(formatLimitElapsedDuration(averageDuration)) + '</b> ' + buildLimitHistoryTrend(insight.averageChangePercent) + '</span>',
     '</div>'
   ].join("");
 }

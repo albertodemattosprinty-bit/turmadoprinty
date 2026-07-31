@@ -12644,7 +12644,7 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-nav
 .limit-history-insights > span[hidden] { display: none; }
 .limit-history-insights b { color: inherit; font: inherit; }
 .limit-history-trend { display: inline-flex; align-items: center; gap: 3px; color: inherit; }
-.limit-history-trend svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.limit-history-trend svg { width: 12px; height: 12px; flex: 0 0 auto; }
 .limit-history-trend.is-up svg { color: #24d17e; }
 .limit-history-trend.is-down svg { color: #ff5e68; }
 .limit-history-trend b { color: #fff; }
