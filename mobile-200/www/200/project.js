@@ -15264,14 +15264,17 @@ function renderLimitHistoryModal() {
     const visibleRecords = rankedRecords.slice(0, 50);
     if (currentRecord && currentRank > 50) visibleRecords.push(currentRecord);
     const closedIntervalCount = Math.max(0, Number(state.limitHistory?.intervalCount || records.length || 0));
-    const dynamicAverageSeconds = closedIntervalCount > 0 || currentRecord
-      ? Math.round(((averageSeconds * closedIntervalCount) + Number(currentRecord?.durationSeconds || 0)) / (closedIntervalCount + (currentRecord ? 1 : 0)))
-      : 0;
+    const currentDurationSeconds = Math.max(0, Number(currentRecord?.durationSeconds || 0));
+    const includeCurrentInAverage = Boolean(currentRecord)
+      && (averageSeconds <= 0 || currentDurationSeconds > averageSeconds);
+    const averageDividend = (averageSeconds * closedIntervalCount) + (includeCurrentInAverage ? currentDurationSeconds : 0);
+    const averageDivisor = closedIntervalCount + (includeCurrentInAverage ? 1 : 0);
+    const dynamicAverageSeconds = averageDivisor > 0 ? Math.round(averageDividend / averageDivisor) : 0;
     const averageRecord = dynamicAverageSeconds > 0 ? {
       isAverage: true,
       durationSeconds: dynamicAverageSeconds,
-      intervalCount: closedIntervalCount + (currentRecord ? 1 : 0),
-      includesCurrent: Boolean(currentRecord)
+      intervalCount: averageDivisor,
+      includesCurrent: includeCurrentInAverage
     } : null;
     const displayRecords = averageRecord ? [averageRecord, ...visibleRecords] : visibleRecords;
     limitHistoryList.innerHTML = displayRecords.length
