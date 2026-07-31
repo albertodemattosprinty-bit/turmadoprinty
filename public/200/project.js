@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "0.7";
+const project200AppVersion = "0.73";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -12265,10 +12265,15 @@ async function openSleepHistoryEditor() {
   }
 }
 
+function getMissionVariantsCacheKey(goalId, profileName = state.selectedProfile || getDefaultProfileName()) {
+  const profile = normalizeAssigneeName(profileName).trim().toLowerCase();
+  return `${profile}::${String(goalId || "").trim()}`;
+}
+
 function cacheLoadedMissionVariants(goals) {
   (Array.isArray(goals) ? goals : []).forEach((goal) => {
     if (!Array.isArray(goal?.variants)) return;
-    missionVariantsCache.set(String(goal.id || ""), {
+    missionVariantsCache.set(getMissionVariantsCacheKey(goal.id), {
       loadedAt: Date.now(),
       items: goal.variants
     });
@@ -15016,7 +15021,7 @@ function renderMissionVariants() {
 }
 
 async function loadMissionVariants(goalId, { force = false } = {}) {
-  const cacheKey = String(goalId || "").trim();
+  const cacheKey = getMissionVariantsCacheKey(goalId);
   const cached = missionVariantsCache.get(cacheKey);
   if (!force && cached && Date.now() - Number(cached.loadedAt || 0) < 60000) {
     state.missionVariants.items = Array.isArray(cached.items) ? cached.items : [];
@@ -15109,7 +15114,7 @@ async function openMissionRunModal(goalId) {
   if (!goal || isLimitGoal(goal)) return;
   try {
     state.missionVariants.goalId = String(goalId || "");
-    const variants = await loadMissionVariants(goalId);
+    const variants = await loadMissionVariants(goalId, { force: true });
     if (variants.length >= 2) {
       await openMissionVariantsModal(goalId, "choose", { items: variants });
       return;
@@ -18512,7 +18517,7 @@ missionVariantEditorSave?.addEventListener("click", async () => {
       body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays) })
     });
     state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
-    missionVariantsCache.set(String(goalId || ""), { loadedAt: Date.now(), items: state.missionVariants.items });
+    missionVariantsCache.set(getMissionVariantsCacheKey(goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
     syncMissionVariantsIntoMissionState(goalId, state.missionVariants.items);
     state.missionVariants.editorOpen = false;
     renderMissionVariants();
@@ -18537,7 +18542,7 @@ missionVariantsList?.addEventListener("click", async (event) => {
           const profile = encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim());
           const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(state.missionVariants.goalId)}/variants/${encodeURIComponent(id)}?profile=${profile}`, { method: "DELETE" });
           state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
-          missionVariantsCache.set(String(state.missionVariants.goalId || ""), { loadedAt: Date.now(), items: state.missionVariants.items });
+          missionVariantsCache.set(getMissionVariantsCacheKey(state.missionVariants.goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
           syncMissionVariantsIntoMissionState(state.missionVariants.goalId, state.missionVariants.items);
           renderMissionVariants();
           renderMissions();
@@ -18584,8 +18589,14 @@ missionVariantsList?.addEventListener("click", async (event) => {
   state.missionVariants.editorOpen = true;
   state.missionVariants.sortMenuOpen = false;
   state.missionVariants.editingId = id;
+  state.missionVariants.editorStep = 1;
   state.missionVariants.intervalValue = variant.intervalValue;
   state.missionVariants.intervalUnit = variant.intervalUnit;
+  const parentGoal = getMissionRunGoalById(state.missionVariants.goalId);
+  state.missionVariants.unitDurationSeconds = normalizeMissionDurationOption(
+    variant.unitDurationSeconds || getMissionUnitDurationSeconds(parentGoal) || DEFAULT_MISSION_DURATION_SECONDS
+  );
+  state.missionVariants.nextDueOffsetDays = getMissionVariantNextDueOffsetDays(variant);
   if (missionVariantTitleInput) missionVariantTitleInput.value = variant.title;
   renderMissionVariants();
 });
