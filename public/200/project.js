@@ -1131,6 +1131,7 @@ let actionStatusTargetId = "";
 let runningTaskTicker = null;
 let pendingActionsAnchorId = "";
 let actionCompletionAnimationId = "";
+let suppressActionsAutoAnchorOnce = false;
 let runningCarryOverMinutes = 0;
 let actionCategoryInterpretTimer = null;
 let missionCategoryInterpretTimer = null;
@@ -7378,9 +7379,13 @@ function renderActions() {
   }
   renderHomeRunningTask();
   if (document.getElementById("actionsModal")?.classList.contains("active")) {
-    window.requestAnimationFrame(() => {
-      anchorToCurrentAction();
-    });
+    if (suppressActionsAutoAnchorOnce) {
+      suppressActionsAutoAnchorOnce = false;
+    } else {
+      window.requestAnimationFrame(() => {
+        anchorToCurrentAction();
+      });
+    }
   }
 }
 
@@ -7554,10 +7559,64 @@ async function loadActions(options = {}) {
   renderHomeRunningTask();
 }
 
-async function completeActionImmediately(action, { returnToActions = true } = {}) {
+async function completeActionImmediately(action, { returnToActions = true, actionListFeedback = false } = {}) {
   const actionId = String(action?.id || "").trim();
   if (!actionId || normalizeActionStatus(action?.status) === actionStatuses.completed) return false;
   const previousAction = { ...action };
+
+  if (returnToActions && actionListFeedback) {
+    setActionOptimisticSync(actionId, true);
+    delete state.runningLocalStarts[actionId];
+    resetRunningCompletionState();
+    startRunningTaskTicker();
+    closeModal("startDecisionModal");
+    closeModal("runningTaskModal");
+    if (!actionsModal?.classList.contains("active")) {
+      openModal("actionsModal");
+    }
+    const requestResult = apiRequest("/api/actions/" + encodeURIComponent(actionId) + "/status/manual", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "direct_complete" }),
+      skipGlobalLoading: true
+    }).then(
+      (payload) => ({ payload, error: null }),
+      (error) => ({ payload: null, error })
+    );
+
+    await wait(300);
+    const optimisticAction = buildOptimisticAction(previousAction, actionStatuses.completed);
+    updateActionInState(optimisticAction);
+    actionCompletionAnimationId = actionId;
+    suppressActionsAutoAnchorOnce = true;
+    renderActions();
+    renderHomeRunningTask();
+    void playRunningSuccessCue();
+
+    try {
+      const result = await requestResult;
+      if (result.error) throw result.error;
+      if (!result.payload?.action) throw new Error("Nao foi possivel concluir a tarefa.");
+      updateActionInState(result.payload.action);
+      registerSystemEventFromActionTransition(previousAction, result.payload.action);
+      suppressActionsAutoAnchorOnce = true;
+      renderActions();
+      renderHomeRunningTask();
+      void loadStatsSummary();
+      return true;
+    } catch (error) {
+      updateActionInState(previousAction);
+      actionCompletionAnimationId = "";
+      suppressActionsAutoAnchorOnce = true;
+      renderActions();
+      renderHomeRunningTask();
+      showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel concluir a tarefa.");
+      return false;
+    } finally {
+      setActionOptimisticSync(actionId, false);
+    }
+  }
+
   const optimisticAction = buildOptimisticAction(previousAction, actionStatuses.completed);
   setActionOptimisticSync(actionId, true);
   updateActionInState(optimisticAction);
@@ -7644,7 +7703,7 @@ async function toggleActionStatus(actionId, options = {}) {
       return;
     }
     if (rootChoice === "complete") {
-      await completeActionImmediately(targetAction);
+      await completeActionImmediately(targetAction, { actionListFeedback: true });
       return;
     }
   }
