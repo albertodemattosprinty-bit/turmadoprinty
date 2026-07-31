@@ -1388,6 +1388,7 @@ const state = {
   constitutionIndex: 0,
   constitutionEditing: false,
   actions: [],
+  optimisticActionIds: [],
   historySystem: [],
   historyTexts: [],
   project200Onboarding: null,
@@ -2744,7 +2745,7 @@ function renderActionsMissionFilter() {
   const mode = normalizeMissionActionsMode(state.options.missionActionsMode);
   const isAvailable = Boolean(getToken()) && mode !== "hide";
   actionsMissionFilterButton.hidden = !isAvailable;
-  const filterActive = state.actionsMissionOnly;
+  const filterActive = mode === "dynamic" ? state.actionsDynamicMissionsVisible : state.actionsMissionOnly;
   actionsMissionFilterButton.classList.toggle("is-filtering", filterActive);
   actionsMissionFilterButton.classList.toggle("is-dynamic", mode === "dynamic");
   actionsMissionFilterButton.setAttribute("aria-label", mode === "dynamic"
@@ -4075,12 +4076,30 @@ function anchorToCurrentActionOnce() {
   row.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+function getActionNearestToCurrentTime() {
+  const runningAction = getRunningActionForSelectedProfile();
+  if (runningAction) return runningAction;
+  const nowMs = getServerNowMs();
+  return getVisibleActions()
+    .filter((action) => action?.kind !== "free")
+    .sort((left, right) => {
+      const distance = (action) => {
+        const startMs = new Date(action?.startAt || "").getTime();
+        const endMs = new Date(action?.endAt || "").getTime();
+        if (!Number.isFinite(startMs)) return Number.POSITIVE_INFINITY;
+        if (Number.isFinite(endMs) && nowMs >= startMs && nowMs <= endMs) return 0;
+        return Math.min(Math.abs(nowMs - startMs), Number.isFinite(endMs) ? Math.abs(nowMs - endMs) : Number.POSITIVE_INFINITY);
+      };
+      return distance(left) - distance(right);
+    })[0] || null;
+}
+
 function anchorToCurrentAction() {
   if (!actionsList) {
     return;
   }
-  const runningAction = getRunningActionForSelectedProfile();
-  const targetId = String(runningAction?.id || pendingActionsAnchorId || "").trim();
+  const targetAction = getActionNearestToCurrentTime();
+  const targetId = String(targetAction?.id || pendingActionsAnchorId || "").trim();
   if (!targetId) {
     return;
   }
@@ -6250,7 +6269,7 @@ function openModal(id) {
       renderDateHeader();
       renderMissionScopeControls();
       renderStatsScopeControls();
-      if (id === "actionsModal") void loadActions({ silent: true });
+      if (id === "actionsModal" && !state.optimisticActionIds.length) void loadActions({ silent: true });
       if (id === "historyModal") void loadMissions().then(() => renderMissions());
       if (id === "statsModal") void loadStatsSummary();
     });
@@ -6262,7 +6281,7 @@ function openModal(id) {
     pendingActionsAnchorId = runningAction?.id || latestDone?.id || "";
     state.actionsMissionOnly = false;
     renderActions();
-    void loadActions();
+    if (!state.optimisticActionIds.length) void loadActions();
     void loadActionMissions();
     window.setTimeout(() => {
       anchorToCurrentActionOnce();
@@ -7337,6 +7356,54 @@ async function loadActions(options = {}) {
   renderHomeRunningTask();
 }
 
+async function completeActionImmediately(action, { returnToActions = true } = {}) {
+  const actionId = String(action?.id || "").trim();
+  if (!actionId || normalizeActionStatus(action?.status) === actionStatuses.completed) return false;
+  const previousAction = { ...action };
+  const optimisticAction = buildOptimisticAction(previousAction, actionStatuses.completed);
+  setActionOptimisticSync(actionId, true);
+  updateActionInState(optimisticAction);
+  delete state.runningLocalStarts[actionId];
+  pendingActionsAnchorId = actionId;
+  actionCompletionAnimationId = actionId;
+  resetRunningCompletionState();
+  startRunningTaskTicker();
+  renderActions();
+  renderHomeRunningTask();
+  if (returnToActions) {
+    closeModal("startDecisionModal");
+    closeModal("runningTaskModal");
+    openModal("actionsModal");
+    renderActions();
+    window.requestAnimationFrame(() => anchorToCurrentAction());
+  }
+  try {
+    const payload = await apiRequest(`/api/actions/${encodeURIComponent(actionId)}/status/manual`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "direct_complete" }),
+      skipGlobalLoading: true
+    });
+    if (!payload?.action) throw new Error("Nao foi possivel concluir a tarefa.");
+    updateActionInState(payload.action);
+    registerSystemEventFromActionTransition(previousAction, payload.action);
+    enqueueActionPointsUpdateFeedback(payload?.pointsUpdate, 120);
+    renderActions();
+    renderHomeRunningTask();
+    void loadStatsSummary();
+    return true;
+  } catch (error) {
+    updateActionInState(previousAction);
+    actionCompletionAnimationId = "";
+    renderActions();
+    renderHomeRunningTask();
+    showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel concluir a tarefa.");
+    return false;
+  } finally {
+    setActionOptimisticSync(actionId, false);
+  }
+}
+
 async function toggleActionStatus(actionId, options = {}) {
   const targetId = String(actionId || "").trim();
 
@@ -7378,6 +7445,10 @@ async function toggleActionStatus(actionId, options = {}) {
       await loadActions();
       return;
     }
+    if (rootChoice === "complete") {
+      await completeActionImmediately(targetAction);
+      return;
+    }
   }
   if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && !options.ignoreRunningConflict) {
     const runningAction = await resolveRunningActionConflict(targetAction.id, targetAction);
@@ -7392,9 +7463,25 @@ async function toggleActionStatus(actionId, options = {}) {
     return;
   }
 
+  const startingOptimistically = [actionStatuses.pending, actionStatuses.paused].includes(currentStatus);
+  if (startingOptimistically) {
+    const optimisticAction = buildOptimisticAction(targetAction, actionStatuses.inProgress);
+    setActionOptimisticSync(targetId, true);
+    updateActionInState(optimisticAction);
+    resetRunningCompletionState();
+    state.runningLocalStarts[targetId] = getServerNowMs();
+    startRunningTaskTicker();
+    renderActions();
+    renderHomeRunningTask();
+    openPrimaryRunningSurface({ overview: false });
+    closeActionsModalWithFade();
+    void autoPlayRunningTaskDefaultPreference(optimisticAction);
+  }
+
   try {
     const payload = await apiRequest(`/api/actions/${encodeURIComponent(targetId)}/status`, {
-      method: "PATCH"
+      method: "PATCH",
+      skipGlobalLoading: true
     });
     const updated = payload?.action || null;
 
@@ -7406,11 +7493,7 @@ async function toggleActionStatus(actionId, options = {}) {
     registerSystemEventFromActionTransition(targetAction, updated);
     const nextStatus = normalizeActionStatus(updated?.status);
     if ([actionStatuses.pending, actionStatuses.paused].includes(currentStatus) && nextStatus === actionStatuses.inProgress) {
-      resetRunningCompletionState();
-      state.runningLocalStarts[String(targetId)] = getServerNowMs();
-      await autoPlayRunningTaskDefaultPreference(updated);
-      openPrimaryRunningSurface({ overview: false });
-      closeActionsModalWithFade();
+      state.runningLocalStarts[String(targetId)] = new Date(updated?.startedAt || "").getTime() || state.runningLocalStarts[String(targetId)] || getServerNowMs();
     }
     if (currentStatus === actionStatuses.inProgress && nextStatus === actionStatuses.completed) {
       delete state.runningLocalStarts[String(targetId)];
@@ -7421,9 +7504,20 @@ async function toggleActionStatus(actionId, options = {}) {
         RUNNING_COMPLETION_ANIMATION_MS + RUNNING_COMPLETION_HOLD_MS + 120
       );
     }
+    setActionOptimisticSync(targetId, false);
     startRunningTaskTicker();
     renderActions();
+    renderHomeRunningTask();
   } catch (error) {
+    if (startingOptimistically) {
+      setActionOptimisticSync(targetId, false);
+      updateActionInState(targetAction);
+      delete state.runningLocalStarts[targetId];
+      closeModal("runningTaskModal");
+      openModal("actionsModal");
+      renderActions();
+      renderHomeRunningTask();
+    }
     const normalizedErrorMessage = String(error?.message || "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -8130,7 +8224,7 @@ function buildPendingStartActionButtons(targetAction) {
   return [
     { label: "Iniciar", value: "start", primary: true },
     { label: "Excluir", value: "remove" },
-    { label: "Voltar", value: "cancel" }
+    { label: "Definir como feito", value: "complete" }
   ];
 }
 
@@ -8635,7 +8729,8 @@ async function resolveRunningActionConflict(actionId, targetAction = null, force
   if (localRunning) return localRunning;
 
   let runtimeState = state.runtimeState;
-  if (forceRuntimeRefresh || !runtimeState) {
+  if (!runtimeState && !forceRuntimeRefresh) return null;
+  if (forceRuntimeRefresh) {
     try {
       const runtimePayload = await apiRequestWithTimeout(runtimeStateEndpoint, { skipGlobalLoading: true }, 5000);
       runtimeState = runtimePayload?.runtimeState || null;
@@ -8804,7 +8899,8 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
           remove: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21a2 2 0 0 1-2-2V7h14v12a2 2 0 0 1-2 2zm2-10v8h2v-8zm4 0v8h2v-8zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
           swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3 1.4-1.4L22 8l-5.6 5.4L15 12l3-3H7zm10 10H6l3 3-1.4 1.4L2 16l5.6-5.4L9 12l-3 3h11z"/></svg>',
           do_current: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg>',
-          cancel: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 6-6 1.4 1.4L9.8 11H18v2H9.8l3.6 3.6L12 18z"/></svg>'
+          cancel: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 6-6 1.4 1.4L9.8 11H18v2H9.8l3.6 3.6L12 18z"/></svg>',
+          complete: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 16.6 4.9 12.3l1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z" fill="currentColor"/></svg>'
         };
         const classMap = {
           start: "decision-btn decision-btn-start",
@@ -8814,7 +8910,8 @@ function openStartDecisionModal(targetAction, currentEntry, buttons) {
           remove: "decision-btn decision-btn-remove",
           swap: "decision-btn decision-btn-postpone",
           do_current: "decision-btn decision-btn-start",
-          cancel: "decision-btn decision-btn-back"
+          cancel: "decision-btn decision-btn-back",
+          complete: "decision-btn decision-btn-complete"
         };
         btn.className = classMap[item.value] || (item.primary ? "primary-btn" : "ghost-btn");
         btn.innerHTML = `${icons[item.value] || ""}<span>${escapeHtml(item.label)}</span>`;
@@ -9221,6 +9318,28 @@ async function ensureProject200Session() {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function setActionOptimisticSync(actionId, syncing) {
+  const safeId = String(actionId || "").trim();
+  const ids = new Set(Array.isArray(state.optimisticActionIds) ? state.optimisticActionIds : []);
+  if (safeId && syncing) ids.add(safeId);
+  else ids.delete(safeId);
+  state.optimisticActionIds = [...ids];
+}
+
+function buildOptimisticAction(action, status) {
+  const nowIso = new Date(getServerNowMs()).toISOString();
+  const nextStatus = normalizeActionStatus(status);
+  const plannedSeconds = Math.max(1, Math.round(getActionDurationMinutes(action) * 60));
+  return {
+    ...action,
+    status: nextStatus,
+    startedAt: nextStatus === actionStatuses.inProgress ? (action?.startedAt || nowIso) : (action?.startedAt || nowIso),
+    completedAt: nextStatus === actionStatuses.completed ? nowIso : null,
+    completionPercent: nextStatus === actionStatuses.completed ? 100 : Math.max(0, Number(action?.completionPercent || 0)),
+    accumulatedSeconds: nextStatus === actionStatuses.completed ? plannedSeconds : Math.max(0, Number(action?.accumulatedSeconds || 0))
+  };
 }
 
 function updateActionInState(nextAction) {
@@ -14471,6 +14590,37 @@ function getMissionRunVariantIdForCycle(cycleNumber = state.missionRun?.cycleInd
   return String(state.missionRun?.selectedVariantIds?.[index] || state.missionRun?.selectedVariantId || "").trim();
 }
 
+function getMissionRunVariantById(variantId) {
+  const safeId = String(variantId || "").trim();
+  if (!safeId) return null;
+  const variants = Array.isArray(state.missionRun?.availableVariants) ? state.missionRun.availableVariants : [];
+  return variants.find((variant) => String(variant?.id || "").trim() === safeId) || null;
+}
+
+function getMissionRunSelectedVariant(cycleNumber = state.missionRun?.cycleIndex) {
+  return getMissionRunVariantById(getMissionRunVariantIdForCycle(cycleNumber));
+}
+
+function getMissionRunDurationSeconds(goal, variant = null) {
+  const variantSeconds = Math.max(0, Math.trunc(Number(variant?.unitDurationSeconds || 0) || 0));
+  if (variantSeconds > 0) return normalizeMissionDurationOption(variantSeconds);
+  return normalizeMissionDurationOption(getMissionUnitDurationSeconds(goal));
+}
+
+function getMissionRunPointValueForVariant(goal, variant = null) {
+  if (!variant) return 1;
+  return Math.max(1, Math.ceil(getMissionRunDurationSeconds(goal, variant) / 60));
+}
+
+function getMissionRunCompletedPointValue(goal, completedCycles) {
+  const cycles = Math.max(1, Math.min(MISSION_RUN_MAX_CYCLES, Math.trunc(Number(completedCycles || 1) || 1)));
+  let total = 0;
+  for (let cycle = 1; cycle <= cycles; cycle += 1) {
+    total += getMissionRunPointValueForVariant(goal, getMissionRunSelectedVariant(cycle));
+  }
+  return Math.max(1, total || cycles);
+}
+
 function resetMissionRunCycleTimer(cycleNumber = 1) {
   const safeCycle = normalizeMissionRunCycleTarget(cycleNumber);
   stopMissionRunAlarm();
@@ -14484,6 +14634,7 @@ function resetMissionRunCycleTimer(cycleNumber = 1) {
   state.missionRun.announcedCueSeconds = [];
   state.missionRun.previousRemainingSeconds = null;
   state.missionRun.selectedVariantId = getMissionRunVariantIdForCycle(safeCycle);
+  state.missionRun.durationMs = Math.max(0, getMissionRunDurationSeconds(getMissionRunGoalById(state.missionRun?.goalId), getMissionRunSelectedVariant(safeCycle)) * 1000);
   if (missionRunFinishChoice) missionRunFinishChoice.hidden = true;
   if (missionRunConfirm) missionRunConfirm.hidden = true;
   if (missionRunStatus) missionRunStatus.textContent = "";
@@ -14614,6 +14765,7 @@ function renderMissionRunState() {
   if (!goal) {
     return;
   }
+  const selectedVariant = getMissionRunSelectedVariant();
   const durationMs = Math.max(0, Number(state.missionRun?.durationMs || 0));
   const elapsedMs = Math.max(0, Date.now() - Math.max(0, Number(state.missionRun?.startedAtMs || 0)));
   const remainingMs = Math.max(0, durationMs - elapsedMs);
@@ -14622,7 +14774,7 @@ function renderMissionRunState() {
   const percent = Math.round(percentPrecise);
   const circumference = 301.59;
   if (missionRunTitle) {
-    missionRunTitle.textContent = String(goal.title || "Missão");
+    missionRunTitle.textContent = String(selectedVariant?.title || goal.title || "Missão");
   }
   if (missionRunTitleIcon) {
     const icon = getMissionDisplayIcon(goal);
@@ -14911,7 +15063,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   cancelMissionRunMusicFade();
   state.missionRun.goalId = String(goal.id || "");
   state.missionRun.startedAtMs = Date.now();
-  state.missionRun.durationMs = Math.max(0, normalizeMissionDurationOption(selectedVariant?.unitDurationSeconds || getMissionUnitDurationSeconds(goal)) * 1000);
+  state.missionRun.durationMs = Math.max(0, getMissionRunDurationSeconds(goal, selectedVariant) * 1000);
   state.missionRun.centerMode = "time";
   state.missionRun.alarmStarted = false;
   state.missionRun.finalizing = false;
@@ -14929,7 +15081,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   state.missionRun.musicStoppedOnFinish = false;
   state.missionRun.musicWasPlayingAtFinish = false;
   state.missionRun.previousTaskTitle = String(state.runningPlayer.currentTaskTitle || "").trim();
-  state.runningPlayer.currentTaskTitle = String(goal.title || "Missão").trim();
+  state.runningPlayer.currentTaskTitle = String(selectedVariant?.title || goal.title || "Missão").trim();
   if (missionRunConfirm) {
     missionRunConfirm.hidden = true;
   }
@@ -14945,7 +15097,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   const missionGoalId = String(goal.id || "");
   void loadRunningMusicStations().then(() => {
     if (!isMissionRunModalOpen() || String(state.missionRun.goalId || "") !== missionGoalId) return;
-    return autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "Missão") });
+    return autoPlayRunningTaskDefaultPreference({ title: String(selectedVariant?.title || goal.title || "Missão") });
   });
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
@@ -14981,6 +15133,7 @@ async function finalizeMissionRun(triggerButton = null) {
   const preloadedDailyRanking = state.missionRun.preloadedDailyRanking;
   const selectedVariantId = String(state.missionRun.selectedVariantId || "");
   const selectedVariantIds = (state.missionRun.selectedVariantIds || []).slice(0, completedCycles);
+  const completedPoints = getMissionRunCompletedPointValue(getMissionRunGoalById(goalId), completedCycles);
   state.missionRun.finalizing = true;
   if (missionRunFinishButton) missionRunFinishButton.disabled = true;
   if (missionRunRestartButton) missionRunRestartButton.disabled = true;
@@ -14993,7 +15146,7 @@ async function finalizeMissionRun(triggerButton = null) {
     statsScopeMissions: (state.statsScopeMissions || []).map((item) => ({ ...item })),
     linkedMissions: (state.statsAspectLinks?.missions || []).map((item) => ({ ...item }))
   };
-  applyMissionProgressLocally(goalId, completedCycles);
+  applyMissionProgressLocally(goalId, completedPoints);
   renderMissions();
   renderActionsMissionsPanel();
   renderRunningMissionQuickButtons();
@@ -15003,14 +15156,14 @@ async function finalizeMissionRun(triggerButton = null) {
     stopRunningMusicAfterFinishedActivity();
   }
   closeModal("missionRunModal");
-  const completionUx = animateDynamicMissionSettlement(goalId, completedCycles);
+  const completionUx = animateDynamicMissionSettlement(goalId, completedPoints);
   try {
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/progress`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-        delta: completedCycles,
+        delta: completedPoints,
         variantId: selectedVariantId,
         variantIds: selectedVariantIds,
         pointsSnapshotPrepared: Boolean(preloadedDailyRanking)
@@ -15111,19 +15264,17 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
     const intervalUnit = String(goal?.limitIntervalUnit || "day").trim().toLowerCase();
     const cycleStartMs = new Date(goal?.limitCycleStartedAt || "").getTime();
     const cycleEndMs = new Date(goal?.limitCycleEndsAt || "").getTime();
-    let elapsedFraction = Number.isFinite(cycleStartMs) && Number.isFinite(cycleEndMs) && cycleEndMs > cycleStartMs
-      ? Math.max(0, Math.min(1, (nowMs - cycleStartMs) / (cycleEndMs - cycleStartMs)))
-      : 1;
-    if (!(Number.isFinite(cycleStartMs) && Number.isFinite(cycleEndMs) && cycleEndMs > cycleStartMs)
-      && intervalValue === 1
-      && intervalUnit === "day") {
+    let elapsedFraction = 1;
+    if (intervalValue === 1 && intervalUnit === "day") {
       const activeWindow = getActiveTimeWindow(nowMs);
       elapsedFraction = Math.max(0, Math.min(
         1,
         (nowMs - activeWindow.startMs) / Math.max(1, activeWindow.endMs - activeWindow.startMs)
       ));
+    } else if (Number.isFinite(cycleStartMs) && Number.isFinite(cycleEndMs) && cycleEndMs > cycleStartMs) {
+      elapsedFraction = Math.max(0, Math.min(1, (nowMs - cycleStartMs) / (cycleEndMs - cycleStartMs)));
     }
-    const expectedLimitNow = Math.max(1, Math.min(target, target * elapsedFraction));
+    const expectedLimitNow = Math.max(0.01, Math.min(target, target * elapsedFraction));
     ratio = (progress / expectedLimitNow) * 100;
   }
   const organicRatio = Math.max(0, Number.isFinite(ratio) ? ratio : 0);
@@ -18566,52 +18717,14 @@ document.querySelectorAll("[data-ai-time-nav]").forEach((button) => {
 });
 
 async function performRunningFinalize(runningAction) {
-  const beforeSummary = getCompletionSummaryForSelectedProfile();
-  const duration = getActionDurationMinutes(runningAction);
-  const startedAtMs = new Date(runningAction?.startedAt || runningAction?.startAt).getTime();
-  const accumulatedMinutes = Math.max(0, Number(runningAction?.accumulatedSeconds || 0) / 60);
-  const elapsed = accumulatedMinutes
-    + (Number.isFinite(startedAtMs) ? Math.max(0, (getServerNowMs() - startedAtMs) / (60 * 1000)) : duration);
-  const bonusBefore = Math.max(0, Number(runningCarryOverMinutes || 0));
-  const remainingAfterBonus = Math.max(0, elapsed - bonusBefore);
-  const savedMinutes = Math.max(0, Math.floor(duration - remainingAfterBonus));
-  clearRunningCompletionTimers();
-  state.runningCompletion.active = true;
-  state.runningCompletion.phase = "celebration";
-  state.runningCompletion.metric = "progress";
-  state.runningCompletion.fromPercent = beforeSummary.percentPrecise;
-  state.runningCompletion.toPercent = beforeSummary.percentPrecise;
-  state.runningCompletion.displayPercent = beforeSummary.percentPrecise;
-  state.runningCompletion.label = "Progresso";
-  renderRunningCompletionCelebration();
-  await toggleActionStatus(runningAction.id, { skipEndConfirm: true });
-  const after = state.actions.find((item) => item.id === runningAction.id);
-  if (normalizeActionStatus(after?.status) === actionStatuses.completed) {
-    if (state.options.stopMusicOnFinish && runningAudio) {
-      stopRunningMusicAfterFinishedActivity();
-    }
-    const nextAction = getNextTimelineEntryForRunning(runningAction);
-    const nextOfNext = nextAction ? getNextTimelineEntryForRunning(nextAction) : null;
-    const summary = getCompletionSummaryForSelectedProfile();
-    runningCarryOverMinutes = savedMinutes;
-    startRunningCompletionTransition({
-      fromPercent: beforeSummary.percentPrecise,
-      toPercent: summary.percentPrecise,
-      nextAction,
-      nextOfNext,
-      savedMinutes: runningCarryOverMinutes,
-      summary: {
-        ...summary,
-        punctualityBefore: beforeSummary.punctualityPrecise,
-        punctualityAfter: summary.punctualityPrecise
-      }
-    });
-    state.quickTaskAutoFinalizing = false;
-    return;
+  if (!runningAction || state.optimisticActionIds.includes(String(runningAction.id || ""))) return;
+  state.quickTaskAutoFinalizing = true;
+  if (state.options.stopMusicOnFinish && runningAudio) {
+    stopRunningMusicAfterFinishedActivity();
   }
-  resetRunningCompletionState();
+  await completeActionImmediately(runningAction, { returnToActions: true });
   state.quickTaskAutoFinalizing = false;
-  renderHomeRunningTask();
+
 }
 
 runningTaskFinalizeButton?.addEventListener("click", () => {
@@ -18780,6 +18893,10 @@ actionsMissionFilterButton?.addEventListener("click", (event) => {
   renderDateHeader();
   renderActions();
   window.requestAnimationFrame(() => {
+    if (mode === "dynamic" && toggleHit) {
+      anchorToCurrentAction();
+      return;
+    }
     const target = state.actionsMissionOnly ? actionsMissionsPanel : actionsList;
     target?.scrollTo({ top: 0, behavior: "smooth" });
   });

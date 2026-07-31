@@ -2464,6 +2464,11 @@ body.running-music-standalone #actionsModal .actions-list {
   cursor: pointer;
 }
 
+.start-decision-back-btn {
+  left: 18px;
+  right: auto;
+}
+
 .start-decision-home-btn:hover,
 .start-decision-home-btn:focus-visible {
   background: rgba(255, 255, 255, 0.28);
@@ -2693,6 +2698,7 @@ body.running-music-standalone #actionsModal .actions-list {
 .decision-btn-postpone { background: #f97316; }
 .decision-btn-remove { background: #dc2626; }
 .decision-btn-back { background: linear-gradient(160deg, #64748b, #334155); }
+.decision-btn-complete { background: linear-gradient(160deg, #2f7dff, #0a4ca5); }
 .decision-btn-giveup { background: linear-gradient(160deg, #737373, #171717); }
 .decision-btn-start {
   grid-column: 1;

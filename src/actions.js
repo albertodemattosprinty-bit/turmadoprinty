@@ -1312,6 +1312,37 @@ export async function updateUserActionStatusManual(userId, actionId, payload = {
     return getUserActionById(userId, action.id);
   }
 
+  if (mode === "direct_complete") {
+    const now = new Date();
+    const startedAt = action.startedAt || now.toISOString();
+    const completedAt = now.toISOString();
+    const plannedSeconds = Math.max(1, Math.round((new Date(action.endAt).getTime() - new Date(action.startAt).getTime()) / 1000));
+    await query(
+      `
+        insert into action_status_overrides (
+          user_id, action_id, repeat_group_id, status, started_at, completed_at, completion_percent, accumulated_seconds
+        )
+        values ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, 100, $7)
+        on conflict (user_id, action_id) do update
+          set status = excluded.status,
+              started_at = excluded.started_at,
+              completed_at = excluded.completed_at,
+              completion_percent = 100,
+              accumulated_seconds = excluded.accumulated_seconds,
+              updated_at = now()
+      `,
+      [userId, action.id, action.repeatGroupId, ACTION_STATUS_COMPLETED, startedAt, completedAt, plannedSeconds]
+    );
+    await upsertProject200RuntimeState(userId, {
+      actionId: action.id,
+      actionTitle: action.title,
+      eventType: "complete",
+      startedAt,
+      occurredAt: completedAt
+    });
+    return getUserActionById(userId, action.id);
+  }
+
   if (mode === "manual_complete") {
     const startedAtRaw = parseDate(payload?.startedAt, "Horario inicial manual");
     const completedAtRaw = parseDate(payload?.completedAt, "Horario final manual");
