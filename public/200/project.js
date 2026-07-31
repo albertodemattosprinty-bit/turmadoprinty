@@ -1109,6 +1109,7 @@ let platformLongPressTimer = null;
 let platformLongPressHandledOccurrenceId = "";
 let actionsDelayTicker = null;
 let missionHealthTicker = null;
+let limitHistoryInsightTicker = null;
 let historyDeleteHoldTimer = null;
 let historyDeleteHoldInterval = null;
 let historyMediaRecorder = null;
@@ -6345,6 +6346,10 @@ function openModal(id) {
     missionHealthTicker = window.setInterval(() => renderMissions(), 2000);
   }
 
+  if (id === "limitHistoryModal") {
+    startLimitHistoryInsightTicker();
+  }
+
   if (id === "runningTaskModal") {
     if (!getRunningActionForSelectedProfile()) {
       state.runningIdleCenterMode = "time";
@@ -6440,6 +6445,10 @@ function closeModal(modal) {
       missionHealthTicker = null;
     }
     closeHistoryTextComposer();
+  }
+
+  if (modal.id === "limitHistoryModal") {
+    stopLimitHistoryInsightTicker();
   }
 
   if (["missionAdjustModal", "missionProgressModal"].includes(modal.id)) {
@@ -15330,6 +15339,64 @@ function formatLimitElapsedDurationDetailed(totalSeconds) {
   parts.push(`${String(seconds).padStart(2, "0")}s`);
   return parts.join(" ");
 }
+
+function formatLimitHistoryChangePercent(value) {
+  return Math.abs(Number(value || 0)).toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  });
+}
+
+function buildLimitHistoryTrend(changePercent, referenceLabel) {
+  if (changePercent === null || changePercent === undefined) return "";
+  const safeChange = Number(changePercent);
+  if (!Number.isFinite(safeChange)) return "";
+  const improving = safeChange >= 0;
+  const direction = improving ? "up" : "down";
+  const comparison = improving ? "maior" : "menor";
+  const path = improving
+    ? "M12 4 5.5 10.5 7 12l4-4v12h2V8l4 4 1.5-1.5L12 4Z"
+    : "M12 20 5.5 13.5 7 12l4 4V4h2v12l4-4 1.5 1.5L12 20Z";
+  return '<span class="limit-history-trend is-' + direction + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '" fill="currentColor"/></svg><b>' + escapeHtml(formatLimitHistoryChangePercent(safeChange)) + '% ' + comparison + ' que ' + escapeHtml(referenceLabel) + '</b></span>';
+}
+
+function buildLimitHistoryInsights(event) {
+  const insight = event?.intervalInsight;
+  if (!event?.editedAt || !insight) return "";
+  const intervalDuration = Math.max(0, Number(insight.intervalDurationSeconds || 0));
+  const averageDuration = Math.max(0, Number(insight.averageDurationSecondsAtEvent || 0));
+  if (!intervalDuration && !averageDuration) return "";
+  return [
+    '<div class="limit-history-insights" data-limit-history-insight>',
+    '<span data-limit-history-insight-interval>Intervalo registrado: <b>' + escapeHtml(formatLimitElapsedDuration(intervalDuration)) + '</b> ' + buildLimitHistoryTrend(insight.intervalChangePercent, "o intervalo anterior") + '</span>',
+    '<span data-limit-history-insight-average hidden>Média geral no registro: <b>' + escapeHtml(formatLimitElapsedDurationDetailed(averageDuration)) + '</b> ' + buildLimitHistoryTrend(insight.averageChangePercent, "a m?dia geral anterior") + '</span>',
+    '</div>'
+  ].join("");
+}
+
+function updateLimitHistoryInsights() {
+  if (!limitHistoryList) return;
+  const showAverage = Math.floor(Date.now() / 2000) % 2 === 1;
+  limitHistoryList.querySelectorAll("[data-limit-history-insight]").forEach((container) => {
+    const intervalText = container.querySelector("[data-limit-history-insight-interval]");
+    const averageText = container.querySelector("[data-limit-history-insight-average]");
+    if (intervalText) intervalText.hidden = showAverage;
+    if (averageText) averageText.hidden = !showAverage;
+  });
+}
+
+function stopLimitHistoryInsightTicker() {
+  if (!limitHistoryInsightTicker) return;
+  window.clearInterval(limitHistoryInsightTicker);
+  limitHistoryInsightTicker = null;
+}
+
+function startLimitHistoryInsightTicker() {
+  stopLimitHistoryInsightTicker();
+  updateLimitHistoryInsights();
+  limitHistoryInsightTicker = window.setInterval(updateLimitHistoryInsights, 2000);
+}
+
 function formatLimitLastProgress(goal) {
   const lastProgressMs = new Date(goal?.lastProgressAt || "").getTime();
   if (!Number.isFinite(lastProgressMs)) return "Nenhuma marcação ainda";
@@ -15479,7 +15546,7 @@ function renderLimitHistoryModal() {
           <article class="limit-history-entry${event.isLatest ? " is-latest" : ""}" data-limit-history-event="${escapeHtml(String(event.id || ""))}">
             <div class="limit-history-entry-copy">
               <strong>${Math.max(1, Number(event.value || 1))} ${escapeHtml(state.limitHistory?.title || "Limite")} <i>|</i> ${escapeHtml(formatLimitHistoryDate(event.occurredAt))}</strong>
-              ${event.editedAt ? "<span>Atualização corrigida</span>" : ""}
+              ${buildLimitHistoryInsights(event)}
             </div>
             <div class="limit-history-entry-actions">
               <button type="button" data-limit-history-edit ${event.isLatest ? "" : "disabled"} aria-label="Editar movimentação">
@@ -15493,6 +15560,7 @@ function renderLimitHistoryModal() {
         `;
       }).join("")
     : '<div class="limit-history-empty">Nenhuma movimentação registrada ainda.</div>';
+  updateLimitHistoryInsights();
 }
 
 async function loadLimitHistory() {

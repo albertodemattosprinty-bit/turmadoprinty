@@ -12626,7 +12626,32 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-nav
 .limit-history-entry-copy { min-width: 0; display: grid; gap: 4px; }
 .limit-history-entry-copy strong { font-size: clamp(.84rem, 2.7vw, 1.18rem); line-height: 1.35; }
 .limit-history-entry-copy strong i { color: rgba(255,255,255,.42); font-style: normal; padding-inline: 3px; }
-.limit-history-entry-copy span { color: rgba(255,255,255,.58); font-size: .78rem; font-weight: 700; }
+.limit-history-entry-copy > span { color: rgba(255,255,255,.58); font-size: .78rem; font-weight: 700; }
+.limit-history-insights {
+  min-height: 1.2em;
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.limit-history-insights > span {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: inherit;
+  animation: limit-history-insight-in 220ms ease-out both;
+}
+.limit-history-insights > span[hidden] { display: none; }
+.limit-history-insights b { color: inherit; font: inherit; }
+.limit-history-trend { display: inline-flex; align-items: center; gap: 3px; color: inherit; }
+.limit-history-trend svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.limit-history-trend.is-up svg { color: #24d17e; }
+.limit-history-trend.is-down svg { color: #ff5e68; }
+.limit-history-trend b { color: #fff; }
+@keyframes limit-history-insight-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .limit-history-entry-actions { display: flex; gap: 7px; }
 .limit-history-entry-actions button {
   width: 42px;
