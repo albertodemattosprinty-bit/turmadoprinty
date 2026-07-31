@@ -1110,6 +1110,7 @@ let platformLongPressHandledOccurrenceId = "";
 let actionsDelayTicker = null;
 let missionHealthTicker = null;
 let limitHistoryInsightTicker = null;
+let limitHistoryRecordsTicker = null;
 let historyDeleteHoldTimer = null;
 let historyDeleteHoldInterval = null;
 let historyMediaRecorder = null;
@@ -6635,6 +6636,7 @@ function closeModal(modal) {
 
   if (modal.id === "limitHistoryModal") {
     stopLimitHistoryInsightTicker();
+    stopLimitHistoryRecordsTicker();
   }
 
   if (["missionAdjustModal", "missionProgressModal"].includes(modal.id)) {
@@ -15533,6 +15535,11 @@ function formatLimitHistoryChangePercent(value) {
   });
 }
 
+function buildLimitHistoryRankBadge(rank) {
+  const safeRank = Math.max(0, Math.trunc(Number(rank || 0)));
+  return safeRank > 0 ? '<i class="limit-history-rank-badge">' + escapeHtml(String(safeRank)) + '&ordm;</i>' : "";
+}
+
 function buildLimitHistoryTrend(changePercent) {
   if (changePercent === null || changePercent === undefined) return "";
   const safeChange = Number(changePercent);
@@ -15554,8 +15561,8 @@ function buildLimitHistoryInsights(event) {
   if (!intervalDuration && !averageDuration) return "";
   return [
     '<div class="limit-history-insights" data-limit-history-insight>',
-    '<span data-limit-history-insight-interval><b>' + escapeHtml(formatLimitElapsedDuration(intervalDuration)) + '</b> ' + buildLimitHistoryTrend(insight.intervalChangePercent) + '</span>',
-    '<span data-limit-history-insight-average hidden><b>' + escapeHtml(formatLimitElapsedDuration(averageDuration)) + '</b> ' + buildLimitHistoryTrend(insight.averageChangePercent) + '</span>',
+    '<span data-limit-history-insight-interval>' + buildLimitHistoryRankBadge(insight.intervalRank) + '<b>' + escapeHtml(formatLimitElapsedDuration(intervalDuration)) + '</b> ' + buildLimitHistoryTrend(insight.intervalChangePercent) + '</span>',
+    '<span data-limit-history-insight-average hidden>' + buildLimitHistoryRankBadge(insight.averageRankAtEvent) + '<b>' + escapeHtml(formatLimitElapsedDuration(averageDuration)) + '</b> ' + buildLimitHistoryTrend(insight.averageChangePercent) + '</span>',
     '</div>'
   ].join("");
 }
@@ -15577,10 +15584,23 @@ function stopLimitHistoryInsightTicker() {
   limitHistoryInsightTicker = null;
 }
 
+function stopLimitHistoryRecordsTicker() {
+  if (!limitHistoryRecordsTicker) return;
+  window.clearInterval(limitHistoryRecordsTicker);
+  limitHistoryRecordsTicker = null;
+}
+
+function updateLimitHistoryLiveRecords() {
+  if (state.limitHistory?.mode !== "records" || state.limitHistory?.loading) return;
+  renderLimitHistoryModal();
+}
+
 function startLimitHistoryInsightTicker() {
   stopLimitHistoryInsightTicker();
+  stopLimitHistoryRecordsTicker();
   updateLimitHistoryInsights();
   limitHistoryInsightTicker = window.setInterval(updateLimitHistoryInsights, 2000);
+  limitHistoryRecordsTicker = window.setInterval(updateLimitHistoryLiveRecords, 1000);
 }
 
 function formatLimitLastProgress(goal) {
@@ -15619,6 +15639,22 @@ function formatLimitHistoryDate(value) {
   return `${parts.dateLabel} | ${parts.timeLabel}`;
 }
 
+function getLimitHistoryCurrentRankFromEvents(events, currentDurationSeconds) {
+  const safeCurrent = Math.max(0, Number(currentDurationSeconds || 0));
+  const chronological = [...(Array.isArray(events) ? events : [])]
+    .filter((event) => event?.occurredAt)
+    .sort((left, right) => new Date(left.occurredAt).getTime() - new Date(right.occurredAt).getTime());
+  if (chronological.length < 2) return 1;
+  const strongerClosedIntervals = chronological.slice(1).reduce((total, event, index) => {
+    const previous = chronological[index];
+    const fromMs = new Date(previous.occurredAt || "").getTime();
+    const toMs = new Date(event.occurredAt || "").getTime();
+    const durationSeconds = Math.max(0, Math.floor((toMs - fromMs) / 1000));
+    return total + (durationSeconds > safeCurrent ? 1 : 0);
+  }, 0);
+  return strongerClosedIntervals + 1;
+}
+
 function buildLimitHistoryOccurredAt(dateInput, timeInput) {
   const dateMatch = String(dateInput || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   const timeMatch = String(timeInput || "").match(/^(\d{2}):(\d{2})$/);
@@ -15649,7 +15685,7 @@ function renderLimitHistoryModal() {
   if (!limitHistoryList || !limitHistoryModeToggle) return;
   const recordsMode = state.limitHistory?.mode === "records";
   limitHistoryModeToggle.setAttribute("aria-pressed", recordsMode ? "true" : "false");
-  if (limitHistoryTitle) limitHistoryTitle.textContent = state.limitHistory?.title || "Limite";
+  if (limitHistoryTitle) limitHistoryTitle.textContent = "";
   if (state.limitHistory?.loading) {
     limitHistoryList.innerHTML = '<div class="limit-history-empty">Carregando histórico...</div>';
     return;
@@ -15660,16 +15696,19 @@ function renderLimitHistoryModal() {
     const events = Array.isArray(state.limitHistory?.events) ? state.limitHistory.events : [];
     const latestEvent = events.find((event) => event?.isLatest) || events[0] || null;
     const latestAtMs = new Date(latestEvent?.occurredAt || "").getTime();
+    const latestSleepExcludedSeconds = Math.max(0, Number(latestEvent?.sleepExcludedSeconds || 0));
+    const currentNowMs = getServerNowMs();
     const currentRecord = Number.isFinite(latestAtMs) ? {
       isCurrent: true,
-      durationSeconds: Math.max(0, Math.floor((getServerNowMs() - latestAtMs) / 1000)),
+      durationSeconds: Math.max(0, Math.floor((currentNowMs - latestAtMs) / 1000) - latestSleepExcludedSeconds),
       fromAt: latestEvent.occurredAt,
-      toAt: new Date(getServerNowMs()).toISOString()
+      toAt: new Date(currentNowMs).toISOString(),
+      sleepExcludedSeconds: latestSleepExcludedSeconds
     } : null;
     const rankedRecords = currentRecord
       ? [...records, currentRecord].sort((left, right) => Number(right.durationSeconds || 0) - Number(left.durationSeconds || 0))
       : records;
-    const currentRank = currentRecord ? rankedRecords.findIndex((record) => record.isCurrent) + 1 : 0;
+    const currentRank = currentRecord ? getLimitHistoryCurrentRankFromEvents(events, currentRecord.durationSeconds) : 0;
     const visibleRecords = rankedRecords.slice(0, 50);
     if (currentRecord && currentRank > 50) visibleRecords.push(currentRecord);
     const closedIntervalCount = Math.max(0, Number(state.limitHistory?.intervalCount || records.length || 0));
@@ -18395,6 +18434,7 @@ limitHistoryModeToggle?.addEventListener("click", () => {
   state.limitHistory.mode = state.limitHistory?.mode === "records" ? "history" : "records";
   state.limitHistory.editingEventId = "";
   renderLimitHistoryModal();
+  updateLimitHistoryLiveRecords();
 });
 limitHistoryList?.addEventListener("input", (event) => {
   const dateInput = event.target.closest("[data-limit-history-edit-date]");

@@ -181,6 +181,10 @@ async function buildExtraGoalBestIntervals(userId, profileName, events = []) {
   const chronologicalIntervals = netIntervals
     .filter((interval) => interval.durationSeconds > 0)
     .sort((left, right) => new Date(left.toAt).getTime() - new Date(right.toAt).getTime());
+  const rankedIntervals = netIntervals
+    .filter((interval) => interval.durationSeconds > 0)
+    .sort((left, right) => right.durationSeconds - left.durationSeconds);
+  const rankedIntervalPositionByEventId = new Map(rankedIntervals.map((interval, index) => [String(interval.toEventId || ""), index + 1]));
   let cumulativeDurationSeconds = 0;
   const eventInsights = Object.fromEntries(chronologicalIntervals.map((interval, index) => {
     const durationSeconds = Math.max(0, Number(interval.durationSeconds || 0));
@@ -201,12 +205,11 @@ async function buildExtraGoalBestIntervals(userId, profileName, events = []) {
       previousAverageDurationSeconds,
       averageChangePercent: previousAverageDurationSeconds > 0
         ? ((averageDurationSecondsAtEvent - previousAverageDurationSeconds) / previousAverageDurationSeconds) * 100
-        : null
+        : null,
+      intervalRank: rankedIntervalPositionByEventId.get(String(interval.toEventId || "")) || index + 1,
+      averageRankAtEvent: chronologicalIntervals.reduce((rank, current) => rank + (Number(current.durationSeconds || 0) > averageDurationSecondsAtEvent ? 1 : 0), 1)
     }];
   }));
-  const rankedIntervals = netIntervals
-    .filter((interval) => interval.durationSeconds > 0)
-    .sort((left, right) => right.durationSeconds - left.durationSeconds);
   const averageDurationSeconds = rankedIntervals.length
     ? Math.round(rankedIntervals.reduce((sum, interval) => sum + Number(interval.durationSeconds || 0), 0) / rankedIntervals.length)
     : 0;

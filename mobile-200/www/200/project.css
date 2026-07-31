@@ -14527,3 +14527,43 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
   width: 19px;
   height: 19px;
 }
+
+/* Limit history compact centered header. */
+.limit-history-header {
+  justify-content: center;
+  text-align: center;
+}
+.limit-history-header > div {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+}
+.limit-history-header span {
+  display: block;
+  text-align: center;
+}
+.limit-history-header h1,
+.limit-history-header p {
+  display: none !important;
+}
+
+/* Limit history inline rank badge for dynamic insights. */
+.limit-history-rank-badge {
+  width: 25px;
+  height: 25px;
+  display: inline-grid;
+  place-items: center;
+  margin-right: 7px;
+  border-radius: 50%;
+  color: #eaf3ff !important;
+  background: linear-gradient(135deg,#2f8cff,#1f5fe0);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16) inset, 0 8px 18px rgba(47,140,255,.18);
+  font-size: .68rem !important;
+  font-style: normal !important;
+  font-weight: 950 !important;
+  line-height: 1;
+  vertical-align: middle;
+}
+.limit-history-insights > span {
+  align-items: center;
+}
