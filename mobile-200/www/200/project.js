@@ -15535,9 +15535,13 @@ function formatLimitHistoryChangePercent(value) {
   });
 }
 
-function buildLimitHistoryRankBadge(rank) {
+function buildLimitHistoryRankBadge(rank, tone = "interval") {
   const safeRank = Math.max(0, Math.trunc(Number(rank || 0)));
-  return safeRank > 0 ? '<i class="limit-history-rank-badge">' + escapeHtml(String(safeRank)) + '&ordm;</i>' : "";
+  if (safeRank <= 0) return "";
+  const average = tone === "average";
+  const safeTone = average ? " is-average" : "";
+  const label = average ? "melhor m\u00e9dia" : "melhor tempo";
+  return '<span class="limit-history-rank-label' + safeTone + '"><i class="limit-history-rank-badge' + safeTone + '">' + escapeHtml(String(safeRank)) + '&ordm;</i><em>' + label + '</em></span>';
 }
 
 function buildLimitHistoryTrend(changePercent) {
@@ -15562,7 +15566,7 @@ function buildLimitHistoryInsights(event) {
   return [
     '<div class="limit-history-insights" data-limit-history-insight>',
     '<span data-limit-history-insight-interval>' + buildLimitHistoryRankBadge(insight.intervalRank) + '<b>' + escapeHtml(formatLimitElapsedDuration(intervalDuration)) + '</b> ' + buildLimitHistoryTrend(insight.intervalChangePercent) + '</span>',
-    '<span data-limit-history-insight-average hidden>' + buildLimitHistoryRankBadge(insight.averageRankAtEvent) + '<b>' + escapeHtml(formatLimitElapsedDuration(averageDuration)) + '</b> ' + buildLimitHistoryTrend(insight.averageChangePercent) + '</span>',
+    '<span data-limit-history-insight-average hidden>' + buildLimitHistoryRankBadge(insight.averageRankAtEvent, "average") + '<b>' + escapeHtml(formatLimitElapsedDuration(averageDuration)) + '</b> ' + buildLimitHistoryTrend(insight.averageChangePercent) + '</span>',
     '</div>'
   ].join("");
 }

@@ -14567,3 +14567,26 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
 .limit-history-insights > span {
   align-items: center;
 }
+.limit-history-rank-badge.is-average {
+  color: #ecfff7 !important;
+  background: linear-gradient(135deg,#24d17e,#059669);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset, 0 8px 18px rgba(36,209,126,.2);
+}
+.limit-history-rank-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 7px;
+  color: #75adff;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.limit-history-rank-label.is-average {
+  color: #5ef0a0;
+}
+.limit-history-rank-label em {
+  font-style: normal;
+}
+.limit-history-rank-label .limit-history-rank-badge {
+  margin-right: 0;
+}
