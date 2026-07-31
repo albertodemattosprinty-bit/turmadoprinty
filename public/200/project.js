@@ -1313,7 +1313,13 @@ const state = {
     summary: null,
     addMenuOpen: false,
     attentionScopeIndex: 0,
-    wizard: null
+    wizard: null,
+    accounts: [],
+    categories: [],
+    selectedAccount: "Conta principal",
+    activeAccountInput: "Conta principal",
+    activeCategoryInput: "Trabalho",
+    editingEntry: null
   },
   statsSummary: null,
   statsGoals: null,
@@ -5982,8 +5988,134 @@ const financeNanoIcons = {
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M9.9 5.4A9.7 9.7 0 0 1 12 5c6 0 9.5 7 9.5 7a16 16 0 0 1-3 4M6.4 6.8C3.8 8.7 2.5 12 2.5 12s3.5 7 9.5 7c1.4 0 2.7-.3 3.8-.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   income: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10M17 7 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   expense: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17H7V7M7 17 18 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.1 4.1L19 6.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.1 4.1L19 6.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M9 7l1-3h4l1 3M6 7l1 14h10l1-14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.7-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
+const ilifeFinancePrefsKey = "project_200_finance_prefs_v1";
+const ilifeFinanceDefaultAccounts = ["Conta principal", "Carteira", "Reserva"];
+const ilifeFinanceDefaultCategories = ["Trabalho", "Casa", "Alimenta\u00e7\u00e3o", "Transporte", "Sa\u00fade", "Lazer", "Outros"];
+const ilifeFinanceCreateOptionValue = "__CREATE_NEW__";
+
+function normalizeIlifeFinanceName(value, fallback = "") {
+  return String(value || fallback).trim().replace(/\s+/g, " ").slice(0, 80);
+}
+
+function uniqueIlifeFinanceList(values, fallbackValues) {
+  const list = [];
+  [...fallbackValues, ...(Array.isArray(values) ? values : [])].forEach((value) => {
+    const name = normalizeIlifeFinanceName(value);
+    if (name && !list.some((item) => item.toLowerCase() === name.toLowerCase())) list.push(name);
+  });
+  return list.length ? list : [...fallbackValues];
+}
+
+function loadIlifeFinancePrefs() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ilifeFinancePrefsKey) || "{}");
+    state.ilifeFinance.accounts = uniqueIlifeFinanceList(parsed.accounts, ilifeFinanceDefaultAccounts);
+    state.ilifeFinance.categories = uniqueIlifeFinanceList(parsed.categories, ilifeFinanceDefaultCategories);
+    state.ilifeFinance.selectedAccount = normalizeIlifeFinanceName(parsed.selectedAccount, "Conta principal");
+  } catch {
+    state.ilifeFinance.accounts = [...ilifeFinanceDefaultAccounts];
+    state.ilifeFinance.categories = [...ilifeFinanceDefaultCategories];
+    state.ilifeFinance.selectedAccount = "Conta principal";
+  }
+  if (!state.ilifeFinance.accounts.includes("Conta principal")) state.ilifeFinance.accounts.unshift("Conta principal");
+  if (!state.ilifeFinance.accounts.includes(state.ilifeFinance.selectedAccount)) state.ilifeFinance.selectedAccount = state.ilifeFinance.accounts[0] || "Conta principal";
+}
+
+function saveIlifeFinancePrefs() {
+  localStorage.setItem(ilifeFinancePrefsKey, JSON.stringify({ accounts: state.ilifeFinance.accounts, categories: state.ilifeFinance.categories, selectedAccount: state.ilifeFinance.selectedAccount }));
+}
+
+function renderIlifeFinanceSelect(selectId, values, selectedValue, createLabel) {
+  const select = getIlifeFinanceEl(selectId);
+  if (!select) return;
+  const safeSelected = values.includes(selectedValue) ? selectedValue : values[0];
+  select.innerHTML = values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("") + `<option value="${ilifeFinanceCreateOptionValue}">+ ${escapeHtml(createLabel)}</option>`;
+  select.value = safeSelected;
+}
+
+function canDeleteIlifeFinanceAccount(name) {
+  const accounts = state.ilifeFinance.accounts || [];
+  return accounts.length > 1 && accounts.includes(name);
+}
+
+function renderIlifeFinanceChips(containerId, values, type) {
+  const container = getIlifeFinanceEl(containerId);
+  if (!container) return;
+  container.innerHTML = values.map((value) => {
+    const canDelete = type === "account" ? canDeleteIlifeFinanceAccount(value) : values.length > 1;
+    const removeAttr = type === "account" ? "data-ilife-finance-remove-account" : "data-ilife-finance-remove-category";
+    return `<span class="finance-nano-chip"><b>${escapeHtml(value)}</b>${canDelete ? `<button type="button" ${removeAttr}="${escapeHtml(value)}" aria-label="Excluir ${escapeHtml(value)}">${financeNanoIcons.close}</button>` : ""}</span>`;
+  }).join("");
+}
+
+function renderIlifeFinanceCustomFields() {
+  const accounts = state.ilifeFinance.accounts?.length ? state.ilifeFinance.accounts : ilifeFinanceDefaultAccounts;
+  const categories = state.ilifeFinance.categories?.length ? state.ilifeFinance.categories : ilifeFinanceDefaultCategories;
+  renderIlifeFinanceSelect("ilifeFinanceAccountSelect", accounts, state.ilifeFinance.activeAccountInput || state.ilifeFinance.selectedAccount || accounts[0], "Criar novo");
+  renderIlifeFinanceSelect("ilifeFinanceCategorySelect", categories, state.ilifeFinance.activeCategoryInput || categories[0], "Criar novo");
+  renderIlifeFinanceChips("ilifeFinanceAccountChips", accounts, "account");
+  renderIlifeFinanceChips("ilifeFinanceCategoryChips", categories, "category");
+}
+
+function createIlifeFinanceListItem(type) {
+  const isAccount = type === "account";
+  const name = normalizeIlifeFinanceName(window.prompt(isAccount ? "Nome da nova conta" : "Nome da nova categoria"));
+  if (!name) { renderIlifeFinanceCustomFields(); return null; }
+  const listKey = isAccount ? "accounts" : "categories";
+  const fallback = isAccount ? ilifeFinanceDefaultAccounts : ilifeFinanceDefaultCategories;
+  const list = uniqueIlifeFinanceList(state.ilifeFinance[listKey], fallback);
+  const existing = list.find((item) => item.toLowerCase() === name.toLowerCase());
+  state.ilifeFinance[listKey] = existing ? list : [...list, name];
+  if (isAccount) {
+    state.ilifeFinance.activeAccountInput = existing || name;
+    state.ilifeFinance.selectedAccount = existing || name;
+  } else {
+    state.ilifeFinance.activeCategoryInput = existing || name;
+  }
+  saveIlifeFinancePrefs();
+  renderIlifeFinanceCustomFields();
+  renderIlifeFinanceSummary();
+  setIlifeFinanceToast(existing ? "Esse nome j\u00e1 existe." : "Criado.");
+  return existing || name;
+}
+
+function removeIlifeFinanceListItem(type, name) {
+  const listKey = type === "account" ? "accounts" : "categories";
+  const list = state.ilifeFinance[listKey] || [];
+  if (type === "account" && !canDeleteIlifeFinanceAccount(name)) { setIlifeFinanceToast("Mantenha pelo menos uma conta."); return; }
+  if (type === "category" && list.length <= 1) { setIlifeFinanceToast("Mantenha pelo menos uma categoria."); return; }
+  state.ilifeFinance[listKey] = list.filter((item) => item !== name);
+  if (type === "account") {
+    if (state.ilifeFinance.selectedAccount === name) state.ilifeFinance.selectedAccount = state.ilifeFinance.accounts[0] || "Conta principal";
+    if (state.ilifeFinance.activeAccountInput === name) state.ilifeFinance.activeAccountInput = state.ilifeFinance.selectedAccount;
+  } else if (state.ilifeFinance.activeCategoryInput === name) {
+    state.ilifeFinance.activeCategoryInput = state.ilifeFinance.categories[0] || "Outros";
+  }
+  saveIlifeFinancePrefs();
+  renderIlifeFinanceCustomFields();
+  renderIlifeFinanceSummary();
+  setIlifeFinanceToast("Removido deste menu.");
+}
+
+function getIlifeFinanceAccountEntries(entries, accountName) {
+  return entries.filter((entry) => normalizeIlifeFinanceName(entry.accountName, "Conta principal") === accountName);
+}
+
+function getIlifeFinanceAccountTotals(entries, accountName) {
+  const selectedEntries = getIlifeFinanceAccountEntries(entries, accountName);
+  const forecastEntries = selectedEntries.filter((entry) => entry.status === "SCHEDULED" && entry.settlementType === "FUTURE");
+  const settledEntries = selectedEntries.filter((entry) => entry.status === "SETTLED");
+  const incomeCents = forecastEntries.filter((entry) => entry.kind === "INCOME").reduce((sum, entry) => sum + entry.amountCents, 0);
+  const expenseCents = forecastEntries.filter((entry) => entry.kind === "EXPENSE").reduce((sum, entry) => sum + entry.amountCents, 0);
+  const balanceCents = settledEntries.reduce((sum, entry) => sum + (entry.kind === "INCOME" ? entry.amountCents : -entry.amountCents), 0);
+  return { entries: selectedEntries, incomeCents, expenseCents, balanceCents, projectedCents: balanceCents + incomeCents - expenseCents };
+}
 
 const ilifeFinanceDateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" });
 
@@ -6039,13 +6171,19 @@ function setIlifeFinanceToast(message) {
 function renderIlifeFinanceSummary() {
   const summary = state.ilifeFinance.summary || {};
   const entries = Array.isArray(summary.entries) ? summary.entries : [];
-  const scheduledEntries = entries.filter((entry) => entry.status === "SCHEDULED" && entry.settlementType === "FUTURE");
+  const accountsFromEntries = entries.map((entry) => normalizeIlifeFinanceName(entry.accountName, "Conta principal"));
+  state.ilifeFinance.accounts = uniqueIlifeFinanceList(accountsFromEntries, state.ilifeFinance.accounts?.length ? state.ilifeFinance.accounts : ilifeFinanceDefaultAccounts);
+  if (!state.ilifeFinance.accounts.includes(state.ilifeFinance.selectedAccount)) state.ilifeFinance.selectedAccount = state.ilifeFinance.accounts[0] || "Conta principal";
+  const selectedAccount = state.ilifeFinance.selectedAccount || "Conta principal";
+  const accountTotals = getIlifeFinanceAccountTotals(entries, selectedAccount);
+  const accountEntries = accountTotals.entries;
+  const scheduledEntries = accountEntries.filter((entry) => entry.status === "SCHEDULED" && entry.settlementType === "FUTURE");
   const incomeEntries = scheduledEntries.filter((entry) => entry.kind === "INCOME");
   const expenseEntries = scheduledEntries.filter((entry) => entry.kind === "EXPENSE");
-  const balanceCents = Number(summary.balanceCents || 0);
-  const incomeCents = Number(summary.incomeCents || 0);
-  const expenseCents = Number(summary.expenseCents || 0);
-  const projectedCents = balanceCents + incomeCents - expenseCents;
+  const balanceCents = accountTotals.balanceCents;
+  const incomeCents = accountTotals.incomeCents;
+  const expenseCents = accountTotals.expenseCents;
+  const projectedCents = accountTotals.projectedCents;
   const monthName = getIlifeFinanceMonthName();
 
   const monthLabel = getIlifeFinanceEl("ilifeFinanceMonthLabel");
@@ -6060,7 +6198,9 @@ function renderIlifeFinanceSummary() {
   const agenda = getIlifeFinanceEl("ilifeFinanceTodayContent");
   const list = getIlifeFinanceEl("ilifeFinanceTransactionList");
   const toggle = getIlifeFinanceEl("ilifeFinanceToggleMoney");
+  const balanceAccountName = getIlifeFinanceEl("ilifeFinanceBalanceAccountName");
 
+  if (balanceAccountName) balanceAccountName.textContent = selectedAccount;
   if (monthLabel) monthLabel.textContent = monthName;
   if (currentBalance) currentBalance.textContent = formatIlifeFinanceMoney(balanceCents);
   if (projectedBalance) projectedBalance.textContent = formatIlifeFinanceMoney(projectedCents);
@@ -6096,17 +6236,19 @@ function renderIlifeFinanceSummary() {
     }
   }
 
+  renderIlifeFinanceCustomFields();
+
   if (list) {
-    if (!entries.length) {
+    if (!accountEntries.length) {
       list.innerHTML = '<div class="finance-nano-list-empty">Nenhuma movimenta&ccedil;&atilde;o neste m&ecirc;s.</div>';
     } else {
-      list.innerHTML = [...entries]
+      list.innerHTML = [...accountEntries]
         .sort((a, b) => String(b.dueOn || "").localeCompare(String(a.dueOn || "")))
         .slice(0, 8)
         .map((entry) => {
           const expense = entry.kind === "EXPENSE";
           const settled = entry.status === "SETTLED";
-          return `<article class="finance-nano-transaction ${expense ? "is-expense" : ""}"><div>${expense ? financeNanoIcons.expense : financeNanoIcons.income}</div><span><strong>${escapeHtml(entry.title || "Lan\u00e7amento")}</strong><small>${escapeHtml(formatIlifeFinanceDate(entry.dueOn))} &middot; ${settled ? "REALIZADO" : "PREVISTO"}</small></span><b>${expense ? "-" : "+"} ${escapeHtml(formatIlifeFinanceMoney(entry.amountCents || 0))}</b></article>`;
+          return `<article class="finance-nano-transaction ${expense ? "is-expense" : ""}"><div>${expense ? financeNanoIcons.expense : financeNanoIcons.income}</div><span><strong>${escapeHtml(entry.title || "Lan\u00e7amento")}</strong><small>${escapeHtml(formatIlifeFinanceDate(entry.dueOn))} &middot; ${settled ? "REALIZADO" : "PREVISTO"} &middot; ${escapeHtml(entry.category || "Outros")}</small></span><b>${expense ? "-" : "+"} ${escapeHtml(formatIlifeFinanceMoney(entry.amountCents || 0))}</b><nav class="finance-nano-transaction-actions"><button type="button" data-ilife-finance-edit="${escapeHtml(entry.itemId || entry.id)}" aria-label="Editar movimenta\u00e7\u00e3o">${financeNanoIcons.edit}</button><button type="button" data-ilife-finance-delete="${escapeHtml(entry.itemId || entry.id)}" aria-label="Excluir movimenta\u00e7\u00e3o">${financeNanoIcons.trash}</button></nav></article>`;
         }).join("");
     }
   }
@@ -6152,7 +6294,9 @@ function openIlifeFinanceWizard(kind) {
   if (dateInput) dateInput.value = getProjectTodayDateKey();
   if (settlement) settlement.value = "FUTURE";
   if (recurring) recurring.checked = false;
+  state.ilifeFinance.editingEntry = null;
   if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "";
+  renderIlifeFinanceCustomFields();
   renderIlifeFinanceWizard();
   if (ilifeFinanceEntryWizard) {
     ilifeFinanceEntryWizard.hidden = false;
@@ -6175,7 +6319,7 @@ function renderIlifeFinanceWizard() {
   const wizard = state.ilifeFinance.wizard;
   if (!wizard) return;
   const income = wizard.kind === "INCOME";
-  if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = income ? "Nova entrada" : "Nova sa\u00edda";
+  if (ilifeFinanceWizardTitle) ilifeFinanceWizardTitle.textContent = state.ilifeFinance.editingEntry ? "Editar movimenta\u00e7\u00e3o" : (income ? "Nova entrada" : "Nova sa\u00edda");
   document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.ilifeFinanceKindSwitch === wizard.kind);
   });
@@ -6190,8 +6334,8 @@ function buildIlifeFinancePayload() {
   return {
     title: String(getIlifeFinanceEl("ilifeFinanceTitleInput")?.value || "").trim(),
     amountCents: parseIlifeFinanceAmount(getIlifeFinanceEl("ilifeFinanceAmountInput")?.value),
-    accountName: String(getIlifeFinanceEl("ilifeFinanceAccountSelect")?.value || "Conta principal"),
-    category: String(getIlifeFinanceEl("ilifeFinanceCategorySelect")?.value || "Outros"),
+    accountName: normalizeIlifeFinanceName(getIlifeFinanceEl("ilifeFinanceAccountSelect")?.value, "Conta principal"),
+    category: normalizeIlifeFinanceName(getIlifeFinanceEl("ilifeFinanceCategorySelect")?.value, "Outros"),
     kind: wizard.kind,
     settlementType: settlementType === "CASH" ? "CASH" : "FUTURE",
     scheduleMode: recurring ? (endsOn ? "FINITE" : "RECURRING") : "ONCE",
@@ -6200,6 +6344,48 @@ function buildIlifeFinancePayload() {
     endsOn: recurring ? endsOn : null,
     scheduleConfig: recurring ? { daysOfMonth: [Number(startsOn.slice(8, 10))] } : {}
   };
+}
+
+function openIlifeFinanceEdit(itemId) {
+  const summary = state.ilifeFinance.summary || {};
+  const entry = (Array.isArray(summary.entries) ? summary.entries : []).find((item) => String(item.itemId || item.id) === String(itemId));
+  if (!entry) { setIlifeFinanceToast("Movimenta\u00e7\u00e3o n\u00e3o encontrada neste m\u00eas."); return; }
+  state.ilifeFinance.wizard = buildIlifeFinanceWizard(entry.kind);
+  state.ilifeFinance.editingEntry = entry;
+  state.ilifeFinance.activeAccountInput = normalizeIlifeFinanceName(entry.accountName, "Conta principal");
+  state.ilifeFinance.activeCategoryInput = normalizeIlifeFinanceName(entry.category, "Outros");
+  renderIlifeFinanceCustomFields();
+  const titleInput = getIlifeFinanceEl("ilifeFinanceTitleInput");
+  const amountInput = getIlifeFinanceEl("ilifeFinanceAmountInput");
+  const dateInput = getIlifeFinanceEl("ilifeFinanceOnceDate");
+  const settlement = getIlifeFinanceEl("ilifeFinanceSettlementSelect");
+  const recurring = getIlifeFinanceEl("ilifeFinanceRecurring");
+  const endWrap = getIlifeFinanceEl("ilifeFinanceEndDateWrap");
+  if (titleInput) titleInput.value = entry.title || "";
+  if (amountInput) amountInput.value = String((Number(entry.amountCents || 0) / 100).toFixed(2)).replace(".", ",");
+  if (dateInput) dateInput.value = entry.dueOn || getProjectTodayDateKey();
+  if (settlement) settlement.value = entry.settlementType === "CASH" ? "CASH" : "FUTURE";
+  if (recurring) recurring.checked = false;
+  if (endWrap) endWrap.hidden = true;
+  if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "";
+  renderIlifeFinanceWizard();
+  if (ilifeFinanceEntryWizard) {
+    ilifeFinanceEntryWizard.hidden = false;
+    ilifeFinanceEntryWizard.classList.add("is-open");
+    ilifeFinanceEntryWizard.setAttribute("aria-hidden", "false");
+  }
+  window.setTimeout(() => amountInput?.focus(), 80);
+}
+
+async function deleteIlifeFinanceItem(itemId) {
+  if (!window.confirm("Excluir esta movimenta\u00e7\u00e3o?")) return;
+  try {
+    await apiRequest(`/api/200/finance/ledger/${encodeURIComponent(itemId)}`, { method: "DELETE" });
+    await loadIlifeFinanceLedger();
+    setIlifeFinanceToast("Movimenta\u00e7\u00e3o exclu\u00edda.");
+  } catch (error) {
+    setIlifeFinanceToast(error instanceof Error ? error.message : "N\u00e3o foi poss\u00edvel excluir.");
+  }
 }
 
 async function saveIlifeFinanceItem() {
@@ -6223,14 +6409,14 @@ async function saveIlifeFinanceItem() {
   if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = "Salvando...";
   if (ilifeFinanceSave) ilifeFinanceSave.disabled = true;
   try {
-    await apiRequest("/api/200/finance/ledger", {
-      method: "POST",
+    await apiRequest(state.ilifeFinance.editingEntry ? `/api/200/finance/ledger/${encodeURIComponent(state.ilifeFinance.editingEntry.itemId)}` : "/api/200/finance/ledger", {
+      method: state.ilifeFinance.editingEntry ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
     closeIlifeFinanceWizard();
     await loadIlifeFinanceLedger();
-    setIlifeFinanceToast("Lan\u00e7amento salvo no seu m\u00eas.");
+    setIlifeFinanceToast(state.ilifeFinance.editingEntry ? "Movimenta\u00e7\u00e3o atualizada." : "Lan\u00e7amento salvo no seu m\u00eas.");
   } catch (error) {
     if (ilifeFinanceWizardStatus) ilifeFinanceWizardStatus.textContent = error instanceof Error ? error.message : "N\u00e3o foi poss\u00edvel salvar.";
   } finally {
@@ -16444,6 +16630,9 @@ document.querySelectorAll("[data-open-modal]").forEach((button) => {
   });
 });
 
+loadIlifeFinancePrefs();
+renderIlifeFinanceCustomFields();
+
 document.querySelectorAll("[data-ilife-finance-kind]").forEach((button) => {
   button.addEventListener("click", () => openIlifeFinanceWizard(button.dataset.ilifeFinanceKind));
 });
@@ -16457,6 +16646,14 @@ document.querySelectorAll("[data-ilife-finance-kind-switch]").forEach((button) =
 getIlifeFinanceEl("ilifeFinanceFab")?.addEventListener("click", () => openIlifeFinanceWizard("INCOME"));
 getIlifeFinanceEl("ilifeFinanceToggleMoney")?.addEventListener("click", () => {
   state.ilifeFinance.valuesVisible = state.ilifeFinance.valuesVisible === false;
+  renderIlifeFinanceSummary();
+});
+getIlifeFinanceEl("ilifeFinanceCycleAccount")?.addEventListener("click", () => {
+  const accounts = state.ilifeFinance.accounts?.length ? state.ilifeFinance.accounts : ilifeFinanceDefaultAccounts;
+  const currentIndex = Math.max(0, accounts.indexOf(state.ilifeFinance.selectedAccount));
+  state.ilifeFinance.selectedAccount = accounts[(currentIndex + 1) % accounts.length] || "Conta principal";
+  state.ilifeFinance.activeAccountInput = state.ilifeFinance.selectedAccount;
+  saveIlifeFinancePrefs();
   renderIlifeFinanceSummary();
 });
 getIlifeFinanceEl("ilifeFinanceMonthToday")?.addEventListener("click", () => {
@@ -16473,6 +16670,34 @@ ilifeFinanceEntryWizard?.addEventListener("click", (event) => {
 getIlifeFinanceEl("ilifeFinanceForm")?.addEventListener("submit", (event) => {
   event.preventDefault();
   void saveIlifeFinanceItem();
+});
+getIlifeFinanceEl("ilifeFinanceAccountSelect")?.addEventListener("change", (event) => {
+  if (event.currentTarget.value === ilifeFinanceCreateOptionValue) { createIlifeFinanceListItem("account"); return; }
+  state.ilifeFinance.activeAccountInput = event.currentTarget.value;
+  state.ilifeFinance.selectedAccount = event.currentTarget.value;
+  saveIlifeFinancePrefs();
+  renderIlifeFinanceSummary();
+});
+getIlifeFinanceEl("ilifeFinanceCategorySelect")?.addEventListener("change", (event) => {
+  if (event.currentTarget.value === ilifeFinanceCreateOptionValue) { createIlifeFinanceListItem("category"); return; }
+  state.ilifeFinance.activeCategoryInput = event.currentTarget.value;
+  saveIlifeFinancePrefs();
+});
+getIlifeFinanceEl("ilifeFinanceCreateAccountButton")?.addEventListener("click", () => createIlifeFinanceListItem("account"));
+getIlifeFinanceEl("ilifeFinanceCreateCategoryButton")?.addEventListener("click", () => createIlifeFinanceListItem("category"));
+getIlifeFinanceEl("ilifeFinanceAccountChips")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-ilife-finance-remove-account]");
+  if (button) removeIlifeFinanceListItem("account", button.dataset.ilifeFinanceRemoveAccount);
+});
+getIlifeFinanceEl("ilifeFinanceCategoryChips")?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-ilife-finance-remove-category]");
+  if (button) removeIlifeFinanceListItem("category", button.dataset.ilifeFinanceRemoveCategory);
+});
+getIlifeFinanceEl("ilifeFinanceTransactionList")?.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-ilife-finance-edit]");
+  if (editButton) { openIlifeFinanceEdit(editButton.dataset.ilifeFinanceEdit); return; }
+  const deleteButton = event.target.closest("[data-ilife-finance-delete]");
+  if (deleteButton) void deleteIlifeFinanceItem(deleteButton.dataset.ilifeFinanceDelete);
 });
 getIlifeFinanceEl("ilifeFinanceRecurring")?.addEventListener("change", (event) => {
   const wrap = getIlifeFinanceEl("ilifeFinanceEndDateWrap");

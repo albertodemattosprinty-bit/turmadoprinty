@@ -274,6 +274,60 @@ export async function createProject200FinanceItem(userId, payload) {
   return item;
 }
 
+export async function updateProject200FinanceItem(userId, itemId, payload) {
+  await ensureProject200FinanceLedgerSchema();
+  const id = String(itemId || "").trim();
+  if (!id) throw new Error("Lancamento invalido.");
+  const kind = normalizeEnum(payload?.kind, ITEM_KINDS, "Natureza");
+  const settlementType = normalizeEnum(payload?.settlementType, SETTLEMENT_TYPES, "Momento");
+  const today = new Date().toISOString().slice(0, 10);
+  const startsOn = normalizeDateOnly(payload?.startsOn || payload?.dueOn || today, "Data inicial");
+  const title = String(payload?.title || "").trim().slice(0, 90);
+  if (title.length < 2) throw new Error("Digite uma descricao para o lancamento.");
+  const amountCents = normalizeAmountCents(payload?.amountCents);
+  const accountName = normalizeShortText(payload?.accountName, "Conta principal", 80);
+  const category = normalizeShortText(payload?.category, "Outros", 80);
+
+  const result = await query(`
+    update project200_finance_items
+       set title = $3,
+           kind = $4,
+           amount_cents = $5,
+           account_name = $6,
+           category = $7,
+           settlement_type = $8,
+           schedule_mode = 'ONCE',
+           schedule_frequency = 'NONE',
+           schedule_config = '{}'::jsonb,
+           starts_on = $9::date,
+           ends_on = null,
+           updated_at = now()
+     where user_id = $1 and id = $2 and deleted_at is null
+     returning *
+  `, [userId, id, title, kind, amountCents, accountName, category, settlementType, startsOn]);
+  if (!result.rowCount) throw new Error("Lancamento nao encontrado.");
+
+  await query("delete from project200_finance_occurrences where user_id = $1 and item_id = $2", [userId, id]);
+  const item = normalizeItemRow(result.rows[0]);
+  await insertOccurrence(userId, item, startsOn, settlementType === "CASH" ? "SETTLED" : "SCHEDULED");
+  return item;
+}
+
+export async function deleteProject200FinanceItem(userId, itemId) {
+  await ensureProject200FinanceLedgerSchema();
+  const id = String(itemId || "").trim();
+  if (!id) throw new Error("Lancamento invalido.");
+  const result = await query(`
+    update project200_finance_items
+       set deleted_at = now(), updated_at = now()
+     where user_id = $1 and id = $2 and deleted_at is null
+     returning id
+  `, [userId, id]);
+  if (!result.rowCount) throw new Error("Lancamento nao encontrado.");
+  await query("update project200_finance_occurrences set status = 'CANCELLED' where user_id = $1 and item_id = $2", [userId, id]);
+  return { id };
+}
+
 async function materializeRange(userId, rangeStart, rangeEnd) {
   const result = await query(`
     select * from project200_finance_items

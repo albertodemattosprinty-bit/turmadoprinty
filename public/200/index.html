@@ -956,10 +956,10 @@
           <article class="finance-nano-balance-card">
             <div class="finance-nano-balance-top">
               <div>
-                <p>Saldo nas suas contas</p>
+                <p id="ilifeFinanceBalanceAccountName">Conta principal</p>
                 <h1 id="ilifeFinanceCurrentBalance">R$ 0,00</h1>
               </div>
-              <button class="finance-nano-eye" type="button" id="ilifeFinanceToggleMoney" aria-label="Ocultar ou mostrar valores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></button>
+              <div class="finance-nano-balance-tools"><button class="finance-nano-eye" type="button" id="ilifeFinanceCycleAccount" aria-label="Trocar conta exibida"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="finance-nano-eye" type="button" id="ilifeFinanceToggleMoney" aria-label="Ocultar ou mostrar valores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></button></div>
             </div>
             <div class="finance-nano-projection">
               <span>Depois do que est&aacute; previsto:</span>
@@ -1052,8 +1052,10 @@
               <label class="finance-nano-field full"><span>Descri&ccedil;&atilde;o</span><input type="text" id="ilifeFinanceTitleInput" maxlength="90" autocomplete="off" placeholder="Ex.: Pagamento do projeto" /></label>
               <label class="finance-nano-field"><span>Situa&ccedil;&atilde;o</span><select id="ilifeFinanceSettlementSelect"><option value="FUTURE">Previsto</option><option value="CASH">J&aacute; aconteceu</option></select></label>
               <label class="finance-nano-field"><span>Data</span><input type="date" id="ilifeFinanceOnceDate" /></label>
-              <label class="finance-nano-field"><span>Conta</span><select id="ilifeFinanceAccountSelect"><option>Conta principal</option><option>Carteira</option><option>Reserva</option></select></label>
-              <label class="finance-nano-field"><span>Categoria</span><select id="ilifeFinanceCategorySelect"><option>Trabalho</option><option>Casa</option><option>Alimenta&ccedil;&atilde;o</option><option>Transporte</option><option>Sa&uacute;de</option><option>Lazer</option><option>Outros</option></select></label>
+              <label class="finance-nano-field"><span>Conta</span><div class="finance-nano-select-action"><select id="ilifeFinanceAccountSelect"></select><button type="button" id="ilifeFinanceCreateAccountButton" aria-label="Criar nova conta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div></label>
+              <div class="finance-nano-chip-row" id="ilifeFinanceAccountChips" aria-label="Contas cadastradas"></div>
+              <label class="finance-nano-field"><span>Categoria</span><div class="finance-nano-select-action"><select id="ilifeFinanceCategorySelect"></select><button type="button" id="ilifeFinanceCreateCategoryButton" aria-label="Criar nova categoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div></label>
+              <div class="finance-nano-chip-row" id="ilifeFinanceCategoryChips" aria-label="Categorias cadastradas"></div>
             </div>
 
             <details class="finance-nano-advanced">

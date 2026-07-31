@@ -14426,3 +14426,104 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
     display: none;
   }
 }
+
+/* Finance Nano custom accounts, categories and transaction actions. */
+.finance-nano-balance-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.finance-nano-chip-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: -5px;
+}
+.finance-nano-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 7px 6px 10px;
+  border: 1px solid #cae7e0;
+  border-radius: 999px;
+  color: #0b5f55;
+  background: #e9fbf6;
+  font-size: 11px;
+  font-weight: 850;
+}
+.finance-nano-chip b {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.finance-nano-chip button,
+.finance-nano-transaction-actions button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: inherit;
+  background: transparent;
+}
+.finance-nano-chip button {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #d23f5c;
+  background: #ffe7ed;
+}
+.finance-nano-chip button svg {
+  width: 14px;
+  height: 14px;
+}
+.finance-nano-transaction {
+  grid-template-columns: 42px minmax(0,1fr) auto auto;
+}
+.finance-nano-transaction-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.finance-nano-transaction-actions button {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  color: #087d70;
+  background: #e8f8f4;
+}
+.finance-nano-transaction-actions button[data-ilife-finance-delete] {
+  color: #d23f5c;
+  background: #ffe7ed;
+}
+.finance-nano-transaction-actions svg {
+  width: 17px;
+  height: 17px;
+}
+@media (max-width: 390px) {
+  .finance-nano-transaction {
+    grid-template-columns: 42px minmax(0,1fr) auto;
+  }
+  .finance-nano-transaction-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-end;
+  }
+}
+.finance-nano-select-action {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 38px;
+  gap: 7px;
+}
+.finance-nano-select-action button {
+  display: grid;
+  place-items: center;
+  border: 1px solid #bfe8df;
+  border-radius: 13px;
+  color: var(--finance-nano-brand-dark);
+  background: var(--finance-nano-brand-soft);
+}
+.finance-nano-select-action button svg {
+  width: 19px;
+  height: 19px;
+}

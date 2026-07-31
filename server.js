@@ -62,7 +62,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createProject200FinanceItem, summarizeProject200FinanceLedgerMonth } from "./src/project200-finance-ledger.js";
+import { createProject200FinanceItem, deleteProject200FinanceItem, summarizeProject200FinanceLedgerMonth, updateProject200FinanceItem } from "./src/project200-finance-ledger.js";
 import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, deleteLatestExtraGoalProgressEvent, ensureExtraGoalsSchema, getExtraGoalById, getProject200ActiveTime, getProject200MissionInstallmentOrder, listExtraGoalProgressEvents, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateLatestExtraGoalProgressEvent, updateProject200ActiveTime, updateProject200MissionInstallmentOrder } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
@@ -11888,6 +11888,28 @@ const server = http.createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar o lancamento."
+      });
+    }
+    return;
+  }
+
+  if ((request.method === "PUT" || request.method === "DELETE") && pathname.match(/^\/api\/200\/finance\/ledger\/[^/]+$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const match = pathname.match(/^\/api\/200\/finance\/ledger\/([^/]+)$/);
+      const itemId = decodeURIComponent(match[1]);
+      if (request.method === "DELETE") {
+        const deleted = await deleteProject200FinanceItem(user.id, itemId);
+        sendJson(response, 200, { ok: true, deleted });
+      } else {
+        const body = await readJsonBody(request);
+        const item = await updateProject200FinanceItem(user.id, itemId, body);
+        sendJson(response, 200, { ok: true, item });
+      }
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel alterar o lancamento."
       });
     }
     return;
