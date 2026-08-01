@@ -575,6 +575,10 @@ function project200LifeCaptureEncryptionContext(captureId, part = "media") {
   return "life-capture:" + String(captureId || "") + ":" + String(part || "media");
 }
 
+function isProject200PrivateLifeCaptureUrl(value) {
+  return String(value || "").trim().startsWith("/api/200/life-captures/");
+}
+
 function hydrateProject200LifeCapturePrivateUrls(capture) {
   if (!capture?.id) return capture;
   const mediaUrl = capture.uploadKey ? buildProject200LifeCaptureMediaRoute(capture.id, "media") : "";
@@ -4271,8 +4275,20 @@ async function handleProject200LifeCaptureMediaRequest(request, response, captur
       sendJson(response, 404, { error: "Midia nao encontrada." });
       return;
     }
-    const encryptedBuffer = await readProject200PrivateR2ObjectBuffer(key);
-    const buffer = await decryptUserBuffer(user.id, encryptedBuffer, project200LifeCaptureEncryptionContext(capture.id, part));
+    const storedUrl = part === "preview" ? String(capture.previewUrl || "") : String(capture.mediaUrl || "");
+    let buffer;
+    if (isProject200PrivateLifeCaptureUrl(storedUrl)) {
+      const encryptedBuffer = await readProject200PrivateR2ObjectBuffer(key);
+      buffer = await decryptUserBuffer(user.id, encryptedBuffer, project200LifeCaptureEncryptionContext(capture.id, part));
+    } else {
+      // Captures created before private storage still live in the original R2 bucket.
+      // Keep their raw URL hidden and proxy the object only after owner authentication.
+      buffer = await readR2ObjectBuffer(key);
+    }
+    if (!buffer.length) {
+      sendJson(response, 404, { error: "Midia nao encontrada." });
+      return;
+    }
     const contentType = part === "preview" ? "image/webp" : (String(capture.mimeType || "application/octet-stream") || "application/octet-stream");
     response.writeHead(200, {
       "Content-Type": contentType,
