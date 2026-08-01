@@ -152,6 +152,18 @@ export async function replaceProject200ProjectItems(userId, profileName, project
 }
 
 
+export async function deleteProject200Project(userId, profileName, projectId) {
+  await ensureProject200ProjectsSchema();
+  const profile = await resolveProject200ProfileName(userId, profileName);
+  const result = await query(`
+    delete from project200_projects
+    where id = $1 and user_id = $2 and assigned_profile = $3
+    returning id
+  `, [projectId, userId, profile]);
+  if (!result.rows[0]) throw new Error("Projeto nao encontrado.");
+  return String(result.rows[0].id);
+}
+
 export async function recordProject200DailyProgress(userId, projectId, percent) {
   await ensureProject200ProjectsSchema();
   const value = Math.max(0, Math.min(100, Number(percent || 0)));
