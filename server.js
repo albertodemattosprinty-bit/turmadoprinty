@@ -68,13 +68,14 @@ import { createProject200Profile, deleteProject200Profile, listProject200Profile
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
-import { createProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
+import { createProject200Project, deleteProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
 import { listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
+import { decryptUserBuffer, encryptUserBuffer } from "./src/privacy-crypto.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,6 +98,10 @@ const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || "").trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || "").trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || "").trim();
 const R2_PUBLIC_BASE_URL = (process.env.R2_PUBLIC_BASE_URL || CONTENT_BASE_URL).replace(/\/+$/, "");
+const R2_PRIVATE_ACCOUNT_ID = String(process.env.R2_PRIVATE_ACCOUNT_ID || R2_ACCOUNT_ID || "").trim();
+const R2_PRIVATE_BUCKET = String(process.env.R2_PRIVATE_BUCKET || "").trim();
+const R2_PRIVATE_ACCESS_KEY_ID = String(process.env.R2_PRIVATE_ACCESS_KEY_ID || "").trim();
+const R2_PRIVATE_SECRET_ACCESS_KEY = String(process.env.R2_PRIVATE_SECRET_ACCESS_KEY || "").trim();
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ALBUM_ZIP_FOLDER = "album-zips";
 const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
@@ -126,6 +131,7 @@ const contentDir = path.join(__dirname, "ConteÃºdo");
 const albumManifestStore = createAlbumManifestStore({ rootDir: __dirname });
 let cachedContextPrompt = "";
 let r2Client = null;
+let r2PrivateClient = null;
 let miniMediaDatabaseBootstrapped = false;
 
 const eduDownloadFiles = {
@@ -546,6 +552,34 @@ async function readR2ObjectBuffer(key) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   return Buffer.concat(chunks);
+}
+
+async function readProject200PrivateR2ObjectBuffer(key) {
+  const result = await getProject200PrivateR2Client().send(new GetObjectCommand({
+    Bucket: R2_PRIVATE_BUCKET,
+    Key: key
+  }));
+  const body = result?.Body;
+  if (!body) return Buffer.alloc(0);
+  if (typeof body.transformToByteArray === "function") return Buffer.from(await body.transformToByteArray());
+  const chunks = [];
+  for await (const chunk of body) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+function buildProject200LifeCaptureMediaRoute(captureId, part = "media") {
+  return "/api/200/life-captures/" + encodeURIComponent(String(captureId || "")) + "/media?part=" + encodeURIComponent(part);
+}
+
+function project200LifeCaptureEncryptionContext(captureId, part = "media") {
+  return "life-capture:" + String(captureId || "") + ":" + String(part || "media");
+}
+
+function hydrateProject200LifeCapturePrivateUrls(capture) {
+  if (!capture?.id) return capture;
+  const mediaUrl = capture.uploadKey ? buildProject200LifeCaptureMediaRoute(capture.id, "media") : "";
+  const previewUrl = capture.previewKey ? buildProject200LifeCaptureMediaRoute(capture.id, "preview") : "";
+  return { ...capture, remoteUrl: mediaUrl, mediaUrl, previewRemoteUrl: previewUrl, previewUrl };
 }
 
 function sanitizeMiniMediaTitle(value, fallback = "Sem titulo") {
@@ -1047,6 +1081,25 @@ function getR2Client() {
   }
 
   return r2Client;
+}
+
+function getProject200PrivateR2Client() {
+  if (!R2_PRIVATE_ACCOUNT_ID || !R2_PRIVATE_BUCKET || !R2_PRIVATE_ACCESS_KEY_ID || !R2_PRIVATE_SECRET_ACCESS_KEY) {
+    throw new Error("Configure R2_PRIVATE_ACCOUNT_ID, R2_PRIVATE_BUCKET, R2_PRIVATE_ACCESS_KEY_ID e R2_PRIVATE_SECRET_ACCESS_KEY para midias privadas do /200.");
+  }
+
+  if (!r2PrivateClient) {
+    r2PrivateClient = new S3Client({
+      region: "auto",
+      endpoint: `https://${R2_PRIVATE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: R2_PRIVATE_ACCESS_KEY_ID,
+        secretAccessKey: R2_PRIVATE_SECRET_ACCESS_KEY
+      }
+    });
+  }
+
+  return r2PrivateClient;
 }
 
 function ensureProject200MusicCatalogIds(stations = []) {
@@ -4043,7 +4096,7 @@ async function handleProject200LifeCaptureListRequest(request, response) {
   if (!user) return;
   try {
     const captures = await listProject200LifeCaptures(user.id);
-    sendJson(response, 200, { ok: true, captures });
+    sendJson(response, 200, { ok: true, captures: captures.map(hydrateProject200LifeCapturePrivateUrls) });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel carregar sua memoria."
@@ -4061,7 +4114,7 @@ async function handleProject200LifeCapturePatchRequest(request, response, captur
       sendJson(response, 404, { error: "Captura nao encontrada." });
       return;
     }
-    sendJson(response, 200, { ok: true, capture });
+    sendJson(response, 200, { ok: true, capture: hydrateProject200LifeCapturePrivateUrls(capture) });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel atualizar a captura."
@@ -4074,7 +4127,7 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
   if (!user) return;
   try {
     const body = await readJsonBody(request);
-    const captureId = String(body?.captureId || "").trim();
+    const captureId = String(body?.captureId || "").trim() || crypto.randomUUID();
     const title = String(body?.title || "").trim();
     const noteText = String(body?.noteText || "").trim();
     const createdAt = body?.createdAt ? new Date(body.createdAt) : new Date();
@@ -4114,13 +4167,16 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
     const day = String(now.getDate()).padStart(2, "0");
     const baseKey = "project200/life-captures/" + usernamePart + "/" + year + "/" + month + "/" + day + "/" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
     const mediaKey = baseKey + "." + extension;
+    const encryptedMediaBuffer = await encryptUserBuffer(user.id, mediaBuffer, project200LifeCaptureEncryptionContext(captureId, "media"));
+    if (!encryptedMediaBuffer) throw new Error("Configure PROJECT200_DATA_KEK para criptografar midias privadas do /200.");
 
-    await getR2Client().send(new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+    await getProject200PrivateR2Client().send(new PutObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
       Key: mediaKey,
-      Body: mediaBuffer,
-      ContentType: mimeType,
-      CacheControl: "public, max-age=31536000, immutable"
+      Body: encryptedMediaBuffer,
+      ContentType: "application/vnd.project200.encrypted+json",
+      CacheControl: "private, no-store",
+      Metadata: { originalContentType: mimeType }
     }));
 
     let previewKey = "";
@@ -4129,18 +4185,21 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
       const previewBuffer = Buffer.from(previewBase64, "base64");
       if (previewBuffer.length) {
         previewKey = baseKey + "-preview.webp";
-        await getR2Client().send(new PutObjectCommand({
-          Bucket: R2_BUCKET_NAME,
+        const encryptedPreviewBuffer = await encryptUserBuffer(user.id, previewBuffer, project200LifeCaptureEncryptionContext(captureId, "preview"));
+        if (!encryptedPreviewBuffer) throw new Error("Configure PROJECT200_DATA_KEK para criptografar previews privados do /200.");
+        await getProject200PrivateR2Client().send(new PutObjectCommand({
+          Bucket: R2_PRIVATE_BUCKET,
           Key: previewKey,
-          Body: previewBuffer,
-          ContentType: "image/webp",
-          CacheControl: "public, max-age=31536000, immutable"
+          Body: encryptedPreviewBuffer,
+          ContentType: "application/vnd.project200.encrypted+json",
+          CacheControl: "private, no-store",
+          Metadata: { originalContentType: "image/webp" }
         }));
-        previewUrl = buildPublicR2UrlFromKey(previewKey);
+        previewUrl = buildProject200LifeCaptureMediaRoute(captureId, "preview");
       }
     }
 
-    const mediaUrl = buildPublicR2UrlFromKey(mediaKey);
+    const mediaUrl = buildProject200LifeCaptureMediaRoute(captureId, "media");
     const capture = await upsertProject200LifeCapture(user.id, {
       id: captureId,
       kind,
@@ -4168,7 +4227,7 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
         sizeBytes: mediaBuffer.length,
         mimeType
       },
-      capture
+      capture: hydrateProject200LifeCapturePrivateUrls(capture)
     });
   } catch (error) {
     sendJson(response, 400, {
@@ -4176,6 +4235,57 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
     });
   }
 }
+async function requireProject200PrivateMediaAuth(request, response) {
+  if (!hasDatabase()) {
+    sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
+    return null;
+  }
+  const requestUrl = new URL(request.url || "/", "http://" + (request.headers.host || "localhost"));
+  const token = parseBearerToken(request.headers.authorization) || String(requestUrl.searchParams.get("token") || "").trim();
+  if (!token) {
+    sendJson(response, 401, { error: "Token ausente." });
+    return null;
+  }
+  const user = await findUserBySessionToken(token);
+  if (!user) {
+    sendJson(response, 401, { error: "Sessao invalida ou expirada." });
+    return null;
+  }
+  return user;
+}
+
+async function handleProject200LifeCaptureMediaRequest(request, response, captureId) {
+  const user = await requireProject200PrivateMediaAuth(request, response);
+  if (!user) return;
+  try {
+    const requestUrl = new URL(request.url || "/", "http://" + (request.headers.host || "localhost"));
+    const part = requestUrl.searchParams.get("part") === "preview" ? "preview" : "media";
+    const captures = await listProject200LifeCaptures(user.id);
+    const capture = captures.find((item) => String(item.id) === String(captureId));
+    if (!capture) {
+      sendJson(response, 404, { error: "Captura nao encontrada." });
+      return;
+    }
+    const key = part === "preview" ? String(capture.previewKey || "") : String(capture.uploadKey || "");
+    if (!key) {
+      sendJson(response, 404, { error: "Midia nao encontrada." });
+      return;
+    }
+    const encryptedBuffer = await readProject200PrivateR2ObjectBuffer(key);
+    const buffer = await decryptUserBuffer(user.id, encryptedBuffer, project200LifeCaptureEncryptionContext(capture.id, part));
+    const contentType = part === "preview" ? "image/webp" : (String(capture.mimeType || "application/octet-stream") || "application/octet-stream");
+    response.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": buffer.length,
+      "Cache-Control": "private, max-age=300",
+      "X-Content-Type-Options": "nosniff"
+    });
+    response.end(buffer);
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel abrir a midia privada." });
+  }
+}
+
 async function handleProject200MarinMessageRequest(request, response) {
   const user = await requireAuth(request, response);
   if (!user) return;
@@ -11752,6 +11862,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname.match(/^\/api\/200\/life-captures\/[^/]+\/media$/)) {
+    const captureId = decodeURIComponent(pathname.replace(/^\/api\/200\/life-captures\/([^/]+)\/media$/, "$1"));
+    await handleProject200LifeCaptureMediaRequest(request, response, captureId);
+    return;
+  }
+
   if (request.method === "PATCH" && pathname.match(/^\/api\/200\/life-captures\/[^/]+$/)) {
     const captureId = decodeURIComponent(pathname.replace(/^\/api\/200\/life-captures\/([^/]+)$/, "$1"));
     await handleProject200LifeCapturePatchRequest(request, response, captureId);
@@ -11965,6 +12081,20 @@ const server = http.createServer(async (request, response) => {
       sendJson(response, 201, { ok: true, project });
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel criar o projeto." });
+    }
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/200\/projects\/[^/]+$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const projectId = decodeURIComponent(pathname.replace(/^\/api\/200\/projects\/([^/]+)$/, "$1"));
+      const deletedProjectId = await deleteProject200Project(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, projectId);
+      sendJson(response, 200, { ok: true, projectId: deletedProjectId });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel excluir o projeto." });
     }
     return;
   }

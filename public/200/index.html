@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/200/project.css?v=20260724-limit-history-v1" />
-  <link rel="stylesheet" href="/200/life-capture.css?v=20260728-v1" />
-  <link rel="stylesheet" href="/200/onboarding.css?v=20260721-avatar-fix-v2" />
+  <link rel="stylesheet" href="/200/life-capture.css?v=20260801-private-media-v1" />
+  <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -1854,7 +1854,10 @@
       <header class="project-wizard-head">
         <button type="button" id="projectWizardBack" aria-label="Voltar"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
         <span id="projectWizardStepLabel">1 de 3</span>
-        <button type="button" id="projectWizardClose" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        <div class="project-wizard-head-actions">
+          <button type="button" id="projectDeleteButton" aria-label="Excluir projeto" title="Excluir projeto" hidden><svg viewBox="0 0 24 24"><path d="M7 8h10M9 8V5h6v3m-7 0 1 11h6l1-11M10.5 11v5M13.5 11v5"/></svg></button>
+          <button type="button" id="projectWizardClose" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </div>
       </header>
       <main class="project-wizard-body">
         <section class="project-wizard-step is-active" data-project-step="1">
@@ -1900,7 +1903,21 @@
         </section>
         <p class="project-wizard-status" id="projectWizardStatus" aria-live="polite"></p>
       </main>
-      <footer class="project-wizard-footer">
+      <div class="project-confirm-layer" id="projectConfirmDialog" hidden>
+        <div class="project-confirm-card" role="dialog" aria-modal="true" aria-labelledby="projectConfirmTitle">
+          <h3 id="projectConfirmTitle">Confirmar</h3>
+          <p id="projectConfirmMessage"></p>
+          <label class="project-confirm-input-wrap" id="projectConfirmInputWrap" hidden>
+            <span>Digite <strong>Excluir</strong> para confirmar</span>
+            <input class="text-field" id="projectDeleteConfirmInput" autocomplete="off" />
+          </label>
+          <div class="project-confirm-actions">
+            <button class="ghost-btn" type="button" id="projectConfirmCancel">Voltar</button>
+            <button class="danger-btn" type="button" id="projectConfirmAccept">Confirmar</button>
+          </div>
+        </div>
+      </div>
+      <footer class="project-wizard-footer" id="projectWizardFooter">
         <button class="primary-btn" type="button" id="projectWizardNext">Continuar</button>
       </footer>
     </div>
@@ -1917,7 +1934,7 @@
 
   <script type="module" src="/200/project.js?v=0.7.0"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script src="/200/life-capture.js?v=20260728-v1"></script>
+  <script src="/200/life-capture.js?v=20260801-private-media-v1"></script>
   <script src="/200/front-texts.js?v=20260730-admin-texts-v1"></script>
 </body>
 </html>

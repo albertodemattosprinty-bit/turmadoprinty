@@ -131,7 +131,7 @@ export function initializeProject200OnboardingUi(config) {
       '<header class="project200-onboarding__header">',
       '<img src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan">',
       '<div class="project200-onboarding__steps" aria-label="Progresso">',
-      '<span></span><span></span><span></span><span></span>',
+      '<span></span><span></span><span></span><span></span><span></span>',
       '</div>',
       '</header>',
       '<main class="project200-onboarding__content"></main>',
@@ -190,6 +190,23 @@ export function initializeProject200OnboardingUi(config) {
       '</section>'
     ].join("");
     continueButton.textContent = "CONTINUAR";
+    continueButton.hidden = false;
+  }
+
+  function renderPrivacy() {
+    contentEl.innerHTML = [
+      '<section class="project200-onboarding__lesson project200-onboarding__privacy">',
+      '<p class="project200-onboarding__eyebrow">Privacidade</p>',
+      '<h1>Suas memorias sao suas</h1>',
+      '<p>Fotos, videos e audios ficam em armazenamento privado e sao gravados criptografados. A leitura acontece apenas com sua conta autenticada.</p>',
+      '<div class="project200-onboarding__privacy-list">',
+      '<span>Textos e notas ficam no banco protegido da sua conta.</span>',
+      '<span>Arquivos privados nao ficam em bucket publico.</span>',
+      '<span>Voce pode pedir acesso, exportacao ou exclusao dos seus dados.</span>',
+      '</div>',
+      '</section>'
+    ].join("");
+    continueButton.textContent = "ENTENDI";
     continueButton.hidden = false;
   }
 

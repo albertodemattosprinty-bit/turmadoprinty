@@ -209,3 +209,32 @@ export async function decryptUserJson(userId, envelope, context) {
   }
   return decryptJsonWithKey(key, envelope, buildAad(userId, context));
 }
+
+export async function encryptUserBuffer(userId, buffer, context) {
+  const key = await getOrCreateUserDataKey(userId);
+  if (!key) return null;
+  const encrypted = encryptBuffer(key, Buffer.from(buffer || Buffer.alloc(0)), buildAad(userId, context));
+  return Buffer.from(JSON.stringify({
+    v: DATA_ENVELOPE_VERSION,
+    alg: "A256GCM",
+    iv: encrypted.iv.toString("base64"),
+    tag: encrypted.tag.toString("base64"),
+    data: encrypted.data.toString("base64")
+  }), "utf8");
+}
+
+export async function decryptUserBuffer(userId, envelopeBuffer, context) {
+  const key = await getOrCreateUserDataKey(userId);
+  if (!key) {
+    throw new Error("Os dados estao criptografados, mas a chave-mestra nao esta disponivel.");
+  }
+  const envelope = JSON.parse(Buffer.from(envelopeBuffer || Buffer.alloc(0)).toString("utf8"));
+  if (!envelope || Number(envelope.v) !== DATA_ENVELOPE_VERSION || envelope.alg !== "A256GCM") {
+    throw new Error("Envelope criptografado invalido ou nao suportado.");
+  }
+  return decryptBuffer(key, {
+    iv: Buffer.from(String(envelope.iv || ""), "base64"),
+    tag: Buffer.from(String(envelope.tag || ""), "base64"),
+    data: Buffer.from(String(envelope.data || ""), "base64")
+  }, buildAad(userId, context));
+}

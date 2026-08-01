@@ -186,6 +186,26 @@ html.project200-onboarding-active body {
   text-overflow: ellipsis;
 }
 
+
+.project200-onboarding__privacy-list {
+  display: grid;
+  gap: 10px;
+  width: min(520px, 100%);
+  margin: 24px auto 0;
+  text-align: left;
+}
+
+.project200-onboarding__privacy-list span {
+  display: block;
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
 .project200-onboarding__persona-picker {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr) 54px;

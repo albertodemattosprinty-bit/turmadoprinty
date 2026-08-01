@@ -505,12 +505,20 @@
     return window.btoa(binary);
   }
 
+  function withAuthQuery(url) {
+    const token = getAuthToken();
+    const safeUrl = safeText(url);
+    if (!safeUrl || !token || !safeUrl.startsWith('/api/200/life-captures/')) return safeUrl;
+    const joiner = safeUrl.includes('?') ? '&' : '?';
+    return safeUrl + joiner + 'token=' + encodeURIComponent(token);
+  }
+
   function buildCapturePreviewUrl(capture) {
-    return safeText(capture?.previewRemoteUrl || capture?.previewUrl || capture?.previewDataUrl || '');
+    return withAuthQuery(capture?.previewRemoteUrl || capture?.previewUrl || capture?.previewDataUrl || '');
   }
 
   function buildCaptureMediaUrl(capture) {
-    return safeText(capture?.remoteUrl || capture?.mediaUrl || '');
+    return withAuthQuery(capture?.remoteUrl || capture?.mediaUrl || '');
   }
 
   function setUploadError(captureId, message) {
