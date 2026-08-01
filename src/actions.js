@@ -4,6 +4,7 @@ import { query } from "./db.js";
 import { PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName } from "./project200-profiles.js";
 
 const MAX_OCCURRENCES = 370;
+const MATERIALIZED_LOOKAHEAD_DAYS = 45;
 const ACTION_STATUS_PENDING = "PENDING";
 const ACTION_STATUS_IN_PROGRESS = "IN_PROGRESS";
 const ACTION_STATUS_PAUSED = "PAUSED";
@@ -138,6 +139,7 @@ function normalizeAction(row) {
     repeatGroupId: row.repeat_group_id || null,
     repeatRule: row.repeat_rule || "none",
     repeatDays: Array.isArray(row.repeat_days) ? row.repeat_days : [],
+    repeatConfig: row.repeat_config && typeof row.repeat_config === "object" ? row.repeat_config : {},
     status: normalizeActionStatus(row.status_override),
     startedAt: toIso(row.status_started_at),
     completedAt: toIso(row.status_completed_at),
@@ -203,6 +205,164 @@ function normalizeRepeatDays(days) {
     .sort((a, b) => a - b);
 }
 
+function normalizeRepeatConfig(config = {}) {
+  const periodicEveryDays = Math.max(1, Math.min(180, Math.trunc(Number(config?.periodicEveryDays || 1) || 1)));
+  return {
+    periodicEveryDays,
+    avoidSaturday: Boolean(config?.avoidSaturday),
+    avoidSunday: Boolean(config?.avoidSunday),
+    monthlyOrdinalIndex: Math.max(0, Math.min(4, Math.trunc(Number(config?.monthlyOrdinalIndex || 0) || 0))),
+    monthlyWeekdayIndex: Math.max(0, Math.min(6, Math.trunc(Number(config?.monthlyWeekdayIndex || 0) || 0)))
+  };
+}
+
+function addDays(date, amount) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function sameInstant(left, right) {
+  return new Date(left).getTime() === new Date(right).getTime();
+}
+
+function getRecurringOccurrenceDates(action, fromDate, toDate) {
+  const repeatRule = String(action.repeatRule || "none").trim();
+  if (repeatRule === "none") return [];
+
+  const baseStart = parseDate(action.startAt, "Horario inicial");
+  const baseEnd = parseDate(action.endAt, "Horario final");
+  const durationMs = baseEnd.getTime() - baseStart.getTime();
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return [];
+
+  const dates = [];
+  const repeatDays = normalizeRepeatDays(action.repeatDays);
+  const maxToDate = addDays(fromDate, MATERIALIZED_LOOKAHEAD_DAYS);
+  const effectiveToDate = toDate < maxToDate ? toDate : maxToDate;
+
+  if (repeatRule === "daily") {
+    for (let cursor = new Date(baseStart); cursor < effectiveToDate; cursor = addDays(cursor, 1)) {
+      const startAt = new Date(cursor);
+      const endAt = new Date(startAt.getTime() + durationMs);
+      if (startAt >= fromDate && endAt <= effectiveToDate && !sameInstant(startAt, baseStart)) {
+        dates.push({ startAt, endAt });
+      }
+    }
+    return dates;
+  }
+
+  if (repeatRule === "periodic") {
+    const config = normalizeRepeatConfig(action.repeatConfig);
+    const stepDays = Math.max(1, config.periodicEveryDays);
+    for (let cursor = new Date(baseStart); cursor < effectiveToDate; cursor = addDays(cursor, stepDays)) {
+      if (config.avoidSaturday && cursor.getDay() === 6) continue;
+      if (config.avoidSunday && cursor.getDay() === 0) continue;
+      const startAt = new Date(cursor);
+      const endAt = new Date(startAt.getTime() + durationMs);
+      if (startAt >= fromDate && endAt <= effectiveToDate && !sameInstant(startAt, baseStart)) {
+        dates.push({ startAt, endAt });
+      }
+    }
+    return dates;
+  }
+
+  if (repeatRule === "monthly_custom") {
+    const config = normalizeRepeatConfig(action.repeatConfig);
+    const baseMonth = new Date(baseStart.getFullYear(), baseStart.getMonth(), 1);
+    for (let monthOffset = 0; monthOffset < 24; monthOffset += 1) {
+      const monthBase = new Date(baseMonth.getFullYear(), baseMonth.getMonth() + monthOffset, 1);
+      const monthDays = [];
+      for (let day = 1; day <= 31; day += 1) {
+        const candidate = new Date(monthBase.getFullYear(), monthBase.getMonth(), day, baseStart.getHours(), baseStart.getMinutes(), 0, 0);
+        if (candidate.getMonth() !== monthBase.getMonth()) break;
+        if (candidate.getDay() === config.monthlyWeekdayIndex) monthDays.push(candidate);
+      }
+      const picked = config.monthlyOrdinalIndex >= 4
+        ? monthDays[monthDays.length - 1]
+        : monthDays[config.monthlyOrdinalIndex];
+      if (!picked) continue;
+      const startAt = new Date(picked);
+      const endAt = new Date(startAt.getTime() + durationMs);
+      if (startAt >= fromDate && endAt <= effectiveToDate && !sameInstant(startAt, baseStart)) {
+        dates.push({ startAt, endAt });
+      }
+    }
+    return dates;
+  }
+
+  if (repeatRule === "weekly" || repeatRule === "custom") {
+    const allowedDays = repeatDays.length ? repeatDays : [baseStart.getDay()];
+    for (let cursor = new Date(baseStart); cursor < effectiveToDate; cursor = addDays(cursor, 1)) {
+      if (!allowedDays.includes(cursor.getDay())) continue;
+      const startAt = new Date(cursor);
+      const endAt = new Date(startAt.getTime() + durationMs);
+      if (startAt >= fromDate && endAt <= effectiveToDate && !sameInstant(startAt, baseStart)) {
+        dates.push({ startAt, endAt });
+      }
+    }
+  }
+
+  return dates;
+}
+
+async function materializeRecurringActionsForRange(userId, fromDate, toDate) {
+  const seedResult = await query(
+    `
+      select
+        id,
+        user_id,
+        title,
+        music_default_mode,
+        music_station_name,
+        music_track_name,
+        music_track_url,
+        assignee,
+        category_id,
+        svg_icon_url,
+        svg_icon_label,
+        start_at,
+        end_at,
+        repeat_group_id,
+        repeat_rule,
+        repeat_days,
+        repeat_config,
+        created_at,
+        null as status_override,
+        null as status_started_at,
+        null as status_completed_at,
+        0 as completion_percent,
+        0 as accumulated_seconds,
+        null as status_updated_at
+      from actions
+      where user_id = $1
+        and repeat_group_id is not null
+        and repeat_rule <> 'none'
+        and start_at < $2
+    `,
+    [userId, toDate.toISOString()]
+  );
+
+  for (const row of seedResult.rows) {
+    const action = normalizeAction(row);
+    const occurrences = getRecurringOccurrenceDates(action, fromDate, toDate);
+    for (const occurrence of occurrences) {
+      const exists = await query(
+        `
+          select id
+          from actions
+          where user_id = $1
+            and repeat_group_id = $2
+            and start_at = $3::timestamptz
+          limit 1
+        `,
+        [userId, action.repeatGroupId, occurrence.startAt.toISOString()]
+      );
+      if (exists.rows[0]) continue;
+      await cloneActionOccurrence(userId, action, occurrence.startAt, occurrence.endAt);
+    }
+  }
+}
+
 export async function ensureActionsSchema() {
   await query(`
     create table if not exists actions (
@@ -231,6 +391,7 @@ export async function ensureActionsSchema() {
   await query("alter table actions add column if not exists sleep_tracked_minutes integer not null default 0;");
   await query("alter table actions add column if not exists svg_icon_url text not null default '';");
   await query("alter table actions add column if not exists svg_icon_label text not null default '';");
+  await query("alter table actions add column if not exists repeat_config jsonb not null default '{}'::jsonb;");
   await query(`update actions set category_id = 'aprendizado' where lower(category_id) in ('estudo', 'financeiro');`);
   await query(`update actions set category_id = 'planejamento' where coalesce(btrim(category_id), '') = '' or lower(category_id) = 'proposito';`);
   await query(`update actions set category_id = 'aspecto' where lower(category_id) in ('familia', 'administracao');`);
@@ -516,9 +677,9 @@ async function cloneActionOccurrence(userId, action, startAt, endAt) {
     `
       insert into actions (
         user_id, title, music_default_mode, music_station_name, music_track_name, music_track_url,
-        assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days
+        assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::timestamptz, $12::timestamptz, $13, $14, $15::jsonb)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::timestamptz, $12::timestamptz, $13, $14, $15::jsonb, $16::jsonb)
     `,
     [
       userId,
@@ -535,7 +696,8 @@ async function cloneActionOccurrence(userId, action, startAt, endAt) {
       endAt.toISOString(),
       action.repeatGroupId || null,
       action.repeatRule || "none",
-      JSON.stringify(Array.isArray(action.repeatDays) ? action.repeatDays : [])
+      JSON.stringify(Array.isArray(action.repeatDays) ? action.repeatDays : []),
+      JSON.stringify(action.repeatConfig || {})
     ]
   );
 }
@@ -642,6 +804,8 @@ export async function listUserActions(userId, { from, to }) {
     throw new Error("Intervalo de datas invalido.");
   }
 
+  await materializeRecurringActionsForRange(userId, fromDate, toDate);
+
   const result = await query(
     `
       select
@@ -694,6 +858,7 @@ export async function createUserAction(userId, payload) {
   const svgIconLabel = String(payload?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
+  const repeatConfig = normalizeRepeatConfig(payload?.repeatConfig);
   const replaceOverlaps = Boolean(payload?.replaceOverlaps);
   const rawOccurrences = Array.isArray(payload?.occurrences) && payload.occurrences.length
     ? payload.occurrences
@@ -720,11 +885,13 @@ export async function createUserAction(userId, payload) {
     return { startAt, endAt };
   });
 
+  const overlapOccurrences = repeatRule !== "none" ? occurrences.slice(0, 1) : occurrences;
+
   if (replaceOverlaps) {
-    await deleteOverlappingActions(userId, assignee, occurrences);
+    await deleteOverlappingActions(userId, assignee, overlapOccurrences);
   }
 
-  for (const occurrence of occurrences) {
+  for (const occurrence of overlapOccurrences) {
     const overlap = await query(
       `
         select id, user_id, title, assignee, start_at, end_at
@@ -744,10 +911,11 @@ export async function createUserAction(userId, payload) {
     }
   }
 
-  const repeatGroupId = occurrences.length > 1 || repeatRule !== "none" ? crypto.randomUUID() : null;
+  const storedOccurrences = repeatRule !== "none" ? occurrences.slice(0, 1) : occurrences;
+  const repeatGroupId = storedOccurrences.length > 1 || repeatRule !== "none" ? crypto.randomUUID() : null;
   const values = [];
-  const placeholders = occurrences.map((occurrence, index) => {
-    const offset = index * 11;
+  const placeholders = storedOccurrences.map((occurrence, index) => {
+    const offset = index * 12;
     values.push(
       userId,
       title,
@@ -759,17 +927,18 @@ export async function createUserAction(userId, payload) {
       occurrence.endAt.toISOString(),
       repeatGroupId,
       repeatRule,
-      JSON.stringify(repeatDays)
+      JSON.stringify(repeatDays),
+      JSON.stringify(repeatConfig)
     );
 
-    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}::jsonb)`;
+    return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}::jsonb, $${offset + 12}::jsonb)`;
   });
 
   const result = await query(
     `
-      insert into actions (user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days)
+      insert into actions (user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config)
       values ${placeholders.join(", ")}
-      returning id, user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, created_at
+      returning id, user_id, title, assignee, category_id, svg_icon_url, svg_icon_label, start_at, end_at, repeat_group_id, repeat_rule, repeat_days, repeat_config, created_at
     `,
     values
   );
@@ -907,6 +1076,7 @@ export async function updateUserAction(userId, actionId, payload) {
   const svgIconLabel = String(payload?.svgIconLabel || action?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
   const repeatRule = String(payload?.repeatRule || "none").trim() || "none";
   const repeatDays = normalizeRepeatDays(payload?.repeatDays);
+  const repeatConfig = normalizeRepeatConfig(payload?.repeatConfig);
   const applyTo = String(payload?.applyTo || "").trim().toLowerCase() === "series" ? "series" : "single";
   const replaceOverlaps = Boolean(payload?.replaceOverlaps);
   const occurrences = parseActionOccurrences(payload);
@@ -969,7 +1139,8 @@ export async function updateUserAction(userId, actionId, payload) {
                    start_at = $8::timestamptz,
                    end_at = $9::timestamptz,
                    repeat_rule = $10,
-                   repeat_days = $11::jsonb
+                   repeat_days = $11::jsonb,
+                   repeat_config = $12::jsonb
              where user_id = $1
                and id = $2
           `,
@@ -984,7 +1155,8 @@ export async function updateUserAction(userId, actionId, payload) {
             item.startAt.toISOString(),
             item.endAt.toISOString(),
             repeatRule,
-            JSON.stringify(repeatDays)
+            JSON.stringify(repeatDays),
+            JSON.stringify(repeatConfig)
           ]
         );
       }
@@ -996,9 +1168,9 @@ export async function updateUserAction(userId, actionId, payload) {
     }
 
     if (replaceOverlaps) {
-      await deleteOverlappingActions(userId, assignee, occurrences, existingIds);
+      await deleteOverlappingActions(userId, assignee, repeatRule !== "none" ? occurrences.slice(0, 1) : occurrences, existingIds);
     }
-    await assertActionOverlaps(userId, assignee, occurrences, existingIds);
+    await assertActionOverlaps(userId, assignee, repeatRule !== "none" ? occurrences.slice(0, 1) : occurrences, existingIds);
     if (existingIds.length) {
       await query("delete from action_status_overrides where user_id = $1 and action_id = any($2::uuid[])", [userId, existingIds]);
       await query("delete from actions where user_id = $1 and id = any($2::uuid[])", [userId, existingIds]);
@@ -1011,6 +1183,7 @@ export async function updateUserAction(userId, actionId, payload) {
       svgIconLabel,
       repeatRule,
       repeatDays,
+      repeatConfig,
       occurrences
     });
     const preferred = created.find((item) => item.startAt === action.startAt) || created[0] || null;

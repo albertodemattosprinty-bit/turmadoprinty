@@ -10484,6 +10484,13 @@ async function saveAction() {
     const repeatDays = repeatRule === "weekly"
       ? state.wizard.repeatDays
       : recurrenceDays[repeatRule] || [];
+    const repeatConfig = {
+      periodicEveryDays: Number(state.wizard.periodicEveryDays || 1),
+      avoidSaturday: Boolean(state.wizard.avoidSaturday),
+      avoidSunday: Boolean(state.wizard.avoidSunday),
+      monthlyOrdinalIndex: Number(state.wizard.monthlyOrdinalIndex || 0),
+      monthlyWeekdayIndex: Number(state.wizard.monthlyWeekdayIndex || 0)
+    };
 
     const requestPath = state.wizard.editingActionId
       ? `/api/actions/${encodeURIComponent(state.wizard.editingActionId)}`
@@ -10512,6 +10519,7 @@ async function saveAction() {
         aspectId: String(state.wizard.categoryId || "aspecto").trim().toLowerCase(),
         repeatRule,
         repeatDays,
+        repeatConfig,
         occurrences,
         startAt: firstOccurrence?.startAt || "",
         endAt: firstOccurrence?.endAt || "",
@@ -10533,7 +10541,7 @@ async function saveAction() {
 
     const overlaps = state.friendAssignment.action
       ? []
-      : computeOverlapsForOccurrences(occurrences, {
+      : computeOverlapsForOccurrences(repeatRule !== "none" ? occurrences.slice(0, 1) : occurrences, {
           excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
         });
     if (overlaps.length) {
@@ -10586,6 +10594,7 @@ async function saveAction() {
         svgIconLabel: String(state.wizard.svgIconLabel || "").trim(),
         repeatRule,
         repeatDays,
+        repeatConfig,
         applyTo,
         replaceOverlaps: Boolean(state.wizard.replaceOverlaps || state.wizard.forceReplaceOverlaps),
         occurrences: occurrences
@@ -13960,6 +13969,13 @@ async function saveTaskComposer() {
     const repeatDays = repeatRule === "weekly"
       ? state.wizard.repeatDays
       : recurrenceDays[repeatRule] || [];
+    const repeatConfig = {
+      periodicEveryDays: Number(state.wizard.periodicEveryDays || 1),
+      avoidSaturday: Boolean(state.wizard.avoidSaturday),
+      avoidSunday: Boolean(state.wizard.avoidSunday),
+      monthlyOrdinalIndex: Number(state.wizard.monthlyOrdinalIndex || 0),
+      monthlyWeekdayIndex: Number(state.wizard.monthlyWeekdayIndex || 0)
+    };
     let occurrences = buildOccurrences();
     let applyTo = "single";
     const editingAction = findActionById(state.startDecisionContext.actionId);
@@ -13977,7 +13993,7 @@ async function saveTaskComposer() {
     }
     const overlaps = state.friendAssignment.action
       ? []
-      : computeOverlapsForOccurrences(occurrences, {
+      : computeOverlapsForOccurrences(repeatRule !== "none" ? occurrences.slice(0, 1) : occurrences, {
           excludeGroupId: applyTo === "series" ? String(editingAction?.repeatGroupId || "") : ""
         });
     if (overlaps.length) {
@@ -14032,6 +14048,7 @@ async function saveTaskComposer() {
         categoryId: normalizeTaskCategoryId(state.wizard.categoryId),
         repeatRule,
         repeatDays,
+        repeatConfig,
         occurrences,
         applyTo,
         replaceOverlaps: Boolean(state.wizard.replaceOverlaps || state.wizard.forceReplaceOverlaps)
