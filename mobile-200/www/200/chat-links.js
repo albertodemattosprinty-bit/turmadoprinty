@@ -5,6 +5,20 @@ const ILIFE_MEDIA_SUFFIX = "]]";
 
 const PRIVATE_MEDIA_PATH_PREFIX = "/api/200/life-captures/";
 const PRIVATE_MEDIA_TOKEN_KEY = "turma_do_printy_token";
+let activeChatAudioElement = null;
+const chatAudioState = window.__project200ChatAudioState || (window.__project200ChatAudioState = { url: "", playing: false, time: 0 });
+
+function stopActiveChatAudio(exceptAudio = null) {
+  if (activeChatAudioElement && activeChatAudioElement !== exceptAudio) {
+    try { activeChatAudioElement.pause(); } catch {}
+  }
+}
+
+function playNextChatAudio(card) {
+  const nextCard = card?.parentElement?.querySelector?.(".marin-message-audio-card + .marin-message-audio-card");
+  const nextButton = nextCard?.querySelector?.(".marin-message-audio-button");
+  if (nextButton) nextButton.click();
+}
 
 function readPrivateMediaToken() {
   try {
@@ -215,9 +229,11 @@ function createMediaCard(payload) {
     duration.textContent = "0:00 / " + formatMediaDuration(payload?.durationMs || 0);
     const audio = new Audio(mediaUrl);
     audio.preload = "metadata";
+    audio.playsInline = true;
 
     const updateProgress = () => {
-      const total = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : Math.max(0, Number(payload?.durationMs || 0) / 1000);
+      const recordedTotal = Math.max(0, Number(payload?.durationMs || 0) / 1000);
+      const total = recordedTotal > 0 ? recordedTotal : (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
       const current = Math.max(0, Number(audio.currentTime || 0));
       const ratio = total > 0 ? Math.max(0, Math.min(1, current / total)) : 0;
       const activeBars = Math.round(ratio * bars.length);
@@ -227,7 +243,7 @@ function createMediaCard(payload) {
     };
 
     const seekFromClientX = (clientX) => {
-      const total = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      const total = Math.max(0, Number(payload?.durationMs || 0) / 1000) || (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
       if (!total) return;
       const rect = wave.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width)));
@@ -255,21 +271,56 @@ function createMediaCard(payload) {
     wave.addEventListener("pointerup", endScrub);
     wave.addEventListener("pointercancel", endScrub);
 
-    audio.addEventListener("loadedmetadata", updateProgress);
-    audio.addEventListener("timeupdate", updateProgress);
+    audio.addEventListener("loadedmetadata", () => {
+      updateProgress();
+      if (chatAudioState.url === mediaUrl && chatAudioState.playing) {
+        const target = Math.max(0, Number(chatAudioState.time || 0));
+        if (target > 0) {
+          try { audio.currentTime = Math.min(target, Math.max(0, Number(audio.duration) || target)); } catch {}
+        }
+        audio.play().catch(() => {});
+      }
+    });
+    audio.addEventListener("timeupdate", () => {
+      chatAudioState.url = mediaUrl;
+      chatAudioState.time = Math.max(0, Number(audio.currentTime || 0));
+      updateProgress();
+    });
     audio.addEventListener("play", () => {
+      stopActiveChatAudio(audio);
+      activeChatAudioElement = audio;
+      chatAudioState.url = mediaUrl;
+      chatAudioState.playing = true;
+      chatAudioState.time = Math.max(0, Number(audio.currentTime || 0));
       button.textContent = "\u275a\u275a";
       markAudioViewed(card, mediaUrl);
     });
-    audio.addEventListener("pause", () => { button.textContent = "\u25b6"; });
+    audio.addEventListener("pause", () => {
+      if (activeChatAudioElement === audio) activeChatAudioElement = null;
+      if (chatAudioState.url === mediaUrl) {
+        chatAudioState.playing = false;
+        chatAudioState.time = Math.max(0, Number(audio.currentTime || 0));
+      }
+      button.textContent = "\u25b6";
+    });
     audio.addEventListener("ended", () => {
+      if (activeChatAudioElement === audio) activeChatAudioElement = null;
+      if (chatAudioState.url === mediaUrl) {
+        chatAudioState.playing = false;
+        chatAudioState.time = 0;
+      }
       button.textContent = "\u25b6";
       updateProgress();
+      playNextChatAudio(card);
     });
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (audio.paused) audio.play().catch(() => {});
-      else audio.pause();
+      if (audio.paused) {
+        stopActiveChatAudio(audio);
+        audio.play().catch(() => {});
+      } else {
+        audio.pause();
+      }
     });
     card.addEventListener("dblclick", () => {
       window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));

@@ -44,6 +44,16 @@ export function initializeProject200TutorsUi(dependencies = {}) {
   };
 
   const defaultPersonMarkup = elements.chatPersonButton?.innerHTML || "";
+  if (elements.composer && !document.getElementById("marinChatCancelButton")) {
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.id = "marinChatCancelButton";
+    cancelButton.className = "marin-chat-cancel";
+    cancelButton.setAttribute("aria-label", "Cancelar audio");
+    cancelButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12m-10 0 .7 13h6.6L16 7M10 7V5h4v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    elements.cancelButton = cancelButton;
+    elements.composer.insertBefore(cancelButton, elements.send || null);
+  }
   const state = {
     human: false,
     tutors: [],
@@ -63,6 +73,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     inboxNotifications: [],
     inboxUnreadCount: 0,
     notifiedMessageIds: new Set(),
+    attaching: false,
     recording: false,
     recordingStartedAt: 0,
     recordingPointerDownAt: 0,
@@ -135,8 +146,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     elements.send.classList.toggle("is-mic", !hasText);
     elements.send.classList.toggle("is-recording", state.recording);
     elements.send.type = hasText ? "submit" : "button";
-    elements.send.setAttribute("aria-label", hasText ? "Enviar mensagem" : (state.recording ? "Encerrar e enviar audio" : "Gravar audio"));
+    elements.send.setAttribute("aria-label", hasText ? "Enviar mensagem" : (state.recording ? "Enviar audio" : "Gravar audio"));
     elements.send.innerHTML = hasText ? SEND_ICON : MIC_ICON;
+    if (elements.cancelButton) {
+      elements.cancelButton.hidden = !state.recording;
+      elements.cancelButton.classList.toggle("is-visible", state.recording);
+    }
   }
 
   function chooseAudioMimeType() {
@@ -945,7 +960,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       state.recording = true;
       state.recordingStartedAt = Date.now();
       syncComposerMode();
-      setStatus("Toque no microfone para enviar.");
+      setStatus("Gravando audio...");
       recorder.addEventListener("dataavailable", (event) => {
         if (event.data?.size) state.audioChunks.push(event.data);
       });
@@ -1186,6 +1201,10 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     if (!state.human) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (typeof elements.fileInput?.showPicker === "function") {
+      elements.fileInput.showPicker();
+      return;
+    }
     elements.fileInput?.click();
   }, true);
   elements.fileInput?.addEventListener("change", () => {
@@ -1256,6 +1275,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     event.preventDefault();
     event.stopImmediatePropagation();
     if (!state.recordingPointerDownAt) void toggleAudioRecording();
+  }, true);
+  elements.cancelButton?.addEventListener("click", (event) => {
+    if (!state.recording) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void finishAudioRecording({ send: false });
   }, true);
   let homePressStartedAt = 0;
   elements.homeEntry?.addEventListener("pointerdown", () => {

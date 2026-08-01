@@ -30,7 +30,11 @@ if (ctx) {
   })();
 
   function itemStatus(item) {
-    if (item.itemType === "step") return { percent: item.completedAt ? 100 : 0, broken: false };
+    if (item.itemType === "step") {
+      const action = item.itemId ? ctx.state.actions.find((entry) => String(entry.id) === String(item.itemId)) : null;
+      const completed = Boolean(item.completedAt) || ctx.normalizeActionStatus(action?.status) === ctx.actionStatuses.completed;
+      return { percent: completed ? 100 : 0, broken: false };
+    }
     if (item.itemType === "action") {
       const action = ctx.state.actions.find((entry) => String(entry.id) === String(item.itemId));
       return { percent: ctx.normalizeActionStatus(action?.status) === ctx.actionStatuses.completed ? 100 : 0, broken: false };
@@ -92,14 +96,21 @@ if (ctx) {
       syncDailyProgress(project, values.daily);
       const card = document.createElement("button");
       card.type = "button";
-      card.className = "actions-project-card";
+      card.className = "history-mission-card actions-project-card";
       card.dataset.actionsProjectId = project.id;
       const brokenLimit = (project.items || []).some((item) => item.itemType === "limit" && itemStatus(item).broken);
-      card.innerHTML = `<span class="actions-project-card-head"><strong>${ctx.escapeHtml(project.name)}</strong><small>${ctx.escapeHtml(project.endsOn)}</small></span><span class="actions-project-label">${values.daily}% concluído hoje</span><span class="actions-project-track"><span class="actions-project-fill" style="width:${values.daily}%;background:${brokenLimit ? "#f59e0b" : "#2f8dff"}"></span></span>`;
+      card.innerHTML = `
+        <span class="history-mission-card-top">
+          <span class="history-mission-card-info">
+            <span class="actions-project-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1L12 2Z"/></svg></span>
+            <span class="actions-project-copy"><strong class="history-mission-card-title">${ctx.escapeHtml(project.name)}</strong><span class="history-mission-card-progress actions-project-label">${values.daily}% concluído hoje</span></span>
+          </span>
+        </span>
+        <span class="history-mission-progress-track actions-project-track"><span class="history-mission-progress-fill actions-project-fill" style="width:${values.daily}%;background:${brokenLimit ? "#f59e0b" : "#2f8dff"}"></span></span>`;
       list.appendChild(card);
     });
     records.filter(active).flatMap((project) => (project.items || []).map((item) => ({ project, item })))
-      .filter(({ item }) => item.itemType === "step" && !item.completedAt)
+      .filter(({ item }) => item.itemType === "step" && itemStatus(item).percent < 100)
       .forEach(({ project, item }) => {
         const row = document.createElement("article");
         row.className = "task-row task-pending-clean project-step-action";
@@ -128,7 +139,7 @@ if (ctx) {
     const labels = { step: "Etapa", action: "Agenda", mission: "Missão", limit: "Limite" };
     byId("projectItemsList").innerHTML = (draft?.items || []).map((item, index) => {
       const warning = item.itemType === "limit" && itemStatus(item).broken ? "Limite quebrado" : labels[item.itemType];
-      return `<div class="project-item-row"><span><strong>${ctx.escapeHtml(item.title || labels[item.itemType])}</strong><small>${warning}</small></span><button class="project-item-remove" type="button" data-project-item-remove="${index}" aria-label="Remover">×</button></div>`;
+      return `<div class="project-item-row" data-project-item-open="${index}" role="button" tabindex="0"><span><strong>${ctx.escapeHtml(item.title || labels[item.itemType])}</strong><small>${warning}</small></span><button class="project-item-remove" type="button" data-project-item-remove="${index}" aria-label="Remover ${ctx.escapeHtml(item.title || labels[item.itemType])}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>`;
     }).join("");
   }
 
@@ -137,8 +148,10 @@ if (ctx) {
     document.querySelectorAll("[data-project-step]").forEach((step) => step.classList.toggle("is-active", Number(step.dataset.projectStep) === draft.step));
     byId("projectWizardStepLabel").textContent = `${draft.step} de 3`;
     byId("projectDurationLabel").textContent = durations[draft.durationIndex].label;
-    byId("projectWizardNext").textContent = draft.step === 3 ? (draft.id ? "Salvar projeto" : "Criar projeto") : "Continuar";
+    byId("projectWizardNext").textContent = draft.step === 3 ? "Criar projeto" : "Continuar";
     byId("projectWizardBack").style.visibility = draft.step === 1 ? "hidden" : "visible";
+    byId("projectDeleteButton").hidden = !draft.id;
+    byId("projectWizardFooter").hidden = Boolean(draft.id) && draft.step === 3;
     renderItems();
   }
 
@@ -150,6 +163,7 @@ if (ctx) {
       draft = { id: "", kind, step: 1, durationIndex: 0, items: [] };
       byId("projectNameInput").value = "";
     }
+    byId("projectWizardStatus").textContent = "";
     renderWizard();
     ctx.openModal("projectWizardModal");
   }
@@ -180,20 +194,151 @@ if (ctx) {
     byId("projectListCount").textContent = `+${pickerSelection.size}`;
   }
 
+  async function persistProjectItems(project, items) {
+    const payload = await ctx.apiRequest(`/api/200/projects/${encodeURIComponent(project.id)}/items`, {
+      method: "PUT",
+      body: JSON.stringify({ profile: ctx.state.selectedProfile, items })
+    });
+    records = records.map((entry) => String(entry.id) === String(project.id) ? payload.project : entry);
+    if (draft?.id && String(draft.id) === String(project.id)) draft.items = (payload.project.items || []).map((item) => ({ ...item }));
+    renderItems();
+    ctx.renderActions();
+    return payload.project;
+  }
+
+  async function persistDraftItems() {
+    if (!draft?.id) return null;
+    const project = records.find((entry) => String(entry.id) === String(draft.id));
+    if (!project) return null;
+    return persistProjectItems(project, draft.items);
+  }
+
+  let projectConfirmResolver = null;
+  function closeProjectConfirmation(result = false) {
+    byId("projectConfirmDialog").hidden = true;
+    const resolve = projectConfirmResolver;
+    projectConfirmResolver = null;
+    if (resolve) resolve(result);
+  }
+
+  function requestProjectConfirmation({ title, message, confirmLabel = "Confirmar", requireText = "" }) {
+    byId("projectConfirmTitle").textContent = title;
+    byId("projectConfirmMessage").textContent = message;
+    byId("projectConfirmAccept").textContent = confirmLabel;
+    byId("projectConfirmAccept").dataset.requireText = requireText;
+    byId("projectConfirmInputWrap").hidden = !requireText;
+    byId("projectDeleteConfirmInput").value = "";
+    byId("projectConfirmAccept").disabled = Boolean(requireText);
+    byId("projectConfirmDialog").hidden = false;
+    if (requireText) window.setTimeout(() => byId("projectDeleteConfirmInput").focus(), 60);
+    return new Promise((resolve) => { projectConfirmResolver = resolve; });
+  }
+
+  function actionTime(value) {
+    return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+  }
+
+  async function openActionProjectItem(action) {
+    if (!action) return;
+    ctx.closeModal("projectWizardModal");
+    const choice = await ctx.openStartDecisionModal(action, null, [
+      { label: ctx.normalizeActionStatus(action.status) === ctx.actionStatuses.inProgress ? "Continuar" : "Iniciar", value: "start", primary: true },
+      { label: "Definir como feito", value: "complete" },
+      { label: "Voltar", value: "cancel" }
+    ]);
+    if (choice === "start") await ctx.toggleActionStatus(action.id, { skipDecision: true });
+    if (choice === "complete") await ctx.completeActionImmediately(action, { actionListFeedback: true });
+  }
+
+  async function completeProjectStep(project, item) {
+    const previous = item.completedAt || null;
+    item.completedAt = new Date().toISOString();
+    renderItems();
+    ctx.renderActions();
+    try {
+      const payload = await ctx.apiRequest(`/api/200/projects/${project.id}/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ completed: true }) });
+      item.completedAt = payload?.item?.completedAt || item.completedAt;
+    } catch (error) {
+      item.completedAt = previous;
+      renderItems();
+      ctx.renderActions();
+      throw error;
+    }
+  }
+
+  async function openSimpleStep(project, item) {
+    const linkedAction = item.itemId ? ctx.state.actions.find((entry) => String(entry.id) === String(item.itemId)) : null;
+    if (linkedAction) {
+      await openActionProjectItem(linkedAction);
+      return;
+    }
+    const now = new Date(ctx.getServerNowMs());
+    const end = new Date(now.getTime() + Math.max(1, Number(item.durationMinutes || 5)) * 60000);
+    const preview = {
+      id: `project-step-${item.id}`,
+      title: item.title,
+      status: ctx.actionStatuses.pending,
+      startAt: actionTime(now),
+      endAt: actionTime(end),
+      repeatRule: "none",
+      repeatDays: [],
+      categoryId: "planejamento"
+    };
+    ctx.closeModal("projectWizardModal");
+    const choice = await ctx.openStartDecisionModal(preview, null, [
+      { label: "Iniciar", value: "start", primary: true },
+      { label: "Definir como feito", value: "complete" },
+      { label: "Voltar", value: "cancel" }
+    ]);
+    if (choice === "complete") {
+      await completeProjectStep(project, item);
+      ctx.openModal("actionsModal");
+      return;
+    }
+    if (choice !== "start") return;
+    const payload = await ctx.apiRequest("/api/actions/quick-start", {
+      method: "POST",
+      body: JSON.stringify({ title: item.title, plannedMinutes: item.durationMinutes, assignee: ctx.state.selectedProfile })
+    });
+    await ctx.loadActions({ silent: true });
+    if (payload?.action?.id) {
+      item.itemId = String(payload.action.id);
+      await persistProjectItems(project, project.items);
+      ctx.closeActionsModalWithFade();
+      ctx.openModal("runningTaskModal");
+    }
+  }
+
+  async function openProjectItem(index) {
+    if (!draft?.id) {
+      byId("projectWizardStatus").textContent = "Crie o projeto antes de iniciar os itens.";
+      return;
+    }
+    const project = records.find((entry) => String(entry.id) === String(draft.id));
+    const item = project?.items?.[index];
+    if (!project || !item) return;
+    if (item.itemType === "action") {
+      await openActionProjectItem(ctx.state.actions.find((entry) => String(entry.id) === String(item.itemId)));
+      return;
+    }
+    if (item.itemType === "mission" || item.itemType === "limit") {
+      ctx.closeModal("projectWizardModal");
+      ctx.openMissionProgressModal(item.itemId);
+      return;
+    }
+    await openSimpleStep(project, item);
+  }
+
   async function save() {
     const name = String(byId("projectNameInput").value || "").trim();
-    if (draft.id) {
-      const payload = await ctx.apiRequest(`/api/200/projects/${encodeURIComponent(draft.id)}/items`, { method: "PUT", body: JSON.stringify({ profile: ctx.state.selectedProfile, items: draft.items }) });
-      records = records.map((project) => project.id === payload.project.id ? payload.project : project);
-    } else {
-      const duration = durations[draft.durationIndex];
-      const starts = new Date(ctx.getServerNowMs());
-      const ends = new Date(starts);
-      if (duration.months) ends.setMonth(ends.getMonth() + duration.months); else ends.setDate(ends.getDate() + duration.days);
-      const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      const payload = await ctx.apiRequest("/api/200/projects", { method: "POST", body: JSON.stringify({ profile: ctx.state.selectedProfile, name, kind: draft.kind, startsOn: dateKey(starts), endsOn: dateKey(ends), items: draft.items }) });
-      records = [payload.project, ...records];
-    }
+    if (draft.id) return persistDraftItems();
+    const duration = durations[draft.durationIndex];
+    const starts = new Date(ctx.getServerNowMs());
+    const ends = new Date(starts);
+    if (duration.months) ends.setMonth(ends.getMonth() + duration.months); else ends.setDate(ends.getDate() + duration.days);
+    const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const payload = await ctx.apiRequest("/api/200/projects", { method: "POST", body: JSON.stringify({ profile: ctx.state.selectedProfile, name, kind: draft.kind, startsOn: dateKey(starts), endsOn: dateKey(ends), items: draft.items }) });
+    records = [payload.project, ...records];
     ctx.closeModal("projectWizardModal");
     ctx.renderActions();
   }
@@ -207,6 +352,31 @@ if (ctx) {
   });
   byId("projectWizardBack")?.addEventListener("click", () => { if (draft?.step > 1) { draft.step -= 1; closeLayers(); renderWizard(); } });
   byId("projectWizardClose")?.addEventListener("click", () => ctx.closeModal("projectWizardModal"));
+  byId("projectConfirmCancel")?.addEventListener("click", () => closeProjectConfirmation(false));
+  byId("projectConfirmAccept")?.addEventListener("click", () => {
+    const required = String(byId("projectConfirmAccept").dataset.requireText || "");
+    if (required && byId("projectDeleteConfirmInput").value !== required) return;
+    closeProjectConfirmation(true);
+  });
+  byId("projectDeleteConfirmInput")?.addEventListener("input", () => {
+    const required = String(byId("projectConfirmAccept").dataset.requireText || "");
+    byId("projectConfirmAccept").disabled = Boolean(required) && byId("projectDeleteConfirmInput").value !== required;
+  });
+  byId("projectDeleteButton")?.addEventListener("click", async () => {
+    if (!draft?.id) return;
+    const confirmed = await requestProjectConfirmation({ title: "Excluir projeto", message: `Excluir ${byId("projectNameInput").value}? Essa ação não pode ser desfeita.`, confirmLabel: "Excluir projeto", requireText: "Excluir" });
+    if (!confirmed) return;
+    const projectId = String(draft.id);
+    try {
+      await ctx.apiRequest(`/api/200/projects/${encodeURIComponent(projectId)}`, { method: "DELETE", body: JSON.stringify({ profile: ctx.state.selectedProfile }) });
+      records = records.filter((project) => String(project.id) !== projectId);
+      draft = null;
+      ctx.closeModal("projectWizardModal");
+      ctx.renderActions();
+    } catch (error) {
+      byId("projectWizardStatus").textContent = error instanceof Error ? error.message : "Não foi possível excluir o projeto.";
+    }
+  });
   byId("projectDurationPrev")?.addEventListener("click", () => { draft.durationIndex = Math.max(0, draft.durationIndex - 1); renderWizard(); });
   byId("projectDurationNext")?.addEventListener("click", () => { draft.durationIndex = Math.min(durations.length - 1, draft.durationIndex + 1); renderWizard(); });
   byId("projectAddItem")?.addEventListener("click", () => { closeLayers(); byId("projectItemMenu").hidden = false; });
@@ -240,29 +410,56 @@ if (ctx) {
     if (pickerSelection.has(id)) pickerSelection.delete(id); else pickerSelection.add(id);
     renderPicker();
   });
-  byId("projectListConfirm")?.addEventListener("click", () => {
+  byId("projectListConfirm")?.addEventListener("click", async () => {
     const source = sourceItems(pickerType);
     pickerSelection.forEach((id) => {
       if (draft.items.some((item) => item.itemType === pickerType && String(item.itemId) === id)) return;
       const item = source.find((entry) => String(entry.id) === id);
       if (item) draft.items.push({ itemType: pickerType, itemId: id, title: item.title, durationMinutes: 5 });
     });
-    closeLayers(); renderItems();
+    closeLayers();
+    renderItems();
+    if (draft.id) try { await persistDraftItems(); } catch (error) { byId("projectWizardStatus").textContent = error instanceof Error ? error.message : "Não foi possível atualizar o projeto."; }
   });
   document.querySelectorAll("[data-project-step-time]").forEach((button) => button.addEventListener("click", () => {
     stepMinutes = Math.max(1, Math.min(1440, stepMinutes + Number(button.dataset.projectStepTime || 0)));
     byId("projectStepTimeLabel").textContent = ctx.formatMinutesHuman(stepMinutes);
   }));
-  byId("projectStepAdd")?.addEventListener("click", () => {
+  byId("projectStepAdd")?.addEventListener("click", async () => {
     const title = byId("projectStepTitle").value.trim();
     if (!title) return;
     draft.items.push({ itemType: "step", itemId: null, title, durationMinutes: stepMinutes });
-    byId("projectStepTitle").value = ""; stepMinutes = 5; byId("projectStepTimeLabel").textContent = "5 minutos"; closeLayers(); renderItems();
+    byId("projectStepTitle").value = "";
+    stepMinutes = 5;
+    byId("projectStepTimeLabel").textContent = "5 minutos";
+    closeLayers();
+    renderItems();
+    if (draft.id) try { await persistDraftItems(); } catch (error) { byId("projectWizardStatus").textContent = error instanceof Error ? error.message : "Não foi possível atualizar o projeto."; }
   });
-  byId("projectItemsList")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-project-item-remove]");
-    if (!button) return;
-    draft.items.splice(Number(button.dataset.projectItemRemove), 1); renderItems();
+  byId("projectItemsList")?.addEventListener("click", async (event) => {
+    const removeButton = event.target.closest("[data-project-item-remove]");
+    if (removeButton) {
+      event.stopPropagation();
+      const index = Number(removeButton.dataset.projectItemRemove);
+      const item = draft.items[index];
+      if (!item) return;
+      const confirmed = await requestProjectConfirmation({ title: "Remover do projeto?", message: `${item.title} deixará de fazer parte deste projeto.`, confirmLabel: "Remover" });
+      if (!confirmed) return;
+      const previousItems = draft.items.map((entry) => ({ ...entry }));
+      draft.items.splice(index, 1);
+      renderItems();
+      if (draft.id) try { await persistDraftItems(); } catch (error) { draft.items = previousItems; renderItems(); byId("projectWizardStatus").textContent = error instanceof Error ? error.message : "Não foi possível remover o item."; }
+      return;
+    }
+    const row = event.target.closest("[data-project-item-open]");
+    if (row) await openProjectItem(Number(row.dataset.projectItemOpen));
+  });
+  byId("projectItemsList")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const row = event.target.closest("[data-project-item-open]");
+    if (!row || event.target.closest("button")) return;
+    event.preventDefault();
+    void openProjectItem(Number(row.dataset.projectItemOpen));
   });
   byId("actionsCreateMenu")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-actions-create]");
@@ -285,9 +482,7 @@ if (ctx) {
     const project = records.find((entry) => String(entry.id) === String(row.dataset.projectId));
     const item = project?.items?.find((entry) => String(entry.id) === String(row.dataset.projectStepId));
     if (!item) return;
-    item.completedAt = new Date().toISOString(); ctx.renderActions();
-    try { await ctx.apiRequest(`/api/200/projects/${project.id}/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ completed: true }) }); }
-    catch { item.completedAt = null; ctx.renderActions(); }
+    await openSimpleStep(project, item);
   }, true);
 
 
@@ -309,6 +504,9 @@ if (ctx) {
       const created = sourceItems(pending.type).find((item) => !pending.before.has(String(item.id)));
       if (created && !draft.items.some((item) => item.itemType === pending.type && String(item.itemId) === String(created.id))) {
         draft.items.push({ itemType: pending.type, itemId: String(created.id), title: created.title, durationMinutes: 5 });
+      }
+      if (draft.id) {
+        try { await persistDraftItems(); } catch (error) { byId("projectWizardStatus").textContent = error instanceof Error ? error.message : "Não foi possível atualizar o projeto."; }
       }
       renderWizard();
       ctx.openModal("projectWizardModal");
