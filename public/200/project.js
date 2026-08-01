@@ -15530,8 +15530,21 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
     if (intervalValue === 1 && intervalUnit === "day") {
       const activeWindow = getActiveTimeWindow(nowMs);
       const firstProgressMs = new Date(goal?.limitFirstProgressAt || "").getTime();
-      const effectiveStartMs = Number.isFinite(firstProgressMs) && firstProgressMs < activeWindow.startMs
-        ? firstProgressMs
+      const firstProgressParts = Number.isFinite(firstProgressMs)
+        ? getProjectDateTimeParts(new Date(firstProgressMs))
+        : null;
+      const firstProgressHourMs = firstProgressParts
+        ? makeProjectZonedDate(
+            Number(firstProgressParts.year),
+            Number(firstProgressParts.month),
+            Number(firstProgressParts.day),
+            Number(firstProgressParts.hour),
+            0,
+            0
+          ).getTime()
+        : Number.NaN;
+      const effectiveStartMs = Number.isFinite(firstProgressHourMs) && firstProgressHourMs < activeWindow.startMs
+        ? firstProgressHourMs
         : activeWindow.startMs;
       elapsedFraction = Math.max(0, Math.min(
         1,
