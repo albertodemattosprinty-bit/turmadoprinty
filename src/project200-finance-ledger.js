@@ -5,6 +5,7 @@ const SETTLEMENT_TYPES = new Set(["CASH", "FUTURE"]);
 const SCHEDULE_MODES = new Set(["ONCE", "RECURRING", "FINITE"]);
 const SCHEDULE_FREQUENCIES = new Set(["NONE", "MONTHLY", "WEEKLY", "CUSTOM"]);
 const CUSTOM_MODES = new Set(["MONTHLY", "WEEKLY", "DAILY"]);
+const VALUE_MODES = new Set(["FIXED", "VARIABLE"]);
 
 function normalizeEnum(value, allowed, label) {
   const normalized = String(value || "").trim().toUpperCase();
@@ -182,6 +183,7 @@ function normalizeItemRow(row) {
     scheduleConfig: row.schedule_config || {},
     startsOn: toDateOnly(row.starts_on),
     endsOn: toDateOnly(row.ends_on),
+    valueMode: row.value_mode || row.schedule_config?.valueMode || "FIXED",
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null
   };
 }
@@ -209,6 +211,7 @@ export async function ensureProject200FinanceLedgerSchema() {
   `);
   await query("alter table project200_finance_items add column if not exists account_name text not null default 'Conta principal';");
   await query("alter table project200_finance_items add column if not exists category text not null default 'Outros';");
+  await query("alter table project200_finance_items add column if not exists value_mode text not null default 'FIXED';");
   await query("create index if not exists idx_project200_finance_items_user_dates on project200_finance_items(user_id, starts_on, ends_on) where deleted_at is null;");
   await query("create index if not exists idx_project200_finance_items_user_category on project200_finance_items(user_id, category) where deleted_at is null;");
   await query(`
@@ -258,14 +261,15 @@ export async function createProject200FinanceItem(userId, payload) {
   const amountCents = normalizeAmountCents(payload?.amountCents);
   const accountName = normalizeShortText(payload?.accountName, "Conta principal", 80);
   const category = normalizeShortText(payload?.category, "Outros", 80);
+  const valueMode = normalizeEnum(payload?.valueMode || payload?.scheduleConfig?.valueMode || "FIXED", VALUE_MODES, "Tipo de valor");
 
   const result = await query(`
     insert into project200_finance_items (
       user_id, title, kind, amount_cents, account_name, category, settlement_type, schedule_mode,
-      schedule_frequency, schedule_config, starts_on, ends_on
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::date,$12::date)
+      schedule_frequency, schedule_config, starts_on, ends_on, value_mode
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::date,$12::date,$13)
     returning *
-  `, [userId, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify(scheduleConfig), startsOn, endsOn]);
+  `, [userId, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify({ ...scheduleConfig, valueMode }), startsOn, endsOn, valueMode]);
 
   const item = normalizeItemRow(result.rows[0]);
   if (scheduleMode === "ONCE") {
@@ -280,13 +284,24 @@ export async function updateProject200FinanceItem(userId, itemId, payload) {
   if (!id) throw new Error("Lancamento invalido.");
   const kind = normalizeEnum(payload?.kind, ITEM_KINDS, "Natureza");
   const settlementType = normalizeEnum(payload?.settlementType, SETTLEMENT_TYPES, "Momento");
+  const scheduleMode = settlementType === "CASH"
+    ? "ONCE"
+    : normalizeEnum(payload?.scheduleMode || "ONCE", SCHEDULE_MODES, "Agenda");
+  const scheduleFrequency = scheduleMode === "ONCE"
+    ? "NONE"
+    : normalizeEnum(payload?.scheduleFrequency || "MONTHLY", SCHEDULE_FREQUENCIES, "Frequencia");
+  if (scheduleMode !== "ONCE" && scheduleFrequency === "NONE") throw new Error("Escolha uma frequencia.");
   const today = new Date().toISOString().slice(0, 10);
   const startsOn = normalizeDateOnly(payload?.startsOn || payload?.dueOn || today, "Data inicial");
+  const endsOn = scheduleMode === "FINITE" ? normalizeDateOnly(payload?.endsOn, "Data final") : null;
+  if (endsOn && endsOn < startsOn) throw new Error("A data final precisa vir depois da inicial.");
+  const scheduleConfig = normalizeScheduleConfig(payload?.scheduleConfig, scheduleFrequency, startsOn);
   const title = String(payload?.title || "").trim().slice(0, 90);
   if (title.length < 2) throw new Error("Digite uma descricao para o lancamento.");
   const amountCents = normalizeAmountCents(payload?.amountCents);
   const accountName = normalizeShortText(payload?.accountName, "Conta principal", 80);
   const category = normalizeShortText(payload?.category, "Outros", 80);
+  const valueMode = normalizeEnum(payload?.valueMode || payload?.scheduleConfig?.valueMode || "FIXED", VALUE_MODES, "Tipo de valor");
 
   const result = await query(`
     update project200_finance_items
@@ -296,21 +311,66 @@ export async function updateProject200FinanceItem(userId, itemId, payload) {
            account_name = $6,
            category = $7,
            settlement_type = $8,
-           schedule_mode = 'ONCE',
-           schedule_frequency = 'NONE',
-           schedule_config = '{}'::jsonb,
-           starts_on = $9::date,
-           ends_on = null,
+           schedule_mode = $9,
+           schedule_frequency = $10,
+           schedule_config = $11::jsonb,
+           starts_on = $12::date,
+           ends_on = $13::date,
+           value_mode = $14,
            updated_at = now()
      where user_id = $1 and id = $2 and deleted_at is null
      returning *
-  `, [userId, id, title, kind, amountCents, accountName, category, settlementType, startsOn]);
+  `, [userId, id, title, kind, amountCents, accountName, category, settlementType, scheduleMode, scheduleFrequency, JSON.stringify({ ...scheduleConfig, valueMode }), startsOn, endsOn, valueMode]);
   if (!result.rowCount) throw new Error("Lancamento nao encontrado.");
 
   await query("delete from project200_finance_occurrences where user_id = $1 and item_id = $2", [userId, id]);
   const item = normalizeItemRow(result.rows[0]);
-  await insertOccurrence(userId, item, startsOn, settlementType === "CASH" ? "SETTLED" : "SCHEDULED");
+  if (scheduleMode === "ONCE") {
+    await insertOccurrence(userId, item, startsOn, settlementType === "CASH" ? "SETTLED" : "SCHEDULED");
+  }
   return item;
+}
+
+export async function settleProject200FinanceOccurrence(userId, occurrenceId, payload = {}) {
+  await ensureProject200FinanceLedgerSchema();
+  const id = String(occurrenceId || "").trim();
+  if (!id) throw new Error("Movimentacao invalida.");
+  const result = await query(`
+    select o.*, i.title, i.account_name, i.category
+      from project200_finance_occurrences o
+      join project200_finance_items i on i.id = o.item_id
+     where o.user_id = $1 and o.id = $2 and o.status = 'SCHEDULED' and i.deleted_at is null
+     limit 1
+  `, [userId, id]);
+  const row = result.rows[0];
+  if (!row) throw new Error("Movimentacao prevista nao encontrada.");
+  const confirmedAmountCents = normalizeAmountCents(payload.amountCents);
+  const originalAmountCents = Number(row.amount_cents || 0);
+  await query(`
+    update project200_finance_occurrences
+       set amount_cents = $3, status = 'SETTLED', settled_at = now()
+     where user_id = $1 and id = $2 and status = 'SCHEDULED'
+  `, [userId, id, confirmedAmountCents]);
+  const remainderCents = originalAmountCents - confirmedAmountCents;
+  let remainderItem = null;
+  if (remainderCents > 0 && payload.remainderDueOn) {
+    const remainderDueOn = normalizeDateOnly(payload.remainderDueOn, "Data do restante");
+    const title = normalizeShortText(payload.remainderTitle, String(row.title || "Lancamento") + " restante", 90);
+    remainderItem = await createProject200FinanceItem(userId, {
+      title,
+      kind: row.kind,
+      amountCents: remainderCents,
+      accountName: row.account_name || "Conta principal",
+      category: row.category || "Outros",
+      settlementType: "FUTURE",
+      valueMode: payload.valueMode || "VARIABLE",
+      scheduleMode: "ONCE",
+      scheduleFrequency: "NONE",
+      startsOn: remainderDueOn,
+      scheduleConfig: { valueMode: payload.valueMode || "VARIABLE" }
+    });
+  }
+  return { id, confirmedAmountCents, originalAmountCents, remainderCents: Math.max(0, remainderCents), remainderItem };
 }
 
 export async function deleteProject200FinanceItem(userId, itemId) {
@@ -356,7 +416,7 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
 
   const occurrencesResult = await query(`
     select o.id, o.item_id, i.title, i.account_name, i.category, o.kind, o.amount_cents, o.due_on, o.status,
-           i.settlement_type, i.schedule_mode, i.schedule_frequency
+           i.settlement_type, i.schedule_mode, i.schedule_frequency, i.schedule_config, i.value_mode
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
     where o.user_id = $1 and o.due_on between $2::date and $3::date and o.status <> 'CANCELLED'
@@ -374,14 +434,16 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     status: row.status,
     settlementType: row.settlement_type,
     scheduleMode: row.schedule_mode,
-    scheduleFrequency: row.schedule_frequency
+    scheduleFrequency: row.schedule_frequency,
+    scheduleConfig: row.schedule_config || {},
+    valueMode: row.value_mode || row.schedule_config?.valueMode || "FIXED"
   }));
   const today = getProject200TodayKey();
   const attentionEnd = getProject200AttentionEndKey(today);
   await materializeRange(userId, today, attentionEnd);
   const attentionResult = await query(`
     select o.id, o.item_id, i.title, i.account_name, i.category, o.kind, o.amount_cents, o.due_on, o.status,
-           i.settlement_type, i.schedule_mode, i.schedule_frequency
+           i.settlement_type, i.schedule_mode, i.schedule_frequency, i.schedule_config, i.value_mode
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
     where o.user_id = $1
@@ -402,7 +464,9 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     status: row.status,
     settlementType: row.settlement_type,
     scheduleMode: row.schedule_mode,
-    scheduleFrequency: row.schedule_frequency
+    scheduleFrequency: row.schedule_frequency,
+    scheduleConfig: row.schedule_config || {},
+    valueMode: row.value_mode || row.schedule_config?.valueMode || "FIXED"
   }));
   const todayEntries = attentionEntries.filter((entry) => entry.dueOn === today);
 

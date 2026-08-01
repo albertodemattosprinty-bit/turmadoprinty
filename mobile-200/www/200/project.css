@@ -14809,3 +14809,138 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
   font-size: 0.88rem;
   font-weight: 850;
 }
+
+
+/* Finance Nano: escolhas explicitas, listas leves e confirmacao manual. */
+.finance-nano-choice-block { display: grid; gap: 7px; }
+.finance-nano-choice-block.full { grid-column: 1 / -1; }
+.finance-nano-choice-block > span {
+  color: #536863;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.finance-nano-choice-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.finance-nano-choice-row label {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid #d8e5e1;
+  border-radius: 13px;
+  color: var(--finance-nano-text);
+  background: #fbfdfc;
+  font-size: 12px;
+  font-weight: 900;
+}
+.finance-nano-choice-row input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--finance-nano-brand);
+}
+.finance-nano-choice-row label:has(input:checked) {
+  border-color: #7ee2cf;
+  background: var(--finance-nano-brand-soft);
+  color: #06675b;
+}
+.finance-nano-mini-layer,
+.finance-nano-settle-layer { align-items: flex-end; z-index: 7; }
+.finance-nano-mini-sheet,
+.finance-nano-settle-sheet { padding-top: 18px; }
+.finance-nano-chip-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 14px;
+}
+.finance-nano-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.finance-nano-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid #d8e5e1;
+  border-radius: 999px;
+  background: #f7fbfa;
+  color: var(--finance-nano-text);
+  font-size: 12px;
+  font-weight: 850;
+}
+.finance-nano-chip button,
+.finance-nano-transaction-actions button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  color: #526963;
+  background: #eef6f3;
+}
+.finance-nano-chip button svg,
+.finance-nano-transaction-actions button svg { width: 16px; height: 16px; }
+.finance-nano-multi-date { grid-column: 1 / -1; display: grid; gap: 10px; margin-top: 8px; }
+.finance-nano-transaction-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.finance-nano-transaction-actions .finance-nano-confirm-btn {
+  color: #9a5c00;
+  background: #ffedc9;
+}
+.finance-nano-settle-sheet {
+  border-top: 4px solid #ff9f1c;
+}
+.finance-nano-settle-sheet p {
+  margin: 10px 0 14px;
+  color: var(--finance-nano-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.finance-nano-orange-save { background: #ff9f1c; box-shadow: 0 12px 26px rgba(255, 159, 28, .28); }
+.finance-nano-secondary-save {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 9px;
+  border: 0;
+  border-radius: 15px;
+  color: #536863;
+  background: #edf4f2;
+  font-size: 13px;
+  font-weight: 900;
+}
+.finance-nano-date-stepper {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+.finance-nano-date-stepper button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  color: #9a5c00;
+  background: #ffedc9;
+}
+.finance-nano-date-stepper button:disabled { opacity: .38; }
+.finance-nano-date-stepper svg { width: 20px; height: 20px; }
+.finance-nano-date-stepper strong {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #fff7e8;
+  color: #6f4300;
+  font-size: 15px;
+  font-weight: 950;
+}
