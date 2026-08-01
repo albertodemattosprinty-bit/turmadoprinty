@@ -15540,7 +15540,7 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
     } else if (Number.isFinite(cycleStartMs) && Number.isFinite(cycleEndMs) && cycleEndMs > cycleStartMs) {
       elapsedFraction = Math.max(0, Math.min(1, (nowMs - cycleStartMs) / (cycleEndMs - cycleStartMs)));
     }
-    const expectedLimitNow = Math.max(1, Math.min(target, target * elapsedFraction));
+    const expectedLimitNow = Math.max(0.01, Math.min(target, target * elapsedFraction));
     ratio = (progress / expectedLimitNow) * 100;
   }
   const organicRatio = Math.max(0, Number.isFinite(ratio) ? ratio : 0);
