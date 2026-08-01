@@ -60,6 +60,7 @@ function mapLifeCaptureRow(row) {
   if (!row) return null;
   return {
     id: normalizeId(row.id),
+    userId: normalizeId(row.user_id),
     kind: normalizeKind(row.kind),
     title: String(row.title || ""),
     noteText: String(row.note_text || ""),
