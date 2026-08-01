@@ -37,6 +37,17 @@ export async function ensureProject200LifeCapturesSchema() {
         );
       `);
       await query("create index if not exists idx_project200_life_captures_user_created on project200_life_captures(user_id, created_at_capture desc, created_at desc);");
+      await query(`
+        create table if not exists project200_life_capture_shares (
+          capture_id text not null references project200_life_captures(id) on delete cascade,
+          owner_user_id uuid not null references users(id) on delete cascade,
+          shared_with_user_id uuid not null references users(id) on delete cascade,
+          shared_by_user_id uuid not null references users(id) on delete cascade,
+          created_at timestamptz not null default now(),
+          primary key (capture_id, shared_with_user_id)
+        );
+      `);
+      await query("create index if not exists idx_project200_life_capture_shares_viewer on project200_life_capture_shares(shared_with_user_id, capture_id);");
     })().catch((error) => {
       lifeCapturesSchemaPromise = null;
       throw error;
@@ -168,4 +179,54 @@ export async function patchProject200LifeCapture(userId, captureId, patch = {}) 
     values
   );
   return mapLifeCaptureRow(result.rows[0]);
+}
+
+export async function getProject200LifeCaptureById(captureId) {
+  await ensureProject200LifeCapturesSchema();
+  const normalizedCaptureId = normalizeId(captureId);
+  if (!normalizedCaptureId) return null;
+  const result = await query("select * from project200_life_captures where id = $1 limit 1", [normalizedCaptureId]);
+  return mapLifeCaptureRow(result.rows[0]);
+}
+
+export async function grantProject200LifeCaptureShare(captureId, ownerUserId, sharedWithUserId, sharedByUserId) {
+  await ensureProject200LifeCapturesSchema();
+  const normalizedCaptureId = normalizeId(captureId);
+  const ownerId = normalizeId(ownerUserId);
+  const viewerId = normalizeId(sharedWithUserId);
+  const sharerId = normalizeId(sharedByUserId) || ownerId;
+  if (!normalizedCaptureId || !ownerId || !viewerId || ownerId === viewerId) return false;
+  await query(
+    `insert into project200_life_capture_shares (capture_id, owner_user_id, shared_with_user_id, shared_by_user_id, created_at)
+     values ($1, $2, $3, $4, now())
+     on conflict (capture_id, shared_with_user_id) do update
+       set shared_by_user_id = excluded.shared_by_user_id,
+           created_at = now()`,
+    [normalizedCaptureId, ownerId, viewerId, sharerId]
+  );
+  return true;
+}
+
+export async function canViewProject200LifeCapture(userId, captureId) {
+  await ensureProject200LifeCapturesSchema();
+  const viewerId = normalizeId(userId);
+  const normalizedCaptureId = normalizeId(captureId);
+  if (!viewerId || !normalizedCaptureId) return false;
+  const result = await query(
+    `select 1
+       from project200_life_captures capture
+      where capture.id = $1
+        and (
+          capture.user_id = $2
+          or exists (
+            select 1
+              from project200_life_capture_shares share
+             where share.capture_id = capture.id
+               and share.shared_with_user_id = $2
+          )
+        )
+      limit 1`,
+    [normalizedCaptureId, viewerId]
+  );
+  return Boolean(result.rows[0]);
 }

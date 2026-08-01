@@ -70,7 +70,7 @@ import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProje
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { createProject200Project, deleteProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
-import { listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
+import { canViewProject200LifeCapture, getProject200LifeCaptureById, listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
@@ -4264,9 +4264,9 @@ async function handleProject200LifeCaptureMediaRequest(request, response, captur
   try {
     const requestUrl = new URL(request.url || "/", "http://" + (request.headers.host || "localhost"));
     const part = requestUrl.searchParams.get("part") === "preview" ? "preview" : "media";
-    const captures = await listProject200LifeCaptures(user.id);
-    const capture = captures.find((item) => String(item.id) === String(captureId));
-    if (!capture) {
+    const capture = await getProject200LifeCaptureById(captureId);
+    const canView = capture ? await canViewProject200LifeCapture(user.id, captureId) : false;
+    if (!capture || !canView) {
       sendJson(response, 404, { error: "Captura nao encontrada." });
       return;
     }
@@ -4279,7 +4279,7 @@ async function handleProject200LifeCaptureMediaRequest(request, response, captur
     let buffer;
     if (isProject200PrivateLifeCaptureUrl(storedUrl)) {
       const encryptedBuffer = await readProject200PrivateR2ObjectBuffer(key);
-      buffer = await decryptUserBuffer(user.id, encryptedBuffer, project200LifeCaptureEncryptionContext(capture.id, part));
+      buffer = await decryptUserBuffer(capture.userId || user.id, encryptedBuffer, project200LifeCaptureEncryptionContext(capture.id, part));
     } else {
       // Captures created before private storage still live in the original R2 bucket.
       // Keep their raw URL hidden and proxy the object only after owner authentication.

@@ -167,6 +167,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     const mediaUrl = String(asset?.url || asset?.mediaUrl || asset?.remoteUrl || "");
     const payload = {
       kind,
+      captureId: String(asset?.id || asset?.captureId || ""),
       title,
       previewDataUrl: String(options.previewDataUrl || ""),
       previewUrl: String(asset?.previewUrl || asset?.previewRemoteUrl || ""),
@@ -206,8 +207,6 @@ export function initializeProject200TutorsUi(dependencies = {}) {
   }
 
   function attachmentTitle(file, kind) {
-    const name = String(file?.name || "").trim().replace(/\.[^.]+$/, "");
-    if (name) return name.slice(0, 80);
     if (kind === "video") return "Video do chat";
     if (kind === "photo") return "Imagem do chat";
     return "Audio do chat";
@@ -229,7 +228,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
         noteText: "",
         createdAt: new Date().toISOString(),
         durationMs: 0,
-        metadata: { source: "project200-human-chat-attachment", fileName: String(file.name || "") },
+        metadata: { source: "project200-human-chat-attachment" },
         mimeType,
         fileBase64: await fileToBase64(file),
         previewBase64: ""

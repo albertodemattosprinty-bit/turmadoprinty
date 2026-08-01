@@ -316,7 +316,7 @@ function createMediaCard(payload) {
   } else {
     const image = document.createElement("img");
     image.src = previewUrl || mediaUrl;
-    image.alt = String(payload?.title || "Memoria compartilhada");
+    image.alt = "";
     trigger.appendChild(image);
   }
 
@@ -326,20 +326,6 @@ function createMediaCard(payload) {
 
   card.appendChild(trigger);
 
-  const captionParts = [String(payload?.title || "").trim(), noteText].filter(Boolean);
-  if (captionParts.length) {
-    const meta = document.createElement("div");
-    meta.className = "marin-message-media-meta";
-    const title = document.createElement("strong");
-    title.textContent = captionParts[0];
-    meta.appendChild(title);
-    if (captionParts[1]) {
-      const note = document.createElement("span");
-      note.textContent = captionParts[1];
-      meta.appendChild(note);
-    }
-    card.appendChild(meta);
-  }
 
   return card;
 }

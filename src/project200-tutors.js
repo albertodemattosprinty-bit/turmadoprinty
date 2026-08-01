@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { query } from "./db.js";
 import { getProject200FriendsSnapshot, resolveProject200FriendAssignmentUser } from "./project200-friends.js";
+import { getProject200LifeCaptureById, grantProject200LifeCaptureShare } from "./project200-life-captures.js";
 import { decryptUserJson, encryptUserJson, ensurePrivacyEncryptionSchema } from "./privacy-crypto.js";
 
 const MAX_MESSAGES = 100;
@@ -16,6 +17,32 @@ function normalizeId(value) {
   return String(value || "").trim();
 }
 
+const TUTOR_MEDIA_PREFIX = "[[ILIFE_MEDIA:";
+const TUTOR_MEDIA_SUFFIX = "]]";
+
+function parseTutorMediaCaptureId(content) {
+  const text = String(content || "").trim();
+  if (!text.startsWith(TUTOR_MEDIA_PREFIX) || !text.endsWith(TUTOR_MEDIA_SUFFIX)) return "";
+  try {
+    const encoded = text.slice(TUTOR_MEDIA_PREFIX.length, -TUTOR_MEDIA_SUFFIX.length);
+    const payload = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+    const directId = normalizeId(payload?.captureId || payload?.id || "");
+    if (directId) return directId;
+    const mediaUrl = String(payload?.mediaUrl || payload?.remoteUrl || payload?.previewUrl || "");
+    const match = mediaUrl.match(/\/api\/200\/life-captures\/([^/?#]+)\/media/);
+    return match ? normalizeId(decodeURIComponent(match[1])) : "";
+  } catch {
+    return "";
+  }
+}
+
+async function grantTutorMediaShareFromContent(content, senderId, recipientId) {
+  const sharedCaptureId = parseTutorMediaCaptureId(content);
+  if (!sharedCaptureId) return false;
+  const capture = await getProject200LifeCaptureById(sharedCaptureId);
+  if (!capture || normalizeId(capture.userId) !== normalizeId(senderId)) return false;
+  return grantProject200LifeCaptureShare(sharedCaptureId, senderId, recipientId, senderId);
+}
 function buildPairKey(leftUserId, rightUserId) {
   return [normalizeId(leftUserId), normalizeId(rightUserId)].sort().join(":");
 }
@@ -345,12 +372,14 @@ export async function listProject200TutorMessages(userId, contactUserId, limit =
       order by recent.created_at asc`,
     [link.id, safeLimit, link.owner_user_id, afterIso, cursor]
   );
+  const messages = await Promise.all(result.rows.map((row) => normalizeTutorMessage(viewerId, row)));
+  await Promise.all(messages.map((message) => grantTutorMediaShareFromContent(message.content, message.senderUserId, message.recipientUserId)));
   return {
     linkId: normalizeId(link.id),
     contactUserId: getCounterpartUserId(link, viewerId),
     cursor,
     incremental: Boolean(afterIso),
-    messages: await Promise.all(result.rows.map((row) => normalizeTutorMessage(viewerId, row)))
+    messages
   };
 }
 
@@ -466,6 +495,7 @@ export async function appendProject200TutorMessage(userId, contactUserId, payloa
       encrypted ? 1 : 0
     ]
   );
+  await grantTutorMediaShareFromContent(content, senderId, recipientId);
   await query("update project200_tutor_links set updated_at = now() where id = $1", [link.id]);
   return normalizeTutorMessage(senderId, {
     ...result.rows[0],
