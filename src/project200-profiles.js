@@ -158,29 +158,39 @@ async function getProfileByNameWithClient(client, userId, profileName) {
   return result.rows[0] ? normalizeProfileRow(result.rows[0]) : null;
 }
 
+let project200ProfilesSchemaPromise = null;
+
 export async function ensureProject200ProfilesSchema() {
-  await query(`
-    create table if not exists project200_profiles (
-      id uuid primary key default gen_random_uuid(),
-      user_id uuid not null references users(id) on delete cascade,
-      name text not null,
-      avatar_preset text not null default 'default-user',
-      avatar_data_url text not null default '',
-      svg_icon_url text not null default '',
-      svg_icon_label text not null default '',
-      is_immutable boolean not null default false,
-      is_system boolean not null default false,
-      sort_order integer not null default 100,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      deleted_at timestamptz
-    );
-  `);
-  await query("alter table project200_profiles add column if not exists avatar_data_url text not null default '';");
-  await query("alter table project200_profiles add column if not exists svg_icon_url text not null default '';");
-  await query("alter table project200_profiles add column if not exists svg_icon_label text not null default '';");
-  await query("create unique index if not exists idx_project200_profiles_unique_name on project200_profiles (user_id, lower(name)) where deleted_at is null;");
-  await query("create index if not exists idx_project200_profiles_user_sort on project200_profiles (user_id, sort_order, created_at);");
+  if (!project200ProfilesSchemaPromise) {
+    project200ProfilesSchemaPromise = (async () => {
+      await query(`
+        create table if not exists project200_profiles (
+          id uuid primary key default gen_random_uuid(),
+          user_id uuid not null references users(id) on delete cascade,
+          name text not null,
+          avatar_preset text not null default 'default-user',
+          avatar_data_url text not null default '',
+          svg_icon_url text not null default '',
+          svg_icon_label text not null default '',
+          is_immutable boolean not null default false,
+          is_system boolean not null default false,
+          sort_order integer not null default 100,
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now(),
+          deleted_at timestamptz
+        );
+      `);
+      await query("alter table project200_profiles add column if not exists avatar_data_url text not null default '';");
+      await query("alter table project200_profiles add column if not exists svg_icon_url text not null default '';");
+      await query("alter table project200_profiles add column if not exists svg_icon_label text not null default '';");
+      await query("create unique index if not exists idx_project200_profiles_unique_name on project200_profiles (user_id, lower(name)) where deleted_at is null;");
+      await query("create index if not exists idx_project200_profiles_user_sort on project200_profiles (user_id, sort_order, created_at);");
+    })().catch((error) => {
+      project200ProfilesSchemaPromise = null;
+      throw error;
+    });
+  }
+  return project200ProfilesSchemaPromise;
 }
 
 export async function listProject200Profiles(userId) {

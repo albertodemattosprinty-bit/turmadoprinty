@@ -12,6 +12,8 @@ const PROJECT200_FRIEND_SCOPE_MAP = new Map([
   ["last30", { key: "last30", label: "30 dias", days: 30 }]
 ]);
 const PROJECT200_FRIEND_TIME_ZONE = "America/Sao_Paulo";
+let project200PointsSchemaPromise = null;
+let project200FriendsSchemaPromise = null;
 
 function normalizeScope(scopeKey = "today") {
   const normalized = String(scopeKey || "today").trim().toLowerCase();
@@ -119,21 +121,29 @@ async function getUserCardMap(userIds = []) {
 }
 
 export async function ensureProject200PointsSchema() {
-  await query(`
-    create table if not exists project200_point_events (
-      id uuid primary key default gen_random_uuid(),
-      user_id uuid not null references users(id) on delete cascade,
-      source_type text not null,
-      source_key text not null,
-      points integer not null default 0,
-      scope_date date not null,
-      metadata jsonb not null default '{}'::jsonb,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      unique (user_id, source_type, source_key)
-    );
-  `);
-  await query("create index if not exists idx_project200_point_events_user_date on project200_point_events(user_id, scope_date desc);");
+  if (!project200PointsSchemaPromise) {
+    project200PointsSchemaPromise = (async () => {
+      await query(`
+        create table if not exists project200_point_events (
+          id uuid primary key default gen_random_uuid(),
+          user_id uuid not null references users(id) on delete cascade,
+          source_type text not null,
+          source_key text not null,
+          points integer not null default 0,
+          scope_date date not null,
+          metadata jsonb not null default '{}'::jsonb,
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now(),
+          unique (user_id, source_type, source_key)
+        );
+      `);
+      await query("create index if not exists idx_project200_point_events_user_date on project200_point_events(user_id, scope_date desc);");
+    })().catch((error) => {
+      project200PointsSchemaPromise = null;
+      throw error;
+    });
+  }
+  return project200PointsSchemaPromise;
 }
 
 function getActionPointValue(action) {
@@ -340,27 +350,35 @@ async function getPointsByUserIds(userIds = [], scopeKey = "today") {
 }
 
 export async function ensureProject200FriendsSchema() {
-  await ensureExtraGoalsSchema();
-  await ensureProject200PointsSchema();
-  await query(`
-    create table if not exists project200_friendships (
-      id uuid primary key default gen_random_uuid(),
-      requester_user_id uuid not null references users(id) on delete cascade,
-      addressee_user_id uuid not null references users(id) on delete cascade,
-      status text not null default 'pending',
-      responded_at timestamptz,
-      created_at timestamptz not null default now(),
-      updated_at timestamptz not null default now(),
-      check (requester_user_id <> addressee_user_id)
-    );
-  `);
-  await query("alter table project200_friendships add column if not exists responded_at timestamptz;");
-  await query("alter table project200_friendships add column if not exists status text not null default 'pending';");
-  await query("alter table project200_friendships add column if not exists created_at timestamptz not null default now();");
-  await query("alter table project200_friendships add column if not exists updated_at timestamptz not null default now();");
-  await query("create unique index if not exists idx_project200_friendships_request_pair on project200_friendships(requester_user_id, addressee_user_id);");
-  await query("create index if not exists idx_project200_friendships_user_status on project200_friendships(addressee_user_id, status, updated_at desc);");
-  await query("create index if not exists idx_project200_friendships_requester_status on project200_friendships(requester_user_id, status, updated_at desc);");
+  if (!project200FriendsSchemaPromise) {
+    project200FriendsSchemaPromise = (async () => {
+      await ensureExtraGoalsSchema();
+      await ensureProject200PointsSchema();
+      await query(`
+        create table if not exists project200_friendships (
+          id uuid primary key default gen_random_uuid(),
+          requester_user_id uuid not null references users(id) on delete cascade,
+          addressee_user_id uuid not null references users(id) on delete cascade,
+          status text not null default 'pending',
+          responded_at timestamptz,
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now(),
+          check (requester_user_id <> addressee_user_id)
+        );
+      `);
+      await query("alter table project200_friendships add column if not exists responded_at timestamptz;");
+      await query("alter table project200_friendships add column if not exists status text not null default 'pending';");
+      await query("alter table project200_friendships add column if not exists created_at timestamptz not null default now();");
+      await query("alter table project200_friendships add column if not exists updated_at timestamptz not null default now();");
+      await query("create unique index if not exists idx_project200_friendships_request_pair on project200_friendships(requester_user_id, addressee_user_id);");
+      await query("create index if not exists idx_project200_friendships_user_status on project200_friendships(addressee_user_id, status, updated_at desc);");
+      await query("create index if not exists idx_project200_friendships_requester_status on project200_friendships(requester_user_id, status, updated_at desc);");
+    })().catch((error) => {
+      project200FriendsSchemaPromise = null;
+      throw error;
+    });
+  }
+  return project200FriendsSchemaPromise;
 }
 
 export async function createProject200FriendInvite(userId, targetUserId) {
@@ -482,7 +500,7 @@ export async function getProject200FriendsSnapshot(userId, scopeKey = "today") {
   const scope = normalizeScope(scopeKey);
   const friendshipsResult = await query(
     `
-      select *
+      select id, requester_user_id, addressee_user_id, status, created_at, updated_at
       from project200_friendships
       where requester_user_id = $1
          or addressee_user_id = $1
