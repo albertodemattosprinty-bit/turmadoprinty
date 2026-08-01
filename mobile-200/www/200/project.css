@@ -12954,57 +12954,53 @@ body[data-background-theme="white"] #actionsModal .history-mission-card.actions-
   transition: background 300ms ease, border-color 300ms ease;
 }
 
-.marin-chat-composer::before {
-  content: "Gravando";
-  position: absolute;
-  left: max(20px, env(safe-area-inset-left, 0px));
-  right: 68px;
-  bottom: max(17px, env(safe-area-inset-bottom, 0px));
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border-radius: 22px;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 1.04rem;
-  font-weight: 850;
-  opacity: 0;
-  transform: translateY(6px) scale(0.985);
-  pointer-events: none;
-  transition: opacity 300ms ease, transform 300ms ease;
+.marin-chat-status:empty {
+  min-height: 0;
+  padding-bottom: 0;
 }
 
-.marin-chat-composer::after {
-  content: "";
-  position: absolute;
-  right: 76px;
-  bottom: max(27px, calc(env(safe-area-inset-bottom, 0px) + 28px));
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.36);
-  border-top-color: #fff;
+.marin-chat-recording-indicator {
+  min-width: 0;
+  height: 44px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 1rem;
+  font-weight: 850;
   opacity: 0;
+  transform: scale(0.98);
+  transition: opacity 300ms ease, transform 300ms ease;
   pointer-events: none;
-  transition: opacity 300ms ease;
-  animation: marinChatRecordingSpin 800ms linear infinite;
+}
+
+.marin-chat-recording-indicator.is-visible {
+  display: flex;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.marin-chat-recording-indicator svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  animation: marinChatRecordingSpin 850ms linear infinite;
+}
+
+.marin-chat-recording-indicator circle {
+  stroke-dasharray: 36 18;
+  transform-origin: center;
 }
 
 .marin-chat-composer.is-recording {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
   background: rgba(10, 18, 39, 0.44);
 }
 
-.marin-chat-composer.is-recording textarea {
-  opacity: 0;
-  transform: translateY(-5px) scale(0.985);
-  pointer-events: none;
-}
-
-.marin-chat-composer.is-recording::before,
-.marin-chat-composer.is-recording::after {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+.marin-chat-composer.is-recording .marin-chat-input-wrap {
+  display: none;
 }
 
 .marin-chat-composer textarea {
@@ -13016,8 +13012,9 @@ body[data-background-theme="white"] #actionsModal .history-mission-card.actions-
 }
 
 .marin-chat-send.is-recording {
-  background: linear-gradient(145deg, #ff5a68, #c7152f);
-  animation: marinMicPulse 1s ease-in-out infinite;
+  background: linear-gradient(145deg, #1b86f7, #0b59c3);
+  color: #fff;
+  animation: none;
 }
 
 .marin-chat-cancel {
@@ -13025,7 +13022,7 @@ body[data-background-theme="white"] #actionsModal .history-mission-card.actions-
   height: 44px;
   border: 0;
   border-radius: 50%;
-  display: grid;
+  display: none;
   place-items: center;
   background: linear-gradient(145deg, #ff5a68, #b80f2c);
   color: #fff;
@@ -13035,6 +13032,7 @@ body[data-background-theme="white"] #actionsModal .history-mission-card.actions-
 }
 
 .marin-chat-cancel.is-visible {
+  display: grid;
   opacity: 1;
   transform: scale(1);
 }

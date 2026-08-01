@@ -44,16 +44,31 @@ export function initializeProject200TutorsUi(dependencies = {}) {
   };
 
   const defaultPersonMarkup = elements.chatPersonButton?.innerHTML || "";
-  if (elements.composer && !document.getElementById("marinChatCancelButton")) {
-    const cancelButton = document.createElement("button");
-    cancelButton.type = "button";
-    cancelButton.id = "marinChatCancelButton";
-    cancelButton.className = "marin-chat-cancel";
-    cancelButton.setAttribute("aria-label", "Cancelar audio");
-    cancelButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12m-10 0 .7 13h6.6L16 7M10 7V5h4v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  if (elements.composer) {
+    let cancelButton = document.getElementById("marinChatCancelButton");
+    if (!cancelButton) {
+      cancelButton = document.createElement("button");
+      cancelButton.type = "button";
+      cancelButton.id = "marinChatCancelButton";
+      cancelButton.className = "marin-chat-cancel";
+      cancelButton.setAttribute("aria-label", "Cancelar audio");
+      cancelButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12m-10 0 .7 13h6.6L16 7M10 7V5h4v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      elements.composer.insertBefore(cancelButton, elements.send || null);
+    }
     elements.cancelButton = cancelButton;
-    elements.composer.insertBefore(cancelButton, elements.send || null);
+
+    let recordingIndicator = document.getElementById("marinChatRecordingIndicator");
+    if (!recordingIndicator) {
+      recordingIndicator = document.createElement("span");
+      recordingIndicator.id = "marinChatRecordingIndicator";
+      recordingIndicator.className = "marin-chat-recording-indicator";
+      recordingIndicator.setAttribute("aria-live", "polite");
+      recordingIndicator.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/></svg><span>Gravando</span>`;
+      elements.composer.insertBefore(recordingIndicator, elements.send || null);
+    }
+    elements.recordingIndicator = recordingIndicator;
   }
+
   const state = {
     human: false,
     tutors: [],
@@ -143,14 +158,18 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     elements.composer?.classList.toggle("is-recording", state.recording);
     elements.composer?.classList.toggle("has-text", hasText);
     if (!elements.send) return;
-    elements.send.classList.toggle("is-mic", !hasText);
+    elements.send.classList.toggle("is-mic", !hasText && !state.recording);
     elements.send.classList.toggle("is-recording", state.recording);
     elements.send.type = hasText ? "submit" : "button";
     elements.send.setAttribute("aria-label", hasText ? "Enviar mensagem" : (state.recording ? "Enviar audio" : "Gravar audio"));
-    elements.send.innerHTML = hasText ? SEND_ICON : MIC_ICON;
+    elements.send.innerHTML = hasText || state.recording ? SEND_ICON : MIC_ICON;
     if (elements.cancelButton) {
       elements.cancelButton.hidden = !state.recording;
       elements.cancelButton.classList.toggle("is-visible", state.recording);
+    }
+    if (elements.recordingIndicator) {
+      elements.recordingIndicator.hidden = !state.recording;
+      elements.recordingIndicator.classList.toggle("is-visible", state.recording);
     }
   }
 
@@ -933,6 +952,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     state.recordingPointerDownAt = 0;
     state.recordingWasActiveOnPress = false;
     state.recordingAutoStopOnRelease = false;
+    setStatus("");
     syncComposerMode();
   }
 
@@ -943,6 +963,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       return;
     }
     state.mediaRecorder._sendOnStop = Boolean(send);
+    if (!send) setStatus("");
     state.mediaRecorder.stop();
   }
 
@@ -960,7 +981,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       state.recording = true;
       state.recordingStartedAt = Date.now();
       syncComposerMode();
-      setStatus("Gravando audio...");
+      setStatus("");
       recorder.addEventListener("dataavailable", (event) => {
         if (event.data?.size) state.audioChunks.push(event.data);
       });
