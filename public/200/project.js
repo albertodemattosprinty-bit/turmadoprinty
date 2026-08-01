@@ -15529,14 +15529,18 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
     let elapsedFraction = 1;
     if (intervalValue === 1 && intervalUnit === "day") {
       const activeWindow = getActiveTimeWindow(nowMs);
+      const firstProgressMs = new Date(goal?.limitFirstProgressAt || "").getTime();
+      const effectiveStartMs = Number.isFinite(firstProgressMs) && firstProgressMs < activeWindow.startMs
+        ? firstProgressMs
+        : activeWindow.startMs;
       elapsedFraction = Math.max(0, Math.min(
         1,
-        (nowMs - activeWindow.startMs) / Math.max(1, activeWindow.endMs - activeWindow.startMs)
+        (nowMs - effectiveStartMs) / Math.max(1, activeWindow.endMs - effectiveStartMs)
       ));
     } else if (Number.isFinite(cycleStartMs) && Number.isFinite(cycleEndMs) && cycleEndMs > cycleStartMs) {
       elapsedFraction = Math.max(0, Math.min(1, (nowMs - cycleStartMs) / (cycleEndMs - cycleStartMs)));
     }
-    const expectedLimitNow = Math.max(0.01, Math.min(target, target * elapsedFraction));
+    const expectedLimitNow = Math.max(1, Math.min(target, target * elapsedFraction));
     ratio = (progress / expectedLimitNow) * 100;
   }
   const organicRatio = Math.max(0, Number.isFinite(ratio) ? ratio : 0);
@@ -15548,7 +15552,7 @@ function getLimitProgressVisual(goal, historyRangeActive = false) {
     : interpolateLimitColor(visualRatio);
   const labelTone = interpolateLimitColor(visualRatio);
   const labelBackground = `linear-gradient(90deg, ${labelTone} 0%, ${labelTone} 18%, transparent 100%)`;
-  return { ratio: organicRatio, width, background, labelBackground };
+  return { ratio: visualRatio, width, background, labelBackground };
 }
 
 function formatLimitElapsedDuration(totalSeconds) {
