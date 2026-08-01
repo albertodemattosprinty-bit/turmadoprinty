@@ -508,9 +508,17 @@
   function withAuthQuery(url) {
     const token = getAuthToken();
     const safeUrl = safeText(url);
-    if (!safeUrl || !token || !safeUrl.startsWith('/api/200/life-captures/')) return safeUrl;
-    const joiner = safeUrl.includes('?') ? '&' : '?';
-    return safeUrl + joiner + 'token=' + encodeURIComponent(token);
+    if (!safeUrl) return '';
+    const resolvedUrl = /^https?:\/\//i.test(safeUrl) ? safeUrl : getApiUrl(safeUrl);
+    try {
+      const parsed = new URL(resolvedUrl, getApiOrigin());
+      if (!parsed.pathname.startsWith('/api/200/life-captures/')) return resolvedUrl;
+      parsed.searchParams.delete('token');
+      if (token) parsed.searchParams.set('token', token);
+      return parsed.toString();
+    } catch {
+      return resolvedUrl;
+    }
   }
 
   function buildCapturePreviewUrl(capture) {
@@ -1194,8 +1202,8 @@
     host.replaceChildren();
     if (safeText(payload?.kind) === "video" && safeText(payload?.mediaUrl)) {
       const video = document.createElement("video");
-      video.poster = safeText(payload?.previewUrl || payload?.previewDataUrl);
-      video.src = safeText(payload?.mediaUrl);
+      video.poster = withAuthQuery(payload?.previewUrl || payload?.previewDataUrl);
+      video.src = withAuthQuery(payload?.mediaUrl);
       video.controls = true;
       video.playsInline = true;
       video.autoplay = true;
@@ -1206,7 +1214,7 @@
       const title = document.createElement("strong");
       title.textContent = safeText(payload?.title || "Audio compartilhado");
       const audio = document.createElement("audio");
-      audio.src = safeText(payload?.mediaUrl);
+      audio.src = withAuthQuery(payload?.mediaUrl);
       audio.controls = true;
       audio.autoplay = true;
       const meta = document.createElement("small");
@@ -1224,7 +1232,7 @@
       host.appendChild(panel);
     } else {
       const image = document.createElement("img");
-      image.src = safeText(payload?.previewUrl || payload?.previewDataUrl || payload?.mediaUrl);
+      image.src = withAuthQuery(payload?.previewUrl || payload?.previewDataUrl || payload?.mediaUrl);
       image.alt = safeText(payload?.title || "Midia compartilhada");
       host.appendChild(image);
     }
@@ -1292,8 +1300,8 @@
       kind: capture.kind,
       title: safeText(capture.title || defaultTitle(capture.kind, capture.createdAt)),
       previewDataUrl: safeText(capture.previewDataUrl),
-      previewUrl: buildCapturePreviewUrl(capture),
-      mediaUrl: buildCaptureMediaUrl(capture),
+      previewUrl: safeText(capture.previewRemoteUrl || capture.previewUrl || capture.previewDataUrl || ""),
+      mediaUrl: safeText(capture.remoteUrl || capture.mediaUrl || ""),
       dateLabel: formatDate(capture.createdAt),
       noteText: safeText(capture.noteText || ""),
       sizeBytes: Number(capture.sizeBytes || capture.mediaBlob?.size || 0),

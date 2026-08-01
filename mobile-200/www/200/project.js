@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
-import { initializeProject200MarinUi } from "./marin.js?v=0.7.0-chat-links";
-import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.7.0-chat-links";
+import { initializeProject200MarinUi } from "./marin.js?v=0.74-private-media";
+import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.74-private-media";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
 
 import {
@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "0.73";
+const project200AppVersion = "0.74";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 

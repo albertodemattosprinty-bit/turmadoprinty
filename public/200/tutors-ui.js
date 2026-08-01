@@ -1,4 +1,4 @@
-import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.7.0";
+import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.74-private-media";
 
 export function initializeProject200TutorsUi(dependencies = {}) {
   const {

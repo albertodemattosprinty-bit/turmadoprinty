@@ -3,6 +3,49 @@ const TRAILING_URL_PUNCTUATION = /[.,!?;:)\]}]+$/u;
 const ILIFE_MEDIA_PREFIX = "[[ILIFE_MEDIA:";
 const ILIFE_MEDIA_SUFFIX = "]]";
 
+const PRIVATE_MEDIA_PATH_PREFIX = "/api/200/life-captures/";
+const PRIVATE_MEDIA_TOKEN_KEY = "turma_do_printy_token";
+
+function readPrivateMediaToken() {
+  try {
+    const localToken = String(window.localStorage.getItem(PRIVATE_MEDIA_TOKEN_KEY) || "").trim();
+    if (localToken) return localToken;
+  } catch {}
+  try {
+    const match = document.cookie.match(/(?:^|; )turma_do_printy_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
+function getPrivateMediaApiOrigin() {
+  const metaValue = document.querySelector('meta[name="tdp-api-base-url"]')?.getAttribute("content")?.trim();
+  if (metaValue) return metaValue.replace(/\/+$/, "");
+  const runtimeValue = typeof window.__TDP_API_BASE_URL__ === "string" ? window.__TDP_API_BASE_URL__.trim() : "";
+  if (runtimeValue) return runtimeValue.replace(/\/+$/, "");
+  const capacitor = window.Capacitor;
+  const platform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
+  const isNative = typeof capacitor?.isNativePlatform === "function" ? capacitor.isNativePlatform() : platform === "android" || platform === "ios";
+  if (isNative) return "https://www.turmadoprinty.com.br";
+  return window.location.origin.replace(/\/+$/, "");
+}
+
+function withPrivateMediaAuth(url) {
+  const safeUrl = String(url || "").trim();
+  if (!safeUrl) return "";
+  try {
+    const parsed = new URL(safeUrl, getPrivateMediaApiOrigin());
+    if (!parsed.pathname.startsWith(PRIVATE_MEDIA_PATH_PREFIX)) return safeUrl;
+    parsed.searchParams.delete("token");
+    const token = readPrivateMediaToken();
+    if (token) parsed.searchParams.set("token", token);
+    return parsed.toString();
+  } catch {
+    return safeUrl;
+  }
+}
+
 function splitTrailingPunctuation(value) {
   const url = String(value || "");
   const trailing = url.match(TRAILING_URL_PUNCTUATION)?.[0] || "";
@@ -139,8 +182,8 @@ async function buildAudioWaveform(mediaUrl, count) {
 
 function createMediaCard(payload) {
   const kind = String(payload?.kind || "").trim().toLowerCase();
-  const previewUrl = String(payload?.previewUrl || payload?.previewRemoteUrl || payload?.previewDataUrl || "");
-  const mediaUrl = String(payload?.mediaUrl || payload?.remoteUrl || "");
+  const previewUrl = withPrivateMediaAuth(payload?.previewUrl || payload?.previewRemoteUrl || payload?.previewDataUrl || "");
+  const mediaUrl = withPrivateMediaAuth(payload?.mediaUrl || payload?.remoteUrl || "");
   const noteText = String(payload?.noteText || "").trim();
   if (!previewUrl && !mediaUrl && kind !== "text") return null;
 

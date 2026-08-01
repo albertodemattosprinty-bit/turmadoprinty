@@ -28,6 +28,14 @@ services:
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
+      - key: R2_PRIVATE_ACCOUNT_ID
+        sync: false
+      - key: R2_PRIVATE_BUCKET
+        value: dadosusers
+      - key: R2_PRIVATE_ACCESS_KEY_ID
+        sync: false
+      - key: R2_PRIVATE_SECRET_ACCESS_KEY
+        sync: false
       - key: R2_PUBLIC_BASE_URL
         value: https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev
       - key: OPENAI_MODEL

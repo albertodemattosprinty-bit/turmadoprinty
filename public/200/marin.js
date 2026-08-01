@@ -1,4 +1,4 @@
-import { renderChatMessageContent } from "./chat-links.js?v=0.7.0";
+import { renderChatMessageContent } from "./chat-links.js?v=0.74-private-media";
 
 const DEFAULT_PERSONAS = [
   { key: "marin", name: "Marin", avatar: "/200/agents/marin.svg" },
