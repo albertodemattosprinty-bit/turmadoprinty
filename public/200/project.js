@@ -592,8 +592,6 @@ const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
 const toggleAppKeyboardOptionButton = document.getElementById("toggleAppKeyboardOption");
 const toggleAppKeyboardHint = document.getElementById("toggleAppKeyboardHint");
-const toggleFreeTimeOptionButton = document.getElementById("toggleFreeTimeOption");
-const toggleFreeTimeHint = document.getElementById("toggleFreeTimeHint");
 const toggleMissionActionsOptionButton = document.getElementById("toggleMissionActionsOption");
 const toggleMissionActionsHint = document.getElementById("toggleMissionActionsHint");
 const activeTimeStartInput = document.getElementById("activeTimeStartInput");
@@ -1506,7 +1504,6 @@ const state = {
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState(),
   options: {
-    showFreeTime: true,
     missionActionsMode: "separate",
     completionBeepCycles: 0,
     minuteNotificationInterval: 1,
@@ -2261,14 +2258,17 @@ function isQuickTaskAction(action) {
 }
 
 function buildActionTimelineEntries() {
-  const visibleActions = getVisibleActions()
+  return getVisibleActions()
     .filter((action) => !isActionsTaskMutedForToday(action.id))
+    .map((action) => ({ kind: "action", ...action }))
     .slice()
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  if (state.actionPeriodDays > 1) {
-    return visibleActions.map((action) => ({ kind: "action", ...action }));
-  }
-  const entries = [];
+}
+
+function buildActionFreeSlots() {
+  const visibleActions = buildActionTimelineEntries();
+  if (state.actionPeriodDays > 1) return [];
+  const slots = [];
   const baseDate = dateFromOffset(state.activeOffset);
   const dayStart = new Date(baseDate);
   dayStart.setHours(8, 0, 0, 0);
@@ -2281,34 +2281,15 @@ function buildActionTimelineEntries() {
     const startMs = new Date(action.startAt).getTime();
     const endMs = new Date(action.endAt).getTime();
     if (Number.isFinite(startMs) && startMs > cursor) {
-      entries.push({
-        kind: "free",
-        id: `free-${cursor}-${startMs}`,
-        startAt: new Date(cursor).toISOString(),
-        endAt: new Date(startMs).toISOString(),
-        title: "Tempo livre"
-      });
+      slots.push({ startAt: new Date(cursor).toISOString(), endAt: new Date(startMs).toISOString() });
     }
-    entries.push({ kind: "action", ...action });
-    if (Number.isFinite(endMs)) {
-      cursor = Math.max(cursor, endMs);
-    }
+    if (Number.isFinite(endMs)) cursor = Math.max(cursor, endMs);
   }
 
   if (cursor < dayEnd.getTime()) {
-    entries.push({
-      kind: "free",
-      id: `free-${cursor}-${dayEnd.getTime()}`,
-      startAt: new Date(cursor).toISOString(),
-      endAt: new Date(dayEnd).toISOString(),
-      title: "Tempo livre"
-    });
+    slots.push({ startAt: new Date(cursor).toISOString(), endAt: new Date(dayEnd).toISOString() });
   }
-
-  return entries
-    .filter((entry) => state.options.showFreeTime || entry.kind !== "free")
-    .filter((entry) => getActionDurationMinutes(entry) > 0)
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  return slots.filter((slot) => getActionDurationMinutes(slot) > 0);
 }
 
 function normalizeMissionActionsMode(value) {
@@ -3004,7 +2985,7 @@ function getNextTimelineEntryForRunning(action) {
   const currentStart = new Date(action.startAt).getTime();
   if (!Number.isFinite(currentStart)) return null;
   const timeline = buildActionTimelineEntries()
-    .filter((entry) => entry.kind === "free" || normalizeActionStatus(entry.status) === actionStatuses.pending)
+    .filter((entry) => normalizeActionStatus(entry.status) === actionStatuses.pending)
     .filter((entry) => {
       if (entry.id === action.id) return false;
       const start = new Date(entry.startAt).getTime();
@@ -3415,7 +3396,7 @@ function renderRunningCompletionNextView() {
   }
   setRunningCompletionVisualState(false);
   setRunningIdleVisualState(false);
-  runningTaskName.innerHTML = formatRunningTaskTitleMarkup(nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title));
+  runningTaskName.innerHTML = formatRunningTaskTitleMarkup(formatActionTitleForDisplay(nextAction.title));
   if (runningTaskCategoryIcon) {
     runningTaskCategoryIcon.hidden = true;
   }
@@ -3430,7 +3411,7 @@ function renderRunningCompletionNextView() {
   }
   const nextOfNext = state.runningCompletion.nextOfNext;
   if (nextOfNext) {
-    const nextLabel = nextOfNext.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextOfNext.title);
+    const nextLabel = formatActionTitleForDisplay(nextOfNext.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextOfNext));
   } else {
     setRunningNextDisplay("Sem próxima tarefa", 0);
@@ -4285,9 +4266,7 @@ function renderHomeRunningTask() {
   renderRunningStatusChip(punctualitySummary, scheduleDeltaMinutes);
   if (runningTaskActionsWrap) runningTaskActionsWrap.hidden = false;
   if (nextAction) {
-    const nextLabel = nextAction.kind === "free"
-      ? "Tempo livre"
-      : formatActionTitleForDisplay(nextAction.title);
+    const nextLabel = formatActionTitleForDisplay(nextAction.title);
     setRunningNextDisplay(nextLabel, getActionDurationMinutes(nextAction));
     if (homeRunningDatePrimary) {
       homeRunningDatePrimary.textContent = "Próxima tarefa";
@@ -4323,9 +4302,7 @@ function renderHomeRunningTask() {
     centerMarkup: runningCenterMarkup,
     ariaLabel: `${formatActionTitleForDisplay(action.title)} em andamento`,
     primaryLine: "Próxima tarefa",
-    secondaryLine: nextAction
-      ? (nextAction.kind === "free" ? "Tempo livre" : formatActionTitleForDisplay(nextAction.title))
-      : "Sem próxima tarefa",
+    secondaryLine: nextAction ? formatActionTitleForDisplay(nextAction.title) : "Sem próxima tarefa",
     useCalendarDate: false
   });
   renderRunningMusicPlayer();
@@ -6466,6 +6443,7 @@ function openModal(id) {
   }
 
   if (id === "actionsModal") {
+    void window.project200Projects?.load();
     const runningAction = getRunningActionForSelectedProfile();
     const latestDone = getLatestCompletedActionForSelectedProfile();
     pendingActionsAnchorId = runningAction?.id || latestDone?.id || "";
@@ -7239,7 +7217,6 @@ function getActionsDynamicMissionDeckInsertIndex(entries = [], nowMs = getServer
   let lastPastIndex = -1;
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
-    if (entry?.kind === 'free') continue;
     const status = normalizeActionStatus(entry?.status);
     const startMs = new Date(entry?.startAt || '').getTime();
     const endMs = new Date(entry?.endAt || '').getTime();
@@ -7273,8 +7250,18 @@ function renderActions() {
   const compactMissionDeck = createActionsDynamicMissionDeck(compactDynamicMissionEntries);
   const compactMissionDeckInsertIndex = compactMissionDeck ? getActionsDynamicMissionDeckInsertIndex(timelineEntries) : -1;
 
+  window.project200Projects?.renderInto(actionsList);
+
   if (!timelineEntries.length && !compactMissionDeck) {
-    actionsList.innerHTML = '<div class="empty-state">Sem tarefas nesse periodo.</div>';
+    actionsList.insertAdjacentHTML("beforeend", `
+      <div class="actions-empty-state" role="status">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 3v3m10-3v3M4 9h16M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+          <path d="m8.5 15 2.1 2.1 4.9-5.2" />
+        </svg>
+        <span>Crie sua primeira ação</span>
+      </div>
+    `);
   }
   timelineEntries.forEach((action, actionIndex) => {
     if (compactMissionDeck && actionIndex === compactMissionDeckInsertIndex) {
@@ -7297,28 +7284,8 @@ function renderActions() {
       row.innerHTML = `
         ${buildTaskAvatarMarkup(missionIcon.src, missionIcon.alt, { categoryIcon: missionIcon.categoryIcon })}
         <div class="task-main">
-          <div class="task-title">${escapeHtml(action.title)}</div>
+          <div class="task-title">${window.project200Projects?.isLinked("mission", action.goalId) ? '<span class="project-star">★</span>' : ""}${escapeHtml(action.title)}</div>
           <div class="task-assignee task-duration">${action.installmentNumber} de ${action.target}</div>
-        </div>
-        <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
-      `;
-      actionsList.appendChild(row);
-      return;
-    }
-    if (action.kind === "free") {
-      const duration = getActionDurationMinutes(action);
-      const ended = getServerNowMs() >= new Date(action.endAt).getTime();
-      const dotColor = ended ? "#94a3b8" : "#64748b";
-      const row = document.createElement("article");
-      row.className = `task-row task-free-slot${ended ? " task-free-expired" : ""}`;
-      row.dataset.freeSlot = "1";
-      row.dataset.startIso = action.startAt;
-      row.dataset.endIso = action.endAt;
-      row.innerHTML = `
-        <img class="task-avatar" src="${slotAvatar}" alt="Tempo livre" loading="lazy" />
-        <div class="task-main">
-          <div class="task-title">${buildActionTitleMarkup("Tempo livre", dotColor, false)}</div>
-          <div class="task-assignee task-duration">${formatMinutesHuman(duration)}</div>
         </div>
         <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
       `;
@@ -7359,7 +7326,7 @@ function renderActions() {
     row.innerHTML = `
       ${buildTaskAvatarMarkup(actionIcon.src, actionIcon.alt, { categoryIcon: actionIcon.categoryIcon })}
       <div class="task-main">
-        <div class="task-title">${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
+        <div class="task-title">${window.project200Projects?.isLinked("action", action.id) ? '<span class="project-star">★</span>' : ""}${buildActionTitleMarkup(action.title, dotColor, isBlinking)}</div>
         <div class="task-assignee task-duration">${formatMinutesHuman(getActionDurationMinutes(action))}${status === actionStatuses.paused ? ` &middot; ${getActionStoredCompletionPercent(action)}%` : ""}</div>
       </div>
       <div class="task-time">${formatActionPeriodTime(action.startAt)}</div>
@@ -9271,7 +9238,7 @@ function getPostponeOverlaps(startAt, endAt, sourceActionId) {
   const startMs = startAt.getTime();
   const endMs = endAt.getTime();
   return buildActionTimelineEntries()
-    .filter((entry) => entry.kind !== "free" && String(entry.id || "") !== String(sourceActionId || ""))
+    .filter((entry) => String(entry.id || "") !== String(sourceActionId || ""))
     .filter((entry) => {
       const entryStart = new Date(entry.startAt).getTime();
       const entryEnd = new Date(entry.endAt).getTime();
@@ -9289,8 +9256,7 @@ function resolvePostponeDraftWithFreeFit(draft) {
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(targetStart);
   dayEnd.setHours(23, 59, 59, 999);
-  const freeFit = buildActionTimelineEntries()
-    .filter((entry) => entry.kind === "free")
+  const freeFit = buildActionFreeSlots()
     .map((entry) => ({ start: new Date(entry.startAt).getTime(), end: new Date(entry.endAt).getTime() }))
     .map((slot) => ({
       start: Math.max(slot.start, dayStart.getTime()),
@@ -10449,9 +10415,8 @@ function computeOverlapsForOccurrences(occurrences, options = {}) {
 }
 
 function buildFreeStartCandidates(durationMinutes) {
-  const timeline = buildActionTimelineEntries();
-  return timeline
-    .filter((entry) => entry.kind === "free" && getActionDurationMinutes(entry) >= durationMinutes)
+  return buildActionFreeSlots()
+    .filter((entry) => getActionDurationMinutes(entry) >= durationMinutes)
     .map((entry) => entry.startAt);
 }
 
@@ -16928,7 +16893,6 @@ async function loadOptionsConfig() {
 
     try {
       const parsed = JSON.parse(raw || "{}");
-      state.options.showFreeTime = parsed.showFreeTime !== false;
       state.options.missionActionsMode = normalizeMissionActionsMode(parsed.missionActionsMode);
       state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
         ? Number(parsed.completionBeepCycles)
@@ -16943,7 +16907,6 @@ async function loadOptionsConfig() {
       state.options.missionNotificationsEnabled = parsed.missionNotificationsEnabled === true;
       state.options.useAppKeyboard = parsed.useAppKeyboard === true;
     } catch {
-      state.options.showFreeTime = true;
       state.options.missionActionsMode = "separate";
       state.options.completionBeepCycles = 0;
       state.options.minuteNotificationInterval = 1;
@@ -16964,7 +16927,6 @@ async function loadOptionsConfig() {
 
 function saveOptionsConfig() {
   const serialized = JSON.stringify({
-    showFreeTime: Boolean(state.options.showFreeTime),
     missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
     completionBeepCycles: Number(state.options.completionBeepCycles || 0),
     minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
@@ -17149,10 +17111,6 @@ function renderOptionsModal() {
     toggleAppKeyboardHint.textContent = state.options.useAppKeyboard ? "Do iLife" : "Do aparelho";
   }
   toggleAppKeyboardOptionButton?.classList.toggle("is-off", !state.options.useAppKeyboard);
-  if (toggleFreeTimeHint) {
-    toggleFreeTimeHint.textContent = state.options.showFreeTime ? "Mostrando" : "Ocultando";
-  }
-  toggleFreeTimeOptionButton?.classList.toggle("is-off", !state.options.showFreeTime);
   const missionActionsMode = normalizeMissionActionsMode(state.options.missionActionsMode);
   if (toggleMissionActionsHint) {
     toggleMissionActionsHint.textContent = missionActionsModeLabels.get(missionActionsMode) || "Janela separada";
@@ -17314,11 +17272,7 @@ openActionWizardButton.addEventListener("click", () => {
     redirectToProject200Login();
     return;
   }
-  if (isActionsMissionViewActive()) {
-    openMissionCreateModal();
-    return;
-  }
-  openTaskComposer();
+  window.project200Projects?.toggleCreateMenu();
 });
 
 actionFriendAssignButton?.addEventListener("click", () => {
@@ -17787,16 +17741,13 @@ actionsList.addEventListener("pointerdown", (event) => {
     y: Number(event.clientY || 0),
     goalId: String(missionRow.dataset.missionGoalId || ""),
     actionId: ""
-  } : (row && row.dataset.freeSlot !== "1" ? {
+  } : (row ? {
     x: Number(event.clientX || 0),
     y: Number(event.clientY || 0),
     goalId: "",
     actionId: String(row.dataset.actionId || "")
   } : null);
   if (!row) {
-    return;
-  }
-  if (row.dataset.freeSlot === "1") {
     return;
   }
   beginActionLongPress(row.dataset.actionId);
@@ -17836,9 +17787,6 @@ actionsList.addEventListener("click", async (event) => {
   }
   const row = event.target.closest("[data-action-id]");
   if (!row) {
-    return;
-  }
-  if (row.dataset.freeSlot === "1") {
     return;
   }
   const clickedAvatar = event.target.closest(".task-avatar");
@@ -17938,9 +17886,6 @@ actionsList.addEventListener("keydown", async (event) => {
   const row = event.target.closest("[data-action-id]");
 
   if (!row) {
-    return;
-  }
-  if (row.dataset.freeSlot === "1") {
     return;
   }
 
@@ -19351,13 +19296,6 @@ toggleAppKeyboardOptionButton?.addEventListener("click", () => {
   applyProjectKeyboardPreference();
   renderOptionsModal();
 });
-toggleFreeTimeOptionButton?.addEventListener("click", () => {
-  state.options.showFreeTime = !state.options.showFreeTime;
-  saveOptionsConfig();
-  renderOptionsModal();
-  renderActions();
-  renderHomeRunningTask();
-});
 toggleTaskBeepOptionButton?.addEventListener("click", () => {
   const currentIndex = Math.max(0, taskBeepOptionCycles.indexOf(Number(state.options.completionBeepCycles || 0)));
   const nextIndex = (currentIndex + 1) % taskBeepOptionCycles.length;
@@ -20616,3 +20554,10 @@ if (runningMusicProgressTicker) {
 
 
 
+
+window.project200ProjectsContext = {
+  state, actionsList, actionsModal, actionStatuses, apiRequest, escapeHtml,
+  formatActionTitleForDisplay, formatMinutesHuman, getServerNowMs, isLimitGoal,
+  normalizeActionStatus, openModal, closeModal, openTaskComposer, openMissionCreateModal,
+  getToken, redirectToProject200Login, renderActions, loadActions, loadMissions
+};

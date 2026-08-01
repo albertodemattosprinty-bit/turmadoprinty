@@ -68,6 +68,7 @@ import { createProject200Profile, deleteProject200Profile, listProject200Profile
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
+import { createProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
 import { listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
@@ -11938,6 +11939,75 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/200/extra-goals") {
     await handleExtraGoalsListRequest(request, response);
+    return;
+  }
+
+
+  if (request.method === "GET" && pathname === "/api/200/projects") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const requestUrl = new URL(request.url || pathname, "http://" + (request.headers.host || "localhost"));
+      const projects = await listProject200Projects(user.id, requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME);
+      sendJson(response, 200, { ok: true, projects });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar os projetos." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/projects") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const project = await createProject200Project(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, body);
+      sendJson(response, 201, { ok: true, project });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel criar o projeto." });
+    }
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/200\/projects\/[^/]+\/progress$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const projectId = decodeURIComponent(pathname.replace(/^\/api\/200\/projects\/([^/]+)\/progress$/, "$1"));
+      const overallPercent = await recordProject200DailyProgress(user.id, projectId, body?.percent);
+      sendJson(response, 200, { ok: true, overallPercent });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o progresso." });
+    }
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/200\/projects\/[^/]+\/items$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const projectId = decodeURIComponent(pathname.replace(/^\/api\/200\/projects\/([^/]+)\/items$/, "$1"));
+      const project = await replaceProject200ProjectItems(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, projectId, body?.items);
+      sendJson(response, 200, { ok: true, project });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o projeto." });
+    }
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/projects\/[^/]+\/items\/[^/]+$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const match = pathname.match(/^\/api\/200\/projects\/([^/]+)\/items\/([^/]+)$/);
+      const item = await toggleProject200Step(user.id, decodeURIComponent(match[1]), decodeURIComponent(match[2]), body?.completed !== false);
+      sendJson(response, 200, { ok: true, item });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel concluir a etapa." });
+    }
     return;
   }
 
