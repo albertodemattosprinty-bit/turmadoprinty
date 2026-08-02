@@ -7,6 +7,11 @@
   const MEDIA_PREFIX = "[[ILIFE_MEDIA:";
   const MEDIA_SUFFIX = "]]";
   const TOKEN_KEY = "turma_do_printy_token";
+  const QUALITY_LEVELS = [
+    { key: "720", label: "720", size: 720, width: 1280, height: 720, imageQuality: 0.86, videoBits: 2500000 },
+    { key: "1080", label: "1080", size: 1080, width: 1920, height: 1080, imageQuality: 0.9, videoBits: 3750000 },
+    { key: "1080-best", label: "1080 best", size: 1080, width: 1920, height: 1080, imageQuality: 0.94, videoBits: 5000000 }
+  ];
   const state = {
     mode: "photo",
     facingMode: "environment",
@@ -58,6 +63,10 @@
   const byId = (id) => document.getElementById(id);
   const safeText = (value, fallback = "") => String(value ?? fallback);
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  function currentQuality() {
+    return QUALITY_LEVELS.find((item) => item.key === state.qualityKey) || QUALITY_LEVELS[0];
+  }
+
   function normalizeMimeType(value) {
     return safeText(value).split(";")[0].trim().toLowerCase();
   }
@@ -169,13 +178,15 @@
     host.innerHTML = `
       <section class="life-capture-overlay" id="lifeCaptureOverlay" aria-hidden="true">
         <div class="life-capture-shell">
-          <header class="life-capture-head">
-            <div class="life-capture-head-copy">
-              <span class="life-capture-kicker">Camera</span>
-              <h2 class="life-capture-title" id="lifeCaptureModeLabel">Foto</h2>
-            </div>
-            <button class="life-capture-close" type="button" data-life-close="capture" aria-label="Fechar camera">
-              <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <header class="life-capture-head life-capture-camera-head">
+            <button class="life-capture-top-action" id="lifeCaptureQualityButton" type="button" aria-label="Qualidade da camera">
+              <span id="lifeCaptureQualityLabel">720</span>
+            </button>
+            <button class="life-capture-top-action life-capture-tree-action" id="lifeCaptureBackgroundButton" type="button" aria-label="Gravar com tela desligada">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c2.1 0 3.8 1.4 4.3 3.3A4.8 4.8 0 0 1 20 11a4.9 4.9 0 0 1-4.8 5H13v5h-2v-5H8.8A4.9 4.9 0 0 1 4 11a4.8 4.8 0 0 1 3.7-4.7A4.5 4.5 0 0 1 12 3Z" fill="currentColor"/></svg>
+            </button>
+            <button class="life-capture-top-action" type="button" data-life-close="capture" aria-label="Voltar">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </header>
           <div class="life-capture-stage">
@@ -203,6 +214,23 @@
             </button>
             <button class="life-capture-mode-btn" id="lifeCaptureModeButton" type="button" aria-label="Trocar foto ou video"></button>
           </footer>
+        </div>
+      </section>
+
+
+      <section class="life-capture-overlay life-capture-background-confirm" id="lifeCaptureBackgroundConfirmOverlay" aria-hidden="true">
+        <div class="life-capture-background-confirm-shell">
+          <button class="life-capture-close" type="button" data-life-close="background-confirm" aria-label="Voltar">
+            <svg viewBox="0 0 24 24"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="life-capture-background-confirm-copy">
+            <span>Iniciar gravação segundo plano</span>
+            <h2>Grave sem perder o momento</h2>
+            <p>Iniciar gravação fluída</p>
+            <small>Toque na tela três vezes para parar</small>
+            <small>Se fechar o app, a gravação se perde e não salva nada.</small>
+          </div>
+          <button class="primary-btn life-capture-background-start" id="lifeCaptureBackgroundStartButton" type="button">Iniciar gravação</button>
         </div>
       </section>
 
@@ -721,6 +749,7 @@
   }
 
   function stopPreview() {
+    state.stealthPhoto = false;
     if (state.raf) cancelAnimationFrame(state.raf);
     state.raf = 0;
     state.previewReady = false;
@@ -734,10 +763,25 @@
     state.stream = null;
   }
 
+  function syncBackgroundUi() {
+    const overlay = byId("lifeCaptureOverlay");
+    overlay?.classList.toggle("is-background-capture", !!state.backgroundCapture || !!state.stealthPhoto);
+  }
+
+  function resizeCaptureCanvas() {
+    const canvas = byId("lifeCaptureCanvas");
+    const quality = currentQuality();
+    if (canvas && (canvas.width !== quality.size || canvas.height !== quality.size)) {
+      canvas.width = quality.size;
+      canvas.height = quality.size;
+    }
+  }
+
   function drawPreviewFrame() {
     const preview = byId("lifeCapturePreview");
     const canvas = byId("lifeCaptureCanvas");
     if (!(preview && canvas)) return;
+    resizeCaptureCanvas();
     const context = canvas.getContext("2d", { alpha: false });
     if (!preview.videoWidth || !preview.videoHeight || !context) {
       state.previewReady = false;
@@ -768,11 +812,12 @@
     stopPreview();
     const preview = byId("lifeCapturePreview");
     if (!preview) return;
+    const quality = currentQuality();
     state.stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: state.facingMode },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: quality.width },
+        height: { ideal: quality.height }
       },
       audio: true
     });
@@ -782,15 +827,26 @@
     preview.style.transform = state.facingMode === "user" ? "scaleX(-1)" : "none";
     preview.style.transformOrigin = "center center";
     await preview.play().catch(() => {});
+    resizeCaptureCanvas();
+    syncBackgroundUi();
     drawPreviewFrame();
-    setStatus(state.mode === "video" ? "Video 720p ativo." : "Foto 720p ativa.");
+    setStatus(`${state.mode === "video" ? "Video" : "Foto"} ${currentQuality().label} ativo.`);
   }
 
   function setModeUi() {
-    const label = byId("lifeCaptureModeLabel");
     const modeButton = byId("lifeCaptureModeButton");
+    const qualityButton = byId("lifeCaptureQualityButton");
+    const qualityLabel = byId("lifeCaptureQualityLabel");
+    const backgroundButton = byId("lifeCaptureBackgroundButton");
     const trigger = byId("lifeCaptureTriggerButton");
-    if (label) label.textContent = state.mode === "video" ? "Video" : "Foto";
+    if (qualityLabel) qualityLabel.textContent = currentQuality().label;
+    if (qualityButton) qualityButton.setAttribute("aria-label", `Qualidade ${currentQuality().label}`);
+    if (backgroundButton) {
+      const disabled = state.mode === "photo" && state.facingMode === "user";
+      backgroundButton.classList.toggle("is-soft-disabled", disabled);
+      backgroundButton.setAttribute("aria-disabled", disabled ? "true" : "false");
+    }
+    syncBackgroundUi();
     if (modeButton) {
       modeButton.innerHTML = state.mode === "video"
         ? '<svg viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h7A2.5 2.5 0 0 1 16 7.5v1.2l4.1-2.4c.8-.46 1.9.1 1.9 1.02v9.4c0 .92-1.1 1.48-1.9 1.02L16 15.3v1.2A2.5 2.5 0 0 1 13.5 19h-7A2.5 2.5 0 0 1 4 16.5Z" fill="currentColor"/></svg>'
@@ -807,7 +863,7 @@
       canvas?.toBlob((blob) => {
         if (blob) resolve(blob);
         else reject(new Error("Falha ao gerar a imagem."));
-      }, "image/webp", 0.86);
+      }, "image/webp", currentQuality().imageQuality);
     });
   }
 
@@ -838,8 +894,10 @@
       setTimeout(resolve, 250);
     });
     const canvas = document.createElement("canvas");
-    canvas.width = 720;
-    canvas.height = 720;
+    const quality = currentQuality();
+    canvas.width = quality.size;
+    canvas.height = quality.size;
+    resizeCaptureCanvas();
     const context = canvas.getContext("2d", { alpha: false });
     if (context) {
       context.filter = FILTER;
@@ -849,8 +907,57 @@
     return canvas.toDataURL("image/webp", 0.82);
   }
 
+  function cycleQuality() {
+    if (state.recording) return;
+    const index = QUALITY_LEVELS.findIndex((item) => item.key === state.qualityKey);
+    state.qualityKey = QUALITY_LEVELS[(index + 1) % QUALITY_LEVELS.length].key;
+    resizeCaptureCanvas();
+    setModeUi();
+    setStatus(`Qualidade ${currentQuality().label} ativa.`);
+    if (byId("lifeCaptureOverlay")?.classList.contains("active")) {
+      startPreview().catch((error) => setStatus(error instanceof Error ? error.message : "Falha ao trocar qualidade."));
+    }
+  }
+
+  function openBackgroundConfirm() {
+    if (state.mode === "photo" && state.facingMode === "user") {
+      setStatus("Na camera frontal, o modo tela apagada fica desativado para fotos.");
+      return;
+    }
+    if (state.mode === "photo") {
+      state.stealthPhoto = true;
+      syncBackgroundUi();
+      setStatus("Tire fotos sem ver a tela frontal.");
+      return;
+    }
+    show("lifeCaptureBackgroundConfirmOverlay");
+  }
+
+  async function startBackgroundRecording() {
+    hide("lifeCaptureBackgroundConfirmOverlay");
+    state.backgroundCapture = true;
+    state.stealthTapTimes = [];
+    syncBackgroundUi();
+    setStatus("Gravando com a tela apagada. Toque 3 vezes para parar.");
+    if (!state.recording) await toggleVideoRecording();
+  }
+
+  function registerBackgroundTap() {
+    if (!(state.backgroundCapture && state.recording)) return;
+    const now = Date.now();
+    state.stealthTapTimes = [...state.stealthTapTimes, now].filter((time) => now - time <= 2000);
+    if (state.stealthTapTimes.length >= 3) {
+      state.stealthTapTimes = [];
+      setStatus("Finalizando gravacao...");
+      void toggleVideoRecording();
+    }
+  }
+
   function prepareSave(capture) {
     state.pending = capture;
+    state.backgroundCapture = false;
+    state.stealthPhoto = false;
+    syncBackgroundUi();
     const image = byId("lifeCaptureSaveImage");
     const video = byId("lifeCaptureSaveVideo");
     const input = byId("lifeCaptureTitleInput");
@@ -887,6 +994,7 @@
 
   async function capturePhoto() {
     setStatus("Capturando foto...");
+    const wasStealthPhoto = !!state.stealthPhoto;
     const mediaBlob = await canvasBlob();
     const previewDataUrl = await blobToDataUrl(mediaBlob);
     stopPreview();
@@ -897,7 +1005,8 @@
       mimeType: "image/webp",
       mediaBlob,
       previewDataUrl,
-      noteText: ""
+      noteText: "",
+      metadata: { quality: currentQuality().key, stealthPhoto: wasStealthPhoto }
     });
   }
 
@@ -918,7 +1027,7 @@
         stream,
         {
           ...(preferredMimeType ? { mimeType: preferredMimeType } : {}),
-          videoBitsPerSecond: 2500000,
+          videoBitsPerSecond: currentQuality().videoBits,
           audioBitsPerSecond: 96000
         }
       );
@@ -950,7 +1059,8 @@
           mediaBlob,
           previewDataUrl,
           durationMs: Date.now() - state.recordingStartedAt,
-          noteText: ""
+          noteText: "",
+          metadata: { quality: currentQuality().key, backgroundCapture: wasBackgroundCapture }
         });
       };
       state.recorder.start();
@@ -1873,6 +1983,11 @@
       return;
     }
 
+    if (button.dataset.lifeClose === "background-confirm") {
+      hide("lifeCaptureBackgroundConfirmOverlay");
+      return;
+    }
+
     if (button.dataset.lifeClose === "save") {
       state.pending = null;
       stopTitleMic();
@@ -1905,17 +2020,39 @@
       return;
     }
 
+    if (button.id === "lifeCaptureQualityButton") {
+      cycleQuality();
+      return;
+    }
+
+    if (button.id === "lifeCaptureBackgroundButton") {
+      openBackgroundConfirm();
+      return;
+    }
+
+    if (button.id === "lifeCaptureBackgroundStartButton") {
+      void startBackgroundRecording().catch((error) => {
+        state.backgroundCapture = false;
+        syncBackgroundUi();
+        setStatus(error instanceof Error ? error.message : "Falha ao iniciar gravacao fluida.");
+      });
+      return;
+    }
+
     if (button.id === "lifeCaptureModeButton") {
       if (state.recording) return;
       state.mode = state.mode === "photo" ? "video" : "photo";
+      state.stealthPhoto = false;
       setModeUi();
-      setStatus(state.mode === "video" ? "Video 720p ativo." : "Foto 720p ativa.");
+      setStatus(`${state.mode === "video" ? "Video" : "Foto"} ${currentQuality().label} ativo.`);
       return;
     }
 
     if (button.id === "lifeCaptureSwitchButton") {
       if (state.recording) return;
       state.facingMode = state.facingMode === "environment" ? "user" : "environment";
+      state.stealthPhoto = false;
+      setModeUi();
       setStatus(state.facingMode === "user" ? "Camera frontal ativa." : "Camera traseira ativa.");
       startPreview().catch((error) => {
         setStatus(error instanceof Error ? error.message : "Falha ao trocar camera.");
@@ -2065,6 +2202,13 @@
       void openShare(button.dataset.captureShare);
     }
   });
+
+
+  document.addEventListener("touchend", (event) => {
+    if (!byId("lifeCaptureOverlay")?.classList.contains("active")) return;
+    if (event.target.closest("button,input,textarea")) return;
+    registerBackgroundTap();
+  }, { passive: true });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
