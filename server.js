@@ -70,7 +70,7 @@ import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProje
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { createProject200Project, deleteProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
-import { canViewProject200LifeCapture, getProject200LifeCaptureById, listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
+import { canViewProject200LifeCapture, deleteProject200LifeCapture, getProject200LifeCaptureById, listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
@@ -4258,6 +4258,47 @@ async function requireProject200PrivateMediaAuth(request, response) {
   return user;
 }
 
+async function deleteProject200LifeCaptureObject(key, usePrivateBucket = true) {
+  const normalizedKey = String(key || "").trim();
+  if (!normalizedKey) return false;
+  try {
+    const client = usePrivateBucket ? getProject200PrivateR2Client() : getR2Client();
+    await client.send(new DeleteObjectCommand({
+      Bucket: usePrivateBucket ? R2_PRIVATE_BUCKET : R2_BUCKET_NAME,
+      Key: normalizedKey
+    }));
+    return true;
+  } catch (error) {
+    console.warn("[project200-life-captures] falha ao excluir objeto R2", normalizedKey, error instanceof Error ? error.message : error);
+    return false;
+  }
+}
+
+async function handleProject200LifeCaptureDeleteRequest(request, response, captureId) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const current = await getProject200LifeCaptureById(captureId);
+    if (!current || String(current.userId) !== String(user.id)) {
+      sendJson(response, 404, { error: "Captura nao encontrada." });
+      return;
+    }
+    const deleted = await deleteProject200LifeCapture(user.id, captureId);
+    if (!deleted) {
+      sendJson(response, 404, { error: "Captura nao encontrada." });
+      return;
+    }
+    const privateMedia = isProject200PrivateLifeCaptureUrl(current.mediaUrl || current.remoteUrl);
+    const privatePreview = isProject200PrivateLifeCaptureUrl(current.previewUrl || current.previewRemoteUrl);
+    await Promise.allSettled([
+      deleteProject200LifeCaptureObject(current.uploadKey, privateMedia),
+      deleteProject200LifeCaptureObject(current.previewKey, privatePreview)
+    ]);
+    sendJson(response, 200, { ok: true, deleted: true, captureId: deleted.id });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel excluir a captura." });
+  }
+}
 async function handleProject200LifeCaptureMediaRequest(request, response, captureId) {
   const user = await requireProject200PrivateMediaAuth(request, response);
   if (!user) return;
@@ -11890,6 +11931,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "DELETE" && pathname.match(/^\/api\/200\/life-captures\/[^/]+$/)) {
+    const captureId = decodeURIComponent(pathname.replace(/^\/api\/200\/life-captures\/([^/]+)$/, "$1"));
+    await handleProject200LifeCaptureDeleteRequest(request, response, captureId);
+    return;
+  }
   if (request.method === "PATCH" && pathname.match(/^\/api\/200\/life-captures\/[^/]+$/)) {
     const captureId = decodeURIComponent(pathname.replace(/^\/api\/200\/life-captures\/([^/]+)$/, "$1"));
     await handleProject200LifeCapturePatchRequest(request, response, captureId);

@@ -190,6 +190,17 @@ export async function getProject200LifeCaptureById(captureId) {
   return mapLifeCaptureRow(result.rows[0]);
 }
 
+export async function deleteProject200LifeCapture(userId, captureId) {
+  await ensureProject200LifeCapturesSchema();
+  const normalizedUserId = normalizeId(userId);
+  const normalizedCaptureId = normalizeId(captureId);
+  if (!normalizedUserId || !normalizedCaptureId) throw new Error("Captura invalida.");
+  const result = await query(
+    `delete from project200_life_captures where id = $1 and user_id = $2 returning *`,
+    [normalizedCaptureId, normalizedUserId]
+  );
+  return mapLifeCaptureRow(result.rows[0]);
+}
 export async function grantProject200LifeCaptureShare(captureId, ownerUserId, sharedWithUserId, sharedByUserId) {
   await ensureProject200LifeCapturesSchema();
   const normalizedCaptureId = normalizeId(captureId);

@@ -322,9 +322,6 @@ function createMediaCard(payload) {
         audio.pause();
       }
     });
-    card.addEventListener("dblclick", () => {
-      window.dispatchEvent(new CustomEvent("project200:life-capture-open-shared", { detail: payload }));
-    });
     buildAudioWaveform(mediaUrl, barCount).then((values) => {
       values.forEach((value, index) => bars[index]?.style.setProperty("--wave-level", String(value)));
     });
