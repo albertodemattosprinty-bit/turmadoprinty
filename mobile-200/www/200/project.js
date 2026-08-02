@@ -1278,6 +1278,7 @@ let missionVariantsTicker = null;
 let missionRunCueAudio = null;
 let missionRunCycleAudio = null;
 let missionRunCycleAudioQueue = Promise.resolve();
+let missionRunCycleCueTimer = null;
 let missionRunMusicFadeTimer = null;
 let missionRunMusicFadeToken = 0;
 let missionRunMusicFadeRestoreVolume = null;
@@ -1299,6 +1300,7 @@ const missionRunCycleCueMap = new Map([
   [6, "6.mp3"], [7, "7.mp3"], [8, "8.mp3"], [9, "9.mp3"],
   [10, "10.mp3"], [11, "11.mp3"], [12, "12.mp3"]
 ]);
+const MISSION_RUN_CYCLE_CUE_DELAY_MS = 2000;
 let sleepFrequencyMonitorTicker = null;
 let sleepFrequencyFadeToken = 0;
 let sleepAmbienceShuffleSignature = "";
@@ -14735,9 +14737,23 @@ function stopMissionRunCueAudio() {
 }
 
 function stopMissionRunCycleAudio() {
+  if (missionRunCycleCueTimer) {
+    window.clearTimeout(missionRunCycleCueTimer);
+    missionRunCycleCueTimer = null;
+  }
   if (!missionRunCycleAudio) return;
   try { missionRunCycleAudio.pause(); missionRunCycleAudio.currentTime = 0; } catch {}
   missionRunCycleAudio = null;
+}
+
+function scheduleMissionRunCycleCue(cycleNumber) {
+  const safeCycleNumber = normalizeMissionRunCycleTarget(cycleNumber);
+  if (!missionRunCycleCueMap.has(safeCycleNumber)) return;
+  if (missionRunCycleCueTimer) window.clearTimeout(missionRunCycleCueTimer);
+  missionRunCycleCueTimer = window.setTimeout(() => {
+    missionRunCycleCueTimer = null;
+    playMissionRunCycleCue(safeCycleNumber);
+  }, MISSION_RUN_CYCLE_CUE_DELAY_MS);
 }
 
 function playMissionRunCycleCue(cycleNumber) {
@@ -15076,7 +15092,7 @@ function advanceMissionRunCycle() {
   if (current >= target) return false;
   const nextCycle = current + 1;
   resetMissionRunCycleTimer(nextCycle);
-  playMissionRunCycleCue(nextCycle);
+  scheduleMissionRunCycleCue(nextCycle);
   return true;
 }
 
