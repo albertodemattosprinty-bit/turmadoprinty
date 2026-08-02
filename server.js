@@ -4890,7 +4890,13 @@ async function syncProject200ActionPoints(userId, beforeAction, afterAction, { r
     try {
       dailyRankingBefore = await getProject200FriendsSnapshot(userId, "today");
     } catch {}
-    const removed = await removeProject200ActionPoints(userId, actionId);
+    const extraPointKeys = [
+      beforeAction?.repeatGroupId,
+      afterAction?.repeatGroupId,
+      beforeAction?.startAt ? actionId + ":" + String(beforeAction.startAt).slice(0, 10) : "",
+      afterAction?.startAt ? actionId + ":" + String(afterAction.startAt).slice(0, 10) : ""
+    ];
+    const removed = await removeProject200ActionPoints(userId, actionId, extraPointKeys);
     let dailyRankingAfter = null;
     if (removed) {
       try {

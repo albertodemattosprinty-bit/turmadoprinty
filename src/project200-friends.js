@@ -215,19 +215,30 @@ export async function recordProject200ActionPoints(userId, action, completedAt =
   };
 }
 
-export async function removeProject200ActionPoints(userId, actionId) {
+export async function removeProject200ActionPoints(userId, actionId, extraSourceKeys = []) {
   await ensureProject200PointsSchema();
+  const sourceKeys = [...new Set([
+    String(actionId || "").trim(),
+    ...(Array.isArray(extraSourceKeys) ? extraSourceKeys : []).map((value) => String(value || "").trim())
+  ].filter(Boolean))];
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId || !sourceKeys.length) return null;
   const result = await query(
     `
       delete from project200_point_events
       where user_id = $1
         and source_type = 'action'
-        and source_key = $2
+        and source_key = any($2::text[])
       returning points, scope_date
     `,
-    [String(userId || "").trim(), String(actionId || "").trim()]
+    [normalizedUserId, sourceKeys]
   );
-  return result.rows[0] || null;
+  if (!result.rows.length) return null;
+  return {
+    points: result.rows.reduce((sum, row) => sum + Math.max(0, Math.trunc(Number(row.points || 0) || 0)), 0),
+    scope_date: result.rows[0]?.scope_date,
+    removedCount: result.rows.length
+  };
 }
 
 export async function addProject200ManualPoints(userId, points, scopeDate = new Date(), sourceKey = "") {
