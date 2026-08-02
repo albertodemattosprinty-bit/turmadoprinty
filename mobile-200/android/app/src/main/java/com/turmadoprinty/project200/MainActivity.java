@@ -7,9 +7,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
-import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.widget.Toast;
 
@@ -17,6 +15,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebChromeClient;
 
 public class MainActivity extends BridgeActivity {
     private static final String UPDATE_HOST = "pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev";
@@ -32,20 +31,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         WebView webView = getBridge().getWebView();
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onPermissionRequest(final PermissionRequest request) {
-                runOnUiThread(() -> {
-                    if (!hasMediaPermissions()) {
-                        ensureMediaPermissions();
-                        request.deny();
-                        Toast.makeText(MainActivity.this, "Permita camera e microfone e tente novamente.", Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    request.grant(request.getResources());
-                });
-            }
-        });
+        webView.setWebChromeClient(new BridgeWebChromeClient(getBridge()));
 
         ensureMediaPermissions();
 
