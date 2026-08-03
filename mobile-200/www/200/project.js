@@ -722,6 +722,7 @@ const missionCreateSlider = document.getElementById("missionCreateSlider");
 const missionCreateNameCopy = document.getElementById("missionCreateNameCopy");
 const missionCreateTargetCopy = document.getElementById("missionCreateTargetCopy");
 const missionCreateTimeCopy = document.getElementById("missionCreateTimeCopy");
+const missionCreateWeekdays = document.getElementById("missionCreateWeekdays");
 const missionAdjustTitle = document.getElementById("missionAdjustTitle");
 const missionAdjustCloseButton = document.getElementById("missionAdjustCloseButton");
 const missionAdjustMinusButton = document.getElementById("missionAdjustMinus");
@@ -739,6 +740,7 @@ const missionAdjustDeleteButton = document.getElementById("missionAdjustDelete")
 const missionProgressTitle = document.getElementById("missionProgressTitle");
 const missionProgressIcon = document.getElementById("missionProgressIcon");
 const missionProgressCloseButton = document.getElementById("missionProgressCloseButton");
+const missionProgressEditButton = document.getElementById("missionProgressEditButton");
 const missionProgressMinusButton = document.getElementById("missionProgressMinus");
 const missionProgressPlusButton = document.getElementById("missionProgressPlus");
 const missionProgressValue = document.getElementById("missionProgressValue");
@@ -765,6 +767,10 @@ const missionTimeValue = document.getElementById("missionTimeValue");
 const missionTimeUnitLabel = document.getElementById("missionTimeUnitLabel");
 const missionTimeStatus = document.getElementById("missionTimeStatus");
 const missionTimeConfirmButton = document.getElementById("missionTimeConfirmButton");
+const missionTimeBackButton = document.getElementById("missionTimeBackButton");
+const missionTimeDurationStep = document.getElementById("missionTimeDurationStep");
+const missionTimeRepeatStep = document.getElementById("missionTimeRepeatStep");
+const missionTimeWeekdays = document.getElementById("missionTimeWeekdays");
 const missionRunBackButton = document.getElementById("missionRunBackButton");
 const missionRunTitle = document.getElementById("missionRunTitle");
 const missionRunTitleIcon = document.getElementById("missionRunTitleIcon");
@@ -802,6 +808,8 @@ const missionVariantDeadlineValue = document.getElementById("missionVariantDeadl
 const missionVariantEditorStep1 = document.getElementById("missionVariantEditorStep1");
 const missionVariantEditorStep2 = document.getElementById("missionVariantEditorStep2");
 const missionVariantEditorStep3 = document.getElementById("missionVariantEditorStep3");
+const missionVariantEditorStep4 = document.getElementById("missionVariantEditorStep4");
+const missionVariantWeekdays = document.getElementById("missionVariantWeekdays");
 const missionVariantDurationPrev = document.getElementById("missionVariantDurationPrev");
 const missionVariantDurationNext = document.getElementById("missionVariantDurationNext");
 const missionVariantDurationValue = document.getElementById("missionVariantDurationValue");
@@ -1438,12 +1446,16 @@ const state = {
   missionAdjust: {
     goalId: "",
     goalKind: "goal",
+    isFolder: false,
+    repeatDays: [0, 1, 2, 3, 4, 5, 6],
     targetValue: 1,
     unitDurationSeconds: 30,
     countSleepTime: true
   },
   missionCreate: {
     goalKind: "",
+    structureType: "",
+    repeatDays: [0, 1, 2, 3, 4, 5, 6],
     step: 0,
     unitDurationSeconds: 30,
     timeConfigured: true,
@@ -1476,6 +1488,8 @@ const state = {
   missionTime: {
     mode: "",
     title: "",
+    step: 1,
+    repeatDays: [0, 1, 2, 3, 4, 5, 6],
     value: 0
   },
   missionRun: {
@@ -1513,7 +1527,8 @@ const state = {
     sortMode: "user",
     sortMenuOpen: false,
     intervalValue: 1,
-    intervalUnit: "days"
+    intervalUnit: "days",
+    repeatDays: [0, 1, 2, 3, 4, 5, 6]
   },
   missionQuickSlots: [],
   runningMissionQuick: {
@@ -2423,7 +2438,7 @@ function isSharedMissionOrderGoal(goal) {
 
 function getAlphabeticalMissionOrderUnits() {
   return [...(Array.isArray(state.actionMissions) ? state.actionMissions : [])]
-    .filter((goal) => !isLimitGoal(goal))
+    .filter((goal) => !isLimitGoal(goal) && !isMissionFolder(goal) && isMissionScheduledForToday(goal))
     .filter(isSharedMissionOrderGoal)
     .sort((left, right) => String(left?.title || "").localeCompare(String(right?.title || ""), "pt-BR"))
     .flatMap((goal) => {
@@ -2459,7 +2474,7 @@ function getOrderedMissionUnits() {
 
 function buildMissionScheduleUnits(nowMs = getServerNowMs()) {
   const windowState = getActiveTimeWindow(nowMs);
-  const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => !isLimitGoal(goal));
+  const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => !isLimitGoal(goal) && !isMissionFolder(goal) && isMissionScheduledForToday(goal));
   const goalsById = new Map(goals.map((goal) => [String(goal?.id || ""), goal]));
   const sharedUnits = getOrderedMissionUnits();
   const sharedIntervalMs = (windowState.endMs - windowState.startMs) / Math.max(1, sharedUnits.length);
@@ -2793,6 +2808,8 @@ function getAvailableMissionById(goalId) {
 
 function getActionsMissionProgress(goal) {
   const variants = Array.isArray(goal?.variants) ? goal.variants : [];
+  const folder = isMissionFolder(goal);
+  if (folder && !variants.length) return { progress: 0, target: 0, percent: 0 };
   const dailyVariantProgress = variants.length ? getMissionVariantsDailyProgress(variants) : null;
   const progress = dailyVariantProgress
     ? Math.max(0, Number(dailyVariantProgress.completed || 0))
@@ -2843,7 +2860,11 @@ function renderActionsMissionsPanel() {
       Number(card.dataset.progressPercent)
     ])
   );
-  const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => !isLimitGoal(goal));
+  const goals = (Array.isArray(state.actionMissions) ? state.actionMissions : []).filter((goal) => {
+    if (isLimitGoal(goal)) return false;
+    if (isMissionFolder(goal)) return !goal?.variants?.length || goal.variants.some((variant) => isMissionScheduledForToday(variant));
+    return isMissionScheduledForToday(goal);
+  });
   actionsMissionsList.innerHTML = "";
   if (!goals.length) {
     actionsMissionsList.innerHTML = '<div class="empty-state">Você não tem missões para hoje.</div>';
@@ -2857,8 +2878,10 @@ function renderActionsMissionsPanel() {
     const priorPercent = previousProgress.get(goalId);
     const initialPercent = Number.isFinite(priorPercent) ? priorPercent : progress.percent;
     const card = document.createElement("article");
-    const expectation = getMissionExpectation(goal);
-    card.className = `actions-mission-card mission-expectation-${expectation.tone}`;
+    const folder = isMissionFolder(goal);
+    const expectation = folder ? { tone: "blue" } : getMissionExpectation(goal);
+    const variantCount = Math.max(0, Number(goal?.variantCount || goal?.variants?.length || 0));
+    card.className = `actions-mission-card mission-expectation-${expectation.tone}${folder ? " is-folder" : ""}`;
     card.dataset.actionsMissionGoalId = goalId;
     card.dataset.progressPercent = String(progress.percent);
     card.setAttribute("role", "button");
@@ -2866,8 +2889,8 @@ function renderActionsMissionsPanel() {
     card.innerHTML = `
       <img class="actions-mission-card-icon" src="${escapeHtml(String(goalIcon?.src || "/200/icons/target.svg"))}" alt="${escapeHtml(String(goalIcon?.alt || "Ícone da missão"))}" />
       <div class="actions-mission-card-copy">
-        <h3>${escapeHtml(String(goal?.title || "Missão"))}</h3>
-        <p>${progress.progress} de ${progress.target}</p>
+        <h3>${escapeHtml(String(goal?.title || "Missão"))}${folder ? `<span class="actions-mission-folder-summary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg><small>${variantCount}</small></span>` : ""}</h3>
+        <p>${folder && variantCount === 0 ? "Clique para criar uma tarefa" : `${progress.progress} de ${progress.target}`}</p>
       </div>
       <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
         <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
@@ -4362,16 +4385,27 @@ function getRunningTrackId(track) {
   return String(track?.id || "").trim().toLowerCase();
 }
 
+function normalizeRunningMusicName(value = "") {
+  return String(value || "").normalize("NFC").trim().toLocaleLowerCase("pt-BR");
+}
+
+function isAmbienceRunningStation(station = getCurrentRunningStation()) {
+  return normalizeRunningMusicName(station?.name) === normalizeRunningMusicName(DEFAULT_RUNNING_STATION_NAME);
+}
+
 function runningStationMatchesPreference(station, preference) {
   const stationId = String(preference?.stationId || "").trim().toLowerCase();
   return Boolean(stationId && getRunningStationId(station) === stationId)
-    || String(station?.name || "").trim() === String(preference?.stationName || "").trim();
+    || normalizeRunningMusicName(station?.name) === normalizeRunningMusicName(preference?.stationName);
 }
 
 function runningTrackMatchesPreference(track, preference) {
   const trackId = String(preference?.trackId || "").trim().toLowerCase();
+  const preferenceUrl = normalizeRunningTrackUrl(preference?.trackUrl);
+  const preferenceName = normalizeRunningMusicName(preference?.trackName);
   return Boolean(trackId && getRunningTrackId(track) === trackId)
-    || normalizeRunningTrackUrl(track?.url) === normalizeRunningTrackUrl(preference?.trackUrl);
+    || Boolean(preferenceUrl && normalizeRunningTrackUrl(track?.url) === preferenceUrl)
+    || Boolean(preferenceName && normalizeRunningMusicName(track?.name) === preferenceName);
 }
 
 async function loadRunningMusicStations() {
@@ -4586,10 +4620,10 @@ function buildRunningDefaultPreferenceMap(preferences = {}) {
       if (mode === "station" && !stationId && !stationName) {
         return null;
       }
-      if (mode === "track" && !trackId && !trackUrl) {
+      if (mode === "track" && !trackId && !trackUrl && !trackName) {
         return null;
       }
-      return [taskTitle, { mode, stationId, trackId, stationName, trackName, trackUrl }];
+      return [normalizeRunningMusicName(taskTitle), { mode, stationId, trackId, stationName, trackName, trackUrl }];
     })
     .filter(Boolean));
 }
@@ -4603,7 +4637,7 @@ function getRunningDefaultPreferenceForTaskTitle(taskTitle = "") {
   if (!(map instanceof Map)) {
     return null;
   }
-  return map.get(safeTaskTitle) || null;
+  return map.get(normalizeRunningMusicName(safeTaskTitle)) || map.get(safeTaskTitle) || null;
 }
 
 function getRunningDefaultPreferenceForCurrentTask() {
@@ -4864,7 +4898,7 @@ function ensureRunningAudioLoopState() {
   if (runningAudio) {
     const currentTrack = getRunningPlaybackState().track || getCurrentRunningTrack();
     const defaultTrackLoop = Boolean(currentTrack && isRunningTrackDefaultForCurrentTask(currentTrack));
-    runningAudio.loop = Boolean(state.runningPlayer.repeatEnabled || defaultTrackLoop);
+    runningAudio.loop = Boolean(state.runningPlayer.repeatEnabled || defaultTrackLoop || isAmbienceRunningStation(getRunningPlaybackState().station));
   }
 }
 
@@ -5239,7 +5273,12 @@ async function executeRunningTaskDefaultPreference() {
   if (preference.mode === "station") {
     nextStationIndex = state.runningPlayer.stations.findIndex((station) => runningStationMatchesPreference(station, preference));
   } else {
-    nextStationIndex = state.runningPlayer.stations.findIndex((station) =>
+    const preferredStationIndex = state.runningPlayer.stations.findIndex((station) =>
+      runningStationMatchesPreference(station, preference)
+      && Array.isArray(station?.tracks)
+      && station.tracks.some((track) => runningTrackMatchesPreference(track, preference))
+    );
+    nextStationIndex = preferredStationIndex >= 0 ? preferredStationIndex : state.runningPlayer.stations.findIndex((station) =>
       Array.isArray(station?.tracks) && station.tracks.some((track) => runningTrackMatchesPreference(track, preference))
     );
     const matchedTrack = state.runningPlayer.stations[nextStationIndex]?.tracks?.find((track) => runningTrackMatchesPreference(track, preference));
@@ -14469,31 +14508,84 @@ function renderMissionKindFilter() {
     : '<img src="/200/icons/target.svg" alt="" aria-hidden="true" />';
 }
 
+const ALL_MISSION_REPEAT_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+function normalizeMissionRepeatDays(value, fallback = ALL_MISSION_REPEAT_DAYS) {
+  const sourceDays = Array.isArray(value) ? value : fallback;
+  return [...new Set(sourceDays.map((day) => Math.trunc(Number(day))).filter((day) => day >= 0 && day <= 6))].sort((a, b) => a - b);
+}
+
+function renderMissionWeekdayPicker(container, repeatDays) {
+  const selected = new Set(normalizeMissionRepeatDays(repeatDays, []));
+  container?.querySelectorAll("[data-repeat-day]").forEach((button) => {
+    const active = selected.has(Number(button.dataset.repeatDay));
+    button.classList.toggle("is-selected", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function toggleMissionRepeatDay(currentDays, day) {
+  const selected = new Set(normalizeMissionRepeatDays(currentDays, []));
+  const normalizedDay = Math.max(0, Math.min(6, Math.trunc(Number(day))));
+  if (selected.has(normalizedDay)) selected.delete(normalizedDay);
+  else selected.add(normalizedDay);
+  return [...selected].sort((left, right) => left - right);
+}
+
+function isMissionFolder(goal) {
+  if (!goal || isLimitGoal(goal)) return false;
+  const variants = Array.isArray(goal?.variants) ? goal.variants : [];
+  return goal?.isFolder === true || variants.length > 0 || Number(goal?.variantCount || 0) > 0;
+}
+
+function getMissionLocalWeekday(nowMs = getServerNowMs()) {
+  const dateKey = getProjectDateKey(new Date(nowMs));
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, Math.max(0, month - 1), Math.max(1, day), 12)).getUTCDay();
+}
+
+function isMissionScheduledForToday(item, nowMs = getServerNowMs()) {
+  return normalizeMissionRepeatDays(item?.repeatDays).includes(getMissionLocalWeekday(nowMs));
+}
+
+function getMissionCreateStepSequence() {
+  const kind = normalizeMissionKind(state.missionCreate?.goalKind);
+  if (!state.missionCreate?.goalKind) return [0];
+  if (kind === "limit") return [0, 2, 3, 4];
+  if (state.missionCreate?.structureType === "folder") return [0, 1, 2];
+  return [0, 1, 2, 3, 4, 5];
+}
+
 function renderMissionCreateStep(direction = 0) {
   const kind = state.missionCreate.goalKind;
-  const maxStep = kind ? 3 : 2;
-  const step = Math.max(0, Math.min(maxStep, Math.trunc(Number(state.missionCreate?.step || 0))));
+  const sequence = getMissionCreateStepSequence();
+  let step = Math.trunc(Number(state.missionCreate?.step || 0));
+  if (!sequence.includes(step)) step = sequence[0];
   state.missionCreate.step = step;
+  const currentIndex = sequence.indexOf(step);
   missionCreateSlider?.querySelectorAll("[data-mission-create-step]").forEach((panel) => {
     const panelStep = Number(panel.dataset.missionCreateStep || 0);
-    const available = panelStep <= maxStep;
+    const panelIndex = sequence.indexOf(panelStep);
+    const available = panelIndex >= 0;
     panel.hidden = !available;
     panel.classList.toggle("is-active", available && panelStep === step);
-    panel.classList.toggle("is-before", available && panelStep < step);
-    panel.classList.toggle("is-after", available && panelStep > step);
+    panel.classList.toggle("is-before", available && panelIndex < currentIndex);
+    panel.classList.toggle("is-after", available && panelIndex > currentIndex);
     panel.setAttribute("aria-hidden", available && panelStep === step ? "false" : "true");
   });
-  document.querySelectorAll("[data-mission-kind]").forEach((button) => {
-    button.classList.toggle("is-selected", button.dataset.missionKind === kind);
-  });
-  if (missionCreateBackButton) missionCreateBackButton.hidden = step === 0;
-  if (missionCreateConfirmLabel) missionCreateConfirmLabel.textContent = step < maxStep ? "Continuar" : (kind === "limit" ? "Criar limite" : "Criar meta");
+  document.querySelectorAll("[data-mission-kind]").forEach((button) => button.classList.toggle("is-selected", button.dataset.missionKind === kind));
+  document.querySelectorAll("[data-mission-structure]").forEach((button) => button.classList.toggle("is-selected", button.dataset.missionStructure === state.missionCreate?.structureType));
+  if (missionCreateBackButton) missionCreateBackButton.hidden = currentIndex === 0;
+  const lastStep = currentIndex === sequence.length - 1;
+  const isFolder = state.missionCreate?.structureType === "folder";
+  if (missionCreateConfirmLabel) missionCreateConfirmLabel.textContent = !lastStep ? "Continuar" : (kind === "limit" ? "Criar limite" : isFolder ? "Criar pasta" : "Criar missão");
   missionCreateConfirmButton?.classList.toggle("is-limit", kind === "limit");
   const modal = document.getElementById("missionCreateModal");
   modal?.classList.toggle("is-limit-creation", kind === "limit");
   modal?.classList.toggle("is-compact-stage", step > 0);
   const nameStepTitle = document.getElementById("missionCreateNameStep");
-  if (nameStepTitle) nameStepTitle.textContent = kind === "limit" ? "Nome do limite" : "Nome da missão";
+  if (nameStepTitle) nameStepTitle.textContent = kind === "limit" ? "Nome do limite" : isFolder ? "Nome da pasta" : "Nome da missão";
+  if (missionTitleInput) missionTitleInput.placeholder = isFolder ? "Ex: Rotina da manhã" : "Digite o nome";
   if (missionCreateTargetStep) missionCreateTargetStep.textContent = kind === "limit" ? "Quantas vezes?" : "Quantas vezes por dia?";
   if (missionTargetInput) missionTargetInput.placeholder = "Digite um número";
   const limitCreation = kind === "limit";
@@ -14504,6 +14596,7 @@ function renderMissionCreateStep(direction = 0) {
   renderMissionCreateCategoryPicker();
   if (missionCreateTimeCopy) missionCreateTimeCopy.textContent = "Defina quanto tempo leva cada execução desta missão.";
   if (missionCreateTimeSummary) missionCreateTimeSummary.textContent = formatMissionDurationValue(normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds));
+  renderMissionWeekdayPicker(missionCreateWeekdays, state.missionCreate?.repeatDays);
   const interval = getSelectedLimitInterval();
   if (missionLimitIntervalLabel) missionLimitIntervalLabel.textContent = interval.label;
   if (missionLimitIntervalPrevButton) missionLimitIntervalPrevButton.disabled = Number(state.missionCreate?.limitIntervalIndex || 0) <= 0;
@@ -14513,25 +14606,17 @@ function renderMissionCreateStep(direction = 0) {
     const name = String(missionTitleInput?.value || "Limite").trim() || "Limite";
     missionLimitExampleTitle.textContent = `${amount} ${name}`;
   }
-  const keyboardTarget = step === 1 ? "mission-title" : step === 2 ? "mission-target" : "";
+  const keyboardTarget = step === 2 ? "mission-title" : step === 3 ? "mission-target" : "";
   if (shouldUseProjectNativeKeyboard()) {
     const missionKeyboardOpen = String(state.nativeKeyboard?.target || "").startsWith("mission-");
     if (keyboardTarget && (!state.nativeKeyboard?.open || state.nativeKeyboard?.target !== keyboardTarget)) {
-      window.setTimeout(() => {
-        if (Number(state.missionCreate?.step || 0) === step) openProjectNativeKeyboard(keyboardTarget);
-      }, direction === 0 ? 40 : 180);
-    } else if (!keyboardTarget && missionKeyboardOpen) {
-      closeProjectNativeKeyboard({ commit: false });
-    }
+      window.setTimeout(() => { if (Number(state.missionCreate?.step || 0) === step) openProjectNativeKeyboard(keyboardTarget); }, direction === 0 ? 40 : 180);
+    } else if (!keyboardTarget && missionKeyboardOpen) closeProjectNativeKeyboard({ commit: false });
   } else {
     const input = keyboardTarget === "mission-title" ? missionTitleInput : keyboardTarget === "mission-target" ? missionTargetInput : null;
     if (input && document.activeElement !== input) {
-      window.setTimeout(() => {
-        if (Number(state.missionCreate?.step || 0) === step && !shouldUseProjectNativeKeyboard()) input.focus({ preventScroll: true });
-      }, direction === 0 ? 40 : 180);
-    } else if (!input && [missionTitleInput, missionTargetInput].includes(document.activeElement)) {
-      document.activeElement.blur();
-    }
+      window.setTimeout(() => { if (Number(state.missionCreate?.step || 0) === step && !shouldUseProjectNativeKeyboard()) input.focus({ preventScroll: true }); }, direction === 0 ? 40 : 180);
+    } else if (!input && [missionTitleInput, missionTargetInput].includes(document.activeElement)) document.activeElement.blur();
   }
   if (direction !== 0) {
     const active = missionCreateSlider?.querySelector('[data-mission-create-step="' + step + '"]');
@@ -14542,26 +14627,30 @@ function renderMissionCreateStep(direction = 0) {
 
 function validateMissionCreateStep(step = state.missionCreate?.step) {
   if (step === 0 && !state.missionCreate?.goalKind) return "Escolha Meta ou Limite.";
-  if (step === 1 && !String(missionTitleInput?.value || "").trim()) return "Digite o nome.";
-  if (step === 2 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diária.";
-  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && state.missionCreate?.categoryThinking) return "Aguarde a definição do aspecto.";
-  if (step === 3 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && !state.missionCreate?.categoryResolved) return "Escolha um aspecto.";
+  if (step === 1 && !state.missionCreate?.structureType) return "Escolha Ação simples ou Pasta de ações.";
+  if (step === 2 && !String(missionTitleInput?.value || "").trim()) return "Digite o nome.";
+  if (step === 3 && !(Math.trunc(Number(missionTargetInput?.value || 0)) > 0)) return state.missionCreate?.goalKind === "limit" ? "Digite a quantidade do limite." : "Digite a quantidade diária.";
+  if (step === 4 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && state.missionCreate?.categoryThinking) return "Aguarde a definição do aspecto.";
+  if (step === 4 && normalizeMissionKind(state.missionCreate?.goalKind) !== "limit" && !state.missionCreate?.categoryResolved) return "Escolha um aspecto.";
+  if (step === 5 && !normalizeMissionRepeatDays(state.missionCreate?.repeatDays, []).length) return "Escolha pelo menos um dia.";
   return "";
 }
 
 function moveMissionCreateStep(direction) {
-  const maxStep = state.missionCreate?.goalKind ? 3 : 2;
-  const current = Math.max(0, Math.min(maxStep, Number(state.missionCreate?.step || 0)));
+  const sequence = getMissionCreateStepSequence();
+  const current = sequence.includes(Number(state.missionCreate?.step)) ? Number(state.missionCreate.step) : sequence[0];
+  const currentIndex = sequence.indexOf(current);
   if (direction > 0) {
     const error = validateMissionCreateStep(current);
     if (error) { if (missionCreateStatus) missionCreateStatus.textContent = error; return false; }
   }
-  state.missionCreate.step = Math.max(0, Math.min(maxStep, current + Number(direction || 0)));
+  const nextIndex = Math.max(0, Math.min(sequence.length - 1, currentIndex + Number(direction || 0)));
+  state.missionCreate.step = sequence[nextIndex];
   if (missionCreateStatus) missionCreateStatus.textContent = "";
   renderMissionCreateStep(direction);
   window.setTimeout(() => {
-    if (state.missionCreate.step === 1) missionTitleInput?.focus();
-    if (state.missionCreate.step === 2) missionTargetInput?.focus();
+    if (state.missionCreate.step === 2) missionTitleInput?.focus();
+    if (state.missionCreate.step === 3) missionTargetInput?.focus();
   }, 220);
   return true;
 }
@@ -14573,14 +14662,21 @@ function renderMissionAdjustState() {
     missionAdjustValue.textContent = String(targetValue);
   }
   const limit = normalizeMissionKind(state.missionAdjust?.goalKind) === "limit";
-  if (missionAdjustHint) missionAdjustHint.textContent = limit
-    ? `Limite ${targetValue}x a cada ${formatLimitInterval(state.missionAdjust?.limitIntervalValue, state.missionAdjust?.limitIntervalUnit).toLocaleLowerCase("pt-BR")}`
-    : `Meta diária ${targetValue}x`;
+  const folder = state.missionAdjust?.isFolder === true;
+  if (missionAdjustHint) missionAdjustHint.textContent = folder
+    ? "A duração e o progresso pertencem às ações desta pasta."
+    : limit
+      ? `Limite ${targetValue}x a cada ${formatLimitInterval(state.missionAdjust?.limitIntervalValue, state.missionAdjust?.limitIntervalUnit).toLocaleLowerCase("pt-BR")}`
+      : `Meta diária ${targetValue}x`;
   const adjustModal = document.getElementById("missionAdjustModal");
   const adjustEyebrow = adjustModal?.querySelector(".mission-modal-eyebrow");
   const adjustQuestion = adjustModal?.querySelector(".mission-modal-explainer h2");
-  if (adjustEyebrow) adjustEyebrow.textContent = limit ? "Editar limite" : "Editar meta";
-  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite?" : "Qual será a meta diária?";
+  if (adjustEyebrow) adjustEyebrow.textContent = limit ? "Editar limite" : folder ? "Pasta de ações" : "Editar meta";
+  if (adjustQuestion) adjustQuestion.textContent = limit ? "Qual será o limite?" : folder ? "Organize as ações desta pasta" : "Qual será a meta diária?";
+  const adjustStage = missionAdjustValue?.closest(".history-mission-adjust-stage");
+  if (adjustStage) adjustStage.hidden = folder;
+  if (openMissionAdjustTimeButton) openMissionAdjustTimeButton.hidden = limit || folder;
+  if (missionAdjustConfirmButton) missionAdjustConfirmButton.hidden = folder;
   if (missionLimitSleepOption) missionLimitSleepOption.hidden = !limit;
   if (missionLimitCountSleepTime) missionLimitCountSleepTime.checked = state.missionAdjust?.countSleepTime !== false;
 
@@ -14599,6 +14695,8 @@ function openMissionCreateModal() {
   }
   state.missionCreate = {
     goalKind: "",
+    structureType: "",
+    repeatDays: [...ALL_MISSION_REPEAT_DAYS],
     step: 0,
     unitDurationSeconds: DEFAULT_MISSION_DURATION_SECONDS,
     timeConfigured: true,
@@ -14623,6 +14721,8 @@ function openMissionAdjustModal(goalId) {
   state.missionAdjust = {
     goalId: String(goal.id),
     goalKind: normalizeMissionKind(goal.goalKind),
+    isFolder: isMissionFolder(goal),
+    repeatDays: normalizeMissionRepeatDays(goal.repeatDays),
     targetValue: Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1)),
     unitDurationSeconds: isLimitGoal(goal) ? 0 : getMissionUnitDurationSeconds(goal),
     countSleepTime: goal.countSleepTime !== false,
@@ -14668,17 +14768,15 @@ function renderMissionProgressState() {
 function renderMissionTimeState() {
   const safeValue = normalizeMissionDurationOption(state.missionTime?.value);
   state.missionTime.value = safeValue;
-  if (missionTimePrompt) {
-    missionTimePrompt.textContent = formatMissionTimePromptLabel(state.missionTime?.title || "");
-  }
-  if (missionTimeValue) {
-    missionTimeValue.textContent = safeValue >= 60 && safeValue % 60 === 0
-      ? String(safeValue / 60)
-      : String(safeValue);
-  }
-  if (missionTimeUnitLabel) {
-    missionTimeUnitLabel.textContent = formatMissionUnitDurationLabel(safeValue);
-  }
+  const repeatStep = state.missionTime?.mode === "adjust" && Number(state.missionTime?.step || 1) === 2;
+  if (missionTimeDurationStep) missionTimeDurationStep.hidden = repeatStep;
+  if (missionTimeRepeatStep) missionTimeRepeatStep.hidden = !repeatStep;
+  if (missionTimeBackButton) missionTimeBackButton.hidden = !repeatStep;
+  if (missionTimeConfirmButton) missionTimeConfirmButton.setAttribute("aria-label", repeatStep ? "Salvar tempo e dias" : (state.missionTime?.mode === "adjust" ? "Continuar para os dias" : "Salvar tempo"));
+  if (missionTimePrompt) missionTimePrompt.textContent = formatMissionTimePromptLabel(state.missionTime?.title || "");
+  if (missionTimeValue) missionTimeValue.textContent = safeValue >= 60 && safeValue % 60 === 0 ? String(safeValue / 60) : String(safeValue);
+  if (missionTimeUnitLabel) missionTimeUnitLabel.textContent = formatMissionUnitDurationLabel(safeValue);
+  renderMissionWeekdayPicker(missionTimeWeekdays, state.missionTime?.repeatDays);
 }
 
 function openMissionTimeModal(mode) {
@@ -14687,6 +14785,8 @@ function openMissionTimeModal(mode) {
     state.missionTime = {
       mode: "create",
       title: String(missionTitleInput?.value || "").trim() || "esta missão",
+      step: 1,
+      repeatDays: normalizeMissionRepeatDays(state.missionCreate?.repeatDays),
       value: normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds)
     };
   } else {
@@ -14694,12 +14794,12 @@ function openMissionTimeModal(mode) {
     state.missionTime = {
       mode: "adjust",
       title: String(goal?.title || missionAdjustTitle?.textContent || "esta missão").trim(),
+      step: 1,
+      repeatDays: normalizeMissionRepeatDays(state.missionAdjust?.repeatDays),
       value: normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds)
     };
   }
-  if (missionTimeStatus) {
-    missionTimeStatus.textContent = "";
-  }
+  if (missionTimeStatus) missionTimeStatus.textContent = "";
   renderMissionTimeState();
   openModal("missionTimeModal");
 }
@@ -15348,7 +15448,7 @@ function sortMissionVariants(items, sortMode = "user") {
 }
 
 function getMissionVariantsDailyProgress(variants, nowMs = getServerNowMs()) {
-  const items = Array.isArray(variants) ? variants : [];
+  const items = (Array.isArray(variants) ? variants : []).filter((variant) => isMissionScheduledForToday(variant, nowMs));
   const todayKey = getProjectDateKey(new Date(nowMs));
   const tomorrowStartMs = projectDateKeyToDate(addDaysToDateKey(todayKey, 1)).getTime();
   const assignedToday = items.filter((variant) => {
@@ -15374,7 +15474,7 @@ function syncMissionVariantsIntoMissionState(goalId, items) {
   const variants = Array.isArray(items) ? items : [];
   const syncCollection = (collection) => (Array.isArray(collection) ? collection : []).map((goal) => (
     String(goal?.id || "") === String(goalId || "")
-      ? { ...goal, variants, variantCount: variants.length }
+      ? { ...goal, variants, variantCount: variants.length, isFolder: goal?.isFolder === true || variants.length > 0 }
       : goal
   ));
   state.missions = syncCollection(state.missions);
@@ -15411,12 +15511,14 @@ function renderMissionVariants() {
       button.classList.toggle("active", button.dataset.missionVariantSort === state.missionVariants.sortMode);
     });
   }
-  const editorStep = Math.max(1, Math.min(3, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
+  const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
   if (missionVariantEditorStep1) missionVariantEditorStep1.hidden = editorStep !== 1;
   if (missionVariantEditorStep2) missionVariantEditorStep2.hidden = editorStep !== 2;
   if (missionVariantEditorStep3) missionVariantEditorStep3.hidden = editorStep !== 3;
+  if (missionVariantEditorStep4) missionVariantEditorStep4.hidden = editorStep !== 4;
   if (missionVariantEditorCancel) missionVariantEditorCancel.textContent = editorStep > 1 ? "Voltar" : "Cancelar";
-  if (missionVariantEditorSave) missionVariantEditorSave.textContent = editorStep < 3 ? "Continuar" : "Salvar";
+  if (missionVariantEditorSave) missionVariantEditorSave.textContent = editorStep < 4 ? "Continuar" : "Salvar";
+  renderMissionWeekdayPicker(missionVariantWeekdays, state.missionVariants?.repeatDays);
   if (missionVariantDeadlineValue) missionVariantDeadlineValue.textContent = String(state.missionVariants.intervalValue || 1);
   const variantDuration = normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds);
   if (missionVariantDurationValue) missionVariantDurationValue.textContent = variantDuration >= 60 && variantDuration % 60 === 0 ? String(variantDuration / 60) : String(variantDuration);
@@ -15427,7 +15529,10 @@ function renderMissionVariants() {
   missionVariantHoursButton?.classList.toggle("active", state.missionVariants.intervalUnit === "hours");
   missionVariantDaysButton?.classList.toggle("active", state.missionVariants.intervalUnit === "days");
   if (!missionVariantsList) return;
-  const items = sortMissionVariants(state.missionVariants.items, state.missionVariants.sortMode);
+  const visibleItems = chooseMode
+    ? (state.missionVariants.items || []).filter((variant) => isMissionScheduledForToday(variant))
+    : state.missionVariants.items;
+  const items = sortMissionVariants(visibleItems, state.missionVariants.sortMode);
   missionVariantsList.hidden = editorOpen;
   missionVariantsList.innerHTML = items.length ? items.map((variant) => {
     const timing = getMissionVariantTiming(variant);
@@ -15444,7 +15549,7 @@ function renderMissionVariants() {
       ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
-  }).join("") : '<div class="empty-state">Adicione micro-tarefas diferentes para controlar seus prazos.</div>';
+  }).join("") : `<div class="empty-state">${chooseMode ? "Nenhuma ação desta pasta está programada para hoje." : "Clique em adicionar para criar a primeira tarefa."}</div>`;
 }
 
 async function loadMissionVariants(goalId, { force = false } = {}) {
@@ -15475,7 +15580,8 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
     sortMode: loadMissionVariantSortMode(),
     sortMenuOpen: false,
     intervalValue: 1,
-    intervalUnit: "days"
+    intervalUnit: "days",
+    repeatDays: [...ALL_MISSION_REPEAT_DAYS]
   };
   openModal("missionVariantsModal");
   if (missionVariantsList && !cachedItems.length) missionVariantsList.innerHTML = '<div class="empty-state">Carregando atividades...</div>';
@@ -15484,6 +15590,12 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
   } catch (error) {
     if (missionVariantsList) missionVariantsList.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha ao carregar.")}</div>`;
     return;
+  }
+  if (options?.openEditorIfEmpty && !state.missionVariants.items.length) {
+    state.missionVariants.editorOpen = true;
+    state.missionVariants.editorStep = 1;
+    state.missionVariants.repeatDays = [...ALL_MISSION_REPEAT_DAYS];
+    if (missionVariantTitleInput) missionVariantTitleInput.value = "";
   }
   renderMissionVariants();
   if (missionVariantsTicker) window.clearInterval(missionVariantsTicker);
@@ -15542,6 +15654,10 @@ async function openMissionRunModal(goalId) {
   try {
     state.missionVariants.goalId = String(goalId || "");
     const variants = await loadMissionVariants(goalId, { force: true });
+    if (isMissionFolder(goal)) {
+      await openMissionVariantsModal(goalId, variants.length ? "choose" : "edit", { items: variants, openEditorIfEmpty: !variants.length });
+      return;
+    }
     if (variants.length >= 2) {
       await openMissionVariantsModal(goalId, "choose", { items: variants });
       return;
@@ -15644,9 +15760,39 @@ async function finalizeMissionRun(triggerButton = null) {
     }
   }
 }
+async function openMissionFolderModal(goalId, mode = "choose") {
+  const goal = getAvailableMissionById(goalId);
+  if (!goal) return;
+  const cachedItems = Array.isArray(goal?.variants) ? goal.variants : [];
+  await openMissionVariantsModal(goalId, mode, { items: cachedItems, openEditorIfEmpty: !cachedItems.length });
+}
+
+function openMissionEditorModal(goalId) {
+  const goal = getAvailableMissionById(goalId);
+  if (isMissionFolder(goal) && !Math.max(0, Number(goal?.variantCount || goal?.variants?.length || 0))) {
+    void openMissionFolderModal(goalId, "edit");
+    return;
+  }
+  openMissionAdjustModal(goalId);
+}
+
+function openMissionEntryModal(goalId) {
+  const goal = getAvailableMissionById(goalId);
+  if (!goal) return;
+  if (isMissionFolder(goal)) {
+    void openMissionFolderModal(goalId, "choose");
+    return;
+  }
+  openMissionProgressModal(goalId);
+}
+
 function openMissionProgressModal(goalId) {
   const goal = getAvailableMissionById(goalId);
   if (!goal) {
+    return;
+  }
+  if (isMissionFolder(goal)) {
+    void openMissionFolderModal(goalId, "choose");
     return;
   }
   const goalIcon = getMissionDisplayIcon(goal);
@@ -16121,7 +16267,8 @@ function createMissionCard(goal, initialPercent = null) {
   const historyRangeActive = isMissionHistoryRangeActive();
   const limit = isLimitGoal(goal);
   const variants = Array.isArray(goal?.variants) ? goal.variants : [];
-  const hasMicrotasks = !limit && (variants.length > 0 || Number(goal?.variantCount || 0) > 0);
+  const hasMicrotasks = isMissionFolder(goal);
+  const variantCount = Math.max(0, Number(goal?.variantCount || variants.length || 0));
   const dailyVariantProgress = !limit && !historyRangeActive && variants.length > 0 ? getMissionVariantsDailyProgress(variants) : null;
   const progress = dailyVariantProgress ? dailyVariantProgress.completed : Math.max(0, Number(goal.progressValue || 0));
   const target = dailyVariantProgress ? dailyVariantProgress.total : Math.max(1, Number(goal.targetValue || 1));
@@ -16134,7 +16281,9 @@ function createMissionCard(goal, initialPercent = null) {
     ? formatMissionRangeProgress(progress, getMissionHistoryScope().days)
     : dailyVariantProgress
       ? dailyVariantProgress.label
-      : limit
+      : hasMicrotasks && variantCount === 0
+        ? "Clique para criar uma tarefa"
+        : limit
         ? (showLimitRatio ? `${limitVisual.ratio.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do esperado` : formatLimitLastProgress(goal))
         : `${Math.max(0, Math.trunc(progress))} de ${Math.max(1, Math.trunc(target))}`;
   const card = document.createElement("article");
@@ -16153,7 +16302,7 @@ function createMissionCard(goal, initialPercent = null) {
     <div class="history-mission-card-top">
       <div class="history-mission-card-info">
         ${goalIcon ? buildTaskAvatarMarkup(goalIcon.src, goalIcon.alt, { categoryIcon: goalIcon.categoryIcon }) : ""}
-        <div><h3 class="history-mission-card-title">${escapeHtml(String(goal.title || (limit ? "Limite" : "Meta")))}${hasMicrotasks ? '<svg class="history-mission-folder-icon" viewBox="0 0 24 24" aria-label="Meta com microtarefas" role="img"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg>' : ""}</h3>
+        <div><h3 class="history-mission-card-title">${escapeHtml(String(goal.title || (limit ? "Limite" : "Meta")))}${hasMicrotasks ? `<span class="history-mission-folder-summary"><svg class="history-mission-folder-icon" viewBox="0 0 24 24" aria-label="Pasta de ações" role="img"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg><small>${variantCount}</small></span>` : ""}</h3>
         <div class="history-mission-card-progress${showLimitRatio ? " is-limit-ratio" : ""}"${showLimitRatio ? ` style="background:${limitVisual.labelBackground};"` : ""}>${escapeHtml(progressLabel)}</div></div>
       </div>
       <div class="history-mission-card-actions"><button class="history-mission-card-edit" type="button" data-mission-goal-edit="${escapeHtml(String(goal.id || ""))}" aria-label="${escapeHtml(`Editar ${String(goal.title || (limit ? "limite" : "meta"))}`)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z"/></svg></button></div>
@@ -18034,13 +18183,13 @@ actionsList.addEventListener("click", async (event) => {
   if (missionEditButton) {
     event.stopPropagation();
     document.body.classList.add("actions-mission-editor-open");
-    openMissionAdjustModal(String(missionEditButton.dataset.missionGoalEdit || ""));
+    openMissionEditorModal(String(missionEditButton.dataset.missionGoalEdit || ""));
     return;
   }
   const missionRow = event.target.closest("[data-mission-goal-id]");
   if (missionRow) {
     document.body.classList.add("actions-mission-editor-open");
-    openMissionProgressModal(String(missionRow.dataset.missionGoalId || ""));
+    openMissionEntryModal(String(missionRow.dataset.missionGoalId || ""));
     return;
   }
   const row = event.target.closest("[data-action-id]");
@@ -18138,7 +18287,7 @@ actionsList.addEventListener("keydown", async (event) => {
   if (missionRow && !event.target.closest("button")) {
     event.preventDefault();
     document.body.classList.add("actions-mission-editor-open");
-    openMissionProgressModal(String(missionRow.dataset.missionGoalId || ""));
+    openMissionEntryModal(String(missionRow.dataset.missionGoalId || ""));
     return;
   }
   const row = event.target.closest("[data-action-id]");
@@ -18198,18 +18347,23 @@ missionList?.addEventListener("click", (event) => {
   const avatar = event.target.closest(".task-avatar");
   const missionCard = event.target.closest("[data-goal-id]");
   if (avatar && missionCard) {
-    void openSvgSelectorModal("mission", missionCard.dataset.goalId || "");
+    const goal = getAvailableMissionById(missionCard.dataset.goalId || "");
+    if (isMissionFolder(goal) && !Math.max(0, Number(goal?.variantCount || goal?.variants?.length || 0))) {
+      openMissionEntryModal(missionCard.dataset.goalId || "");
+    } else {
+      void openSvgSelectorModal("mission", missionCard.dataset.goalId || "");
+    }
     return;
   }
   if (missionCard && !event.target.closest("[data-mission-goal-edit]")) {
-    openMissionProgressModal(missionCard.dataset.goalId || "");
+    openMissionEntryModal(missionCard.dataset.goalId || "");
     return;
   }
   const editButton = event.target.closest("[data-mission-goal-edit]");
   if (!editButton) {
     return;
   }
-  openMissionAdjustModal(editButton.dataset.missionGoalEdit || "");
+  openMissionEditorModal(editButton.dataset.missionGoalEdit || "");
 });
 
 let statsAspectHoldTimer = 0;
@@ -18296,9 +18450,26 @@ missionKindToggle?.addEventListener("click", () => {
 document.querySelectorAll("[data-mission-kind]").forEach((button) => {
   button.addEventListener("click", () => {
     state.missionCreate.goalKind = normalizeMissionKind(button.dataset.missionKind);
+    state.missionCreate.structureType = state.missionCreate.goalKind === "limit" ? "simple" : "";
     if (missionCreateStatus) missionCreateStatus.textContent = "";
     renderMissionCreateStep();
   });
+});
+
+document.querySelectorAll("[data-mission-structure]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.missionCreate.structureType = button.dataset.missionStructure === "folder" ? "folder" : "simple";
+    if (missionCreateStatus) missionCreateStatus.textContent = "";
+    renderMissionCreateStep();
+  });
+});
+
+missionCreateWeekdays?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-repeat-day]");
+  if (!button) return;
+  state.missionCreate.repeatDays = toggleMissionRepeatDay(state.missionCreate.repeatDays, button.dataset.repeatDay);
+  if (missionCreateStatus) missionCreateStatus.textContent = "";
+  renderMissionCreateStep();
 });
 
 missionCreateBackButton?.addEventListener("click", () => moveMissionCreateStep(-1));
@@ -18342,21 +18513,25 @@ missionLimitIntervalNextButton?.addEventListener("click", () => {
 });
 missionCreateConfirmButton?.addEventListener("click", () => {
   void (async () => {
-    const createMaxStep = 3;
-    if (Number(state.missionCreate?.step || 0) < createMaxStep) {
+    const sequence = getMissionCreateStepSequence();
+    const currentStep = Number(state.missionCreate?.step || 0);
+    const finalStep = sequence[sequence.length - 1];
+    if (currentStep !== finalStep) {
       moveMissionCreateStep(1);
       return;
     }
     const title = String(missionTitleInput?.value || "").trim();
-    const targetValue = Math.max(1, Math.trunc(Number(missionTargetInput?.value || 0) || 0));
     const goalKind = normalizeMissionKind(state.missionCreate?.goalKind);
+    const isFolder = goalKind !== "limit" && state.missionCreate?.structureType === "folder";
+    const targetValue = isFolder ? 1 : Math.max(1, Math.trunc(Number(missionTargetInput?.value || 0) || 0));
+    const repeatDays = isFolder ? [...ALL_MISSION_REPEAT_DAYS] : normalizeMissionRepeatDays(state.missionCreate?.repeatDays);
     const selectedLimitInterval = getSelectedLimitInterval();
     const categoryId = normalizeTaskCategoryId(state.missionCreate?.categoryId);
-    const stepError = validateMissionCreateStep(createMaxStep);
+    const stepError = validateMissionCreateStep(finalStep);
     if (stepError) { if (missionCreateStatus) missionCreateStatus.textContent = stepError; return; }
 
     if (state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "mission") {
-      const proposal = { type: "mission", goalKind, title, targetValue, aspectId: categoryId, categoryId, unitDurationSeconds: goalKind === "limit" ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), limitIntervalValue: selectedLimitInterval.value, limitIntervalUnit: selectedLimitInterval.unit, svgIconUrl: "", svgIconLabel: "" };
+      const proposal = { type: "mission", goalKind, title, targetValue, isFolder, repeatDays, aspectId: categoryId, categoryId, unitDurationSeconds: goalKind === "limit" || isFolder ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), limitIntervalValue: selectedLimitInterval.value, limitIntervalUnit: selectedLimitInterval.unit, svgIconUrl: "", svgIconLabel: "" };
       state.tutorProposalDraft = { active: false, type: "" };
       setTutorProposalComposerControls(false);
       closeModal("missionCreateModal");
@@ -18364,19 +18539,21 @@ missionCreateConfirmButton?.addEventListener("click", () => {
       return;
     }
     await runMissionActionWithLoading(missionCreateConfirmButton, async () => {
-      if (missionCreateStatus) missionCreateStatus.textContent = goalKind === "limit" ? "Criando limite..." : "Criando meta...";
+      if (missionCreateStatus) missionCreateStatus.textContent = goalKind === "limit" ? "Criando limite..." : isFolder ? "Criando pasta..." : "Criando missão...";
       try {
         await apiRequest("/api/200/extra-goals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             goalKind,
+            isFolder,
+            repeatDays,
             title,
             recipientUserId: String(state.friendAssignment.mission?.userId || ""),
             targetValue,
             categoryId,
             profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-            unitDurationSeconds: goalKind === "limit" ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
+            unitDurationSeconds: goalKind === "limit" || isFolder ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds),
             limitIntervalValue: selectedLimitInterval.value,
             limitIntervalUnit: selectedLimitInterval.unit,
             svgIconUrl: "",
@@ -18385,8 +18562,9 @@ missionCreateConfirmButton?.addEventListener("click", () => {
         });
         state.missionKindFilter = goalKind;
         closeModal("missionCreateModal");
-        await loadMissions();
+        await Promise.all([loadMissions(), loadActionMissions()]);
         renderMissions();
+        renderActionsMissionsPanel();
         renderRunningMissionQuickButtons();
       } catch (error) {
         if (missionCreateStatus) missionCreateStatus.textContent = error instanceof Error ? error.message : "Falha ao criar.";
@@ -18795,7 +18973,9 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
         body: JSON.stringify({
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
           targetValue,
-          unitDurationSeconds: normalizeMissionKind(state.missionAdjust?.goalKind) === "limit" ? 0 : normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
+          isFolder: state.missionAdjust?.isFolder === true,
+          repeatDays: normalizeMissionRepeatDays(state.missionAdjust?.repeatDays),
+          unitDurationSeconds: normalizeMissionKind(state.missionAdjust?.goalKind) === "limit" || state.missionAdjust?.isFolder === true ? 0 : normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
           limitIntervalValue: Math.max(1, Math.trunc(Number(state.missionAdjust?.limitIntervalValue || 1))),
           limitIntervalUnit: String(state.missionAdjust?.limitIntervalUnit || "day"),
           countSleepTime: state.missionAdjust?.countSleepTime !== false,
@@ -18825,7 +19005,9 @@ missionProgressConfirmButton?.addEventListener("click", () => {
   }
   if (deltaValue === 0) {
     if (normalizeMissionKind(state.missionProgress?.goalKind) === "limit") return;
+    const goal = getAvailableMissionById(goalId);
     closeModal("missionProgressModal");
+    if (goal) void autoPlayRunningTaskDefaultPreference({ title: String(goal.title || "Missão") });
     void openMissionRunModal(goalId);
     return;
   }
@@ -18955,6 +19137,11 @@ missionAdjustCloseButton?.addEventListener("click", () => {
 missionProgressCloseButton?.addEventListener("click", () => {
   closeModal("missionProgressModal");
 });
+missionProgressEditButton?.addEventListener("click", () => {
+  const goalId = String(state.missionProgress?.goalId || "");
+  closeModal("missionProgressModal");
+  openMissionEditorModal(goalId);
+});
 missionQuickAssignCloseButton?.addEventListener("click", () => {
   closeModal("missionQuickAssignModal");
 });
@@ -18968,23 +19155,39 @@ function moveMissionTimeBySteps(amount) {
 }
 attachAddingFastControl(missionTimeMinusButton, (amount) => moveMissionTimeBySteps(-amount));
 attachAddingFastControl(missionTimePlusButton, (amount) => moveMissionTimeBySteps(amount));
+missionTimeBackButton?.addEventListener("click", () => {
+  state.missionTime.step = 1;
+  if (missionTimeStatus) missionTimeStatus.textContent = "";
+  renderMissionTimeState();
+});
+missionTimeWeekdays?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-repeat-day]");
+  if (!button) return;
+  state.missionTime.repeatDays = toggleMissionRepeatDay(state.missionTime.repeatDays, button.dataset.repeatDay);
+  if (missionTimeStatus) missionTimeStatus.textContent = "";
+  renderMissionTimeState();
+});
 missionTimeConfirmButton?.addEventListener("click", () => {
   const safeValue = normalizeMissionDurationOption(state.missionTime?.value);
+  if (state.missionTime?.mode === "adjust" && Number(state.missionTime?.step || 1) === 1) {
+    state.missionTime.step = 2;
+    renderMissionTimeState();
+    return;
+  }
+  if (!normalizeMissionRepeatDays(state.missionTime?.repeatDays, []).length) {
+    if (missionTimeStatus) missionTimeStatus.textContent = "Escolha pelo menos um dia.";
+    return;
+  }
   if (state.missionTime?.mode === "create") {
     state.missionCreate.unitDurationSeconds = safeValue;
     state.missionCreate.timeConfigured = true;
-    if (missionCreateTimeSummary) {
-      missionCreateTimeSummary.textContent = formatMissionDurationValue(safeValue);
-    }
-    if (missionCreateStatus) {
-      missionCreateStatus.textContent = `Tempo definido: ${formatMissionUnitDurationLabel(safeValue)}.`;
-    }
+    if (missionCreateTimeSummary) missionCreateTimeSummary.textContent = formatMissionDurationValue(safeValue);
+    if (missionCreateStatus) missionCreateStatus.textContent = `Tempo definido: ${formatMissionUnitDurationLabel(safeValue)}.`;
   } else {
     state.missionAdjust.unitDurationSeconds = safeValue;
+    state.missionAdjust.repeatDays = normalizeMissionRepeatDays(state.missionTime?.repeatDays);
     renderMissionAdjustState();
-    if (missionAdjustStatus) {
-      missionAdjustStatus.textContent = `Tempo definido: ${formatMissionUnitDurationLabel(safeValue)}.`;
-    }
+    if (missionAdjustStatus) missionAdjustStatus.textContent = `Tempo e dias atualizados.`;
   }
   closeModal("missionTimeModal");
 });
@@ -19071,6 +19274,7 @@ missionVariantAddButton?.addEventListener("click", () => {
   state.missionVariants.intervalUnit = "days";
   state.missionVariants.unitDurationSeconds = DEFAULT_MISSION_DURATION_SECONDS;
   state.missionVariants.nextDueOffsetDays = 0;
+  state.missionVariants.repeatDays = [...ALL_MISSION_REPEAT_DAYS];
   if (missionVariantTitleInput) missionVariantTitleInput.value = "";
   if (missionVariantStatus) missionVariantStatus.textContent = "";
   renderMissionVariants();
@@ -19109,16 +19313,24 @@ attachAddingFastControl(missionVariantNextDueNext, (amount) => {
 });
 missionVariantHoursButton?.addEventListener("click", () => { state.missionVariants.intervalUnit = "hours"; renderMissionVariants(); });
 missionVariantDaysButton?.addEventListener("click", () => { state.missionVariants.intervalUnit = "days"; renderMissionVariants(); });
+missionVariantWeekdays?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-repeat-day]");
+  if (!button) return;
+  state.missionVariants.repeatDays = toggleMissionRepeatDay(state.missionVariants.repeatDays, button.dataset.repeatDay);
+  if (missionVariantStatus) missionVariantStatus.textContent = "";
+  renderMissionVariants();
+});
 missionVariantEditorSave?.addEventListener("click", async () => {
   const title = String(missionVariantTitleInput?.value || "").trim();
   if (!title) { if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa."; return; }
-  const editorStep = Math.max(1, Math.min(3, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
-  if (editorStep < 3) {
+  const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
+  if (editorStep < 4) {
     state.missionVariants.editorStep = editorStep + 1;
     if (missionVariantStatus) missionVariantStatus.textContent = "";
     renderMissionVariants();
     return;
   }
+  if (!normalizeMissionRepeatDays(state.missionVariants.repeatDays, []).length) { if (missionVariantStatus) missionVariantStatus.textContent = "Escolha pelo menos um dia."; return; }
   const goalId = state.missionVariants.goalId;
   const editingId = state.missionVariants.editingId;
   const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
@@ -19127,7 +19339,7 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/variants${editingId ? `/${encodeURIComponent(editingId)}` : ""}`, {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays) })
+      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), repeatDays: normalizeMissionRepeatDays(state.missionVariants.repeatDays), nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays) })
     });
     state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
     missionVariantsCache.set(getMissionVariantsCacheKey(goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
@@ -19210,6 +19422,7 @@ missionVariantsList?.addEventListener("click", async (event) => {
     variant.unitDurationSeconds || getMissionUnitDurationSeconds(parentGoal) || DEFAULT_MISSION_DURATION_SECONDS
   );
   state.missionVariants.nextDueOffsetDays = getMissionVariantNextDueOffsetDays(variant);
+  state.missionVariants.repeatDays = normalizeMissionRepeatDays(variant.repeatDays);
   if (missionVariantTitleInput) missionVariantTitleInput.value = variant.title;
   renderMissionVariants();
 });
@@ -19537,7 +19750,7 @@ actionsMissionsList?.addEventListener("click", (event) => {
   const card = event.target.closest("[data-actions-mission-goal-id]");
   if (!card) return;
   document.body.classList.add("actions-mission-editor-open");
-  openMissionProgressModal(String(card.dataset.actionsMissionGoalId || ""));
+  openMissionEntryModal(String(card.dataset.actionsMissionGoalId || ""));
 });
 
 actionsMissionsList?.addEventListener("keydown", (event) => {
@@ -19546,7 +19759,7 @@ actionsMissionsList?.addEventListener("keydown", (event) => {
   if (!card || event.target.closest("button")) return;
   event.preventDefault();
   document.body.classList.add("actions-mission-editor-open");
-  openMissionProgressModal(String(card.dataset.actionsMissionGoalId || ""));
+  openMissionEntryModal(String(card.dataset.actionsMissionGoalId || ""));
 });
 toggleAppKeyboardOptionButton?.addEventListener("click", () => {
   state.options.useAppKeyboard = !state.options.useAppKeyboard;
@@ -20190,7 +20403,10 @@ runningConfirmPauseButton?.addEventListener("click", () => {
 
 if (runningAudio) {
   runningAudio.addEventListener("ended", () => {
-    if (state.runningPlayer.repeatEnabled) {
+    const playback = getRunningPlaybackState();
+    if (state.runningPlayer.repeatEnabled || isAmbienceRunningStation(playback.station) || isRunningTrackDefaultForCurrentTask(playback.track)) {
+      runningAudio.currentTime = 0;
+      void runningAudio.play().catch(() => {});
       return;
     }
     void moveRunningTrack(1);

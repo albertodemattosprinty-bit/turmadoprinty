@@ -1400,19 +1400,33 @@
               </button>
             </div>
           </section>
-          <section class="mission-guide-step" data-mission-create-step="1" aria-labelledby="missionCreateNameStep">
+          <section class="mission-guide-step mission-guide-step-structure" data-mission-create-step="1" aria-labelledby="missionCreateStructureStep">
+            <span class="mission-guide-number">1</span>
+            <h2 id="missionCreateStructureStep">Como essa missão funciona?</h2>
+            <div class="mission-structure-choice-list">
+              <button class="mission-structure-choice" type="button" data-mission-structure="simple">
+                <span class="mission-structure-choice-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5V4Zm3 4v2h8V8H8Zm0 4v2h8v-2H8Z" fill="currentColor"/></svg></span>
+                <span><strong>Ação simples</strong><small>Ex: Beber água, escovar os dentes</small></span>
+              </button>
+              <button class="mission-structure-choice" type="button" data-mission-structure="folder">
+                <span class="mission-structure-choice-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg></span>
+                <span><strong>Pasta de ações</strong><small>Adicione várias ações à mesma pasta</small></span>
+              </button>
+            </div>
+          </section>
+          <section class="mission-guide-step" data-mission-create-step="2" aria-labelledby="missionCreateNameStep">
             <span class="mission-guide-number">1</span>
             <h2 id="missionCreateNameStep">Nome da missão</h2>
             <p id="missionCreateNameCopy" hidden></p>
             <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" inputmode="text" placeholder="Digite o nome" />
           </section>
-          <section class="mission-guide-step" data-mission-create-step="2" aria-labelledby="missionCreateTargetStep">
+          <section class="mission-guide-step" data-mission-create-step="3" aria-labelledby="missionCreateTargetStep">
             <span class="mission-guide-number">2</span>
             <h2 id="missionCreateTargetStep">Quantas vezes por dia?</h2>
             <p id="missionCreateTargetCopy" hidden></p>
             <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off" placeholder="Digite um número" />
           </section>
-          <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="3" aria-labelledby="missionCreateFinalStepTitle">
+          <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="4" aria-labelledby="missionCreateFinalStepTitle">
             <span class="mission-guide-number">3</span>
             <h2 id="missionCreateFinalStepTitle">Quanto tempo leva?</h2>
             <div id="missionCreateLimitIntervalPanel" hidden>
@@ -1438,6 +1452,20 @@
               </span>
               <span id="missionCreateCategoryLabel">Aspecto</span>
             </button>
+          </section>
+        <section class="mission-guide-step mission-repeat-step" data-mission-create-step="5" aria-labelledby="missionCreateRepeatStep">
+            <span class="mission-guide-number">4</span>
+            <h2 id="missionCreateRepeatStep">Quando?</h2>
+            <p>Toque nos dias em que essa missão se repete</p>
+            <div class="mission-weekday-list" id="missionCreateWeekdays" role="group" aria-label="Dias em que a missão se repete">
+              <button type="button" data-repeat-day="1">Segunda-feira</button>
+              <button type="button" data-repeat-day="2">Terça-feira</button>
+              <button type="button" data-repeat-day="3">Quarta-feira</button>
+              <button type="button" data-repeat-day="4">Quinta-feira</button>
+              <button type="button" data-repeat-day="5">Sexta-feira</button>
+              <button type="button" data-repeat-day="6">Sábado</button>
+              <button type="button" data-repeat-day="0">Domingo</button>
+            </div>
           </section>
         </div>
         <p class="finance-status" id="missionCreateStatus" aria-live="polite"></p>
@@ -1540,11 +1568,23 @@
           </div>
         </div>
         <div class="mission-variant-editor-step" id="missionVariantEditorStep3" hidden>
-          <div class="mission-variant-stage-copy"><strong>Quando vence a proxima?</strong><span>Escolha o deslocamento do primeiro ciclo.</span></div>
+          <div class="mission-variant-stage-copy"><strong>Quando vence a próxima?</strong><span>Escolha o deslocamento do primeiro ciclo.</span></div>
           <div class="mission-variant-deadline-selector">
             <button type="button" id="missionVariantNextDuePrev" aria-label="Antecipar vencimento"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <div><strong id="missionVariantNextDueValue">Hoje</strong><span id="missionVariantNextDueHint">Vence hoje</span></div>
             <button type="button" id="missionVariantNextDueNext" aria-label="Adiar vencimento"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+        <div class="mission-variant-editor-step" id="missionVariantEditorStep4" hidden>
+          <div class="mission-variant-stage-copy"><strong>Quando?</strong><span>Toque nos dias em que essa missão se repete</span></div>
+          <div class="mission-weekday-list" id="missionVariantWeekdays" role="group" aria-label="Dias em que a micro-tarefa se repete">
+            <button type="button" data-repeat-day="1">Segunda-feira</button>
+            <button type="button" data-repeat-day="2">Terça-feira</button>
+            <button type="button" data-repeat-day="3">Quarta-feira</button>
+            <button type="button" data-repeat-day="4">Quinta-feira</button>
+            <button type="button" data-repeat-day="5">Sexta-feira</button>
+            <button type="button" data-repeat-day="6">Sábado</button>
+            <button type="button" data-repeat-day="0">Domingo</button>
           </div>
         </div>
         <p class="finance-status" id="missionVariantStatus" aria-live="polite"></p>
@@ -1559,9 +1599,14 @@
         <div class="mission-modal-heading">
           <h1 class="mission-modal-title" id="missionProgressTitle">Missão</h1>
         </div>
-        <button class="history-mission-modal-close" type="button" id="missionProgressCloseButton" aria-label="Fechar">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
-        </button>
+        <div class="mission-progress-head-actions">
+          <button class="history-mission-modal-close" type="button" id="missionProgressEditButton" aria-label="Editar missão">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 9.7-9.7-3.5-3.5L5 15.5 4 20zm12-13.8 2.8 2.8 1.2-1.2a2 2 0 0 0 0-2.8l-.1-.1a2 2 0 0 0-2.8 0L16 6.2z" fill="currentColor"/></svg>
+          </button>
+          <button class="history-mission-modal-close" type="button" id="missionProgressCloseButton" aria-label="Fechar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg>
+          </button>
+        </div>
       </div>
       <div class="history-mission-modal-body">
         <img class="mission-progress-icon" id="missionProgressIcon" src="/200/icons/target.svg" alt="Ícone da missão" />
@@ -1634,20 +1679,29 @@
         </button>
       </div>
       <div class="history-mission-modal-body">
-        <div class="mission-modal-explainer">
-          <h2 class="history-mission-time-prompt" id="missionTimePrompt">Quanto tempo leva uma missão?</h2>
-          <p>Use os controles para escolher segundos ou minutos por execução.</p>
+        <div id="missionTimeDurationStep">
+          <div class="mission-modal-explainer">
+            <h2 class="history-mission-time-prompt" id="missionTimePrompt">Quanto tempo leva uma missão?</h2>
+            <p>Use os controles para escolher segundos ou minutos por execução.</p>
+          </div>
+          <div class="history-mission-adjust-stage">
+            <button class="history-mission-sign-btn" type="button" id="missionTimeMinus">-</button>
+            <div class="history-mission-adjust-value" id="missionTimeValue">30</div>
+            <button class="history-mission-sign-btn active" type="button" id="missionTimePlus">+</button>
+          </div>
+          <div class="history-mission-time-unit-label" id="missionTimeUnitLabel">30 segundos por unidade</div>
         </div>
-        <div class="history-mission-adjust-stage">
-          <button class="history-mission-sign-btn" type="button" id="missionTimeMinus">-</button>
-          <div class="history-mission-adjust-value" id="missionTimeValue">30</div>
-          <button class="history-mission-sign-btn active" type="button" id="missionTimePlus">+</button>
+        <div class="mission-time-repeat-step" id="missionTimeRepeatStep" hidden>
+          <div class="mission-modal-explainer"><h2>Quando?</h2><p>Toque nos dias em que essa missão se repete</p></div>
+          <div class="mission-weekday-list" id="missionTimeWeekdays" role="group" aria-label="Dias em que a missão se repete">
+            <button type="button" data-repeat-day="1">Segunda-feira</button><button type="button" data-repeat-day="2">Terça-feira</button><button type="button" data-repeat-day="3">Quarta-feira</button><button type="button" data-repeat-day="4">Quinta-feira</button><button type="button" data-repeat-day="5">Sexta-feira</button><button type="button" data-repeat-day="6">Sábado</button><button type="button" data-repeat-day="0">Domingo</button>
+          </div>
         </div>
-        <div class="history-mission-time-unit-label" id="missionTimeUnitLabel">30 segundos por unidade</div>
         <p class="finance-status" id="missionTimeStatus" aria-live="polite"></p>
       </div>
-      <div class="history-mission-modal-footer history-mission-modal-footer-one">
-        <button class="history-mission-footer-icon history-mission-footer-icon-green" type="button" id="missionTimeConfirmButton" aria-label="Salvar tempo">
+      <div class="history-mission-modal-footer mission-time-footer">
+        <button class="ghost-btn" type="button" id="missionTimeBackButton" hidden>Voltar</button>
+        <button class="history-mission-footer-icon history-mission-footer-icon-green" type="button" id="missionTimeConfirmButton" aria-label="Continuar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z" fill="currentColor"/></svg>
         </button>
       </div>
