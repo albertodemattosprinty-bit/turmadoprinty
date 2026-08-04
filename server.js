@@ -87,8 +87,6 @@ const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
 const PROJECT200_MARIN_MODEL_LUNA = process.env.PROJECT200_MARIN_MODEL_LUNA || "gpt-5.6-luna";
-const PROJECT200_MARIN_MODEL_TERRA = process.env.PROJECT200_MARIN_MODEL_TERRA || "gpt-5.6-terra";
-const PROJECT200_MARIN_MODEL_SOL = process.env.PROJECT200_MARIN_MODEL_SOL || "gpt-5.6-sol";
 const OPENAI_TTS_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
@@ -3587,15 +3585,8 @@ function detectProject200MarinContextAreas(message) {
   return [...areas];
 }
 
-function chooseProject200MarinModel(message, areas) {
-  const normalized = String(message || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  if (/\b(plano de vida|cinco anos|5 anos|mudar minha vida|analise profunda|todos os aspectos|estrategia de longo prazo)\b/.test(normalized)) {
-    return { model: PROJECT200_MARIN_MODEL_SOL, reason: "deep-life-plan", effort: "medium" };
-  }
-  if (areas.length || normalized.length > 120 || /\b(crie|criar|adicione|adicionar|organize|planeje)\b/.test(normalized)) {
-    return { model: PROJECT200_MARIN_MODEL_TERRA, reason: "contextual-coach", effort: "low" };
-  }
-  return { model: PROJECT200_MARIN_MODEL_LUNA, reason: "fast-conversation", effort: "none" };
+function chooseProject200MarinModel() {
+  return { model: PROJECT200_MARIN_MODEL_LUNA, reason: "luna-only", effort: "none" };
 }
 
 function getProject200MarinHistoryDays(message) {
