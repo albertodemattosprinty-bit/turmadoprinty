@@ -92,6 +92,8 @@ export async function listProject200LifeCaptures(userId) {
       select *
       from project200_life_captures
       where user_id = $1
+        and coalesce(metadata->>'hiddenFromLibrary', 'false') <> 'true'
+        and coalesce(metadata->>'source', '') not like 'project200-%-chat%'
       order by created_at_capture desc, created_at desc
     `,
     [normalizedUserId]

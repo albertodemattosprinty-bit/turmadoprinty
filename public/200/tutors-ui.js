@@ -40,7 +40,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     unreadAvatarFallback: document.getElementById("tutorUnreadAvatarFallback"),
     unreadCount: document.getElementById("tutorUnreadCount"),
     notificationAudio: document.getElementById("tutorNotificationAudio"),
-    composer: document.getElementById("marinChatForm")
+    composer: document.getElementById("marinChatForm"),
+    attach: document.getElementById("marinChatAttachButton"),
+    fileInput: document.getElementById("marinChatFileInput")
   };
 
   const defaultPersonMarkup = elements.chatPersonButton?.innerHTML || "";
@@ -234,10 +236,23 @@ export function initializeProject200TutorsUi(dependencies = {}) {
 
   function attachmentKind(file) {
     const type = String(file?.type || "").toLowerCase();
-    if (type.startsWith("audio/")) return "audio";
-    if (type.startsWith("video/")) return "video";
-    if (type.startsWith("image/")) return "photo";
+    const name = String(file?.name || "").toLowerCase();
+    if (type.startsWith("audio/") || /\.(mp3|m4a|aac|wav|ogg|webm)$/i.test(name)) return "audio";
+    if (type.startsWith("video/") || /\.(mp4|mov|m4v|ogv)$/i.test(name)) return "video";
+    if (type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(name)) return "photo";
     return "";
+  }
+
+  function attachmentMimeType(file, kind) {
+    const type = String(file?.type || "").split(";")[0].trim().toLowerCase();
+    if (type && type !== "application/octet-stream") return type;
+    const extension = String(file?.name || "").toLowerCase().split(".").pop();
+    const byExtension = {
+      mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav", ogg: kind === "video" ? "video/ogg" : "audio/ogg", webm: kind === "video" ? "video/webm" : "audio/webm",
+      mp4: "video/mp4", mov: "video/mp4", m4v: "video/mp4", ogv: "video/ogg",
+      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif"
+    };
+    return byExtension[extension] || "";
   }
 
   function attachmentTitle(file, kind) {
@@ -250,7 +265,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     const kind = attachmentKind(file);
     if (!kind) throw new Error("Envie audio, video ou imagem.");
     if (Number(file?.size || 0) > 20 * 1024 * 1024) throw new Error("O anexo precisa ter ate 20 MB.");
-    const mimeType = String(file.type || "").split(";")[0];
+    const mimeType = attachmentMimeType(file, kind);
     if (!mimeType) throw new Error("Arquivo sem tipo valido.");
     const previewDataUrl = "";
     const payload = await apiRequest("/api/200/life-captures/upload", {
@@ -262,7 +277,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
         noteText: "",
         createdAt: new Date().toISOString(),
         durationMs: 0,
-        metadata: { source: "project200-human-chat-attachment" },
+        metadata: { source: "project200-human-chat-attachment", hiddenFromLibrary: true },
         mimeType,
         fileBase64: await fileToBase64(file),
         previewBase64: ""
@@ -270,7 +285,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       skipGlobalLoading: true
     });
     return {
-      asset: payload?.asset || payload?.capture || null,
+      asset: payload?.capture || payload?.asset || null,
       kind,
       title: attachmentTitle(file, kind),
       previewDataUrl,
@@ -289,14 +304,14 @@ export function initializeProject200TutorsUi(dependencies = {}) {
         noteText: "",
         createdAt: new Date().toISOString(),
         durationMs,
-        metadata: { source: "project200-human-chat" },
+        metadata: { source: "project200-human-chat", hiddenFromLibrary: true },
         mimeType,
         fileBase64,
         previewBase64: ""
       }),
       skipGlobalLoading: true
     });
-    return payload?.asset || payload?.capture || null;
+    return payload?.capture || payload?.asset || null;
   }
   function notificationPreferences() {
     const preferences = typeof getNotificationPreferences === "function" ? getNotificationPreferences() : {};
@@ -519,6 +534,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
   }
 
   function updateHeader() {
+    if (elements.chatModal) elements.chatModal.dataset.chatMode = state.human && state.activeTutor ? "human" : "ai";
     if (!state.human || !state.activeTutor) {
       if (elements.proposalButton) elements.proposalButton.hidden = true;
       if (elements.chatType) elements.chatType.textContent = "IA do iLife";
@@ -1223,10 +1239,12 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     event.preventDefault();
     event.stopImmediatePropagation();
     if (typeof elements.fileInput?.showPicker === "function") {
-      elements.fileInput.showPicker();
-      return;
+      try {
+        elements.fileInput.showPicker();
+        return;
+      } catch {}
     }
-    elements.fileInput?.click();
+    try { elements.fileInput?.click(); } catch { setStatus("Nao foi possivel abrir os arquivos."); }
   }, true);
   elements.fileInput?.addEventListener("change", () => {
     const file = firstSupportedFile(elements.fileInput?.files);

@@ -70,6 +70,7 @@ import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProje
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { createProject200Project, deleteProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
+import { addTranscriptToProject200ChatMediaMessage, buildProject200ChatMediaMessage, getProject200ChatMessageModelText } from "./src/project200-chat-media.js";
 import { canViewProject200LifeCapture, deleteProject200LifeCapture, getProject200LifeCaptureById, listProject200LifeCaptures, patchProject200LifeCapture, upsertProject200LifeCapture } from "./src/project200-life-captures.js";
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
@@ -3939,16 +3940,147 @@ function sanitizeProject200MarinProposals(rawProposals) {
   return proposals;
 }
 
-async function requestProject200MarinReply({ apiKey, user, profileName, personaKey, messages, context, areas }) {
+const PROJECT200_MARIN_VOICES = Object.freeze({
+  marin: "marin",
+  peter: "cedar",
+  lena: "coral",
+  gaia: "sage",
+  sami: "echo",
+  zach: "ash"
+});
+
+function normalizeProject200MarinModality(value) {
+  const modality = String(value || "text").trim().toLowerCase();
+  return new Set(["text", "audio", "image"]).has(modality) ? modality : "text";
+}
+
+function decodeProject200MarinMedia(base64, maxBytes, emptyMessage) {
+  const normalized = String(base64 || "").trim();
+  if (!normalized) throw new Error(emptyMessage);
+  const buffer = Buffer.from(normalized, "base64");
+  if (!buffer.length) throw new Error(emptyMessage);
+  if (buffer.length > maxBytes) throw new Error("O anexo ultrapassa o limite permitido.");
+  return buffer;
+}
+
+async function transcribeProject200MarinAudio(apiKey, { audioBase64, mimeType, fileName }) {
+  const audioBuffer = decodeProject200MarinMedia(audioBase64, 20 * 1024 * 1024, "Audio vazio.");
+  const safeMimeType = String(mimeType || "audio/webm").split(";")[0].trim().toLowerCase() || "audio/webm";
+  const safeFileName = String(fileName || "marin-voice.webm").trim().slice(0, 180) || "marin-voice.webm";
+  const formData = new FormData();
+  formData.append("model", OPENAI_TRANSCRIBE_MODEL);
+  formData.append("language", "pt");
+  formData.append("file", new Blob([audioBuffer], { type: safeMimeType }), safeFileName);
+  const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + apiKey },
+    body: formData
+  });
+  const parsed = await readApiResponse(transcriptionResponse);
+  if (!transcriptionResponse.ok) {
+    const error = new Error("Falha ao transcrever o audio para o bot.");
+    error.statusCode = transcriptionResponse.status;
+    error.details = parsed.data || parsed.text || "Resposta vazia da OpenAI.";
+    throw error;
+  }
+  const transcript = String(parsed.data?.text || "").trim();
+  if (!transcript) throw new Error("Nao foi possivel entender o audio.");
+  return transcript;
+}
+
+function normalizeProject200MarinImage({ imageBase64, mimeType }) {
+  const safeMimeType = String(mimeType || "").split(";")[0].trim().toLowerCase();
+  const supported = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+  if (!supported.has(safeMimeType)) throw new Error("Envie uma imagem JPG, PNG, WEBP ou GIF.");
+  const imageBuffer = decodeProject200MarinMedia(imageBase64, 12 * 1024 * 1024, "Imagem vazia.");
+  return { mimeType: safeMimeType, base64: imageBuffer.toString("base64") };
+}
+
+async function generateProject200MarinSpeech(apiKey, text, personaKey) {
+  const voice = PROJECT200_MARIN_VOICES[personaKey] || "marin";
+  const speechResponse = await fetch("https://api.openai.com/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: OPENAI_TTS_MODEL,
+      voice,
+      response_format: "mp3",
+      input: String(text || "").slice(0, 3900),
+      instructions: "Fale em portugues do Brasil com naturalidade, proximidade e ritmo de conversa."
+    })
+  });
+  if (!speechResponse.ok) {
+    const parsed = await readApiResponse(speechResponse);
+    const error = new Error("Falha ao gerar a resposta em audio.");
+    error.statusCode = speechResponse.status;
+    error.details = parsed.data || parsed.text || "Resposta vazia da OpenAI.";
+    throw error;
+  }
+  return Buffer.from(await speechResponse.arrayBuffer());
+}
+
+async function storeProject200MarinSpeech(user, personaKey, replyText, audioBuffer) {
+  if (!audioBuffer.length) throw new Error("A resposta em audio veio vazia.");
+  const captureId = crypto.randomUUID();
+  const usernamePart = String(user.username || user.id || "usuario").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "usuario";
+  const now = new Date();
+  const baseKey = "project200/life-captures/" + usernamePart + "/" + now.getFullYear() + "/" + String(now.getMonth() + 1).padStart(2, "0") + "/" + String(now.getDate()).padStart(2, "0") + "/" + Date.now() + "-" + crypto.randomUUID().slice(0, 8);
+  const mediaKey = baseKey + ".mp3";
+  const encrypted = await encryptUserBuffer(user.id, audioBuffer, project200LifeCaptureEncryptionContext(captureId, "media"));
+  if (!encrypted) throw new Error("Configure PROJECT200_DATA_KEK para criptografar o audio do chat.");
+  await getProject200PrivateR2Client().send(new PutObjectCommand({
+    Bucket: R2_PRIVATE_BUCKET,
+    Key: mediaKey,
+    Body: encrypted,
+    ContentType: "application/vnd.project200.encrypted+json",
+    CacheControl: "private, no-store",
+    Metadata: { originalContentType: "audio/mpeg" }
+  }));
+  const personaName = getProject200MarinPersonaName(personaKey);
+  const durationMs = Math.max(0, Math.round(estimateNarrationDurationSeconds(replyText) * 1000));
+  const mediaUrl = buildProject200LifeCaptureMediaRoute(captureId, "media");
+  await upsertProject200LifeCapture(user.id, {
+    id: captureId,
+    kind: "audio",
+    title: "Resposta de " + personaName,
+    noteText: "",
+    createdAt: now.toISOString(),
+    mimeType: "audio/mpeg",
+    mediaKey,
+    mediaUrl,
+    previewKey: "",
+    previewUrl: "",
+    sizeBytes: audioBuffer.length,
+    durationMs,
+    metadata: { source: "project200-ai-chat-response", hiddenFromLibrary: true }
+  });
+  void recordNarrationUsage(user.id, Math.max(1, Math.round(durationMs / 1000))).catch(() => {});
+  return buildProject200ChatMediaMessage({
+    kind: "audio",
+    captureId,
+    title: "Resposta de " + personaName,
+    mediaUrl,
+    remoteUrl: mediaUrl,
+    durationMs,
+    sizeBytes: audioBuffer.length,
+    transcript: replyText,
+    dateLabel: now.toLocaleDateString("pt-BR", { timeZone: PROJECT200_TIME_ZONE })
+  });
+}
+
+async function requestProject200MarinReply({ apiKey, user, profileName, personaKey, messages, context, areas, latestInput = null }) {
   const prompts = await getProject200MarinPrompts({ includeText: true });
   const persona = prompts.personas.find((entry) => entry.key === personaKey) || prompts.personas[0];
-  const latestText = String(messages[messages.length - 1]?.content || "");
+  const latestText = String(latestInput?.text || getProject200ChatMessageModelText(messages[messages.length - 1]?.content) || "");
   const route = chooseProject200MarinModel(latestText, areas);
   const personaName = persona?.name || "Marin";
   const instructions = [
     prompts.generalPrompt,
     "",
-    "PERSONALIDADE VISÍVEL: " + personaName,
+    "PERSONALIDADE VISIVEL: " + personaName,
     String(persona?.prompt || ""),
     "Quando o prompt geral disser Marin, entenda como o papel da IA do iLife; apresente-se sempre como " + personaName + ".",
     "",
@@ -3956,23 +4088,36 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "- Use type limit para propor um limite: quantidade maxima e intervalo day, week, month ou year. Limites nunca tem cronometro.",
     "- Use type aspect somente quando o usuario pedir para configurar Estatisticas. Acoes daquele aspecto ja entram automaticamente; missionGoalIds vincula missoes; useManualTarget e targetMinutes ativam a meta manual.",
     "- dataLines serve apenas para resumir dados reais presentes no contexto. Nunca gere dataLines numa conversa sem dados carregados e nunca invente uma media.",
-    "- Nunca diga que já gravou algo. Você somente oferece cartões; o usuário precisa tocar para confirmar.",
-    "- Não crie microtarefas de missões.",
-    "- Não invente datas, horários, valores ou durações. Se faltar dado obrigatório, pergunte antes e retorne proposals vazio.",
-    "- Ações usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto. Sono nunca é atribuído a uma ação.",
-    "- Ambiente mapeia para casa. Propósito usa planejamento. Família usa aspecto e nunca social.",
-    "- Preserve sono, alimentação, saúde, segurança, autonomia e limites físicos. Disciplina nunca significa privação perigosa.",
-    "- Não substitua orientação médica, jurídica ou financeira profissional.",
-    "- A resposta textual tem no máximo 400 caracteres e as propostas no máximo 8.",
+    "- Nunca diga que ja gravou algo. Voce somente oferece cartoes; o usuario precisa tocar para confirmar.",
+    "- Nao crie microtarefas de missoes.",
+    "- Nao invente datas, horarios, valores ou duracoes. Se faltar dado obrigatorio, pergunte antes e retorne proposals vazio.",
+    "- Acoes usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto. Sono nunca e atribuido a uma acao.",
+    "- Ambiente mapeia para casa. Proposito usa planejamento. Familia usa aspecto e nunca social.",
+    "- Preserve sono, alimentacao, saude, seguranca, autonomia e limites fisicos. Disciplina nunca significa privacao perigosa.",
+    "- Nao substitua orientacao medica, juridica ou financeira profissional.",
+    "- Ao receber uma imagem, descreva e interprete somente o que estiver visivel. Diga quando algo nao puder ser confirmado.",
+    "- A resposta textual tem no maximo 400 caracteres e as propostas no maximo 8.",
     "",
-    "CONTEXTO DO USUÁRIO CARREGADO SOMENTE PARA ESTA PERGUNTA:",
+    "CONTEXTO DO USUARIO CARREGADO SOMENTE PARA ESTA PERGUNTA:",
     JSON.stringify(context)
   ].join("\n");
 
-  const input = messages.slice(-24).map((message) => ({
-    role: message.role === "assistant" ? "assistant" : "user",
-    content: String(message.content || "").slice(0, 4000)
-  }));
+  const recentMessages = messages.slice(-24);
+  const input = recentMessages.map((message, index) => {
+    const role = message.role === "assistant" ? "assistant" : "user";
+    const modelText = getProject200ChatMessageModelText(message.content).slice(0, 4000);
+    const isLatestImage = latestInput?.modality === "image" && index === recentMessages.length - 1 && role === "user";
+    if (isLatestImage) {
+      return {
+        role,
+        content: [
+          { type: "input_text", text: String(latestInput.text || "Analise esta imagem e responda ao usuario.").slice(0, 4000) },
+          { type: "input_image", image_url: "data:" + latestInput.mimeType + ";base64," + latestInput.base64, detail: "auto" }
+        ]
+      };
+    }
+    return { role, content: modelText };
+  });
   const startedAt = Date.now();
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -4009,7 +4154,7 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     requestError.latencyMs = Date.now() - startedAt;
     throw requestError;
   }
-  if (!parsedResponse.data) throw new Error("A OpenAI devolveu uma resposta inválida.");
+  if (!parsedResponse.data) throw new Error("A OpenAI devolveu uma resposta invalida.");
   return {
     payload: parsedResponse.data,
     reply: parseProject200MarinReply(parsedResponse.data),
@@ -4152,12 +4297,18 @@ async function handleProject200LifeCaptureUploadRequest(request, response) {
       "image/webp": "webp",
       "image/jpeg": "jpg",
       "image/png": "png",
+      "image/gif": "gif",
       "video/webm": "webm",
       "video/mp4": "mp4",
       "video/ogg": "ogv",
       "audio/ogg": "ogg",
       "audio/webm": "webm",
       "audio/mpeg": "mp3",
+      "audio/mp4": "m4a",
+      "audio/x-m4a": "m4a",
+      "audio/aac": "aac",
+      "audio/wav": "wav",
+      "audio/x-wav": "wav",
       "text/plain": "txt"
     };
     const extension = extensionByMime[mimeType];
@@ -4351,7 +4502,7 @@ async function handleProject200MarinMessageRequest(request, response) {
   if (!user) return;
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    sendJson(response, 503, { error: "OPENAI_API_KEY não configurada no backend." });
+    sendJson(response, 503, { error: "OPENAI_API_KEY nao configurada no backend." });
     return;
   }
 
@@ -4360,33 +4511,56 @@ async function handleProject200MarinMessageRequest(request, response) {
   const startedAt = Date.now();
   try {
     const body = await readJsonBody(request);
-    const content = String(body?.content || "").trim().slice(0, 4000);
-    if (!content) {
-      sendJson(response, 400, { error: "Escreva uma mensagem para conversar." });
+    const modality = normalizeProject200MarinModality(body?.inputType);
+    let storedContent = String(body?.content || "").trim().slice(0, 20000);
+    let modelText = storedContent;
+    let latestInput = { modality, text: "" };
+
+    if (modality === "audio") {
+      const transcript = await transcribeProject200MarinAudio(apiKey, {
+        audioBase64: body?.mediaBase64 || body?.audioBase64,
+        mimeType: body?.mimeType,
+        fileName: body?.fileName
+      });
+      modelText = transcript;
+      storedContent = addTranscriptToProject200ChatMediaMessage(storedContent, transcript);
+      latestInput = { modality, text: transcript };
+    } else if (modality === "image") {
+      const image = normalizeProject200MarinImage({
+        imageBase64: body?.mediaBase64 || body?.imageBase64,
+        mimeType: body?.mimeType
+      });
+      modelText = String(body?.caption || "Analise esta imagem e converse comigo sobre o que voce percebe.").trim().slice(0, 4000);
+      latestInput = { modality, text: modelText, ...image };
+    } else {
+      modelText = getProject200ChatMessageModelText(storedContent);
+      latestInput = { modality: "text", text: modelText };
+    }
+
+    if (!storedContent || !modelText) {
+      sendJson(response, 400, { error: "Envie uma mensagem, um audio ou uma imagem para conversar." });
       return;
     }
     const profileName = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const setting = await getProject200MarinSetting(user.id, profileName);
     const personaKey = normalizeProject200MarinPersonaKey(body?.personaKey || setting.personaKey);
     conversation = await getOrCreateProject200MarinConversation(user.id, profileName, personaKey);
-    await appendProject200MarinMessage(user.id, conversation.id, { role: "user", content });
+    const userMessage = await appendProject200MarinMessage(user.id, conversation.id, { role: "user", content: storedContent });
     const history = await listProject200MarinMessages(user.id, profileName, personaKey, 24);
-    const areas = detectProject200MarinContextAreas(content);
+    const areas = detectProject200MarinContextAreas(modelText);
     const domainAreas = areas.filter((area) => area !== "history");
     if (!domainAreas.length && areas.includes("history")) {
       const previousUserText = history.messages
-        .filter((message) => message.role === "user" && String(message.content || "").trim() !== content)
+        .filter((message) => message.role === "user" && message.id !== userMessage.id)
         .slice(-2)
-        .map((message) => message.content)
+        .map((message) => getProject200ChatMessageModelText(message.content))
         .join(" ");
       for (const inherited of detectProject200MarinContextAreas(previousUserText)) {
         if (inherited !== "history" && !areas.includes(inherited)) areas.push(inherited);
       }
-      if (areas.every((area) => area === "history")) {
-        areas.push("actions", "missions", "limits", "stats");
-      }
+      if (areas.every((area) => area === "history")) areas.push("actions", "missions", "limits", "stats");
     }
-    const context = await buildProject200MarinUserContext(user, profileName, areas, content);
+    const context = await buildProject200MarinUserContext(user, profileName, areas, modelText);
     const generated = await requestProject200MarinReply({
       apiKey,
       user,
@@ -4394,7 +4568,8 @@ async function handleProject200MarinMessageRequest(request, response) {
       personaKey,
       messages: history.messages,
       context,
-      areas
+      areas,
+      latestInput
     });
     route = generated.route;
     const replyText = shortenProject200MarinMessage(generated.reply?.message)
@@ -4404,16 +4579,21 @@ async function handleProject200MarinMessageRequest(request, response) {
       ...dataLines,
       ...sanitizeProject200MarinProposals(generated.reply?.proposals)
     ];
+    let assistantContent = replyText;
+    if (modality === "audio") {
+      const speech = await generateProject200MarinSpeech(apiKey, replyText, personaKey);
+      assistantContent = await storeProject200MarinSpeech(user, personaKey, replyText, speech);
+    }
     const saved = await appendProject200MarinMessage(user.id, conversation.id, {
       role: "assistant",
-      content: replyText,
+      content: assistantContent,
       proposals,
       model: generated.payload?.model || route.model
     });
     const usage = generated.payload?.usage || {};
     await recordProject200MarinRun(user.id, conversation.id, {
       model: generated.payload?.model || route.model,
-      routeReason: route.reason,
+      routeReason: route.reason + (modality === "text" ? "" : ":" + modality),
       inputTokens: usage.input_tokens,
       outputTokens: usage.output_tokens,
       totalTokens: usage.total_tokens,
@@ -4424,6 +4604,9 @@ async function handleProject200MarinMessageRequest(request, response) {
       ok: true,
       personaKey,
       personaName: getProject200MarinPersonaName(personaKey),
+      inputType: modality,
+      transcript: modality === "audio" ? modelText : undefined,
+      userMessage,
       message: saved
     });
   } catch (error) {
@@ -4437,7 +4620,7 @@ async function handleProject200MarinMessageRequest(request, response) {
       }).catch(() => {});
     }
     sendJson(response, Number(error?.statusCode) || 500, {
-      error: error instanceof Error ? error.message : "Não foi possível conversar agora.",
+      error: error instanceof Error ? error.message : "Nao foi possivel conversar agora.",
       details: error?.details || undefined
     });
   }

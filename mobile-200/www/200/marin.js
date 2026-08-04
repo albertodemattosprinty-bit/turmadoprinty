@@ -1,4 +1,4 @@
-import { renderChatMessageContent } from "./chat-links.js?v=0.76-gallery-inline-v1";
+import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.76-gallery-inline-v1";
 
 const DEFAULT_PERSONAS = [
   { key: "marin", name: "Marin", avatar: "/200/agents/marin.svg" },
@@ -50,7 +50,9 @@ export function initializeProject200MarinUi(dependencies = {}) {
     form: document.getElementById("marinChatForm"),
     input: document.getElementById("marinChatInput"),
     mic: document.getElementById("marinChatMicButton"),
-    send: document.getElementById("marinChatSendButton")
+    send: document.getElementById("marinChatSendButton"),
+    attach: document.getElementById("marinChatAttachButton"),
+    fileInput: document.getElementById("marinChatFileInput")
   };
 
   const state = {
@@ -67,11 +69,17 @@ export function initializeProject200MarinUi(dependencies = {}) {
     promptKey: "",
     mediaRecorder: null,
     mediaStream: null,
-    audioChunks: []
+    audioChunks: [],
+    recordingStartedAt: 0,
+    attaching: false
   };
 
   function currentProfile() {
     return String(typeof getProfileName === "function" ? getProfileName() : "Usuario").trim() || "Usuario";
+  }
+
+  function isHumanChatMode() {
+    return elements.chatModal?.dataset.chatMode === "human";
   }
 
   function updateIdentity() {
@@ -307,10 +315,11 @@ export function initializeProject200MarinUi(dependencies = {}) {
           .slice(0, 3)
           .forEach((proposal) => elements.messages.appendChild(createDataLine(proposal)));
       }
+      const isSharedMedia = isChatMediaMessage(message.content);
       const bubble = document.createElement("article");
-      bubble.className = "marin-message " + (message.role === "user" ? "is-user" : "is-assistant");
+      bubble.className = (isSharedMedia ? "marin-message-shared " : "marin-message ") + (message.role === "user" ? "is-user" : "is-assistant");
       const copy = document.createElement("div");
-      copy.className = "marin-message-copy";
+      copy.className = isSharedMedia ? "marin-message-shared-content" : "marin-message-copy";
       renderChatMessageContent(copy, message.content);
       bubble.appendChild(copy);
       elements.messages.appendChild(bubble);
@@ -468,24 +477,96 @@ export function initializeProject200MarinUi(dependencies = {}) {
     elements.input.style.height = Math.min(132, Math.max(44, elements.input.scrollHeight)) + "px";
   }
 
-  async function sendMessage() {
-    const content = String(elements.input?.value || "").trim();
-    if (!content || state.sending) return;
-    state.messages.push({
-      id: "local-" + Date.now(),
-      role: "user",
-      content,
-      proposals: []
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+      reader.onerror = () => reject(reader.error || new Error("Falha ao ler a midia."));
+      reader.readAsDataURL(blob);
     });
-    if (elements.input) {
+  }
+
+  function encodeUtf8Base64(text) {
+    const bytes = new TextEncoder().encode(String(text || ""));
+    let binary = "";
+    bytes.forEach((value) => { binary += String.fromCharCode(value); });
+    return window.btoa(binary);
+  }
+
+  function buildMediaShareMessage(asset, options = {}) {
+    const kind = String(options.kind || asset?.kind || "").trim().toLowerCase();
+    const mediaUrl = String(asset?.mediaUrl || asset?.remoteUrl || asset?.url || "");
+    const payload = {
+      kind,
+      captureId: String(asset?.id || asset?.captureId || ""),
+      title: String(options.title || asset?.title || (kind === "photo" ? "Imagem para a IA" : "Audio para a IA")),
+      previewUrl: String(asset?.previewUrl || asset?.previewRemoteUrl || ""),
+      mediaUrl,
+      remoteUrl: mediaUrl,
+      durationMs: Math.max(0, Number(options.durationMs || asset?.durationMs || 0)),
+      sizeBytes: Math.max(0, Number(asset?.sizeBytes || options.sizeBytes || 0)),
+      dateLabel: new Date().toLocaleDateString("pt-BR"),
+      noteText: ""
+    };
+    return "[[ILIFE_MEDIA:" + encodeUtf8Base64(JSON.stringify(payload)) + "]]";
+  }
+
+  function aiAttachmentKind(file) {
+    const type = String(file?.type || "").toLowerCase();
+    const name = String(file?.name || "").toLowerCase();
+    if (type.startsWith("audio/") || /\.(mp3|m4a|aac|wav|ogg|webm)$/i.test(name)) return "audio";
+    if (type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(name)) return "photo";
+    return "";
+  }
+
+  function aiAttachmentMimeType(file, kind) {
+    const type = String(file?.type || "").split(";")[0].trim().toLowerCase();
+    if (type && type !== "application/octet-stream") return type;
+    const extension = String(file?.name || "").toLowerCase().split(".").pop();
+    const byExtension = {
+      mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav", ogg: "audio/ogg", webm: "audio/webm",
+      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif"
+    };
+    return byExtension[extension] || (kind === "audio" ? "audio/webm" : "");
+  }
+
+  async function uploadAiChatMedia({ blob, kind, mimeType, durationMs = 0, title }) {
+    const fileBase64 = await blobToBase64(blob);
+    const payload = await apiRequest("/api/200/life-captures/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind,
+        title,
+        noteText: "",
+        createdAt: new Date().toISOString(),
+        durationMs,
+        metadata: { source: "project200-ai-chat", hiddenFromLibrary: true },
+        mimeType,
+        fileBase64,
+        previewBase64: ""
+      }),
+      skipGlobalLoading: true
+    });
+    return { capture: payload?.capture || payload?.asset || null, fileBase64 };
+  }
+
+  async function sendMessage(options = {}) {
+    const fromInput = !Object.prototype.hasOwnProperty.call(options, "content");
+    const content = String(fromInput ? elements.input?.value : options.content || "").trim();
+    if (!content || state.sending || isHumanChatMode()) return;
+    const localId = "local-" + Date.now();
+    state.messages.push({ id: localId, role: "user", content, proposals: [] });
+    if (fromInput && elements.input) {
       elements.input.value = "";
       resizeInput();
     }
     state.sending = true;
     if (elements.send) elements.send.disabled = true;
     if (elements.mic) elements.mic.disabled = true;
+    if (elements.attach) elements.attach.disabled = true;
     renderMessages();
-    setStatus(state.personaName + " está pensando", true);
+    setStatus(state.personaName + " esta pensando", true);
     try {
       const payload = await apiRequest("/api/200/marin/messages", {
         method: "POST",
@@ -493,20 +574,78 @@ export function initializeProject200MarinUi(dependencies = {}) {
         body: JSON.stringify({
           profile: currentProfile(),
           personaKey: state.personaKey,
-          content
+          content,
+          inputType: options.inputType || "text",
+          mediaBase64: options.mediaBase64 || "",
+          mimeType: options.mimeType || "",
+          fileName: options.fileName || "",
+          caption: options.caption || ""
         }),
         skipGlobalLoading: true
       });
+      state.messages = state.messages.filter((message) => message.id !== localId);
+      if (payload?.userMessage) state.messages.push(payload.userMessage);
+      else state.messages.push({ id: localId, role: "user", content, proposals: [] });
       if (payload?.message) state.messages.push(payload.message);
       renderMessages();
       setStatus("");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Não foi possível responder agora.");
+      state.messages = state.messages.filter((message) => message.id !== localId);
+      renderMessages();
+      setStatus(error instanceof Error ? error.message : "Nao foi possivel responder agora.");
     } finally {
       state.sending = false;
       if (elements.send) elements.send.disabled = false;
       if (elements.mic) elements.mic.disabled = false;
+      if (elements.attach) elements.attach.disabled = false;
       window.setTimeout(() => elements.input?.focus({ preventScroll: true }), 40);
+    }
+  }
+
+  async function sendAiAttachment(file) {
+    if (!file || state.attaching || state.sending || isHumanChatMode()) return;
+    const kind = aiAttachmentKind(file);
+    if (!kind) {
+      setStatus("Para a IA, envie uma imagem ou um audio.");
+      return;
+    }
+    const maxBytes = kind === "photo" ? 12 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (Number(file.size || 0) > maxBytes) {
+      setStatus(kind === "photo" ? "A imagem precisa ter ate 12 MB." : "O audio precisa ter ate 20 MB.");
+      return;
+    }
+    const mimeType = aiAttachmentMimeType(file, kind);
+    const caption = String(elements.input?.value || "").trim();
+    state.attaching = true;
+    if (elements.attach) elements.attach.disabled = true;
+    setStatus(kind === "photo" ? "Enviando imagem para a IA..." : "Enviando audio para a IA...");
+    try {
+      const uploaded = await uploadAiChatMedia({
+        blob: file,
+        kind,
+        mimeType,
+        title: kind === "photo" ? "Imagem para a IA" : "Audio para a IA"
+      });
+      if (!uploaded.capture) throw new Error("A midia foi enviada sem referencia privada.");
+      if (elements.input) {
+        elements.input.value = "";
+        resizeInput();
+      }
+      state.attaching = false;
+      await sendMessage({
+        content: buildMediaShareMessage(uploaded.capture, { kind, title: kind === "photo" ? "Imagem para a IA" : "Audio para a IA", sizeBytes: file.size }),
+        inputType: kind === "photo" ? "image" : "audio",
+        mediaBase64: uploaded.fileBase64,
+        mimeType,
+        fileName: String(file.name || (kind === "photo" ? "image.jpg" : "audio.webm")),
+        caption
+      });
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Nao foi possivel enviar a midia.");
+    } finally {
+      state.attaching = false;
+      if (elements.attach) elements.attach.disabled = false;
+      if (elements.fileInput) elements.fileInput.value = "";
     }
   }
 
@@ -535,74 +674,102 @@ export function initializeProject200MarinUi(dependencies = {}) {
     });
   }
 
-  function stopVoiceCapture() {
-    if (state.mediaRecorder && state.mediaRecorder.state !== "inactive") state.mediaRecorder.stop();
+  function stopVoiceCapture({ send = false } = {}) {
+    if (state.mediaRecorder && state.mediaRecorder.state !== "inactive") {
+      state.mediaRecorder._sendOnStop = Boolean(send);
+      state.mediaRecorder.stop();
+      return;
+    }
     if (state.mediaStream) {
       state.mediaStream.getTracks().forEach((track) => track.stop());
       state.mediaStream = null;
     }
-    elements.mic?.classList.remove("is-recording");
+    elements.send?.classList.remove("is-recording");
   }
 
   async function toggleVoiceCapture() {
+    if (isHumanChatMode() || state.sending || state.attaching) return;
     if (state.mediaRecorder && state.mediaRecorder.state !== "inactive") {
-      stopVoiceCapture();
+      stopVoiceCapture({ send: true });
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       state.mediaStream = stream;
       state.audioChunks = [];
-      const options = typeof MediaRecorder !== "undefined"
-        && typeof MediaRecorder.isTypeSupported === "function"
-        && MediaRecorder.isTypeSupported("audio/webm")
-        ? { mimeType: "audio/webm" }
-        : undefined;
-      const recorder = options ? new MediaRecorder(stream, options) : new MediaRecorder(stream);
+      const supportedTypes = ["audio/ogg;codecs=opus", "audio/ogg", "audio/webm;codecs=opus", "audio/webm"];
+      const mimeType = typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function"
+        ? supportedTypes.find((type) => MediaRecorder.isTypeSupported(type)) || ""
+        : "";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       state.mediaRecorder = recorder;
+      state.recordingStartedAt = Date.now();
       recorder.addEventListener("dataavailable", (event) => {
         if (event.data?.size) state.audioChunks.push(event.data);
       });
       recorder.addEventListener("stop", async () => {
-        elements.mic?.classList.remove("is-recording");
+        const shouldSend = recorder._sendOnStop !== false;
+        const durationMs = Math.max(0, Date.now() - state.recordingStartedAt);
         const chunks = state.audioChunks.slice();
         state.audioChunks = [];
         state.mediaRecorder = null;
-        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
-        if (!blob.size) {
-          setStatus("Não ouvi nada. Tente novamente.");
+        state.recordingStartedAt = 0;
+        if (state.mediaStream) state.mediaStream.getTracks().forEach((track) => track.stop());
+        state.mediaStream = null;
+        elements.send?.classList.remove("is-recording");
+        if (!shouldSend) {
+          setStatus("");
           return;
         }
-        setStatus("Transformando sua voz em texto...", true);
+        const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
+        if (!blob.size) {
+          setStatus("Nao ouvi nada. Tente novamente.");
+          return;
+        }
+        state.attaching = true;
+        setStatus("Enviando sua voz para " + state.personaName + "...", true);
         try {
-          const buffer = await blob.arrayBuffer();
-          const payload = await apiRequest("/api/audio/transcribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              audioBase64: arrayBufferToBase64(buffer),
-              mimeType: blob.type || "audio/webm",
-              fileName: "marin-voice.webm"
-            }),
-            skipGlobalLoading: true
+          const normalizedMimeType = String(blob.type || "audio/webm").split(";")[0] || "audio/webm";
+          const uploaded = await uploadAiChatMedia({
+            blob,
+            kind: "audio",
+            mimeType: normalizedMimeType,
+            durationMs,
+            title: "Audio para a IA"
           });
-          if (elements.input) {
-            elements.input.value = String(payload?.text || "").trim();
-            resizeInput();
-            elements.input.focus({ preventScroll: true });
-          }
-          setStatus("");
+          if (!uploaded.capture) throw new Error("O audio foi enviado sem referencia privada.");
+          state.attaching = false;
+          await sendMessage({
+            content: buildMediaShareMessage(uploaded.capture, { kind: "audio", title: "Audio para a IA", durationMs, sizeBytes: blob.size }),
+            inputType: "audio",
+            mediaBase64: uploaded.fileBase64,
+            mimeType: normalizedMimeType,
+            fileName: "marin-voice." + (normalizedMimeType.includes("ogg") ? "ogg" : "webm")
+          });
         } catch (error) {
-          setStatus(error instanceof Error ? error.message : "Falha ao transcrever.");
+          setStatus(error instanceof Error ? error.message : "Nao foi possivel enviar o audio.");
+        } finally {
+          state.attaching = false;
         }
       });
       recorder.start();
-      elements.mic?.classList.add("is-recording");
-      setStatus("Ouvindo... toque novamente para parar.");
+      elements.send?.classList.add("is-recording");
+      setStatus("Ouvindo... toque novamente para enviar.");
     } catch (error) {
-      stopVoiceCapture();
-      setStatus(error instanceof Error ? error.message : "Não foi possível abrir o microfone.");
+      stopVoiceCapture({ send: false });
+      setStatus(error instanceof Error ? error.message : "Nao foi possivel abrir o microfone.");
     }
+  }
+
+  function openAiAttachmentPicker() {
+    if (isHumanChatMode() || state.attaching || state.sending) return;
+    if (typeof elements.fileInput?.showPicker === "function") {
+      try {
+        elements.fileInput.showPicker();
+        return;
+      } catch {}
+    }
+    try { elements.fileInput?.click(); } catch { setStatus("Nao foi possivel abrir os arquivos."); }
   }
 
   updateIdentity();
@@ -615,19 +782,36 @@ export function initializeProject200MarinUi(dependencies = {}) {
   elements.promptBack?.addEventListener("click", () => closeModal(elements.promptModal));
   elements.promptSave?.addEventListener("click", () => void savePrompt());
   elements.form?.addEventListener("submit", (event) => {
+    if (isHumanChatMode()) return;
     event.preventDefault();
     void sendMessage();
   });
   elements.input?.addEventListener("input", resizeInput);
   elements.input?.addEventListener("keydown", (event) => {
+    if (isHumanChatMode()) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void sendMessage();
     }
   });
   elements.mic?.addEventListener("click", () => void toggleVoiceCapture());
+  elements.send?.addEventListener("click", (event) => {
+    if (isHumanChatMode() || String(elements.input?.value || "").trim()) return;
+    event.preventDefault();
+    void toggleVoiceCapture();
+  });
+  elements.attach?.addEventListener("click", (event) => {
+    if (isHumanChatMode()) return;
+    event.preventDefault();
+    openAiAttachmentPicker();
+  });
+  elements.fileInput?.addEventListener("change", () => {
+    if (isHumanChatMode()) return;
+    const file = [...(elements.fileInput?.files || [])].find((entry) => aiAttachmentKind(entry));
+    if (file) void sendAiAttachment(file);
+  });
   elements.chatModal?.querySelectorAll("[data-close-modal]").forEach((button) => {
-    button.addEventListener("click", stopVoiceCapture);
+    button.addEventListener("click", () => stopVoiceCapture({ send: false }));
   });
 
   return {
