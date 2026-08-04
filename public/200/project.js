@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "0.75";
+const project200AppVersion = "0.77";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -121,6 +121,10 @@ function openProject200RequiredUpdateModal(config) {
   document.body.classList.add("modal-open");
 }
 
+function isProject200RequiredUpdateOpen() {
+  return document.getElementById("project200RequiredUpdateModal")?.classList.contains("active") || false;
+}
+
 function triggerProject200ApkDownload(config) {
   const downloadLink = document.createElement("a");
   downloadLink.href = buildProject200AppDownloadUrl(config);
@@ -144,23 +148,14 @@ async function checkProject200AppUpdate({ userInitiated = false } = {}) {
   return false;
 }
 
+let project200UpdateCheckTimer = null;
+
 function scheduleProject200AppUpdateChecks() {
   if (!isProject200NativeApp()) return;
-  const now = new Date();
-  const next = new Date(now);
-  const hasPartialHour = Boolean(now.getMinutes() || now.getSeconds() || now.getMilliseconds());
-  const nextHour = Math.ceil((now.getHours() + (hasPartialHour ? 1 : 0)) / 6) * 6;
-  if (nextHour >= 24) {
-    next.setDate(next.getDate() + 1);
-    next.setHours(0, 0, 0, 0);
-  } else {
-    next.setHours(nextHour, 0, 0, 0);
-  }
-  const delay = Math.max(1000, next.getTime() - now.getTime());
-  window.setTimeout(() => {
-    void checkProject200AppUpdate();
-    scheduleProject200AppUpdateChecks();
-  }, delay);
+  if (project200UpdateCheckTimer) window.clearInterval(project200UpdateCheckTimer);
+  project200UpdateCheckTimer = window.setInterval(() => {
+    if (!document.hidden) void checkProject200AppUpdate().catch(() => {});
+  }, 15000);
 }
 
 async function enforceProject200MinimumAppVersion() {
@@ -6753,6 +6748,7 @@ function closeModal(modal) {
   if (!modal) {
     return;
   }
+  if (modal.id === "project200RequiredUpdateModal") return;
   if (["sleepModal", "sleepFinalizeModal"].includes(modal.id) && state.sleepModal?.session) {
     return;
   }
@@ -6948,6 +6944,7 @@ function closeModal(modal) {
 }
 
 function navigateToProjectHome() {
+  if (isProject200RequiredUpdateOpen()) return;
   modalBackNavigationActive = true;
   try {
 
@@ -16918,6 +16915,7 @@ function registerNativeBackButtonHandler() {
     return;
   }
   appPlugin.addListener("backButton", async () => {
+    if (isProject200RequiredUpdateOpen()) return;
     if (navigateBackOneProjectLayer()) {
       return;
     }
@@ -20523,6 +20521,12 @@ state.profileLock = "";
 beginStartupLoading(loadingIconByArea.actions);
 applySelectedProfile(readSelectedProfile());
 void (async () => {
+  try {
+    if (await enforceProject200MinimumAppVersion()) return;
+  } catch (error) {
+    console.warn("Nao foi possivel verificar a versao minima do aplicativo.", error);
+  }
+  scheduleProject200AppUpdateChecks();
   await loadOptionsConfig();
   project200TutorsUi?.refreshNotificationPreferences();
   await bootstrapProject200App();
@@ -20984,6 +20988,7 @@ preventEdgeSwipeNavigation();
 registerNativeBackButtonHandler();
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
+    void checkProject200AppUpdate().catch(() => {});
     startRunningTaskTicker();
     scheduleScreenLockInactivity();
     void refreshHomeSnapshot();
@@ -20992,18 +20997,21 @@ document.addEventListener("visibilitychange", () => {
   clearScreenLockInactivityTimer();
 });
 window.addEventListener("focus", () => {
+  void checkProject200AppUpdate().catch(() => {});
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
   syncHomeDeviceClock();
   void refreshHomeSnapshot();
 });
 window.addEventListener("pageshow", () => {
+  void checkProject200AppUpdate().catch(() => {});
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
   syncHomeDeviceClock();
   void refreshHomeSnapshot();
 });
 document.addEventListener("resume", () => {
+  void checkProject200AppUpdate().catch(() => {});
   startRunningTaskTicker();
   scheduleScreenLockInactivity();
   syncHomeDeviceClock();

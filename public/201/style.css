@@ -124,6 +124,36 @@ textarea:focus-visible {
 
 .admin-panel h2 { font-size: 1.25rem; margin-bottom: 18px; }
 
+.force-update-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 18px;
+  border: 1px solid #ffd8a8;
+  border-radius: 8px;
+  background: #fff9db;
+}
+
+.force-update-control p { margin: 5px 0 0; color: #5f4b20; line-height: 1.4; }
+.force-update-control strong { display: block; color: #17212b; font-size: 1.25rem; }
+.force-update-control .force-update-label { margin: 0 0 4px; color: #a65300; font-size: .75rem; font-weight: 800; text-transform: uppercase; }
+
+.force-update-button {
+  min-height: 52px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 20px;
+  background: #d9480f;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.force-update-button:disabled { background: #2b8a3e; cursor: default; opacity: 1; }
+
 form { display: grid; gap: 14px; }
 
 label {
@@ -154,6 +184,8 @@ textarea { resize: vertical; min-height: 118px; }
   .download-panel { min-height: calc(100vh - 28px); padding: 26px 16px; }
   .version-row { width: 100%; justify-content: space-between; }
   .download-button, .save-button { width: 100%; }
+  .force-update-control { grid-template-columns: 1fr; }
+  .force-update-button { width: 100%; }
 }
 
 

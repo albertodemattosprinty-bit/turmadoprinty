@@ -1,8 +1,9 @@
 ﻿import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
+const releaseVersion = "0.77";
 const defaults = {
-  currentVersion: "0.71",
+  currentVersion: releaseVersion,
   minimumVersion: "0.71",
   downloadUrl: "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk",
   title: "Atualizacao do iLife disponivel",
@@ -20,6 +21,7 @@ const elements = {
   adminPanel: document.getElementById("adminPanel"),
   adminForm: document.getElementById("adminForm"),
   adminStatus: document.getElementById("adminStatus"),
+  forceUpdateButton: document.getElementById("forceUpdateButton"),
   currentInput: document.getElementById("currentVersionInput"),
   minimumInput: document.getElementById("minimumVersionInput"),
   urlInput: document.getElementById("downloadUrlInput"),
@@ -63,6 +65,25 @@ function normalizeConfig(config) {
   return { ...defaults, ...(config || {}) };
 }
 
+function compareVersions(left, right) {
+  const leftParts = String(left || "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = String(right || "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(leftParts.length, rightParts.length, 1);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftParts[index] || 0) - (rightParts[index] || 0);
+    if (difference) return difference > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+function updateForceButton(config) {
+  const isRequired = compareVersions(config.minimumVersion, releaseVersion) >= 0;
+  elements.forceUpdateButton.disabled = isRequired;
+  elements.forceUpdateButton.textContent = isRequired
+    ? `Atualizacao ${releaseVersion} obrigatoria`
+    : `Exigir atualizacao ${releaseVersion}`;
+}
+
 function renderConfig(rawConfig) {
   const config = normalizeConfig(rawConfig);
   elements.title.textContent = config.title;
@@ -82,6 +103,7 @@ function renderConfig(rawConfig) {
   elements.titleInput.value = config.title;
   elements.messageInput.value = config.message;
   elements.buttonInput.value = config.buttonLabel;
+  updateForceButton(config);
 }
 
 async function requestJson(path, options = {}) {
@@ -127,22 +149,53 @@ async function revealAdminIfAllowed() {
   }
 }
 
+async function saveConfig(config) {
+  return requestJson("/api/admin/201/app-update", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config)
+  });
+}
+
+elements.forceUpdateButton.addEventListener("click", () => {
+  const confirmed = window.confirm(
+    `Exigir a versao ${releaseVersion} agora? Usuarios com versoes anteriores nao poderao continuar sem atualizar.`
+  );
+  if (!confirmed) return;
+
+  void (async () => {
+    elements.forceUpdateButton.disabled = true;
+    elements.adminStatus.textContent = `Publicando a atualizacao obrigatoria ${releaseVersion}...`;
+    try {
+      const payload = await saveConfig({
+        currentVersion: releaseVersion,
+        minimumVersion: releaseVersion,
+        downloadUrl: defaults.downloadUrl,
+        title: elements.titleInput.value || defaults.title,
+        message: elements.messageInput.value || defaults.message,
+        buttonLabel: elements.buttonInput.value || defaults.buttonLabel
+      });
+      renderConfig(payload.config);
+      elements.adminStatus.textContent = `Versao ${releaseVersion} exigida para todos os aplicativos.`;
+    } catch (error) {
+      elements.forceUpdateButton.disabled = false;
+      elements.adminStatus.textContent = error instanceof Error ? error.message : "Nao foi possivel ativar a atualizacao.";
+    }
+  })();
+});
+
 elements.adminForm.addEventListener("submit", (event) => {
   event.preventDefault();
   void (async () => {
     elements.adminStatus.textContent = "Salvando...";
     try {
-      const payload = await requestJson("/api/admin/201/app-update", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentVersion: elements.currentInput.value,
-          minimumVersion: elements.minimumInput.value,
-          downloadUrl: elements.urlInput.value,
-          title: elements.titleInput.value,
-          message: elements.messageInput.value,
-          buttonLabel: elements.buttonInput.value
-        })
+      const payload = await saveConfig({
+        currentVersion: elements.currentInput.value,
+        minimumVersion: elements.minimumInput.value,
+        downloadUrl: elements.urlInput.value,
+        title: elements.titleInput.value,
+        message: elements.messageInput.value,
+        buttonLabel: elements.buttonInput.value
       });
       renderConfig(payload.config);
       elements.adminStatus.textContent = "Salvo no Postgres.";
