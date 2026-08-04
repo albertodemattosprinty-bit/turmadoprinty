@@ -196,14 +196,16 @@ export function initializeProject200OnboardingUi(config) {
   function renderPrivacy() {
     contentEl.innerHTML = [
       '<section class="project200-onboarding__lesson project200-onboarding__privacy">',
+      '<div class="project200-onboarding__privacy-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 5 9 11v11c0 10 6.2 17.5 15 21 8.8-3.5 15-11 15-21V11L24 5Z" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="m17.5 24 4.2 4.2 9.2-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>',
       '<p class="project200-onboarding__eyebrow">Privacidade</p>',
-      '<h1>Suas memorias sao suas</h1>',
-      '<p>Fotos, videos e audios ficam em armazenamento privado e sao gravados criptografados. A leitura acontece apenas com sua conta autenticada.</p>',
+      '<h1>Seus dados merecem cuidado.</h1>',
+      '<p>Protegemos cada categoria de acordo com o risco e explicamos com clareza onde seus dados são usados.</p>',
       '<div class="project200-onboarding__privacy-list">',
-      '<span>Textos e notas ficam no banco protegido da sua conta.</span>',
-      '<span>Arquivos privados nao ficam em bucket publico.</span>',
-      '<span>Voce pode pedir acesso, exportacao ou exclusao dos seus dados.</span>',
+      '<span><strong>Conta protegida</strong>Sua senha não é salva em texto aberto e a sessão pode ser revogada.</span>',
+      '<span><strong>Conteúdo sensível cifrado</strong>Conversas com IAs e novas memórias usam AES-256-GCM vinculado à sua conta.</span>',
+      '<span><strong>Você mantém o controle</strong>Arquivos privados exigem autenticação e compartilhamentos dependem da sua escolha.</span>',
       '</div>',
+      '<a class="project200-onboarding__privacy-policy" href="/200/privacidade.html" target="_blank" rel="noopener">LER POLÍTICA COMPLETA</a>',
       '</section>'
     ].join("");
     continueButton.textContent = "ENTENDI";

@@ -1,12 +1,14 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=/log.html">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Log</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acesso iLife</title>
 </head>
 <body>
-  <script>window.location.replace("/log.html");</script>
+  <script>
+    const target = "/log.html" + window.location.search + window.location.hash;
+    window.location.replace(target);
+  </script>
 </body>
 </html>

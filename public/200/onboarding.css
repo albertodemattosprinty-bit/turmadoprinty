@@ -187,6 +187,28 @@ html.project200-onboarding-active body {
 }
 
 
+.project200-onboarding__privacy .project200-onboarding__eyebrow,
+.project200-onboarding__privacy h1 {
+  letter-spacing: 0;
+}
+
+.project200-onboarding__privacy-mark {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 20px;
+  border: 2px solid rgba(53, 213, 140, 0.42);
+  border-radius: 50%;
+  color: var(--onboarding-green);
+  background: rgba(53, 213, 140, 0.08);
+}
+
+.project200-onboarding__privacy-mark svg {
+  width: 56px;
+  height: 56px;
+}
+
 .project200-onboarding__privacy-list {
   display: grid;
   gap: 10px;
@@ -204,6 +226,28 @@ html.project200-onboarding-active body {
   color: rgba(255, 255, 255, 0.84);
   font-size: 0.92rem;
   line-height: 1.35;
+}
+
+.project200-onboarding__privacy-list strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #fff;
+}
+
+.project200-onboarding__privacy-policy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 18px;
+  border: 1px solid rgba(43, 156, 255, 0.38);
+  border-radius: 8px;
+  padding: 10px 15px;
+  color: #fff;
+  background: rgba(43, 156, 255, 0.08);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .project200-onboarding__persona-picker {

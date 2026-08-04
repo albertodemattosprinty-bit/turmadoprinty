@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <meta name="description" content="Política de Privacidade do iLife MindsetPlan, da Turma do Printy.">
+  <title>Privacidade | iLife MindsetPlan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/200/privacy.css">
+</head>
+<body>
+  <header class="privacy-header">
+    <button class="privacy-back" type="button" aria-label="Voltar" onclick="history.length > 1 ? history.back() : location.assign('/log?next=/200')">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <img src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan">
+  </header>
+
+  <main class="privacy-main">
+    <section class="privacy-hero" aria-labelledby="privacy-title">
+      <div class="privacy-shield" aria-hidden="true">
+        <svg viewBox="0 0 56 56"><path d="M28 6 10 13v13c0 12 7.4 21 18 25 10.6-4 18-13 18-25V13L28 6Z" fill="none" stroke="currentColor" stroke-width="2.8"/><path d="m20 28 5 5 11-12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <p class="privacy-eyebrow">Privacidade e dados seguros</p>
+      <h1 id="privacy-title">Seus dados fazem parte da sua vida. O cuidado também.</h1>
+      <p class="privacy-intro">Este aviso explica, de forma direta, quais dados o iLife usa, por quê, com quem eles podem ser processados e quais proteções existem hoje.</p>
+      <time datetime="2026-08-04">Atualizada em 4 de agosto de 2026</time>
+    </section>
+
+    <section class="privacy-highlight" aria-labelledby="security-summary-title">
+      <div>
+        <p class="privacy-eyebrow">Resumo de segurança</p>
+        <h2 id="security-summary-title">Não guardamos sua senha em texto aberto.</h2>
+      </div>
+      <p>Senhas usam scrypt com salt individual. Tokens de sessão são aleatórios e ficam armazenados no banco apenas como hash. Conversas com IAs, propostas geradas e novas memórias de mídia recebem criptografia AES-256-GCM vinculada à conta.</p>
+    </section>
+
+    <article class="privacy-content">
+      <section>
+        <span class="privacy-number">01</span>
+        <div>
+          <h2>Quem cuida destes dados</h2>
+          <p>O controlador é <strong>Alberto Luiz Passos de Mattos - Turma do Printy Ltda.</strong>, CNPJ 36.442.785/0001-08, responsável pelo iLife MindsetPlan.</p>
+          <p>Pedidos sobre privacidade podem ser enviados para <a href="mailto:contato@turmadoprinty.com.br">contato@turmadoprinty.com.br</a>.</p>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">02</span>
+        <div>
+          <h2>Dados que o iLife trata</h2>
+          <ul>
+            <li><strong>Conta e perfil:</strong> nome, usuário, credencial protegida, preferências, foto e perfis criados.</li>
+            <li><strong>Organização da vida:</strong> ações, missões, limites, projetos, ciclos, horários, pontos, sono, estatísticas e registros financeiros inseridos por você.</li>
+            <li><strong>Memórias:</strong> fotos, vídeos, áudios, legendas, notas e compartilhamentos que você escolher criar.</li>
+            <li><strong>Interações com IA:</strong> mensagens, respostas, propostas e o contexto necessário para atender ao pedido feito no chat.</li>
+            <li><strong>Segurança e operação:</strong> sessões, datas de criação e atualização, estado do onboarding e registros técnicos necessários para manter o serviço.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">03</span>
+        <div>
+          <h2>Para que usamos</h2>
+          <p>Usamos os dados para autenticar sua conta, sincronizar seu progresso, executar timers e ciclos, mostrar históricos, permitir compartilhamentos escolhidos por você, responder nas funções de IA e proteger o aplicativo contra uso indevido.</p>
+          <p>O tratamento ocorre para prestar o serviço solicitado, cumprir obrigações legais, proteger a segurança da plataforma e, quando necessário, com consentimento específico.</p>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">04</span>
+        <div>
+          <h2>Como protegemos</h2>
+          <ul>
+            <li><strong>Senhas:</strong> são derivadas com scrypt e salt individual. A senha original não é recuperável pelo banco.</li>
+            <li><strong>Sessões:</strong> usam tokens aleatórios com prazo de 30 dias. O servidor guarda somente o hash e pode revogar a sessão.</li>
+            <li><strong>Conteúdo sensível:</strong> mensagens das IAs e dos tutores, propostas e novas mídias privadas usam AES-256-GCM, chaves por usuário e contexto autenticado.</li>
+            <li><strong>Arquivos:</strong> novas memórias ficam em armazenamento privado e são entregues por rota autenticada. Registros antigos, quando existentes, também têm o endereço direto ocultado e exigem autorização para leitura.</li>
+            <li><strong>Banco:</strong> registros operacionais são separados por usuário e protegidos pelas regras de autorização da API e por conexão TLS em produção.</li>
+          </ul>
+          <p class="privacy-caution"><strong>Transparência importante:</strong> a criptografia não é ponta a ponta. O servidor abre os dados autorizados para executar funções pedidas por você. Nem todo campo operacional do banco recebe criptografia adicional na camada da aplicação.</p>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">05</span>
+        <div>
+          <h2>IA e fornecedores necessários</h2>
+          <p>Quando você usa uma IA, o texto do pedido e o contexto relevante são enviados à <strong>OpenAI</strong> para produzir a resposta. As chamadas do chat são configuradas com armazenamento desativado na requisição (<code>store: false</code>), mas o provedor ainda trata os dados conforme seus termos e obrigações de segurança.</p>
+          <p>Também usamos infraestrutura de hospedagem, banco de dados e <strong>Cloudflare R2</strong> para armazenar arquivos. Esses fornecedores recebem apenas o necessário para prestar seus serviços e podem operar infraestrutura fora do Brasil. Não vendemos dados pessoais.</p>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">06</span>
+        <div>
+          <h2>Compartilhamento escolhido por você</h2>
+          <p>Memórias e informações privadas não são públicas por padrão. Quando uma função permite compartilhar com outro usuário, o acesso é liberado somente para a conta escolhida e pode ser removido conforme as opções disponíveis.</p>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">07</span>
+        <div>
+          <h2>Retenção e exclusão</h2>
+          <p>Os dados permanecem enquanto a conta estiver ativa ou enquanto forem necessários para entregar o serviço. Itens que possuem exclusão no aplicativo são removidos dos registros ativos e, no caso de mídias, o arquivo associado também é solicitado para exclusão.</p>
+          <p>Após um pedido de encerramento, alguns registros podem ser conservados pelo período necessário para cumprir obrigação legal, prevenir fraude, resolver disputas ou manter backups técnicos por tempo limitado.</p>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">08</span>
+        <div>
+          <h2>Seus direitos</h2>
+          <p>Nos termos da LGPD, você pode pedir confirmação do tratamento, acesso, correção, informações sobre compartilhamento, portabilidade quando aplicável, anonimização, bloqueio ou eliminação de dados inadequados, além de revogar consentimento quando essa for a base utilizada.</p>
+          <p>Envie o pedido para <a href="mailto:contato@turmadoprinty.com.br">contato@turmadoprinty.com.br</a>. Podemos solicitar informações adicionais para confirmar sua identidade antes de entregar ou excluir dados.</p>
+          <a class="privacy-anpd" href="https://www.gov.br/anpd/pt-br/assuntos/titular-de-dados-1/direito-dos-titulares" target="_blank" rel="noopener noreferrer">Consultar os direitos do titular na ANPD</a>
+        </div>
+      </section>
+
+      <section>
+        <span class="privacy-number">09</span>
+        <div>
+          <h2>Mudanças nesta política</h2>
+          <p>Podemos atualizar este aviso quando o produto, a infraestrutura ou as regras aplicáveis mudarem. A data no topo identifica a versão vigente. Alterações relevantes serão comunicadas no aplicativo ou por outro canal adequado.</p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer class="privacy-footer">
+    <img src="/200/images/ilife-mindsetplan-home.png" alt="">
+    <span>Turma do Printy · iLife MindsetPlan</span>
+  </footer>
+</body>
+</html>
