@@ -103,7 +103,20 @@ const R2_PRIVATE_SECRET_ACCESS_KEY = String(process.env.R2_PRIVATE_SECRET_ACCESS
 const DEFAULT_SYSTEM_PROMPT = "Responda em portugues do Brasil, com tom humano, claro, respeitoso e direto. So use linguagem ou conteudo religioso se a pessoa pedir claramente ou trouxer esse contexto. Nao ofereca extras nem proximos passos que nao foram pedidos. Entregue exatamente o que a pessoa pediu, com etica, amizade e boa conversa.";
 const ALBUM_ZIP_FOLDER = "album-zips";
 const MAX_ALBUM_ZIP_BYTES = 150 * 1024 * 1024;
-const MINI_COURSE_MODEL_CANDIDATES = ["gpt-5.1", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"];
+const MINI_COURSE_MODEL_CANDIDATES = [
+  "gpt-5.6-sol",
+  "gpt-5.6-luna",
+  "gpt-5.6-terra",
+  "gpt-5.1",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano"
+];
+const MINI_COURSE_MODEL_LABELS = new Map([
+  ["gpt-5.6-sol", "Sol"],
+  ["gpt-5.6-luna", "Luna"],
+  ["gpt-5.6-terra", "Terra"]
+]);
 const MINI_COURSE_COVERS_PREFIX = "mini/courses";
 const MINI_MEDIA_LIBRARY_KEY = "mini/media/library.json";
 const MINI_MEDIA_ALBUMS_PREFIX = "mini/media/albums";
@@ -1282,10 +1295,9 @@ function normalizeMiniInstantModel(value) {
 function getMiniCourseGeneratorModels() {
   const unique = new Set();
   [
-    "gpt-5.1",
+    ...MINI_COURSE_MODEL_CANDIDATES,
     OPENAI_MODEL,
-    OPENAI_INSTANT_MODEL,
-    ...MINI_COURSE_MODEL_CANDIDATES
+    OPENAI_INSTANT_MODEL
   ].forEach((value) => {
     const safe = String(value || "").trim();
     if (safe) {
@@ -1295,7 +1307,7 @@ function getMiniCourseGeneratorModels() {
 
   return Array.from(unique).map((id) => ({
     id,
-    label: id.toUpperCase().replace(/^GPT-/, "GPT-")
+    label: MINI_COURSE_MODEL_LABELS.get(id) || id.toUpperCase().replace(/^GPT-/, "GPT-")
   }));
 }
 
