@@ -8328,6 +8328,14 @@ body[data-background-theme="white"] #missionVariantsModal.workspace-modal {
 .mission-variant-unit-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .mission-variant-unit-tabs button { border:1px solid rgba(255,255,255,.18); border-radius:14px; padding:13px; background:rgba(255,255,255,.07); color:#fff; font-weight:900; }
 .mission-variant-unit-tabs button.active { background:#1765d8; border-color:#5ea0ff; }
+.mission-variant-periodic-deadline { display:grid; gap:12px; }
+.mission-variant-periodic-deadline[hidden] { display:none !important; }
+.mission-variant-schedule-mode { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.mission-variant-schedule-mode button { min-height:76px; display:grid; align-content:center; gap:4px; padding:12px; border:1px solid rgba(255,255,255,.17); border-radius:12px; background:rgba(255,255,255,.06); color:#fff; font:inherit; text-align:left; }
+.mission-variant-schedule-mode button strong { font-size:.96rem; font-weight:900; }
+.mission-variant-schedule-mode button small { color:rgba(255,255,255,.62); font-size:.72rem; font-weight:750; line-height:1.3; }
+.mission-variant-schedule-mode button.is-selected { border-color:rgba(80,165,255,.82); background:#1f67d7; }
+.mission-variant-schedule-mode button.is-selected small { color:rgba(255,255,255,.82); }
 .mission-variant-editor-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .mission-variants-kicker,
 .mission-variants-title { display:none; }
@@ -15017,6 +15025,12 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
   background: #1f67d7;
 }
 
+.mission-weekday-list.is-avoidance button.is-selected {
+  border-color: rgba(255, 111, 111, .9);
+  color: #fff;
+  background: #c92a2a;
+}
+
 .mission-guide-step.mission-repeat-step { align-content: start; }
 .mission-guide-step.mission-repeat-step .mission-weekday-list { margin-top: 7px; }
 .mission-variant-editor-step .mission-weekday-list { max-height: min(52dvh, 420px); }
@@ -15070,6 +15084,8 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
 
 body[data-background-theme="light"] .mission-structure-choice,
 body[data-background-theme="white"] .mission-structure-choice,
+body[data-background-theme="light"] .mission-variant-schedule-mode button,
+body[data-background-theme="white"] .mission-variant-schedule-mode button,
 body[data-background-theme="light"] .mission-weekday-list button,
 body[data-background-theme="white"] .mission-weekday-list button {
   border-color: rgba(29, 45, 70, .17);
@@ -15084,8 +15100,13 @@ body[data-background-theme="white"] .mission-structure-choice small {
 
 body[data-background-theme="light"] .mission-structure-choice.is-selected,
 body[data-background-theme="white"] .mission-structure-choice.is-selected,
+body[data-background-theme="light"] .mission-variant-schedule-mode button.is-selected,
+body[data-background-theme="white"] .mission-variant-schedule-mode button.is-selected,
 body[data-background-theme="light"] .mission-weekday-list button.is-selected,
 body[data-background-theme="white"] .mission-weekday-list button.is-selected {
   color: #fff;
   background: #1f67d7;
 }
+
+body[data-background-theme="light"] .mission-weekday-list.is-avoidance button.is-selected,
+body[data-background-theme="white"] .mission-weekday-list.is-avoidance button.is-selected { color:#fff; background:#c92a2a; border-color:#ff8787; }

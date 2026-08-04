@@ -136,6 +136,10 @@ function normalizeExtraGoalVariantUnit(value) {
   return String(value || "days").trim().toLowerCase() === "hours" ? "hours" : "days";
 }
 
+function normalizeExtraGoalVariantScheduleMode(value) {
+  return String(value || "periodic").trim().toLowerCase() === "weekly" ? "weekly" : "periodic";
+}
+
 function normalizeActiveTimeMinutes(value, fallback, { allowEndOfDay = false } = {}) {
   const maximum = allowEndOfDay ? 24 * 60 : (24 * 60) - 1;
   const number = Math.trunc(Number(value));
@@ -238,7 +242,13 @@ function normalizeExtraGoalVariantRow(row) {
     intervalValue: Math.max(1, Math.trunc(Number(row.interval_value || 1))),
     intervalUnit: normalizeExtraGoalVariantUnit(row.interval_unit),
     unitDurationSeconds,
-    repeatDays: normalizeExtraGoalRepeatDays(row.repeat_days),
+    scheduleMode: normalizeExtraGoalVariantScheduleMode(row.schedule_mode),
+    repeatDays: normalizeExtraGoalVariantScheduleMode(row.schedule_mode) === "weekly"
+      ? normalizeExtraGoalRepeatDays(row.repeat_days, [])
+      : [],
+    avoidDays: normalizeExtraGoalVariantScheduleMode(row.schedule_mode) === "periodic"
+      ? normalizeExtraGoalRepeatDays(row.avoid_days, [])
+      : [],
     nextDueAt: row.next_due_at ? new Date(row.next_due_at).toISOString() : null,
     lastCompletedAt: row.last_completed_at ? new Date(row.last_completed_at).toISOString() : null,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
@@ -255,6 +265,50 @@ function normalizeVariantNextDueAt(value) {
   if (!raw) return null;
   const date = new Date(raw);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function getExtraGoalVariantWeekday(value) {
+  const dateKey = toDateKey(value);
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, Math.max(0, month - 1), Math.max(1, day), 12)).getUTCDay();
+}
+
+function addExtraGoalVariantDays(value, amount) {
+  return new Date(new Date(value).getTime() + (Math.trunc(Number(amount) || 0) * 86400000));
+}
+
+function alignExtraGoalVariantDueAt(variant, candidateValue) {
+  const candidate = new Date(candidateValue);
+  const safeCandidate = Number.isNaN(candidate.getTime()) ? new Date() : candidate;
+  const scheduleMode = normalizeExtraGoalVariantScheduleMode(variant?.scheduleMode ?? variant?.schedule_mode);
+  if (scheduleMode === "weekly") {
+    const repeatDays = normalizeExtraGoalRepeatDays(variant?.repeatDays ?? variant?.repeat_days, []);
+    if (!repeatDays.length) return safeCandidate;
+    for (let offset = 0; offset < 7; offset += 1) {
+      const next = addExtraGoalVariantDays(safeCandidate, offset);
+      if (repeatDays.includes(getExtraGoalVariantWeekday(next))) return next;
+    }
+    return safeCandidate;
+  }
+  const avoidDays = normalizeExtraGoalRepeatDays(variant?.avoidDays ?? variant?.avoid_days, []);
+  let next = safeCandidate;
+  for (let guard = 0; guard < 7 && avoidDays.includes(getExtraGoalVariantWeekday(next)); guard += 1) {
+    next = addExtraGoalVariantDays(next, 1);
+  }
+  return next;
+}
+
+export function resolveNextExtraGoalVariantDueAt(variant, fromValue = new Date()) {
+  const from = new Date(fromValue);
+  const safeFrom = Number.isNaN(from.getTime()) ? new Date() : from;
+  const scheduleMode = normalizeExtraGoalVariantScheduleMode(variant?.scheduleMode ?? variant?.schedule_mode);
+  if (scheduleMode === "weekly") {
+    return alignExtraGoalVariantDueAt(variant, addExtraGoalVariantDays(safeFrom, 1)).toISOString();
+  }
+  const intervalValue = Math.max(1, Math.min(999, Math.trunc(Number(variant?.intervalValue ?? variant?.interval_value ?? 1) || 1)));
+  const intervalUnit = normalizeExtraGoalVariantUnit(variant?.intervalUnit ?? variant?.interval_unit);
+  const intervalMs = intervalValue * (intervalUnit === "hours" ? 3600000 : 86400000);
+  return alignExtraGoalVariantDueAt(variant, new Date(safeFrom.getTime() + intervalMs)).toISOString();
 }
 
 function toDateKey(value = new Date()) {
@@ -635,6 +689,11 @@ export async function ensureExtraGoalsSchema() {
   await query("alter table extra_goal_variants add column if not exists unit_duration_seconds integer not null default 0;");
   await query("alter table extra_goal_variants add column if not exists next_due_at timestamptz;");
   await query("alter table extra_goal_variants add column if not exists repeat_days jsonb not null default '[0,1,2,3,4,5,6]'::jsonb;");
+  await query("alter table extra_goal_variants add column if not exists schedule_mode text not null default 'periodic';");
+  await query("alter table extra_goal_variants add column if not exists avoid_days jsonb not null default '[]'::jsonb;");
+  await query("update extra_goal_variants set schedule_mode = 'periodic' where schedule_mode is null or schedule_mode not in ('weekly', 'periodic');");
+  await query("update extra_goal_variants set repeat_days = '[]'::jsonb where schedule_mode = 'periodic' and repeat_days <> '[]'::jsonb;");
+  await query("update extra_goal_variants set avoid_days = '[]'::jsonb where schedule_mode = 'weekly' and avoid_days <> '[]'::jsonb;");
   await query(`
     update extra_goal_variants variant
     set unit_duration_seconds = goal.unit_duration_seconds,
@@ -812,7 +871,7 @@ export async function listExtraGoalVariants(userId, profileName, goalId) {
   const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
   if (!goal) throw new Error("Missao nao encontrada.");
   const result = await query(`
-    select id, goal_id, title, interval_value, interval_unit, unit_duration_seconds, repeat_days, next_due_at, last_completed_at, created_at, updated_at
+    select id, goal_id, title, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, next_due_at, last_completed_at, created_at, updated_at
     from extra_goal_variants
     where user_id = $1 and assigned_profile = $2 and goal_id = $3
     order by updated_at desc, created_at asc
@@ -827,15 +886,22 @@ export async function createExtraGoalVariant(userId, profileName, goalId, payloa
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
   const unitDurationSeconds = normalizeVariantDurationSeconds(payload?.unitDurationSeconds);
-  const repeatDays = normalizeExtraGoalRepeatDays(payload?.repeatDays);
-  const nextDueAt = normalizeVariantNextDueAt(payload?.nextDueAt);
+  const scheduleMode = normalizeExtraGoalVariantScheduleMode(payload?.scheduleMode);
+  const repeatDays = scheduleMode === "weekly" ? normalizeExtraGoalRepeatDays(payload?.repeatDays, []) : [];
+  const avoidDays = scheduleMode === "periodic" ? normalizeExtraGoalRepeatDays(payload?.avoidDays, []) : [];
+  const requestedNextDueAt = normalizeVariantNextDueAt(payload?.nextDueAt);
+  const nextDueAt = requestedNextDueAt
+    ? alignExtraGoalVariantDueAt({ scheduleMode, repeatDays, avoidDays }, requestedNextDueAt).toISOString()
+    : null;
+  if (scheduleMode === "weekly" && !repeatDays.length) throw new Error("Escolha pelo menos um dia da semana.");
+  if (scheduleMode === "periodic" && avoidDays.length >= 7) throw new Error("Deixe pelo menos um dia disponivel.");
   if (!title) throw new Error("Informe o nome da micro-tarefa.");
   const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
   if (!goal) throw new Error("Missao nao encontrada.");
   await query(`
-    insert into extra_goal_variants (user_id, goal_id, assigned_profile, title, interval_value, interval_unit, unit_duration_seconds, repeat_days, next_due_at)
-    values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::timestamptz)
-  `, [userId, safeGoalId, normalizedProfile, title, intervalValue, intervalUnit, unitDurationSeconds, JSON.stringify(repeatDays), nextDueAt]);
+    insert into extra_goal_variants (user_id, goal_id, assigned_profile, title, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, next_due_at)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::timestamptz)
+  `, [userId, safeGoalId, normalizedProfile, title, intervalValue, intervalUnit, unitDurationSeconds, scheduleMode, JSON.stringify(repeatDays), JSON.stringify(avoidDays), nextDueAt]);
   return listExtraGoalVariants(userId, normalizedProfile, safeGoalId);
 }
 
@@ -846,13 +912,20 @@ export async function updateExtraGoalVariant(userId, profileName, goalId, varian
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
   const unitDurationSeconds = normalizeVariantDurationSeconds(payload?.unitDurationSeconds);
-  const repeatDays = normalizeExtraGoalRepeatDays(payload?.repeatDays);
-  const nextDueAt = normalizeVariantNextDueAt(payload?.nextDueAt);
+  const scheduleMode = normalizeExtraGoalVariantScheduleMode(payload?.scheduleMode);
+  const repeatDays = scheduleMode === "weekly" ? normalizeExtraGoalRepeatDays(payload?.repeatDays, []) : [];
+  const avoidDays = scheduleMode === "periodic" ? normalizeExtraGoalRepeatDays(payload?.avoidDays, []) : [];
+  const requestedNextDueAt = normalizeVariantNextDueAt(payload?.nextDueAt);
+  const nextDueAt = requestedNextDueAt
+    ? alignExtraGoalVariantDueAt({ scheduleMode, repeatDays, avoidDays }, requestedNextDueAt).toISOString()
+    : null;
   if (!title) throw new Error("Informe o nome da micro-tarefa.");
+  if (scheduleMode === "weekly" && !repeatDays.length) throw new Error("Escolha pelo menos um dia da semana.");
+  if (scheduleMode === "periodic" && avoidDays.length >= 7) throw new Error("Deixe pelo menos um dia disponivel.");
   const result = await query(`
-    update extra_goal_variants set title = $5, interval_value = $6, interval_unit = $7, unit_duration_seconds = $8, repeat_days = $9::jsonb, next_due_at = $10::timestamptz, updated_at = now()
+    update extra_goal_variants set title = $5, interval_value = $6, interval_unit = $7, unit_duration_seconds = $8, schedule_mode = $9, repeat_days = $10::jsonb, avoid_days = $11::jsonb, next_due_at = $12::timestamptz, updated_at = now()
     where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2
-  `, [userId, normalizedProfile, goalId, variantId, title, intervalValue, intervalUnit, unitDurationSeconds, JSON.stringify(repeatDays), nextDueAt]);
+  `, [userId, normalizedProfile, goalId, variantId, title, intervalValue, intervalUnit, unitDurationSeconds, scheduleMode, JSON.stringify(repeatDays), JSON.stringify(avoidDays), nextDueAt]);
   if (!result.rowCount) throw new Error("Micro-tarefa nao encontrada.");
   return listExtraGoalVariants(userId, normalizedProfile, goalId);
 }
@@ -962,7 +1035,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     ])
   );
   const variantsResult = await query(`
-    select id, goal_id, title, interval_value, interval_unit, unit_duration_seconds, repeat_days, next_due_at, last_completed_at, created_at, updated_at
+    select id, goal_id, title, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, next_due_at, last_completed_at, created_at, updated_at
     from extra_goal_variants
     where user_id = $1 and assigned_profile = $2
     order by created_at asc, id asc
@@ -1255,13 +1328,20 @@ export async function updateExtraGoalProgress(userId, profileName = PROJECT200_D
     variantId
   ].map((value) => String(value || "").trim()).filter(Boolean))].slice(0, EXTRA_GOAL_MAX_CYCLES);
   if (safeDelta > 0 && safeVariantIds.length) {
-    await query(`
-      update extra_goal_variants
-      set last_completed_at = now(),
-          next_due_at = now() + (interval '1 hour' * case when interval_unit = 'hours' then interval_value else interval_value * 24 end),
-          updated_at = now()
+    const completedAt = new Date();
+    const completedVariants = await query(`
+      select id, interval_value, interval_unit, schedule_mode, repeat_days, avoid_days
+      from extra_goal_variants
       where id = any($4::uuid[]) and goal_id = $1 and user_id = $2 and assigned_profile = $3
     `, [safeGoalId, userId, normalizedProfile, safeVariantIds]);
+    for (const variant of completedVariants.rows) {
+      const nextDueAt = resolveNextExtraGoalVariantDueAt(variant, completedAt);
+      await query(`
+        update extra_goal_variants
+        set last_completed_at = $5::timestamptz, next_due_at = $6::timestamptz, updated_at = now()
+        where id = $4 and goal_id = $1 and user_id = $2 and assigned_profile = $3
+      `, [safeGoalId, userId, normalizedProfile, variant.id, completedAt.toISOString(), nextDueAt]);
+    }
   }
   const goals = await listExtraGoals(userId, normalizedProfile, dateKey);
   const updatedGoal = goals.find((goal) => String(goal.id || "").trim() === safeGoalId) || null;

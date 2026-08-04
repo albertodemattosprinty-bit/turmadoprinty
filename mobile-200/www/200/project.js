@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "0.77";
+const project200AppVersion = "0.78";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -797,6 +797,10 @@ const missionVariantsList = document.getElementById("missionVariantsList");
 const missionVariantAddButton = document.getElementById("missionVariantAddButton");
 const missionVariantEditor = document.getElementById("missionVariantEditor");
 const missionVariantTitleInput = document.getElementById("missionVariantTitleInput");
+const missionVariantScheduleMode = document.getElementById("missionVariantScheduleMode");
+const missionVariantPeriodicDeadline = document.getElementById("missionVariantPeriodicDeadline");
+const missionVariantWeekdayTitle = document.getElementById("missionVariantWeekdayTitle");
+const missionVariantWeekdayHint = document.getElementById("missionVariantWeekdayHint");
 const missionVariantDeadlinePrev = document.getElementById("missionVariantDeadlinePrev");
 const missionVariantDeadlineNext = document.getElementById("missionVariantDeadlineNext");
 const missionVariantDeadlineValue = document.getElementById("missionVariantDeadlineValue");
@@ -1523,7 +1527,9 @@ const state = {
     sortMenuOpen: false,
     intervalValue: 1,
     intervalUnit: "days",
-    repeatDays: [0, 1, 2, 3, 4, 5, 6]
+    scheduleMode: "",
+    repeatDays: [],
+    avoidDays: []
   },
   missionQuickSlots: [],
   runningMissionQuick: {
@@ -11827,8 +11833,21 @@ function formatMissionVariantNextDueLabel(offsetDays) {
   return { value: formatMissionVariantCalendarDate(getMissionVariantNextDueDate(safeOffset)), hint: `Em ${safeOffset} dias` };
 }
 
-function getMissionVariantNextDueAtIso(offsetDays) {
-  return getMissionVariantNextDueDate(offsetDays).toISOString();
+function alignMissionVariantNextDueDate(dateValue, scheduleMode, repeatDays, avoidDays) {
+  const mode = normalizeMissionVariantScheduleMode(scheduleMode);
+  const selectedDays = normalizeMissionRepeatDays(mode === "weekly" ? repeatDays : avoidDays, []);
+  let date = new Date(dateValue);
+  for (let guard = 0; guard < 7; guard += 1) {
+    const weekday = getMissionLocalWeekday(date.getTime());
+    const accepted = mode === "weekly" ? selectedDays.includes(weekday) : !selectedDays.includes(weekday);
+    if (accepted) return date;
+    date = new Date(date.getTime() + 86400000);
+  }
+  return date;
+}
+
+function getMissionVariantNextDueAtIso(offsetDays, scheduleMode, repeatDays, avoidDays) {
+  return alignMissionVariantNextDueDate(getMissionVariantNextDueDate(offsetDays), scheduleMode, repeatDays, avoidDays).toISOString();
 }
 
 function getMissionVariantNextDueOffsetDays(variant) {
@@ -14507,6 +14526,13 @@ function renderMissionKindFilter() {
 
 const ALL_MISSION_REPEAT_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
+function normalizeMissionVariantScheduleMode(value, { allowEmpty = false } = {}) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "weekly") return "weekly";
+  if (normalized === "periodic") return "periodic";
+  return allowEmpty ? "" : "periodic";
+}
+
 function normalizeMissionRepeatDays(value, fallback = ALL_MISSION_REPEAT_DAYS) {
   const sourceDays = Array.isArray(value) ? value : fallback;
   return [...new Set(sourceDays.map((day) => Math.trunc(Number(day))).filter((day) => day >= 0 && day <= 6))].sort((a, b) => a - b);
@@ -14542,7 +14568,17 @@ function getMissionLocalWeekday(nowMs = getServerNowMs()) {
 }
 
 function isMissionScheduledForToday(item, nowMs = getServerNowMs()) {
-  return normalizeMissionRepeatDays(item?.repeatDays).includes(getMissionLocalWeekday(nowMs));
+  const isVariant = item && (Object.prototype.hasOwnProperty.call(item, "intervalValue") || Object.prototype.hasOwnProperty.call(item, "scheduleMode"));
+  if (!isVariant) return normalizeMissionRepeatDays(item?.repeatDays).includes(getMissionLocalWeekday(nowMs));
+  const timing = getMissionVariantTiming(item, nowMs);
+  const todayKey = getProjectDateKey(new Date(nowMs));
+  const tomorrowStartMs = projectDateKeyToDate(addDaysToDateKey(todayKey, 1)).getTime();
+  if (timing.dueAtMs >= tomorrowStartMs) return false;
+  const scheduleMode = normalizeMissionVariantScheduleMode(item?.scheduleMode);
+  if (scheduleMode === "weekly") {
+    return normalizeMissionRepeatDays(item?.repeatDays, []).includes(getMissionLocalWeekday(nowMs));
+  }
+  return true;
 }
 
 function getMissionCreateStepSequence() {
@@ -15378,16 +15414,17 @@ function saveMissionVariantSortMode(value) {
 }
 
 function getMissionVariantTiming(variant, nowMs = getServerNowMs()) {
-  const intervalMs = Math.max(1, Number(variant?.intervalValue || 1)) * (variant?.intervalUnit === "hours" ? 3600000 : 86400000);
+  const baseIntervalMs = Math.max(1, Number(variant?.intervalValue || 1)) * (variant?.intervalUnit === "hours" ? 3600000 : 86400000);
+  const scheduleMode = normalizeMissionVariantScheduleMode(variant?.scheduleMode);
+  const rawReferenceMs = new Date(variant?.lastCompletedAt || variant?.createdAt || nowMs).getTime();
+  const fallbackReferenceMs = Number.isFinite(rawReferenceMs) ? rawReferenceMs : nowMs;
   const rawNextDueAtMs = new Date(variant?.nextDueAt || "").getTime();
-  const dueAtMs = Number.isFinite(rawNextDueAtMs)
-    ? rawNextDueAtMs
-    : (() => {
-      const rawReferenceMs = new Date(variant?.lastCompletedAt || variant?.createdAt || nowMs).getTime();
-      const referenceMs = Number.isFinite(rawReferenceMs) ? rawReferenceMs : nowMs;
-      return referenceMs + intervalMs;
-    })();
-  const referenceMs = dueAtMs - intervalMs;
+  let dueAtMs = Number.isFinite(rawNextDueAtMs) ? rawNextDueAtMs : fallbackReferenceMs + baseIntervalMs;
+  if (scheduleMode === "periodic") {
+    dueAtMs = alignMissionVariantNextDueDate(dueAtMs, scheduleMode, [], variant?.avoidDays).getTime();
+  }
+  const referenceMs = scheduleMode === "weekly" ? fallbackReferenceMs : dueAtMs - baseIntervalMs;
+  const intervalMs = scheduleMode === "weekly" ? Math.max(1, dueAtMs - referenceMs) : baseIntervalMs;
   const elapsedMs = Math.max(0, nowMs - referenceMs);
   const signedRemainingMs = dueAtMs - nowMs;
   const remainingMs = Math.max(0, signedRemainingMs);
@@ -15509,13 +15546,27 @@ function renderMissionVariants() {
     });
   }
   const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
+  const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants.scheduleMode, { allowEmpty: true });
   if (missionVariantEditorStep1) missionVariantEditorStep1.hidden = editorStep !== 1;
   if (missionVariantEditorStep2) missionVariantEditorStep2.hidden = editorStep !== 2;
   if (missionVariantEditorStep3) missionVariantEditorStep3.hidden = editorStep !== 3;
   if (missionVariantEditorStep4) missionVariantEditorStep4.hidden = editorStep !== 4;
   if (missionVariantEditorCancel) missionVariantEditorCancel.textContent = editorStep > 1 ? "Voltar" : "Cancelar";
   if (missionVariantEditorSave) missionVariantEditorSave.textContent = editorStep < 4 ? "Continuar" : "Salvar";
-  renderMissionWeekdayPicker(missionVariantWeekdays, state.missionVariants?.repeatDays);
+  missionVariantScheduleMode?.querySelectorAll("[data-variant-schedule-mode]").forEach((button) => {
+    const active = button.dataset.variantScheduleMode === scheduleMode;
+    button.classList.toggle("is-selected", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+  if (missionVariantPeriodicDeadline) missionVariantPeriodicDeadline.hidden = scheduleMode !== "periodic";
+  const avoidanceMode = scheduleMode === "periodic";
+  missionVariantWeekdays?.classList.toggle("is-avoidance", avoidanceMode);
+  if (missionVariantWeekdayTitle) missionVariantWeekdayTitle.textContent = avoidanceMode ? "Quer evitar algum dia?" : "Quando se repete?";
+  if (missionVariantWeekdayHint) missionVariantWeekdayHint.textContent = avoidanceMode
+    ? "Os dias evitados ficam marcados em vermelho"
+    : "Toque nos dias em que esta micro-tarefa se repete";
+  if (missionVariantWeekdays) missionVariantWeekdays.setAttribute("aria-label", avoidanceMode ? "Dias que devem ser evitados" : "Dias em que a micro-tarefa se repete");
+  renderMissionWeekdayPicker(missionVariantWeekdays, avoidanceMode ? state.missionVariants?.avoidDays : state.missionVariants?.repeatDays);
   if (missionVariantDeadlineValue) missionVariantDeadlineValue.textContent = String(state.missionVariants.intervalValue || 1);
   const variantDuration = normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds);
   if (missionVariantDurationValue) missionVariantDurationValue.textContent = variantDuration >= 60 && variantDuration % 60 === 0 ? String(variantDuration / 60) : String(variantDuration);
@@ -15540,9 +15591,14 @@ function renderMissionVariants() {
         ? Math.max(2, Math.min(100, (timing.overdueMs / timing.intervalMs) * 100))
         : timing.percent;
     const unitLabel = variant.intervalUnit === "hours" ? `${variant.intervalValue}h` : `${variant.intervalValue} ${variant.intervalValue === 1 ? "dia" : "dias"}`;
+    const scheduleMode = normalizeMissionVariantScheduleMode(variant?.scheduleMode);
+    const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+    const scheduleLabel = scheduleMode === "weekly"
+      ? `Semanal: ${normalizeMissionRepeatDays(variant?.repeatDays, []).map((day) => weekdayNames[day]).join(", ")}`
+      : `Prazo: ${unitLabel}`;
     const variantDuration = normalizeMissionDurationOption(variant.unitDurationSeconds || getMissionUnitDurationSeconds(getMissionRunGoalById(state.missionVariants.goalId)) || DEFAULT_MISSION_DURATION_SECONDS);
     return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
-      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>Prazo: ${unitLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
+      <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>${scheduleLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
       ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
@@ -15578,7 +15634,9 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
     sortMenuOpen: false,
     intervalValue: 1,
     intervalUnit: "days",
-    repeatDays: [...ALL_MISSION_REPEAT_DAYS]
+    scheduleMode: "",
+    repeatDays: [],
+    avoidDays: []
   };
   openModal("missionVariantsModal");
   if (missionVariantsList && !cachedItems.length) missionVariantsList.innerHTML = '<div class="empty-state">Carregando atividades...</div>';
@@ -15591,7 +15649,9 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
   if (options?.openEditorIfEmpty && !state.missionVariants.items.length) {
     state.missionVariants.editorOpen = true;
     state.missionVariants.editorStep = 1;
-    state.missionVariants.repeatDays = [...ALL_MISSION_REPEAT_DAYS];
+    state.missionVariants.scheduleMode = "";
+    state.missionVariants.repeatDays = [];
+    state.missionVariants.avoidDays = [];
     if (missionVariantTitleInput) missionVariantTitleInput.value = "";
   }
   renderMissionVariants();
@@ -19272,7 +19332,9 @@ missionVariantAddButton?.addEventListener("click", () => {
   state.missionVariants.intervalUnit = "days";
   state.missionVariants.unitDurationSeconds = DEFAULT_MISSION_DURATION_SECONDS;
   state.missionVariants.nextDueOffsetDays = 0;
-  state.missionVariants.repeatDays = [...ALL_MISSION_REPEAT_DAYS];
+  state.missionVariants.scheduleMode = "";
+  state.missionVariants.repeatDays = [];
+  state.missionVariants.avoidDays = [];
   if (missionVariantTitleInput) missionVariantTitleInput.value = "";
   if (missionVariantStatus) missionVariantStatus.textContent = "";
   renderMissionVariants();
@@ -19309,12 +19371,30 @@ attachAddingFastControl(missionVariantNextDueNext, (amount) => {
   state.missionVariants.nextDueOffsetDays = Math.min(MISSION_VARIANT_NEXT_DUE_MAX_DAYS, Number(state.missionVariants.nextDueOffsetDays || 0) + amount);
   renderMissionVariants();
 });
+missionVariantScheduleMode?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-variant-schedule-mode]");
+  if (!button) return;
+  const nextMode = normalizeMissionVariantScheduleMode(button.dataset.variantScheduleMode);
+  if (state.missionVariants.scheduleMode !== nextMode) {
+    state.missionVariants.repeatDays = [];
+    state.missionVariants.avoidDays = [];
+  }
+  state.missionVariants.scheduleMode = nextMode;
+  if (missionVariantStatus) missionVariantStatus.textContent = "";
+  renderMissionVariants();
+});
 missionVariantHoursButton?.addEventListener("click", () => { state.missionVariants.intervalUnit = "hours"; renderMissionVariants(); });
 missionVariantDaysButton?.addEventListener("click", () => { state.missionVariants.intervalUnit = "days"; renderMissionVariants(); });
 missionVariantWeekdays?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-repeat-day]");
   if (!button) return;
-  state.missionVariants.repeatDays = toggleMissionRepeatDay(state.missionVariants.repeatDays, button.dataset.repeatDay);
+  const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants.scheduleMode, { allowEmpty: true });
+  if (!scheduleMode) return;
+  if (scheduleMode === "periodic") {
+    state.missionVariants.avoidDays = toggleMissionRepeatDay(state.missionVariants.avoidDays, button.dataset.repeatDay);
+  } else {
+    state.missionVariants.repeatDays = toggleMissionRepeatDay(state.missionVariants.repeatDays, button.dataset.repeatDay);
+  }
   if (missionVariantStatus) missionVariantStatus.textContent = "";
   renderMissionVariants();
 });
@@ -19322,13 +19402,16 @@ missionVariantEditorSave?.addEventListener("click", async () => {
   const title = String(missionVariantTitleInput?.value || "").trim();
   if (!title) { if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa."; return; }
   const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants.editorStep || 1) || 1)));
+  const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants.scheduleMode, { allowEmpty: true });
+  if (editorStep === 1 && !scheduleMode) { if (missionVariantStatus) missionVariantStatus.textContent = "Escolha Semanal ou Periodico."; return; }
   if (editorStep < 4) {
     state.missionVariants.editorStep = editorStep + 1;
     if (missionVariantStatus) missionVariantStatus.textContent = "";
     renderMissionVariants();
     return;
   }
-  if (!normalizeMissionRepeatDays(state.missionVariants.repeatDays, []).length) { if (missionVariantStatus) missionVariantStatus.textContent = "Escolha pelo menos um dia."; return; }
+  if (scheduleMode === "weekly" && !normalizeMissionRepeatDays(state.missionVariants.repeatDays, []).length) { if (missionVariantStatus) missionVariantStatus.textContent = "Escolha pelo menos um dia."; return; }
+  if (scheduleMode === "periodic" && normalizeMissionRepeatDays(state.missionVariants.avoidDays, []).length >= 7) { if (missionVariantStatus) missionVariantStatus.textContent = "Deixe pelo menos um dia disponivel."; return; }
   const goalId = state.missionVariants.goalId;
   const editingId = state.missionVariants.editingId;
   const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
@@ -19337,7 +19420,7 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/variants${editingId ? `/${encodeURIComponent(editingId)}` : ""}`, {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), repeatDays: normalizeMissionRepeatDays(state.missionVariants.repeatDays), nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays) })
+      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, scheduleMode, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), repeatDays: scheduleMode === "weekly" ? normalizeMissionRepeatDays(state.missionVariants.repeatDays, []) : [], avoidDays: scheduleMode === "periodic" ? normalizeMissionRepeatDays(state.missionVariants.avoidDays, []) : [], nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays, scheduleMode, state.missionVariants.repeatDays, state.missionVariants.avoidDays) })
     });
     state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
     missionVariantsCache.set(getMissionVariantsCacheKey(goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
@@ -19420,7 +19503,9 @@ missionVariantsList?.addEventListener("click", async (event) => {
     variant.unitDurationSeconds || getMissionUnitDurationSeconds(parentGoal) || DEFAULT_MISSION_DURATION_SECONDS
   );
   state.missionVariants.nextDueOffsetDays = getMissionVariantNextDueOffsetDays(variant);
-  state.missionVariants.repeatDays = normalizeMissionRepeatDays(variant.repeatDays);
+  state.missionVariants.scheduleMode = normalizeMissionVariantScheduleMode(variant?.scheduleMode);
+  state.missionVariants.repeatDays = state.missionVariants.scheduleMode === "weekly" ? normalizeMissionRepeatDays(variant.repeatDays, []) : [];
+  state.missionVariants.avoidDays = state.missionVariants.scheduleMode === "periodic" ? normalizeMissionRepeatDays(variant.avoidDays, []) : [];
   if (missionVariantTitleInput) missionVariantTitleInput.value = variant.title;
   renderMissionVariants();
 });
