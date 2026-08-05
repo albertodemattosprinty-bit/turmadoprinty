@@ -1114,24 +1114,16 @@ const moneyFormatter = new Intl.NumberFormat("pt-BR", {
   currency: "BRL"
 });
 const backgroundThemeModes = [
-  { key: "black", label: "Black" },
   { key: "white", label: "Branco" },
-  { key: "sky", label: "Sky" }
+  { key: "black", label: "Black" },
+  { key: "orange", label: "Laranja" },
+  { key: "bluevivid", label: "Azul vivo" },
+  { key: "pinkstrong", label: "Rosa forte" },
+  { key: "bluedark", label: "Azul escuro" },
+  { key: "brown", label: "Marrom" },
+  { key: "edge", label: "Edge" },
+  { key: "light", label: "Light" }
 ];
-const skyThemeFrames = [
-  { minutes: 60, image: "/200/images/sky/01h.png" },
-  { minutes: 240, image: "/200/images/sky/04h.png" },
-  { minutes: 360, image: "/200/images/sky/06.png" },
-  { minutes: 720, image: "/200/images/sky/12h.png" },
-  { minutes: 900, image: "/200/images/sky/15h.png" },
-  { minutes: 1020, image: "/200/images/sky/17h.png" },
-  { minutes: 1110, image: "/200/images/sky/18h30.png" },
-  { minutes: 1260, image: "/200/images/sky/21h.png" }
-];
-const skyThemeTransitionMs = 5 * 60 * 1000;
-let skyThemeTicker = null;
-let optionsThemeHydratedFromServer = false;
-let optionsThemeSaveTimer = null;
 
 let financeTimer = null;
 let platformMetricsTicker = null;
@@ -1562,7 +1554,7 @@ const state = {
     completionBeepCycles: 0,
     minuteNotificationInterval: 1,
     finalMinuteNotificationsEnabled: true,
-    backgroundTheme: "sky",
+    backgroundTheme: "edge",
     screenLockEnabled: false,
     stopMusicOnFinish: false,
     messageNotificationsEnabled: false,
@@ -1798,9 +1790,10 @@ function renderSocialCardAvatar(entry) {
 
 function normalizeBackgroundTheme(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "modern") return "black";
-  if (normalized === "edge" || normalized === "light") return "sky";
-  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "sky";
+  if (normalized === "modern") {
+    return "black";
+  }
+  return backgroundThemeModes.find((item) => item.key === normalized)?.key || "edge";
 }
 
 function getBackgroundThemeMode(value) {
@@ -1808,83 +1801,8 @@ function getBackgroundThemeMode(value) {
   return backgroundThemeModes.find((item) => item.key === normalized) || backgroundThemeModes[0];
 }
 
-function getSkyThemeSnapshot(nowMs = getServerNowMs()) {
-  const date = new Date(nowMs);
-  const minutes = (date.getHours() * 60) + date.getMinutes();
-  const dayMs = (minutes * 60 * 1000) + (date.getSeconds() * 1000) + date.getMilliseconds();
-  let currentIndex = skyThemeFrames.length - 1;
-  for (let index = 0; index < skyThemeFrames.length; index += 1) {
-    if (minutes >= skyThemeFrames[index].minutes) currentIndex = index;
-  }
-  const currentFrame = skyThemeFrames[currentIndex];
-  const previousFrame = skyThemeFrames[(currentIndex - 1 + skyThemeFrames.length) % skyThemeFrames.length];
-  const frameStartMs = currentFrame.minutes * 60 * 1000;
-  const elapsedFromStart = dayMs - frameStartMs;
-  if (elapsedFromStart >= 0 && elapsedFromStart < skyThemeTransitionMs) {
-    return {
-      current: previousFrame.image,
-      next: currentFrame.image,
-      nextOpacity: Math.max(0, Math.min(1, elapsedFromStart / skyThemeTransitionMs))
-    };
-  }
-  return { current: currentFrame.image, next: currentFrame.image, nextOpacity: 0 };
-}
-
-function updateSkyThemeBackground() {
-  if (normalizeBackgroundTheme(state.options.backgroundTheme) !== "sky") return;
-  const snapshot = getSkyThemeSnapshot();
-  document.body.style.setProperty("--project-sky-current", `url("${snapshot.current}")`);
-  document.body.style.setProperty("--project-sky-next", `url("${snapshot.next}")`);
-  document.body.style.setProperty("--project-sky-next-opacity", String(snapshot.nextOpacity));
-}
-
-function scheduleSkyThemeTicker() {
-  if (skyThemeTicker) {
-    window.clearInterval(skyThemeTicker);
-    skyThemeTicker = null;
-  }
-  if (normalizeBackgroundTheme(state.options.backgroundTheme) !== "sky") return;
-  updateSkyThemeBackground();
-  skyThemeTicker = window.setInterval(updateSkyThemeBackground, 15000);
-}
-
 function applyBackgroundTheme() {
   document.body.dataset.backgroundTheme = normalizeBackgroundTheme(state.options.backgroundTheme);
-  scheduleSkyThemeTicker();
-}
-
-function syncServerNowFromIso(value) {
-  const parsed = Date.parse(String(value || ""));
-  if (!Number.isFinite(parsed)) return;
-  state.serverNowMs = parsed;
-  state.serverNowCapturedAtMs = Date.now();
-}
-
-async function loadProject200ThemePreference() {
-  try {
-    const payload = await apiRequest("/api/200/theme", { skipGlobalLoading: true });
-    if (payload?.serverNow) syncServerNowFromIso(payload.serverNow);
-    if (!payload?.theme) return;
-    optionsThemeHydratedFromServer = true;
-    state.options.backgroundTheme = normalizeBackgroundTheme(payload.theme);
-    applyBackgroundTheme();
-    saveOptionsConfig({ syncTheme: false });
-  } catch {}
-}
-
-function saveProject200ThemePreference() {
-  if (!optionsThemeHydratedFromServer) return;
-  window.clearTimeout(optionsThemeSaveTimer);
-  optionsThemeSaveTimer = window.setTimeout(() => {
-    apiRequest("/api/200/theme", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: normalizeBackgroundTheme(state.options.backgroundTheme) }),
-      skipGlobalLoading: true
-    }).then((payload) => {
-      if (payload?.serverNow) syncServerNowFromIso(payload.serverNow);
-    }).catch(() => {});
-  }, 250);
 }
 
 function readTokenCookie() {
@@ -17528,7 +17446,7 @@ async function loadOptionsConfig() {
       state.options.completionBeepCycles = 0;
       state.options.minuteNotificationInterval = 1;
       state.options.finalMinuteNotificationsEnabled = true;
-      state.options.backgroundTheme = "sky";
+      state.options.backgroundTheme = "edge";
       state.options.screenLockEnabled = false;
       state.options.stopMusicOnFinish = false;
       state.options.messageNotificationsEnabled = false;
@@ -17537,13 +17455,12 @@ async function loadOptionsConfig() {
       state.options.useAppKeyboard = false;
     }
     applyBackgroundTheme();
-    void loadProject200ThemePreference();
     applyProjectKeyboardPreference();
   })();
   return optionsConfigLoadPromise;
 }
 
-function saveOptionsConfig({ syncTheme = true } = {}) {
+function saveOptionsConfig() {
   const serialized = JSON.stringify({
     missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
     completionBeepCycles: Number(state.options.completionBeepCycles || 0),
@@ -17565,7 +17482,6 @@ function saveOptionsConfig({ syncTheme = true } = {}) {
   if (nativePreferences?.set) {
     void nativePreferences.set({ key: optionsConfigKey, value: serialized }).catch(() => {});
   }
-  if (syncTheme) saveProject200ThemePreference();
 }
 
 async function requestMessageNotificationPermission() {

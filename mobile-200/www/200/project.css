@@ -39,36 +39,6 @@ body {
   position: relative;
   touch-action: pan-y;
 }
-body[data-background-theme="sky"]::before,
-body[data-background-theme="sky"]::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-}
-
-body[data-background-theme="sky"]::before {
-  background-image: var(--project-sky-current, url("/200/images/sky/12h.png"));
-}
-
-body[data-background-theme="sky"]::after {
-  background-image: var(--project-sky-next, url("/200/images/sky/12h.png"));
-  opacity: var(--project-sky-next-opacity, 0);
-}
-body[data-background-theme="sky"] > :not(.app-background-video):not(.app-background-light) {
-  position: relative;
-  z-index: 1;
-}
-
-body[data-background-theme="sky"] .app-background-video,
-body[data-background-theme="sky"] .app-background-light {
-  opacity: 0;
-}
-
 
 .app-background-video {
   position: fixed;
@@ -213,7 +183,7 @@ body[data-background-theme="brown"] {
   --ink: #5b2f18;
 }
 
-body[data-background-theme="sky"] {
+body[data-background-theme="edge"] {
   background:
     radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
     linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
@@ -3011,7 +2981,7 @@ body[data-background-theme="brown"] #runningMissionQuickModal.workspace-modal {
   --running-quick-badge-bg: #6b321b;
 }
 
-body[data-background-theme="sky"] #runningMissionQuickModal.workspace-modal {
+body[data-background-theme="edge"] #runningMissionQuickModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
     linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
@@ -5725,8 +5695,8 @@ body[data-background-theme="brown"] .stats-aspect-assign-content {
     linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%);
 }
 
-body[data-background-theme="sky"] .stats-aspect-modal-content,
-body[data-background-theme="sky"] .stats-aspect-assign-content {
+body[data-background-theme="edge"] .stats-aspect-modal-content,
+body[data-background-theme="edge"] .stats-aspect-assign-content {
   background:
     radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
     linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
@@ -5754,7 +5724,7 @@ body[data-background-theme="bluevivid"] .svg-selector-content { background: line
 body[data-background-theme="pinkstrong"] .svg-selector-content { background: linear-gradient(145deg, rgba(255, 47, 146, 0.96), rgba(177, 12, 83, 0.97)); }
 body[data-background-theme="bluedark"] .svg-selector-content { background: linear-gradient(145deg, rgba(13, 45, 143, 0.96), rgba(2, 13, 55, 0.98)); }
 body[data-background-theme="brown"] .svg-selector-content { background: linear-gradient(145deg, rgba(158, 90, 45, 0.96), rgba(49, 20, 11, 0.98)); }
-body[data-background-theme="sky"] .svg-selector-content { background: linear-gradient(145deg, rgba(0, 183, 255, 0.96), rgba(35, 209, 161, 0.96)); }
+body[data-background-theme="edge"] .svg-selector-content { background: linear-gradient(145deg, rgba(0, 183, 255, 0.96), rgba(35, 209, 161, 0.96)); }
 body[data-background-theme="light"] .svg-selector-content { background: rgba(16, 51, 118, 0.94); }
 body[data-background-theme="white"] .svg-selector-content {
   background: linear-gradient(145deg, rgba(248, 248, 245, 0.98), rgba(236, 236, 231, 0.98));
@@ -6033,7 +6003,7 @@ body[data-background-theme="brown"] .global-loading-overlay {
     linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%);
 }
 
-body[data-background-theme="sky"] .global-loading-overlay {
+body[data-background-theme="edge"] .global-loading-overlay {
   background:
     radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
     linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
@@ -6916,7 +6886,7 @@ body[data-background-theme="orange"] .sleep-music-picker-modal {
 
 body[data-background-theme="bluevivid"] #socialModal.workspace-modal,
 body[data-background-theme="bluedark"] #socialModal.workspace-modal,
-body[data-background-theme="sky"] .sleep-music-picker-modal {
+body[data-background-theme="edge"] .sleep-music-picker-modal {
   z-index: 4200;
   background: rgba(0, 0, 0, 0.84);
   backdrop-filter: blur(18px);
@@ -8212,8 +8182,8 @@ body[data-background-theme="brown"] #missionVariantsModal.workspace-modal {
     linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%);
 }
 
-body[data-background-theme="sky"] #missionRunModal.workspace-modal,
-body[data-background-theme="sky"] #missionVariantsModal.workspace-modal {
+body[data-background-theme="edge"] #missionRunModal.workspace-modal,
+body[data-background-theme="edge"] #missionVariantsModal.workspace-modal {
   background:
     radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%),
     linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%);
@@ -8897,7 +8867,7 @@ body[data-background-theme="bluevivid"] { --project-modal-theme: radial-gradient
 body[data-background-theme="pinkstrong"] { --project-modal-theme: radial-gradient(circle at top left, rgba(255, 190, 216, 0.28), transparent 36%), linear-gradient(145deg, #ff2f92 0%, #ff1660 48%, #b10c53 100%); }
 body[data-background-theme="bluedark"] { --project-modal-theme: radial-gradient(circle at top left, rgba(125, 187, 255, 0.22), transparent 36%), linear-gradient(145deg, #0d2d8f 0%, #09206b 44%, #020d37 100%); }
 body[data-background-theme="brown"] { --project-modal-theme: radial-gradient(circle at top left, rgba(244, 197, 139, 0.24), transparent 34%), linear-gradient(145deg, #9e5a2d 0%, #6b321b 48%, #31140b 100%); }
-body[data-background-theme="sky"] { --project-modal-theme: radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%), linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%); }
+body[data-background-theme="edge"] { --project-modal-theme: radial-gradient(circle at top left, rgba(173, 252, 246, 0.28), transparent 34%), linear-gradient(145deg, #00b7ff 0%, #0c88f2 28%, #12b5c9 58%, #23d1a1 100%); }
 body[data-background-theme="light"] { --project-modal-theme: url("/200/background-light.png") center center / cover no-repeat; }
 body[data-background-theme="white"] { --project-modal-theme: radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 38%), linear-gradient(145deg, #f8f8f5 0%, #f2f2ed 48%, #ecece7 100%); }
 
@@ -8925,7 +8895,7 @@ body[data-background-theme="white"] :is(.history-mission-card, .task-row.stats-m
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%) !important;
 }
 
-body[data-background-theme="sky"] :is(.history-mission-card, .task-row.stats-mission-row) {
+body[data-background-theme="edge"] :is(.history-mission-card, .task-row.stats-mission-row) {
   background: linear-gradient(90deg, rgba(5, 66, 126, 0.4) 0%, rgba(5, 66, 126, 0) 100%) !important;
 }
 
@@ -15278,7 +15248,7 @@ body[data-background-theme="black"] .universal-schedule-modal {
   --universal-schedule-border: rgba(255, 255, 255, .14);
   --universal-schedule-active-bg: rgba(31, 103, 215, .24);
 }
-body[data-background-theme="sky"] .universal-schedule-modal {
+body[data-background-theme="edge"] .universal-schedule-modal {
   --universal-schedule-surface: #07140f;
   --universal-schedule-panel: #0d1d16;
   --universal-schedule-card: #122a1f;

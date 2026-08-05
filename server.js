@@ -75,7 +75,6 @@ import { canViewProject200LifeCapture, deleteProject200LifeCapture, getProject20
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
-import { getProject200ThemePreference, saveProject200ThemePreference } from "./src/project200-theme-preferences.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
 import { decryptUserBuffer, encryptUserBuffer } from "./src/privacy-crypto.js";
 
@@ -12232,25 +12231,6 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (pathname === "/api/200/theme" && (request.method === "GET" || request.method === "PUT")) {
-    try {
-      const user = await requireAuth(request, response);
-      if (!user) return;
-      if (request.method === "GET") {
-        const theme = await getProject200ThemePreference(user.id);
-        sendJson(response, 200, { ok: true, theme, serverNow: new Date().toISOString() });
-      } else {
-        const body = await readJsonBody(request);
-        const theme = await saveProject200ThemePreference(user.id, body?.theme);
-        sendJson(response, 200, { ok: true, theme, serverNow: new Date().toISOString() });
-      }
-    } catch (error) {
-      sendJson(response, 400, {
-        error: error instanceof Error ? error.message : "Nao foi possivel salvar o tema."
-      });
-    }
-    return;
-  }
   if (request.method === "GET" && pathname === "/api/200/marin/bootstrap") {
     await handleProject200MarinBootstrapRequest(request, response);
     return;
