@@ -15110,3 +15110,29 @@ body[data-background-theme="white"] .mission-weekday-list button.is-selected {
 
 body[data-background-theme="light"] .mission-weekday-list.is-avoidance button.is-selected,
 body[data-background-theme="white"] .mission-weekday-list.is-avoidance button.is-selected { color:#fff; background:#c92a2a; border-color:#ff8787; }
+
+/* Universal schedule modal */
+.universal-schedule-modal.active { display:flex; align-items:center; justify-content:center; padding:14px; z-index:1300; }
+.universal-schedule-panel { width:min(430px, 100%); max-height:min(86vh, 760px); display:flex; flex-direction:column; border-radius:8px; overflow:hidden; background:#f8fbff; color:#152331; box-shadow:0 24px 80px rgba(0,0,0,.34); }
+.universal-schedule-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px; border-bottom:1px solid rgba(21,35,49,.09); }
+.universal-schedule-head small { display:block; color:#667789; font-weight:800; font-size:.72rem; }
+.universal-schedule-head strong { display:block; font-size:1.16rem; font-weight:950; }
+.universal-schedule-body { overflow:auto; padding:12px; display:grid; gap:10px; }
+.universal-schedule-card { display:grid; gap:9px; padding:12px; border:1px solid rgba(21,35,49,.1); border-radius:8px; background:#fff; }
+.universal-schedule-card > label:first-child, .universal-schedule-label { font-size:.78rem; font-weight:900; color:#586778; }
+.universal-schedule-options { display:grid; gap:6px; }
+.universal-schedule-options button { min-height:38px; border:1px solid rgba(21,35,49,.14); border-radius:8px; background:#fff; color:#152331; font:inherit; font-weight:800; text-align:left; padding:8px 10px; }
+.universal-schedule-options button.active { border-color:#0f87a9; background:#e7f8fd; color:#07566d; }
+.universal-schedule-inline { display:flex; align-items:center; gap:8px; }
+.universal-schedule-inline input, .universal-schedule-inline select, .universal-schedule-card > select, .universal-schedule-card > input[type="date"] { min-height:38px; border:1px solid rgba(21,35,49,.16); border-radius:8px; background:#fff; color:#152331; padding:6px 8px; font:inherit; font-weight:800; min-width:0; }
+.universal-schedule-inline input { width:84px; }
+.universal-schedule-inline select { flex:1; }
+.universal-weekdays { display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; }
+.universal-weekdays button { aspect-ratio:1; border-radius:999px; border:1px solid rgba(21,35,49,.2); background:#fff; color:#152331; font-size:.72rem; font-weight:900; }
+.universal-weekdays button.active { background:#0f87a9; border-color:#0f87a9; color:#fff; }
+#usMonthly { display:grid; gap:8px; }
+#usMonthly label, .universal-schedule-card label:not(:first-child) { display:flex; align-items:center; gap:8px; color:#263545; font-weight:800; font-size:.9rem; }
+.universal-schedule-footer { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px; border-top:1px solid rgba(21,35,49,.09); background:#f8fbff; }
+body[data-background-theme="black"] .universal-schedule-panel, body[data-background-theme="edge"] .universal-schedule-panel { background:#101923; color:#fff; }
+body[data-background-theme="black"] .universal-schedule-card, body[data-background-theme="edge"] .universal-schedule-card { background:#172433; border-color:rgba(255,255,255,.1); }
+body[data-background-theme="black"] .universal-schedule-options button, body[data-background-theme="edge"] .universal-schedule-options button, body[data-background-theme="black"] .universal-schedule-inline input, body[data-background-theme="black"] .universal-schedule-inline select, body[data-background-theme="edge"] .universal-schedule-inline input, body[data-background-theme="edge"] .universal-schedule-inline select { background:#101923; color:#fff; border-color:rgba(255,255,255,.16); }

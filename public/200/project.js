@@ -5881,6 +5881,16 @@ function buildInitialWizardState() {
     repeatOpen: false,
     repeatMode: "none",
     repeatDays: [],
+    repeatInterval: 1,
+    repeatIntervalUnit: "week",
+    repeatMonthlyMode: "day",
+    repeatMonthDay: now.getDate(),
+    repeatEndMode: "never",
+    repeatEndDate: "",
+    repeatEndCount: 10,
+    notificationMode: "at_time",
+    notificationCustomAmount: 10,
+    notificationCustomUnit: "minutes",
     periodicEveryDays: 2,
     avoidSaturday: false,
     avoidSunday: false,
@@ -5909,6 +5919,66 @@ function normalizeRepeatMode(mode) {
     return mode;
   }
   return "none";
+}
+
+function normalizeUniversalIntervalUnit(value) {
+  const normalized = String(value || "week").trim().toLowerCase();
+  return ["day", "week", "month", "year"].includes(normalized) ? normalized : "week";
+}
+
+function normalizeUniversalEndMode(value) {
+  const normalized = String(value || "never").trim().toLowerCase();
+  return ["never", "date", "count"].includes(normalized) ? normalized : "never";
+}
+
+function normalizeUniversalNotificationMode(value) {
+  const normalized = String(value || "at_time").trim().toLowerCase();
+  return ["at_time", "5m", "10m", "30m", "1h", "1d", "custom"].includes(normalized) ? normalized : "at_time";
+}
+
+function getWizardScheduleConfig() {
+  const repeatMode = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
+  const intervalUnit = repeatMode === "daily" ? "day"
+    : repeatMode === "weekly" ? "week"
+    : repeatMode === "monthly_custom" ? "month"
+    : normalizeUniversalIntervalUnit(state.wizard.repeatIntervalUnit);
+  return {
+    version: 1,
+    source: "universal-schedule-modal",
+    frequency: repeatMode,
+    interval: Math.max(1, Math.min(999, Math.trunc(Number(state.wizard.repeatInterval || 1) || 1))),
+    intervalUnit,
+    weekDays: normalizeMissionRepeatDays(state.wizard.repeatDays, []),
+    monthlyMode: state.wizard.repeatMonthlyMode === "weekday" || repeatMode === "monthly_custom" ? "weekday" : "day",
+    monthDay: Math.max(1, Math.min(31, Math.trunc(Number(state.wizard.repeatMonthDay || 1) || 1))),
+    monthlyOrdinalIndex: Math.max(0, Math.min(4, Math.trunc(Number(state.wizard.monthlyOrdinalIndex || 0) || 0))),
+    monthlyWeekdayIndex: Math.max(0, Math.min(6, Math.trunc(Number(state.wizard.monthlyWeekdayIndex || 0) || 0))),
+    startsOn: getProjectDateKey(dateFromOffset(state.wizard.dateOffset)),
+    endMode: normalizeUniversalEndMode(state.wizard.repeatEndMode),
+    endsOn: String(state.wizard.repeatEndDate || "").slice(0, 10),
+    count: Math.max(1, Math.min(999, Math.trunc(Number(state.wizard.repeatEndCount || 10) || 10))),
+    notification: {
+      mode: normalizeUniversalNotificationMode(state.wizard.notificationMode),
+      customAmount: Math.max(1, Math.min(999, Math.trunc(Number(state.wizard.notificationCustomAmount || 10) || 10))),
+      customUnit: ["minutes", "hours", "days"].includes(String(state.wizard.notificationCustomUnit || "")) ? state.wizard.notificationCustomUnit : "minutes"
+    }
+  };
+}
+
+function applyScheduleConfigToWizard(config = {}) {
+  const schedule = config && typeof config === "object" ? config : {};
+  state.wizard.repeatInterval = Math.max(1, Math.min(999, Math.trunc(Number(schedule.interval || state.wizard.repeatInterval || 1) || 1)));
+  state.wizard.repeatIntervalUnit = normalizeUniversalIntervalUnit(schedule.intervalUnit || state.wizard.repeatIntervalUnit);
+  state.wizard.repeatMonthlyMode = schedule.monthlyMode === "weekday" ? "weekday" : "day";
+  state.wizard.repeatMonthDay = Math.max(1, Math.min(31, Math.trunc(Number(schedule.monthDay || state.wizard.repeatMonthDay || 1) || 1)));
+  state.wizard.monthlyOrdinalIndex = Math.max(0, Math.min(4, Math.trunc(Number(schedule.monthlyOrdinalIndex || state.wizard.monthlyOrdinalIndex || 0) || 0)));
+  state.wizard.monthlyWeekdayIndex = Math.max(0, Math.min(6, Math.trunc(Number(schedule.monthlyWeekdayIndex || state.wizard.monthlyWeekdayIndex || 0) || 0)));
+  state.wizard.repeatEndMode = normalizeUniversalEndMode(schedule.endMode || state.wizard.repeatEndMode);
+  state.wizard.repeatEndDate = String(schedule.endsOn || state.wizard.repeatEndDate || "").slice(0, 10);
+  state.wizard.repeatEndCount = Math.max(1, Math.min(999, Math.trunc(Number(schedule.count || state.wizard.repeatEndCount || 10) || 10)));
+  state.wizard.notificationMode = normalizeUniversalNotificationMode(schedule.notification?.mode || state.wizard.notificationMode);
+  state.wizard.notificationCustomAmount = Math.max(1, Math.min(999, Math.trunc(Number(schedule.notification?.customAmount || state.wizard.notificationCustomAmount || 10) || 10)));
+  state.wizard.notificationCustomUnit = ["minutes", "hours", "days"].includes(String(schedule.notification?.customUnit || "")) ? schedule.notification.customUnit : state.wizard.notificationCustomUnit;
 }
 
 function buildInitialPlatformWizardState() {
@@ -21128,3 +21198,119 @@ window.project200ProjectsContext = {
   normalizeActionStatus, openModal, closeModal, openTaskComposer, openMissionCreateModal,
   getToken, redirectToProject200Login, renderActions, loadActions, loadMissions
 };
+
+// PROJECT200_UNIVERSAL_SCHEDULE_EXTENSION
+(function installProject200UniversalSchedule() {
+  if (window.__project200UniversalScheduleInstalled) return;
+  window.__project200UniversalScheduleInstalled = true;
+  const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+  const ordinals = ["primeira", "segunda", "terceira", "quarta", "ultima"];
+  const weekdayLong = ["domingo", "segunda-feira", "terca-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sabado"];
+  function ensureFields() {
+    state.wizard.repeatInterval = Math.max(1, Number(state.wizard.repeatInterval || 1));
+    state.wizard.repeatIntervalUnit = ["day", "week", "month", "year"].includes(state.wizard.repeatIntervalUnit) ? state.wizard.repeatIntervalUnit : "week";
+    state.wizard.repeatMonthlyMode = state.wizard.repeatMonthlyMode === "day" ? "day" : "weekday";
+    state.wizard.repeatMonthDay = Math.max(1, Math.min(31, Number(state.wizard.repeatMonthDay || new Date().getDate())));
+    state.wizard.repeatEndMode = ["never", "date", "count"].includes(state.wizard.repeatEndMode) ? state.wizard.repeatEndMode : "never";
+    state.wizard.repeatEndDate = String(state.wizard.repeatEndDate || "").slice(0, 10);
+    state.wizard.repeatEndCount = Math.max(1, Number(state.wizard.repeatEndCount || 10));
+  }
+  function ensureModal() {
+    let modal = document.getElementById("universalScheduleModal");
+    if (modal) return modal;
+    modal = document.createElement("section");
+    modal.id = "universalScheduleModal";
+    modal.className = "workspace-modal simple-modal universal-schedule-modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><div><small>Quando</small><strong>Repeticao</strong></div><button class="history-mission-modal-close" type="button" data-us-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-us-repeat="none">Nunca se repete</button><button type="button" data-us-repeat="daily">Diariamente</button><button type="button" data-us-repeat="weekly">Semanalmente</button><button type="button" data-us-repeat="monthly_custom">Mensalmente</button><button type="button" data-us-repeat="yearly">Anualmente</button><button type="button" data-us-repeat="periodic">Personalizado</button></div></section><section class="universal-schedule-card" data-us-custom><label>Repetir a cada</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usInterval"><select id="usUnit"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mes</option><option value="year">Ano</option></select></div><div class="universal-weekdays" id="usWeekdays"></div><div id="usMonthly"><label><input type="radio" name="usMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usMonthDay"></div><label><input type="radio" name="usMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label>Comecar em</label><input class="text-field options-text-field" type="date" id="usStart"></section><section class="universal-schedule-card" data-us-end><label>Termino</label><label><input type="radio" name="usEnd" value="never"> Nunca termina</label><label><input type="radio" name="usEnd" value="date"> Termina em</label><input class="text-field options-text-field" type="date" id="usEndDate"><label><input type="radio" name="usEnd" value="count"> Depois de</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usNotification"><option>No horario da tarefa</option><option>5 minutos antes</option><option>10 minutos antes</option><option>30 minutos antes</option><option>1 hora antes</option><option>1 dia antes</option><option>Personalizado</option></select></section></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-us-close>Cancelar</button><button class="primary-btn" type="button" id="usApply">Aplicar</button></footer></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener("click", function(event) {
+      if (event.target.closest("[data-us-close]")) closeModalLocal();
+      const repeat = event.target.closest("[data-us-repeat]");
+      if (repeat) { setRepeatChoice(repeat.dataset.usRepeat); renderModal(); }
+      const day = event.target.closest("[data-us-weekday]");
+      if (day) { const set = new Set(state.wizard.repeatDays || []); const value = Number(day.dataset.usWeekday); set.has(value) ? set.delete(value) : set.add(value); state.wizard.repeatDays = Array.from(set).sort((a,b)=>a-b); renderModal(); }
+    });
+    modal.querySelector("#usApply").addEventListener("click", applyModal);
+    return modal;
+  }
+  function setRepeatChoice(mode) {
+    state.wizard.repeatOpen = mode !== "none";
+    if (mode === "none") state.wizard.repeatMode = "none";
+    else if (mode === "yearly") { state.wizard.repeatMode = "periodic"; state.wizard.repeatIntervalUnit = "year"; state.wizard.repeatInterval = 1; }
+    else state.wizard.repeatMode = mode;
+    if (mode === "daily") { state.wizard.repeatIntervalUnit = "day"; state.wizard.repeatInterval = 1; }
+    if (mode === "weekly") { state.wizard.repeatIntervalUnit = "week"; state.wizard.repeatInterval = 1; if (!state.wizard.repeatDays.length) state.wizard.repeatDays = [new Date().getDay()]; }
+    if (mode === "monthly_custom") { state.wizard.repeatIntervalUnit = "month"; state.wizard.repeatInterval = 1; state.wizard.repeatMonthlyMode = "weekday"; }
+  }
+  function renderModal() {
+    ensureFields();
+    const modal = ensureModal();
+    const mode = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
+    modal.querySelectorAll("[data-us-repeat]").forEach(btn => btn.classList.toggle("active", btn.dataset.usRepeat === mode || (btn.dataset.usRepeat === "yearly" && state.wizard.repeatIntervalUnit === "year")));
+    modal.querySelector("[data-us-custom]").hidden = mode === "none";
+    modal.querySelector("[data-us-end]").hidden = mode === "none";
+    modal.querySelector("#usInterval").value = state.wizard.repeatInterval;
+    modal.querySelector("#usUnit").value = state.wizard.repeatIntervalUnit;
+    modal.querySelector("#usStart").value = getProjectDateKey(dateFromOffset(state.wizard.dateOffset));
+    modal.querySelector("#usMonthDay").value = state.wizard.repeatMonthDay;
+    modal.querySelector("#usOrdinal").value = state.wizard.monthlyOrdinalIndex || 0;
+    modal.querySelector("#usWeekday").value = state.wizard.monthlyWeekdayIndex || 1;
+    modal.querySelectorAll("[name='usMonthlyMode']").forEach(input => input.checked = input.value === state.wizard.repeatMonthlyMode);
+    modal.querySelectorAll("[name='usEnd']").forEach(input => input.checked = input.value === state.wizard.repeatEndMode);
+    modal.querySelector("#usEndDate").value = state.wizard.repeatEndDate;
+    modal.querySelector("#usEndCount").value = state.wizard.repeatEndCount;
+    modal.querySelector("#usWeekdays").hidden = state.wizard.repeatIntervalUnit !== "week";
+    modal.querySelector("#usWeekdays").innerHTML = weekdays.map((label, day) => '<button type="button" data-us-weekday="' + day + '" class="' + ((state.wizard.repeatDays || []).includes(day) ? 'active' : '') + '">' + label + '</button>').join('');
+    modal.querySelector("#usMonthly").hidden = state.wizard.repeatIntervalUnit !== "month";
+  }
+  function openModalLocal() { ensureModal().classList.add("active"); ensureModal().setAttribute("aria-hidden", "false"); document.body.classList.add("modal-open"); renderModal(); }
+  function closeModalLocal() { const modal = document.getElementById("universalScheduleModal"); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden", "true"); }
+  function applyModal() {
+    const modal = ensureModal();
+    state.wizard.repeatInterval = Math.max(1, Number(modal.querySelector("#usInterval").value || 1));
+    state.wizard.repeatIntervalUnit = modal.querySelector("#usUnit").value;
+    state.wizard.repeatMonthlyMode = modal.querySelector("[name='usMonthlyMode']:checked")?.value === "day" ? "day" : "weekday";
+    state.wizard.repeatMonthDay = Math.max(1, Math.min(31, Number(modal.querySelector("#usMonthDay").value || 1)));
+    state.wizard.monthlyOrdinalIndex = Number(modal.querySelector("#usOrdinal").value || 0);
+    state.wizard.monthlyWeekdayIndex = Number(modal.querySelector("#usWeekday").value || 1);
+    state.wizard.repeatEndMode = modal.querySelector("[name='usEnd']:checked")?.value || "never";
+    state.wizard.repeatEndDate = modal.querySelector("#usEndDate").value || "";
+    state.wizard.repeatEndCount = Math.max(1, Number(modal.querySelector("#usEndCount").value || 10));
+    const start = modal.querySelector("#usStart").value;
+    if (start) state.wizard.dateOffset = Math.round((projectDateKeyToDate(start, 12).getTime() - todayStart().getTime()) / 86400000);
+    if (state.wizard.repeatIntervalUnit === "day") state.wizard.repeatMode = state.wizard.repeatInterval === 1 ? "daily" : "periodic";
+    if (state.wizard.repeatIntervalUnit === "week") state.wizard.repeatMode = "weekly";
+    if (state.wizard.repeatIntervalUnit === "month") state.wizard.repeatMode = "monthly_custom";
+    if (state.wizard.repeatIntervalUnit === "year") state.wizard.repeatMode = "periodic";
+    state.wizard.repeatOpen = state.wizard.repeatMode !== "none";
+    state.startDecisionContext.dirty = true;
+    closeModalLocal();
+    renderTaskComposerModal();
+  }
+  function nthWeekday(year, month, weekday, ordinal) { const found = []; for (let d = 1; d <= 31; d += 1) { const date = new Date(year, month, d); if (date.getMonth() !== month) break; if (date.getDay() === weekday) found.push(date); } return ordinal === 4 ? found[found.length - 1] : found[ordinal]; }
+  const oldBuildOccurrences = buildOccurrences;
+  buildOccurrences = function() {
+    ensureFields();
+    if (!state.wizard.repeatOpen) return oldBuildOccurrences();
+    const selected = dateFromOffset(state.wizard.dateOffset);
+    const firstStart = buildDateWithTime(selected, state.wizard.startHour, state.wizard.startMinute);
+    const firstEnd = buildDateWithTime(selected, state.wizard.endHour, state.wizard.endMinute);
+    if (firstEnd <= firstStart) throw new Error("O horario final precisa ser depois do inicial.");
+    const out = [];
+    const max = state.wizard.repeatEndMode === "count" ? state.wizard.repeatEndCount : 370;
+    const endMs = state.wizard.repeatEndMode === "date" && state.wizard.repeatEndDate ? projectDateKeyToDate(state.wizard.repeatEndDate, 23, 59, 59).getTime() : Infinity;
+    const push = (date) => { if (!date || out.length >= max) return; const startAt = buildDateWithTime(date, state.wizard.startHour, state.wizard.startMinute); if (startAt < firstStart || startAt.getTime() > endMs) return; out.push({ startAt: startAt.toISOString(), endAt: buildDateWithTime(date, state.wizard.endHour, state.wizard.endMinute).toISOString() }); };
+    const interval = Math.max(1, state.wizard.repeatInterval || 1);
+    if (state.wizard.repeatIntervalUnit === "day") for (let i = 0; i < 730 && out.length < max; i += interval) push(addDays(selected, i));
+    if (state.wizard.repeatIntervalUnit === "week") for (let w = 0; w < 104 && out.length < max; w += interval) (state.wizard.repeatDays.length ? state.wizard.repeatDays : [selected.getDay()]).forEach(day => push(addDays(selected, w * 7 + ((day - selected.getDay() + 7) % 7))));
+    if (state.wizard.repeatIntervalUnit === "month") for (let m = 0; m < 60 && out.length < max; m += interval) { const base = new Date(selected.getFullYear(), selected.getMonth() + m, 1); if (state.wizard.repeatMonthlyMode === "weekday") push(nthWeekday(base.getFullYear(), base.getMonth(), state.wizard.monthlyWeekdayIndex || 1, state.wizard.monthlyOrdinalIndex || 0)); else push(new Date(base.getFullYear(), base.getMonth(), Math.min(state.wizard.repeatMonthDay, new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate()))); }
+    if (state.wizard.repeatIntervalUnit === "year") for (let y = 0; y < 20 && out.length < max; y += interval) push(new Date(selected.getFullYear() + y, selected.getMonth(), selected.getDate()));
+    if (!out.length) throw new Error("Nenhuma data valida encontrada para essa repeticao.");
+    return out.sort((a,b)=>new Date(a.startAt)-new Date(b.startAt));
+  };
+  const oldFormat = formatTaskComposerDateLabel;
+  formatTaskComposerDateLabel = function() { ensureFields(); if (!state.wizard.repeatOpen) return oldFormat(); if (state.wizard.repeatIntervalUnit === "week") return "A cada " + state.wizard.repeatInterval + " semana(s): " + ((state.wizard.repeatDays || []).map(d => weekdays[d]).join(", ") || "dia escolhido"); if (state.wizard.repeatIntervalUnit === "month" && state.wizard.repeatMonthlyMode === "weekday") return "Todo mes: " + ordinals[state.wizard.monthlyOrdinalIndex || 0] + " " + weekdayLong[state.wizard.monthlyWeekdayIndex || 1]; if (state.wizard.repeatIntervalUnit === "month") return "Todo dia " + state.wizard.repeatMonthDay + " do mes"; if (state.wizard.repeatIntervalUnit === "year") return "Anualmente"; return "A cada " + state.wizard.repeatInterval + " dia(s)"; };
+  const oldOpenEditor = openTaskComposerFieldEditor;
+  openTaskComposerFieldEditor = function(field) { if (field === "repeat") { openModalLocal(); return; } return oldOpenEditor(field); };
+})();
