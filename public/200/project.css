@@ -15223,7 +15223,7 @@ body[data-background-theme="white"] .mission-weekday-list.is-avoidance button.is
 .universal-schedule-card > label:first-child, .universal-schedule-label { font-size:.78rem; font-weight:900; color:var(--universal-schedule-muted); }
 .universal-schedule-options { display:grid; gap:6px; }
 .universal-schedule-options button { min-height:38px; border:1px solid var(--universal-schedule-border); border-radius:8px; background:var(--universal-schedule-card); color:var(--universal-schedule-text); font:inherit; font-weight:800; text-align:left; padding:8px 10px; }
-.universal-schedule-options button.active { border-color:var(--universal-schedule-accent); background:var(--universal-schedule-active-bg); color:var(--universal-schedule-accent); box-shadow:inset 3px 0 0 var(--universal-schedule-accent); }
+.universal-schedule-options button.active { border-color:var(--universal-schedule-accent); background:var(--universal-schedule-accent); color:#fff; box-shadow:inset 3px 0 0 rgba(255,255,255,.38); }
 .universal-schedule-inline { display:flex; align-items:center; gap:8px; }
 .universal-schedule-inline input, .universal-schedule-inline select, .universal-schedule-card > select, .universal-schedule-card > input[type="date"] { min-height:38px; border:1px solid var(--universal-schedule-border); border-radius:8px; background:var(--universal-schedule-card); color:var(--universal-schedule-text); padding:6px 8px; font:inherit; font-weight:800; min-width:0; }
 .universal-schedule-inline input { width:84px; }
@@ -15232,6 +15232,10 @@ body[data-background-theme="white"] .mission-weekday-list.is-avoidance button.is
 .universal-weekdays { display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; }
 .universal-weekdays button { aspect-ratio:1; border-radius:999px; border:1px solid var(--universal-schedule-border); background:var(--universal-schedule-card); color:var(--universal-schedule-text); font-size:.72rem; font-weight:900; }
 .universal-weekdays button.active { background:var(--universal-schedule-accent); border-color:var(--universal-schedule-accent); color:#fff; }
+.universal-schedule-avoid { display:grid; gap:7px; }
+.universal-schedule-avoid > label { color:var(--universal-schedule-muted); font-size:.78rem; font-weight:900; }
+.universal-schedule-avoid small { color:var(--universal-schedule-text); font-size:.78rem; font-weight:850; opacity:.86; }
+.universal-weekdays-avoid button.active { background:#df3030; border-color:#ff6b6b; color:#fff; }
 #usMonthly, #usbMonthly { display:grid; gap:8px; }
 #usMonthly label, #usbMonthly label, .universal-schedule-card label:not(:first-child) { display:flex; align-items:center; gap:8px; color:var(--universal-schedule-text); font-weight:800; font-size:.9rem; }
 .universal-schedule-footer { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px; border-top:1px solid var(--universal-schedule-border); background:var(--universal-schedule-panel); }
