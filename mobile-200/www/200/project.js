@@ -21214,7 +21214,7 @@ window.project200ProjectsContext = {
   const weekdayLong = ["domingo", "segunda-feira", "terca-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sabado"];
   function ensureFields() {
     state.wizard.repeatInterval = Math.max(1, Number(state.wizard.repeatInterval || 1));
-    state.wizard.repeatIntervalUnit = ["day", "week", "month", "year"].includes(state.wizard.repeatIntervalUnit) ? state.wizard.repeatIntervalUnit : "week";
+    state.wizard.repeatIntervalUnit = ["day", "week", "month", "year"].includes(state.wizard.repeatIntervalUnit) ? state.wizard.repeatIntervalUnit : "day";
     state.wizard.repeatMonthlyMode = state.wizard.repeatMonthlyMode === "day" ? "day" : "weekday";
     state.wizard.repeatMonthDay = Math.max(1, Math.min(31, Number(state.wizard.repeatMonthDay || new Date().getDate())));
     state.wizard.repeatEndMode = ["never", "date", "count"].includes(state.wizard.repeatEndMode) ? state.wizard.repeatEndMode : "never";
@@ -21228,7 +21228,7 @@ window.project200ProjectsContext = {
     modal.id = "universalScheduleModal";
     modal.className = "workspace-modal simple-modal universal-schedule-modal";
     modal.setAttribute("aria-hidden", "true");
-    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><div><small>Quando</small><strong>Repeticao</strong></div><button class="history-mission-modal-close" type="button" data-us-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-us-repeat="none">Nunca se repete</button><button type="button" data-us-repeat="daily">Diariamente</button><button type="button" data-us-repeat="weekly">Semanalmente</button><button type="button" data-us-repeat="monthly_custom">Mensalmente</button><button type="button" data-us-repeat="yearly">Anualmente</button><button type="button" data-us-repeat="periodic">Personalizado</button></div></section><section class="universal-schedule-card" data-us-custom><label>Repetir a cada</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usInterval"><select id="usUnit"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mes</option><option value="year">Ano</option></select></div><div class="universal-weekdays" id="usWeekdays"></div><div id="usMonthly"><label><input type="radio" name="usMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usMonthDay"></div><label><input type="radio" name="usMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label>Comecar em</label><input class="text-field options-text-field" type="date" id="usStart"></section><section class="universal-schedule-card" data-us-end><label>Termino</label><label><input type="radio" name="usEnd" value="never"> Nunca termina</label><label><input type="radio" name="usEnd" value="date"> Termina em</label><input class="text-field options-text-field" type="date" id="usEndDate"><label><input type="radio" name="usEnd" value="count"> Depois de</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usNotification"><option>No horario da tarefa</option><option>5 minutos antes</option><option>10 minutos antes</option><option>30 minutos antes</option><option>1 hora antes</option><option>1 dia antes</option><option>Personalizado</option></select></section></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-us-close>Cancelar</button><button class="primary-btn" type="button" id="usApply">Aplicar</button></footer></div>';
+    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><h2 class="universal-schedule-title">Quando se repete?</h2><button class="history-mission-modal-close" type="button" data-us-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-us-repeat="none">Nunca se repete</button><button type="button" data-us-repeat="daily">Diariamente</button><button type="button" data-us-repeat="weekly">Semanalmente</button><button type="button" data-us-repeat="monthly_custom">Mensalmente</button><button type="button" data-us-repeat="yearly">Anualmente</button><button type="button" data-us-repeat="periodic">Personalizado</button></div></section><div data-us-details><section class="universal-schedule-card" data-us-custom><label>Repetir a cada</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usInterval"><select id="usUnit"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mes</option><option value="year">Ano</option></select></div><div class="universal-weekdays" id="usWeekdays"></div><div id="usMonthly"><label><input type="radio" name="usMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usMonthDay"></div><label><input type="radio" name="usMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label data-us-start-label>Comecar em</label><input class="text-field options-text-field" type="date" id="usStart"></section><section class="universal-schedule-card" data-us-end><label>Repete ate</label><label><input type="radio" name="usEnd" value="never"> Para sempre</label><label data-us-end-extra><input type="radio" name="usEnd" value="date"> Termina em</label><input data-us-end-extra class="text-field options-text-field" type="date" id="usEndDate"><label data-us-end-extra><input type="radio" name="usEnd" value="count"> Depois de</label><div data-us-end-extra class="universal-schedule-inline"><input type="number" min="1" max="999" id="usEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usNotification"><option>No horario da tarefa</option><option>5 minutos antes</option><option>10 minutos antes</option><option>30 minutos antes</option><option>1 hora antes</option><option>1 dia antes</option><option>Personalizado</option></select></section></div></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-us-close>Cancelar</button><button class="primary-btn" type="button" id="usApply">Aplicar</button></footer></div>';
     document.body.appendChild(modal);
     modal.addEventListener("click", function(event) {
       if (event.target.closest("[data-us-close]")) closeModalLocal();
@@ -21236,6 +21236,9 @@ window.project200ProjectsContext = {
       if (repeat) { setRepeatChoice(repeat.dataset.usRepeat); renderModal(); }
       const day = event.target.closest("[data-us-weekday]");
       if (day) { const set = new Set(state.wizard.repeatDays || []); const value = Number(day.dataset.usWeekday); set.has(value) ? set.delete(value) : set.add(value); state.wizard.repeatDays = Array.from(set).sort((a,b)=>a-b); renderModal(); }
+    });
+    modal.addEventListener("change", function(event) {
+      if (event.target.matches("[name='usEnd']")) { state.wizard.repeatEndMode = event.target.value; renderModal(); }
     });
     modal.querySelector("#usApply").addEventListener("click", applyModal);
     return modal;
@@ -21252,13 +21255,19 @@ window.project200ProjectsContext = {
   function renderModal() {
     ensureFields();
     const modal = ensureModal();
-    const mode = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "none";
+    const mode = state.wizard.repeatOpen ? normalizeRepeatMode(state.wizard.repeatMode) : "daily";
+    const isDailyOnly = mode === "daily" && state.wizard.repeatIntervalUnit === "day" && Number(state.wizard.repeatInterval || 1) === 1;
     modal.querySelectorAll("[data-us-repeat]").forEach(btn => btn.classList.toggle("active", btn.dataset.usRepeat === mode || (btn.dataset.usRepeat === "yearly" && state.wizard.repeatIntervalUnit === "year")));
-    modal.querySelector("[data-us-custom]").hidden = mode === "none";
-    modal.querySelector("[data-us-end]").hidden = mode === "none";
+    modal.querySelector("[data-us-details]").hidden = isDailyOnly;
+    modal.querySelector("[data-us-custom]").hidden = mode === "none" || isDailyOnly;
+    modal.querySelector("[data-us-end]").hidden = mode === "none" || isDailyOnly;
     modal.querySelector("#usInterval").value = state.wizard.repeatInterval;
     modal.querySelector("#usUnit").value = state.wizard.repeatIntervalUnit;
-    modal.querySelector("#usStart").value = getProjectDateKey(dateFromOffset(state.wizard.dateOffset));
+    const startKey = getProjectDateKey(dateFromOffset(state.wizard.dateOffset));
+    modal.querySelector("#usStart").value = startKey;
+    const todayKey = getProjectDateKey(new Date(getServerNowMs ? getServerNowMs() : Date.now()));
+    const startLabel = modal.querySelector("[data-us-start-label]");
+    if (startLabel) startLabel.textContent = startKey === todayKey ? "Comecar em: Hoje" : "Comecar em";
     modal.querySelector("#usMonthDay").value = state.wizard.repeatMonthDay;
     modal.querySelector("#usOrdinal").value = state.wizard.monthlyOrdinalIndex || 0;
     modal.querySelector("#usWeekday").value = state.wizard.monthlyWeekdayIndex || 1;
@@ -21266,6 +21275,9 @@ window.project200ProjectsContext = {
     modal.querySelectorAll("[name='usEnd']").forEach(input => input.checked = input.value === state.wizard.repeatEndMode);
     modal.querySelector("#usEndDate").value = state.wizard.repeatEndDate;
     modal.querySelector("#usEndCount").value = state.wizard.repeatEndCount;
+    modal.querySelectorAll("[data-us-end-extra]").forEach((el) => { el.hidden = state.wizard.repeatEndMode === "never"; });
+    modal.querySelector("#usEndDate").hidden = state.wizard.repeatEndMode !== "date";
+    modal.querySelector("#usEndCount").closest(".universal-schedule-inline").hidden = state.wizard.repeatEndMode !== "count";
     modal.querySelector("#usWeekdays").hidden = state.wizard.repeatIntervalUnit !== "week";
     modal.querySelector("#usWeekdays").innerHTML = weekdays.map((label, day) => '<button type="button" data-us-weekday="' + day + '" class="' + ((state.wizard.repeatDays || []).includes(day) ? 'active' : '') + '">' + label + '</button>').join('');
     modal.querySelector("#usMonthly").hidden = state.wizard.repeatIntervalUnit !== "month";
@@ -21274,6 +21286,25 @@ window.project200ProjectsContext = {
   function closeModalLocal() { const modal = document.getElementById("universalScheduleModal"); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden", "true"); }
   function applyModal() {
     const modal = ensureModal();
+    const selectedMode = modal.querySelector("[data-us-repeat].active")?.dataset.usRepeat || "daily";
+    if (selectedMode === "none") {
+      state.wizard.repeatOpen = false;
+      state.wizard.repeatMode = "none";
+      state.startDecisionContext.dirty = true;
+      closeModalLocal();
+      renderTaskComposerModal();
+      return;
+    }
+    if (selectedMode === "daily") {
+      state.wizard.repeatOpen = true;
+      state.wizard.repeatMode = "daily";
+      state.wizard.repeatInterval = 1;
+      state.wizard.repeatIntervalUnit = "day";
+      state.startDecisionContext.dirty = true;
+      closeModalLocal();
+      renderTaskComposerModal();
+      return;
+    }
     state.wizard.repeatInterval = Math.max(1, Number(modal.querySelector("#usInterval").value || 1));
     state.wizard.repeatIntervalUnit = modal.querySelector("#usUnit").value;
     state.wizard.repeatMonthlyMode = modal.querySelector("[name='usMonthlyMode']:checked")?.value === "day" ? "day" : "weekday";
@@ -21333,12 +21364,12 @@ window.project200ProjectsContext = {
   const cleanDays = (days, fallback = []) => normalizeMissionRepeatDays(Array.isArray(days) ? days : fallback, fallback);
   function baseSchedule(days = [getMissionLocalWeekday()]) {
     const today = getProjectDateKey(new Date(getServerNowMs()));
-    return { frequency: "weekly", interval: 1, intervalUnit: "week", weekDays: cleanDays(days, [getMissionLocalWeekday()]), monthlyMode: "weekday", monthDay: new Date().getDate(), monthlyOrdinalIndex: 0, monthlyWeekdayIndex: getMissionLocalWeekday(), startsOn: today, endMode: "never", endsOn: "", count: 10, notification: { mode: "at_time", customAmount: 10, customUnit: "minutes" } };
+    return { frequency: "daily", interval: 1, intervalUnit: "day", weekDays: cleanDays(days, ALL_MISSION_REPEAT_DAYS), monthlyMode: "weekday", monthDay: new Date().getDate(), monthlyOrdinalIndex: 0, monthlyWeekdayIndex: getMissionLocalWeekday(), startsOn: today, endMode: "never", endsOn: "", count: 10, notification: { mode: "at_time", customAmount: 10, customUnit: "minutes" } };
   }
   function normalizeSchedule(config, fallbackDays = []) {
     const raw = config && typeof config === "object" ? config : {};
     const merged = { ...baseSchedule(fallbackDays), ...raw };
-    merged.frequency = ["none", "daily", "weekly", "monthly_custom", "periodic", "yearly"].includes(String(merged.frequency || "")) ? String(merged.frequency) : "weekly";
+    merged.frequency = ["none", "daily", "weekly", "monthly_custom", "periodic", "yearly"].includes(String(merged.frequency || "")) ? String(merged.frequency) : "daily";
     merged.intervalUnit = ["day", "week", "month", "year"].includes(String(merged.intervalUnit || "")) ? String(merged.intervalUnit) : (merged.frequency === "monthly_custom" ? "month" : merged.frequency === "yearly" ? "year" : merged.frequency === "daily" ? "day" : "week");
     merged.interval = Math.max(1, Math.min(999, Math.trunc(Number(merged.interval || 1) || 1)));
     merged.weekDays = cleanDays(merged.weekDays, fallbackDays.length ? fallbackDays : [getMissionLocalWeekday()]);
@@ -21438,7 +21469,7 @@ window.project200ProjectsContext = {
     modal.id = "universalScheduleBridgeModal";
     modal.className = "workspace-modal simple-modal universal-schedule-modal";
     modal.setAttribute("aria-hidden", "true");
-    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><div><small>Quando</small><strong>Repeticao</strong></div><button class="history-mission-modal-close" type="button" data-usb-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-usb-repeat="none">Nunca se repete</button><button type="button" data-usb-repeat="daily">Diariamente</button><button type="button" data-usb-repeat="weekly">Semanalmente</button><button type="button" data-usb-repeat="monthly_custom">Mensalmente</button><button type="button" data-usb-repeat="yearly">Anualmente</button><button type="button" data-usb-repeat="periodic">Personalizado</button></div></section><section class="universal-schedule-card" data-usb-custom><label>Repetir a cada</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usbInterval"><select id="usbUnit"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mes</option><option value="year">Ano</option></select></div><div class="universal-weekdays" id="usbWeekdays"></div><div id="usbMonthly"><label><input type="radio" name="usbMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usbMonthDay"></div><label><input type="radio" name="usbMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usbOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usbWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label>Comecar em</label><input class="text-field options-text-field" type="date" id="usbStart"></section><section class="universal-schedule-card" data-usb-end><label>Termino</label><label><input type="radio" name="usbEnd" value="never"> Nunca termina</label><label><input type="radio" name="usbEnd" value="date"> Termina em</label><input class="text-field options-text-field" type="date" id="usbEndDate"><label><input type="radio" name="usbEnd" value="count"> Depois de</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usbEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usbNotification"><option value="at_time">No horario da tarefa</option><option value="5m">5 minutos antes</option><option value="10m">10 minutos antes</option><option value="30m">30 minutos antes</option><option value="1h">1 hora antes</option><option value="1d">1 dia antes</option><option value="custom">Personalizado</option></select><div class="universal-schedule-inline" id="usbNotificationCustom"><input type="number" min="1" max="999" id="usbNotificationAmount"><select id="usbNotificationUnit"><option value="minutes">minutos antes</option><option value="hours">horas antes</option><option value="days">dias antes</option></select></div></section></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-usb-close>Cancelar</button><button class="primary-btn" type="button" id="usbApply">Aplicar</button></footer></div>';
+    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><h2 class="universal-schedule-title">Quando se repete?</h2><button class="history-mission-modal-close" type="button" data-usb-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-usb-repeat="none">Nunca se repete</button><button type="button" data-usb-repeat="daily">Diariamente</button><button type="button" data-usb-repeat="weekly">Semanalmente</button><button type="button" data-usb-repeat="monthly_custom">Mensalmente</button><button type="button" data-usb-repeat="yearly">Anualmente</button><button type="button" data-usb-repeat="periodic">Personalizado</button></div></section><div data-usb-details><section class="universal-schedule-card" data-usb-custom><label>Repetir a cada</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usbInterval"><select id="usbUnit"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mes</option><option value="year">Ano</option></select></div><div class="universal-weekdays" id="usbWeekdays"></div><div id="usbMonthly"><label><input type="radio" name="usbMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usbMonthDay"></div><label><input type="radio" name="usbMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usbOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usbWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label data-usb-start-label>Comecar em</label><input class="text-field options-text-field" type="date" id="usbStart"></section><section class="universal-schedule-card" data-usb-end><label>Repete ate</label><label><input type="radio" name="usbEnd" value="never"> Para sempre</label><label data-usb-end-extra><input type="radio" name="usbEnd" value="date"> Termina em</label><input data-usb-end-extra class="text-field options-text-field" type="date" id="usbEndDate"><label data-usb-end-extra><input type="radio" name="usbEnd" value="count"> Depois de</label><div data-usb-end-extra class="universal-schedule-inline"><input type="number" min="1" max="999" id="usbEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usbNotification"><option value="at_time">No horario da tarefa</option><option value="5m">5 minutos antes</option><option value="10m">10 minutos antes</option><option value="30m">30 minutos antes</option><option value="1h">1 hora antes</option><option value="1d">1 dia antes</option><option value="custom">Personalizado</option></select><div class="universal-schedule-inline" id="usbNotificationCustom"><input type="number" min="1" max="999" id="usbNotificationAmount"><select id="usbNotificationUnit"><option value="minutes">minutos antes</option><option value="hours">horas antes</option><option value="days">dias antes</option></select></div></section></div></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-usb-close>Cancelar</button><button class="primary-btn" type="button" id="usbApply">Aplicar</button></footer></div>';
     document.body.appendChild(modal);
     modal.addEventListener("click", (event) => {
       if (event.target.closest("[data-usb-close]")) return closeBridgeModal();
@@ -21467,6 +21498,7 @@ window.project200ProjectsContext = {
     modal.querySelector("#usbApply")?.addEventListener("click", applyBridgeModal);
     modal.addEventListener("change", (event) => {
       if (event.target.matches("#usbNotification")) modal.querySelector("#usbNotificationCustom").hidden = event.target.value !== "custom";
+      if (event.target.matches("[name='usbEnd']")) { const cfg = readTargetSchedule(); cfg.endMode = event.target.value; saveTargetSchedule(cfg); renderBridgeModal(); }
     });
     return modal;
   }
@@ -21475,11 +21507,16 @@ window.project200ProjectsContext = {
     const cfg = readTargetSchedule();
     const active = cfg.intervalUnit === "year" ? "yearly" : cfg.frequency;
     modal.querySelectorAll("[data-usb-repeat]").forEach((button) => button.classList.toggle("active", button.dataset.usbRepeat === active));
-    modal.querySelector("[data-usb-custom]").hidden = cfg.frequency === "none";
-    modal.querySelector("[data-usb-end]").hidden = cfg.frequency === "none";
+    const isDailyOnly = active === "daily" && cfg.intervalUnit === "day" && Number(cfg.interval || 1) === 1;
+    modal.querySelector("[data-usb-details]").hidden = isDailyOnly;
+    modal.querySelector("[data-usb-custom]").hidden = cfg.frequency === "none" || isDailyOnly;
+    modal.querySelector("[data-usb-end]").hidden = cfg.frequency === "none" || isDailyOnly;
     modal.querySelector("#usbInterval").value = cfg.interval;
     modal.querySelector("#usbUnit").value = cfg.intervalUnit;
     modal.querySelector("#usbStart").value = cfg.startsOn;
+    const todayKey = getProjectDateKey(new Date(getServerNowMs()));
+    const startLabel = modal.querySelector("[data-usb-start-label]");
+    if (startLabel) startLabel.textContent = cfg.startsOn === todayKey ? "Comecar em: Hoje" : "Comecar em";
     modal.querySelector("#usbMonthDay").value = cfg.monthDay;
     modal.querySelector("#usbOrdinal").value = cfg.monthlyOrdinalIndex;
     modal.querySelector("#usbWeekday").value = cfg.monthlyWeekdayIndex;
@@ -21487,6 +21524,9 @@ window.project200ProjectsContext = {
     modal.querySelectorAll("[name='usbEnd']").forEach((input) => { input.checked = input.value === cfg.endMode; });
     modal.querySelector("#usbEndDate").value = cfg.endsOn;
     modal.querySelector("#usbEndCount").value = cfg.count;
+    modal.querySelectorAll("[data-usb-end-extra]").forEach((el) => { el.hidden = cfg.endMode === "never"; });
+    modal.querySelector("#usbEndDate").hidden = cfg.endMode !== "date";
+    modal.querySelector("#usbEndCount").closest(".universal-schedule-inline").hidden = cfg.endMode !== "count";
     modal.querySelector("#usbNotification").value = cfg.notification.mode;
     modal.querySelector("#usbNotificationAmount").value = cfg.notification.customAmount;
     modal.querySelector("#usbNotificationUnit").value = cfg.notification.customUnit;
@@ -21499,6 +21539,23 @@ window.project200ProjectsContext = {
   function applyBridgeModal() {
     const modal = ensureModal();
     const cfg = readTargetSchedule();
+    const selectedMode = modal.querySelector("[data-usb-repeat].active")?.dataset.usbRepeat || cfg.frequency || "daily";
+    if (selectedMode === "none") {
+      cfg.frequency = "none";
+      saveTargetSchedule(cfg);
+      if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg);
+      closeBridgeModal();
+      return;
+    }
+    if (selectedMode === "daily") {
+      cfg.frequency = "daily";
+      cfg.interval = 1;
+      cfg.intervalUnit = "day";
+      saveTargetSchedule(cfg);
+      if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg);
+      closeBridgeModal();
+      return;
+    }
     cfg.interval = Math.max(1, Math.min(999, Math.trunc(Number(modal.querySelector("#usbInterval").value || 1) || 1)));
     cfg.intervalUnit = modal.querySelector("#usbUnit").value;
     cfg.monthlyMode = modal.querySelector("[name='usbMonthlyMode']:checked")?.value === "day" ? "day" : "weekday";

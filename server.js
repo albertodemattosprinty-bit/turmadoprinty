@@ -3531,12 +3531,35 @@ const PROJECT200_MARIN_REPLY_SCHEMA = {
           scheduleConfig: {
             type: ["object", "null"],
             additionalProperties: false,
-            required: ["customMode", "daysOfMonth", "weekdays", "dates"],
+            required: ["customMode", "daysOfMonth", "weekdays", "dates", "frequency", "interval", "intervalUnit", "weekDays", "monthlyMode", "monthDay", "monthDays", "monthlyOrdinalIndex", "monthlyWeekdayIndex", "startsOn", "endMode", "endsOn", "count", "notification"],
             properties: {
               customMode: { type: ["string", "null"], enum: ["MONTHLY", "WEEKLY", "DAILY", null] },
               daysOfMonth: { type: "array", items: { type: "integer", minimum: 1, maximum: 31 } },
               weekdays: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 } },
-              dates: { type: "array", items: { type: "string" } }
+              dates: { type: "array", items: { type: "string" } },
+              frequency: { type: ["string", "null"], enum: ["none", "daily", "weekly", "monthly_custom", "yearly", "periodic", null] },
+              interval: { type: ["integer", "null"], minimum: 1, maximum: 999 },
+              intervalUnit: { type: ["string", "null"], enum: ["day", "week", "month", "year", null] },
+              weekDays: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 } },
+              monthlyMode: { type: ["string", "null"], enum: ["day", "weekday", null] },
+              monthDay: { type: ["integer", "null"], minimum: 1, maximum: 31 },
+              monthDays: { type: "array", items: { type: "integer", minimum: 1, maximum: 31 } },
+              monthlyOrdinalIndex: { type: ["integer", "null"], minimum: 0, maximum: 4 },
+              monthlyWeekdayIndex: { type: ["integer", "null"], minimum: 0, maximum: 6 },
+              startsOn: { type: ["string", "null"] },
+              endMode: { type: ["string", "null"], enum: ["never", "date", "count", null] },
+              endsOn: { type: ["string", "null"] },
+              count: { type: ["integer", "null"], minimum: 1, maximum: 999 },
+              notification: {
+                type: ["object", "null"],
+                additionalProperties: false,
+                required: ["mode", "customAmount", "customUnit"],
+                properties: {
+                  mode: { type: ["string", "null"], enum: ["at_time", "5m", "10m", "30m", "1h", "1d", "custom", null] },
+                  customAmount: { type: ["integer", "null"], minimum: 1, maximum: 999 },
+                  customUnit: { type: ["string", "null"], enum: ["minutes", "hours", "days", null] }
+                }
+              }
             }
           },
           startsOn: { type: ["string", "null"] },
@@ -3901,6 +3924,9 @@ function sanitizeProject200MarinProposals(rawProposals) {
           ? String(raw.limitIntervalUnit).trim().toLowerCase()
           : "day";
       }
+      if (raw?.scheduleConfig && typeof raw.scheduleConfig === "object") {
+        proposal.scheduleConfig = raw.scheduleConfig;
+      }
     }
 
     if (type === "aspect") {
@@ -4092,6 +4118,8 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     "- Nao crie microtarefas de missoes.",
     "- Nao invente datas, horarios, valores ou duracoes. Se faltar dado obrigatorio, pergunte antes e retorne proposals vazio.",
     "- Acoes usam apenas estes IDs de aspecto: alimentacao, hidratacao, aprendizado, trabalho, casa, exercicios, social, planejamento, higiene, lazer, aspecto. Sono nunca e atribuido a uma acao.",
+    "- Quando criar missao, tarefa ou limite com repeticao, preencha scheduleConfig no modelo universal: frequency none/daily/weekly/monthly_custom/yearly/periodic; interval; intervalUnit day/week/month/year; weekDays 0=Dom a 6=Sab; monthlyMode day ou weekday; monthDay; monthlyOrdinalIndex 0=primeira, 1=segunda, 2=terceira, 3=quarta, 4=ultima; monthlyWeekdayIndex 0=Dom a 6=Sab; startsOn YYYY-MM-DD; endMode never/date/count; endsOn; count; notification com mode at_time/5m/10m/30m/1h/1d/custom, customAmount e customUnit minutes/hours/days.",
+    "- Exemplos: diariamente use frequency daily, interval 1 e intervalUnit day. Toda segunda use weekly com weekDays [1]. Primeira segunda do mes use monthly_custom, intervalUnit month, monthlyMode weekday, monthlyOrdinalIndex 0, monthlyWeekdayIndex 1. Dia 15 do mes use monthlyMode day e monthDay 15.",
     "- Ambiente mapeia para casa. Proposito usa planejamento. Familia usa aspecto e nunca social.",
     "- Preserve sono, alimentacao, saude, seguranca, autonomia e limites fisicos. Disciplina nunca significa privacao perigosa.",
     "- Nao substitua orientacao medica, juridica ou financeira profissional.",
