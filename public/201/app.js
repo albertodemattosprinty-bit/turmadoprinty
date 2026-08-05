@@ -1,7 +1,7 @@
 import { getApiUrl } from "../api.js";
 
 const tokenKey = "turma_do_printy_token";
-const releaseVersion = "0.82";
+const releaseVersion = "0.83";
 const defaults = {
   currentVersion: releaseVersion,
   minimumVersion: "0.71",
