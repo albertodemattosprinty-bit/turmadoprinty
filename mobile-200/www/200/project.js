@@ -18659,7 +18659,7 @@ missionCreateConfirmButton?.addEventListener("click", () => {
     if (stepError) { if (missionCreateStatus) missionCreateStatus.textContent = stepError; return; }
 
     if (state.tutorProposalDraft?.active && state.tutorProposalDraft.type === "mission") {
-      const proposal = { type: "mission", goalKind, title, targetValue, isFolder, repeatDays, aspectId: categoryId, categoryId, unitDurationSeconds: goalKind === "limit" || isFolder ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), limitIntervalValue: selectedLimitInterval.value, limitIntervalUnit: selectedLimitInterval.unit, svgIconUrl: "", svgIconLabel: "" };
+      const proposal = { type: "mission", goalKind, title, targetValue, isFolder, repeatDays, scheduleConfig: state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig || null, repeatConfig: state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig || null, aspectId: categoryId, categoryId, unitDurationSeconds: goalKind === "limit" || isFolder ? 0 : normalizeMissionDurationOption(state.missionCreate?.unitDurationSeconds), limitIntervalValue: selectedLimitInterval.value, limitIntervalUnit: selectedLimitInterval.unit, svgIconUrl: "", svgIconLabel: "" };
       state.tutorProposalDraft = { active: false, type: "" };
       setTutorProposalComposerControls(false);
       closeModal("missionCreateModal");
@@ -18676,6 +18676,8 @@ missionCreateConfirmButton?.addEventListener("click", () => {
             goalKind,
             isFolder,
             repeatDays,
+            scheduleConfig: state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig || null,
+            repeatConfig: state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig || null,
             title,
             recipientUserId: String(state.friendAssignment.mission?.userId || ""),
             targetValue,
@@ -19103,6 +19105,8 @@ missionAdjustConfirmButton?.addEventListener("click", () => {
           targetValue,
           isFolder: state.missionAdjust?.isFolder === true,
           repeatDays: normalizeMissionRepeatDays(state.missionAdjust?.repeatDays),
+          scheduleConfig: state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig || null,
+          repeatConfig: state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig || null,
           unitDurationSeconds: normalizeMissionKind(state.missionAdjust?.goalKind) === "limit" || state.missionAdjust?.isFolder === true ? 0 : normalizeMissionDurationOption(state.missionAdjust?.unitDurationSeconds),
           limitIntervalValue: Math.max(1, Math.trunc(Number(state.missionAdjust?.limitIntervalValue || 1))),
           limitIntervalUnit: String(state.missionAdjust?.limitIntervalUnit || "day"),
@@ -19490,7 +19494,7 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/variants${editingId ? `/${encodeURIComponent(editingId)}` : ""}`, {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, scheduleMode, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), repeatDays: scheduleMode === "weekly" ? normalizeMissionRepeatDays(state.missionVariants.repeatDays, []) : [], avoidDays: scheduleMode === "periodic" ? normalizeMissionRepeatDays(state.missionVariants.avoidDays, []) : [], nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays, scheduleMode, state.missionVariants.repeatDays, state.missionVariants.avoidDays) })
+      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, scheduleMode, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), repeatDays: scheduleMode === "weekly" ? normalizeMissionRepeatDays(state.missionVariants.repeatDays, []) : [], avoidDays: scheduleMode === "periodic" ? normalizeMissionRepeatDays(state.missionVariants.avoidDays, []) : [], scheduleConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null, repeatConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null, nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays, scheduleMode, state.missionVariants.repeatDays, state.missionVariants.avoidDays) })
     });
     state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
     missionVariantsCache.set(getMissionVariantsCacheKey(goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
@@ -19576,6 +19580,8 @@ missionVariantsList?.addEventListener("click", async (event) => {
   state.missionVariants.scheduleMode = normalizeMissionVariantScheduleMode(variant?.scheduleMode);
   state.missionVariants.repeatDays = state.missionVariants.scheduleMode === "weekly" ? normalizeMissionRepeatDays(variant.repeatDays, []) : [];
   state.missionVariants.avoidDays = state.missionVariants.scheduleMode === "periodic" ? normalizeMissionRepeatDays(variant.avoidDays, []) : [];
+  state.missionVariants.scheduleConfig = variant?.scheduleConfig || variant?.repeatConfig || null;
+  state.missionVariants.repeatConfig = state.missionVariants.scheduleConfig;
   if (missionVariantTitleInput) missionVariantTitleInput.value = variant.title;
   renderMissionVariants();
 });
@@ -21313,4 +21319,293 @@ window.project200ProjectsContext = {
   formatTaskComposerDateLabel = function() { ensureFields(); if (!state.wizard.repeatOpen) return oldFormat(); if (state.wizard.repeatIntervalUnit === "week") return "A cada " + state.wizard.repeatInterval + " semana(s): " + ((state.wizard.repeatDays || []).map(d => weekdays[d]).join(", ") || "dia escolhido"); if (state.wizard.repeatIntervalUnit === "month" && state.wizard.repeatMonthlyMode === "weekday") return "Todo mes: " + ordinals[state.wizard.monthlyOrdinalIndex || 0] + " " + weekdayLong[state.wizard.monthlyWeekdayIndex || 1]; if (state.wizard.repeatIntervalUnit === "month") return "Todo dia " + state.wizard.repeatMonthDay + " do mes"; if (state.wizard.repeatIntervalUnit === "year") return "Anualmente"; return "A cada " + state.wizard.repeatInterval + " dia(s)"; };
   const oldOpenEditor = openTaskComposerFieldEditor;
   openTaskComposerFieldEditor = function(field) { if (field === "repeat") { openModalLocal(); return; } return oldOpenEditor(field); };
+})();
+
+// PROJECT200_UNIVERSAL_SCHEDULE_MISSIONS_BRIDGE
+(function installProject200UniversalScheduleMissionsBridge() {
+  if (window.__project200UniversalScheduleMissionsBridgeInstalled) return;
+  window.__project200UniversalScheduleMissionsBridgeInstalled = true;
+  const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+  const weekdayLong = ["domingo", "segunda-feira", "terca-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sabado"];
+  const ordinals = ["primeira", "segunda", "terceira", "quarta", "ultima"];
+  let bridgeTarget = "mission-create";
+  let bridgeApplyCallback = null;
+  const cleanDays = (days, fallback = []) => normalizeMissionRepeatDays(Array.isArray(days) ? days : fallback, fallback);
+  function baseSchedule(days = [getMissionLocalWeekday()]) {
+    const today = getProjectDateKey(new Date(getServerNowMs()));
+    return { frequency: "weekly", interval: 1, intervalUnit: "week", weekDays: cleanDays(days, [getMissionLocalWeekday()]), monthlyMode: "weekday", monthDay: new Date().getDate(), monthlyOrdinalIndex: 0, monthlyWeekdayIndex: getMissionLocalWeekday(), startsOn: today, endMode: "never", endsOn: "", count: 10, notification: { mode: "at_time", customAmount: 10, customUnit: "minutes" } };
+  }
+  function normalizeSchedule(config, fallbackDays = []) {
+    const raw = config && typeof config === "object" ? config : {};
+    const merged = { ...baseSchedule(fallbackDays), ...raw };
+    merged.frequency = ["none", "daily", "weekly", "monthly_custom", "periodic", "yearly"].includes(String(merged.frequency || "")) ? String(merged.frequency) : "weekly";
+    merged.intervalUnit = ["day", "week", "month", "year"].includes(String(merged.intervalUnit || "")) ? String(merged.intervalUnit) : (merged.frequency === "monthly_custom" ? "month" : merged.frequency === "yearly" ? "year" : merged.frequency === "daily" ? "day" : "week");
+    merged.interval = Math.max(1, Math.min(999, Math.trunc(Number(merged.interval || 1) || 1)));
+    merged.weekDays = cleanDays(merged.weekDays, fallbackDays.length ? fallbackDays : [getMissionLocalWeekday()]);
+    merged.monthlyMode = merged.monthlyMode === "day" ? "day" : "weekday";
+    merged.monthDay = Math.max(1, Math.min(31, Math.trunc(Number(merged.monthDay || 1) || 1)));
+    merged.monthlyOrdinalIndex = Math.max(0, Math.min(4, Math.trunc(Number(merged.monthlyOrdinalIndex || 0) || 0)));
+    merged.monthlyWeekdayIndex = Math.max(0, Math.min(6, Math.trunc(Number(merged.monthlyWeekdayIndex ?? getMissionLocalWeekday()) || getMissionLocalWeekday())));
+    merged.startsOn = String(merged.startsOn || getProjectDateKey(new Date(getServerNowMs()))).slice(0, 10);
+    merged.endMode = ["never", "date", "count"].includes(String(merged.endMode || "")) ? String(merged.endMode) : "never";
+    merged.endsOn = String(merged.endsOn || "").slice(0, 10);
+    merged.count = Math.max(1, Math.min(999, Math.trunc(Number(merged.count || 10) || 10)));
+    merged.notification = merged.notification && typeof merged.notification === "object" ? merged.notification : {};
+    merged.notification.mode = ["at_time", "5m", "10m", "30m", "1h", "1d", "custom"].includes(String(merged.notification.mode || "")) ? String(merged.notification.mode) : "at_time";
+    merged.notification.customAmount = Math.max(1, Math.min(999, Math.trunc(Number(merged.notification.customAmount || 10) || 10)));
+    merged.notification.customUnit = ["minutes", "hours", "days"].includes(String(merged.notification.customUnit || "")) ? String(merged.notification.customUnit) : "minutes";
+    return merged;
+  }
+  function readTargetSchedule(target = bridgeTarget) {
+    if (target === "mission-create") return normalizeSchedule(state.missionCreate?.scheduleConfig || state.missionCreate?.repeatConfig, state.missionCreate?.repeatDays);
+    if (target === "mission-adjust") return normalizeSchedule(state.missionAdjust?.scheduleConfig || state.missionAdjust?.repeatConfig, state.missionAdjust?.repeatDays);
+    if (target === "microtask") return normalizeSchedule(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig, state.missionVariants?.repeatDays);
+    return normalizeSchedule();
+  }
+  function derivedRepeatDays(schedule) {
+    const cfg = normalizeSchedule(schedule);
+    if (cfg.frequency === "none") return [];
+    if (cfg.intervalUnit === "week") return cleanDays(cfg.weekDays, []);
+    if (cfg.intervalUnit === "day") return [...ALL_MISSION_REPEAT_DAYS];
+    return [cfg.monthlyWeekdayIndex];
+  }
+  function saveTargetSchedule(schedule, target = bridgeTarget) {
+    const cfg = normalizeSchedule(schedule);
+    const days = derivedRepeatDays(cfg);
+    if (target === "mission-create") {
+      state.missionCreate.scheduleConfig = cfg;
+      state.missionCreate.repeatConfig = cfg;
+      state.missionCreate.repeatDays = days.length ? days : [...ALL_MISSION_REPEAT_DAYS];
+    } else if (target === "mission-adjust") {
+      state.missionAdjust.scheduleConfig = cfg;
+      state.missionAdjust.repeatConfig = cfg;
+      state.missionAdjust.repeatDays = days.length ? days : [...ALL_MISSION_REPEAT_DAYS];
+    } else if (target === "microtask") {
+      state.missionVariants.scheduleConfig = cfg;
+      state.missionVariants.repeatConfig = cfg;
+      state.missionVariants.scheduleMode = cfg.intervalUnit === "week" ? "weekly" : "periodic";
+      state.missionVariants.intervalUnit = "days";
+      state.missionVariants.intervalValue = cfg.intervalUnit === "week" ? cfg.interval * 7 : cfg.interval;
+      state.missionVariants.repeatDays = cfg.intervalUnit === "week" ? days : [];
+      state.missionVariants.avoidDays = [];
+      const start = projectDateKeyToDate(cfg.startsOn, 12);
+      state.missionVariants.nextDueOffsetDays = Math.max(0, Math.round((start.getTime() - todayStart().getTime()) / 86400000));
+    }
+    renderBridgeButtons();
+  }
+  function labelForSchedule(schedule) {
+    const cfg = normalizeSchedule(schedule);
+    if (cfg.frequency === "none") return "Nunca se repete";
+    if (cfg.intervalUnit === "week") return `A cada ${cfg.interval} semana(s): ${(cfg.weekDays || []).map((day) => weekdays[day]).join(", ") || "dia escolhido"}`;
+    if (cfg.intervalUnit === "month" && cfg.monthlyMode === "weekday") return `Todo mes: ${ordinals[cfg.monthlyOrdinalIndex]} ${weekdayLong[cfg.monthlyWeekdayIndex]}`;
+    if (cfg.intervalUnit === "month") return `Todo dia ${cfg.monthDay} do mes`;
+    if (cfg.intervalUnit === "year") return cfg.interval === 1 ? "Anualmente" : `A cada ${cfg.interval} anos`;
+    return cfg.interval === 1 ? "Diariamente" : `A cada ${cfg.interval} dias`;
+  }
+  function ensureModal() {
+    let modal = document.getElementById("universalScheduleBridgeModal");
+    if (modal) return modal;
+    modal = document.createElement("section");
+    modal.id = "universalScheduleBridgeModal";
+    modal.className = "workspace-modal simple-modal universal-schedule-modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><div><small>Quando</small><strong>Repeticao</strong></div><button class="history-mission-modal-close" type="button" data-usb-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-usb-repeat="none">Nunca se repete</button><button type="button" data-usb-repeat="daily">Diariamente</button><button type="button" data-usb-repeat="weekly">Semanalmente</button><button type="button" data-usb-repeat="monthly_custom">Mensalmente</button><button type="button" data-usb-repeat="yearly">Anualmente</button><button type="button" data-usb-repeat="periodic">Personalizado</button></div></section><section class="universal-schedule-card" data-usb-custom><label>Repetir a cada</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usbInterval"><select id="usbUnit"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mes</option><option value="year">Ano</option></select></div><div class="universal-weekdays" id="usbWeekdays"></div><div id="usbMonthly"><label><input type="radio" name="usbMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usbMonthDay"></div><label><input type="radio" name="usbMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usbOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usbWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label>Comecar em</label><input class="text-field options-text-field" type="date" id="usbStart"></section><section class="universal-schedule-card" data-usb-end><label>Termino</label><label><input type="radio" name="usbEnd" value="never"> Nunca termina</label><label><input type="radio" name="usbEnd" value="date"> Termina em</label><input class="text-field options-text-field" type="date" id="usbEndDate"><label><input type="radio" name="usbEnd" value="count"> Depois de</label><div class="universal-schedule-inline"><input type="number" min="1" max="999" id="usbEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usbNotification"><option value="at_time">No horario da tarefa</option><option value="5m">5 minutos antes</option><option value="10m">10 minutos antes</option><option value="30m">30 minutos antes</option><option value="1h">1 hora antes</option><option value="1d">1 dia antes</option><option value="custom">Personalizado</option></select><div class="universal-schedule-inline" id="usbNotificationCustom"><input type="number" min="1" max="999" id="usbNotificationAmount"><select id="usbNotificationUnit"><option value="minutes">minutos antes</option><option value="hours">horas antes</option><option value="days">dias antes</option></select></div></section></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-usb-close>Cancelar</button><button class="primary-btn" type="button" id="usbApply">Aplicar</button></footer></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (event) => {
+      if (event.target.closest("[data-usb-close]")) return closeBridgeModal();
+      const repeat = event.target.closest("[data-usb-repeat]");
+      if (repeat) {
+        const cfg = readTargetSchedule();
+        cfg.frequency = repeat.dataset.usbRepeat;
+        if (cfg.frequency === "daily") { cfg.intervalUnit = "day"; cfg.interval = 1; }
+        if (cfg.frequency === "weekly") { cfg.intervalUnit = "week"; cfg.interval = 1; if (!cfg.weekDays.length) cfg.weekDays = [getMissionLocalWeekday()]; }
+        if (cfg.frequency === "monthly_custom") { cfg.intervalUnit = "month"; cfg.interval = 1; }
+        if (cfg.frequency === "yearly") { cfg.intervalUnit = "year"; cfg.interval = 1; }
+        saveTargetSchedule(cfg);
+        renderBridgeModal();
+      }
+      const day = event.target.closest("[data-usb-weekday]");
+      if (day) {
+        const cfg = readTargetSchedule();
+        const selected = new Set(cfg.weekDays || []);
+        const value = Number(day.dataset.usbWeekday);
+        selected.has(value) ? selected.delete(value) : selected.add(value);
+        cfg.weekDays = [...selected].sort((a, b) => a - b);
+        saveTargetSchedule(cfg);
+        renderBridgeModal();
+      }
+    });
+    modal.querySelector("#usbApply")?.addEventListener("click", applyBridgeModal);
+    modal.addEventListener("change", (event) => {
+      if (event.target.matches("#usbNotification")) modal.querySelector("#usbNotificationCustom").hidden = event.target.value !== "custom";
+    });
+    return modal;
+  }
+  function renderBridgeModal() {
+    const modal = ensureModal();
+    const cfg = readTargetSchedule();
+    const active = cfg.intervalUnit === "year" ? "yearly" : cfg.frequency;
+    modal.querySelectorAll("[data-usb-repeat]").forEach((button) => button.classList.toggle("active", button.dataset.usbRepeat === active));
+    modal.querySelector("[data-usb-custom]").hidden = cfg.frequency === "none";
+    modal.querySelector("[data-usb-end]").hidden = cfg.frequency === "none";
+    modal.querySelector("#usbInterval").value = cfg.interval;
+    modal.querySelector("#usbUnit").value = cfg.intervalUnit;
+    modal.querySelector("#usbStart").value = cfg.startsOn;
+    modal.querySelector("#usbMonthDay").value = cfg.monthDay;
+    modal.querySelector("#usbOrdinal").value = cfg.monthlyOrdinalIndex;
+    modal.querySelector("#usbWeekday").value = cfg.monthlyWeekdayIndex;
+    modal.querySelectorAll("[name='usbMonthlyMode']").forEach((input) => { input.checked = input.value === cfg.monthlyMode; });
+    modal.querySelectorAll("[name='usbEnd']").forEach((input) => { input.checked = input.value === cfg.endMode; });
+    modal.querySelector("#usbEndDate").value = cfg.endsOn;
+    modal.querySelector("#usbEndCount").value = cfg.count;
+    modal.querySelector("#usbNotification").value = cfg.notification.mode;
+    modal.querySelector("#usbNotificationAmount").value = cfg.notification.customAmount;
+    modal.querySelector("#usbNotificationUnit").value = cfg.notification.customUnit;
+    modal.querySelector("#usbNotificationCustom").hidden = cfg.notification.mode !== "custom";
+    const weekWrap = modal.querySelector("#usbWeekdays");
+    weekWrap.hidden = cfg.intervalUnit !== "week";
+    weekWrap.innerHTML = weekdays.map((label, day) => '<button type="button" data-usb-weekday="' + day + '" class="' + (cfg.weekDays.includes(day) ? 'active' : '') + '">' + label + '</button>').join("");
+    modal.querySelector("#usbMonthly").hidden = cfg.intervalUnit !== "month";
+  }
+  function applyBridgeModal() {
+    const modal = ensureModal();
+    const cfg = readTargetSchedule();
+    cfg.interval = Math.max(1, Math.min(999, Math.trunc(Number(modal.querySelector("#usbInterval").value || 1) || 1)));
+    cfg.intervalUnit = modal.querySelector("#usbUnit").value;
+    cfg.monthlyMode = modal.querySelector("[name='usbMonthlyMode']:checked")?.value === "day" ? "day" : "weekday";
+    cfg.monthDay = Math.max(1, Math.min(31, Math.trunc(Number(modal.querySelector("#usbMonthDay").value || 1) || 1)));
+    cfg.monthlyOrdinalIndex = Number(modal.querySelector("#usbOrdinal").value || 0);
+    cfg.monthlyWeekdayIndex = Number(modal.querySelector("#usbWeekday").value || 1);
+    cfg.startsOn = modal.querySelector("#usbStart").value || cfg.startsOn;
+    cfg.endMode = modal.querySelector("[name='usbEnd']:checked")?.value || "never";
+    cfg.endsOn = modal.querySelector("#usbEndDate").value || "";
+    cfg.count = Math.max(1, Math.min(999, Math.trunc(Number(modal.querySelector("#usbEndCount").value || 10) || 10)));
+    cfg.notification = { mode: modal.querySelector("#usbNotification").value || "at_time", customAmount: Math.max(1, Math.min(999, Math.trunc(Number(modal.querySelector("#usbNotificationAmount").value || 10) || 10))), customUnit: modal.querySelector("#usbNotificationUnit").value || "minutes" };
+    cfg.frequency = cfg.intervalUnit === "day" && cfg.interval === 1 ? "daily" : cfg.intervalUnit === "week" ? "weekly" : cfg.intervalUnit === "month" ? "monthly_custom" : cfg.intervalUnit === "year" && cfg.interval === 1 ? "yearly" : "periodic";
+    saveTargetSchedule(cfg);
+    if (typeof bridgeApplyCallback === "function") bridgeApplyCallback(cfg);
+    closeBridgeModal();
+  }
+  function openBridgeModal(target, callback = null) {
+    bridgeTarget = target;
+    bridgeApplyCallback = callback;
+    const modal = ensureModal();
+    renderBridgeModal();
+    modal.classList.add("active");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  }
+  function closeBridgeModal() {
+    const modal = document.getElementById("universalScheduleBridgeModal");
+    modal?.classList.remove("active");
+    modal?.setAttribute("aria-hidden", "true");
+  }
+  function renderBridgeButtons() {
+    document.getElementById("missionCreateUniversalScheduleButton")?.querySelector("strong") && (document.getElementById("missionCreateUniversalScheduleButton").querySelector("strong").textContent = labelForSchedule(readTargetSchedule("mission-create")));
+    document.getElementById("missionAdjustUniversalScheduleButton")?.querySelector("strong") && (document.getElementById("missionAdjustUniversalScheduleButton").querySelector("strong").textContent = labelForSchedule(readTargetSchedule("mission-adjust")));
+    document.getElementById("missionVariantUniversalScheduleButton")?.querySelector("strong") && (document.getElementById("missionVariantUniversalScheduleButton").querySelector("strong").textContent = labelForSchedule(readTargetSchedule("microtask")));
+  }
+  function ensureBridgeButtons() {
+    if (missionCreateTimePanel && !document.getElementById("missionCreateUniversalScheduleButton")) {
+      const button = document.createElement("button");
+      button.className = "mission-create-time-button";
+      button.type = "button";
+      button.id = "missionCreateUniversalScheduleButton";
+      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>Semanalmente</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
+      button.addEventListener("click", () => openBridgeModal("mission-create", () => { if (missionCreateStatus) missionCreateStatus.textContent = "Repeticao definida."; renderMissionCreateStep(); }));
+      missionCreateTimePanel.after(button);
+    }
+    if (missionAdjustConfirmButton && !document.getElementById("missionAdjustUniversalScheduleButton")) {
+      const button = document.createElement("button");
+      button.className = "history-mission-footer-icon history-mission-footer-icon-blue";
+      button.type = "button";
+      button.id = "missionAdjustUniversalScheduleButton";
+      button.setAttribute("aria-label", "Alterar repeticao da missao");
+      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><strong class="sr-only">Semanalmente</strong>';
+      button.addEventListener("click", () => openBridgeModal("mission-adjust", () => { if (missionAdjustStatus) missionAdjustStatus.textContent = "Repeticao atualizada."; renderMissionAdjustState(); }));
+      missionAdjustConfirmButton.before(button);
+    }
+  }
+  const oldGetMissionCreateStepSequence = getMissionCreateStepSequence;
+  getMissionCreateStepSequence = function() {
+    const sequence = oldGetMissionCreateStepSequence();
+    return state.missionCreate?.structureType === "folder" ? sequence : sequence.filter((step) => Number(step) !== 5);
+  };
+  const oldValidateMissionCreateStep = validateMissionCreateStep;
+  validateMissionCreateStep = function(step = state.missionCreate?.step) { return Number(step) === 5 ? "" : oldValidateMissionCreateStep(step); };
+  const oldRenderMissionCreateStep = renderMissionCreateStep;
+  renderMissionCreateStep = function(direction = 0) {
+    oldRenderMissionCreateStep(direction);
+    ensureBridgeButtons();
+    const legacyStep = document.querySelector('[data-mission-create-step="5"]');
+    if (legacyStep) legacyStep.hidden = true;
+    renderBridgeButtons();
+  };
+  const oldOpenMissionCreateModal = openMissionCreateModal;
+  openMissionCreateModal = function() { oldOpenMissionCreateModal(); state.missionCreate.scheduleConfig = normalizeSchedule(null, state.missionCreate.repeatDays); state.missionCreate.repeatConfig = state.missionCreate.scheduleConfig; renderBridgeButtons(); };
+  const oldOpenMissionAdjustModal = openMissionAdjustModal;
+  openMissionAdjustModal = function(goalId) { oldOpenMissionAdjustModal(goalId); const goal = getAvailableMissionById(goalId); state.missionAdjust.scheduleConfig = normalizeSchedule(goal?.scheduleConfig || goal?.repeatConfig, goal?.repeatDays); state.missionAdjust.repeatConfig = state.missionAdjust.scheduleConfig; renderBridgeButtons(); };
+  const oldRenderMissionAdjustState = renderMissionAdjustState;
+  renderMissionAdjustState = function() { oldRenderMissionAdjustState(); ensureBridgeButtons(); renderBridgeButtons(); };
+  const oldRenderMissionVariants = renderMissionVariants;
+  renderMissionVariants = function() {
+    oldRenderMissionVariants();
+    if (!missionVariantScheduleMode) return;
+    missionVariantScheduleMode.hidden = true;
+    if (missionVariantPeriodicDeadline) missionVariantPeriodicDeadline.hidden = true;
+    if (!document.getElementById("missionVariantUniversalScheduleButton")) {
+      const button = document.createElement("button");
+      button.className = "mission-create-time-button";
+      button.type = "button";
+      button.id = "missionVariantUniversalScheduleButton";
+      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>Definir repeticao</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
+      button.addEventListener("click", () => openBridgeModal("microtask", () => { if (missionVariantStatus) missionVariantStatus.textContent = "Repeticao definida."; renderMissionVariants(); }));
+      missionVariantScheduleMode.after(button);
+    }
+    renderBridgeButtons();
+  };
+  const oldVariantSaveClick = missionVariantEditorSave?.onclick;
+  missionVariantEditorSave?.addEventListener("click", () => {
+    if (state.missionVariants?.editorStep === 1 && !normalizeMissionVariantScheduleMode(state.missionVariants.scheduleMode, { allowEmpty: true })) {
+      saveTargetSchedule(readTargetSchedule("microtask"), "microtask");
+    }
+  }, true);
+  const oldMissionTimeConfirmClick = missionTimeConfirmButton?.onclick;
+  missionTimeConfirmButton?.addEventListener("click", (event) => {
+    if (state.missionTime?.mode === "adjust" && Number(state.missionTime?.step || 1) === 1) {
+      event.stopImmediatePropagation();
+      state.missionAdjust.unitDurationSeconds = normalizeMissionDurationOption(state.missionTime?.value);
+      closeModal("missionTimeModal");
+      openBridgeModal("mission-adjust", () => { renderMissionAdjustState(); if (missionAdjustStatus) missionAdjustStatus.textContent = "Tempo e repeticao atualizados."; });
+    }
+  }, true);
+  const oldIsMissionScheduledForToday = isMissionScheduledForToday;
+  function nthWeekdayDate(year, month, weekday, ordinal) {
+    const found = [];
+    for (let day = 1; day <= 31; day += 1) { const date = new Date(year, month, day, 12); if (date.getMonth() !== month) break; if (date.getDay() === weekday) found.push(date); }
+    return ordinal === 4 ? found[found.length - 1] : found[ordinal];
+  }
+  function scheduleMatchesToday(config, nowMs = getServerNowMs()) {
+    const cfg = normalizeSchedule(config);
+    if (cfg.frequency === "none") return false;
+    const todayKey = getProjectDateKey(new Date(nowMs));
+    const today = projectDateKeyToDate(todayKey, 12);
+    const start = projectDateKeyToDate(cfg.startsOn, 12);
+    if (today.getTime() < start.getTime()) return false;
+    if (cfg.endMode === "date" && cfg.endsOn && todayKey > cfg.endsOn) return false;
+    if (cfg.intervalUnit === "day") return Math.floor((today.getTime() - start.getTime()) / 86400000) % cfg.interval === 0;
+    if (cfg.intervalUnit === "week") return cfg.weekDays.includes(today.getDay()) && Math.floor((today.getTime() - start.getTime()) / (86400000 * 7)) % cfg.interval === 0;
+    if (cfg.intervalUnit === "month") {
+      const diff = (today.getFullYear() - start.getFullYear()) * 12 + today.getMonth() - start.getMonth();
+      if (diff < 0 || diff % cfg.interval !== 0) return false;
+      if (cfg.monthlyMode === "day") return today.getDate() === Math.min(cfg.monthDay, new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate());
+      return getProjectDateKey(today) === getProjectDateKey(nthWeekdayDate(today.getFullYear(), today.getMonth(), cfg.monthlyWeekdayIndex, cfg.monthlyOrdinalIndex));
+    }
+    return today.getMonth() === start.getMonth() && today.getDate() === start.getDate() && ((today.getFullYear() - start.getFullYear()) % cfg.interval === 0);
+  }
+  isMissionScheduledForToday = function(item, nowMs = getServerNowMs()) {
+    if (item?.scheduleConfig || item?.repeatConfig) return scheduleMatchesToday(item.scheduleConfig || item.repeatConfig, nowMs);
+    return oldIsMissionScheduledForToday(item, nowMs);
+  };
+  ensureBridgeButtons();
 })();
