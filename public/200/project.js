@@ -21393,14 +21393,27 @@ window.project200ProjectsContext = {
     }
     renderBridgeButtons();
   }
-  function labelForSchedule(schedule) {
+  function labelForSchedule(schedule, options = {}) {
     const cfg = normalizeSchedule(schedule);
-    if (cfg.frequency === "none") return "Nunca se repete";
-    if (cfg.intervalUnit === "week") return `A cada ${cfg.interval} semana(s): ${(cfg.weekDays || []).map((day) => weekdays[day]).join(", ") || "dia escolhido"}`;
-    if (cfg.intervalUnit === "month" && cfg.monthlyMode === "weekday") return `Todo mes: ${ordinals[cfg.monthlyOrdinalIndex]} ${weekdayLong[cfg.monthlyWeekdayIndex]}`;
-    if (cfg.intervalUnit === "month") return `Todo dia ${cfg.monthDay} do mes`;
-    if (cfg.intervalUnit === "year") return cfg.interval === 1 ? "Anualmente" : `A cada ${cfg.interval} anos`;
-    return cfg.interval === 1 ? "Diariamente" : `A cada ${cfg.interval} dias`;
+    const fallback = options.fallback || "Definir repeticao";
+    const maxLength = Math.max(8, Number(options.maxLength || 22));
+    const dayNames = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
+    const short = (text) => String(text || fallback).length > maxLength ? "Personalizado" : String(text || fallback);
+    const days = cleanDays(cfg.weekDays, []);
+    const isAllDays = days.length === 7;
+    if (cfg.frequency === "none") return fallback;
+    if (cfg.intervalUnit === "day" && cfg.interval === 1) return "Diariamente";
+    if (cfg.intervalUnit === "week" && cfg.interval === 1) {
+      if (isAllDays) return "Diariamente";
+      if (days.length === 1) return short(`Toda ${dayNames[days[0]]}`);
+      const contiguous = days.length > 1 && days.every((day, index) => index === 0 || day === days[index - 1] + 1);
+      if (contiguous) return short(`${dayNames[days[0]]} a ${dayNames[days[days.length - 1]]}`);
+      if (days.length === 2) return short(`${dayNames[days[0]]} e ${dayNames[days[1]]}`);
+      return short(days.map((day) => dayNames[day]).join(", "));
+    }
+    if (cfg.intervalUnit === "month" && cfg.interval === 1 && cfg.monthlyMode === "day") return short(`Todo dia ${cfg.monthDay}`);
+    if (cfg.intervalUnit === "year" && cfg.interval === 1) return "Anualmente";
+    return "Personalizado";
   }
   function ensureModal() {
     let modal = document.getElementById("universalScheduleBridgeModal");
@@ -21501,9 +21514,18 @@ window.project200ProjectsContext = {
     modal?.setAttribute("aria-hidden", "true");
   }
   function renderBridgeButtons() {
-    document.getElementById("missionCreateUniversalScheduleButton")?.querySelector("strong") && (document.getElementById("missionCreateUniversalScheduleButton").querySelector("strong").textContent = labelForSchedule(readTargetSchedule("mission-create")));
-    document.getElementById("missionAdjustUniversalScheduleButton")?.querySelector("strong") && (document.getElementById("missionAdjustUniversalScheduleButton").querySelector("strong").textContent = labelForSchedule(readTargetSchedule("mission-adjust")));
-    document.getElementById("missionVariantUniversalScheduleButton")?.querySelector("strong") && (document.getElementById("missionVariantUniversalScheduleButton").querySelector("strong").textContent = labelForSchedule(readTargetSchedule("microtask")));
+    const missionCreateButton = document.getElementById("missionCreateUniversalScheduleButton");
+    const missionAdjustButton = document.getElementById("missionAdjustUniversalScheduleButton");
+    const missionVariantButton = document.getElementById("missionVariantUniversalScheduleButton");
+    const missionCreateLabel = labelForSchedule(readTargetSchedule("mission-create"));
+    const missionAdjustLabel = labelForSchedule(readTargetSchedule("mission-adjust"));
+    const missionVariantLabel = labelForSchedule(readTargetSchedule("microtask"));
+    if (missionCreateButton?.querySelector("strong")) missionCreateButton.querySelector("strong").textContent = missionCreateLabel;
+    if (missionAdjustButton) {
+      missionAdjustButton.setAttribute("aria-label", `Alterar repeticao da missao: ${missionAdjustLabel}`);
+      missionAdjustButton.title = missionAdjustLabel;
+    }
+    if (missionVariantButton?.querySelector("strong")) missionVariantButton.querySelector("strong").textContent = missionVariantLabel;
   }
   function ensureBridgeButtons() {
     if (missionCreateTimePanel && !document.getElementById("missionCreateUniversalScheduleButton")) {
@@ -21511,7 +21533,7 @@ window.project200ProjectsContext = {
       button.className = "mission-create-time-button";
       button.type = "button";
       button.id = "missionCreateUniversalScheduleButton";
-      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>Semanalmente</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
+      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>Definir repeticao</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
       button.addEventListener("click", () => openBridgeModal("mission-create", () => { if (missionCreateStatus) missionCreateStatus.textContent = "Repeticao definida."; renderMissionCreateStep(); }));
       missionCreateTimePanel.after(button);
     }
@@ -21521,7 +21543,7 @@ window.project200ProjectsContext = {
       button.type = "button";
       button.id = "missionAdjustUniversalScheduleButton";
       button.setAttribute("aria-label", "Alterar repeticao da missao");
-      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><strong class="sr-only">Semanalmente</strong>';
+      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg>';
       button.addEventListener("click", () => openBridgeModal("mission-adjust", () => { if (missionAdjustStatus) missionAdjustStatus.textContent = "Repeticao atualizada."; renderMissionAdjustState(); }));
       missionAdjustConfirmButton.before(button);
     }
