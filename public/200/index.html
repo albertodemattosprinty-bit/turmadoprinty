@@ -7,11 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=0.81-agendamento-universal" />
+  <link rel="stylesheet" href="/200/project.css?v=0.81-sky-theme-v1" />
   <link rel="stylesheet" href="/200/life-capture.css?v=20260802-gallery-inline-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
 </head>
-<body data-background-theme="edge">
+<body data-background-theme="sky">
   <script>
     (function bootstrapProject200Access() {
       try {
@@ -29,7 +29,8 @@
         var parsed = raw ? JSON.parse(raw) : null;
         var theme = String(parsed && parsed.backgroundTheme || "").trim().toLowerCase();
         if (theme === "modern") theme = "black";
-        var allowed = ["white", "black", "orange", "bluevivid", "pinkstrong", "bluedark", "brown", "edge", "light"];
+        if (theme === "edge" || theme === "light") theme = "sky";
+        var allowed = ["black", "white", "sky"];
         if (allowed.indexOf(theme) !== -1) {
           document.body.setAttribute("data-background-theme", theme);
         }
