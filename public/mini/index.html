@@ -1490,6 +1490,10 @@
       filter: drop-shadow(0 20px 30px rgba(0,0,0,.18));
       transition: transform .22s ease, filter .22s ease;
     }
+    .course-cover-shell[data-course-cover-admin-id] {
+      cursor: pointer;
+      touch-action: manipulation;
+    }
     .course-cover-read-layer {
       position: absolute;
       inset: 0;
@@ -4929,6 +4933,8 @@
       <select id="courseImageModelSelect" class="course-admin-input"></select>
       <label class="course-admin-label" for="courseImageCourseSelect">Curso</label>
       <select id="courseImageCourseSelect" class="course-admin-input"></select>
+      <label class="course-admin-label" for="courseImagePromptInput">Direcao criativa opcional</label>
+      <textarea id="courseImagePromptInput" class="course-admin-input course-admin-textarea" placeholder="Ex.: mais fantasia, fundo azul profundo, letras grandes com clima alegre, visual editorial premium."></textarea>
       <label class="course-admin-label" for="courseImageReferenceInput">Upload opcional de referencia</label>
       <input id="courseImageReferenceInput" class="course-admin-input" type="file" accept="image/*">
       <button id="submitCourseImageGen" class="ai-primary course-admin-submit" type="button">Gerar nova capa</button>
@@ -8106,23 +8112,31 @@
       $("mediaImageGenModal").classList.remove("show");
       $("mediaImageGenModal").setAttribute("aria-hidden", "true");
     }
-    async function openMiniCourseImageGenModal() {
+    async function openMiniCourseImageGenModal(preferredCourseId = "") {
       if (!isMiniCourseAdmin) {
         return;
       }
+      const safePreferredCourseId = String(preferredCourseId || "").trim();
       closeMiniCourseAdminModal();
       closeMiniCourseJobsModal();
       $("courseImageGenStatus").textContent = "";
       $("courseImageActionSelect").value = "generate";
+      $("courseImagePromptInput").value = "";
       $("courseImageReferenceInput").value = "";
       renderMiniCourseImageModelOptions();
       renderMiniCourseImageCourseOptions();
+      if (safePreferredCourseId && miniCourses.some((course) => course.id === safePreferredCourseId)) {
+        $("courseImageCourseSelect").value = safePreferredCourseId;
+      }
       syncMiniCourseImageGenActionUi();
       $("courseImageGenModal").classList.add("show");
       $("courseImageGenModal").setAttribute("aria-hidden", "false");
       try {
         await loadMediaImageModels();
         renderMiniCourseImageModelOptions();
+        if (safePreferredCourseId && miniCourses.some((course) => course.id === safePreferredCourseId)) {
+          $("courseImageCourseSelect").value = safePreferredCourseId;
+        }
       } catch (error) {
         $("courseImageGenStatus").textContent = error instanceof Error ? error.message : "Falha ao carregar os modelos de imagem.";
       }
@@ -8219,8 +8233,9 @@
         return;
       }
       const action = String($("courseImageActionSelect")?.value || "generate").trim();
-      const model = String($("courseImageModelSelect")?.value || mediaImageDefaultModel || "gpt-image-2").trim();
+      const model = String($("courseImageModelSelect")?.value || mediaImageDefaultModel || "gpt-image-1").trim();
       const courseId = String($("courseImageCourseSelect")?.value || "").trim();
+      const prompt = String($("courseImagePromptInput")?.value || "").trim();
       const referenceFile = $("courseImageReferenceInput")?.files?.[0] || null;
       const status = $("courseImageGenStatus");
       const button = $("submitCourseImageGen");
@@ -8268,13 +8283,14 @@
               "Authorization": getMiniToken() ? `Bearer ${getMiniToken()}` : "",
               "Content-Type": referenceFile.type || "application/octet-stream",
               "X-File-Name": encodeURIComponent(referenceFile.name),
-              "X-Model": model
+              "X-Model": model,
+              "X-Prompt": encodeURIComponent(prompt)
             },
             body: referenceFile
           })
           : await apiMini(`/api/mini/courses/${encodeURIComponent(courseId)}/cover/generate`, {
             method: "POST",
-            body: JSON.stringify({ model })
+            body: JSON.stringify({ model, prompt })
           });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -11006,16 +11022,19 @@
     function buildMiniCourseCover(course, { progressPreview = false } = {}) {
       const progressPercent = getMiniCourseProgressPercent(course);
       const coverUrl = String(course?.coverImageUrl || miniCourseDefaultCoverUrl).trim();
+      const adminAttrs = isMiniCourseAdmin && course?.id
+        ? ` data-course-cover-admin-id="${escapeAttr(course.id)}" title="Segure por 500ms para criar capa com IA"`
+        : "";
       if (!progressPreview) {
         return `
-          <div class="course-cover-shell">
+          <div class="course-cover-shell"${adminAttrs}>
             <img class="${course?.coverImageUrl ? "course-cover" : "course-cover course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="${escapeAttr(course.title || "Curso")}">
           </div>
         `;
       }
       const progressMask = `<div class="course-cover-progress-mask" style="--course-cover-read:${progressPercent}%"></div>`;
       return `
-        <div class="course-cover-shell">
+        <div class="course-cover-shell"${adminAttrs}>
           <img class="${course?.coverImageUrl ? "course-cover-base" : "course-cover-base course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="${escapeAttr(course.title || "Curso")}">
           <div class="course-cover-read-layer" style="--course-cover-read:${progressPercent}%">
             <img class="${course?.coverImageUrl ? "course-cover-color" : "course-cover-color course-cover-fallback"}" src="${escapeAttr(coverUrl)}" alt="">
@@ -11023,6 +11042,54 @@
           ${progressMask}
         </div>
       `;
+    }
+
+    function bindMiniCourseAdminCoverHold(container) {
+      if (!container || !isMiniCourseAdmin) {
+        return;
+      }
+      container.querySelectorAll("[data-course-cover-admin-id]").forEach((coverShell) => {
+        let holdTimer = 0;
+        let openedFromHold = false;
+        const clearHoldTimer = () => {
+          if (holdTimer) {
+            window.clearTimeout(holdTimer);
+            holdTimer = 0;
+          }
+        };
+        coverShell.addEventListener("pointerdown", (event) => {
+          if (!isMiniCourseAdmin) {
+            return;
+          }
+          clearHoldTimer();
+          openedFromHold = false;
+          const courseId = coverShell.getAttribute("data-course-cover-admin-id") || "";
+          holdTimer = window.setTimeout(() => {
+            holdTimer = 0;
+            openedFromHold = true;
+            openMiniCourseImageGenModal(courseId);
+          }, 500);
+          try {
+            coverShell.setPointerCapture(event.pointerId);
+          } catch (_) {}
+        });
+        ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+          coverShell.addEventListener(eventName, clearHoldTimer);
+        });
+        coverShell.addEventListener("click", (event) => {
+          if (!openedFromHold) {
+            return;
+          }
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          openedFromHold = false;
+        }, true);
+        coverShell.addEventListener("contextmenu", (event) => {
+          if (isMiniCourseAdmin) {
+            event.preventDefault();
+          }
+        });
+      });
     }
 
     function renderMiniCourseIntro(readerView) {
@@ -11053,6 +11120,7 @@
           closeMiniCoursesModal();
         };
       }
+      bindMiniCourseAdminCoverHold(readerView);
       const startButton = $("startMiniCourseButton");
       const backActionButton = $("backMiniCourseButton");
       if (startButton) {
@@ -11108,6 +11176,7 @@
         return;
       }
 
+      bindMiniCourseAdminCoverHold(container);
       container.querySelectorAll("[data-open-mobile-course]").forEach((button) => {
         button.onclick = async () => {
           await openMiniCourseById(button.getAttribute("data-open-mobile-course") || "");
@@ -11411,6 +11480,7 @@
           }
         };
       });
+      bindMiniCourseAdminCoverHold(listView);
       listView.querySelectorAll("[data-upload-course-cover-id]").forEach((button) => {
         button.onclick = async (event) => {
           event.stopPropagation();

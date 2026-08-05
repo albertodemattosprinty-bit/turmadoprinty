@@ -123,11 +123,11 @@ const MINI_MEDIA_LIBRARY_KEY = "mini/media/library.json";
 const MINI_MEDIA_ALBUMS_PREFIX = "mini/media/albums";
 const MINI_MEDIA_COVER_SYNC_PREFIX = "Capas/";
 const MINI_MEDIA_IMAGE_MODELS = [
-  { id: "gpt-image-2", label: "GPT Image 2" },
-  { id: "gpt-image-1.5", label: "GPT Image 1.5" },
   { id: "gpt-image-1", label: "GPT Image 1" },
-  { id: "gpt-image-1-mini", label: "GPT Image 1 Mini" }
+  { id: "gpt-image-1-mini", label: "GPT Image 1 Mini" },
+  { id: "dall-e-3", label: "DALL-E 3" }
 ];
+const MINI_MEDIA_IMAGE_EDIT_MODEL_IDS = new Set(["gpt-image-1", "gpt-image-1-mini"]);
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
@@ -8563,6 +8563,25 @@ async function handleMiniCourseProgressRequest(request, response, courseId) {
   }
 }
 
+function buildMiniCourseCoverContextText(course) {
+  const pages = Array.isArray(course?.pages) ? course.pages : [];
+  const firstChapterNumber = pages.find((page) => Number(page?.chapterNumber || 0) > 0)?.chapterNumber || 1;
+  const chapterPages = pages
+    .filter((page) => Number(page?.chapterNumber || 0) === Number(firstChapterNumber))
+    .slice(0, 5);
+  return chapterPages.map((page) => [
+    String(page?.title || "").trim(),
+    String(page?.subtitle || "").trim(),
+    String(page?.logline || "").trim(),
+    ...(Array.isArray(page?.paragraphs) ? page.paragraphs : []).map((item) => String(item || "").trim()),
+    ...(Array.isArray(page?.bullets) ? page.bullets : []).map((item) => String(item || "").trim()),
+    ...(Array.isArray(page?.tableRows) ? page.tableRows : []).flatMap((row) => [
+      String(row?.label || "").trim(),
+      String(row?.value || "").trim()
+    ])
+  ].filter(Boolean).join(" | ")).filter(Boolean).join("\n").slice(0, 2200);
+}
+
 async function handleMiniCourseCoverGenerateRequest(request, response, courseId) {
   const adminUser = await requireAdmin(request, response);
   if (!adminUser) {
@@ -8610,9 +8629,16 @@ async function handleMiniCourseCoverGenerateRequest(request, response, courseId)
   }
 
   const requestedModel = String(isUploadReference ? request.headers["x-model"] || "" : body?.model || "").trim();
-  const model = MINI_MEDIA_IMAGE_MODELS.some((item) => item.id === requestedModel)
+  const selectedModel = MINI_MEDIA_IMAGE_MODELS.some((item) => item.id === requestedModel)
     ? requestedModel
-    : (MINI_MEDIA_IMAGE_MODELS[0]?.id || "gpt-image-2");
+    : (MINI_MEDIA_IMAGE_MODELS[0]?.id || "gpt-image-1");
+  const model = uploadedReferenceBuffer?.length && !MINI_MEDIA_IMAGE_EDIT_MODEL_IDS.has(selectedModel)
+    ? "gpt-image-1"
+    : selectedModel;
+  const userPrompt = String(isUploadReference
+    ? decodeURIComponent(String(request.headers["x-prompt"] || "").trim())
+    : body?.prompt || ""
+  ).trim().slice(0, 1500);
 
   try {
     const existingCourse = await getMiniCourseById(courseId, "");
@@ -8621,25 +8647,31 @@ async function handleMiniCourseCoverGenerateRequest(request, response, courseId)
       return;
     }
 
+    const firstChapterContext = buildMiniCourseCoverContextText(existingCourse);
     const prompt = [
-      `Crie uma capa vertical original em proporcao 2:3 para o curso "${String(existingCourse.title || "Curso").trim()}".`,
-      existingCourse.context ? `Contexto do curso: ${String(existingCourse.context).trim()}.` : "",
-      existingCourse.coverImagePrompt ? `Direcao visual sugerida: ${String(existingCourse.coverImagePrompt).trim()}.` : "",
-      "A arte deve parecer premium, acolhedora, nítida e apropriada para um curso cristao infantil ou de formacao de professores.",
-      "Nao escreva titulo, letras, tipografia, selo ou texto na imagem.",
+      `Crie uma capa vertical original em proporcao 2:3 para o livro "${String(existingCourse.title || "Curso").trim()}".`,
+      existingCourse.context ? `Contexto geral do livro: ${String(existingCourse.context).trim()}.` : "",
+      firstChapterContext ? `Use o primeiro capitulo como base conceitual e emocional: ${firstChapterContext}` : "",
+      existingCourse.coverImagePrompt ? `Direcao visual salva para este livro: ${String(existingCourse.coverImagePrompt).trim()}.` : "",
+      userPrompt ? `Direcao criativa do admin: ${userPrompt}.` : "",
+      "Prompt base obrigatorio: arte de capa editorial premium, bonita e diversa, com composicao clara, foco visual forte, fundo expressivo, profundidade, luz cinematografica suave e acabamento profissional.",
+      "Varie a linguagem visual de acordo com o titulo: misture paletas de cores, contrastes, texturas, padroes, cenarios, fundos, simbolos e sensacao grafica sem cair em capa generica.",
+      "Pode sugerir a presenca de tipografia, letras, lombada, moldura editorial ou formas que lembrem titulo de livro, mas nao escreva texto legivel, palavras reais, logotipos, selos ou marcas.",
+      "A capa deve funcionar em miniatura no celular e tambem parecer rica em tela maior, com leitura visual imediata.",
       uploadedReferenceBuffer?.length ? "Use a imagem enviada apenas como referencia de estilo, paleta, clima, composicao e nivel de detalhe." : "",
       uploadedReferenceBuffer?.length ? "Nao replique exatamente a imagem enviada e nao copie personagens, poses, enquadramento ou elementos de forma identica." : "",
-      "Crie uma capa nova e original, mantendo personalidade propria mesmo quando houver referencia.",
-      "A imagem precisa funcionar bem como capa do curso em tela mobile e desktop."
+      "Crie uma capa nova e original, mantendo personalidade propria e coerencia com a proposta do livro."
     ].filter(Boolean).join(" ");
+    const imageSize = model === "dall-e-3" ? "1024x1792" : "1024x1536";
+    const imageQuality = model === "dall-e-3" ? "hd" : "high";
 
     let openAiResponse = null;
     if (uploadedReferenceBuffer?.length) {
       const formData = new FormData();
       formData.append("model", model);
       formData.append("prompt", prompt);
-      formData.append("size", "1024x1536");
-      formData.append("quality", "high");
+      formData.append("size", imageSize);
+      formData.append("quality", imageQuality);
       formData.append(
         "image[]",
         new Blob([uploadedReferenceBuffer], { type: uploadedReferenceType }),
@@ -8662,8 +8694,8 @@ async function handleMiniCourseCoverGenerateRequest(request, response, courseId)
         body: JSON.stringify({
           model,
           prompt,
-          size: "1024x1536",
-          quality: "high"
+          size: imageSize,
+          quality: imageQuality
         })
       });
     }
@@ -8702,7 +8734,7 @@ async function handleMiniCourseCoverGenerateRequest(request, response, courseId)
       ok: true,
       user: sanitizeUser(adminUser),
       course: updatedCourse,
-      feedback: `Nova capa do curso gerada com ${model}.`
+      feedback: selectedModel !== model ? `Nova capa do curso gerada com ${model} porque ${selectedModel} nao aceita imagem de referencia.` : `Nova capa do curso gerada com ${model}.`
     });
   } catch (error) {
     sendJson(response, 400, {
