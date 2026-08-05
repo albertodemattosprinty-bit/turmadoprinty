@@ -15228,6 +15228,7 @@ body[data-background-theme="white"] .mission-weekday-list.is-avoidance button.is
 .universal-schedule-inline input, .universal-schedule-inline select, .universal-schedule-card > select, .universal-schedule-card > input[type="date"] { min-height:38px; border:1px solid var(--universal-schedule-border); border-radius:8px; background:var(--universal-schedule-card); color:var(--universal-schedule-text); padding:6px 8px; font:inherit; font-weight:800; min-width:0; }
 .universal-schedule-inline input { width:84px; }
 .universal-schedule-inline select { flex:1; }
+.universal-schedule-periodic-inline span { color:var(--universal-schedule-text); font-weight:900; }
 .universal-weekdays { display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; }
 .universal-weekdays button { aspect-ratio:1; border-radius:999px; border:1px solid var(--universal-schedule-border); background:var(--universal-schedule-card); color:var(--universal-schedule-text); font-size:.72rem; font-weight:900; }
 .universal-weekdays button.active { background:var(--universal-schedule-accent); border-color:var(--universal-schedule-accent); color:#fff; }
