@@ -13126,12 +13126,99 @@ body[data-background-theme="white"] #actionsModal .history-mission-card.actions-
 }
 
 .marin-message-audio-duration {
-  min-width: 72px;
+  min-width: 58px;
+  border: 0;
+  background: transparent;
   color: currentColor !important;
   font-size: 0.72rem !important;
   font-weight: 850 !important;
   text-align: right;
   opacity: 0.86;
+  padding: 0;
+}
+
+.marin-message-audio-label {
+  min-width: 0;
+  color: currentColor;
+}
+
+.marin-message-audio-card.is-user-audio {
+  grid-template-columns: minmax(0, auto);
+  justify-items: end;
+  min-width: 0;
+  width: auto !important;
+  gap: 6px;
+}
+
+.marin-message-audio-card.is-user-audio .marin-message-audio-label {
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.marin-message-audio-card.is-user-audio .marin-message-audio-label svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.marin-message-audio-card.is-user-audio .marin-message-audio-label strong {
+  font-size: .9rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.marin-message-audio-progress {
+  position: relative;
+  display: block;
+  width: min(150px, 44vw);
+  height: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+
+.marin-message-audio-card.is-playing .marin-message-audio-progress {
+  opacity: .9;
+  pointer-events: auto;
+}
+
+.marin-message-audio-progress::before,
+.marin-message-audio-progress i {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  height: 2px;
+  border-radius: 999px;
+}
+
+.marin-message-audio-progress::before {
+  width: 100%;
+  background: color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.marin-message-audio-progress i {
+  width: 0;
+  background: currentColor;
+}
+
+.marin-message-audio-progress b {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateX(-50%);
 }
 
 body[data-background-theme="white"] .marin-message-audio-card {
@@ -13151,7 +13238,7 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
   .marin-message-audio-card {
     width: 100% !important;
     min-width: 0;
-    grid-template-columns: 38px minmax(0, 1fr) 70px;
+    grid-template-columns: 38px minmax(0, 1fr) 58px;
   }
 
   .marin-message-audio-wave {
@@ -13159,8 +13246,12 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
   }
 
   .marin-message-audio-duration {
-    min-width: 66px;
+    min-width: 52px;
     font-size: 0.68rem !important;
+  }
+
+  .marin-message-audio-card.is-user-audio {
+    min-width: 0;
   }
 }
 

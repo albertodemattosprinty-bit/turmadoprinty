@@ -6,7 +6,8 @@ const ILIFE_MEDIA_SUFFIX = "]]";
 const PRIVATE_MEDIA_PATH_PREFIX = "/api/200/life-captures/";
 const PRIVATE_MEDIA_TOKEN_KEY = "turma_do_printy_token";
 let activeChatAudioElement = null;
-const chatAudioState = window.__project200ChatAudioState || (window.__project200ChatAudioState = { url: "", playing: false, time: 0 });
+const chatAudioState = window.__project200ChatAudioState || (window.__project200ChatAudioState = { url: "", playing: false, time: 0, players: new Map() });
+if (!(chatAudioState.players instanceof Map)) chatAudioState.players = new Map();
 
 function stopActiveChatAudio(exceptAudio = null) {
   if (activeChatAudioElement && activeChatAudioElement !== exceptAudio) {
@@ -100,8 +101,32 @@ function decodeUtf8Base64(input) {
 function formatMediaDuration(ms) {
   const total = Math.max(0, Math.round(Number(ms || 0) / 1000));
   const minutes = Math.floor(total / 60);
-  const seconds = String(total % 60).padStart(2, "0");
-  return minutes + ":" + seconds;
+  const seconds = total % 60;
+  if (minutes <= 0) return seconds + "s";
+  return minutes + " min e " + seconds + " s";
+}
+
+function getChatAudioPlayer(mediaUrl) {
+  const key = String(mediaUrl || "");
+  if (!key) return null;
+  const existing = chatAudioState.players.get(key);
+  if (existing) return existing;
+  const audio = new Audio(key);
+  audio.preload = "metadata";
+  audio.playsInline = true;
+  audio.playbackRate = 1;
+  chatAudioState.players.set(key, audio);
+  return audio;
+}
+
+function formatPlaybackRate(rate) {
+  return Math.max(1, Math.min(2.5, Number(rate || 1))).toFixed(2) + "x";
+}
+
+function nextPlaybackRate(rate) {
+  const steps = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5];
+  const current = Number(rate || 1);
+  return steps.find((step) => step > current + 0.01) || 1;
 }
 
 function parseMediaPayload(text) {
@@ -194,7 +219,7 @@ async function buildAudioWaveform(mediaUrl, count) {
   }
 }
 
-function createMediaCard(payload) {
+function createMediaCard(payload, options = {}) {
   const kind = String(payload?.kind || "").trim().toLowerCase();
   const previewUrl = withPrivateMediaAuth(payload?.previewUrl || payload?.previewRemoteUrl || payload?.previewDataUrl || "");
   const mediaUrl = withPrivateMediaAuth(payload?.mediaUrl || payload?.remoteUrl || "");
@@ -202,85 +227,134 @@ function createMediaCard(payload) {
   if (!previewUrl && !mediaUrl && kind !== "text") return null;
 
   if (kind === "audio" && mediaUrl) {
+    const role = String(options.role || payload?.role || "").trim().toLowerCase();
+    const isUserAudio = role === "user";
     const card = document.createElement("div");
     card.className = "marin-message-audio-card";
+    card.classList.toggle("is-user-audio", isUserAudio);
     card.classList.toggle("is-viewed", hasAudioBeenViewed(mediaUrl));
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "marin-message-audio-button";
     button.textContent = "\u25b6";
     button.setAttribute("aria-label", "Reproduzir audio");
-    const wave = document.createElement("span");
-    wave.className = "marin-message-audio-wave";
-    wave.setAttribute("role", "slider");
-    wave.setAttribute("aria-label", "Linha do tempo do audio");
-    wave.setAttribute("aria-valuemin", "0");
-    wave.setAttribute("aria-valuemax", "100");
-    wave.setAttribute("aria-valuenow", "0");
-    const barCount = 32;
-    const bars = Array.from({ length: barCount }, () => {
-      const bar = document.createElement("i");
-      bar.style.setProperty("--wave-level", "0.28");
-      wave.appendChild(bar);
-      return bar;
-    });
-    const duration = document.createElement("span");
+
+    const label = document.createElement(isUserAudio ? "button" : "span");
+    label.className = "marin-message-audio-label";
+    if (isUserAudio) {
+      label.type = "button";
+      label.setAttribute("aria-label", "Reproduzir audio enviado");
+      label.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5-.9a1 1 0 0 0-1.4 1.4A3.5 3.5 0 0 1 16 12a3.5 3.5 0 0 1-.9 2.5 1 1 0 1 0 1.4 1.4A5.5 5.5 0 0 0 18 12a5.5 5.5 0 0 0-1.5-3.9Zm2.8-2.8a1 1 0 0 0-1.4 1.4A7.4 7.4 0 0 1 20 12a7.4 7.4 0 0 1-2.1 5.3 1 1 0 0 0 1.4 1.4A9.4 9.4 0 0 0 22 12a9.4 9.4 0 0 0-2.7-6.7Z" fill="currentColor"/></svg><strong>Audio enviado</strong>';
+    } else {
+      const wave = document.createElement("span");
+      wave.className = "marin-message-audio-wave";
+      wave.setAttribute("role", "slider");
+      wave.setAttribute("aria-label", "Linha do tempo do audio");
+      wave.setAttribute("aria-valuemin", "0");
+      wave.setAttribute("aria-valuemax", "100");
+      wave.setAttribute("aria-valuenow", "0");
+      label.appendChild(wave);
+    }
+
+    const progress = document.createElement("span");
+    progress.className = "marin-message-audio-progress";
+    const progressFill = document.createElement("i");
+    const progressDot = document.createElement("b");
+    progress.append(progressFill, progressDot);
+
+    const duration = document.createElement("button");
+    duration.type = "button";
     duration.className = "marin-message-audio-duration";
-    duration.textContent = "0:00 / " + formatMediaDuration(payload?.durationMs || 0);
-    const audio = new Audio(mediaUrl);
-    audio.preload = "metadata";
-    audio.playsInline = true;
+    duration.setAttribute("aria-label", "Alterar velocidade do audio");
+
+    const audio = getChatAudioPlayer(mediaUrl);
+    const barCount = 32;
+    const bars = [];
+    const wave = label.querySelector?.(".marin-message-audio-wave") || null;
+    if (wave) {
+      for (let index = 0; index < barCount; index += 1) {
+        const bar = document.createElement("i");
+        bar.style.setProperty("--wave-level", "0.28");
+        wave.appendChild(bar);
+        bars.push(bar);
+      }
+    }
+
+    const totalSeconds = () => {
+      const recordedTotal = Math.max(0, Number(payload?.durationMs || 0) / 1000);
+      return recordedTotal > 0 ? recordedTotal : (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
+    };
 
     const updateProgress = () => {
-      const recordedTotal = Math.max(0, Number(payload?.durationMs || 0) / 1000);
-      const total = recordedTotal > 0 ? recordedTotal : (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
+      const total = totalSeconds();
       const current = Math.max(0, Number(audio.currentTime || 0));
       const ratio = total > 0 ? Math.max(0, Math.min(1, current / total)) : 0;
-      const activeBars = Math.round(ratio * bars.length);
-      bars.forEach((bar, index) => bar.classList.toggle("is-played", index < activeBars));
-      duration.textContent = formatMediaDuration(current * 1000) + " / " + formatMediaDuration(total * 1000);
-      wave.setAttribute("aria-valuenow", String(Math.round(ratio * 100)));
+      bars.forEach((bar, index) => bar.classList.toggle("is-played", index < Math.round(ratio * bars.length)));
+      progressFill.style.width = (ratio * 100).toFixed(2) + "%";
+      progressDot.style.left = (ratio * 100).toFixed(2) + "%";
+      if (wave) wave.setAttribute("aria-valuenow", String(Math.round(ratio * 100)));
+      duration.textContent = audio.paused ? formatMediaDuration(total * 1000) : formatPlaybackRate(audio.playbackRate);
+      button.textContent = audio.paused ? "\u25b6" : "\u275a\u275a";
+      card.classList.toggle("is-playing", !audio.paused && !audio.ended);
     };
 
     const seekFromClientX = (clientX) => {
-      const total = Math.max(0, Number(payload?.durationMs || 0) / 1000) || (Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
+      const total = totalSeconds();
       if (!total) return;
-      const rect = wave.getBoundingClientRect();
+      const target = wave || progress;
+      const rect = target.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width)));
       audio.currentTime = ratio * total;
       updateProgress();
     };
 
     let scrubbing = false;
-    wave.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-      scrubbing = true;
-      wave.setPointerCapture?.(event.pointerId);
-      seekFromClientX(event.clientX);
-    });
-    wave.addEventListener("pointermove", (event) => {
-      if (!scrubbing) return;
-      event.preventDefault();
-      seekFromClientX(event.clientX);
-    });
-    const endScrub = (event) => {
-      if (!scrubbing) return;
-      scrubbing = false;
-      wave.releasePointerCapture?.(event.pointerId);
+    const bindSeek = (target) => {
+      if (!target) return;
+      target.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        scrubbing = true;
+        target.setPointerCapture?.(event.pointerId);
+        seekFromClientX(event.clientX);
+      });
+      target.addEventListener("pointermove", (event) => {
+        if (!scrubbing) return;
+        event.preventDefault();
+        seekFromClientX(event.clientX);
+      });
+      const endScrub = (event) => {
+        if (!scrubbing) return;
+        scrubbing = false;
+        target.releasePointerCapture?.(event.pointerId);
+      };
+      target.addEventListener("pointerup", endScrub);
+      target.addEventListener("pointercancel", endScrub);
     };
-    wave.addEventListener("pointerup", endScrub);
-    wave.addEventListener("pointercancel", endScrub);
+    bindSeek(wave);
+    bindSeek(progress);
 
-    audio.addEventListener("loadedmetadata", () => {
-      updateProgress();
-      if (chatAudioState.url === mediaUrl && chatAudioState.playing) {
-        const target = Math.max(0, Number(chatAudioState.time || 0));
-        if (target > 0) {
-          try { audio.currentTime = Math.min(target, Math.max(0, Number(audio.duration) || target)); } catch {}
-        }
+    const togglePlay = (event) => {
+      event?.stopPropagation?.();
+      if (audio.paused) {
+        stopActiveChatAudio(audio);
         audio.play().catch(() => {});
+      } else {
+        audio.pause();
       }
+    };
+
+    button.addEventListener("click", togglePlay);
+    if (isUserAudio) label.addEventListener("click", togglePlay);
+    duration.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (audio.paused) return;
+      audio.playbackRate = nextPlaybackRate(audio.playbackRate);
+      updateProgress();
     });
+
+    audio.addEventListener("loadedmetadata", updateProgress);
+    audio.addEventListener("ratechange", updateProgress);
     audio.addEventListener("timeupdate", () => {
       chatAudioState.url = mediaUrl;
       chatAudioState.time = Math.max(0, Number(audio.currentTime || 0));
@@ -292,8 +366,8 @@ function createMediaCard(payload) {
       chatAudioState.url = mediaUrl;
       chatAudioState.playing = true;
       chatAudioState.time = Math.max(0, Number(audio.currentTime || 0));
-      button.textContent = "\u275a\u275a";
       markAudioViewed(card, mediaUrl);
+      updateProgress();
     });
     audio.addEventListener("pause", () => {
       if (activeChatAudioElement === audio) activeChatAudioElement = null;
@@ -301,7 +375,7 @@ function createMediaCard(payload) {
         chatAudioState.playing = false;
         chatAudioState.time = Math.max(0, Number(audio.currentTime || 0));
       }
-      button.textContent = "\u25b6";
+      updateProgress();
     });
     audio.addEventListener("ended", () => {
       if (activeChatAudioElement === audio) activeChatAudioElement = null;
@@ -309,23 +383,23 @@ function createMediaCard(payload) {
         chatAudioState.playing = false;
         chatAudioState.time = 0;
       }
-      button.textContent = "\u25b6";
+      audio.currentTime = 0;
       updateProgress();
+      window.setTimeout(() => card.classList.remove("is-playing"), 500);
       playNextChatAudio(card);
     });
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (audio.paused) {
-        stopActiveChatAudio(audio);
-        audio.play().catch(() => {});
-      } else {
-        audio.pause();
-      }
-    });
-    buildAudioWaveform(mediaUrl, barCount).then((values) => {
-      values.forEach((value, index) => bars[index]?.style.setProperty("--wave-level", String(value)));
-    });
-    card.append(button, wave, duration);
+
+    if (wave) {
+      buildAudioWaveform(mediaUrl, barCount).then((values) => {
+        values.forEach((value, index) => bars[index]?.style.setProperty("--wave-level", String(value)));
+      });
+    }
+
+    if (chatAudioState.url === mediaUrl && Number(chatAudioState.time || 0) > 0 && audio.paused) {
+      try { audio.currentTime = Number(chatAudioState.time || 0); } catch {}
+    }
+    if (isUserAudio) card.append(label, progress);
+    else card.append(button, label, duration);
     updateProgress();
     return card;
   }
@@ -378,13 +452,13 @@ function createMediaCard(payload) {
   return card;
 }
 
-export function renderChatMessageContent(container, content) {
+export function renderChatMessageContent(container, content, options = {}) {
   if (!(container instanceof Element)) return;
   const text = String(content || "");
   container.replaceChildren();
   const mediaPayload = parseMediaPayload(text);
   if (mediaPayload) {
-    const card = createMediaCard(mediaPayload);
+    const card = createMediaCard(mediaPayload, options);
     if (card) container.append(card);
     return;
   }

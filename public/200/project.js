@@ -14767,7 +14767,7 @@ function renderMissionAdjustState() {
   const limit = normalizeMissionKind(state.missionAdjust?.goalKind) === "limit";
   const folder = state.missionAdjust?.isFolder === true;
   if (missionAdjustHint) missionAdjustHint.textContent = folder
-    ? "A duração e o progresso pertencem às ações desta pasta."
+    ? ""
     : limit
       ? `Limite ${targetValue}x a cada ${formatLimitInterval(state.missionAdjust?.limitIntervalValue, state.missionAdjust?.limitIntervalUnit).toLocaleLowerCase("pt-BR")}`
       : `Meta diária ${targetValue}x`;

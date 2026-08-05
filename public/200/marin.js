@@ -1,4 +1,4 @@
-import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.76-gallery-inline-v1";
+import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.81-chat-audio-v1";
 
 const DEFAULT_PERSONAS = [
   { key: "marin", name: "Marin", avatar: "/200/agents/marin.svg" },
@@ -320,7 +320,7 @@ export function initializeProject200MarinUi(dependencies = {}) {
       bubble.className = (isSharedMedia ? "marin-message-shared " : "marin-message ") + (message.role === "user" ? "is-user" : "is-assistant");
       const copy = document.createElement("div");
       copy.className = isSharedMedia ? "marin-message-shared-content" : "marin-message-copy";
-      renderChatMessageContent(copy, message.content);
+      renderChatMessageContent(copy, message.content, { role: message.role });
       bubble.appendChild(copy);
       elements.messages.appendChild(bubble);
 
