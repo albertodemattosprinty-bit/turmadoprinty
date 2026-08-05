@@ -11814,7 +11814,7 @@ const MISSION_DURATION_OPTIONS_SECONDS = Object.freeze([
   45,
   ...Array.from({ length: MISSION_MAX_DURATION_MINUTES }, (_, index) => (index + 1) * 60)
 ]);
-const DEFAULT_MISSION_DURATION_SECONDS = 30;
+const DEFAULT_MISSION_DURATION_SECONDS = 180;
 const LIMIT_INTERVAL_OPTIONS = [
   { value: 1, unit: "day", label: "Dia" },
   { value: 1, unit: "week", label: "Semana" },
@@ -21398,21 +21398,37 @@ window.project200ProjectsContext = {
     const fallback = options.fallback || "Definir repeticao";
     const maxLength = Math.max(8, Number(options.maxLength || 22));
     const dayNames = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
-    const short = (text) => String(text || fallback).length > maxLength ? "Personalizado" : String(text || fallback);
+    const monthNames = ["Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    const short = (text) => {
+      const clean = String(text || fallback).replace(/\s+/g, " ").trim();
+      return clean.length > maxLength ? "Personalizado" : clean;
+    };
+    const formatDate = (dateKey) => {
+      const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return "";
+      const day = Number(match[3]);
+      const month = monthNames[Math.max(0, Number(match[2]) - 1)] || "";
+      return month ? `${day} de ${month}` : "";
+    };
     const days = cleanDays(cfg.weekDays, []);
-    const isAllDays = days.length === 7;
-    if (cfg.frequency === "none") return fallback;
+    const monthDays = Array.isArray(cfg.monthDays) ? [...new Set(cfg.monthDays.map((day) => Math.trunc(Number(day))).filter((day) => day >= 1 && day <= 31))].sort((a, b) => a - b) : [];
+    const customDates = Array.isArray(cfg.dates) ? cfg.dates.map(formatDate).filter(Boolean) : [];
+    if (cfg.frequency === "none") return short(customDates[0] || formatDate(cfg.startsOn) || fallback);
     if (cfg.intervalUnit === "day" && cfg.interval === 1) return "Diariamente";
     if (cfg.intervalUnit === "week" && cfg.interval === 1) {
-      if (isAllDays) return "Diariamente";
+      if (days.length === 7) return "Diariamente";
       if (days.length === 1) return short(`Toda ${dayNames[days[0]]}`);
       const contiguous = days.length > 1 && days.every((day, index) => index === 0 || day === days[index - 1] + 1);
       if (contiguous) return short(`${dayNames[days[0]]} a ${dayNames[days[days.length - 1]]}`);
       if (days.length === 2) return short(`${dayNames[days[0]]} e ${dayNames[days[1]]}`);
       return short(days.map((day) => dayNames[day]).join(", "));
     }
-    if (cfg.intervalUnit === "month" && cfg.interval === 1 && cfg.monthlyMode === "day") return short(`Todo dia ${cfg.monthDay}`);
-    if (cfg.intervalUnit === "year" && cfg.interval === 1) return "Anualmente";
+    if (cfg.intervalUnit === "month" && cfg.interval === 1 && cfg.monthlyMode === "day") {
+      if (monthDays.length === 2) return short(`Dias ${monthDays[0]} e ${monthDays[1]}`);
+      if (monthDays.length > 2) return short(`Dias ${monthDays.join(", ")}`);
+      return short(`Todo dia ${cfg.monthDay}`);
+    }
+    if (cfg.intervalUnit === "year" && cfg.interval === 1) return short(formatDate(cfg.startsOn) || "Anualmente");
     return "Personalizado";
   }
   function ensureModal() {
@@ -21528,14 +21544,20 @@ window.project200ProjectsContext = {
     if (missionVariantButton?.querySelector("strong")) missionVariantButton.querySelector("strong").textContent = missionVariantLabel;
   }
   function ensureBridgeButtons() {
-    if (missionCreateTimePanel && !document.getElementById("missionCreateUniversalScheduleButton")) {
+    const repeatStep = document.querySelector('[data-mission-create-step="5"]');
+    if (repeatStep) {
+      const copy = repeatStep.querySelector("p");
+      if (copy) copy.textContent = "Defina quando essa missao aparece.";
+      if (missionCreateWeekdays) missionCreateWeekdays.hidden = true;
+    }
+    if (repeatStep && !document.getElementById("missionCreateUniversalScheduleButton")) {
       const button = document.createElement("button");
       button.className = "mission-create-time-button";
       button.type = "button";
       button.id = "missionCreateUniversalScheduleButton";
       button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>Definir repeticao</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
       button.addEventListener("click", () => openBridgeModal("mission-create", () => { if (missionCreateStatus) missionCreateStatus.textContent = "Repeticao definida."; renderMissionCreateStep(); }));
-      missionCreateTimePanel.after(button);
+      repeatStep.appendChild(button);
     }
     if (missionAdjustConfirmButton && !document.getElementById("missionAdjustUniversalScheduleButton")) {
       const button = document.createElement("button");
@@ -21550,8 +21572,7 @@ window.project200ProjectsContext = {
   }
   const oldGetMissionCreateStepSequence = getMissionCreateStepSequence;
   getMissionCreateStepSequence = function() {
-    const sequence = oldGetMissionCreateStepSequence();
-    return state.missionCreate?.structureType === "folder" ? sequence : sequence.filter((step) => Number(step) !== 5);
+    return oldGetMissionCreateStepSequence();
   };
   const oldValidateMissionCreateStep = validateMissionCreateStep;
   validateMissionCreateStep = function(step = state.missionCreate?.step) { return Number(step) === 5 ? "" : oldValidateMissionCreateStep(step); };
@@ -21560,7 +21581,8 @@ window.project200ProjectsContext = {
     oldRenderMissionCreateStep(direction);
     ensureBridgeButtons();
     const legacyStep = document.querySelector('[data-mission-create-step="5"]');
-    if (legacyStep) legacyStep.hidden = true;
+    if (legacyStep) legacyStep.hidden = state.missionCreate?.structureType === "folder";
+    if (missionCreateWeekdays) missionCreateWeekdays.hidden = true;
     renderBridgeButtons();
   };
   const oldOpenMissionCreateModal = openMissionCreateModal;
