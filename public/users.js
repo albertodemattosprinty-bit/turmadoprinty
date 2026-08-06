@@ -192,6 +192,7 @@ function renderUsersTable() {
       user.activeMessage?.userReplyBody &&
       !viewedReplyMessageIds.has(user.activeMessage.id)
     );
+    const hasUnreadEventUpdate = Boolean(user.hasUnreadEventUpdate);
 
     const row = document.createElement("article");
     row.className = `users-table-row users-table-card ${user.isOnline ? "is-online" : "is-offline"}${user.id === selectedUserId ? " is-selected" : ""}`;
@@ -200,7 +201,7 @@ function renderUsersTable() {
         <button class="users-table-select" type="button">
           <span class="users-table-user-copy">
             <strong class="users-table-user-name">
-              ${hasUnreadUserReply ? '<span class="users-message-dot users-message-dot-left" aria-hidden="true"></span>' : ""}
+              ${(hasUnreadUserReply || hasUnreadEventUpdate) ? `<span class="users-message-dot users-message-dot-left" aria-hidden="true" title="${hasUnreadEventUpdate ? "Nova movimentacao no evento" : "Nova mensagem"}"></span>` : ""}
               <span>${user.name || user.username || "Usuario"}</span>
             </strong>
             <small>${user.username ? `@${user.username}` : ""}</small>

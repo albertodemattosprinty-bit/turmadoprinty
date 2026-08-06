@@ -1104,19 +1104,25 @@
       const basePriceCents = selected.amountCents * eventCount;
       const couponDiscountCents = Math.min(basePriceCents, Math.max(0, Number(answers.couponDiscountCents || 0)));
       answers.presentationKey = selected.key;
+      const transportAmountCents = Math.max(0, Number(answers.transportAmountCents || 0));
       answers.eventCount = String(eventCount);
       answers.pagamentoOpcao = selected.key;
       answers.pagamentoValor = selected.priceLabel;
       answers.unitPriceCents = String(selected.amountCents);
       answers.basePriceCents = String(basePriceCents);
-      answers.finalPriceCents = String(basePriceCents - couponDiscountCents);
-      return { selected, eventCount, basePriceCents, couponDiscountCents, finalPriceCents: basePriceCents - couponDiscountCents };
+      answers.finalPriceCents = String(basePriceCents - couponDiscountCents + transportAmountCents);
+      return { selected, eventCount, basePriceCents, couponDiscountCents, transportAmountCents, finalPriceCents: basePriceCents - couponDiscountCents + transportAmountCents };
     }
 
     function removeAppliedCoupon(feedback = "") {
       answers.couponCode = "";
       answers.couponDiscountCents = "0";
       answers.freeTransport = false;
+      answers.transportAmountCents = "0";
+      answers.transportTripType = "";
+      answers.transportCityA = "";
+      answers.transportCityB = "";
+      answers.transportDescription = "";
       answers.freeLodging = false;
       answers.couponFeedback = feedback;
       syncPricingPreview();
@@ -1134,6 +1140,11 @@
       answers.couponCode = data.pricing.couponCode || "";
       answers.couponDiscountCents = String(data.pricing.couponDiscountCents || 0);
       answers.freeTransport = Boolean(data.pricing.freeTransport);
+      answers.transportAmountCents = String(data.pricing.transportAmountCents || 0);
+      answers.transportTripType = data.pricing.transportTripType || "";
+      answers.transportCityA = data.pricing.transportCityA || "";
+      answers.transportCityB = data.pricing.transportCityB || "";
+      answers.transportDescription = data.pricing.transportDescription || "";
       answers.freeLodging = Boolean(data.pricing.freeLodging);
       answers.couponFeedback = "Cupom aplicado no preco final.";
       couponPanelOpen = true;
@@ -1152,7 +1163,7 @@
         prepareTermTextElement(paymentH2, "payment.choice.copy", "");
         const pricing = syncPricingPreview();
         const couponBenefits = [
-          answers.freeTransport ? "Livre de transporte" : "",
+          answers.transportDescription || (answers.freeTransport ? "Livre de transporte" : ""),
           answers.freeLodging ? "Livre de hospedagem" : ""
         ].filter(Boolean);
         paymentBody.innerHTML = `
@@ -1173,6 +1184,7 @@
               <div class="price-row"><span>${pricing.selected.label} x ${pricing.eventCount}</span><strong>${formatEventMoney(pricing.basePriceCents)}</strong></div>
               ${pricing.couponDiscountCents ? `<div class="price-row"><span>Desconto ${escapeHtml(answers.couponCode)}</span><strong>- ${formatEventMoney(pricing.couponDiscountCents)}</strong></div>` : ""}
               <div class="price-row final"><span>Preco final</span><strong>${formatEventMoney(pricing.finalPriceCents)}</strong></div>
+              ${pricing.transportAmountCents ? `<div class="price-row"><span>Transporte definido</span><strong>${formatEventMoney(pricing.transportAmountCents)}</strong></div>` : ""}
             </div>
           </div>
         `;
@@ -1428,7 +1440,7 @@
     function buildAcceptedTermsSnapshot() {
       const pricing = syncPricingPreview();
       const benefits = [
-        answers.freeTransport ? "Livre de transporte" : "",
+        answers.transportDescription || (answers.freeTransport ? "Livre de transporte" : ""),
         answers.freeLodging ? "Livre de hospedagem" : ""
       ].filter(Boolean);
       const accepted = agreementSteps.map((step, index) => ({

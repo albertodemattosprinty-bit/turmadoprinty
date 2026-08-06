@@ -37,7 +37,11 @@ const QUESTION_ORDER = [
   { key: "couponDiscount", label: "Desconto do cupom" },
   { key: "finalPrice", label: "Preco final" },
   { key: "freeTransport", label: "Transporte livre de cobranca" },
+  { key: "transportAmount", label: "Valor definido para o transporte" },
+  { key: "transportRoute", label: "Rota do transporte" },
+  { key: "transportDescription", label: "Condicao do transporte" },
   { key: "freeLodging", label: "Hospedagem livre de cobranca" },
+  { key: "pagamentoVencimento", label: "Vencimento do primeiro pagamento" },
   { key: "assinatura", label: "Assinatura" },
   { key: "assinaturaCpf", label: "CPF da assinatura" }
 ];
@@ -177,6 +181,9 @@ async function buildCommercialAnswers(rawAnswers) {
       couponDiscount: formatEventMoney(pricing.couponDiscountCents),
       finalPrice: formatEventMoney(pricing.finalPriceCents),
       freeTransport: pricing.freeTransport ? "Sim" : "Nao",
+      transportAmount: pricing.transportAmountCents ? formatEventMoney(pricing.transportAmountCents) : (pricing.freeTransport ? "Livre de cobranca" : "Nao definido"),
+      transportRoute: pricing.transportCityA && pricing.transportCityB ? (pricing.transportTripType === "ROUND_TRIP" ? `${pricing.transportCityA} para ${pricing.transportCityB} e volta para ${pricing.transportCityA}` : `${pricing.transportCityA} para ${pricing.transportCityB}`) : "Nao definida",
+      transportDescription: pricing.transportDescription || "Transporte nao definido neste cupom",
       freeLodging: pricing.freeLodging ? "Sim" : "Nao"
     }
   };
@@ -189,8 +196,13 @@ export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedT
   answers.presentationKey = commercial.pricing.presentationKey;
   answers.unitPriceCents = String(commercial.pricing.unitPriceCents);
   answers.basePriceCents = String(commercial.pricing.basePriceCents);
+  answers.transportAmountCents = String(commercial.pricing.transportAmountCents || 0);
   answers.couponDiscountCents = String(commercial.pricing.couponDiscountCents);
   answers.finalPriceCents = String(commercial.pricing.finalPriceCents);
+  const firstPaymentDue = String(rawAnswers?.pagamentoVencimentoIso || "").trim().slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(firstPaymentDue)) {
+    answers.pagamentoVencimentoIso = firstPaymentDue;
+  }
   const acceptedTerms = sanitizeAcceptedTerms(rawAcceptedTerms);
   const eventDate = parseEventDate(answers);
   const eventTimeSort = parseEventTimeSort(answers.horario);
@@ -335,12 +347,14 @@ export async function updateLatestTermCouponByUserId(userId, couponCode = "") {
     ...commercial.values,
     presentationKey: commercial.pricing.presentationKey,
     unitPriceCents: String(commercial.pricing.unitPriceCents),
+    transportAmountCents: String(commercial.pricing.transportAmountCents || 0),
     basePriceCents: String(commercial.pricing.basePriceCents),
     couponDiscountCents: String(commercial.pricing.couponDiscountCents),
     finalPriceCents: String(commercial.pricing.finalPriceCents)
   };
   const benefits = [
     commercial.pricing.freeTransport ? "Livre de transporte" : "",
+    commercial.pricing.transportDescription || "",
     commercial.pricing.freeLodging ? "Livre de hospedagem" : ""
   ].filter(Boolean);
   const acceptedTerms = [

@@ -55,6 +55,7 @@ import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugify
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, recordProposalActivity, recordProposalVisit, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
+import { confirmEventLodging, confirmEventPayment, ensureEventContractingSchema, getEventContractWorkflow, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
@@ -133,6 +134,7 @@ const MINI_MEDIA_IMAGE_EDIT_MODEL_IDS = new Set(["gpt-image-1", "gpt-image-1-min
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
+const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
 const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
 const MINI_DOC_KEY_ALL_DOCS = "all-docs";
 const MINI_DOC_TITLE_ALL_DOCS = "AllDocs";
@@ -2689,6 +2691,7 @@ async function ensurePaymentsReady(response) {
     await ensureAdminUsersSchema();
     await ensureAllTermsSchema();
     await ensureEventFlowSchema();
+    await ensureEventContractingSchema();
     await ensureActionsSchema();
     await ensurePlatformFinanceSchema();
     await ensureStatsSchema();
@@ -10081,6 +10084,7 @@ async function handleGetContractorPanel(request, response) {
   try {
     const term = await getLatestTermByUserId(authUser.id);
     if (term) await markContractorPanelReached(authUser.id);
+    const workflow = term ? await getEventContractWorkflow(term) : null;
 
     sendJson(response, 200, {
       ok: true,
@@ -10096,6 +10100,7 @@ async function handleGetContractorPanel(request, response) {
               eventTime: term.eventTime,
               createdAt: term.createdAt,
               pdfUrl: `/api/terms/${term.id}/pdf`
+              ,workflow
             }
           : null
       }
@@ -10337,9 +10342,11 @@ async function handleAdminEvents(request, response) {
       listAdminEventFlow(),
       listEventCoupons({ includeInactive: true })
     ]);
+    const unreadUserIds = await listUnreadEventUserIds();
+    const eventUsers = users.map((user) => ({ ...user, hasUnreadUpdate: unreadUserIds.has(user.userId) }));
     sendJson(response, 200, {
       ok: true,
-      users,
+      users: eventUsers,
       coupons,
       presentations: getEventPresentations()
     });
@@ -10371,6 +10378,120 @@ async function handleAdminEventCouponUpdate(request, response, couponId) {
     sendJson(response, 200, { ok: true, coupon });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o cupom." });
+  }
+}
+
+async function handleContractorPaymentReport(request, response, paymentId) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const payment = await reportEventPayment(user.id, paymentId);
+    sendJson(response, 200, { ok: true, payment });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel informar o pagamento." });
+  }
+}
+
+async function handleContractorLodgingUpdate(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const term = await getLatestTermByUserId(user.id);
+    if (!term) throw new Error("Termo do evento nao encontrado.");
+    await getEventContractWorkflow(term);
+    const body = await readJsonBody(request);
+    const lodging = await saveEventLodging(user.id, term.id, body || {});
+    sendJson(response, 200, { ok: true, lodging });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar o hotel." });
+  }
+}
+
+async function handleAdminEventUserDetail(request, response, userId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const term = await getLatestTermByUserId(userId);
+    if (!term) {
+      sendJson(response, 404, { error: "Esse usuario ainda nao concluiu o termo." });
+      return;
+    }
+    const workflow = await getEventContractWorkflow(term);
+    const list = await listAdminEventFlow();
+    const summary = list.find((item) => item.userId === userId) || null;
+    await markEventUpdatesViewed(userId);
+    sendJson(response, 200, {
+      ok: true,
+      user: summary ? { id: userId, name: summary.name, username: summary.username } : { id: userId },
+      term: { id: term.id, answers: term.answers || {}, acceptedTerms: term.acceptedTerms || [], eventDate: term.eventDate, eventTime: term.eventTime, createdAt: term.createdAt, pdfUrl: `/api/terms/${term.id}/pdf` },
+      workflow
+    });
+  } catch (error) {
+    sendJson(response, 500, { error: error instanceof Error ? error.message : "Nao foi possivel carregar o evento." });
+  }
+}
+
+async function handleAdminEventPaymentConfirm(request, response, userId, paymentId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const payment = await confirmEventPayment(admin.id, userId, paymentId);
+    sendJson(response, 200, { ok: true, payment });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel dar baixa." });
+  }
+}
+
+async function handleAdminEventLodgingConfirm(request, response, userId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const term = await getLatestTermByUserId(userId);
+    if (!term) throw new Error("Termo do evento nao encontrado.");
+    const lodging = await confirmEventLodging(admin.id, userId, term.id);
+    sendJson(response, 200, { ok: true, lodging });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel confirmar a hospedagem." });
+  }
+}
+
+async function handleAdminEventVideoUpload(request, response, userId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  const term = await getLatestTermByUserId(userId);
+  if (!term) {
+    sendJson(response, 404, { error: "Termo do evento nao encontrado." });
+    return;
+  }
+  let fileName = String(request.headers["x-file-name"] || "video-divulgacao.mp4").trim().slice(0, 180);
+  try { fileName = decodeURIComponent(fileName); } catch { /* mantem o nome recebido */ }
+  const contentType = String(request.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+  const allowedTypes = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]);
+  if (!allowedTypes.has(contentType)) {
+    sendJson(response, 400, { error: "Envie um video MP4, WebM, MOV ou M4V." });
+    return;
+  }
+  let buffer;
+  try {
+    buffer = await readBinaryBody(request, MAX_EVENT_PROMO_VIDEO_BYTES);
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel ler o video." });
+    return;
+  }
+  if (!buffer?.length) {
+    sendJson(response, 400, { error: "O video enviado esta vazio." });
+    return;
+  }
+  try {
+    const extByType = { "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov", "video/x-m4v": "m4v" };
+    const key = `eventos/contratantes/${userId}/${term.id}/video-divulgacao-${Date.now()}.${extByType[contentType]}`;
+    await getR2Client().send(new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key, Body: buffer, ContentType: contentType }));
+    const promoVideo = await saveEventPromoVideo(admin.id, userId, term.id, {
+      key, url: buildPublicR2UrlFromKey(key), fileName, contentType, sizeBytes: buffer.length
+    });
+    sendJson(response, 200, { ok: true, promoVideo });
+  } catch (error) {
+    sendJson(response, 500, { error: error instanceof Error ? error.message : "Nao foi possivel enviar o video ao R2." });
   }
 }
 
@@ -11693,9 +11814,11 @@ async function handleAdminUsersList(request, response) {
       getScheduleEntries()
     ]);
 
+    const unreadEventUserIds = await listUnreadEventUserIds();
+    const enrichedUsers = users.map((user) => ({ ...user, hasUnreadEventUpdate: unreadEventUserIds.has(user.id) }));
     sendJson(response, 200, {
       ok: true,
-      users,
+      users: enrichedUsers,
       plans: buildSubscriptionPlans(pricing.planPrices),
       albums: storeProducts.map((product) => ({
         id: product.id,
@@ -13336,6 +13459,17 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname.match(/^\/api\/contractor-panel\/payments\/[^/]+\/report$/)) {
+    const paymentId = decodeURIComponent(pathname.replace(/^\/api\/contractor-panel\/payments\/([^/]+)\/report$/, "$1"));
+    await handleContractorPaymentReport(request, response, paymentId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/contractor-panel/lodging") {
+    await handleContractorLodgingUpdate(request, response);
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/contractor-panel") {
     await handleGetContractorPanel(request, response);
     return;
@@ -14647,6 +14781,30 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar a atualizacao do app."
       });
     }
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)$/, "$1"));
+    await handleAdminEventUserDetail(request, response, userId);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/payments\/[^/]+$/)) {
+    const match = pathname.match(/^\/api\/admin\/eventos\/users\/([^/]+)\/payments\/([^/]+)$/);
+    await handleAdminEventPaymentConfirm(request, response, decodeURIComponent(match[1]), decodeURIComponent(match[2]));
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/lodging$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/lodging$/, "$1"));
+    await handleAdminEventLodgingConfirm(request, response, userId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/video$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/video$/, "$1"));
+    await handleAdminEventVideoUpload(request, response, userId);
     return;
   }
 

@@ -40,6 +40,20 @@ function normalizeEventCount(value) {
   return eventCount;
 }
 
+function normalizeTransport(input = {}) {
+  const freeTransport = Boolean(input.freeTransport);
+  const amountCents = freeTransport ? 0 : Math.max(0, Math.trunc(Number(input.transportAmountCents || 0) || 0));
+  const tripType = String(input.transportTripType || "ONE_WAY").toUpperCase() === "ROUND_TRIP" ? "ROUND_TRIP" : "ONE_WAY";
+  return { freeTransport, amountCents, tripType, cityA: String(input.transportCityA || "").trim().slice(0, 120), cityB: String(input.transportCityB || "").trim().slice(0, 120) };
+}
+
+function transportDescription({ freeTransport, transportAmountCents, transportTripType, transportCityA, transportCityB } = {}) {
+  if (freeTransport) return "Transporte livre de cobranca.";
+  if (!transportAmountCents) return "";
+  const route = transportCityA && transportCityB ? (transportTripType === "ROUND_TRIP" ? `ida de ${transportCityA} para ${transportCityB} e volta para ${transportCityA}` : `trecho de ${transportCityA} para ${transportCityB}`) : "trajeto informado";
+  return `O transporte ficou definido em ${formatEventMoney(transportAmountCents)} para ${route}.`;
+}
+
 function mapCouponRow(row) {
   if (!row) return null;
   return {
@@ -53,6 +67,11 @@ function mapCouponRow(row) {
     freeLodging: Boolean(row.free_lodging),
     active: Boolean(row.active),
     createdAt: row.created_at,
+    transportAmountCents: Number(row.transport_amount_cents || 0),
+    transportTripType: row.transport_trip_type || "ONE_WAY",
+    transportCityA: row.transport_city_a || "",
+    transportCityB: row.transport_city_b || "",
+    transportDescription: transportDescription({ freeTransport: row.free_transport, transportAmountCents: row.transport_amount_cents, transportTripType: row.transport_trip_type, transportCityA: row.transport_city_a, transportCityB: row.transport_city_b }),
     updatedAt: row.updated_at
   };
 }
@@ -109,6 +128,10 @@ export async function ensureEventFlowSchema() {
         );
       `);
       await query(`create index if not exists idx_event_discount_coupons_active on event_discount_coupons(active, updated_at desc);`);
+      await query(`alter table event_discount_coupons add column if not exists transport_amount_cents integer not null default 0 check (transport_amount_cents >= 0);`);
+      await query(`alter table event_discount_coupons add column if not exists transport_trip_type text not null default 'ONE_WAY' check (transport_trip_type in ('ONE_WAY', 'ROUND_TRIP'));`);
+      await query(`alter table event_discount_coupons add column if not exists transport_city_a text not null default '';`);
+      await query(`alter table event_discount_coupons add column if not exists transport_city_b text not null default '';`);
     })().catch((error) => {
       eventFlowSchemaPromise = null;
       throw error;
@@ -212,7 +235,8 @@ export async function listEventCoupons({ includeInactive = false } = {}) {
   await ensureEventFlowSchema();
   const result = await query(
     `select id, code, discount_cents, presentation_key, event_count,
-            free_transport, free_lodging, active, created_at, updated_at
+            free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b,
+            free_lodging, active, created_at, updated_at
        from event_discount_coupons
       where ($1::boolean = true or active = true)
       order by active desc, updated_at desc, code asc`,
@@ -227,31 +251,43 @@ export async function createEventCoupon(adminUserId, input = {}) {
   const discountCents = Math.max(0, Math.trunc(Number(input.discountCents || 0) || 0));
   const presentation = resolvePresentation(input.presentationKey);
   const eventCount = normalizeEventCount(input.eventCount);
+  const transport = normalizeTransport(input);
   if (!code || code.length < 3) throw new Error("O cupom precisa ter pelo menos 3 caracteres.");
   if (!presentation) throw new Error("Escolha uma apresentacao valida para o cupom.");
   if (discountCents < 1) throw new Error("Informe um valor de desconto maior que zero.");
+  if (transport.amountCents > 0 && (!transport.cityA || !transport.cityB)) throw new Error("Informe a cidade A e a cidade B do transporte.");
 
   const result = await query(
     `insert into event_discount_coupons
-       (code, discount_cents, presentation_key, event_count, free_transport, free_lodging, active, created_by_user_id)
-     values ($1, $2, $3, $4, $5, $6, true, $7)
+       (code, discount_cents, presentation_key, event_count, free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b, free_lodging, active, created_by_user_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, $11)
      returning id, code, discount_cents, presentation_key, event_count,
-               free_transport, free_lodging, active, created_at, updated_at`,
-    [code, discountCents, presentation.key, eventCount, Boolean(input.freeTransport), Boolean(input.freeLodging), adminUserId]
+               free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b, free_lodging, active, created_at, updated_at`,
+    [code, discountCents, presentation.key, eventCount, transport.freeTransport, transport.amountCents, transport.tripType, transport.cityA, transport.cityB, Boolean(input.freeLodging), adminUserId]
   );
   return mapCouponRow(result.rows[0]);
 }
 
 export async function updateEventCoupon(couponId, input = {}) {
   await ensureEventFlowSchema();
+  const editing = input.discountCents !== undefined || input.presentationKey !== undefined || input.transportAmountCents !== undefined;
+  const transport = editing ? normalizeTransport(input) : null;
+  const presentation = editing ? resolvePresentation(input.presentationKey) : null;
+  const eventCount = editing ? normalizeEventCount(input.eventCount) : null;
+  const discountCents = editing ? Math.max(0, Math.trunc(Number(input.discountCents || 0) || 0)) : null;
+  if (editing && (!presentation || discountCents < 1)) throw new Error("Confira os dados do cupom.");
+  if (editing && transport.amountCents > 0 && (!transport.cityA || !transport.cityB)) throw new Error("Informe a cidade A e a cidade B do transporte.");
   const result = await query(
     `update event_discount_coupons
-        set active = coalesce($2::boolean, active),
-            updated_at = now()
+        set active = coalesce($2::boolean, active), discount_cents = coalesce($3::integer, discount_cents),
+            presentation_key = coalesce($4::text, presentation_key), event_count = coalesce($5::smallint, event_count),
+            free_transport = coalesce($6::boolean, free_transport), transport_amount_cents = coalesce($7::integer, transport_amount_cents),
+            transport_trip_type = coalesce($8::text, transport_trip_type), transport_city_a = coalesce($9::text, transport_city_a),
+            transport_city_b = coalesce($10::text, transport_city_b), free_lodging = coalesce($11::boolean, free_lodging), updated_at = now()
       where id = $1
       returning id, code, discount_cents, presentation_key, event_count,
-                free_transport, free_lodging, active, created_at, updated_at`,
-    [couponId, typeof input.active === "boolean" ? input.active : null]
+                free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b, free_lodging, active, created_at, updated_at`,
+    [couponId, typeof input.active === "boolean" ? input.active : null, discountCents, presentation?.key || null, eventCount, transport?.freeTransport ?? null, transport?.amountCents ?? null, transport?.tripType || null, transport?.cityA ?? null, transport?.cityB ?? null, editing ? Boolean(input.freeLodging) : null]
   );
   if (!result.rows[0]) throw new Error("Cupom nao encontrado.");
   return mapCouponRow(result.rows[0]);
@@ -269,7 +305,8 @@ export async function resolveEventPricing(input = {}) {
   if (couponCode) {
     const couponResult = await query(
       `select id, code, discount_cents, presentation_key, event_count,
-              free_transport, free_lodging, active, created_at, updated_at
+              free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b,
+              free_lodging, active, created_at, updated_at
          from event_discount_coupons
         where code = $1 and active = true
         limit 1`,
@@ -283,7 +320,8 @@ export async function resolveEventPricing(input = {}) {
   }
 
   const discountCents = Math.min(basePriceCents, Number(coupon?.discountCents || 0));
-  const finalPriceCents = Math.max(0, basePriceCents - discountCents);
+  const transportAmountCents = coupon?.freeTransport ? 0 : Number(coupon?.transportAmountCents || 0);
+  const finalPriceCents = Math.max(0, basePriceCents - discountCents + transportAmountCents);
   return {
     presentationKey: presentation.key,
     presentationName: presentation.name,
@@ -294,6 +332,11 @@ export async function resolveEventPricing(input = {}) {
     couponDiscountCents: discountCents,
     finalPriceCents,
     freeTransport: Boolean(coupon?.freeTransport),
+    transportAmountCents,
+    transportTripType: coupon?.transportTripType || "",
+    transportCityA: coupon?.transportCityA || "",
+    transportCityB: coupon?.transportCityB || "",
+    transportDescription: coupon?.transportDescription || "",
     freeLodging: Boolean(coupon?.freeLodging),
     coupon
   };
