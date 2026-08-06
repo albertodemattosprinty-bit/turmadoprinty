@@ -15258,3 +15258,32 @@ body[data-background-theme="edge"] .universal-schedule-modal {
   --universal-schedule-accent: #2fd36b;
   --universal-schedule-active-bg: rgba(47, 211, 107, .18);
 }
+
+.marin-chat-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+
+.marin-chat-more-button {
+  min-height: 34px;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: rgba(255,255,255,.12);
+  color: var(--white);
+  font-size: .78rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  box-shadow: 0 10px 24px rgba(0,0,0,.14);
+}
+
+.marin-chat-more-button:disabled {
+  opacity: .62;
+}
+
+body[data-background-theme="white"] .marin-chat-more-button {
+  border-color: rgba(47,54,64,.14);
+  background: rgba(255,255,255,.78);
+  color: #2f3640;
+}

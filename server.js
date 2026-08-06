@@ -4200,7 +4200,7 @@ async function handleProject200MarinBootstrapRequest(request, response) {
     const setting = await getProject200MarinSetting(user.id, profileName);
     const admin = isAdminUser(user);
     const prompts = await getProject200MarinPrompts({ includeText: admin });
-    const chat = await listProject200MarinMessages(user.id, profileName, setting.personaKey, 80);
+    const chat = await listProject200MarinMessages(user.id, profileName, setting.personaKey, requestUrl.searchParams.get("limit") || 80);
     sendJson(response, 200, {
       ok: true,
       profile: profileName,
@@ -4209,7 +4209,8 @@ async function handleProject200MarinBootstrapRequest(request, response) {
       personas: prompts.personas,
       generalPrompt: admin ? prompts.generalPrompt : "",
       isAdmin: admin,
-      messages: chat.messages
+      messages: chat.messages,
+      hasMoreMessages: Boolean(chat.hasMoreMessages)
     });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível abrir o Marin." });
@@ -4223,12 +4224,13 @@ async function handleProject200MarinPersonaRequest(request, response) {
     const body = await readJsonBody(request);
     const profileName = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
     const setting = await setProject200MarinPersona(user.id, profileName, body?.personaKey);
-    const chat = await listProject200MarinMessages(user.id, profileName, setting.personaKey, 80);
+    const chat = await listProject200MarinMessages(user.id, profileName, setting.personaKey, body?.limit || 80);
     sendJson(response, 200, {
       ok: true,
       ...setting,
       personaName: getProject200MarinPersonaName(setting.personaKey),
-      messages: chat.messages
+      messages: chat.messages,
+      hasMoreMessages: Boolean(chat.hasMoreMessages)
     });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível trocar a personalidade." });

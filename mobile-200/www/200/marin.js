@@ -1,4 +1,4 @@
-import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.81-chat-audio-v1";
+import { isChatMediaMessage, renderChatMessageContent } from "./chat-links.js?v=0.83-chat-history-v1";
 
 const DEFAULT_PERSONAS = [
   { key: "marin", name: "Marin", avatar: "/200/agents/marin.svg" },
@@ -55,6 +55,9 @@ export function initializeProject200MarinUi(dependencies = {}) {
     fileInput: document.getElementById("marinChatFileInput")
   };
 
+  const chatMessageBatchSize = 40;
+  const chatMessageMaxLimit = 240;
+
   const state = {
     profile: "",
     personaKey: "marin",
@@ -62,6 +65,9 @@ export function initializeProject200MarinUi(dependencies = {}) {
     personas: DEFAULT_PERSONAS.map((persona) => ({ ...persona })),
     generalPrompt: "",
     messages: [],
+    messageLimit: chatMessageBatchSize,
+    hasMoreMessages: false,
+    loadingMoreMessages: false,
     isAdmin: false,
     loaded: false,
     loading: false,
@@ -296,7 +302,7 @@ export function initializeProject200MarinUi(dependencies = {}) {
     return button;
   }
 
-  function renderMessages() {
+  function renderMessages({ stickToBottom = true } = {}) {
     if (!elements.messages) return;
     elements.messages.innerHTML = "";
     if (!state.messages.length) {
@@ -305,6 +311,19 @@ export function initializeProject200MarinUi(dependencies = {}) {
       empty.textContent = "Eu sou " + state.personaName + ". Quero conhecer sua vida com calma e transformar seus minutos em um plano que faça sentido. Por onde você quer começar?";
       elements.messages.appendChild(empty);
       return;
+    }
+
+    if (state.hasMoreMessages) {
+      const moreWrap = document.createElement("div");
+      moreWrap.className = "marin-chat-more-wrap";
+      const moreButton = document.createElement("button");
+      moreButton.type = "button";
+      moreButton.className = "marin-chat-more-button";
+      moreButton.disabled = Boolean(state.loadingMoreMessages);
+      moreButton.textContent = state.loadingMoreMessages ? "Carregando..." : "Ver mais";
+      moreButton.addEventListener("click", () => void loadMoreMessages());
+      moreWrap.appendChild(moreButton);
+      elements.messages.appendChild(moreWrap);
     }
 
     state.messages.forEach((message) => {
@@ -332,22 +351,26 @@ export function initializeProject200MarinUi(dependencies = {}) {
         elements.messages.appendChild(list);
       }
     });
-    window.requestAnimationFrame(() => {
-      elements.messages.scrollTop = elements.messages.scrollHeight;
-    });
+    if (stickToBottom) {
+      window.requestAnimationFrame(() => {
+        elements.messages.scrollTop = elements.messages.scrollHeight;
+      });
+    }
   }
 
-  async function load({ silent = false, force = false } = {}) {
+  async function load({ silent = false, force = false, limit = state.messageLimit, preserveScroll = false } = {}) {
     const profile = currentProfile();
     if (state.loading) return;
-    if (!force && state.loaded && state.profile === profile) {
+    if (!force && state.loaded && state.profile === profile && Number(limit) <= state.messageLimit) {
       updateIdentity();
       return;
     }
     state.loading = true;
     if (!silent) setStatus("Abrindo sua conversa...", true);
     try {
-      const payload = await apiRequest("/api/200/marin/bootstrap?profile=" + encodeURIComponent(profile), {
+      const scrollAnchor = preserveScroll && elements.messages ? elements.messages.scrollHeight - elements.messages.scrollTop : 0;
+      const safeLimit = Math.max(chatMessageBatchSize, Math.min(chatMessageMaxLimit, Math.trunc(Number(limit) || chatMessageBatchSize)));
+      const payload = await apiRequest("/api/200/marin/bootstrap?profile=" + encodeURIComponent(profile) + "&limit=" + encodeURIComponent(String(safeLimit)), {
         skipGlobalLoading: true
       });
       state.profile = String(payload?.profile || profile);
@@ -366,10 +389,17 @@ export function initializeProject200MarinUi(dependencies = {}) {
       state.generalPrompt = String(payload?.generalPrompt || "");
       state.isAdmin = Boolean(payload?.isAdmin);
       state.messages = Array.isArray(payload?.messages) ? payload.messages : [];
+      state.messageLimit = safeLimit;
+      state.hasMoreMessages = Boolean(payload?.hasMoreMessages) || (state.messages.length >= state.messageLimit && state.messageLimit < chatMessageMaxLimit);
       state.loaded = true;
       updateIdentity();
       renderPersonaList();
-      renderMessages();
+      renderMessages({ stickToBottom: !preserveScroll });
+      if (preserveScroll && elements.messages) {
+        window.requestAnimationFrame(() => {
+          elements.messages.scrollTop = Math.max(0, elements.messages.scrollHeight - scrollAnchor);
+        });
+      }
       setStatus("");
     } catch (error) {
       if (!silent) setStatus(error instanceof Error ? error.message : "Não foi possível abrir a conversa.");
@@ -378,9 +408,25 @@ export function initializeProject200MarinUi(dependencies = {}) {
     }
   }
 
+  async function loadMoreMessages() {
+    if (state.loadingMoreMessages || state.loading) return;
+    state.loadingMoreMessages = true;
+    renderMessages({ stickToBottom: false });
+    try {
+      await load({
+        silent: true,
+        force: true,
+        limit: state.messageLimit + chatMessageBatchSize,
+        preserveScroll: true
+      });
+    } finally {
+      state.loadingMoreMessages = false;
+      renderMessages({ stickToBottom: false });
+    }
+  }
   async function openChat() {
     openModal("marinChatModal");
-    await load({ force: state.profile !== currentProfile() });
+    await load({ force: state.profile !== currentProfile(), limit: state.messageLimit });
     renderMessages();
     window.setTimeout(() => elements.input?.focus({ preventScroll: true }), 80);
   }
@@ -401,7 +447,9 @@ export function initializeProject200MarinUi(dependencies = {}) {
     const previous = {
       key: state.personaKey,
       name: state.personaName,
-      messages: state.messages
+      messages: state.messages,
+      messageLimit: state.messageLimit,
+      hasMoreMessages: state.hasMoreMessages
     };
     state.personaKey = key;
     state.personaName = persona.name;
@@ -587,7 +635,12 @@ export function initializeProject200MarinUi(dependencies = {}) {
       if (payload?.userMessage) state.messages.push(payload.userMessage);
       else state.messages.push({ id: localId, role: "user", content, proposals: [] });
       if (payload?.message) state.messages.push(payload.message);
-      renderMessages();
+      renderMessages({ stickToBottom: !preserveScroll });
+      if (preserveScroll && elements.messages) {
+        window.requestAnimationFrame(() => {
+          elements.messages.scrollTop = Math.max(0, elements.messages.scrollHeight - scrollAnchor);
+        });
+      }
       setStatus("");
     } catch (error) {
       state.messages = state.messages.filter((message) => message.id !== localId);

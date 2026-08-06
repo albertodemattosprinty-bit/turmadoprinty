@@ -5,7 +5,7 @@ import { getProject200FriendsSnapshot, resolveProject200FriendAssignmentUser } f
 import { getProject200LifeCaptureById, grantProject200LifeCaptureShare } from "./project200-life-captures.js";
 import { decryptUserJson, encryptUserJson, ensurePrivacyEncryptionSchema } from "./privacy-crypto.js";
 
-const MAX_MESSAGES = 100;
+const MAX_MESSAGES = 240;
 const MAX_OCCURRENCES = 180;
 let tutorsSchemaPromise = null;
 
@@ -330,6 +330,7 @@ export async function listProject200TutorMessages(userId, contactUserId, limit =
   const link = await getTutorLink(viewerId, contactUserId);
   if (!link) throw new Error("Tutor nao encontrado.");
   const safeLimit = Math.max(1, Math.min(MAX_MESSAGES, Math.trunc(Number(limit) || 80)));
+  const queryLimit = Math.min(MAX_MESSAGES + 1, safeLimit + 1);
   const rawAfter = String(after || "").trim();
   const afterDate = rawAfter ? new Date(rawAfter) : null;
   if (afterDate && Number.isNaN(afterDate.getTime())) {
@@ -370,15 +371,17 @@ export async function listProject200TutorMessages(userId, contactUserId, limit =
           limit $2
        ) recent
       order by recent.created_at asc`,
-    [link.id, safeLimit, link.owner_user_id, afterIso, cursor]
+    [link.id, queryLimit, link.owner_user_id, afterIso, cursor]
   );
-  const messages = await Promise.all(result.rows.map((row) => normalizeTutorMessage(viewerId, row)));
+  const rows = result.rows.length > safeLimit ? result.rows.slice(1) : result.rows;
+  const messages = await Promise.all(rows.map((row) => normalizeTutorMessage(viewerId, row)));
   await Promise.all(messages.map((message) => grantTutorMediaShareFromContent(message.content, message.senderUserId, message.recipientUserId)));
   return {
     linkId: normalizeId(link.id),
     contactUserId: getCounterpartUserId(link, viewerId),
     cursor,
     incremental: Boolean(afterIso),
+    hasMoreMessages: !afterIso && result.rows.length > safeLimit,
     messages
   };
 }

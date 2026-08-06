@@ -267,7 +267,8 @@ export async function getOrCreateProject200MarinConversation(userId, profileName
 
 export async function listProject200MarinMessages(userId, profileName, personaKey, limit = 60) {
   const conversation = await getOrCreateProject200MarinConversation(userId, profileName, personaKey);
-  const safeLimit = Math.max(1, Math.min(100, Math.trunc(Number(limit) || 60)));
+  const safeLimit = Math.max(1, Math.min(240, Math.trunc(Number(limit) || 60)));
+  const queryLimit = safeLimit + 1;
   const result = await query(
     `select recent.id, recent.role, recent.content, recent.proposals, recent.model_id, recent.created_at,
             recent.content_encrypted, recent.proposals_encrypted, recent.encryption_version,
@@ -288,9 +289,14 @@ export async function listProject200MarinMessages(userId, profileName, personaKe
           limit $3
        ) recent
       order by created_at asc`,
-    [conversation.id, userId, safeLimit]
+    [conversation.id, userId, queryLimit]
   );
-  return { conversation, messages: await Promise.all(result.rows.map((row) => normalizeMessage(userId, row))) };
+  const rows = result.rows.length > safeLimit ? result.rows.slice(1) : result.rows;
+  return {
+    conversation,
+    hasMoreMessages: result.rows.length > safeLimit,
+    messages: await Promise.all(rows.map((row) => normalizeMessage(userId, row)))
+  };
 }
 
 export async function appendProject200MarinMessage(userId, conversationId, payload = {}) {

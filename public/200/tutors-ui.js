@@ -45,6 +45,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     fileInput: document.getElementById("marinChatFileInput")
   };
 
+  const humanMessageBatchSize = 40;
+  const humanMessageMaxLimit = 240;
+
   const defaultPersonMarkup = elements.chatPersonButton?.innerHTML || "";
   if (elements.composer) {
     let cancelButton = document.getElementById("marinChatCancelButton");
@@ -77,6 +80,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     friends: [],
     activeTutor: null,
     messages: [],
+    messageLimit: humanMessageBatchSize,
+    hasMoreMessages: false,
+    loadingMoreMessages: false,
     sending: false,
     pollTimer: 0,
     syncCursor: "",
@@ -641,7 +647,7 @@ export function initializeProject200TutorsUi(dependencies = {}) {
         const rightTime = Date.parse(String(right?.createdAt || "")) || 0;
         return leftTime - rightTime || String(left?.id || "").localeCompare(String(right?.id || ""));
       })
-      .slice(-100);
+      .slice(-state.messageLimit);
   }
 
   function renderMessages({ preserveScroll = false, animateMessageIds = new Set() } = {}) {
@@ -655,6 +661,19 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       elements.messages.appendChild(empty);
       return;
     }
+    if (state.hasMoreMessages) {
+      const moreWrap = document.createElement("div");
+      moreWrap.className = "marin-chat-more-wrap";
+      const moreButton = document.createElement("button");
+      moreButton.type = "button";
+      moreButton.className = "marin-chat-more-button";
+      moreButton.disabled = Boolean(state.loadingMoreMessages);
+      moreButton.textContent = state.loadingMoreMessages ? "Carregando..." : "Ver mais";
+      moreButton.addEventListener("click", () => void loadMoreMessages());
+      moreWrap.appendChild(moreButton);
+      elements.messages.appendChild(moreWrap);
+    }
+
     state.messages.forEach((message) => {
       const messageId = String(message?.id || "");
       const isSharedMedia = isChatMediaMessage(message.content);
@@ -839,7 +858,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     state.syncToken = requestToken;
     state.syncing = true;
     state.syncContactId = contactId;
-    let requestPath = "/api/200/tutors/" + encodeURIComponent(contactId) + "/messages?limit=80";
+    const safeLimit = Math.max(humanMessageBatchSize, Math.min(humanMessageMaxLimit, Math.trunc(Number(state.messageLimit) || humanMessageBatchSize)));
+    state.messageLimit = safeLimit;
+    let requestPath = "/api/200/tutors/" + encodeURIComponent(contactId) + "/messages?limit=" + encodeURIComponent(String(safeLimit));
     if (useCursor) {
       requestPath += "&after=" + encodeURIComponent(state.syncCursor);
     }
@@ -860,7 +881,8 @@ export function initializeProject200TutorsUi(dependencies = {}) {
       if (useCursor) {
         mergeMessageChanges(changes);
       } else {
-        state.messages = changes.slice(-100);
+        state.messages = changes.slice(-state.messageLimit);
+        state.hasMoreMessages = Boolean(payload?.hasMoreMessages) || (state.messages.length >= state.messageLimit && state.messageLimit < humanMessageMaxLimit);
       }
       state.syncCursor = String(payload?.cursor || state.syncCursor || "");
       const afterFingerprint = conversationFingerprint(state.messages);
@@ -884,6 +906,25 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     }
   }
 
+  async function loadMoreMessages() {
+    if (!state.human || state.loadingMoreMessages || state.syncing) return;
+    const previousAnchor = elements.messages ? elements.messages.scrollHeight - elements.messages.scrollTop : 0;
+    state.loadingMoreMessages = true;
+    renderMessages({ preserveScroll: true });
+    try {
+      state.messageLimit = Math.min(humanMessageMaxLimit, state.messageLimit + humanMessageBatchSize);
+      state.syncCursor = "";
+      await refreshMessages({ silent: true, forceFull: true });
+      if (elements.messages) {
+        window.requestAnimationFrame(() => {
+          elements.messages.scrollTop = Math.max(0, elements.messages.scrollHeight - previousAnchor);
+        });
+      }
+    } finally {
+      state.loadingMoreMessages = false;
+      renderMessages({ preserveScroll: true });
+    }
+  }
   function stopPolling() {
     if (state.pollTimer) window.clearInterval(state.pollTimer);
     state.pollTimer = 0;
@@ -930,6 +971,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     state.human = true;
     state.activeTutor = tutor;
     state.messages = [];
+    state.messageLimit = humanMessageBatchSize;
+    state.hasMoreMessages = false;
+    state.loadingMoreMessages = false;
     state.syncCursor = "";
     state.syncToken += 1;
     state.syncing = false;
@@ -946,6 +990,9 @@ export function initializeProject200TutorsUi(dependencies = {}) {
     state.human = false;
     state.activeTutor = null;
     state.messages = [];
+    state.messageLimit = humanMessageBatchSize;
+    state.hasMoreMessages = false;
+    state.loadingMoreMessages = false;
     state.syncCursor = "";
     state.syncToken += 1;
     state.syncing = false;

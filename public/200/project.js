@@ -1,6 +1,6 @@
 import { getApiUrl } from "../api.js";
-import { initializeProject200MarinUi } from "./marin.js?v=0.81-agendamento-universal";
-import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.81-agendamento-universal";
+import { initializeProject200MarinUi } from "./marin.js?v=0.83-chat-history-v1";
+import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.83-chat-history-v1";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
 
 import {
