@@ -28,6 +28,12 @@ function mapPayment(row) {
     dueDate: dateOnly(row.due_at),
     amountCents: Number(row.amount_cents || 0),
     amount: money(row.amount_cents),
+    paidCents: Number(row.paid_cents || 0),
+    paid: money(row.paid_cents),
+    reportedAmountCents: Number(row.reported_amount_cents || 0),
+    reportedAmount: money(row.reported_amount_cents),
+    remainingCents: Math.max(0, Number(row.amount_cents || 0) - Number(row.paid_cents || 0)),
+    remaining: money(Math.max(0, Number(row.amount_cents || 0) - Number(row.paid_cents || 0))),
     status: row.status,
     userReportedAt: row.user_reported_at || null,
     adminConfirmedAt: row.admin_confirmed_at || null
@@ -82,6 +88,9 @@ export async function ensureEventContractingSchema() {
         );
       `);
       await query(`create index if not exists idx_event_contract_payments_user on event_contract_payments(user_id, updated_at desc);`);
+      await query(`alter table event_contract_payments add column if not exists paid_cents integer not null default 0 check (paid_cents >= 0);`);
+      await query(`alter table event_contract_payments add column if not exists reported_amount_cents integer not null default 0 check (reported_amount_cents >= 0);`);
+      await query(`update event_contract_payments set paid_cents = amount_cents where status = 'CONFIRMED' and paid_cents = 0;`);
       await query(`
         create table if not exists event_contract_lodging (
           term_id uuid primary key references "all-terms"(id) on delete cascade,
@@ -135,7 +144,7 @@ async function ensureRows(term) {
       values ($1, $2, $3, $4::date, $5)
       on conflict (term_id, payment_order) do update
         set due_at = case when event_contract_payments.status = 'PENDING' then excluded.due_at else event_contract_payments.due_at end,
-            amount_cents = case when event_contract_payments.status = 'PENDING' then excluded.amount_cents else event_contract_payments.amount_cents end,
+            amount_cents = case when event_contract_payments.status = 'PENDING' then greatest(event_contract_payments.paid_cents, excluded.amount_cents) else event_contract_payments.amount_cents end,
             updated_at = now()
     `, [term.id, term.userId, index + 1, dues[index], amounts[index]]);
   }
@@ -163,29 +172,40 @@ async function addUpdate(termId, userId, kind, payload = {}) {
   await query(`insert into event_admin_updates (term_id, user_id, kind, payload) values ($1, $2, $3, $4::jsonb)`, [termId, userId, kind, JSON.stringify(payload)]);
 }
 
-export async function reportEventPayment(userId, paymentId) {
+export async function reportEventPayment(userId, paymentId, amountCents) {
   await ensureEventContractingSchema();
+  const requested = Math.trunc(Number(amountCents || 0));
+  const current = await query(`select * from event_contract_payments where id = $1 and user_id = $2 limit 1`, [paymentId, userId]);
+  const payment = current.rows[0];
+  if (!payment) throw new Error("Pagamento nao encontrado.");
+  if (payment.status === "REVIEW") throw new Error("Este pagamento ja esta em analise.");
+  const remaining = Math.max(0, Number(payment.amount_cents || 0) - Number(payment.paid_cents || 0));
+  if (remaining < 1) throw new Error("Este pagamento ja foi quitado.");
+  if (!Number.isInteger(requested) || requested < 1 || requested > remaining) throw new Error(`Informe um valor entre R$ 0,01 e ${money(remaining)}.`);
   const result = await query(`
-    update event_contract_payments set status = case when status = 'CONFIRMED' then status else 'REVIEW' end,
-      user_reported_at = case when status = 'CONFIRMED' then user_reported_at else now() end, updated_at = now()
-    where id = $1 and user_id = $2 returning *
-  `, [paymentId, userId]);
+    update event_contract_payments set status = 'REVIEW', reported_amount_cents = $1,
+      user_reported_at = now(), updated_at = now()
+    where id = $2 and user_id = $3 returning *
+  `, [requested, paymentId, userId]);
   const row = result.rows[0];
-  if (!row) throw new Error("Pagamento nao encontrado.");
-  if (row.status !== "CONFIRMED") await addUpdate(row.term_id, userId, "PAYMENT_REPORTED", { paymentId: row.id, order: row.payment_order });
+  await addUpdate(row.term_id, userId, "PAYMENT_REPORTED", { paymentId: row.id, order: row.payment_order, amountCents: requested });
   return mapPayment(row);
 }
 
 export async function confirmEventPayment(adminId, userId, paymentId) {
   await ensureEventContractingSchema();
   const result = await query(`
-    update event_contract_payments set status = 'CONFIRMED', admin_confirmed_at = now(),
-      admin_confirmed_by_user_id = $1, updated_at = now()
-    where id = $2 and user_id = $3 returning *
+    update event_contract_payments
+       set paid_cents = least(amount_cents, paid_cents + reported_amount_cents),
+           status = case when paid_cents + reported_amount_cents >= amount_cents then 'CONFIRMED' else 'PENDING' end,
+           reported_amount_cents = 0, admin_confirmed_at = now(), admin_confirmed_by_user_id = $1, updated_at = now()
+     where id = $2 and user_id = $3 and status = 'REVIEW' and reported_amount_cents > 0
+     returning *
   `, [adminId, paymentId, userId]);
-  if (!result.rows[0]) throw new Error("Pagamento nao encontrado.");
+  if (!result.rows[0]) throw new Error("Nao ha pagamento informado aguardando baixa.");
   return mapPayment(result.rows[0]);
 }
+
 
 export async function saveEventLodging(userId, termId, input = {}) {
   await ensureEventContractingSchema();

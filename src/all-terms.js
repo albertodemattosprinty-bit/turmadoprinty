@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { query } from "./db.js";
 import { formatEventMoney, resolveEventPricing } from "./event-flow.js";
 
@@ -63,6 +64,8 @@ export async function ensureAllTermsSchema() {
   await query(`alter table "all-terms" add column if not exists accepted_terms jsonb not null default '[]'::jsonb;`);
   await query(`create index if not exists idx_all_terms_event_date_time on "all-terms"(event_date asc, event_time_sort asc, created_at asc);`);
   await query(`create index if not exists idx_all_terms_user_id_created_at on "all-terms"(user_id, created_at desc);`);
+  await query(`alter table "all-terms" add column if not exists claim_token_hash text;`);
+  await query(`alter table "all-terms" add column if not exists claimed_at timestamptz;`);
 }
 
 function normalizeMonthValue(rawMonth) {
@@ -189,7 +192,7 @@ async function buildCommercialAnswers(rawAnswers) {
   };
 }
 
-export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedTerms = []) {
+export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedTerms = [], claimToken = "") {
   await ensureAllTermsSchema();
   const commercial = await buildCommercialAnswers(rawAnswers);
   const answers = sanitizeTermAnswers({ ...rawAnswers, ...commercial.values });
@@ -209,11 +212,11 @@ export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedT
 
   const result = await query(
     `
-      insert into "all-terms" (user_id, answers, event_date, event_time, event_time_sort, accepted_terms)
-      values ($1, $2::jsonb, $3::date, $4, $5, $6::jsonb)
+      insert into "all-terms" (user_id, answers, event_date, event_time, event_time_sort, accepted_terms, claim_token_hash)
+      values ($1, $2::jsonb, $3::date, $4, $5, $6::jsonb, $7)
       returning id, user_id, answers, event_date, event_time, event_time_sort, accepted_terms, created_at;
     `,
-    [userId || null, JSON.stringify(answers), eventDate, answers.horario, eventTimeSort, JSON.stringify(acceptedTerms)]
+    [userId || null, JSON.stringify(answers), eventDate, answers.horario, eventTimeSort, JSON.stringify(acceptedTerms), claimToken ? crypto.createHash("sha256").update(claimToken).digest("hex") : null]
   );
 
   return result.rows[0];
@@ -378,6 +381,29 @@ export async function updateLatestTermCouponByUserId(userId, couponCode = "") {
   return {
     id: row.id,
     userId: row.user_id || null,
+    answers: row.answers || {},
+    acceptedTerms: row.accepted_terms || [],
+    eventDate: row.event_date,
+    eventTime: row.event_time,
+    createdAt: row.created_at
+  };
+}
+
+export async function claimAllTerm(termId, claimToken, userId) {
+  if (!termId || !claimToken || !userId) throw new Error("Dados de vinculacao incompletos.");
+  await ensureAllTermsSchema();
+  const tokenHash = crypto.createHash("sha256").update(String(claimToken)).digest("hex");
+  const result = await query(`
+    update "all-terms"
+       set user_id = $3, claimed_at = now(), claim_token_hash = null
+     where id = $1 and user_id is null and claim_token_hash = $2
+     returning id, user_id, answers, accepted_terms, event_date, event_time, created_at
+  `, [termId, tokenHash, userId]);
+  const row = result.rows[0];
+  if (!row) throw new Error("Este termo ja foi vinculado ou o acesso expirou.");
+  return {
+    id: row.id,
+    userId: row.user_id,
     answers: row.answers || {},
     acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,

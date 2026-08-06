@@ -50,7 +50,7 @@
       $("payments").innerHTML=(w.payments||[]).map((p)=>{const [cls,label]=statusMeta(p.status);const action=p.status==="PENDING"?`<button class="button primary wide pay-action" data-payment="${p.id}">Pagar via Pix</button>`:p.status==="REVIEW"?`<button class="button secondary wide" disabled>Aguardando confirmação do admin</button>`:`<button class="button green wide" disabled>Pagamento confirmado</button>`;return `<article class="task"><div class="task-top"><div><h3>${p.order}º pagamento</h3><small>Prazo: ${date(p.dueDate)}</small></div><span class="status ${cls}">${label}</span></div><strong class="price">${esc(p.amount)}</strong>${action}</article>`}).join("");
       const payments=w.payments||[];const allPaid=payments.length===2&&payments.every((p)=>p.status==="CONFIRMED");statusEl($("overallStatus"),allPaid?"CONFIRMED":"PENDING");$("overallStatus").textContent=allPaid?"Pagamentos confirmados":"Preparação em andamento";
       const freeTransport=a.freeTransport==="Sim"||a.freeTransport===true;$("transportBenefit").classList.toggle("hidden",!freeTransport);if(freeTransport){statusEl($("transportStatus"),"CONFIRMED");$("transportStatus").textContent="Livre de cobrança"}
-      $("transportCopy").textContent=a.transportDescription||"A equipe combinar? os detalhes do transporte diretamente com voc?.";
+      $("transportCopy").textContent=a.transportDescription||"A equipe combinar\u00e1 os detalhes do transporte diretamente com voc\u00ea.";
       const freeLodging=a.freeLodging==="Sim"||a.freeLodging===true;$("lodgingBenefit").classList.toggle("hidden",!freeLodging);const l=w.lodging||{};$("hotelName").value=l.hotelName||"";$("hotelPhone").value=l.phone||"";$("hotelAddress").value=l.address||"";$("hotelCheckIn").value=l.checkIn||"";$("hotelCheckOut").value=l.checkOut||"";$("hotelNotes").value=l.notes||"";statusEl($("lodgingStatus"),l.status||"PENDING");$("saveHotel").textContent=l.status==="CONFIRMED"?"Atualizar dados do hotel":l.status==="REVIEW"?"Atualizar e reenviar":"Enviar dados do hotel";$("pixKey").textContent=w.pixKey||"36.442.785/0001-00";$("pixLabel").textContent=w.pixLabel||"CNPJ";
       $("loading").classList.add("hidden");$("panel").classList.remove("hidden");
     }
@@ -60,6 +60,32 @@
     $("copyPix").addEventListener("click",async()=>{await navigator.clipboard.writeText($("pixKey").textContent);$("paymentFeedback").textContent="Chave Pix copiada."});
     $("reportPayment").addEventListener("click",async()=>{if(!activePayment)return;$("reportPayment").disabled=true;$("paymentFeedback").textContent="Informando pagamento…";try{const r=await fetch(getApiUrl(`/api/contractor-panel/payments/${encodeURIComponent(activePayment.id)}/report`),{method:"POST",headers:auth()});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Falha ao informar pagamento.");$("paymentModal").classList.add("hidden");await load()}catch(e){$("paymentFeedback").textContent=e.message}finally{$("reportPayment").disabled=false}});
     $("lodgingForm").addEventListener("submit",async(e)=>{e.preventDefault();$("saveHotel").disabled=true;$("hotelFeedback").textContent="Salvando…";try{const body={hotelName:$("hotelName").value,phone:$("hotelPhone").value,address:$("hotelAddress").value,checkIn:$("hotelCheckIn").value,checkOut:$("hotelCheckOut").value,notes:$("hotelNotes").value};const r=await fetch(getApiUrl("/api/contractor-panel/lodging"),{method:"PUT",headers:auth({"Content-Type":"application/json"}),body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Falha ao salvar hotel.");$("hotelFeedback").textContent="Dados enviados. Agora estão em análise pelo admin.";await load()}catch(e){$("hotelFeedback").textContent=e.message}finally{$("saveHotel").disabled=false}});
+    const originalReportButton = $("reportPayment");
+    const partialReportButton = originalReportButton.cloneNode(true);
+    originalReportButton.replaceWith(partialReportButton);
+    const pixBox = document.querySelector("#paymentModal .pix");
+    const copyPixButton = $("copyPix");
+    const partialStep = document.createElement("div");
+    partialStep.innerHTML = `<label class="field" style="margin:18px 0">Quanto voc\u00ea quer pagar agora?<input id="partialPaymentValue" type="number" min="0.01" step="0.01" inputmode="decimal"></label><button class="button primary wide" id="continueToPix" type="button">Avan\u00e7ar para o Pix</button>`;
+    pixBox.before(partialStep);
+    let selectedPartialAmountCents = 0;
+    function showPartialStep() {
+      selectedPartialAmountCents = 0;
+      partialStep.classList.remove("hidden");
+      pixBox.classList.add("hidden");
+      copyPixButton.classList.add("hidden");
+      partialReportButton.classList.add("hidden");
+      const remaining = Number(activePayment?.remainingCents ?? activePayment?.amountCents ?? 0);
+      const input = $("partialPaymentValue");
+      input.max = String(remaining / 100);
+      input.value = (remaining / 100).toFixed(2);
+      $("paymentFeedback").textContent = "";
+    }
+    $("payments").addEventListener("click",(event)=>{if(event.target.closest("[data-payment]"))window.setTimeout(showPartialStep,0)});
+    $("continueToPix").addEventListener("click",()=>{const remaining=Number(activePayment?.remainingCents??activePayment?.amountCents??0);selectedPartialAmountCents=Math.round(Number($("partialPaymentValue").value||0)*100);if(selectedPartialAmountCents<1||selectedPartialAmountCents>remaining){$("paymentFeedback").textContent=`Informe um valor de at\u00e9 ${activePayment?.remaining||activePayment?.amount}.`;return}partialStep.classList.add("hidden");pixBox.classList.remove("hidden");copyPixButton.classList.remove("hidden");partialReportButton.classList.remove("hidden");$("paymentSummary").textContent=`Voc\u00ea vai informar ${new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(selectedPartialAmountCents/100)} via Pix.`});
+    partialReportButton.addEventListener("click",async()=>{if(!activePayment||!selectedPartialAmountCents)return;partialReportButton.disabled=true;$("paymentFeedback").textContent="Informando pagamento?";try{const response=await fetch(getApiUrl(`/api/contractor-panel/payments/${encodeURIComponent(activePayment.id)}/report`),{method:"POST",headers:auth({"Content-Type":"application/json"}),body:JSON.stringify({amountCents:selectedPartialAmountCents})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Falha ao informar pagamento.");$("paymentModal").classList.add("hidden");await load()}catch(error){$("paymentFeedback").textContent=error.message}finally{partialReportButton.disabled=false}});
+    function decoratePaymentBalances(){const paymentItems=term?.workflow?.payments||[];document.querySelectorAll("#payments .task").forEach((card,index)=>{card.querySelector(".payment-balance")?.remove();const payment=paymentItems[index];if(!payment)return;const info=document.createElement("small");info.className="payment-balance";info.textContent=`Pago: ${payment.paid||"R$ 0,00"} ? Saldo: ${payment.remaining||payment.amount}`;const action=card.querySelector(".pay-action,button");if(action)card.insertBefore(info,action);else card.appendChild(info)})}
+    new MutationObserver(decoratePaymentBalances).observe($("payments"),{childList:true});
     load().catch((e)=>{$("loading").textContent=e.message||"Não foi possível carregar o painel."});
   </script>
 </body>

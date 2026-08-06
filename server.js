@@ -52,7 +52,7 @@ import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscripti
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
-import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
+import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, recordProposalActivity, recordProposalVisit, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { confirmEventLodging, confirmEventPayment, ensureEventContractingSchema, getEventContractWorkflow, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
@@ -9997,10 +9997,8 @@ function buildTermPdfBufferV2(term) {
 }
 
 async function handleCreateTerm(request, response) {
-  const authUser = await requireAuth(request, response);
-  if (!authUser) {
-    return;
-  }
+  const bearerToken = parseBearerToken(request.headers.authorization);
+  const authUser = bearerToken ? await findUserBySessionToken(bearerToken) : null;
 
   if (!hasDatabase()) {
     sendJson(response, 503, { error: "DATABASE_URL nao configurada." });
@@ -10009,7 +10007,8 @@ async function handleCreateTerm(request, response) {
 
   try {
     const body = await readJsonBody(request);
-    const term = await createAllTermEntry(body?.answers || {}, authUser.id, body?.acceptedTerms || []);
+    const claimToken = authUser ? "" : crypto.randomBytes(32).toString("hex");
+    const term = await createAllTermEntry(body?.answers || {}, authUser?.id || null, body?.acceptedTerms || [], claimToken);
     const answers = term?.answers || {};
     const months = [
       "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
@@ -10047,11 +10046,41 @@ async function handleCreateTerm(request, response) {
       time: timeLabel || "-"
     });
 
-    sendJson(response, 201, { ok: true, termId: term.id, pdfUrl: `/api/terms/${term.id}/pdf` });
+    sendJson(response, 201, { ok: true, termId: term.id, pdfUrl: `/api/terms/${term.id}/pdf`, requiresAccount: !authUser, claimToken: claimToken || undefined });
   } catch (error) {
     sendJson(response, 400, {
       error: error instanceof Error ? error.message : "Nao foi possivel salvar o termo."
     });
+  }
+}
+
+async function handleClaimTermAccount(request, response, termId) {
+  if (!hasDatabase()) { sendJson(response, 503, { error: "DATABASE_URL nao configurada." }); return; }
+  let body;
+  try { body = await readJsonBody(request); } catch (error) { sendJson(response, 400, { error: error.message }); return; }
+  const username = String(body?.username || "").trim();
+  const password = String(body?.password || "");
+  const claimToken = String(body?.claimToken || "");
+  const displayName = String(body?.name || username).trim();
+  const activeSeconds = Math.min(21600, Math.max(0, Math.trunc(Number(body?.activeSeconds || 0))));
+  if (!isValidUsername(username)) { sendJson(response, 400, { error: "Crie um nome de acesso com 3 a 24 caracteres." }); return; }
+  if (password.length < 6) { sendJson(response, 400, { error: "A senha precisa ter pelo menos 6 caracteres." }); return; }
+  if (!claimToken) { sendJson(response, 400, { error: "Vinculo do termo nao encontrado. Finalize o termo novamente." }); return; }
+  let user = null;
+  try {
+    if (await findUserByUsername(username)) { sendJson(response, 409, { error: "Esse nome de acesso ja esta em uso." }); return; }
+    user = await createUser({ name: displayName || username, username, password });
+    const term = await claimAllTerm(termId, claimToken, user.id);
+    if (activeSeconds > 0) {
+      const visit = await query(`insert into event_proposal_visits (user_id, opened_at, last_seen_at) values ($1, now() - ($2 * interval '1 second'), now()) returning id`, [user.id, activeSeconds]);
+      await query(`insert into event_proposal_activity_sessions (visit_id, user_id, started_at, last_seen_at, ended_at) values ($1, $2, now() - ($3 * interval '1 second'), now(), now())`, [visit.rows[0].id, user.id, activeSeconds]);
+    }
+    await query(`insert into event_flow_state (user_id) values ($1) on conflict (user_id) do update set last_term_at = now(), updated_at = now()`, [user.id]);
+    const session = await createSession(user.id);
+    sendJson(response, 201, { ok: true, token: session.token, expiresAt: session.expiresAt.toISOString(), user: sanitizeUser(user), termId: term.id, pdfUrl: `/api/terms/${term.id}/pdf` });
+  } catch (error) {
+    if (user?.id) await deleteUserById(user.id).catch(() => {});
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel criar o acesso ao painel." });
   }
 }
 
@@ -10385,7 +10414,8 @@ async function handleContractorPaymentReport(request, response, paymentId) {
   const user = await requireAuth(request, response);
   if (!user) return;
   try {
-    const payment = await reportEventPayment(user.id, paymentId);
+    const body = await readJsonBody(request);
+    const payment = await reportEventPayment(user.id, paymentId, body?.amountCents);
     sendJson(response, 200, { ok: true, payment });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel informar o pagamento." });
@@ -10422,7 +10452,7 @@ async function handleAdminEventUserDetail(request, response, userId) {
     await markEventUpdatesViewed(userId);
     sendJson(response, 200, {
       ok: true,
-      user: summary ? { id: userId, name: summary.name, username: summary.username } : { id: userId },
+      user: summary ? { id: userId, name: summary.accountName || summary.name, username: summary.username } : { id: userId },
       term: { id: term.id, answers: term.answers || {}, acceptedTerms: term.acceptedTerms || [], eventDate: term.eventDate, eventTime: term.eventTime, createdAt: term.createdAt, pdfUrl: `/api/terms/${term.id}/pdf` },
       workflow
     });
@@ -13419,6 +13449,12 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar o onboarding."
       });
     }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/terms\/[^/]+\/claim$/)) {
+    const termId = decodeURIComponent(pathname.replace(/^\/api\/terms\/([^/]+)\/claim$/, "$1"));
+    await handleClaimTermAccount(request, response, termId);
     return;
   }
 

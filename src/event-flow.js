@@ -368,7 +368,7 @@ export async function listAdminEventFlow() {
            latest_term.created_at as term_created_at,
            latest_term.answers
       from candidate_users cu
-      join users u on u.id = cu.user_id and upper(coalesce(u.role, 'USER')) <> 'ADMIN'
+      join users u on u.id = cu.user_id
       left join visit_stats vs on vs.user_id = u.id
       left join activity_stats ast on ast.user_id = u.id
       left join event_flow_state efs on efs.user_id = u.id
@@ -384,7 +384,8 @@ export async function listAdminEventFlow() {
 
   return result.rows.map((row) => ({
     userId: row.user_id,
-    name: row.name || "-",
+    name: row.answers?.igreja || row.name || "-",
+    accountName: row.name || "-",
     username: row.username || "-",
     accessCount: Number(row.access_count || 0),
     activeSeconds: Number(row.active_seconds || 0),
