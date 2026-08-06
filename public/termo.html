@@ -166,6 +166,78 @@
       border-color: rgba(33, 203, 99, 0.82);
       background: rgba(33, 203, 99, 0.24);
     }
+    .presentation-carousel {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      padding: 4px 3px 12px;
+      scrollbar-width: thin;
+    }
+    .presentation-card {
+      flex: 0 0 min(78%, 310px);
+      min-height: 148px;
+      scroll-snap-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid rgba(255,255,255,.24);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      text-align: center;
+    }
+    .presentation-card.active { border-color: #53e58c; background: rgba(33,203,99,.22); }
+    .presentation-card strong { font-size: 1.55rem; }
+    .presentation-card span { color: var(--text-soft); }
+    .presentation-badge {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: #f4ca69;
+      color: #17345c !important;
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+    }
+    .payment-controls { display:grid; grid-template-columns: 1fr; gap:12px; margin-top:12px; }
+    .quantity-control,.coupon-box,.price-summary {
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 15px;
+      padding: 14px;
+      background: rgba(4,20,40,.34);
+    }
+    .quantity-control label { display:flex; align-items:center; justify-content:space-between; gap:15px; }
+    .quantity-control input {
+      width: 88px;
+      min-height: 42px;
+      border: 0;
+      border-radius: 10px;
+      padding: 8px 10px;
+      color: var(--input-text);
+      background: var(--input-bg);
+      font: inherit;
+      text-align:center;
+    }
+    .coupon-trigger { width:100%; display:flex; justify-content:space-between; padding:0; color:#fff; background:transparent; text-align:left; }
+    .coupon-trigger small { display:block; margin-top:3px; color:var(--text-soft); font-weight:300; }
+    .coupon-entry { display:flex; gap:8px; margin-top:12px; }
+    .coupon-entry input { min-width:0; flex:1; border:0; border-radius:10px; padding:10px 12px; color:var(--input-text); background:var(--input-bg); font:inherit; text-transform:uppercase; }
+    .coupon-entry button,.coupon-remove { border-radius:10px; padding:10px 13px; background:#fff; color:#0d4ea8; font-weight:600; }
+    .coupon-details { margin-top:10px; color:#bdf5d1; font-size:.88rem; line-height:1.45; }
+    .coupon-remove { margin-top:10px; background:rgba(255,255,255,.12); color:#fff; }
+    .price-row { display:flex; justify-content:space-between; gap:12px; padding:4px 0; color:var(--text-soft); }
+    .price-row.final { margin-top:5px; padding-top:9px; border-top:1px solid rgba(255,255,255,.15); color:#fff; font-size:1.08rem; }
+    .coupon-feedback { min-height:18px; margin-top:8px; color:#ffd98b; font-size:.82rem; }
+    @media (min-width:700px) {
+      .presentation-card { flex-basis: 42%; }
+      .payment-controls { grid-template-columns: .85fr 1.15fr; }
+      .price-summary { grid-column: 1 / -1; }
+    }
+
     .countdown {
       text-align: center;
       font-size: clamp(1.3rem, 3.8vw, 2rem);
@@ -567,6 +639,14 @@
       }
     };
     const currentTermConfig = termVariantConfigs[termVariantKey] || termVariantConfigs.default;
+    const eventPresentationOptions = [
+      { key: "teatro-fantoches", label: "Teatro Fantoches", priceLabel: "R$ 1.800,00", amountCents: 180000 },
+      { key: "teatro-palco", label: "Teatro de Palco", priceLabel: "R$ 2.600,00", amountCents: 260000 },
+      { key: "congresso-infantil", label: "Congresso Infantil", priceLabel: "R$ 3.400,00", amountCents: 340000, featured: true },
+      { key: "parques-arenas", label: "Parques e Arenas", priceLabel: "R$ 4.500,00", amountCents: 450000 },
+      { key: "show-completo-2h", label: "Show Completo 2h", priceLabel: "R$ 6.000,00", amountCents: 600000 }
+    ];
+    const eventFinanceAgreementText = "Escolha entre Teatro Fantoches (R$ 1.800,00), Teatro de Palco (R$ 2.600,00), Congresso Infantil (R$ 3.400,00), Parques e Arenas (R$ 4.500,00) e Show Completo 2h (R$ 6.000,00). O valor-base e multiplicado pela quantidade de eventos. Cupons validos reduzem um valor fixo e podem incluir transporte ou hospedagem livre de cobranca.";
     const termEditorModal = document.getElementById("termEditorModal");
     const termEditorText = document.getElementById("termEditorText");
     const termEditorFeedback = document.getElementById("termEditorFeedback");
@@ -855,7 +935,13 @@
       { key: "cep", title: "Qual é o código postal (CEP)?", type: "text", placeholder: "8 dígitos", maxLength: 8, numeric: true }
     ];
 
-    const answers = {};
+    const answers = {
+      presentationKey: "congresso-infantil",
+      eventCount: "1",
+      couponCode: "",
+      couponDiscountCents: "0",
+      finalPriceCents: "340000"
+    };
     const pickerIndexes = {};
     steps.forEach((s) => { if (s.type === "picker") pickerIndexes[s.key] = 0; });
 
@@ -904,6 +990,10 @@
     let inPostQuestionAgreements = false;
     let paymentStage = 0;
     let countdownTimer = null;
+    let couponPanelOpen = false;
+    let proposalVisitId = "";
+    let proposalSessionId = "";
+    let proposalHeartbeatTimer = 0;
 
     const agreementSteps = [
       {
@@ -924,7 +1014,8 @@
       { icon: `<rect x="6" y="4" width="12" height="16" rx="2" stroke="white" stroke-width="1.8"/><path d="M9 9h6M9 12h6M9 15h4" stroke="white" stroke-width="1.8"/>`, h1: "Considerações finais", h2: "As informações utilizadas serão exatamente as informadas no termo de compromisso pelo contratante. Se houver alguma variação necessária, como nome de congresso/evento, escrita/pronúncia de nomes próprios, igreja/end, deverá ser informada no campo \"Notas adicionais\" deste formulário. O material é enviado 8 dias após o preenchimento do contrato." }
     ];
 
-    const paymentOptions = currentTermConfig.paymentOptions;
+    agreementSteps[2].h2 = eventFinanceAgreementText;
+    const paymentOptions = eventPresentationOptions;
 
     const totalStages = 1 + steps.length + (agreementSteps.length - 1) + 3 + 1 + 1;
 
@@ -999,6 +1090,56 @@
       updateProgress();
     }
 
+    function formatEventMoney(cents) {
+      return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(cents || 0) / 100);
+    }
+
+    function getSelectedPresentation() {
+      return paymentOptions.find((item) => item.key === answers.presentationKey) || paymentOptions[2] || paymentOptions[0];
+    }
+
+    function syncPricingPreview() {
+      const selected = getSelectedPresentation();
+      const eventCount = Math.min(20, Math.max(1, Math.trunc(Number(answers.eventCount || 1))));
+      const basePriceCents = selected.amountCents * eventCount;
+      const couponDiscountCents = Math.min(basePriceCents, Math.max(0, Number(answers.couponDiscountCents || 0)));
+      answers.presentationKey = selected.key;
+      answers.eventCount = String(eventCount);
+      answers.pagamentoOpcao = selected.key;
+      answers.pagamentoValor = selected.priceLabel;
+      answers.unitPriceCents = String(selected.amountCents);
+      answers.basePriceCents = String(basePriceCents);
+      answers.finalPriceCents = String(basePriceCents - couponDiscountCents);
+      return { selected, eventCount, basePriceCents, couponDiscountCents, finalPriceCents: basePriceCents - couponDiscountCents };
+    }
+
+    function removeAppliedCoupon(feedback = "") {
+      answers.couponCode = "";
+      answers.couponDiscountCents = "0";
+      answers.freeTransport = false;
+      answers.freeLodging = false;
+      answers.couponFeedback = feedback;
+      syncPricingPreview();
+    }
+
+    async function applyCouponCode(code) {
+      const preview = syncPricingPreview();
+      const response = await fetch("/api/event-coupons/validate", {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ presentationKey: preview.selected.key, eventCount: preview.eventCount, couponCode: code })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.pricing) throw new Error(data.error || "Cupom invalido.");
+      answers.couponCode = data.pricing.couponCode || "";
+      answers.couponDiscountCents = String(data.pricing.couponDiscountCents || 0);
+      answers.freeTransport = Boolean(data.pricing.freeTransport);
+      answers.freeLodging = Boolean(data.pricing.freeLodging);
+      answers.couponFeedback = "Cupom aplicado no preco final.";
+      couponPanelOpen = true;
+      syncPricingPreview();
+    }
+
     function renderPaymentStage() {
       clearCountdown();
       paymentError.textContent = "";
@@ -1009,20 +1150,73 @@
         paymentIcon.innerHTML = `<path d="M3 8h18v8H3z" stroke="white" stroke-width="1.8"/><path d="M3 12h18" stroke="white" stroke-width="1.8"/>`;
         prepareTermTextElement(paymentH1, "payment.choice.title", "Escolha da apresentação");
         prepareTermTextElement(paymentH2, "payment.choice.copy", "");
+        const pricing = syncPricingPreview();
+        const couponBenefits = [
+          answers.freeTransport ? "Livre de transporte" : "",
+          answers.freeLodging ? "Livre de hospedagem" : ""
+        ].filter(Boolean);
         paymentBody.innerHTML = `
-          ${paymentOptions.map((opt) => `<button type="button" class="payment-choice ${answers.pagamentoOpcao === opt.key ? "active" : ""}" data-option="${opt.key}">${opt.label} - ${opt.priceLabel}</button>`).join("")}
+          <div class="presentation-carousel" id="presentationCarousel" aria-label="Apresentacoes disponiveis">
+            ${paymentOptions.map((opt) => `<button type="button" class="presentation-card ${answers.presentationKey === opt.key ? "active" : ""}" data-option="${opt.key}">${opt.featured ? '<span class="presentation-badge">MAIS CONTRATADO</span>' : ""}<strong>${opt.priceLabel}</strong><span>${opt.label}</span></button>`).join("")}
+          </div>
+          <div class="payment-controls">
+            <div class="quantity-control">
+              <label><span>Quantos eventos serao?</span><input id="eventCountInput" type="number" min="1" max="20" value="${pricing.eventCount}" inputmode="numeric"></label>
+            </div>
+            <div class="coupon-box">
+              <button class="coupon-trigger" id="couponTrigger" type="button"><span><strong>Voce tem um cupom de desconto</strong><small>(Toque para ativar)</small></span><span>${couponPanelOpen ? "?" : "+"}</span></button>
+              ${couponPanelOpen ? `<div class="coupon-entry"><input id="couponInput" maxlength="40" placeholder="Digite o cupom" value="${escapeHtml(answers.couponCode || "")}"><button id="applyCouponBtn" type="button">Aplicar</button></div>` : ""}
+              ${answers.couponCode ? `<div class="coupon-details"><strong>${escapeHtml(answers.couponCode)}</strong> retirou ${formatEventMoney(pricing.couponDiscountCents)} do valor.${couponBenefits.length ? `<br>${couponBenefits.join(" + ")}` : ""}</div><button class="coupon-remove" id="removeCouponBtn" type="button">Remover cupom</button>` : ""}
+              <div class="coupon-feedback" id="couponFeedback">${escapeHtml(answers.couponFeedback || "")}</div>
+            </div>
+            <div class="price-summary">
+              <div class="price-row"><span>${pricing.selected.label} x ${pricing.eventCount}</span><strong>${formatEventMoney(pricing.basePriceCents)}</strong></div>
+              ${pricing.couponDiscountCents ? `<div class="price-row"><span>Desconto ${escapeHtml(answers.couponCode)}</span><strong>- ${formatEventMoney(pricing.couponDiscountCents)}</strong></div>` : ""}
+              <div class="price-row final"><span>Preco final</span><strong>${formatEventMoney(pricing.finalPriceCents)}</strong></div>
+            </div>
+          </div>
         `;
 
         paymentBody.querySelectorAll("[data-option]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const key = btn.getAttribute("data-option");
-            const selected = paymentOptions.find((item) => item.key === key);
-            if (!selected) return;
-            answers.pagamentoOpcao = selected.key;
-            answers.pagamentoValor = selected.priceLabel;
-            answers.pagamentoStripeProduto = selected.stripeProductId;
+            if (!paymentOptions.some((item) => item.key === key)) return;
+            const hadCoupon = Boolean(answers.couponCode);
+            answers.presentationKey = key;
+            if (hadCoupon) removeAppliedCoupon("Cupom removido porque a apresentacao mudou.");
             renderPaymentStage();
           });
+        });
+        const selectedCard = paymentBody.querySelector(".presentation-card.active");
+        window.setTimeout(() => selectedCard?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }), 0);
+        document.getElementById("eventCountInput")?.addEventListener("change", (event) => {
+          const nextCount = Math.min(20, Math.max(1, Math.trunc(Number(event.target.value || 1))));
+          const hadCoupon = Boolean(answers.couponCode);
+          answers.eventCount = String(nextCount);
+          if (hadCoupon) removeAppliedCoupon("Cupom removido porque a quantidade de eventos mudou.");
+          renderPaymentStage();
+        });
+        document.getElementById("couponTrigger")?.addEventListener("click", () => {
+          couponPanelOpen = !couponPanelOpen;
+          renderPaymentStage();
+        });
+        document.getElementById("applyCouponBtn")?.addEventListener("click", async () => {
+          const button = document.getElementById("applyCouponBtn");
+          const code = document.getElementById("couponInput")?.value || "";
+          if (!code.trim()) { answers.couponFeedback = "Digite o codigo do cupom."; renderPaymentStage(); return; }
+          button.disabled = true;
+          answers.couponFeedback = "Validando...";
+          try {
+            await applyCouponCode(code);
+          } catch (error) {
+            removeAppliedCoupon(error instanceof Error ? error.message : "Cupom invalido.");
+            couponPanelOpen = true;
+          }
+          renderPaymentStage();
+        });
+        document.getElementById("removeCouponBtn")?.addEventListener("click", () => {
+          removeAppliedCoupon("Cupom removido. O valor normal foi restaurado.");
+          renderPaymentStage();
         });
       } else if (paymentStage === 1) {
         const dueDates = getDueDateOptions();
@@ -1088,6 +1282,9 @@
               const selectedOption = paymentOptions.find((item) => item.key === answers.pagamentoOpcao) || null;
               const requestBody = {
                 stripeProductId: answers.pagamentoStripeProduto,
+                presentationKey: answers.presentationKey,
+                eventCount: Number(answers.eventCount || 1),
+                couponCode: answers.couponCode || "",
                 returnPath: buildTermReturnPath()
               };
               if (selectedOption?.amountCents) {
@@ -1228,6 +1425,29 @@
       renderStep();
     });
 
+    function buildAcceptedTermsSnapshot() {
+      const pricing = syncPricingPreview();
+      const benefits = [
+        answers.freeTransport ? "Livre de transporte" : "",
+        answers.freeLodging ? "Livre de hospedagem" : ""
+      ].filter(Boolean);
+      const accepted = agreementSteps.map((step, index) => ({
+        title: getTermText(`agreement.${index}.title`, step.h1),
+        text: getTermText(`agreement.${index}.copy`, step.h2 || "")
+      }));
+      accepted.push({
+        title: "Condicoes comerciais escolhidas",
+        text: [
+          `${pricing.selected.label}: ${formatEventMoney(pricing.selected.amountCents)} por evento.`,
+          `Quantidade: ${pricing.eventCount} evento${pricing.eventCount === 1 ? "" : "s"}.`,
+          answers.couponCode ? `Cupom ${answers.couponCode}: desconto de ${formatEventMoney(pricing.couponDiscountCents)}.` : "Nenhum cupom aplicado.",
+          `Preco final: ${formatEventMoney(pricing.finalPriceCents)}.`,
+          benefits.length ? benefits.join(". ") + "." : ""
+        ].filter(Boolean).join("\n")
+      });
+      return accepted;
+    }
+
     async function submitTerm() {
       nextBtn.disabled = true;
       nextBtn.textContent = "Enviando...";
@@ -1237,7 +1457,7 @@
         const response = await fetch("/api/terms", {
           method: "POST",
           headers: getAuthHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ answers })
+          body: JSON.stringify({ answers, acceptedTerms: buildAcceptedTermsSnapshot() })
         });
         const data = await response.json();
 
@@ -1361,9 +1581,65 @@
       submitTerm();
     });
 
+    async function sendProposalActivity(action, { keepalive = false } = {}) {
+      if (!proposalVisitId || (action !== "resume" && !proposalSessionId)) return null;
+      const sessionId = proposalSessionId;
+      if (action === "pause") proposalSessionId = "";
+      const response = await fetch("/api/event-flow/activity", {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ action, visitId: proposalVisitId, sessionId }),
+        keepalive
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Falha ao registrar atividade.");
+      if (action === "resume") proposalSessionId = data?.tracking?.sessionId || "";
+      return data?.tracking || null;
+    }
+
+    function startProposalHeartbeat() {
+      window.clearInterval(proposalHeartbeatTimer);
+      proposalHeartbeatTimer = window.setInterval(() => {
+        if (document.visibilityState === "visible" && proposalSessionId) {
+          void sendProposalActivity("heartbeat").catch(() => {});
+        }
+      }, 15000);
+    }
+
+    async function startProposalTracking() {
+      const response = await fetch("/api/event-flow/visit", {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: "{}"
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.tracking) return;
+      proposalVisitId = data.tracking.visitId || "";
+      proposalSessionId = data.tracking.sessionId || "";
+      startProposalHeartbeat();
+      if (document.visibilityState !== "visible") {
+        void sendProposalActivity("pause", { keepalive: true }).catch(() => {});
+      }
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!proposalVisitId) return;
+      if (document.visibilityState === "hidden") {
+        void sendProposalActivity("pause", { keepalive: true }).catch(() => {});
+      } else if (!proposalSessionId) {
+        void sendProposalActivity("resume").catch(() => {});
+      }
+    });
+
+    window.addEventListener("pagehide", () => {
+      window.clearInterval(proposalHeartbeatTimer);
+      if (proposalSessionId) void sendProposalActivity("pause", { keepalive: true }).catch(() => {});
+    });
+
     async function initializeTermPage() {
       await loadTermContentConfig();
       const user = await ensureAuthenticatedAccess();
+      if (user) void startProposalTracking();
       if (user?.isAdmin) {
         enableTermAdminEditing();
       }

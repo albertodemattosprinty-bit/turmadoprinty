@@ -250,6 +250,16 @@
       display: none !important;
     }
 
+    .commercial-total { display:block; margin:8px 0 14px; font-size:clamp(1.8rem,4vw,2.8rem); color:#fff; }
+    .coupon-panel { margin-top:18px; padding:16px; border:1px solid rgba(255,255,255,.14); border-radius:16px; background:rgba(255,255,255,.045); }
+    .coupon-panel h3 { margin:0 0 4px; font-size:1rem; }
+    .coupon-panel p { margin:0; color:var(--muted); font-size:.86rem; }
+    .coupon-entry { display:flex; gap:8px; margin-top:12px; }
+    .coupon-entry input { min-width:0; flex:1; min-height:43px; border:1px solid rgba(255,255,255,.14); border-radius:11px; padding:10px 12px; background:#081b34; color:#fff; font:inherit; text-transform:uppercase; }
+    .coupon-entry button,.remove-coupon { border:0; border-radius:11px; padding:10px 13px; background:#fff; color:#164b91; font:inherit; font-weight:700; cursor:pointer; }
+    .remove-coupon { margin-top:10px; background:rgba(255,255,255,.12); color:#fff; }
+    .coupon-result { min-height:20px; margin-top:9px !important; color:#9ef0bc !important; }
+
     @media (max-width: 900px) {
       .summary-grid,
       .sections-grid {
@@ -329,14 +339,36 @@
         </article>
 
         <article class="card">
+          <span class="card-label">Pagamento</span>
+          <h2 class="section-title">Valor do evento</h2>
+          <strong class="commercial-total" id="finalPriceValue">-</strong>
+          <div class="event-list">
+            <div class="event-item"><strong>Apresentacao</strong><span id="presentationValue">-</span></div>
+            <div class="event-item"><strong>Quantidade</strong><span id="eventCountValue">-</span></div>
+            <div class="event-item"><strong>Cupom</strong><span id="couponValue">Nenhum</span></div>
+            <div class="event-item hidden" id="transportBenefit"><strong>Beneficio</strong><span>Livre de transporte</span></div>
+            <div class="event-item hidden" id="lodgingBenefit"><strong>Beneficio</strong><span>Livre de hospedagem</span></div>
+          </div>
+          <div class="coupon-panel">
+            <h3>Voce tem um cupom de desconto</h3>
+            <p>(Toque para ativar)</p>
+            <div class="coupon-entry">
+              <input id="panelCouponInput" maxlength="40" placeholder="Digite o cupom">
+              <button id="panelApplyCoupon" type="button">Aplicar</button>
+            </div>
+            <button class="remove-coupon hidden" id="panelRemoveCoupon" type="button">Remover cupom</button>
+            <p class="coupon-result" id="panelCouponFeedback" role="status"></p>
+          </div>
+          <div class="hero-actions">
+            <a class="button button-primary" href="/eventos-pagamento">Abrir pagamentos</a>
+          </div>
+        </article>
+
+        <article class="card">
           <span class="card-label">Estrutura prevista</span>
           <h2 class="section-title">Proximas sessoes</h2>
           <p class="section-copy">Deixei o painel pronto para crescer por etapas sem perder o vínculo com o evento e com o login do usuário.</p>
           <div class="placeholder-list">
-            <div class="placeholder-item">
-              <strong>Pagamentos</strong>
-              <p class="section-copy">Status do sinal, vencimentos e comprovantes.</p>
-            </div>
             <div class="placeholder-item">
               <strong>Materiais de divulgacao</strong>
               <p class="section-copy">Artes, textos e arquivos do evento em um so lugar.</p>
@@ -381,6 +413,17 @@
     const storyValue = document.getElementById("storyValue");
     const whatsappValue = document.getElementById("whatsappValue");
     const heroCopy = document.getElementById("heroCopy");
+    const finalPriceValue = document.getElementById("finalPriceValue");
+    const presentationValue = document.getElementById("presentationValue");
+    const eventCountValue = document.getElementById("eventCountValue");
+    const couponValue = document.getElementById("couponValue");
+    const transportBenefit = document.getElementById("transportBenefit");
+    const lodgingBenefit = document.getElementById("lodgingBenefit");
+    const panelCouponInput = document.getElementById("panelCouponInput");
+    const panelApplyCoupon = document.getElementById("panelApplyCoupon");
+    const panelRemoveCoupon = document.getElementById("panelRemoveCoupon");
+    const panelCouponFeedback = document.getElementById("panelCouponFeedback");
+    let currentTerm = null;
 
     function getToken() {
       return window.localStorage.getItem(sessionStorageKey) || "";
@@ -426,8 +469,28 @@
       return `${days} dias`;
     }
 
+    function formatMoney(cents) {
+      return new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" }).format(Number(cents || 0) / 100);
+    }
+
+    function fillCommercial(answers) {
+      const count = Number(answers.eventCount || 1);
+      const hasCoupon = Boolean(String(answers.couponCode || "").trim());
+      finalPriceValue.textContent = formatMoney(answers.finalPriceCents || answers.basePriceCents || 0);
+      presentationValue.textContent = answers.presentationName || "-";
+      eventCountValue.textContent = `${count} evento${count === 1 ? "" : "s"}`;
+      couponValue.textContent = hasCoupon ? `${answers.couponCode} (- ${formatMoney(answers.couponDiscountCents)})` : "Nenhum";
+      transportBenefit.classList.toggle("hidden", !(answers.freeTransport === true || answers.freeTransport === "Sim"));
+      lodgingBenefit.classList.toggle("hidden", !(answers.freeLodging === true || answers.freeLodging === "Sim"));
+      panelRemoveCoupon.classList.toggle("hidden", !hasCoupon);
+      panelCouponInput.value = hasCoupon ? answers.couponCode : "";
+      panelCouponFeedback.textContent = hasCoupon ? "Cupom aplicado ao preco final e ao PDF do termo." : "";
+    }
+
     function fillPanel(term) {
+      currentTerm = term;
       const answers = term?.answers || {};
+      fillCommercial(answers);
       churchValue.textContent = answers.igreja || "-";
       dateValue.textContent = formatEventDate(answers) || "-";
       timeValue.textContent = answers.horario || "-";
@@ -439,6 +502,39 @@
       heroCopy.textContent = `Tudo o que for entrando no seu fluxo do evento pode nascer daqui. Hoje o painel já mostra o resumo base de ${answers.igreja || "seu evento"} e fica vinculado ao seu login.`;
       pdfLink.href = term?.pdfUrl || "/termo";
     }
+
+    async function updatePanelCoupon(couponCode) {
+      const response = await fetch(getApiUrl("/api/contractor-panel/coupon"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({ couponCode })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.term) throw new Error(data.error || "Nao foi possivel atualizar o cupom.");
+      fillPanel(data.term);
+      return data.term;
+    }
+
+    panelApplyCoupon.addEventListener("click", async () => {
+      const code = panelCouponInput.value.trim();
+      if (!code) { panelCouponFeedback.textContent = "Digite o codigo do cupom."; return; }
+      panelApplyCoupon.disabled = true;
+      panelCouponFeedback.textContent = "Validando...";
+      try { await updatePanelCoupon(code); }
+      catch (error) { panelCouponFeedback.textContent = error instanceof Error ? error.message : "Cupom invalido."; }
+      finally { panelApplyCoupon.disabled = false; }
+    });
+
+    panelRemoveCoupon.addEventListener("click", async () => {
+      panelRemoveCoupon.disabled = true;
+      panelCouponFeedback.textContent = "Removendo...";
+      try { await updatePanelCoupon(""); panelCouponFeedback.textContent = "Cupom removido. O valor normal foi restaurado."; }
+      catch (error) { panelCouponFeedback.textContent = error instanceof Error ? error.message : "Falha ao remover cupom."; }
+      finally { panelRemoveCoupon.disabled = false; }
+    });
 
     async function loadPanel() {
       const token = getToken();

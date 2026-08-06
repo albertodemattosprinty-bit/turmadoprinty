@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <style>
+    .event-coupon-box{margin-top:16px;padding:16px;border:1px solid rgba(15,58,108,.14);border-radius:16px;background:#f5f9ff}.event-coupon-box h3{margin:0 0 3px}.event-coupon-box p{margin:0;color:#61728a}.event-coupon-entry{display:flex;gap:8px;margin-top:12px}.event-coupon-entry input{min-width:0;flex:1;border:1px solid #c9d6e7;border-radius:10px;padding:11px;font:inherit;text-transform:uppercase}.event-coupon-entry button,.coupon-remove-button{border:0;border-radius:10px;padding:11px 14px;background:#1659a5;color:#fff;font:inherit;font-weight:700;cursor:pointer}.coupon-remove-button{margin-top:10px;background:#e7edf5;color:#23456e}.coupon-status{min-height:20px;margin-top:9px!important;color:#167341!important}.hidden{display:none!important}
+  </style>
 </head>
 <body data-page="eventos-pagamento">
   <header class="site-header">
@@ -19,28 +22,28 @@
       <div class="payment-hero-content">
         <div>
           <p class="eyebrow">Eventos</p>
-          <h1 class="section-title">Apresentacao da Turma do Printy</h1>
+          <h1 class="section-title" id="paymentTitle">Apresentacao da Turma do Printy</h1>
         </div>
 
-        <p class="payment-copy">
+        <p class="payment-copy" id="paymentCopy">
           Apresentacao de 1 hora e 30 minutos. Este pagamento e referente ao cache e nao inclui despesas de viagem, alimentacao ou hospedagem. Confira os valores e a logistica para a sua regiao antes da confirmacao final.
         </p>
 
         <div class="payment-price-row" aria-label="Valor do cache">
           <span class="payment-price-label">Valor</span>
-          <strong class="payment-price-value">R$ 3.600,00</strong>
+          <strong class="payment-price-value" id="paymentPrice">Carregando...</strong>
         </div>
       </div>
     </section>
 
     <section class="payment-grid">
       <div class="payment-feature-list">
-        <article class="payment-feature-item">
+        <article class="payment-feature-item" id="includedSection">
           <strong>O que esta incluso</strong>
-          <p>Apresentacao especial da Turma do Printy com duracao total de 1 hora e 30 minutos, pensada para eventos, igrejas, encontros infantis e programacoes especiais.</p>
+          <p id="includedCopy">Apresentacao especial da Turma do Printy.</p>
         </article>
 
-        <article class="payment-feature-item">
+        <article class="payment-feature-item" id="logisticsSection">
           <strong>Importante</strong>
           <p>O valor informado corresponde somente ao cache artistico. Despesas extras como viagem, alimentacao e hospedagem sao definidas conforme a cidade e a estrutura necessaria para o evento.</p>
         </article>
@@ -58,7 +61,7 @@
               <input type="radio" name="payment-option" checked>
               <span class="option-badge">Pagamento unico</span>
               <strong>Pagamento a vista</strong>
-              <p>Ideal para fechar a reserva com um unico pagamento de R$ 3.600,00.</p>
+              <p id="singlePaymentCopy">O valor final do seu termo aparecera aqui.</p>
             </label>
           </article>
 
@@ -72,8 +75,15 @@
           </article>
         </div>
 
-        <a class="primary-button full-width" href="#" aria-label="Pagar agora">Pagar agora</a>
-        <p class="payment-note">Se quiser, esta pagina pode ser conectada depois a um checkout real com pagamento unico e parcelamento.</p>
+        <div class="event-coupon-box">
+          <h3>Voce tem um cupom de desconto</h3>
+          <p>(Toque para ativar)</p>
+          <div class="event-coupon-entry"><input id="paymentCouponInput" maxlength="40" placeholder="Digite o cupom"><button id="paymentApplyCoupon" type="button">Aplicar</button></div>
+          <button class="coupon-remove-button hidden" id="paymentRemoveCoupon" type="button">Remover cupom</button>
+          <p class="coupon-status" id="paymentCouponStatus" role="status"></p>
+        </div>
+        <a class="primary-button full-width" id="payNowLink" href="#" aria-label="Pagar agora">Pagar agora</a>
+        <p class="payment-note">O checkout usa o preco final registrado no seu termo.</p>
       </aside>
     </section>
   </main>
@@ -84,5 +94,85 @@
     <a class="nav-link" href="/eventos.html"><svg viewBox="0 0 24 24"><path d="M7 3a1 1 0 0 1 1 1v1h8V4a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a2 2 0 0 1 2-2h1V4a1 1 0 0 1 1-1m12 8H5v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1zm-1-4H6a1 1 0 0 0-1 1v1h14V8a1 1 0 0 0-1-1"/></svg><span>Eventos</span></a>
     <a class="nav-link" href="/explorar.html"><svg viewBox="0 0 24 24"><path d="m12 3 2.45 4.96 5.48.8-3.97 3.87.94 5.47L12 15.52 7.1 18.1l.94-5.47-3.97-3.87 5.48-.8z"/></svg><span>Explorar</span></a>
   </nav>
+  <script type="module">
+    import { getApiUrl } from "/api.js";
+    const tokenKey = "turma_do_printy_token";
+    const getToken = () => localStorage.getItem(tokenKey) || "";
+    const headers = (extra = {}) => ({ ...extra, ...(getToken() ? { Authorization:`Bearer ${getToken()}` } : {}) });
+    const money = (cents) => new Intl.NumberFormat("pt-BR", { style:"currency", currency:"BRL" }).format(Number(cents || 0) / 100);
+    const paymentTitle = document.getElementById("paymentTitle");
+    const paymentCopy = document.getElementById("paymentCopy");
+    const paymentPrice = document.getElementById("paymentPrice");
+    const includedCopy = document.getElementById("includedCopy");
+    const logisticsSection = document.getElementById("logisticsSection");
+    const singlePaymentCopy = document.getElementById("singlePaymentCopy");
+    const couponInput = document.getElementById("paymentCouponInput");
+    const applyCouponButton = document.getElementById("paymentApplyCoupon");
+    const removeCouponButton = document.getElementById("paymentRemoveCoupon");
+    const couponStatus = document.getElementById("paymentCouponStatus");
+    const payNowLink = document.getElementById("payNowLink");
+    let currentTerm = null;
+
+    function renderTerm(term) {
+      currentTerm = term;
+      const answers = term?.answers || {};
+      const count = Number(answers.eventCount || 1);
+      const hasCoupon = Boolean(String(answers.couponCode || "").trim());
+      const freeTransport = answers.freeTransport === true || answers.freeTransport === "Sim";
+      const freeLodging = answers.freeLodging === true || answers.freeLodging === "Sim";
+      paymentTitle.textContent = answers.presentationName || "Apresentacao da Turma do Printy";
+      paymentCopy.textContent = `${count} evento${count === 1 ? "" : "s"} registrado${count === 1 ? "" : "s"} no termo de compromisso.`;
+      paymentPrice.textContent = money(answers.finalPriceCents || answers.basePriceCents || 0);
+      singlePaymentCopy.textContent = `Pagamento unico no valor final de ${paymentPrice.textContent}.`;
+      const benefits = [freeTransport ? "transporte livre" : "", freeLodging ? "hospedagem livre" : ""].filter(Boolean);
+      includedCopy.textContent = `${answers.presentationName || "Apresentacao"} para ${count} evento${count === 1 ? "" : "s"}${benefits.length ? `, com ${benefits.join(" e ")}` : ""}.`;
+      logisticsSection.classList.toggle("hidden", freeTransport && freeLodging);
+      if (!logisticsSection.classList.contains("hidden")) {
+        logisticsSection.querySelector("p").textContent = freeTransport
+          ? "O transporte esta livre de cobranca. Hospedagem e demais despesas seguem o termo."
+          : freeLodging
+            ? "A hospedagem esta livre de cobranca. Transporte e demais despesas seguem o termo."
+            : "Transporte, alimentacao e hospedagem seguem as condicoes registradas no termo.";
+      }
+      couponInput.value = hasCoupon ? answers.couponCode : "";
+      removeCouponButton.classList.toggle("hidden", !hasCoupon);
+      couponStatus.textContent = hasCoupon ? `Cupom ${answers.couponCode} aplicado: - ${money(answers.couponDiscountCents)}.` : "";
+    }
+
+    async function loadPanel() {
+      if (!getToken()) { location.href = `/auth.html?next=${encodeURIComponent("/eventos-pagamento")}`; return; }
+      const response = await fetch(getApiUrl("/api/contractor-panel"), { headers:headers() });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) { localStorage.removeItem(tokenKey); location.href = `/auth.html?next=${encodeURIComponent("/eventos-pagamento")}`; return; }
+      if (!response.ok || !data?.panel?.term) throw new Error(data.error || "Preencha o termo antes de abrir os pagamentos.");
+      renderTerm(data.panel.term);
+    }
+
+    async function updateCoupon(couponCode) {
+      const response = await fetch(getApiUrl("/api/contractor-panel/coupon"), { method:"PUT", headers:headers({ "Content-Type":"application/json" }), body:JSON.stringify({ couponCode }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.term) throw new Error(data.error || "Nao foi possivel atualizar o cupom.");
+      renderTerm(data.term);
+    }
+    applyCouponButton.addEventListener("click", async () => {
+      if (!couponInput.value.trim()) { couponStatus.textContent = "Digite o codigo do cupom."; return; }
+      applyCouponButton.disabled = true; couponStatus.textContent = "Validando...";
+      try { await updateCoupon(couponInput.value); } catch (error) { couponStatus.textContent = error.message || "Cupom invalido."; } finally { applyCouponButton.disabled = false; }
+    });
+    removeCouponButton.addEventListener("click", async () => {
+      removeCouponButton.disabled = true; couponStatus.textContent = "Removendo...";
+      try { await updateCoupon(""); couponStatus.textContent = "Cupom removido. O valor normal foi restaurado."; } catch (error) { couponStatus.textContent = error.message || "Falha ao remover."; } finally { removeCouponButton.disabled = false; }
+    });
+    payNowLink.addEventListener("click", async (event) => {
+      event.preventDefault(); if (!currentTerm) return;
+      payNowLink.textContent = "Abrindo checkout...";
+      try {
+        const answers = currentTerm.answers || {};
+        const response = await fetch(getApiUrl("/api/terms/checkout"), { method:"POST", headers:headers({ "Content-Type":"application/json" }), body:JSON.stringify({ presentationKey:answers.presentationKey, eventCount:Number(answers.eventCount || 1), couponCode:answers.couponCode || "", returnPath:"/termo" }) });
+        const data = await response.json().catch(() => ({})); if (!response.ok || !data.payUrl) throw new Error(data.error || "Falha ao abrir checkout."); location.href = data.payUrl;
+      } catch (error) { couponStatus.textContent = error.message || "Falha ao abrir checkout."; payNowLink.textContent = "Pagar agora"; }
+    });
+    loadPanel().catch((error) => { paymentPrice.textContent = "Indisponivel"; couponStatus.textContent = error.message || "Falha ao carregar."; });
+  </script>
 </body>
 </html>

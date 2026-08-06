@@ -1,4 +1,5 @@
 import { query } from "./db.js";
+import { formatEventMoney, resolveEventPricing } from "./event-flow.js";
 
 const MONTHS_PT = [
   "janeiro",
@@ -28,6 +29,15 @@ const QUESTION_ORDER = [
   { key: "endereco", label: "Qual é o endereço do evento?" },
   { key: "cidade", label: "Em qual cidade será o evento?" },
   { key: "cep", label: "Qual é o código postal (CEP)?" },
+  { key: "presentationName", label: "Apresentacao escolhida" },
+  { key: "eventCount", label: "Quantidade de eventos" },
+  { key: "unitPrice", label: "Valor por evento" },
+  { key: "basePrice", label: "Valor antes do desconto" },
+  { key: "couponCode", label: "Cupom aplicado" },
+  { key: "couponDiscount", label: "Desconto do cupom" },
+  { key: "finalPrice", label: "Preco final" },
+  { key: "freeTransport", label: "Transporte livre de cobranca" },
+  { key: "freeLodging", label: "Hospedagem livre de cobranca" },
   { key: "assinatura", label: "Assinatura" },
   { key: "assinaturaCpf", label: "CPF da assinatura" }
 ];
@@ -41,10 +51,12 @@ export async function ensureAllTermsSchema() {
       event_date date not null,
       event_time text not null,
       event_time_sort smallint not null default 0,
+      accepted_terms jsonb not null default '[]'::jsonb,
       created_at timestamptz not null default now()
     );
   `);
   await query(`alter table "all-terms" add column if not exists user_id uuid references users(id) on delete set null;`);
+  await query(`alter table "all-terms" add column if not exists accepted_terms jsonb not null default '[]'::jsonb;`);
   await query(`create index if not exists idx_all_terms_event_date_time on "all-terms"(event_date asc, event_time_sort asc, created_at asc);`);
   await query(`create index if not exists idx_all_terms_user_id_created_at on "all-terms"(user_id, created_at desc);`);
 }
@@ -140,19 +152,56 @@ export function sanitizeTermAnswers(input) {
   return answers;
 }
 
-export async function createAllTermEntry(rawAnswers, userId = null) {
+function sanitizeAcceptedTerms(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(0, 24).map((item) => ({
+    title: String(item?.title || "").trim().slice(0, 180),
+    text: String(item?.text || "").trim().slice(0, 5000)
+  })).filter((item) => item.title || item.text);
+}
+
+async function buildCommercialAnswers(rawAnswers) {
+  const pricing = await resolveEventPricing({
+    presentationKey: rawAnswers?.presentationKey,
+    eventCount: rawAnswers?.eventCount,
+    couponCode: rawAnswers?.couponCode
+  });
+  return {
+    pricing,
+    values: {
+      presentationName: pricing.presentationName,
+      eventCount: String(pricing.eventCount),
+      unitPrice: formatEventMoney(pricing.unitPriceCents),
+      basePrice: formatEventMoney(pricing.basePriceCents),
+      couponCode: pricing.couponCode,
+      couponDiscount: formatEventMoney(pricing.couponDiscountCents),
+      finalPrice: formatEventMoney(pricing.finalPriceCents),
+      freeTransport: pricing.freeTransport ? "Sim" : "Nao",
+      freeLodging: pricing.freeLodging ? "Sim" : "Nao"
+    }
+  };
+}
+
+export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedTerms = []) {
   await ensureAllTermsSchema();
-  const answers = sanitizeTermAnswers(rawAnswers);
+  const commercial = await buildCommercialAnswers(rawAnswers);
+  const answers = sanitizeTermAnswers({ ...rawAnswers, ...commercial.values });
+  answers.presentationKey = commercial.pricing.presentationKey;
+  answers.unitPriceCents = String(commercial.pricing.unitPriceCents);
+  answers.basePriceCents = String(commercial.pricing.basePriceCents);
+  answers.couponDiscountCents = String(commercial.pricing.couponDiscountCents);
+  answers.finalPriceCents = String(commercial.pricing.finalPriceCents);
+  const acceptedTerms = sanitizeAcceptedTerms(rawAcceptedTerms);
   const eventDate = parseEventDate(answers);
   const eventTimeSort = parseEventTimeSort(answers.horario);
 
   const result = await query(
     `
-      insert into "all-terms" (user_id, answers, event_date, event_time, event_time_sort)
-      values ($1, $2::jsonb, $3::date, $4, $5)
-      returning id, user_id, answers, event_date, event_time, event_time_sort, created_at;
+      insert into "all-terms" (user_id, answers, event_date, event_time, event_time_sort, accepted_terms)
+      values ($1, $2::jsonb, $3::date, $4, $5, $6::jsonb)
+      returning id, user_id, answers, event_date, event_time, event_time_sort, accepted_terms, created_at;
     `,
-    [userId || null, JSON.stringify(answers), eventDate, answers.horario, eventTimeSort]
+    [userId || null, JSON.stringify(answers), eventDate, answers.horario, eventTimeSort, JSON.stringify(acceptedTerms)]
   );
 
   return result.rows[0];
@@ -176,7 +225,7 @@ export async function listAllTermsByDate(dateIso) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, user_id, answers, event_date, event_time, created_at
+      select id, user_id, answers, accepted_terms, event_date, event_time, created_at
       from "all-terms"
       where event_date = $1::date
       order by event_time_sort asc, created_at asc;
@@ -188,6 +237,7 @@ export async function listAllTermsByDate(dateIso) {
     id: row.id,
     userId: row.user_id || null,
     answers: row.answers || {},
+    acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,
     eventTime: row.event_time,
     createdAt: row.created_at
@@ -213,7 +263,7 @@ export async function getAllTermById(termId) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, user_id, answers, event_date, event_time, created_at
+      select id, user_id, answers, accepted_terms, event_date, event_time, created_at
       from "all-terms"
       where id = $1
       limit 1;
@@ -230,6 +280,7 @@ export async function getAllTermById(termId) {
     id: row.id,
     userId: row.user_id || null,
     answers: row.answers || {},
+    acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,
     eventTime: row.event_time,
     createdAt: row.created_at
@@ -244,7 +295,7 @@ export async function getLatestTermByUserId(userId) {
   await ensureAllTermsSchema();
   const result = await query(
     `
-      select id, user_id, answers, event_date, event_time, created_at
+      select id, user_id, answers, accepted_terms, event_date, event_time, created_at
       from "all-terms"
       where user_id = $1
       order by created_at desc
@@ -262,6 +313,59 @@ export async function getLatestTermByUserId(userId) {
     id: row.id,
     userId: row.user_id || null,
     answers: row.answers || {},
+    acceptedTerms: row.accepted_terms || [],
+    eventDate: row.event_date,
+    eventTime: row.event_time,
+    createdAt: row.created_at
+  };
+}
+
+export async function updateLatestTermCouponByUserId(userId, couponCode = "") {
+  if (!userId) throw new Error("Usuario nao informado.");
+  await ensureAllTermsSchema();
+  const current = await getLatestTermByUserId(userId);
+  if (!current) throw new Error("Preencha o termo antes de aplicar um cupom.");
+
+  const commercial = await buildCommercialAnswers({
+    ...current.answers,
+    couponCode
+  });
+  const answers = {
+    ...current.answers,
+    ...commercial.values,
+    presentationKey: commercial.pricing.presentationKey,
+    unitPriceCents: String(commercial.pricing.unitPriceCents),
+    basePriceCents: String(commercial.pricing.basePriceCents),
+    couponDiscountCents: String(commercial.pricing.couponDiscountCents),
+    finalPriceCents: String(commercial.pricing.finalPriceCents)
+  };
+  const benefits = [
+    commercial.pricing.freeTransport ? "Livre de transporte" : "",
+    commercial.pricing.freeLodging ? "Livre de hospedagem" : ""
+  ].filter(Boolean);
+  const acceptedTerms = [
+    ...(current.acceptedTerms || []).filter((item) => item?.title !== "Atualizacao comercial do cupom"),
+    {
+      title: "Atualizacao comercial do cupom",
+      text: commercial.pricing.couponCode
+        ? `Cupom ${commercial.pricing.couponCode}: desconto de ${formatEventMoney(commercial.pricing.couponDiscountCents)}. Preco final: ${formatEventMoney(commercial.pricing.finalPriceCents)}.${benefits.length ? ` ${benefits.join(". ")}.` : ""}`
+        : `Cupom removido. Preco normal restaurado para ${formatEventMoney(commercial.pricing.finalPriceCents)}.`
+    }
+  ];
+
+  const result = await query(
+    `update "all-terms"
+        set answers = $3::jsonb, accepted_terms = $4::jsonb
+      where id = $1 and user_id = $2
+      returning id, user_id, answers, accepted_terms, event_date, event_time, created_at`,
+    [current.id, userId, JSON.stringify(answers), JSON.stringify(acceptedTerms)]
+  );
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    userId: row.user_id || null,
+    answers: row.answers || {},
+    acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,
     eventTime: row.event_time,
     createdAt: row.created_at

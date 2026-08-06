@@ -53,6 +53,8 @@ import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js
 import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
+import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
+import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, recordProposalActivity, recordProposalVisit, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
@@ -2686,6 +2688,7 @@ async function ensurePaymentsReady(response) {
     await ensureSiteConfigSchema();
     await ensureAdminUsersSchema();
     await ensureAllTermsSchema();
+    await ensureEventFlowSchema();
     await ensureActionsSchema();
     await ensurePlatformFinanceSchema();
     await ensureStatsSchema();
@@ -9882,6 +9885,114 @@ function buildTermPdfBuffer(term) {
   return Buffer.from(pdf, "latin1");
 }
 
+function wrapTermPdfText(rawText, maxChars = 82) {
+  const paragraphs = toPdfLatinText(rawText).split(/\n/);
+  const wrapped = [];
+  for (const paragraph of paragraphs) {
+    if (!paragraph.trim()) {
+      wrapped.push("");
+      continue;
+    }
+    let current = "";
+    for (const word of paragraph.trim().split(/\s+/)) {
+      const next = current ? `${current} ${word}` : word;
+      if (next.length > maxChars && current) {
+        wrapped.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+    if (current) wrapped.push(current);
+  }
+  return wrapped;
+}
+
+function buildTermPdfBufferV2(term) {
+  const contentLines = [];
+  const addBlock = (text, { fontSize = 11, bold = false, gapAfter = 0, maxChars = 82 } = {}) => {
+    for (const line of wrapTermPdfText(String(text || "-"), maxChars)) {
+      contentLines.push({ text: line, fontSize, bold, gapAfter: 0 });
+    }
+    if (contentLines.length) contentLines[contentLines.length - 1].gapAfter += gapAfter;
+  };
+
+  addBlock("Formulario do Evento", { fontSize: 22, bold: true, gapAfter: 12, maxChars: 44 });
+  for (const item of getTermQuestionOrder()) {
+    addBlock(item.label, { fontSize: 11, bold: true, gapAfter: 2 });
+    addBlock(String(term?.answers?.[item.key] || "-"), { fontSize: 10, gapAfter: 8, maxChars: 92 });
+  }
+
+  const acceptedTerms = Array.isArray(term?.acceptedTerms) ? term.acceptedTerms : [];
+  addBlock("Condicoes aceitas no Termo de Compromisso", { fontSize: 17, bold: true, gapAfter: 10, maxChars: 58 });
+  if (!acceptedTerms.length) {
+    addBlock("O contratante confirmou a assinatura e as informacoes registradas neste documento.", { fontSize: 10, gapAfter: 8 });
+  } else {
+    acceptedTerms.forEach((item, index) => {
+      addBlock(`${index + 1}. ${item?.title || "Condicao"}`, { fontSize: 11, bold: true, gapAfter: 3 });
+      if (item?.text) addBlock(item.text, { fontSize: 9, gapAfter: 9, maxChars: 98 });
+    });
+  }
+
+  const pages = [];
+  let page = [];
+  let usedHeight = 0;
+  const availableHeight = 728;
+  for (const line of contentLines) {
+    const lineHeight = Math.max(13, line.fontSize + 5) + Number(line.gapAfter || 0);
+    if (page.length && usedHeight + lineHeight > availableHeight) {
+      pages.push(page);
+      page = [];
+      usedHeight = 0;
+    }
+    page.push(line);
+    usedHeight += lineHeight;
+  }
+  if (page.length || !pages.length) pages.push(page);
+
+  const objects = [];
+  const pageRefs = pages.map((_, index) => `${4 + (index * 2)} 0 R`);
+  objects[1] = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";
+  objects[2] = `2 0 obj\n<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pages.length} >>\nendobj\n`;
+  objects[3] = "3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n";
+
+  pages.forEach((pageLines, index) => {
+    const pageObjectId = 4 + (index * 2);
+    const contentObjectId = pageObjectId + 1;
+    const stream = ["0 0.22 0.66 rg", "0 0 595 842 re f", "1 1 1 rg"];
+    let y = 792;
+    for (const line of pageLines) {
+      const fontSize = Number(line.fontSize || 10);
+      stream.push("BT");
+      stream.push(`/F1 ${fontSize} Tf`);
+      stream.push(`40 ${y} Td`);
+      stream.push(`(${escapePdfText(toPdfLatinText(line.text))}) Tj`);
+      stream.push("ET");
+      y -= Math.max(13, fontSize + 5) + Number(line.gapAfter || 0);
+    }
+    const pageNumber = `${index + 1}/${pages.length}`;
+    stream.push("BT", "/F1 9 Tf", "520 24 Td", `(${pageNumber}) Tj`, "ET");
+    const contentStream = `${stream.join("\n")}\n`;
+    const contentLength = Buffer.byteLength(contentStream, "latin1");
+    objects[pageObjectId] = `${pageObjectId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectId} 0 R >>\nendobj\n`;
+    objects[contentObjectId] = `${contentObjectId} 0 obj\n<< /Length ${contentLength} >>\nstream\n${contentStream}endstream\nendobj\n`;
+  });
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (let id = 1; id < objects.length; id += 1) {
+    offsets[id] = Buffer.byteLength(pdf, "latin1");
+    pdf += objects[id];
+  }
+  const xrefStart = Buffer.byteLength(pdf, "latin1");
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id += 1) {
+    pdf += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return Buffer.from(pdf, "latin1");
+}
+
 async function handleCreateTerm(request, response) {
   const authUser = await requireAuth(request, response);
   if (!authUser) {
@@ -9895,7 +10006,7 @@ async function handleCreateTerm(request, response) {
 
   try {
     const body = await readJsonBody(request);
-    const term = await createAllTermEntry(body?.answers || {}, authUser.id);
+    const term = await createAllTermEntry(body?.answers || {}, authUser.id, body?.acceptedTerms || []);
     const answers = term?.answers || {};
     const months = [
       "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
@@ -9969,6 +10080,7 @@ async function handleGetContractorPanel(request, response) {
 
   try {
     const term = await getLatestTermByUserId(authUser.id);
+    if (term) await markContractorPanelReached(authUser.id);
 
     sendJson(response, 200, {
       ok: true,
@@ -9979,6 +10091,7 @@ async function handleGetContractorPanel(request, response) {
           ? {
               id: term.id,
               answers: term.answers || {},
+              acceptedTerms: term.acceptedTerms || [],
               eventDate: term.eventDate,
               eventTime: term.eventTime,
               createdAt: term.createdAt,
@@ -10157,7 +10270,114 @@ async function handleProject200ProfileAvatarUploadRequest(request, response, pro
   }
 }
 
+async function handleProposalVisit(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const tracking = await recordProposalVisit(user.id);
+    sendJson(response, 201, { ok: true, tracking });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel iniciar a visita." });
+  }
+}
+
+async function handleProposalActivity(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const tracking = await recordProposalActivity(user.id, body);
+    sendJson(response, 200, { ok: true, tracking });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel registrar a atividade." });
+  }
+}
+
+async function handleValidateEventCoupon(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const pricing = await resolveEventPricing(body || {});
+    sendJson(response, 200, { ok: true, pricing });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel validar o cupom." });
+  }
+}
+
+async function handleContractorCouponUpdate(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const term = await updateLatestTermCouponByUserId(user.id, body?.couponCode || "");
+    sendJson(response, 200, {
+      ok: true,
+      term: {
+        id: term.id,
+        answers: term.answers || {},
+        acceptedTerms: term.acceptedTerms || [],
+        eventDate: term.eventDate,
+        eventTime: term.eventTime,
+        createdAt: term.createdAt,
+        pdfUrl: `/api/terms/${term.id}/pdf`
+      }
+    });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o cupom." });
+  }
+}
+
+async function handleAdminEvents(request, response) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    await ensureAllTermsSchema();
+    const [users, coupons] = await Promise.all([
+      listAdminEventFlow(),
+      listEventCoupons({ includeInactive: true })
+    ]);
+    sendJson(response, 200, {
+      ok: true,
+      users,
+      coupons,
+      presentations: getEventPresentations()
+    });
+  } catch (error) {
+    sendJson(response, 500, { error: error instanceof Error ? error.message : "Nao foi possivel carregar os eventos." });
+  }
+}
+
+async function handleAdminEventCouponCreate(request, response) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const body = await readJsonBody(request);
+    const coupon = await createEventCoupon(admin.id, body || {});
+    sendJson(response, 201, { ok: true, coupon });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Nao foi possivel criar o cupom.";
+    const duplicate = String(error?.code || "") === "23505";
+    sendJson(response, 400, { error: duplicate ? "Ja existe um cupom com esse codigo." : message });
+  }
+}
+
+async function handleAdminEventCouponUpdate(request, response, couponId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const body = await readJsonBody(request);
+    const coupon = await updateEventCoupon(couponId, body || {});
+    sendJson(response, 200, { ok: true, coupon });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o cupom." });
+  }
+}
+
 async function handleTermStripeCheckout(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+
   let body;
   try {
     body = await readJsonBody(request);
@@ -10166,52 +10386,43 @@ async function handleTermStripeCheckout(request, response) {
     return;
   }
 
-  const stripeProductId = String(body?.stripeProductId || "").trim();
-  const amountCents = Math.max(0, Math.trunc(Number(body?.amountCents || 0) || 0));
-  const itemName = String(body?.itemName || "Turma do Printy").trim() || "Turma do Printy";
   const returnPathRaw = String(body?.returnPath || "/termo").trim();
   const returnPath = /^\/termo(?:\?.*)?$/.test(returnPathRaw) ? returnPathRaw : "/termo";
-  if (!stripeProductId && !amountCents) {
-    sendJson(response, 400, { error: "Produto ou valor do checkout nao informado." });
-    return;
-  }
 
   try {
+    const pricing = await resolveEventPricing({
+      presentationKey: body?.presentationKey,
+      eventCount: body?.eventCount,
+      couponCode: body?.couponCode
+    });
+    if (pricing.finalPriceCents < 50) {
+      sendJson(response, 400, { error: "O valor final nao permite checkout online. Fale com a equipe para concluir." });
+      return;
+    }
     const stripe = getStripeClient();
     const baseUrl = getBaseUrl(request);
     const separator = returnPath.includes("?") ? "&" : "?";
-    let lineItems = [];
-    if (amountCents > 0) {
-      lineItems = [{
-        price_data: {
-          currency: "brl",
-          unit_amount: amountCents,
-          product_data: {
-            name: itemName
-          }
-        },
-        quantity: 1
-      }];
-    } else {
-      const prices = await stripe.prices.list({
-        product: stripeProductId,
-        active: true,
-        limit: 1
-      });
-
-      const price = prices.data[0];
-      if (!price?.id) {
-        sendJson(response, 404, { error: "Preco ativo nao encontrado para este produto." });
-        return;
-      }
-
-      lineItems = [{ price: price.id, quantity: 1 }];
-    }
+    const lineItems = [{
+      price_data: {
+        currency: "brl",
+        unit_amount: pricing.finalPriceCents,
+        product_data: {
+          name: `${pricing.presentationName} - ${pricing.eventCount} evento${pricing.eventCount === 1 ? "" : "s"}`
+        }
+      },
+      quantity: 1
+    }];
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       locale: "pt-BR",
       line_items: lineItems,
+      client_reference_id: user.id,
+      metadata: {
+        userId: user.id,
+        couponCode: pricing.couponCode || "",
+        presentationKey: pricing.presentationKey
+      },
       success_url: `${baseUrl}${returnPath}${separator}payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}${returnPath}${separator}payment=cancel`
     });
@@ -10297,7 +10508,7 @@ async function handleTermPdfDownload(response, termId) {
     return;
   }
 
-  const pdfBuffer = buildTermPdfBuffer(term);
+  const pdfBuffer = buildTermPdfBufferV2(term);
   response.writeHead(200, {
     "Content-Type": "application/pdf",
     "Content-Length": pdfBuffer.length,
@@ -13093,6 +13304,26 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/event-flow/visit") {
+    await handleProposalVisit(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/event-flow/activity") {
+    await handleProposalActivity(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/event-coupons/validate") {
+    await handleValidateEventCoupon(request, response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/contractor-panel/coupon") {
+    await handleContractorCouponUpdate(request, response);
+    return;
+  }
+
   if ((request.method === "GET" || request.method === "POST") && pathname.match(/^\/api\/200\/extra-goals\/[^/]+\/variants$/)) {
     const goalId = pathname.replace(/^\/api\/200\/extra-goals\/([^/]+)\/variants$/, "$1");
     await handleExtraGoalVariantsRequest(request, response, goalId);
@@ -14416,6 +14647,22 @@ const server = http.createServer(async (request, response) => {
         error: error instanceof Error ? error.message : "Nao foi possivel salvar a atualizacao do app."
       });
     }
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/admin/eventos") {
+    await handleAdminEvents(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/admin/eventos/coupons") {
+    await handleAdminEventCouponCreate(request, response);
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/coupons\/[^/]+$/)) {
+    const couponId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/coupons\/([^/]+)$/, "$1"));
+    await handleAdminEventCouponUpdate(request, response, couponId);
     return;
   }
 
