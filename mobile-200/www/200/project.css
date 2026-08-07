@@ -15419,3 +15419,83 @@ body[data-background-theme="white"] .marin-chat-more-button {
   font-size: clamp(1.2rem, 4.6vw, 1.65rem);
   font-weight: 950;
 }
+/* Pasta de ações e fluxo de quatro passos das micro-tarefas */
+#missionVariantsModal .mission-variants-kicker,
+#missionVariantsModal .mission-variants-title {
+  display: block;
+}
+#missionVariantsModal .mission-variants-title {
+  max-width: 440px;
+  color: #fff;
+  line-height: 1.15;
+}
+.mission-variant-add {
+  width: 58px;
+  height: 58px;
+  justify-self: center;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #22c55e;
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(15, 146, 70, .34);
+}
+.mission-variant-add svg {
+  width: 27px;
+  height: 27px;
+}
+.mission-variant-step-number {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #1f7ce8;
+  box-shadow: 0 8px 18px rgba(31, 124, 232, .3);
+  font-weight: 950;
+}
+.mission-variant-repeat-stage {
+  width: min(100%, 620px);
+  margin: 0 auto;
+}
+.mission-variant-repetition-button {
+  width: 100%;
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 18px;
+  border: 1px solid rgba(112, 175, 255, .55);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #2979e8, #1749aa);
+  color: #fff;
+  text-align: left;
+}
+.mission-variant-repetition-button > svg:first-child {
+  width: 38px;
+  height: 38px;
+}
+.mission-variant-repetition-button > svg:last-child {
+  width: 22px;
+  height: 22px;
+  opacity: .84;
+}
+.mission-variant-repetition-button span {
+  display: grid;
+  gap: 3px;
+}
+.mission-variant-repetition-button small {
+  color: rgba(255, 255, 255, .72);
+  font-size: .73rem;
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+.mission-variant-repetition-button strong {
+  color: #fff;
+  font-size: 1.22rem;
+  font-weight: 950;
+}

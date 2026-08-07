@@ -243,6 +243,7 @@ function normalizeExtraGoalVariantRow(row) {
     id: row.id,
     goalId: row.goal_id,
     title: normalizeExtraGoalTitle(row.title),
+    targetValue: Math.max(1, Math.min(999999, Math.trunc(Number(row.target_value || 1) || 1))),
     intervalValue: Math.max(1, Math.trunc(Number(row.interval_value || 1))),
     intervalUnit: normalizeExtraGoalVariantUnit(row.interval_unit),
     unitDurationSeconds,
@@ -689,6 +690,7 @@ export async function ensureExtraGoalsSchema() {
       assigned_profile text not null default 'Usuario',
       title text not null,
       interval_value integer not null default 1,
+      target_value integer not null default 1,
       interval_unit text not null default 'days',
       repeat_days jsonb not null default '[0,1,2,3,4,5,6]'::jsonb,
       last_completed_at timestamptz,
@@ -696,6 +698,7 @@ export async function ensureExtraGoalsSchema() {
       updated_at timestamptz not null default now()
     );
   `);
+  await query("alter table extra_goal_variants add column if not exists target_value integer not null default 1;");
   await query("alter table extra_goal_variants add column if not exists unit_duration_seconds integer not null default 0;");
   await query("alter table extra_goal_variants add column if not exists next_due_at timestamptz;");
   await query("alter table extra_goal_variants add column if not exists repeat_days jsonb not null default '[0,1,2,3,4,5,6]'::jsonb;");
@@ -882,7 +885,7 @@ export async function listExtraGoalVariants(userId, profileName, goalId) {
   const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
   if (!goal) throw new Error("Missao nao encontrada.");
   const result = await query(`
-    select id, goal_id, title, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, schedule_config, next_due_at, last_completed_at, created_at, updated_at
+    select id, goal_id, title, target_value, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, schedule_config, next_due_at, last_completed_at, created_at, updated_at
     from extra_goal_variants
     where user_id = $1 and assigned_profile = $2 and goal_id = $3
     order by updated_at desc, created_at asc
@@ -894,6 +897,7 @@ export async function createExtraGoalVariant(userId, profileName, goalId, payloa
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
   const safeGoalId = String(goalId || "").trim();
   const title = normalizeExtraGoalTitle(payload?.title);
+  const targetValue = Math.min(999999, Math.max(1, Math.trunc(Number(payload?.targetValue || 1) || 1)));
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
   const unitDurationSeconds = normalizeVariantDurationSeconds(payload?.unitDurationSeconds);
@@ -911,9 +915,9 @@ export async function createExtraGoalVariant(userId, profileName, goalId, payloa
   const goal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
   if (!goal) throw new Error("Missao nao encontrada.");
   await query(`
-    insert into extra_goal_variants (user_id, goal_id, assigned_profile, title, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, schedule_config, next_due_at)
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::timestamptz)
-  `, [userId, safeGoalId, normalizedProfile, title, intervalValue, intervalUnit, unitDurationSeconds, scheduleMode, JSON.stringify(repeatDays), JSON.stringify(avoidDays), scheduleConfig ? JSON.stringify(scheduleConfig) : null, nextDueAt]);
+    insert into extra_goal_variants (user_id, goal_id, assigned_profile, title, target_value, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, schedule_config, next_due_at)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::timestamptz)
+  `, [userId, safeGoalId, normalizedProfile, title, targetValue, intervalValue, intervalUnit, unitDurationSeconds, scheduleMode, JSON.stringify(repeatDays), JSON.stringify(avoidDays), scheduleConfig ? JSON.stringify(scheduleConfig) : null, nextDueAt]);
   return listExtraGoalVariants(userId, normalizedProfile, safeGoalId);
 }
 
@@ -921,6 +925,7 @@ export async function updateExtraGoalVariant(userId, profileName, goalId, varian
   await ensureExtraGoalsSchema();
   const normalizedProfile = normalizeExtraGoalProfile(profileName);
   const title = normalizeExtraGoalTitle(payload?.title);
+  const targetValue = Math.min(999999, Math.max(1, Math.trunc(Number(payload?.targetValue || 1) || 1)));
   const intervalValue = Math.min(999, Math.max(1, Math.trunc(Number(payload?.intervalValue || 1))));
   const intervalUnit = normalizeExtraGoalVariantUnit(payload?.intervalUnit);
   const unitDurationSeconds = normalizeVariantDurationSeconds(payload?.unitDurationSeconds);
@@ -936,9 +941,9 @@ export async function updateExtraGoalVariant(userId, profileName, goalId, varian
   if (scheduleMode === "weekly" && !repeatDays.length) throw new Error("Escolha pelo menos um dia da semana.");
   if (scheduleMode === "periodic" && avoidDays.length >= 7) throw new Error("Deixe pelo menos um dia disponivel.");
   const result = await query(`
-    update extra_goal_variants set title = $5, interval_value = $6, interval_unit = $7, unit_duration_seconds = $8, schedule_mode = $9, repeat_days = $10::jsonb, avoid_days = $11::jsonb, schedule_config = $12::jsonb, next_due_at = $13::timestamptz, updated_at = now()
+    update extra_goal_variants set title = $5, target_value = $6, interval_value = $7, interval_unit = $8, unit_duration_seconds = $9, schedule_mode = $10, repeat_days = $11::jsonb, avoid_days = $12::jsonb, schedule_config = $13::jsonb, next_due_at = $14::timestamptz, updated_at = now()
     where id = $4 and goal_id = $3 and user_id = $1 and assigned_profile = $2
-  `, [userId, normalizedProfile, goalId, variantId, title, intervalValue, intervalUnit, unitDurationSeconds, scheduleMode, JSON.stringify(repeatDays), JSON.stringify(avoidDays), scheduleConfig ? JSON.stringify(scheduleConfig) : null, nextDueAt]);
+  `, [userId, normalizedProfile, goalId, variantId, title, targetValue, intervalValue, intervalUnit, unitDurationSeconds, scheduleMode, JSON.stringify(repeatDays), JSON.stringify(avoidDays), scheduleConfig ? JSON.stringify(scheduleConfig) : null, nextDueAt]);
   if (!result.rowCount) throw new Error("Micro-tarefa nao encontrada.");
   return listExtraGoalVariants(userId, normalizedProfile, goalId);
 }
@@ -1049,7 +1054,7 @@ export async function listExtraGoals(userId, profileName = PROJECT200_DEFAULT_PR
     ])
   );
   const variantsResult = await query(`
-    select id, goal_id, title, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, schedule_config, next_due_at, last_completed_at, created_at, updated_at
+    select id, goal_id, title, target_value, interval_value, interval_unit, unit_duration_seconds, schedule_mode, repeat_days, avoid_days, schedule_config, next_due_at, last_completed_at, created_at, updated_at
     from extra_goal_variants
     where user_id = $1 and assigned_profile = $2
     order by created_at asc, id asc

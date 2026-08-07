@@ -797,6 +797,7 @@ const missionVariantsList = document.getElementById("missionVariantsList");
 const missionVariantAddButton = document.getElementById("missionVariantAddButton");
 const missionVariantEditor = document.getElementById("missionVariantEditor");
 const missionVariantTitleInput = document.getElementById("missionVariantTitleInput");
+const missionVariantTargetInput = document.getElementById("missionVariantTargetInput");
 const missionVariantScheduleMode = document.getElementById("missionVariantScheduleMode");
 const missionVariantPeriodicDeadline = document.getElementById("missionVariantPeriodicDeadline");
 const missionVariantWeekdayTitle = document.getElementById("missionVariantWeekdayTitle");
@@ -15592,8 +15593,11 @@ function renderMissionVariants() {
   const cycleChooseMode = state.missionVariants.mode === "cycle-choose";
   const cycleSelectionTarget = normalizeMissionRunCycleTarget(state.missionVariants.cycleSelectionTarget);
   const cycleSelections = Array.isArray(state.missionVariants.cycleSelections) ? state.missionVariants.cycleSelections : [];
-  if (missionVariantsKicker) missionVariantsKicker.textContent = "";
-  if (missionVariantsTitle) missionVariantsTitle.textContent = "";
+  const manageMode = !chooseMode;
+  if (missionVariantsKicker) missionVariantsKicker.textContent = manageMode ? "PASTA DE AÇÕES" : "";
+  if (missionVariantsTitle) missionVariantsTitle.textContent = manageMode
+    ? ((state.missionVariants.items || []).length ? "Organize as ações dessa pasta" : "Crie sua primeira tarefa")
+    : "";
   if (missionVariantCycleSelection) {
     missionVariantCycleSelection.hidden = !cycleChooseMode;
     missionVariantCycleSelection.textContent = cycleChooseMode
@@ -15672,7 +15676,7 @@ function renderMissionVariants() {
       ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
-  }).join("") : `<div class="empty-state">${chooseMode ? "Nenhuma ação desta pasta está programada para hoje." : "Clique em adicionar para criar a primeira tarefa."}</div>`;
+  }).join("") : `<div class="empty-state">${chooseMode ? "Nenhuma ação desta pasta está programada para hoje." : "Crie sua primeira tarefa."}</div>`;
 }
 
 async function loadMissionVariants(goalId, { force = false } = {}) {
@@ -15706,7 +15710,8 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
     intervalUnit: "days",
     scheduleMode: "",
     repeatDays: [],
-    avoidDays: []
+    avoidDays: [],
+    targetValue: 1
   };
   openModal("missionVariantsModal");
   if (missionVariantsList && !cachedItems.length) missionVariantsList.innerHTML = '<div class="empty-state">Carregando atividades...</div>';
@@ -15715,14 +15720,6 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
   } catch (error) {
     if (missionVariantsList) missionVariantsList.innerHTML = `<div class="empty-state">${escapeHtml(error instanceof Error ? error.message : "Falha ao carregar.")}</div>`;
     return;
-  }
-  if (options?.openEditorIfEmpty && !state.missionVariants.items.length) {
-    state.missionVariants.editorOpen = true;
-    state.missionVariants.editorStep = 1;
-    state.missionVariants.scheduleMode = "";
-    state.missionVariants.repeatDays = [];
-    state.missionVariants.avoidDays = [];
-    if (missionVariantTitleInput) missionVariantTitleInput.value = "";
   }
   renderMissionVariants();
   if (missionVariantsTicker) window.clearInterval(missionVariantsTicker);
@@ -15782,7 +15779,7 @@ async function openMissionRunModal(goalId) {
     state.missionVariants.goalId = String(goalId || "");
     const variants = await loadMissionVariants(goalId, { force: true });
     if (isMissionFolder(goal)) {
-      await openMissionVariantsModal(goalId, variants.length ? "choose" : "edit", { items: variants, openEditorIfEmpty: !variants.length });
+      await openMissionVariantsModal(goalId, "edit", { items: variants });
       return;
     }
     if (variants.length >= 2) {
@@ -15887,16 +15884,16 @@ async function finalizeMissionRun(triggerButton = null) {
     }
   }
 }
-async function openMissionFolderModal(goalId, mode = "choose") {
+async function openMissionFolderModal(goalId, mode = "edit") {
   const goal = getAvailableMissionById(goalId);
   if (!goal) return;
   const cachedItems = Array.isArray(goal?.variants) ? goal.variants : [];
-  await openMissionVariantsModal(goalId, mode, { items: cachedItems, openEditorIfEmpty: !cachedItems.length });
+  await openMissionVariantsModal(goalId, mode, { items: cachedItems });
 }
 
 function openMissionEditorModal(goalId) {
   const goal = getAvailableMissionById(goalId);
-  if (isMissionFolder(goal) && !Math.max(0, Number(goal?.variantCount || goal?.variants?.length || 0))) {
+  if (isMissionFolder(goal)) {
     void openMissionFolderModal(goalId, "edit");
     return;
   }
@@ -15907,7 +15904,7 @@ function openMissionEntryModal(goalId) {
   const goal = getAvailableMissionById(goalId);
   if (!goal) return;
   if (isMissionFolder(goal)) {
-    void openMissionFolderModal(goalId, "choose");
+    void openMissionFolderModal(goalId, "edit");
     return;
   }
   openMissionProgressModal(goalId);
@@ -15919,7 +15916,7 @@ function openMissionProgressModal(goalId) {
     return;
   }
   if (isMissionFolder(goal)) {
-    void openMissionFolderModal(goalId, "choose");
+    void openMissionFolderModal(goalId, "edit");
     return;
   }
   const goalIcon = getMissionDisplayIcon(goal);
@@ -19409,7 +19406,9 @@ missionVariantAddButton?.addEventListener("click", () => {
   state.missionVariants.scheduleMode = "";
   state.missionVariants.repeatDays = [];
   state.missionVariants.avoidDays = [];
+  state.missionVariants.targetValue = 1;
   if (missionVariantTitleInput) missionVariantTitleInput.value = "";
+  if (missionVariantTargetInput) missionVariantTargetInput.value = "1";
   if (missionVariantStatus) missionVariantStatus.textContent = "";
   renderMissionVariants();
   window.setTimeout(() => missionVariantTitleInput?.focus(), 40);
@@ -19494,7 +19493,7 @@ missionVariantEditorSave?.addEventListener("click", async () => {
     const payload = await apiRequest(`/api/200/extra-goals/${encodeURIComponent(goalId)}/variants${editingId ? `/${encodeURIComponent(editingId)}` : ""}`, {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, scheduleMode, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), repeatDays: scheduleMode === "weekly" ? normalizeMissionRepeatDays(state.missionVariants.repeatDays, []) : [], avoidDays: scheduleMode === "periodic" ? normalizeMissionRepeatDays(state.missionVariants.avoidDays, []) : [], scheduleConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null, repeatConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null, nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays, scheduleMode, state.missionVariants.repeatDays, state.missionVariants.avoidDays) })
+      body: JSON.stringify({ profile: String(state.selectedProfile || getDefaultProfileName()).trim(), title, targetValue: Math.max(1, Math.trunc(Number(state.missionVariants.targetValue || 1) || 1)), scheduleMode, intervalValue: state.missionVariants.intervalValue, intervalUnit: state.missionVariants.intervalUnit, unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds), repeatDays: scheduleMode === "weekly" ? normalizeMissionRepeatDays(state.missionVariants.repeatDays, []) : [], avoidDays: scheduleMode === "periodic" ? normalizeMissionRepeatDays(state.missionVariants.avoidDays, []) : [], scheduleConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null, repeatConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null, nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays, scheduleMode, state.missionVariants.repeatDays, state.missionVariants.avoidDays) })
     });
     state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
     missionVariantsCache.set(getMissionVariantsCacheKey(goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
@@ -19580,6 +19579,8 @@ missionVariantsList?.addEventListener("click", async (event) => {
   state.missionVariants.scheduleMode = normalizeMissionVariantScheduleMode(variant?.scheduleMode);
   state.missionVariants.repeatDays = state.missionVariants.scheduleMode === "weekly" ? normalizeMissionRepeatDays(variant.repeatDays, []) : [];
   state.missionVariants.avoidDays = state.missionVariants.scheduleMode === "periodic" ? normalizeMissionRepeatDays(variant.avoidDays, []) : [];
+  state.missionVariants.targetValue = Math.max(1, Math.trunc(Number(variant?.targetValue || 1) || 1));
+  if (missionVariantTargetInput) missionVariantTargetInput.value = String(state.missionVariants.targetValue);
   state.missionVariants.scheduleConfig = variant?.scheduleConfig || variant?.repeatConfig || null;
   state.missionVariants.repeatConfig = state.missionVariants.scheduleConfig;
   if (missionVariantTitleInput) missionVariantTitleInput.value = variant.title;
@@ -22004,4 +22005,128 @@ window.project200ProjectsContext = {
     close: closeBridgeModal
   };
   ensureBridgeButtons();
+})();
+// PROJECT200_MICROTASK_FOUR_STEP_FLOW
+(function installProject200MicrotaskFourStepFlow() {
+  if (window.__project200MicrotaskFourStepFlowInstalled) return;
+  window.__project200MicrotaskFourStepFlowInstalled = true;
+  const targetInput = document.getElementById("missionVariantTargetInput");
+  const scheduleStage = document.getElementById("missionVariantScheduleMode");
+
+  function getMicrotaskRepeatLabel() {
+    const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
+    const labels = {
+      none: "Nunca se repete",
+      daily: "Todos os dias",
+      weekly: "Todas as semanas",
+      monthly_custom: "Todos os meses",
+      yearly: "Todos os anos",
+      periodic: "Personalizado"
+    };
+    return labels[config.frequency] || "Todos os dias";
+  }
+
+  function renderMicrotaskRepeatStep() {
+    const editorOpen = Boolean(state.missionVariants?.editorOpen);
+    const step = Math.max(1, Math.min(4, Number(state.missionVariants?.editorStep || 1)));
+    if (targetInput) targetInput.value = String(Math.max(1, Math.trunc(Number(state.missionVariants?.targetValue || targetInput.value || 1) || 1)));
+    if (!scheduleStage) return;
+    if (!editorOpen || step !== 4) {
+      scheduleStage.hidden = true;
+      scheduleStage.innerHTML = "";
+      return;
+    }
+    scheduleStage.hidden = false;
+    scheduleStage.className = "mission-variant-repeat-stage";
+    scheduleStage.innerHTML = '<button class="mission-variant-repetition-button" type="button" id="missionVariantUniversalScheduleButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>REPETIÇÃO</small><strong>' + getMicrotaskRepeatLabel() + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
+    scheduleStage.querySelector("#missionVariantUniversalScheduleButton")?.addEventListener("click", () => {
+      window.project200DailyRepetitionModal?.open("microtask", () => {
+        if (missionVariantStatus) missionVariantStatus.textContent = "Repetição definida.";
+        renderMissionVariants();
+      });
+    });
+  }
+
+  const previousRenderMissionVariants = renderMissionVariants;
+  renderMissionVariants = function() {
+    previousRenderMissionVariants();
+    renderMicrotaskRepeatStep();
+  };
+
+  targetInput?.addEventListener("input", () => {
+    targetInput.value = String(targetInput.value || "").replace(/\D+/g, "").slice(0, 6);
+    state.missionVariants.targetValue = Math.max(1, Math.trunc(Number(targetInput.value || 1) || 1));
+    if (missionVariantStatus) missionVariantStatus.textContent = "";
+  });
+
+  missionVariantAddButton?.addEventListener("click", () => {
+    state.missionVariants.targetValue = 1;
+    if (targetInput) targetInput.value = "1";
+  });
+
+  openMissionVariantsButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const goalId = String(state.missionAdjust?.goalId || "").trim();
+    if (!goalId) return;
+    void openMissionVariantsModal(goalId, "edit").then(() => missionVariantAddButton?.click());
+  }, true);
+
+  missionVariantEditorSave?.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const title = String(missionVariantTitleInput?.value || "").trim();
+    const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants?.editorStep || 1) || 1)));
+    if (!title) {
+      if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa.";
+      return;
+    }
+    if (editorStep === 2) {
+      const targetValue = Math.max(1, Math.trunc(Number(targetInput?.value || state.missionVariants?.targetValue || 1) || 1));
+      state.missionVariants.targetValue = targetValue;
+      if (targetInput) targetInput.value = String(targetValue);
+    }
+    if (editorStep < 4) {
+      state.missionVariants.editorStep = editorStep + 1;
+      if (missionVariantStatus) missionVariantStatus.textContent = "";
+      renderMissionVariants();
+      return;
+    }
+
+    const goalId = String(state.missionVariants?.goalId || "").trim();
+    const editingId = String(state.missionVariants?.editingId || "").trim();
+    const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants?.scheduleMode || "periodic");
+    const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
+    if (!finishLoading) return;
+    try {
+      const payload = await apiRequest("/api/200/extra-goals/" + encodeURIComponent(goalId) + "/variants" + (editingId ? "/" + encodeURIComponent(editingId) : ""), {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+          title,
+          targetValue: Math.max(1, Math.trunc(Number(state.missionVariants?.targetValue || 1) || 1)),
+          scheduleMode,
+          intervalValue: state.missionVariants.intervalValue,
+          intervalUnit: state.missionVariants.intervalUnit,
+          unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds),
+          repeatDays: scheduleMode === "weekly" ? normalizeMissionRepeatDays(state.missionVariants.repeatDays, []) : [],
+          avoidDays: scheduleMode === "periodic" ? normalizeMissionRepeatDays(state.missionVariants.avoidDays, []) : [],
+          scheduleConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null,
+          repeatConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null,
+          nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays, scheduleMode, state.missionVariants.repeatDays, state.missionVariants.avoidDays)
+        })
+      });
+      state.missionVariants.items = Array.isArray(payload?.variants) ? payload.variants : [];
+      missionVariantsCache.set(getMissionVariantsCacheKey(goalId), { loadedAt: Date.now(), items: state.missionVariants.items });
+      syncMissionVariantsIntoMissionState(goalId, state.missionVariants.items);
+      state.missionVariants.editorOpen = false;
+      renderMissionVariants();
+      renderMissions();
+    } catch (error) {
+      if (missionVariantStatus) missionVariantStatus.textContent = error instanceof Error ? error.message : "Falha ao salvar.";
+    } finally {
+      finishLoading();
+    }
+  }, true);
 })();

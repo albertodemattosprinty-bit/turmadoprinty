@@ -1518,8 +1518,8 @@
         <button class="history-mission-footer-icon history-mission-footer-icon-blue" type="button" id="openMissionAdjustTimeButton" aria-label="Alterar tempo da missão">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-2.35-5.65L15 9h7V2l-2.95 2.95A9.96 9.96 0 0 0 12 2Zm-1 5h2v5.2l4 2.4-1 1.7-5-3V7Z" fill="currentColor"/></svg>
         </button>
-        <button class="history-mission-footer-icon history-mission-footer-icon-blue" type="button" id="openMissionVariantsButton" aria-label="Abrir micro-tarefas da missão">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h14v2H6V5Zm0 6h14v2H6v-2Zm0 6h14v2H6v-2ZM3 5h2v2H3V5Zm0 6h2v2H3v-2Zm0 6h2v2H3v-2Z" fill="currentColor"/></svg>
+        <button class="history-mission-footer-icon history-mission-footer-icon-green" type="button" id="openMissionVariantsButton" aria-label="Criar micro-tarefa">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7V4Z" fill="currentColor"/></svg>
         </button>
         <button class="history-mission-footer-icon history-mission-footer-icon-green" type="button" id="missionAdjustConfirm" aria-label="Salvar número">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z" fill="currentColor"/></svg>
@@ -1548,25 +1548,16 @@
       </header>
       <div class="mission-variant-cycle-selection" id="missionVariantCycleSelection" hidden></div>
       <div class="mission-variants-list" id="missionVariantsList" aria-live="polite"></div>
-      <button class="primary-btn mission-variant-add" type="button" id="missionVariantAddButton">+ Adicionar micro-tarefa</button>
+      <button class="primary-btn mission-variant-add" type="button" id="missionVariantAddButton" aria-label="Criar micro-tarefa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7V4Z" fill="currentColor"/></svg></button>
       <div class="mission-variant-editor" id="missionVariantEditor" hidden>
         <div class="mission-variant-editor-step" id="missionVariantEditorStep1">
           <input class="text-field options-text-field" type="text" id="missionVariantTitleInput" maxlength="120" autocomplete="off" placeholder="Nome da micro-tarefa" />
-          <div class="mission-variant-stage-copy"><strong>Qual o prazo?</strong><span>Escolha uma unica regra para esta micro-tarefa.</span></div>
-          <div class="mission-variant-schedule-mode" id="missionVariantScheduleMode" role="group" aria-label="Tipo de prazo">
-            <button type="button" data-variant-schedule-mode="weekly"><strong>Semanal</strong><small>Selecione dias da semana</small></button>
-            <button type="button" data-variant-schedule-mode="periodic"><strong>Periodico</strong><small>Renova conforme o tempo definido</small></button>
-          </div>
-          <div class="mission-variant-periodic-deadline" id="missionVariantPeriodicDeadline" hidden>
-            <div class="mission-variant-deadline-selector">
-              <button type="button" id="missionVariantDeadlinePrev" aria-label="Diminuir prazo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-              <div><strong id="missionVariantDeadlineValue">1</strong><span>Prazo</span></div>
-              <button type="button" id="missionVariantDeadlineNext" aria-label="Aumentar prazo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            </div>
-            <div class="mission-variant-unit-tabs" role="tablist" aria-label="Unidade do prazo"><button type="button" id="missionVariantHoursButton" role="tab">Horas</button><button type="button" id="missionVariantDaysButton" role="tab">Dias</button></div>
-          </div>
         </div>
-        <div class="mission-variant-editor-step" id="missionVariantEditorStep2" hidden>
+                        <div class="mission-variant-editor-step" id="missionVariantEditorStep2" hidden>
+          <div class="mission-variant-stage-copy"><strong>Quantas vezes por dia?</strong><span>Defina a quantidade esperada para esta micro-tarefa.</span></div>
+          <input class="text-field options-text-field" type="number" id="missionVariantTargetInput" min="1" max="99" inputmode="numeric" value="1" aria-label="Quantas vezes por dia" />
+        </div>
+        <div class="mission-variant-editor-step" id="missionVariantEditorStep3" hidden>
           <div class="mission-variant-stage-copy"><strong>Quanto tempo leva?</strong><span>Tempo especifico desta micro-tarefa.</span></div>
           <div class="mission-variant-deadline-selector">
             <button type="button" id="missionVariantDurationPrev" aria-label="Diminuir tempo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -1574,25 +1565,9 @@
             <button type="button" id="missionVariantDurationNext" aria-label="Aumentar tempo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           </div>
         </div>
-        <div class="mission-variant-editor-step" id="missionVariantEditorStep3" hidden>
-          <div class="mission-variant-stage-copy"><strong>Quando vence a próxima?</strong><span>Escolha o deslocamento do primeiro ciclo.</span></div>
-          <div class="mission-variant-deadline-selector">
-            <button type="button" id="missionVariantNextDuePrev" aria-label="Antecipar vencimento"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <div><strong id="missionVariantNextDueValue">Hoje</strong><span id="missionVariantNextDueHint">Vence hoje</span></div>
-            <button type="button" id="missionVariantNextDueNext" aria-label="Adiar vencimento"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          </div>
-        </div>
-        <div class="mission-variant-editor-step" id="missionVariantEditorStep4" hidden>
-          <div class="mission-variant-stage-copy"><strong id="missionVariantWeekdayTitle">Quando?</strong><span id="missionVariantWeekdayHint">Selecione os dias da semana</span></div>
-          <div class="mission-weekday-list" id="missionVariantWeekdays" role="group" aria-label="Dias da micro-tarefa">
-            <button type="button" data-repeat-day="1">Segunda-feira</button>
-            <button type="button" data-repeat-day="2">Terça-feira</button>
-            <button type="button" data-repeat-day="3">Quarta-feira</button>
-            <button type="button" data-repeat-day="4">Quinta-feira</button>
-            <button type="button" data-repeat-day="5">Sexta-feira</button>
-            <button type="button" data-repeat-day="6">Sábado</button>
-            <button type="button" data-repeat-day="0">Domingo</button>
-          </div>
+                <div class="mission-variant-editor-step" id="missionVariantEditorStep4" hidden>
+          <div class="mission-variant-stage-copy"><strong>Quando?</strong><span>Defina a repetição desta micro-tarefa.</span></div>
+          <div class="mission-variant-schedule-mode" id="missionVariantScheduleMode"></div>
         </div>
         <p class="finance-status" id="missionVariantStatus" aria-live="polite"></p>
         <div class="mission-variant-editor-actions"><button class="ghost-btn" type="button" id="missionVariantEditorCancel">Voltar</button><button class="primary-btn mission-variant-save-green" type="button" id="missionVariantEditorSave">Salvar</button></div>
