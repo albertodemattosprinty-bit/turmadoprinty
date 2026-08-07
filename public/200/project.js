@@ -21382,7 +21382,7 @@ window.project200ProjectsContext = {
     modal.id = "universalScheduleModal";
     modal.className = "workspace-modal simple-modal universal-schedule-modal";
     modal.setAttribute("aria-hidden", "true");
-    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><h2 class="universal-schedule-title">Quando se repete?</h2><button class="history-mission-modal-close" type="button" data-us-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-us-repeat="none">Nunca se repete</button><button type="button" data-us-repeat="daily">Diariamente</button><button type="button" data-us-repeat="weekly">Semanalmente</button><button type="button" data-us-repeat="monthly_custom">Mensalmente</button><button type="button" data-us-repeat="yearly">Anualmente</button><button type="button" data-us-repeat="periodic">Periodico</button></div></section><div data-us-details><section class="universal-schedule-card" data-us-custom><label data-us-custom-label>A cada</label><div data-us-periodic-only class="universal-schedule-inline universal-schedule-periodic-inline"><input type="number" min="1" max="999" id="usInterval"><span>dias</span></div><div data-us-periodic-only class="universal-schedule-avoid"><label>Evitar:</label><div class="universal-weekdays universal-weekdays-avoid" id="usAvoidDays"></div><small id="usAvoidFeedback">Evitar sabados e domingos</small></div><div class="universal-weekdays" id="usWeekdays"></div><div id="usMonthly"><label><input type="radio" name="usMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usMonthDay"></div><label><input type="radio" name="usMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label data-us-start-label>Comecar em</label><input class="text-field options-text-field" type="date" id="usStart"></section><section class="universal-schedule-card" data-us-end><label>Repete ate</label><label><input type="radio" name="usEnd" value="never"> Para sempre</label><label data-us-end-extra><input type="radio" name="usEnd" value="date"> Termina em</label><input data-us-end-extra class="text-field options-text-field" type="date" id="usEndDate"><label data-us-end-extra><input type="radio" name="usEnd" value="count"> Depois de</label><div data-us-end-extra class="universal-schedule-inline"><input type="number" min="1" max="999" id="usEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usNotification"><option>No horario da tarefa</option><option>5 minutos antes</option><option>10 minutos antes</option><option>30 minutos antes</option><option>1 hora antes</option><option>1 dia antes</option><option>Personalizado</option></select></section></div></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-us-close>Cancelar</button><button class="primary-btn" type="button" id="usApply">Aplicar</button></footer></div>';
+    modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><h2 class="universal-schedule-title">Quando se repete?</h2><button class="history-mission-modal-close" type="button" data-us-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-us-repeat="none">Nunca se repete</button><button type="button" data-us-repeat="daily">Todos os dias</button><button type="button" data-us-repeat="weekly">Todas as semanas</button><button type="button" data-us-repeat="monthly_custom">Todos os meses</button><button type="button" data-us-repeat="yearly">Todos os anos</button><button type="button" data-us-repeat="periodic">Personalizado</button></div></section><div data-us-details><section class="universal-schedule-card" data-us-custom><label data-us-custom-label>A cada</label><div data-us-periodic-only class="universal-schedule-inline universal-schedule-periodic-inline"><input type="number" min="1" max="999" id="usInterval"><span>dias</span></div><div data-us-periodic-only class="universal-schedule-avoid"><label>Evitar:</label><div class="universal-weekdays universal-weekdays-avoid" id="usAvoidDays"></div><small id="usAvoidFeedback">Evitar sabados e domingos</small></div><div class="universal-weekdays" id="usWeekdays"></div><div id="usMonthly"><label><input type="radio" name="usMonthlyMode" value="day"> Dia do mes</label><div class="universal-schedule-inline"><span>Dia</span><input type="number" min="1" max="31" id="usMonthDay"></div><label><input type="radio" name="usMonthlyMode" value="weekday"> Posicao no mes</label><div class="universal-schedule-inline"><select id="usOrdinal"><option value="0">Primeira</option><option value="1">Segunda</option><option value="2">Terceira</option><option value="3">Quarta</option><option value="4">Ultima</option></select><select id="usWeekday"><option value="1">Segunda-feira</option><option value="2">Terca-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sabado</option><option value="0">Domingo</option></select></div></div></section><section class="universal-schedule-card"><label data-us-start-label>Comecar em</label><input class="text-field options-text-field" type="date" id="usStart"></section><section class="universal-schedule-card" data-us-end><label>Repete ate</label><label><input type="radio" name="usEnd" value="never"> Para sempre</label><label data-us-end-extra><input type="radio" name="usEnd" value="date"> Termina em</label><input data-us-end-extra class="text-field options-text-field" type="date" id="usEndDate"><label data-us-end-extra><input type="radio" name="usEnd" value="count"> Depois de</label><div data-us-end-extra class="universal-schedule-inline"><input type="number" min="1" max="999" id="usEndCount"><span>ocorrencias</span></div></section><section class="universal-schedule-card"><label>Notificacao</label><select id="usNotification"><option>No horario da tarefa</option><option>5 minutos antes</option><option>10 minutos antes</option><option>30 minutos antes</option><option>1 hora antes</option><option>1 dia antes</option><option>Personalizado</option></select></section></div></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-us-close>Cancelar</button><button class="primary-btn" type="button" id="usApply">Aplicar</button></footer></div>';
     document.body.appendChild(modal);
     modal.addEventListener("click", function(event) {
       if (event.target.closest("[data-us-close]")) closeModalLocal();
@@ -21868,24 +21868,58 @@ window.project200ProjectsContext = {
   openMissionAdjustModal = function(goalId) { oldOpenMissionAdjustModal(goalId); const goal = getAvailableMissionById(goalId); state.missionAdjust.scheduleConfig = normalizeSchedule(goal?.scheduleConfig || goal?.repeatConfig, goal?.repeatDays); state.missionAdjust.repeatConfig = state.missionAdjust.scheduleConfig; renderBridgeButtons(); };
   const oldRenderMissionAdjustState = renderMissionAdjustState;
   renderMissionAdjustState = function() { oldRenderMissionAdjustState(); ensureBridgeButtons(); renderBridgeButtons(); };
+  function getMissionVariantDirectRepeat() {
+    const cfg = readTargetSchedule("microtask");
+    return ["none", "daily", "weekly", "monthly_custom", "yearly", "periodic"].includes(cfg.frequency) ? cfg.frequency : "daily";
+  }
+  function applyMissionVariantDirectRepeat(repeat) {
+    const cfg = readTargetSchedule("microtask");
+    cfg.frequency = ["none", "daily", "weekly", "monthly_custom", "yearly", "periodic"].includes(repeat) ? repeat : "daily";
+    if (cfg.frequency === "daily") { cfg.intervalUnit = "day"; cfg.interval = 1; }
+    if (cfg.frequency === "weekly") { cfg.intervalUnit = "week"; cfg.interval = 1; }
+    if (cfg.frequency === "monthly_custom") { cfg.intervalUnit = "month"; cfg.interval = 1; }
+    if (cfg.frequency === "yearly") { cfg.intervalUnit = "year"; cfg.interval = 1; }
+    syncSimpleScheduleFromStartDate(cfg);
+    if (cfg.frequency === "periodic") {
+      cfg.intervalUnit = cfg.intervalUnit || "day";
+      cfg.interval = Math.max(1, Number(cfg.interval || 1));
+      cfg.avoidDays = normalizeAvoidDays(cfg.avoidDays, [0, 6]);
+    }
+    saveTargetSchedule(cfg, "microtask");
+    return cfg;
+  }
+  function renderMissionVariantDirectSchedule() {
+    if (!missionVariantScheduleMode) return;
+    if (state.missionVariants?.editorOpen && Number(state.missionVariants?.editorStep || 1) === 1 && !state.missionVariants?.scheduleConfig && !state.missionVariants?.repeatConfig) {
+      applyMissionVariantDirectRepeat("daily");
+    }
+    const cfg = readTargetSchedule("microtask");
+    const active = getMissionVariantDirectRepeat();
+    missionVariantScheduleMode.hidden = false;
+    missionVariantScheduleMode.classList.add("universal-schedule-card", "mission-variant-repeat-inline");
+    missionVariantScheduleMode.innerHTML = '<label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-us-repeat="none">Nunca se repete</button><button type="button" data-us-repeat="daily">Todos os dias</button><button type="button" data-us-repeat="weekly">Todas as semanas</button><button type="button" data-us-repeat="monthly_custom">Todos os meses</button><button type="button" data-us-repeat="yearly">Todos os anos</button><button type="button" data-us-repeat="periodic">Personalizado</button></div><p class="dailyrepetition-feedback" id="missionVariantRepeatFeedback"></p>';
+    missionVariantScheduleMode.querySelectorAll("[data-us-repeat]").forEach((button) => button.classList.toggle("active", button.dataset.usRepeat === active));
+    const feedback = missionVariantScheduleMode.querySelector("#missionVariantRepeatFeedback");
+    if (feedback) feedback.textContent = formatRepeatFeedback(cfg);
+  }
+  missionVariantScheduleMode?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-us-repeat]");
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    applyMissionVariantDirectRepeat(button.dataset.usRepeat);
+    if (missionVariantStatus) missionVariantStatus.textContent = "";
+    renderMissionVariants();
+  }, true);
   const oldRenderMissionVariants = renderMissionVariants;
   renderMissionVariants = function() {
     oldRenderMissionVariants();
     if (!missionVariantScheduleMode) return;
-    missionVariantScheduleMode.hidden = true;
     if (missionVariantPeriodicDeadline) missionVariantPeriodicDeadline.hidden = true;
-    if (!document.getElementById("missionVariantUniversalScheduleButton")) {
-      const button = document.createElement("button");
-      button.className = "mission-create-time-button";
-      button.type = "button";
-      button.id = "missionVariantUniversalScheduleButton";
-      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>Definir repeticao</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
-      button.addEventListener("click", () => openBridgeModal("microtask", () => { if (missionVariantStatus) missionVariantStatus.textContent = "Repeticao definida."; renderMissionVariants(); }));
-      missionVariantScheduleMode.after(button);
-    }
+    document.getElementById("missionVariantUniversalScheduleButton")?.remove();
+    renderMissionVariantDirectSchedule();
     renderBridgeButtons();
-  };
-  const oldVariantSaveClick = missionVariantEditorSave?.onclick;
+  };  const oldVariantSaveClick = missionVariantEditorSave?.onclick;
   missionVariantEditorSave?.addEventListener("click", () => {
     if (state.missionVariants?.editorStep === 1 && !normalizeMissionVariantScheduleMode(state.missionVariants.scheduleMode, { allowEmpty: true })) {
       saveTargetSchedule(readTargetSchedule("microtask"), "microtask");
