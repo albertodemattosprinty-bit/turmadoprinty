@@ -15214,6 +15214,7 @@ body[data-background-theme="white"] .mission-weekday-list.is-avoidance button.is
   --universal-schedule-active-bg: rgba(31, 103, 215, .12);
 }
 .universal-schedule-modal.active { display:flex; align-items:center; justify-content:center; padding:14px; z-index:1300; }
+#dailyrepetitionModal.active { z-index:2500; }
 .universal-schedule-panel { width:min(430px, 100%); max-height:min(86vh, 760px); display:flex; flex-direction:column; border-radius:8px; overflow:hidden; background:var(--universal-schedule-panel); color:var(--universal-schedule-text); box-shadow:0 24px 80px rgba(0,0,0,.34); }
 .universal-schedule-head { position:relative; display:flex; align-items:center; justify-content:center; gap:12px; padding:16px 44px 12px; border-bottom:1px solid var(--universal-schedule-border); color:var(--universal-schedule-text); }
 .universal-schedule-head .history-mission-modal-close { position:absolute; right:12px; top:10px; color:var(--universal-schedule-text); }

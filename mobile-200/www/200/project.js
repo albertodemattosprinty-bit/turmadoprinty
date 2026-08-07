@@ -15595,8 +15595,9 @@ function renderMissionVariants() {
   const cycleSelections = Array.isArray(state.missionVariants.cycleSelections) ? state.missionVariants.cycleSelections : [];
   const manageMode = !chooseMode;
   if (missionVariantsKicker) missionVariantsKicker.textContent = manageMode ? "PASTA DE AÇÕES" : "";
+  const missionVariantFolderName = String(getAvailableMissionById(state.missionVariants?.goalId)?.title || "Pasta de ações").trim();
   if (missionVariantsTitle) missionVariantsTitle.textContent = manageMode
-    ? ((state.missionVariants.items || []).length ? "Organize as ações dessa pasta" : "Crie sua primeira tarefa")
+    ? ((state.missionVariants.items || []).length ? "Organize as ações dessa pasta" : missionVariantFolderName)
     : "";
   if (missionVariantCycleSelection) {
     missionVariantCycleSelection.hidden = !cycleChooseMode;
