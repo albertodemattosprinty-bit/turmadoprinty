@@ -15376,3 +15376,25 @@ body[data-background-theme="white"] .marin-chat-more-button {
   background: rgba(255,255,255,.78);
   color: #2f3640;
 }
+.mission-create-repeat-inline,
+.mission-variant-repeat-inline {
+  --universal-schedule-card: rgba(7, 14, 28, .92);
+  --universal-schedule-text: #ffffff;
+  --universal-schedule-muted: rgba(255, 255, 255, .72);
+  --universal-schedule-border: rgba(86, 155, 255, .34);
+  --universal-schedule-accent: #2388ff;
+  background: linear-gradient(135deg, #123f95 0%, #07101f 58%, #02050b 100%);
+  border-color: rgba(94, 164, 255, .55);
+  box-shadow: 0 16px 34px rgba(6, 17, 40, .34), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+.mission-create-repeat-inline .universal-schedule-options button,
+.mission-variant-repeat-inline .universal-schedule-options button {
+  background: rgba(4, 10, 22, .62);
+  border-color: rgba(255, 255, 255, .16);
+  color: #fff;
+}
+.mission-create-repeat-inline .universal-schedule-options button.active,
+.mission-variant-repeat-inline .universal-schedule-options button.active {
+  background: linear-gradient(135deg, #2d8cff 0%, #174fb7 100%);
+  border-color: rgba(255, 255, 255, .34);
+}
