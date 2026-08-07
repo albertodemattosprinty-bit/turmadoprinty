@@ -15376,3 +15376,46 @@ body[data-background-theme="white"] .marin-chat-more-button {
   background: rgba(255,255,255,.78);
   color: #2f3640;
 }
+
+.mission-create-repetition-modal-button {
+  width: min(680px, 100%);
+  min-height: 84px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 14px;
+  margin: 0 auto;
+  padding: 16px 22px;
+  border: 1px solid rgba(102, 255, 171, .42);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #27c565 0%, #159947 48%, #0d3f29 100%);
+  color: #fff;
+  box-shadow: 0 20px 42px rgba(8, 38, 23, .34), inset 0 1px 0 rgba(255, 255, 255, .18);
+  cursor: pointer;
+  text-align: left;
+}
+.mission-create-repetition-modal-button > svg:first-child {
+  width: 42px;
+  height: 42px;
+}
+.mission-create-repetition-modal-button > svg:last-child {
+  width: 24px;
+  height: 24px;
+  opacity: .82;
+}
+.mission-create-repetition-modal-button span {
+  display: grid;
+  gap: 3px;
+}
+.mission-create-repetition-modal-button small {
+  color: rgba(255, 255, 255, .74);
+  font-size: .76rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.mission-create-repetition-modal-button strong {
+  color: #fff;
+  font-size: clamp(1.2rem, 4.6vw, 1.65rem);
+  font-weight: 950;
+}

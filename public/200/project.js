@@ -18561,9 +18561,9 @@ statsAspectLinksCloseButton?.addEventListener("click", requestStatsAspectLinksCl
 statsAspectLinksConfirmBackButton?.addEventListener("click", () => closeModal("statsAspectLinksConfirmModal"));
 statsAspectLinksConfirmSaveButton?.addEventListener("click", () => void saveStatsAspectLinksDraft());
 
-openMissionCreateHeroButton?.addEventListener("click", openMissionCreateModal);
-openMissionCreateButton?.addEventListener("click", openMissionCreateModal);
-openMissionCreateFloatingButton?.addEventListener("click", openMissionCreateModal);
+openMissionCreateHeroButton?.addEventListener("click", () => openMissionCreateModal());
+openMissionCreateButton?.addEventListener("click", () => openMissionCreateModal());
+openMissionCreateFloatingButton?.addEventListener("click", () => openMissionCreateModal());
 missionScopePrevButton?.addEventListener("click", () => {
   void shiftMissionHistoryScope(-1);
 });
@@ -21201,7 +21201,8 @@ if (runningMusicProgressTicker) {
 window.project200ProjectsContext = {
   state, actionsList, actionsModal, actionStatuses, apiRequest, escapeHtml,
   formatActionTitleForDisplay, formatMinutesHuman, getServerNowMs, isLimitGoal,
-  normalizeActionStatus, openModal, closeModal, openTaskComposer, openMissionCreateModal,
+  normalizeActionStatus, openModal, closeModal, openTaskComposer,
+  openMissionCreateModal: (...args) => openMissionCreateModal(...args),
   getToken, redirectToProject200Login, renderActions, loadActions, loadMissions
 };
 
@@ -21811,12 +21812,13 @@ window.project200ProjectsContext = {
     if (!repeatStep) return;
     if (missionCreateWeekdays) missionCreateWeekdays.hidden = true;
     document.getElementById("missionCreateDirectRepeatPanel")?.remove();
-    let button = document.getElementById("missionCreateUniversalScheduleButton");
+    document.getElementById("missionCreateUniversalScheduleButton")?.remove();
+    let button = document.getElementById("missionCreateRepetitionModalButton");
     if (!button) {
       button = document.createElement("button");
-      button.className = "mission-create-time-button";
+      button.className = "mission-create-repetition-modal-button";
       button.type = "button";
-      button.id = "missionCreateUniversalScheduleButton";
+      button.id = "missionCreateRepetitionModalButton";
       button.addEventListener("click", (event) => {
         event.preventDefault();
         openDailyRepetitionModal("mission-create", () => {
@@ -21828,8 +21830,9 @@ window.project200ProjectsContext = {
     }
     const label = labelForSchedule(readTargetSchedule("mission-create"), { fallback: "Definir repeticao" });
     button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>' + label + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
-  }  function renderBridgeButtons() {
-    const missionCreateButton = document.getElementById("missionCreateUniversalScheduleButton");
+  }
+  function renderBridgeButtons() {
+    const missionCreateButton = document.getElementById("missionCreateRepetitionModalButton");
     const missionAdjustButton = document.getElementById("missionAdjustUniversalScheduleButton");
     const missionVariantButton = document.getElementById("missionVariantUniversalScheduleButton");
     const missionCreateLabel = labelForSchedule(readTargetSchedule("mission-create"));
@@ -21872,12 +21875,18 @@ window.project200ProjectsContext = {
     oldRenderMissionCreateStep(direction);
     ensureBridgeButtons();
     const legacyStep = document.querySelector('[data-mission-create-step="5"]');
-    if (legacyStep) legacyStep.hidden = state.missionCreate?.structureType === "folder";
+    if (legacyStep) legacyStep.hidden = state.missionCreate?.structureType === "folder" || Number(state.missionCreate?.step || 0) !== 5;
     if (missionCreateWeekdays) missionCreateWeekdays.hidden = true;
     renderBridgeButtons();
   };
   const oldOpenMissionCreateModal = openMissionCreateModal;
-  openMissionCreateModal = function() { oldOpenMissionCreateModal(); state.missionCreate.scheduleConfig = normalizeSchedule(null, state.missionCreate.repeatDays); state.missionCreate.repeatConfig = state.missionCreate.scheduleConfig; };
+  openMissionCreateModal = function() {
+    oldOpenMissionCreateModal();
+    state.missionCreate.scheduleConfig = normalizeSchedule(null, state.missionCreate.repeatDays);
+    state.missionCreate.repeatConfig = state.missionCreate.scheduleConfig;
+    state.missionCreate.step = 0;
+    renderMissionCreateStep();
+  };
   const oldOpenMissionAdjustModal = openMissionAdjustModal;
   openMissionAdjustModal = function(goalId) { oldOpenMissionAdjustModal(goalId); const goal = getAvailableMissionById(goalId); state.missionAdjust.scheduleConfig = normalizeSchedule(goal?.scheduleConfig || goal?.repeatConfig, goal?.repeatDays); state.missionAdjust.repeatConfig = state.missionAdjust.scheduleConfig; renderBridgeButtons(); };
   const oldRenderMissionAdjustState = renderMissionAdjustState;
