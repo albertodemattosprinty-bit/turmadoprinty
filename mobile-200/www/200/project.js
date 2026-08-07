@@ -21806,53 +21806,28 @@ window.project200ProjectsContext = {
     modal?.classList.remove("active");
     modal?.setAttribute("aria-hidden", "true");
   }
-  function getMissionCreateDirectRepeat() {
-    const cfg = readTargetSchedule("mission-create");
-    return ["none", "daily", "weekly", "monthly_custom", "yearly", "periodic"].includes(cfg.frequency) ? cfg.frequency : "daily";
-  }
-  function applyMissionCreateDirectRepeat(repeat) {
-    const cfg = readTargetSchedule("mission-create");
-    cfg.frequency = ["none", "daily", "weekly", "monthly_custom", "yearly", "periodic"].includes(repeat) ? repeat : "daily";
-    if (cfg.frequency === "daily") { cfg.intervalUnit = "day"; cfg.interval = 1; }
-    if (cfg.frequency === "weekly") { cfg.intervalUnit = "week"; cfg.interval = 1; }
-    if (cfg.frequency === "monthly_custom") { cfg.intervalUnit = "month"; cfg.interval = 1; }
-    if (cfg.frequency === "yearly") { cfg.intervalUnit = "year"; cfg.interval = 1; }
-    syncSimpleScheduleFromStartDate(cfg);
-    if (cfg.frequency === "periodic") {
-      cfg.intervalUnit = cfg.intervalUnit || "day";
-      cfg.interval = Math.max(1, Number(cfg.interval || 1));
-      cfg.avoidDays = normalizeAvoidDays(cfg.avoidDays, [0, 6]);
-    }
-    saveTargetSchedule(cfg, "mission-create");
-    return cfg;
-  }
-  function renderMissionCreateDirectSchedule() {
+  function renderMissionCreateRepeatButton() {
     const repeatStep = document.querySelector('[data-mission-create-step="5"]');
     if (!repeatStep) return;
-    if (!state.missionCreate?.scheduleConfig && !state.missionCreate?.repeatConfig) applyMissionCreateDirectRepeat("daily");
     if (missionCreateWeekdays) missionCreateWeekdays.hidden = true;
-    document.getElementById("missionCreateUniversalScheduleButton")?.remove();
-    let panel = document.getElementById("missionCreateDirectRepeatPanel");
-    if (!panel) {
-      panel = document.createElement("section");
-      panel.id = "missionCreateDirectRepeatPanel";
-      panel.className = "universal-schedule-card mission-create-repeat-inline";
-      panel.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-us-repeat]");
-        if (!button) return;
+    document.getElementById("missionCreateDirectRepeatPanel")?.remove();
+    let button = document.getElementById("missionCreateUniversalScheduleButton");
+    if (!button) {
+      button = document.createElement("button");
+      button.className = "mission-create-time-button";
+      button.type = "button";
+      button.id = "missionCreateUniversalScheduleButton";
+      button.addEventListener("click", (event) => {
         event.preventDefault();
-        applyMissionCreateDirectRepeat(button.dataset.usRepeat);
-        if (missionCreateStatus) missionCreateStatus.textContent = "";
-        renderMissionCreateStep();
+        openDailyRepetitionModal("mission-create", () => {
+          if (missionCreateStatus) missionCreateStatus.textContent = "Repeticao definida.";
+          renderMissionCreateStep();
+        });
       });
-      repeatStep.appendChild(panel);
+      repeatStep.appendChild(button);
     }
-    const cfg = readTargetSchedule("mission-create");
-    const active = getMissionCreateDirectRepeat();
-    panel.innerHTML = '<label>Repeticao</label><div class="universal-schedule-options"><button type="button" data-us-repeat="none">Nunca se repete</button><button type="button" data-us-repeat="daily">Todos os dias</button><button type="button" data-us-repeat="weekly">Todas as semanas</button><button type="button" data-us-repeat="monthly_custom">Todos os meses</button><button type="button" data-us-repeat="yearly">Todos os anos</button><button type="button" data-us-repeat="periodic">Personalizado</button></div><p class="dailyrepetition-feedback" id="missionCreateRepeatFeedback"></p>';
-    panel.querySelectorAll("[data-us-repeat]").forEach((button) => button.classList.toggle("active", button.dataset.usRepeat === active));
-    const feedback = panel.querySelector("#missionCreateRepeatFeedback");
-    if (feedback) feedback.textContent = formatRepeatFeedback(cfg);
+    const label = labelForSchedule(readTargetSchedule("mission-create"), { fallback: "Definir repeticao" });
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>Repeticao</small><strong>' + label + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg>';
   }  function renderBridgeButtons() {
     const missionCreateButton = document.getElementById("missionCreateUniversalScheduleButton");
     const missionAdjustButton = document.getElementById("missionAdjustUniversalScheduleButton");
@@ -21874,7 +21849,7 @@ window.project200ProjectsContext = {
       if (copy) copy.textContent = "Defina quando essa missao aparece.";
       if (missionCreateWeekdays) missionCreateWeekdays.hidden = true;
     }
-    if (repeatStep && Number(state.missionCreate?.step || 0) === 5) renderMissionCreateDirectSchedule();
+    if (repeatStep && Number(state.missionCreate?.step || 0) === 5) renderMissionCreateRepeatButton();
     if (missionAdjustConfirmButton && !document.getElementById("missionAdjustUniversalScheduleButton")) {
       const button = document.createElement("button");
       button.className = "history-mission-footer-icon history-mission-footer-icon-blue";
