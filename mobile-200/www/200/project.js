@@ -21373,7 +21373,7 @@ window.project200ProjectsContext = {
     syncSimpleScheduleFromStartDate(cfg);
     saveTargetSchedule(cfg, target);
     closeDataSelectModal();
-    openDailyRepetitionModal(target, dataSelectCallback);
+    window.project200DailyRepetitionModal?.open(target, dataSelectCallback);
   }
 
   function ensureModal() {
@@ -21518,6 +21518,13 @@ window.project200ProjectsContext = {
   formatTaskComposerDateLabel = function() { ensureFields(); if (!state.wizard.repeatOpen) return oldFormat(); if (state.wizard.repeatIntervalUnit === "week") return "A cada " + state.wizard.repeatInterval + " semana(s): " + ((state.wizard.repeatDays || []).map(d => weekdays[d]).join(", ") || "dia escolhido"); if (state.wizard.repeatIntervalUnit === "month" && state.wizard.repeatMonthlyMode === "weekday") return "Todo mes: " + ordinals[state.wizard.monthlyOrdinalIndex || 0] + " " + weekdayLong[state.wizard.monthlyWeekdayIndex || 1]; if (state.wizard.repeatIntervalUnit === "month") return "Todo dia " + state.wizard.repeatMonthDay + " do mes"; if (state.wizard.repeatIntervalUnit === "year") return "Anualmente"; return "A cada " + state.wizard.repeatInterval + " dia(s)"; };
   const oldOpenEditor = openTaskComposerFieldEditor;
   openTaskComposerFieldEditor = function(field) { if (field === "repeat") { openModalLocal(); return; } return oldOpenEditor(field); };
+  window.project200UniversalScheduleDataSelect = {
+    open: openDataSelectModal,
+    getWeekday: getDateSelectWeekday,
+    formatLong: formatDateSelectLong,
+    formatRepeatFeedback,
+    syncSimpleScheduleFromStartDate
+  };
 })();
 
 // PROJECT200_UNIVERSAL_SCHEDULE_MISSIONS_BRIDGE
@@ -21528,6 +21535,12 @@ window.project200ProjectsContext = {
   const weekdayLong = ["domingo", "segunda-feira", "terca-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sabado"];
   const ordinals = ["primeira", "segunda", "terceira", "quarta", "ultima"];
   const avoidDayNames = ["domingos", "segundas", "tercas", "quartas", "quintas", "sextas", "sabados"];
+  const dateSelectApi = window.project200UniversalScheduleDataSelect;
+  const getDateSelectWeekday = (dateKey) => dateSelectApi.getWeekday(dateKey);
+  const formatDateSelectLong = (dateKey) => dateSelectApi.formatLong(dateKey);
+  const formatRepeatFeedback = (config) => dateSelectApi.formatRepeatFeedback(config);
+  const syncSimpleScheduleFromStartDate = (config) => dateSelectApi.syncSimpleScheduleFromStartDate(config);
+  const openDataSelectModal = (target, callback = null) => dateSelectApi.open(target, callback);
   function normalizeAvoidDays(days, fallback = [0, 6]) {
     const clean = [...new Set((Array.isArray(days) ? days : fallback).map((day) => Math.trunc(Number(day))).filter((day) => day >= 0 && day <= 6))].sort((a, b) => a - b);
     return clean.slice(0, 6);
@@ -21985,6 +21998,10 @@ window.project200ProjectsContext = {
   isMissionScheduledForToday = function(item, nowMs = getServerNowMs()) {
     if (item?.scheduleConfig || item?.repeatConfig) return scheduleMatchesToday(item.scheduleConfig || item.repeatConfig, nowMs);
     return oldIsMissionScheduledForToday(item, nowMs);
+  };
+  window.project200DailyRepetitionModal = {
+    open: openDailyRepetitionModal,
+    close: closeBridgeModal
   };
   ensureBridgeButtons();
 })();
