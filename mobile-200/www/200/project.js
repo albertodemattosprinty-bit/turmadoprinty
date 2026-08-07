@@ -21874,7 +21874,7 @@ window.project200ProjectsContext = {
       if (copy) copy.textContent = "Defina quando essa missao aparece.";
       if (missionCreateWeekdays) missionCreateWeekdays.hidden = true;
     }
-    if (repeatStep) renderMissionCreateDirectSchedule();
+    if (repeatStep && Number(state.missionCreate?.step || 0) === 5) renderMissionCreateDirectSchedule();
     if (missionAdjustConfirmButton && !document.getElementById("missionAdjustUniversalScheduleButton")) {
       const button = document.createElement("button");
       button.className = "history-mission-footer-icon history-mission-footer-icon-blue";
@@ -21902,7 +21902,7 @@ window.project200ProjectsContext = {
     renderBridgeButtons();
   };
   const oldOpenMissionCreateModal = openMissionCreateModal;
-  openMissionCreateModal = function() { oldOpenMissionCreateModal(); state.missionCreate.scheduleConfig = normalizeSchedule(null, state.missionCreate.repeatDays); state.missionCreate.repeatConfig = state.missionCreate.scheduleConfig; renderBridgeButtons(); };
+  openMissionCreateModal = function() { oldOpenMissionCreateModal(); state.missionCreate.scheduleConfig = normalizeSchedule(null, state.missionCreate.repeatDays); state.missionCreate.repeatConfig = state.missionCreate.scheduleConfig; };
   const oldOpenMissionAdjustModal = openMissionAdjustModal;
   openMissionAdjustModal = function(goalId) { oldOpenMissionAdjustModal(goalId); const goal = getAvailableMissionById(goalId); state.missionAdjust.scheduleConfig = normalizeSchedule(goal?.scheduleConfig || goal?.repeatConfig, goal?.repeatDays); state.missionAdjust.repeatConfig = state.missionAdjust.scheduleConfig; renderBridgeButtons(); };
   const oldRenderMissionAdjustState = renderMissionAdjustState;
