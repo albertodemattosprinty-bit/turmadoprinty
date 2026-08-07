@@ -15248,6 +15248,95 @@ body[data-background-theme="black"] .universal-schedule-modal {
   --universal-schedule-border: rgba(255, 255, 255, .14);
   --universal-schedule-active-bg: rgba(31, 103, 215, .24);
 }
+
+.dailyrepetition-feedback {
+  margin: 2px 0 0;
+  color: var(--universal-schedule-muted);
+  font-size: .82rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+.dailyrepetition-date-button {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--universal-schedule-border);
+  border-radius: 8px;
+  background: var(--universal-schedule-card);
+  color: var(--universal-schedule-text);
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 900;
+  text-align: left;
+}
+.dailyrepetition-date-button svg {
+  width: 22px;
+  height: 22px;
+  opacity: .82;
+}
+.dataselect-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.dataselect-unit {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 34px minmax(42px, auto) 18px 34px;
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  border: 1px solid var(--universal-schedule-border);
+  border-radius: 8px;
+  padding: 8px 6px;
+  background: var(--universal-schedule-card);
+}
+.dataselect-unit button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--universal-schedule-border);
+  border-radius: 999px;
+  background: var(--universal-schedule-card);
+  color: var(--universal-schedule-text);
+  padding: 0;
+}
+.dataselect-unit button svg {
+  width: 20px;
+  height: 20px;
+}
+.dataselect-unit strong {
+  width: 100%;
+  color: var(--universal-schedule-text);
+  font-size: clamp(1.05rem, 4vw, 1.35rem);
+  font-weight: 950;
+  line-height: 1.05;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.dataselect-unit span {
+  color: var(--universal-schedule-muted);
+  font-size: .72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.dataselect-feedback {
+  margin: 4px 0 0;
+  color: var(--universal-schedule-text);
+  font-size: .92rem;
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+}
+@media (max-width: 380px) {
+  .dataselect-grid { gap: 6px; }
+  .dataselect-unit { padding: 7px 4px; }
+  .dataselect-unit strong { font-size: .98rem; }
+}
+
 body[data-background-theme="edge"] .universal-schedule-modal {
   --universal-schedule-surface: #07140f;
   --universal-schedule-panel: #0d1d16;
