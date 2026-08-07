@@ -19905,7 +19905,7 @@ actionsMissionsList?.addEventListener("click", (event) => {
   if (editButton) {
     event.stopPropagation();
     document.body.classList.add("actions-mission-editor-open");
-    openMissionAdjustModal(String(editButton.dataset.actionsMissionEdit || ""));
+    openMissionEditorModal(String(editButton.dataset.actionsMissionEdit || ""));
     return;
   }
   const card = event.target.closest("[data-actions-mission-goal-id]");
@@ -22007,4 +22007,136 @@ window.project200ProjectsContext = {
       finishLoading();
     }
   }, true);
+})();
+// PROJECT200_FOLDER_MANAGER_MODAL
+(function installProject200FolderManagerModal() {
+  if (window.__project200FolderManagerModalInstalled) return;
+  window.__project200FolderManagerModalInstalled = true;
+  let managedGoalId = "";
+
+  function ensureFolderManagerModal() {
+    let modal = document.getElementById("missionFolderManagerModal");
+    if (modal) return modal;
+    modal = document.createElement("section");
+    modal.id = "missionFolderManagerModal";
+    modal.className = "workspace-modal simple-modal mission-folder-manager-modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("aria-label", "Gerenciar pasta de ações");
+    modal.innerHTML = '<div class="mission-folder-manager-panel"><header class="mission-folder-manager-head"><div><span>PASTA DE AÇÕES</span><h2 id="missionFolderManagerTitle">Pasta</h2></div><button class="history-mission-modal-close" type="button" data-folder-manager-close aria-label="Fechar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 7.4 1.4-1.4 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6z" fill="currentColor"/></svg></button></header><div class="mission-folder-manager-body"><label class="mission-folder-manager-field"><span>Nome da pasta</span><input class="text-field options-text-field" type="text" id="missionFolderManagerName" maxlength="120" autocomplete="off"></label><p class="finance-status" id="missionFolderManagerStatus" aria-live="polite"></p><section class="mission-folder-manager-danger"><div><strong>Excluir pasta</strong><p>Digite <b>Excluir</b> para confirmar. As micro-tarefas desta pasta também serão removidas.</p></div><input class="text-field options-text-field" type="text" id="missionFolderManagerDeleteConfirm" autocomplete="off" placeholder="Digite Excluir"><button class="danger-btn" type="button" id="missionFolderManagerDelete" disabled>Excluir pasta</button></section></div><footer class="mission-folder-manager-footer"><button class="ghost-btn" type="button" data-folder-manager-close>Cancelar</button><button class="primary-btn" type="button" id="missionFolderManagerSave">Salvar nome</button></footer></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (event) => {
+      if (event.target.closest("[data-folder-manager-close]")) closeFolderManagerModal();
+    });
+    const confirmInput = modal.querySelector("#missionFolderManagerDeleteConfirm");
+    const deleteButton = modal.querySelector("#missionFolderManagerDelete");
+    confirmInput?.addEventListener("input", () => {
+      deleteButton.disabled = String(confirmInput.value || "").trim() !== "Excluir";
+    });
+    modal.querySelector("#missionFolderManagerSave")?.addEventListener("click", () => { void saveFolderManagerName(); });
+    deleteButton?.addEventListener("click", () => { void deleteManagedFolder(); });
+    return modal;
+  }
+
+  function closeFolderManagerModal() {
+    closeModal("missionFolderManagerModal");
+    document.body.classList.remove("actions-mission-editor-open");
+  }
+
+  function openFolderManagerModal(goalId) {
+    const goal = getAvailableMissionById(goalId);
+    if (!goal || !isMissionFolder(goal)) return;
+    managedGoalId = String(goal.id || "").trim();
+    const modal = ensureFolderManagerModal();
+    const title = String(goal.title || "Pasta de ações").trim();
+    modal.querySelector("#missionFolderManagerTitle").textContent = title;
+    modal.querySelector("#missionFolderManagerName").value = title;
+    modal.querySelector("#missionFolderManagerDeleteConfirm").value = "";
+    modal.querySelector("#missionFolderManagerDelete").disabled = true;
+    modal.querySelector("#missionFolderManagerStatus").textContent = "";
+    openModal("missionFolderManagerModal");
+    window.setTimeout(() => modal.querySelector("#missionFolderManagerName")?.focus(), 40);
+  }
+
+  async function refreshAfterFolderMutation() {
+    await Promise.all([loadMissions(), loadActionMissions()]);
+    renderMissions();
+    renderActionsMissionsPanel();
+    renderRunningMissionQuickButtons();
+  }
+
+  async function saveFolderManagerName() {
+    const modal = ensureFolderManagerModal();
+    const goalId = String(managedGoalId || "").trim();
+    const nameInput = modal.querySelector("#missionFolderManagerName");
+    const status = modal.querySelector("#missionFolderManagerStatus");
+    const goal = getAvailableMissionById(goalId);
+    const title = String(nameInput?.value || "").trim();
+    if (!goalId || !goal) return;
+    if (!title) {
+      status.textContent = "Digite o nome da pasta.";
+      return;
+    }
+    const saveButton = modal.querySelector("#missionFolderManagerSave");
+    const finishLoading = beginMissionActionLoading(saveButton);
+    if (!finishLoading) return;
+    try {
+      status.textContent = "Salvando...";
+      await apiRequest("/api/200/extra-goals/" + encodeURIComponent(goalId), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+          title,
+          targetValue: Math.max(1, Math.trunc(Number(goal.targetValue || 1) || 1)),
+          isFolder: true
+        })
+      });
+      closeFolderManagerModal();
+      await refreshAfterFolderMutation();
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Falha ao salvar a pasta.";
+    } finally {
+      finishLoading();
+    }
+  }
+
+  async function deleteManagedFolder() {
+    const modal = ensureFolderManagerModal();
+    const goalId = String(managedGoalId || "").trim();
+    const confirmValue = String(modal.querySelector("#missionFolderManagerDeleteConfirm")?.value || "").trim();
+    const status = modal.querySelector("#missionFolderManagerStatus");
+    if (!goalId || confirmValue !== "Excluir") {
+      status.textContent = 'Digite "Excluir" para confirmar.';
+      return;
+    }
+    const deleteButton = modal.querySelector("#missionFolderManagerDelete");
+    const finishLoading = beginMissionActionLoading(deleteButton);
+    if (!finishLoading) return;
+    try {
+      status.textContent = "Excluindo pasta...";
+      await apiRequest("/api/200/extra-goals/" + encodeURIComponent(goalId) + "?profile=" + encodeURIComponent(String(state.selectedProfile || getDefaultProfileName()).trim()), { method: "DELETE" });
+      state.missionQuickSlots = missionQuickDefinitions.map((definition) => {
+        const slot = getMissionQuickSlotByKey(definition.key) || { key: definition.key, title: definition.defaultTitle, goalId: "" };
+        return String(slot.goalId || "") === goalId ? { key: definition.key, title: definition.defaultTitle, goalId: "" } : slot;
+      });
+      persistMissionQuickSlots();
+      closeModal("missionVariantsModal");
+      closeFolderManagerModal();
+      await refreshAfterFolderMutation();
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : "Falha ao excluir a pasta.";
+    } finally {
+      finishLoading();
+    }
+  }
+
+  const previousOpenMissionEditorModal = openMissionEditorModal;
+  openMissionEditorModal = function(goalId) {
+    const goal = getAvailableMissionById(goalId);
+    if (isMissionFolder(goal)) {
+      openFolderManagerModal(goalId);
+      return;
+    }
+    previousOpenMissionEditorModal(goalId);
+  };
 })();

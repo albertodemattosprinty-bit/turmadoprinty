@@ -15503,3 +15503,24 @@ body[data-background-theme="white"] .marin-chat-more-button {
   font-size: 1.22rem;
   font-weight: 950;
 }
+/* Folder manager */
+.mission-folder-manager-modal { z-index:2500; padding:16px; }
+.mission-folder-manager-modal.active { display:grid; place-items:center; }
+.mission-folder-manager-panel { width:min(520px, 100%); max-height:min(760px, 92dvh); overflow:auto; border:1px solid rgba(255,255,255,.16); border-radius:8px; background:#07111f; color:#fff; box-shadow:0 26px 76px rgba(0,0,0,.52); }
+.mission-folder-manager-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:18px 18px 14px; border-bottom:1px solid rgba(255,255,255,.12); }
+.mission-folder-manager-head span { display:block; color:#67a8ff; font-size:.78rem; font-weight:900; letter-spacing:.12em; }
+.mission-folder-manager-head h2 { margin:5px 0 0; color:#fff; font-size:clamp(1.35rem,4vw,1.85rem); line-height:1.08; }
+.mission-folder-manager-body { display:grid; gap:16px; padding:18px; }
+.mission-folder-manager-field { display:grid; gap:8px; }
+.mission-folder-manager-field > span { color:rgba(255,255,255,.7); font-size:.8rem; font-weight:900; }
+.mission-folder-manager-field input { width:100%; }
+.mission-folder-manager-danger { display:grid; gap:10px; padding:14px; border:1px solid rgba(255,105,120,.48); border-radius:8px; background:rgba(158,29,49,.16); }
+.mission-folder-manager-danger strong { color:#ffabb4; font-size:1rem; }
+.mission-folder-manager-danger p { margin:4px 0 0; color:rgba(255,255,255,.76); font-size:.84rem; line-height:1.4; }
+.mission-folder-manager-danger b { color:#fff0aa; }
+.mission-folder-manager-danger input { width:100%; }
+.mission-folder-manager-danger .danger-btn { min-height:44px; border:1px solid rgba(255,116,128,.72); border-radius:8px; background:#b92337; color:#fff; font:inherit; font-weight:900; }
+.mission-folder-manager-danger .danger-btn:disabled { opacity:.42; cursor:not-allowed; }
+.mission-folder-manager-footer { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:14px 18px 18px; border-top:1px solid rgba(255,255,255,.12); }
+.mission-folder-manager-footer .ghost-btn, .mission-folder-manager-footer .primary-btn { min-height:46px; }
+@media (max-width:520px) { .mission-folder-manager-modal { padding:12px; } .mission-folder-manager-head, .mission-folder-manager-body { padding-left:14px; padding-right:14px; } .mission-folder-manager-footer { padding:12px 14px 14px; } }

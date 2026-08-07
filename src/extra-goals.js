@@ -1544,9 +1544,11 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   if (!safeGoalId) {
     throw new Error("Missao invalida.");
   }
-  const nextTargetValue = Math.max(1, Math.trunc(Number(payload?.targetValue) || 0));
   const currentGoal = await getExtraGoalById(userId, normalizedProfile, safeGoalId);
-  const currentTitle = normalizeExtraGoalTitle(currentGoal?.title || payload?.title);
+  const nextTitle = normalizeExtraGoalTitle(payload?.title ?? currentGoal?.title);
+  if (!nextTitle) throw new Error("Informe o nome da missao.");
+  const nextTargetValue = Math.max(1, Math.trunc(Number(payload?.targetValue ?? currentGoal?.targetValue) || 0));
+  const currentTitle = normalizeExtraGoalTitle(currentGoal?.title || nextTitle);
   const storedSvgDefault = await getStoredExtraGoalSvgDefault(userId, normalizedProfile, currentTitle);
   const svgIconUrl = String(payload?.svgIconUrl || currentGoal?.svgIconUrl || storedSvgDefault?.svgIconUrl || "").trim();
   const svgIconLabel = String(payload?.svgIconLabel || currentGoal?.svgIconLabel || storedSvgDefault?.svgIconLabel || "").trim();
@@ -1573,24 +1575,25 @@ export async function updateExtraGoal(userId, profileName = PROJECT200_DEFAULT_P
   await query(
     `
       update extra_goals
-      set category_id = $4,
-          target_value = $5,
-          unit_duration_minutes = $6,
-          unit_duration_seconds = $7,
-          limit_interval_value = $8,
-          limit_interval_unit = $9,
-          count_sleep_time = $10,
-          is_folder = $11,
-          repeat_days = $12::jsonb,
-          schedule_config = $13::jsonb,
-          svg_icon_url = $14,
-          svg_icon_label = $15,
+      set title = $4,
+          category_id = $5,
+          target_value = $6,
+          unit_duration_minutes = $7,
+          unit_duration_seconds = $8,
+          limit_interval_value = $9,
+          limit_interval_unit = $10,
+          count_sleep_time = $11,
+          is_folder = $12,
+          repeat_days = $13::jsonb,
+          schedule_config = $14::jsonb,
+          svg_icon_url = $15,
+          svg_icon_label = $16,
           updated_at = now()
       where id = $1
         and user_id = $2
         and assigned_profile = $3
     `,
-    [safeGoalId, userId, normalizedProfile, nextCategoryId, nextTargetValue, nextUnitDurationMinutes, safeNextUnitDurationSeconds, nextLimitIntervalValue, nextLimitIntervalUnit, nextCountSleepTime, nextIsFolder, JSON.stringify(nextRepeatDays), nextScheduleConfig ? JSON.stringify(nextScheduleConfig) : null, svgIconUrl, svgIconLabel]
+    [safeGoalId, userId, normalizedProfile, nextTitle, nextCategoryId, nextTargetValue, nextUnitDurationMinutes, safeNextUnitDurationSeconds, nextLimitIntervalValue, nextLimitIntervalUnit, nextCountSleepTime, nextIsFolder, JSON.stringify(nextRepeatDays), nextScheduleConfig ? JSON.stringify(nextScheduleConfig) : null, svgIconUrl, svgIconLabel]
   );
   if (svgIconUrl && currentTitle) {
     await saveExtraGoalSvgDefault(userId, normalizedProfile, currentTitle, svgIconUrl, svgIconLabel);
