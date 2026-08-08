@@ -215,6 +215,35 @@ export async function recordProject200ActionPoints(userId, action, completedAt =
   };
 }
 
+export async function recordProject200MissionPoints(userId, mission, completedAt = new Date()) {
+  await ensureProject200PointsSchema();
+  const normalizedUserId = String(userId || "").trim();
+  const sourceKey = String(mission?.sourceKey || "").trim();
+  const title = String(mission?.title || "Missao").trim();
+  const points = Math.max(0, Math.trunc(Number(mission?.points || 0) || 0));
+  if (!normalizedUserId || !sourceKey || points <= 0) {
+    return { points: 0, previousPoints: 0, deltaPoints: 0, created: false };
+  }
+  const scopeDate = toDateKey(completedAt);
+  const existingResult = await query(`
+    select points from project200_point_events
+    where user_id = $1 and source_type = 'mission' and source_key = $2
+    limit 1
+  `, [normalizedUserId, sourceKey]);
+  const previousPoints = Math.max(0, Math.trunc(Number(existingResult.rows[0]?.points || 0) || 0));
+  const result = await query(`
+    insert into project200_point_events (
+      user_id, source_type, source_key, points, scope_date, metadata, created_at, updated_at
+    ) values ($1, 'mission', $2, $3, $4::date, $5::jsonb, now(), now())
+    on conflict (user_id, source_type, source_key) do update
+      set points = excluded.points, scope_date = excluded.scope_date, metadata = excluded.metadata, updated_at = now()
+    returning id, points, scope_date
+  `, [normalizedUserId, sourceKey, points, scopeDate, JSON.stringify({ title, kind: String(mission?.kind || "mission") })]);
+  const deltaPoints = points - previousPoints;
+  if (deltaPoints > 0) await recordProject200FirstPointOrigin(normalizedUserId, new Date());
+  return { points: result.rows[0] ? points : previousPoints, previousPoints, deltaPoints, created: Boolean(result.rows[0]) && deltaPoints > 0, scopeDate };
+}
+
 export async function removeProject200ActionPoints(userId, actionId, extraSourceKeys = []) {
   await ensureProject200PointsSchema();
   const sourceKeys = [...new Set([

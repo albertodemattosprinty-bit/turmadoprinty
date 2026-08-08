@@ -2894,6 +2894,7 @@ function renderActionsMissionsPanel() {
         <h3>${escapeHtml(String(goal?.title || "Missão"))}${folder ? `<span class="actions-mission-folder-summary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5h7l2 2h9v11H3v-13Zm2 4v7h14v-7H5Z" fill="currentColor"/></svg><small>${variantCount}</small></span>` : ""}</h3>
         <p>${folder && variantCount === 0 ? "Clique para criar uma tarefa" : `${progress.progress} de ${progress.target}`}</p>
       </div>
+      ${folder ? `<button class="actions-mission-card-edit" type="button" data-actions-mission-folder-edit="${escapeHtml(goalId)}" aria-label="Editar tarefas de ${escapeHtml(String(goal?.title || "Pasta"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5V20h3.5L18 9.5 14.5 6 4 16.5Zm16.7-9.8a1 1 0 0 0 0-1.4l-2-2a1 1 0 0 0-1.4 0L15.5 5.1 19 8.6l1.7-1.9Z" fill="currentColor"/></svg></button>` : ""}
       <div class="actions-mission-card-track" role="progressbar" aria-label="Progresso de ${escapeHtml(String(goal?.title || "missão"))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}">
         <div class="actions-mission-card-fill" style="width:${initialPercent}%"></div>
       </div>
@@ -15271,6 +15272,7 @@ function resetMissionRunCycleTimer(cycleNumber = 1) {
   state.missionRun.previousRemainingSeconds = null;
   state.missionRun.selectedVariantId = getMissionRunVariantIdForCycle(safeCycle);
   state.missionRun.durationMs = Math.max(0, getMissionRunDurationSeconds(getMissionRunGoalById(state.missionRun?.goalId), getMissionRunSelectedVariant(safeCycle)) * 1000);
+  void persistMissionCurrentTaskState({ resetStartedAt: true }).catch(() => {});
   if (missionRunFinishChoice) missionRunFinishChoice.hidden = true;
   if (missionRunConfirm) missionRunConfirm.hidden = true;
   if (missionRunStatus) missionRunStatus.textContent = "";
@@ -15727,11 +15729,67 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
   missionVariantsTicker = window.setInterval(renderMissionVariants, 1000);
 }
 
-function beginMissionRun(goal, selectedVariant = null) {
+const missionCurrentTaskStateEndpoint = "/api/200/current-task-state";
+
+async function persistMissionCurrentTaskState({ resetStartedAt = false } = {}) {
+  const goalId = String(state.missionRun?.goalId || "").trim();
+  if (!goalId || !getToken()) return null;
+  const payload = await apiRequest(missionCurrentTaskStateEndpoint, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+      goalId,
+      variantId: String(state.missionRun?.selectedVariantId || ""),
+      variantIds: Array.isArray(state.missionRun?.selectedVariantIds) ? state.missionRun.selectedVariantIds : [],
+      taskKind: state.missionRun?.selectedVariantId ? "microtask" : "mission",
+      durationSeconds: Math.max(0, Math.round(Number(state.missionRun?.durationMs || 0) / 1000)),
+      resetStartedAt
+    }),
+    skipGlobalLoading: true
+  });
+  const serverStartedAt = new Date(payload?.currentTaskState?.startedAt || "").getTime();
+  if (Number.isFinite(serverStartedAt) && serverStartedAt > 0 && resetStartedAt) {
+    state.missionRun.startedAtMs = serverStartedAt;
+  }
+  return payload?.currentTaskState || null;
+}
+
+async function clearMissionCurrentTaskState() {
+  if (!getToken()) return;
+  await apiRequest(missionCurrentTaskStateEndpoint, { method: "DELETE", skipGlobalLoading: true });
+}
+
+async function restoreMissionCurrentTaskState() {
+  if (!getToken() || state.missionRun?.goalId) return false;
+  const payload = await apiRequest(missionCurrentTaskStateEndpoint, { skipGlobalLoading: true });
+  const current = payload?.currentTaskState;
+  if (!current?.goalId) return false;
+  const goal = getMissionRunGoalById(current.goalId);
+  if (!goal || isLimitGoal(goal)) {
+    await clearMissionCurrentTaskState();
+    return false;
+  }
+  const variants = await loadMissionVariants(current.goalId, { force: true });
+  const selectedVariant = variants.find((variant) => String(variant?.id || "") === String(current.variantId || "")) || null;
+  if (current.variantId && !selectedVariant) {
+    await clearMissionCurrentTaskState();
+    return false;
+  }
+  state.missionRun.availableVariants = variants;
+  beginMissionRun(goal, selectedVariant, {
+    resume: true,
+    startedAtMs: new Date(current.startedAt || "").getTime(),
+    returnToFolderGoalId: selectedVariant ? String(current.goalId || "") : ""
+  });
+  return true;
+}
+
+function beginMissionRun(goal, selectedVariant = null, options = {}) {
   if (!goal) return;
   cancelMissionRunMusicFade();
   state.missionRun.goalId = String(goal.id || "");
-  state.missionRun.startedAtMs = Date.now();
+  state.missionRun.startedAtMs = Number.isFinite(Number(options?.startedAtMs)) && Number(options.startedAtMs) > 0 ? Number(options.startedAtMs) : Date.now();
   state.missionRun.durationMs = Math.max(0, getMissionRunDurationSeconds(goal, selectedVariant) * 1000);
   state.missionRun.centerMode = "time";
   state.missionRun.alarmStarted = false;
@@ -15739,6 +15797,7 @@ function beginMissionRun(goal, selectedVariant = null) {
   state.missionRun.completedSuccessfully = false;
   state.missionRun.selectedVariantId = String(selectedVariant?.id || "");
   state.missionRun.selectedVariantIds = selectedVariant?.id ? [String(selectedVariant.id)] : [];
+  state.missionRun.returnToFolderGoalId = String(options?.returnToFolderGoalId || "").trim();
   state.missionRun.cycleTarget = 1;
   state.missionRun.cycleIndex = 1;
   state.missionRun.completedCycles = 0;
@@ -15771,6 +15830,9 @@ function beginMissionRun(goal, selectedVariant = null) {
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
   openModal("missionRunModal");
+  if (!options?.resume) {
+    void persistMissionCurrentTaskState({ resetStartedAt: true }).catch(() => {});
+  }
 }
 
 async function openMissionRunModal(goalId) {
@@ -15780,7 +15842,7 @@ async function openMissionRunModal(goalId) {
     state.missionVariants.goalId = String(goalId || "");
     const variants = await loadMissionVariants(goalId, { force: true });
     if (isMissionFolder(goal)) {
-      await openMissionVariantsModal(goalId, "edit", { items: variants });
+      await openMissionVariantsModal(goalId, "choose", { items: variants });
       return;
     }
     if (variants.length >= 2) {
@@ -15806,6 +15868,7 @@ async function finalizeMissionRun(triggerButton = null) {
   const preloadedDailyRanking = state.missionRun.preloadedDailyRanking;
   const selectedVariantId = String(state.missionRun.selectedVariantId || "");
   const selectedVariantIds = (state.missionRun.selectedVariantIds || []).slice(0, completedCycles);
+  const returnToFolderGoalId = String(state.missionRun.returnToFolderGoalId || "").trim();
   const completedPoints = getMissionRunCompletedPointValue(getMissionRunGoalById(goalId), completedCycles);
   state.missionRun.finalizing = true;
   if (missionRunFinishButton) missionRunFinishButton.disabled = true;
@@ -15859,6 +15922,11 @@ async function finalizeMissionRun(triggerButton = null) {
       before: payload?.pointsUpdate?.before || preloadedDailyRanking,
       after: payload?.pointsUpdate?.after || null
     });
+    await clearMissionCurrentTaskState().catch(() => {});
+    if (returnToFolderGoalId) {
+      state.missionRun.returnToFolderGoalId = "";
+      await openMissionFolderModal(returnToFolderGoalId, "choose");
+    }
   } catch (error) {
     await completionUx;
     state.missions = rollback.missions;
@@ -15905,7 +15973,7 @@ function openMissionEntryModal(goalId) {
   const goal = getAvailableMissionById(goalId);
   if (!goal) return;
   if (isMissionFolder(goal)) {
-    void openMissionFolderModal(goalId, "edit");
+    void openMissionFolderModal(goalId, "choose");
     return;
   }
   openMissionProgressModal(goalId);
@@ -17141,6 +17209,11 @@ async function bootstrapProject200App() {
     await refreshHomeSnapshot({ force: true });
     project200LoginOverlay?.classList.remove("active");
     project200LoginOverlay?.setAttribute("aria-hidden", "true");
+    if (await restoreMissionCurrentTaskState().catch(() => false)) {
+      endStartupLoading();
+      void musicStationsPromise;
+      return;
+    }
     if (startupLoadingActive) {
       revealInitialHomeIfReady();
       void musicStationsPromise.then(() => revealInitialHomeIfReady());
@@ -19356,6 +19429,7 @@ missionRunCycleCount?.addEventListener("pointercancel", () => {
 missionRunCancelDiscardButton?.addEventListener("click", () => {
   void runMissionActionWithLoading(missionRunCancelDiscardButton, async () => {
     await waitForMissionActionTransition();
+    await clearMissionCurrentTaskState().catch(() => {});
     closeModal("missionRunModal");
   }, { scope: missionRunConfirm });
 });
@@ -19538,7 +19612,7 @@ missionVariantsList?.addEventListener("click", async (event) => {
     const variants = [...(state.missionVariants.items || [])];
     closeModal("missionVariantsModal");
     state.missionRun.availableVariants = variants;
-    beginMissionRun(goal, variant);
+    beginMissionRun(goal, variant, { returnToFolderGoalId: isMissionFolder(goal) ? String(state.missionVariants.goalId || "") : "" });
     return;
   }
   if (state.missionVariants.mode === "cycle-choose") {
@@ -19584,6 +19658,8 @@ missionVariantsList?.addEventListener("click", async (event) => {
   if (missionVariantTargetInput) missionVariantTargetInput.value = String(state.missionVariants.targetValue);
   state.missionVariants.scheduleConfig = variant?.scheduleConfig || variant?.repeatConfig || null;
   state.missionVariants.repeatConfig = state.missionVariants.scheduleConfig;
+  state.missionVariants.timeAnytime = state.missionVariants.scheduleConfig?.timeAnytime !== false;
+  state.missionVariants.timeValue = String(state.missionVariants.scheduleConfig?.time || "09:00").slice(0, 5);
   if (missionVariantTitleInput) missionVariantTitleInput.value = variant.title;
   renderMissionVariants();
 });
@@ -19901,6 +19977,13 @@ actionsMissionFilterButton?.addEventListener("click", (event) => {
 });
 
 actionsMissionsList?.addEventListener("click", (event) => {
+  const folderEditButton = event.target.closest("[data-actions-mission-folder-edit]");
+  if (folderEditButton) {
+    event.stopPropagation();
+    document.body.classList.add("actions-mission-editor-open");
+    void openMissionVariantsModal(String(folderEditButton.dataset.actionsMissionFolderEdit || ""), "edit");
+    return;
+  }
   const editButton = event.target.closest("[data-actions-mission-edit]");
   if (editButton) {
     event.stopPropagation();
@@ -21713,7 +21796,7 @@ window.project200ProjectsContext = {
       button.id = "missionCreateRepetitionModalButton";
       button.addEventListener("click", (event) => {
         event.preventDefault();
-        openDailyRepetitionModal("mission-create", () => {
+        openBridgeModal("mission-create", () => {
           if (missionCreateStatus) missionCreateStatus.textContent = "Repeticao definida.";
           renderMissionCreateStep();
         });
@@ -21890,6 +21973,26 @@ window.project200ProjectsContext = {
   window.__project200MicrotaskFourStepFlowInstalled = true;
   const targetInput = document.getElementById("missionVariantTargetInput");
   const scheduleStage = document.getElementById("missionVariantScheduleMode");
+  const durationStep = document.getElementById("missionVariantEditorStep2");
+  const timeStep = document.getElementById("missionVariantEditorStep3");
+
+  function ensureMicrotaskStages() {
+    if (!durationStep || !timeStep || durationStep.dataset.microtaskStagesReady === "true") return;
+    durationStep.replaceChildren(...Array.from(timeStep.childNodes));
+    timeStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Horario</strong><span>Defina quando essa micro-tarefa acontece.</span></div><label class="mission-variant-anytime"><input type="checkbox" id="missionVariantAnytime" checked><span>A qualquer hora do dia</span></label><label class="mission-variant-clock" id="missionVariantClockWrap" hidden><span>Horario</span><input class="text-field options-text-field" type="time" id="missionVariantClock" value="09:00"></label>';
+    timeStep.addEventListener("change", (event) => {
+      const anytime = event.target.closest("#missionVariantAnytime");
+      if (!anytime) return;
+      const clockWrap = document.getElementById("missionVariantClockWrap");
+      if (clockWrap) clockWrap.hidden = anytime.checked;
+      state.missionVariants.timeAnytime = anytime.checked;
+    });
+    timeStep.addEventListener("input", (event) => {
+      if (!event.target.closest("#missionVariantClock")) return;
+      state.missionVariants.timeValue = String(event.target.value || "").slice(0, 5);
+    });
+    durationStep.dataset.microtaskStagesReady = "true";
+  }
 
   function getMicrotaskRepeatLabel() {
     const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
@@ -21907,6 +22010,13 @@ window.project200ProjectsContext = {
   function renderMicrotaskRepeatStep() {
     const editorOpen = Boolean(state.missionVariants?.editorOpen);
     const step = Math.max(1, Math.min(4, Number(state.missionVariants?.editorStep || 1)));
+    ensureMicrotaskStages();
+    const anytimeInput = document.getElementById("missionVariantAnytime");
+    const clockWrap = document.getElementById("missionVariantClockWrap");
+    const clockInput = document.getElementById("missionVariantClock");
+    if (anytimeInput) anytimeInput.checked = state.missionVariants?.timeAnytime !== false;
+    if (clockWrap) clockWrap.hidden = state.missionVariants?.timeAnytime !== false;
+    if (clockInput) clockInput.value = String(state.missionVariants?.timeValue || "09:00").slice(0, 5);
     if (targetInput) targetInput.value = String(Math.max(1, Math.trunc(Number(state.missionVariants?.targetValue || targetInput.value || 1) || 1)));
     if (!scheduleStage) return;
     if (!editorOpen || step !== 4) {
@@ -21916,9 +22026,11 @@ window.project200ProjectsContext = {
     }
     scheduleStage.hidden = false;
     scheduleStage.className = "mission-variant-repeat-stage";
-    scheduleStage.innerHTML = '<button class="mission-variant-repetition-button" type="button" id="missionVariantUniversalScheduleButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>REPETIÇÃO</small><strong>' + getMicrotaskRepeatLabel() + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
+    const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
+    const startLabel = config.startsOn ? window.project200UniversalScheduleDataSelect?.formatLong(config.startsOn) : "Definir data";
+    scheduleStage.innerHTML = '<button class="mission-variant-repetition-button" type="button" id="missionVariantUniversalScheduleButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>DATA E REPETIÇÃO</small><strong>' + startLabel + ' - ' + getMicrotaskRepeatLabel() + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
     scheduleStage.querySelector("#missionVariantUniversalScheduleButton")?.addEventListener("click", () => {
-      window.project200DailyRepetitionModal?.open("microtask", () => {
+      window.project200UniversalScheduleDataSelect?.open("microtask", () => {
         if (missionVariantStatus) missionVariantStatus.textContent = "Repetição definida.";
         renderMissionVariants();
       });
@@ -21939,6 +22051,10 @@ window.project200ProjectsContext = {
 
   missionVariantAddButton?.addEventListener("click", () => {
     state.missionVariants.targetValue = 1;
+    state.missionVariants.timeAnytime = true;
+    state.missionVariants.timeValue = "09:00";
+    state.missionVariants.scheduleConfig = null;
+    state.missionVariants.repeatConfig = null;
     if (targetInput) targetInput.value = "1";
   });
 
@@ -21959,11 +22075,7 @@ window.project200ProjectsContext = {
       if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa.";
       return;
     }
-    if (editorStep === 2) {
-      const targetValue = Math.max(1, Math.trunc(Number(targetInput?.value || state.missionVariants?.targetValue || 1) || 1));
-      state.missionVariants.targetValue = targetValue;
-      if (targetInput) targetInput.value = String(targetValue);
-    }
+    state.missionVariants.targetValue = 1;
     if (editorStep < 4) {
       state.missionVariants.editorStep = editorStep + 1;
       if (missionVariantStatus) missionVariantStatus.textContent = "";
@@ -21973,7 +22085,12 @@ window.project200ProjectsContext = {
 
     const goalId = String(state.missionVariants?.goalId || "").trim();
     const editingId = String(state.missionVariants?.editingId || "").trim();
+    if (!state.missionVariants?.scheduleConfig && !state.missionVariants?.repeatConfig) {
+      window.project200UniversalScheduleDataSelect?.open("microtask", () => renderMissionVariants());
+      return;
+    }
     const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants?.scheduleMode || "periodic");
+    const scheduleConfig = { ...(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {}), timeAnytime: state.missionVariants?.timeAnytime !== false, time: String(state.missionVariants?.timeValue || "09:00").slice(0, 5) };
     const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
     if (!finishLoading) return;
     try {
@@ -21983,15 +22100,15 @@ window.project200ProjectsContext = {
         body: JSON.stringify({
           profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
           title,
-          targetValue: Math.max(1, Math.trunc(Number(state.missionVariants?.targetValue || 1) || 1)),
+          targetValue: 1,
           scheduleMode,
           intervalValue: state.missionVariants.intervalValue,
           intervalUnit: state.missionVariants.intervalUnit,
           unitDurationSeconds: normalizeMissionDurationOption(state.missionVariants.unitDurationSeconds),
           repeatDays: scheduleMode === "weekly" ? normalizeMissionRepeatDays(state.missionVariants.repeatDays, []) : [],
           avoidDays: scheduleMode === "periodic" ? normalizeMissionRepeatDays(state.missionVariants.avoidDays, []) : [],
-          scheduleConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null,
-          repeatConfig: state.missionVariants.scheduleConfig || state.missionVariants.repeatConfig || null,
+          scheduleConfig,
+          repeatConfig: scheduleConfig,
           nextDueAt: getMissionVariantNextDueAtIso(state.missionVariants.nextDueOffsetDays, scheduleMode, state.missionVariants.repeatDays, state.missionVariants.avoidDays)
         })
       });

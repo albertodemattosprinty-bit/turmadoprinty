@@ -57,6 +57,7 @@ import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, recordProposalActivity, recordProposalVisit, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { confirmEventLodging, confirmEventPayment, ensureEventContractingSchema, getEventContractWorkflow, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
+import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
@@ -69,7 +70,7 @@ import { createProject200FinanceItem, deleteProject200FinanceItem, settleProject
 import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, deleteLatestExtraGoalProgressEvent, ensureExtraGoalsSchema, getExtraGoalById, getProject200ActiveTime, getProject200MissionInstallmentOrder, listExtraGoalProgressEvents, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateLatestExtraGoalProgressEvent, updateProject200ActiveTime, updateProject200MissionInstallmentOrder } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
-import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
+import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, recordProject200MissionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { createProject200Project, deleteProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
@@ -5038,6 +5039,33 @@ async function handleExtraGoalCreateRequest(request, response) {
   }
 }
 
+async function handleProject200CurrentTaskStateRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    if (request.method === "GET") {
+      const currentTaskState = await getProject200CurrentTaskState(user.id);
+      sendJson(response, 200, { ok: true, currentTaskState });
+      return;
+    }
+    if (request.method === "DELETE") {
+      await clearProject200CurrentTaskState(user.id);
+      sendJson(response, 200, { ok: true });
+      return;
+    }
+    const body = await readJsonBody(request);
+    const selectedProfile = await resolveProject200ProfileName(user.id, body?.profile, { fallbackToDefault: true });
+    const goal = await getExtraGoalById(user.id, selectedProfile, body?.goalId);
+    if (!goal || String(goal?.goalKind || "goal").trim().toLowerCase() === "limit") {
+      throw new Error("Missao nao encontrada.");
+    }
+    const currentTaskState = await saveProject200CurrentTaskState(user.id, { ...body, profile: selectedProfile });
+    sendJson(response, 200, { ok: true, currentTaskState });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar a tarefa em andamento." });
+  }
+}
+
 async function handleExtraGoalProgressRequest(request, response, goalId) {
   const user = await requireAuth(request, response);
   if (!user) {
@@ -5073,6 +5101,21 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
       body?.variantId,
       body?.variantIds
     );
+    let missionPointAwards = [];
+    const completedVariantIds = [...new Set([
+      ...(Array.isArray(body?.variantIds) ? body.variantIds : []),
+      body?.variantId
+    ].map((value) => String(value || "").trim()).filter(Boolean))];
+    if (!isLimit && Math.trunc(Number(body?.delta || 0) || 0) > 0 && completedVariantIds.length) {
+      const completedAt = new Date();
+      const pointDateKey = completedAt.toISOString().slice(0, 10);
+      missionPointAwards = await Promise.all(completedVariantIds.map((variantId) => recordProject200MissionPoints(user.id, {
+        sourceKey: `${goalId}:${variantId}:${pointDateKey}`,
+        title: currentGoal?.title || "Missao",
+        points: Math.max(1, Math.ceil(Math.trunc(Number(body?.delta || 0) || 0) / completedVariantIds.length)),
+        kind: "microtask"
+      }, completedAt)));
+    }
     const summary = summarizeExtraGoals(goals);
     if (!isLimit && Math.trunc(Number(body?.delta || 0) || 0) > 0) {
       try {
@@ -5093,6 +5136,7 @@ async function handleExtraGoalProgressRequest(request, response, goalId) {
       profile: selectedProfile,
       goals,
       summary,
+      missionPointAwards,
       pointsUpdate: dailyRankingAfter
         ? { before: dailyRankingBefore, after: dailyRankingAfter }
         : null
@@ -12755,6 +12799,11 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (["GET", "PUT", "DELETE"].includes(request.method) && pathname === "/api/200/current-task-state") {
+    await handleProject200CurrentTaskStateRequest(request, response);
+    return;
+  }
+
 
   if (request.method === "GET" && pathname === "/api/200/projects") {
     try {
@@ -15056,6 +15105,3 @@ void ensureProject200OnboardingSchema().catch((error) => {
 server.listen(PORT, () => {
   console.log(`Servidor online em http://localhost:${PORT}`);
 });
-
-
-
