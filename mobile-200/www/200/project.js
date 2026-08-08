@@ -1,4 +1,4 @@
-import { getApiUrl } from "../api.js";
+﻿import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=0.83-chat-history-v1";
 import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.83-chat-history-v1";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
@@ -22031,69 +22031,39 @@ window.project200ProjectsContext = {
   const targetInput = document.getElementById("missionVariantTargetInput");
   const scheduleStage = document.getElementById("missionVariantScheduleMode");
   const durationStep = document.getElementById("missionVariantEditorStep2");
-  const timeStep = document.getElementById("missionVariantEditorStep3");
-  const hourStep = scheduleStage?.closest(".mission-variant-editor-step");
-  let repeatStep = null;
+  const dateStep = document.getElementById("missionVariantEditorStep3");
+  const repeatStep = scheduleStage?.closest(".mission-variant-editor-step");
 
   function ensureMicrotaskStages() {
-    if (!durationStep || !timeStep || durationStep.dataset.microtaskStagesReady === "true") return;
-    durationStep.replaceChildren(...Array.from(timeStep.childNodes));
-    repeatStep = document.getElementById("missionVariantEditorStep5");
-    if (!repeatStep) {
-      repeatStep = document.createElement("div");
-      repeatStep.id = "missionVariantEditorStep5";
-      repeatStep.className = "mission-variant-editor-step";
-      repeatStep.hidden = true;
-      repeatStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Quando?</strong><span>Defina a repetição desta micro-tarefa.</span></div>';
-      hourStep?.after(repeatStep);
-    }
+    if (!durationStep || !dateStep || !repeatStep || durationStep.dataset.microtaskStagesReady === "true") return;
+    durationStep.replaceChildren(...Array.from(dateStep.childNodes));
+    dateStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Data</strong><span>Escolha a data em que essa micro-tarefa começa.</span></div><button class="mission-variant-repetition-button" type="button" id="missionVariantDateButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>DATA INICIAL</small><strong>Definir data</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
+    repeatStep.replaceChildren();
+    const copy = document.createElement("div");
+    copy.className = "mission-variant-stage-copy";
+    copy.innerHTML = "<strong>Quando?</strong><span>Defina a repetição desta micro-tarefa.</span>";
+    repeatStep.appendChild(copy);
     if (scheduleStage) repeatStep.appendChild(scheduleStage);
-    timeStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Data</strong><span>Escolha a data em que essa micro-tarefa começa.</span></div><button class="mission-variant-repetition-button" type="button" id="missionVariantDateButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>DATA INICIAL</small><strong>Definir data</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
-    hourStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Horario</strong><span>Defina quando essa micro-tarefa acontece.</span></div><label class="mission-variant-anytime"><input type="checkbox" id="missionVariantAnytime" checked><span>A qualquer hora do dia</span></label><label class="mission-variant-clock" id="missionVariantClockWrap" hidden><span>Horario</span><input class="text-field options-text-field" type="time" id="missionVariantClock" value="09:00"></label>';
-    timeStep.addEventListener("click", (event) => {
+    dateStep.addEventListener("click", (event) => {
       if (!event.target.closest("#missionVariantDateButton")) return;
       window.project200UniversalScheduleDataSelect?.open("microtask", () => {
         state.missionVariants.editorStep = 4;
         renderMissionVariants();
       }, { openRepetitionOnApply: false });
     });
-    hourStep.addEventListener("change", (event) => {
-      const anytime = event.target.closest("#missionVariantAnytime");
-      if (!anytime) return;
-      const clockWrap = document.getElementById("missionVariantClockWrap");
-      if (clockWrap) clockWrap.hidden = anytime.checked;
-      state.missionVariants.timeAnytime = anytime.checked;
-    });
-    hourStep.addEventListener("input", (event) => {
-      if (!event.target.closest("#missionVariantClock")) return;
-      state.missionVariants.timeValue = String(event.target.value || "").slice(0, 5);
-    });
     durationStep.dataset.microtaskStagesReady = "true";
   }
 
   function getMicrotaskRepeatLabel() {
     const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
-    const labels = {
-      none: "Nunca se repete",
-      daily: "Todos os dias",
-      weekly: "Todas as semanas",
-      monthly_custom: "Todos os meses",
-      yearly: "Todos os anos",
-      periodic: "Personalizado"
-    };
+    const labels = { none: "Nunca se repete", daily: "Todos os dias", weekly: "Todas as semanas", monthly_custom: "Todos os meses", yearly: "Todos os anos", periodic: "Personalizado" };
     return labels[config.frequency] || "Todos os dias";
   }
 
   function renderMicrotaskRepeatStep() {
     const editorOpen = Boolean(state.missionVariants?.editorOpen);
-    const step = Math.max(1, Math.min(5, Number(state.missionVariants?.editorStep || 1)));
+    const step = Math.max(1, Math.min(4, Number(state.missionVariants?.editorStep || 1)));
     ensureMicrotaskStages();
-    const anytimeInput = document.getElementById("missionVariantAnytime");
-    const clockWrap = document.getElementById("missionVariantClockWrap");
-    const clockInput = document.getElementById("missionVariantClock");
-    if (anytimeInput) anytimeInput.checked = state.missionVariants?.timeAnytime !== false;
-    if (clockWrap) clockWrap.hidden = state.missionVariants?.timeAnytime !== false;
-    if (clockInput) clockInput.value = String(state.missionVariants?.timeValue || "09:00").slice(0, 5);
     const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
     const dateButton = document.getElementById("missionVariantDateButton");
     if (dateButton?.querySelector("strong")) {
@@ -22101,9 +22071,9 @@ window.project200ProjectsContext = {
         ? window.project200UniversalScheduleDataSelect?.formatLong(config.startsOn)
         : "Definir data";
     }
-    if (targetInput) targetInput.value = String(Math.max(1, Math.trunc(Number(state.missionVariants?.targetValue || targetInput.value || 1) || 1)));
+    if (targetInput) targetInput.value = "1";
     if (!scheduleStage) return;
-    if (!editorOpen || step !== 5) {
+    if (!editorOpen || step !== 4) {
       scheduleStage.hidden = true;
       scheduleStage.innerHTML = "";
       return;
@@ -22124,19 +22094,12 @@ window.project200ProjectsContext = {
   renderMissionVariants = function() {
     previousRenderMissionVariants();
     renderMicrotaskRepeatStep();
-    const step = Math.max(1, Math.min(5, Number(state.missionVariants?.editorStep || 1)));
-    if (timeStep) timeStep.hidden = step !== 3;
-    if (hourStep) hourStep.hidden = step !== 4;
-    if (repeatStep) repeatStep.hidden = step !== 5;
+    const step = Math.max(1, Math.min(4, Number(state.missionVariants?.editorStep || 1)));
+    if (dateStep) dateStep.hidden = step !== 3;
+    if (repeatStep) repeatStep.hidden = step !== 4;
     if (missionVariantEditorCancel) missionVariantEditorCancel.textContent = step > 1 ? "Voltar" : "Cancelar";
-    if (missionVariantEditorSave) missionVariantEditorSave.textContent = step < 5 ? "Continuar" : "Salvar";
+    if (missionVariantEditorSave) missionVariantEditorSave.textContent = step < 4 ? "Continuar" : "Salvar";
   };
-
-  targetInput?.addEventListener("input", () => {
-    targetInput.value = String(targetInput.value || "").replace(/\D+/g, "").slice(0, 6);
-    state.missionVariants.targetValue = Math.max(1, Math.trunc(Number(targetInput.value || 1) || 1));
-    if (missionVariantStatus) missionVariantStatus.textContent = "";
-  });
 
   missionVariantAddButton?.addEventListener("click", () => {
     state.missionVariants.targetValue = 1;
@@ -22160,7 +22123,7 @@ window.project200ProjectsContext = {
     event.preventDefault();
     event.stopImmediatePropagation();
     const title = String(missionVariantTitleInput?.value || "").trim();
-    const editorStep = Math.max(1, Math.min(5, Math.trunc(Number(state.missionVariants?.editorStep || 1) || 1)));
+    const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants?.editorStep || 1) || 1)));
     if (!title) {
       if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa.";
       return;
@@ -22173,13 +22136,12 @@ window.project200ProjectsContext = {
       }, { openRepetitionOnApply: false });
       return;
     }
-    if (editorStep < 5) {
+    if (editorStep < 4) {
       state.missionVariants.editorStep = editorStep + 1;
       if (missionVariantStatus) missionVariantStatus.textContent = "";
       renderMissionVariants();
       return;
     }
-
     const goalId = String(state.missionVariants?.goalId || "").trim();
     const editingId = String(state.missionVariants?.editingId || "").trim();
     if (!state.missionVariants?.scheduleConfig && !state.missionVariants?.repeatConfig) {
@@ -22195,7 +22157,7 @@ window.project200ProjectsContext = {
       return;
     }
     const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants?.scheduleMode || "periodic");
-    const scheduleConfig = { ...(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {}), timeAnytime: state.missionVariants?.timeAnytime !== false, time: String(state.missionVariants?.timeValue || "09:00").slice(0, 5) };
+    const scheduleConfig = { ...(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {}), timeAnytime: true, time: "09:00" };
     const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
     if (!finishLoading) return;
     try {
