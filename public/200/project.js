@@ -19708,6 +19708,7 @@ missionVariantsList?.addEventListener("click", async (event) => {
   if (missionVariantTargetInput) missionVariantTargetInput.value = String(state.missionVariants.targetValue);
   state.missionVariants.scheduleConfig = variant?.scheduleConfig || variant?.repeatConfig || null;
   state.missionVariants.repeatConfig = state.missionVariants.scheduleConfig;
+  state.missionVariants.repetitionConfirmed = Boolean(state.missionVariants.scheduleConfig);
   state.missionVariants.timeAnytime = state.missionVariants.scheduleConfig?.timeAnytime !== false;
   state.missionVariants.timeValue = String(state.missionVariants.scheduleConfig?.time || "09:00").slice(0, 5);
   if (missionVariantTitleInput) missionVariantTitleInput.value = variant.title;
@@ -21374,6 +21375,7 @@ window.project200ProjectsContext = {
   const dataSelectWeekdayNames = ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"];
   let dataSelectTarget = null;
   let dataSelectCallback = null;
+  let dataSelectOptions = null;
   let dataSelectDraft = null;
   let dataSelectHoldTimer = null;
   let dataSelectHoldInterval = null;
@@ -21485,9 +21487,10 @@ window.project200ProjectsContext = {
     if (year) year.textContent = String(dataSelectDraft.year);
     if (feedback) feedback.textContent = dataSelectWeekdayNames[getDateSelectWeekday(dateKey)] + ", " + formatDateSelectLong(dateKey);
   }
-  function openDataSelectModal(target, callback = null) {
+  function openDataSelectModal(target, callback = null, options = {}) {
     dataSelectTarget = target;
     dataSelectCallback = callback;
+    dataSelectOptions = options && typeof options === "object" ? options : {};
     dataSelectDraft = parseDateSelectKey(readTargetSchedule(target).startsOn);
     const modal = ensureDataSelectModal();
     renderDataSelectModal();
@@ -21508,6 +21511,10 @@ window.project200ProjectsContext = {
     syncSimpleScheduleFromStartDate(cfg);
     saveTargetSchedule(cfg, target);
     closeDataSelectModal();
+    if (dataSelectOptions?.openRepetitionOnApply === false) {
+      dataSelectCallback?.();
+      return;
+    }
     window.project200DailyRepetitionModal?.open(target, dataSelectCallback);
   }
 
@@ -21846,7 +21853,7 @@ window.project200ProjectsContext = {
       button.id = "missionCreateRepetitionModalButton";
       button.addEventListener("click", (event) => {
         event.preventDefault();
-        openBridgeModal("mission-create", () => {
+        openDailyRepetitionModal("mission-create", () => {
           if (missionCreateStatus) missionCreateStatus.textContent = "Repeticao definida.";
           renderMissionCreateStep();
         });
@@ -22025,19 +22032,39 @@ window.project200ProjectsContext = {
   const scheduleStage = document.getElementById("missionVariantScheduleMode");
   const durationStep = document.getElementById("missionVariantEditorStep2");
   const timeStep = document.getElementById("missionVariantEditorStep3");
+  const hourStep = scheduleStage?.closest(".mission-variant-editor-step");
+  let repeatStep = null;
 
   function ensureMicrotaskStages() {
     if (!durationStep || !timeStep || durationStep.dataset.microtaskStagesReady === "true") return;
     durationStep.replaceChildren(...Array.from(timeStep.childNodes));
-    timeStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Horario</strong><span>Defina quando essa micro-tarefa acontece.</span></div><label class="mission-variant-anytime"><input type="checkbox" id="missionVariantAnytime" checked><span>A qualquer hora do dia</span></label><label class="mission-variant-clock" id="missionVariantClockWrap" hidden><span>Horario</span><input class="text-field options-text-field" type="time" id="missionVariantClock" value="09:00"></label>';
-    timeStep.addEventListener("change", (event) => {
+    repeatStep = document.getElementById("missionVariantEditorStep5");
+    if (!repeatStep) {
+      repeatStep = document.createElement("div");
+      repeatStep.id = "missionVariantEditorStep5";
+      repeatStep.className = "mission-variant-editor-step";
+      repeatStep.hidden = true;
+      repeatStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Quando?</strong><span>Defina a repetição desta micro-tarefa.</span></div>';
+      hourStep?.after(repeatStep);
+    }
+    if (scheduleStage) repeatStep.appendChild(scheduleStage);
+    timeStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Data</strong><span>Escolha a data em que essa micro-tarefa começa.</span></div><button class="mission-variant-repetition-button" type="button" id="missionVariantDateButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>DATA INICIAL</small><strong>Definir data</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
+    hourStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Horario</strong><span>Defina quando essa micro-tarefa acontece.</span></div><label class="mission-variant-anytime"><input type="checkbox" id="missionVariantAnytime" checked><span>A qualquer hora do dia</span></label><label class="mission-variant-clock" id="missionVariantClockWrap" hidden><span>Horario</span><input class="text-field options-text-field" type="time" id="missionVariantClock" value="09:00"></label>';
+    timeStep.addEventListener("click", (event) => {
+      if (!event.target.closest("#missionVariantDateButton")) return;
+      window.project200UniversalScheduleDataSelect?.open("microtask", () => {
+        state.missionVariants.editorStep = 4;
+        renderMissionVariants();
+      }, { openRepetitionOnApply: false });
+    });
+    hourStep.addEventListener("change", (event) => {
       const anytime = event.target.closest("#missionVariantAnytime");
       if (!anytime) return;
       const clockWrap = document.getElementById("missionVariantClockWrap");
       if (clockWrap) clockWrap.hidden = anytime.checked;
       state.missionVariants.timeAnytime = anytime.checked;
     });
-    timeStep.addEventListener("input", (event) => {
+    hourStep.addEventListener("input", (event) => {
       if (!event.target.closest("#missionVariantClock")) return;
       state.missionVariants.timeValue = String(event.target.value || "").slice(0, 5);
     });
@@ -22059,7 +22086,7 @@ window.project200ProjectsContext = {
 
   function renderMicrotaskRepeatStep() {
     const editorOpen = Boolean(state.missionVariants?.editorOpen);
-    const step = Math.max(1, Math.min(4, Number(state.missionVariants?.editorStep || 1)));
+    const step = Math.max(1, Math.min(5, Number(state.missionVariants?.editorStep || 1)));
     ensureMicrotaskStages();
     const anytimeInput = document.getElementById("missionVariantAnytime");
     const clockWrap = document.getElementById("missionVariantClockWrap");
@@ -22067,20 +22094,26 @@ window.project200ProjectsContext = {
     if (anytimeInput) anytimeInput.checked = state.missionVariants?.timeAnytime !== false;
     if (clockWrap) clockWrap.hidden = state.missionVariants?.timeAnytime !== false;
     if (clockInput) clockInput.value = String(state.missionVariants?.timeValue || "09:00").slice(0, 5);
+    const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
+    const dateButton = document.getElementById("missionVariantDateButton");
+    if (dateButton?.querySelector("strong")) {
+      dateButton.querySelector("strong").textContent = config.startsOn
+        ? window.project200UniversalScheduleDataSelect?.formatLong(config.startsOn)
+        : "Definir data";
+    }
     if (targetInput) targetInput.value = String(Math.max(1, Math.trunc(Number(state.missionVariants?.targetValue || targetInput.value || 1) || 1)));
     if (!scheduleStage) return;
-    if (!editorOpen || step !== 4) {
+    if (!editorOpen || step !== 5) {
       scheduleStage.hidden = true;
       scheduleStage.innerHTML = "";
       return;
     }
     scheduleStage.hidden = false;
     scheduleStage.className = "mission-variant-repeat-stage";
-    const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
-    const startLabel = config.startsOn ? window.project200UniversalScheduleDataSelect?.formatLong(config.startsOn) : "Definir data";
-    scheduleStage.innerHTML = '<button class="mission-variant-repetition-button" type="button" id="missionVariantUniversalScheduleButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>DATA E REPETIÇÃO</small><strong>' + startLabel + ' - ' + getMicrotaskRepeatLabel() + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
+    scheduleStage.innerHTML = '<button class="mission-variant-repetition-button" type="button" id="missionVariantUniversalScheduleButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>REPETIÇÃO</small><strong>' + getMicrotaskRepeatLabel() + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
     scheduleStage.querySelector("#missionVariantUniversalScheduleButton")?.addEventListener("click", () => {
-      window.project200UniversalScheduleDataSelect?.open("microtask", () => {
+      window.project200DailyRepetitionModal?.open("microtask", () => {
+        state.missionVariants.repetitionConfirmed = true;
         if (missionVariantStatus) missionVariantStatus.textContent = "Repetição definida.";
         renderMissionVariants();
       });
@@ -22091,6 +22124,12 @@ window.project200ProjectsContext = {
   renderMissionVariants = function() {
     previousRenderMissionVariants();
     renderMicrotaskRepeatStep();
+    const step = Math.max(1, Math.min(5, Number(state.missionVariants?.editorStep || 1)));
+    if (timeStep) timeStep.hidden = step !== 3;
+    if (hourStep) hourStep.hidden = step !== 4;
+    if (repeatStep) repeatStep.hidden = step !== 5;
+    if (missionVariantEditorCancel) missionVariantEditorCancel.textContent = step > 1 ? "Voltar" : "Cancelar";
+    if (missionVariantEditorSave) missionVariantEditorSave.textContent = step < 5 ? "Continuar" : "Salvar";
   };
 
   targetInput?.addEventListener("input", () => {
@@ -22105,6 +22144,7 @@ window.project200ProjectsContext = {
     state.missionVariants.timeValue = "09:00";
     state.missionVariants.scheduleConfig = null;
     state.missionVariants.repeatConfig = null;
+    state.missionVariants.repetitionConfirmed = false;
     if (targetInput) targetInput.value = "1";
   });
 
@@ -22120,13 +22160,20 @@ window.project200ProjectsContext = {
     event.preventDefault();
     event.stopImmediatePropagation();
     const title = String(missionVariantTitleInput?.value || "").trim();
-    const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants?.editorStep || 1) || 1)));
+    const editorStep = Math.max(1, Math.min(5, Math.trunc(Number(state.missionVariants?.editorStep || 1) || 1)));
     if (!title) {
       if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa.";
       return;
     }
     state.missionVariants.targetValue = 1;
-    if (editorStep < 4) {
+    if (editorStep === 3) {
+      window.project200UniversalScheduleDataSelect?.open("microtask", () => {
+        state.missionVariants.editorStep = 4;
+        renderMissionVariants();
+      }, { openRepetitionOnApply: false });
+      return;
+    }
+    if (editorStep < 5) {
       state.missionVariants.editorStep = editorStep + 1;
       if (missionVariantStatus) missionVariantStatus.textContent = "";
       renderMissionVariants();
@@ -22136,7 +22183,15 @@ window.project200ProjectsContext = {
     const goalId = String(state.missionVariants?.goalId || "").trim();
     const editingId = String(state.missionVariants?.editingId || "").trim();
     if (!state.missionVariants?.scheduleConfig && !state.missionVariants?.repeatConfig) {
-      window.project200UniversalScheduleDataSelect?.open("microtask", () => renderMissionVariants());
+      state.missionVariants.editorStep = 3;
+      renderMissionVariants();
+      return;
+    }
+    if (!state.missionVariants?.repetitionConfirmed) {
+      window.project200DailyRepetitionModal?.open("microtask", () => {
+        state.missionVariants.repetitionConfirmed = true;
+        renderMissionVariants();
+      });
       return;
     }
     const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants?.scheduleMode || "periodic");
