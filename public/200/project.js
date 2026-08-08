@@ -1494,6 +1494,7 @@ const state = {
   },
   missionRun: {
     goalId: "",
+    sessionStartedAtMs: 0,
     startedAtMs: 0,
     durationMs: 0,
     centerMode: "time",
@@ -1507,6 +1508,8 @@ const state = {
     cycleTarget: 1,
     cycleIndex: 1,
     completedCycles: 0,
+    cycleDurationsSeconds: [],
+    timelineCompleted: false,
     transitioningCycle: false,
     preloadedDailyRanking: null,
     rankingPreloadStarted: false,
@@ -6949,6 +6952,7 @@ function closeModal(modal) {
     restoreRunningPlayerAfterMission();
     state.runningPlayer.currentTaskTitle = String(state.missionRun.previousTaskTitle || "").trim();
     state.missionRun.goalId = "";
+    state.missionRun.sessionStartedAtMs = 0;
     state.missionRun.startedAtMs = 0;
     state.missionRun.durationMs = 0;
     state.missionRun.centerMode = "time";
@@ -6962,6 +6966,8 @@ function closeModal(modal) {
     state.missionRun.cycleTarget = 1;
     state.missionRun.cycleIndex = 1;
     state.missionRun.completedCycles = 0;
+    state.missionRun.cycleDurationsSeconds = [];
+    state.missionRun.timelineCompleted = false;
     state.missionRun.transitioningCycle = false;
     state.missionRun.preloadedDailyRanking = null;
     state.missionRun.rankingPreloadStarted = false;
@@ -15244,6 +15250,54 @@ function getMissionRunDurationSeconds(goal, variant = null) {
   return normalizeMissionDurationOption(getMissionUnitDurationSeconds(goal));
 }
 
+function getMissionRunCycleDurationSeconds(cycleNumber) {
+  const index = Math.max(0, normalizeMissionRunCycleTarget(cycleNumber) - 1);
+  const persisted = Math.max(0, Math.trunc(Number(state.missionRun?.cycleDurationsSeconds?.[index] || 0) || 0));
+  if (persisted > 0) return persisted;
+  return getMissionRunDurationSeconds(
+    getMissionRunGoalById(state.missionRun?.goalId),
+    getMissionRunSelectedVariant(index + 1)
+  );
+}
+
+function getMissionRunCycleDurationsSeconds(target = state.missionRun?.cycleTarget) {
+  const safeTarget = normalizeMissionRunCycleTarget(target);
+  return Array.from({ length: safeTarget }, (_, index) => getMissionRunCycleDurationSeconds(index + 1));
+}
+
+function reconcileMissionRunTimeline(nowMs = getServerNowMs()) {
+  const target = normalizeMissionRunCycleTarget(state.missionRun?.cycleTarget);
+  const firstCycleIndex = Math.max(1, Math.min(target, normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex || 1)));
+  const firstCycleStartedAtMs = Number(state.missionRun?.startedAtMs || state.missionRun?.sessionStartedAtMs || 0);
+  if (!Number.isFinite(firstCycleStartedAtMs) || firstCycleStartedAtMs <= 0) return false;
+  const durations = getMissionRunCycleDurationsSeconds(target);
+  state.missionRun.cycleDurationsSeconds = durations;
+  const elapsedMs = Math.max(0, Number(nowMs || 0) - firstCycleStartedAtMs);
+  let consumedMs = 0;
+  for (let index = firstCycleIndex - 1; index < target; index += 1) {
+    const durationMs = Math.max(0, Number(durations[index] || 0) * 1000);
+    const cycleEndMs = consumedMs + durationMs;
+    if (elapsedMs < cycleEndMs || durationMs <= 0) {
+      state.missionRun.cycleIndex = index + 1;
+      state.missionRun.completedCycles = index;
+      state.missionRun.startedAtMs = firstCycleStartedAtMs + consumedMs;
+      state.missionRun.durationMs = durationMs;
+      state.missionRun.selectedVariantId = getMissionRunVariantIdForCycle(index + 1);
+      state.missionRun.timelineCompleted = false;
+      return false;
+    }
+    consumedMs = cycleEndMs;
+  }
+  const lastDurationMs = Math.max(0, Number(durations[target - 1] || 0) * 1000);
+  state.missionRun.cycleIndex = target;
+  state.missionRun.completedCycles = target;
+  state.missionRun.startedAtMs = firstCycleStartedAtMs + Math.max(0, consumedMs - lastDurationMs);
+  state.missionRun.durationMs = lastDurationMs;
+  state.missionRun.selectedVariantId = getMissionRunVariantIdForCycle(target);
+  state.missionRun.timelineCompleted = true;
+  return true;
+}
+
 function getMissionRunPointValueForVariant(goal, variant = null) {
   if (!variant) return 1;
   return Math.max(1, Math.ceil(getMissionRunDurationSeconds(goal, variant) / 60));
@@ -15258,12 +15312,15 @@ function getMissionRunCompletedPointValue(goal, completedCycles) {
   return Math.max(1, total || cycles);
 }
 
-function resetMissionRunCycleTimer(cycleNumber = 1) {
+function resetMissionRunCycleTimer(cycleNumber = 1, options = {}) {
   const safeCycle = normalizeMissionRunCycleTarget(cycleNumber);
+  const previousCycleEndMs = Math.max(0, Number(state.missionRun?.startedAtMs || 0)) + Math.max(0, Number(state.missionRun?.durationMs || 0));
   stopMissionRunAlarm();
   stopMissionRunCueAudio();
   state.missionRun.cycleIndex = safeCycle;
-  state.missionRun.startedAtMs = Date.now();
+  state.missionRun.startedAtMs = Number.isFinite(Number(options?.startedAtMs)) && Number(options.startedAtMs) > 0
+    ? Number(options.startedAtMs)
+    : (previousCycleEndMs > 0 ? previousCycleEndMs : getServerNowMs());
   state.missionRun.alarmStarted = false;
   state.missionRun.transitioningCycle = false;
   state.missionRun.rankingPreloadStarted = false;
@@ -15271,8 +15328,9 @@ function resetMissionRunCycleTimer(cycleNumber = 1) {
   state.missionRun.announcedCueSeconds = [];
   state.missionRun.previousRemainingSeconds = null;
   state.missionRun.selectedVariantId = getMissionRunVariantIdForCycle(safeCycle);
-  state.missionRun.durationMs = Math.max(0, getMissionRunDurationSeconds(getMissionRunGoalById(state.missionRun?.goalId), getMissionRunSelectedVariant(safeCycle)) * 1000);
-  void persistMissionCurrentTaskState({ resetStartedAt: true }).catch(() => {});
+  state.missionRun.durationMs = Math.max(0, getMissionRunCycleDurationSeconds(safeCycle) * 1000);
+  state.missionRun.timelineCompleted = false;
+  void persistMissionCurrentTaskState().catch(() => {});
   if (missionRunFinishChoice) missionRunFinishChoice.hidden = true;
   if (missionRunConfirm) missionRunConfirm.hidden = true;
   if (missionRunStatus) missionRunStatus.textContent = "";
@@ -15291,13 +15349,16 @@ async function preloadMissionRunDailyRanking() {
   }
 }
 
-function advanceMissionRunCycle() {
+function advanceMissionRunCycle(options = {}) {
   const current = normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex);
   const target = normalizeMissionRunCycleTarget(state.missionRun?.cycleTarget);
   state.missionRun.completedCycles = Math.max(Number(state.missionRun.completedCycles || 0), current);
   if (current >= target) return false;
   const nextCycle = current + 1;
-  resetMissionRunCycleTimer(nextCycle);
+  const nextCycleStartedAtMs = options?.preserveTimeline === true
+    ? Math.max(0, Number(state.missionRun?.startedAtMs || 0)) + Math.max(0, Number(state.missionRun?.durationMs || 0))
+    : getServerNowMs();
+  resetMissionRunCycleTimer(nextCycle, { startedAtMs: nextCycleStartedAtMs });
   scheduleMissionRunCycleCue(nextCycle);
   return true;
 }
@@ -15310,6 +15371,8 @@ function completeMissionRunCycle() {
     normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex)
   );
   if (missionRunFinishChoice) missionRunFinishChoice.hidden = false;
+  state.missionRun.timelineCompleted = true;
+  void persistMissionCurrentTaskState().catch(() => {});
 }
 
 function scheduleMissionRunVariantCycleSelection({ preserveCompleted = false, resumeMode = "preserve" } = {}) {
@@ -15343,6 +15406,7 @@ function setMissionRunCycleTarget(value) {
     return;
   }
   state.missionRun.cycleTarget = nextTarget;
+  state.missionRun.cycleDurationsSeconds = [];
   if (nextTarget < previousTarget) {
     state.missionRun.selectedVariantIds = (state.missionRun.selectedVariantIds || []).slice(0, nextTarget);
   }
@@ -15356,6 +15420,7 @@ function setMissionRunCycleTarget(value) {
     scheduleMissionRunVariantCycleSelection({ preserveCompleted: true, resumeMode: "preserve" });
   }
   renderMissionRunState();
+  void persistMissionCurrentTaskState().catch(() => {});
 }
 
 function restartMissionRunLocally() {
@@ -15405,7 +15470,7 @@ function renderMissionRunState() {
   }
   const selectedVariant = getMissionRunSelectedVariant();
   const durationMs = Math.max(0, Number(state.missionRun?.durationMs || 0));
-  const elapsedMs = Math.max(0, Date.now() - Math.max(0, Number(state.missionRun?.startedAtMs || 0)));
+  const elapsedMs = Math.max(0, getServerNowMs() - Math.max(0, Number(state.missionRun?.startedAtMs || 0)));
   const remainingMs = Math.max(0, durationMs - elapsedMs);
   const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const percentPrecise = durationMs > 0 ? clampPercent((elapsedMs / durationMs) * 100) : 0;
@@ -15458,10 +15523,14 @@ function renderMissionRunState() {
   if (durationMs > 0 && remainingSeconds <= 0 && missionRunFinishChoice?.hidden !== false && isMissionRunModalOpen()) {
     if (!isLastCycle && !state.missionRun.transitioningCycle) {
       state.missionRun.transitioningCycle = true;
-      advanceMissionRunCycle();
+      advanceMissionRunCycle({ preserveTimeline: true });
     } else if (isLastCycle) {
       startMissionRunAlarm();
+      state.missionRun.timelineCompleted = true;
+      state.missionRun.completedCycles = normalizeMissionRunCycleTarget(state.missionRun?.cycleTarget);
+      if (missionRunFinishChoice) missionRunFinishChoice.hidden = false;
       fadeOutRunningMusicAtMissionFinish();
+      void persistMissionCurrentTaskState().catch(() => {});
     }
   }
 }
@@ -15587,6 +15656,17 @@ function syncMissionVariantsIntoMissionState(goalId, items) {
   state.missions = syncCollection(state.missions);
   state.actionMissions = syncCollection(state.actionMissions);
   renderActionsMissionsPanel();
+}
+
+function syncMissionRunTimelineAfterResume() {
+  if (!state.missionRun?.goalId || !isMissionRunModalOpen()) return;
+  const previousCycle = normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex);
+  const wasCompleted = Boolean(state.missionRun?.timelineCompleted);
+  reconcileMissionRunTimeline();
+  renderMissionRunState();
+  if (previousCycle !== normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex) || wasCompleted !== Boolean(state.missionRun?.timelineCompleted)) {
+    void persistMissionCurrentTaskState().catch(() => {});
+  }
 }
 
 function ensureMissionVariantsEditAllButton() {
@@ -15780,33 +15860,41 @@ async function openMissionVariantsModal(goalId, mode = "edit", options = {}) {
 }
 
 const missionCurrentTaskStateEndpoint = "/api/200/current-task-state";
+let missionCurrentTaskPersistQueue = Promise.resolve();
 
 async function persistMissionCurrentTaskState({ resetStartedAt = false } = {}) {
   const goalId = String(state.missionRun?.goalId || "").trim();
   if (!goalId || !getToken()) return null;
-  const payload = await apiRequest(missionCurrentTaskStateEndpoint, {
+  const requestBody = {
+    profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
+    goalId,
+    variantId: String(state.missionRun?.selectedVariantId || ""),
+    variantIds: Array.isArray(state.missionRun?.selectedVariantIds) ? [...state.missionRun.selectedVariantIds] : [],
+    taskKind: state.missionRun?.selectedVariantId ? "microtask" : "mission",
+    durationSeconds: Math.max(0, Math.round(Number(state.missionRun?.durationMs || 0) / 1000)),
+    startedAt: new Date(Number(state.missionRun?.sessionStartedAtMs || state.missionRun?.startedAtMs || getServerNowMs())).toISOString(),
+    cycleStartedAt: new Date(Number(state.missionRun?.startedAtMs || getServerNowMs())).toISOString(),
+    cycleTarget: normalizeMissionRunCycleTarget(state.missionRun?.cycleTarget),
+    cycleIndex: normalizeMissionRunCycleTarget(state.missionRun?.cycleIndex),
+    completedCycles: Math.max(0, Math.trunc(Number(state.missionRun?.completedCycles || 0) || 0)),
+    cycleDurationsSeconds: getMissionRunCycleDurationsSeconds(),
+    resetStartedAt
+  };
+  const sendState = () => apiRequest(missionCurrentTaskStateEndpoint, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      profile: String(state.selectedProfile || getDefaultProfileName()).trim(),
-      goalId,
-      variantId: String(state.missionRun?.selectedVariantId || ""),
-      variantIds: Array.isArray(state.missionRun?.selectedVariantIds) ? state.missionRun.selectedVariantIds : [],
-      taskKind: state.missionRun?.selectedVariantId ? "microtask" : "mission",
-      durationSeconds: Math.max(0, Math.round(Number(state.missionRun?.durationMs || 0) / 1000)),
-      resetStartedAt
-    }),
+    body: JSON.stringify(requestBody),
     skipGlobalLoading: true
   });
-  const serverStartedAt = new Date(payload?.currentTaskState?.startedAt || "").getTime();
-  if (Number.isFinite(serverStartedAt) && serverStartedAt > 0 && resetStartedAt) {
-    state.missionRun.startedAtMs = serverStartedAt;
-  }
+  const pending = missionCurrentTaskPersistQueue.then(sendState, sendState);
+  missionCurrentTaskPersistQueue = pending.catch(() => null);
+  const payload = await pending;
   return payload?.currentTaskState || null;
 }
 
 async function clearMissionCurrentTaskState() {
   if (!getToken()) return;
+  await missionCurrentTaskPersistQueue.catch(() => null);
   await apiRequest(missionCurrentTaskStateEndpoint, { method: "DELETE", skipGlobalLoading: true });
 }
 
@@ -15821,7 +15909,8 @@ async function restoreMissionCurrentTaskState() {
     return false;
   }
   const variants = await loadMissionVariants(current.goalId, { force: true });
-  const selectedVariant = variants.find((variant) => String(variant?.id || "") === String(current.variantId || "")) || null;
+  const selectedVariantIds = Array.isArray(current.variantIds) ? current.variantIds.map((id) => String(id || "").trim()).filter(Boolean) : [];
+  const selectedVariant = variants.find((variant) => String(variant?.id || "") === String(current.variantId || selectedVariantIds[0] || "")) || null;
   if (current.variantId && !selectedVariant) {
     await clearMissionCurrentTaskState();
     return false;
@@ -15830,6 +15919,13 @@ async function restoreMissionCurrentTaskState() {
   beginMissionRun(goal, selectedVariant, {
     resume: true,
     startedAtMs: new Date(current.startedAt || "").getTime(),
+    sessionStartedAtMs: new Date(current.startedAt || "").getTime(),
+    cycleStartedAtMs: new Date(current.cycleStartedAt || current.startedAt || "").getTime(),
+    cycleTarget: current.cycleTarget,
+    cycleIndex: current.cycleIndex,
+    completedCycles: current.completedCycles,
+    selectedVariantIds,
+    cycleDurationsSeconds: current.cycleDurationsSeconds,
     returnToFolderGoalId: selectedVariant ? String(current.goalId || "") : ""
   });
   return true;
@@ -15839,18 +15935,30 @@ function beginMissionRun(goal, selectedVariant = null, options = {}) {
   if (!goal) return;
   cancelMissionRunMusicFade();
   state.missionRun.goalId = String(goal.id || "");
-  state.missionRun.startedAtMs = Number.isFinite(Number(options?.startedAtMs)) && Number(options.startedAtMs) > 0 ? Number(options.startedAtMs) : Date.now();
+  const initialStartedAtMs = Number.isFinite(Number(options?.sessionStartedAtMs || options?.startedAtMs)) && Number(options?.sessionStartedAtMs || options?.startedAtMs) > 0
+    ? Number(options?.sessionStartedAtMs || options?.startedAtMs)
+    : getServerNowMs();
+  state.missionRun.sessionStartedAtMs = initialStartedAtMs;
+  state.missionRun.startedAtMs = Number.isFinite(Number(options?.cycleStartedAtMs)) && Number(options.cycleStartedAtMs) > 0
+    ? Number(options.cycleStartedAtMs)
+    : initialStartedAtMs;
   state.missionRun.durationMs = Math.max(0, getMissionRunDurationSeconds(goal, selectedVariant) * 1000);
   state.missionRun.centerMode = "time";
   state.missionRun.alarmStarted = false;
   state.missionRun.finalizing = false;
   state.missionRun.completedSuccessfully = false;
   state.missionRun.selectedVariantId = String(selectedVariant?.id || "");
-  state.missionRun.selectedVariantIds = selectedVariant?.id ? [String(selectedVariant.id)] : [];
+  state.missionRun.selectedVariantIds = Array.isArray(options?.selectedVariantIds) && options.selectedVariantIds.length
+    ? options.selectedVariantIds.map((id) => String(id || "").trim()).filter(Boolean).slice(0, MISSION_RUN_MAX_CYCLES)
+    : (selectedVariant?.id ? [String(selectedVariant.id)] : []);
   state.missionRun.returnToFolderGoalId = String(options?.returnToFolderGoalId || "").trim();
-  state.missionRun.cycleTarget = 1;
-  state.missionRun.cycleIndex = 1;
-  state.missionRun.completedCycles = 0;
+  state.missionRun.cycleTarget = normalizeMissionRunCycleTarget(options?.cycleTarget || 1);
+  state.missionRun.cycleIndex = Math.min(state.missionRun.cycleTarget, normalizeMissionRunCycleTarget(options?.cycleIndex || 1));
+  state.missionRun.completedCycles = Math.max(0, Math.min(state.missionRun.cycleTarget, Math.trunc(Number(options?.completedCycles || 0) || 0)));
+  state.missionRun.cycleDurationsSeconds = Array.isArray(options?.cycleDurationsSeconds)
+    ? options.cycleDurationsSeconds.map((seconds) => Math.max(0, Math.trunc(Number(seconds || 0) || 0))).filter((seconds) => seconds > 0).slice(0, MISSION_RUN_MAX_CYCLES)
+    : [];
+  state.missionRun.timelineCompleted = false;
   state.missionRun.transitioningCycle = false;
   state.missionRun.preloadedDailyRanking = null;
   state.missionRun.rankingPreloadStarted = false;
@@ -15863,9 +15971,8 @@ function beginMissionRun(goal, selectedVariant = null, options = {}) {
   if (missionRunConfirm) {
     missionRunConfirm.hidden = true;
   }
-  if (missionRunFinishChoice) {
-    missionRunFinishChoice.hidden = true;
-  }
+  if (options?.resume) reconcileMissionRunTimeline();
+  if (missionRunFinishChoice) missionRunFinishChoice.hidden = !state.missionRun.timelineCompleted;
   const alarmContext = getTaskBeepAudioContext();
   if (alarmContext?.state === "suspended") {
     void alarmContext.resume().catch(() => {});
@@ -15873,10 +15980,12 @@ function beginMissionRun(goal, selectedVariant = null, options = {}) {
   renderMissionRunState();
   mountRunningPlayerForMission();
   const missionGoalId = String(goal.id || "");
-  void loadRunningMusicStations().then(() => {
-    if (!isMissionRunModalOpen() || String(state.missionRun.goalId || "") !== missionGoalId) return;
-    return autoPlayRunningTaskDefaultPreference({ title: String(selectedVariant?.title || goal.title || "Missão") });
-  });
+  if (!state.missionRun.timelineCompleted) {
+    void loadRunningMusicStations().then(() => {
+      if (!isMissionRunModalOpen() || String(state.missionRun.goalId || "") !== missionGoalId) return;
+      return autoPlayRunningTaskDefaultPreference({ title: String(selectedVariant?.title || goal.title || "Missão") });
+    });
+  }
   stopMissionRunTicker();
   missionRunTicker = window.setInterval(renderMissionRunState, 1000);
   openModal("missionRunModal");
@@ -19672,6 +19781,7 @@ missionVariantsList?.addEventListener("click", async (event) => {
       const resumeMode = state.missionVariants.cycleSelectionResumeMode === "advance" ? "advance" : "preserve";
       const completedBeforeSelection = Math.max(0, Math.min(MISSION_RUN_MAX_CYCLES - 1, Math.trunc(Number(state.missionRun.completedCycles || 0) || 0)));
       state.missionRun.selectedVariantIds = state.missionVariants.cycleSelections.slice(0, target);
+      state.missionRun.cycleDurationsSeconds = [];
       state.missionRun.selectedVariantId = getMissionRunVariantIdForCycle(state.missionRun.cycleIndex);
       closeModal("missionVariantsModal");
       if (resumeMode === "advance" && completedBeforeSelection > 0) {
@@ -19684,6 +19794,7 @@ missionVariantsList?.addEventListener("click", async (event) => {
       } else {
         renderMissionRunCycleCount();
         renderMissionRunState();
+        void persistMissionCurrentTaskState().catch(() => {});
       }
       return;
     }
@@ -21287,6 +21398,7 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     void checkProject200AppUpdate().catch(() => {});
     startRunningTaskTicker();
+    syncMissionRunTimelineAfterResume();
     scheduleScreenLockInactivity();
     void refreshHomeSnapshot();
     return;
@@ -21296,6 +21408,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("focus", () => {
   void checkProject200AppUpdate().catch(() => {});
   startRunningTaskTicker();
+  syncMissionRunTimelineAfterResume();
   scheduleScreenLockInactivity();
   syncHomeDeviceClock();
   void refreshHomeSnapshot();
@@ -21303,6 +21416,7 @@ window.addEventListener("focus", () => {
 window.addEventListener("pageshow", () => {
   void checkProject200AppUpdate().catch(() => {});
   startRunningTaskTicker();
+  syncMissionRunTimelineAfterResume();
   scheduleScreenLockInactivity();
   syncHomeDeviceClock();
   void refreshHomeSnapshot();
@@ -21310,6 +21424,7 @@ window.addEventListener("pageshow", () => {
 document.addEventListener("resume", () => {
   void checkProject200AppUpdate().catch(() => {});
   startRunningTaskTicker();
+  syncMissionRunTimelineAfterResume();
   scheduleScreenLockInactivity();
   syncHomeDeviceClock();
   void refreshHomeSnapshot();
@@ -22053,8 +22168,9 @@ window.project200ProjectsContext = {
     timeStep.after(repeatStep);
     if (scheduleStage) repeatStep.appendChild(scheduleStage);
 
-    dateStep.addEventListener("click", (event) => {
-      if (!event.target.closest("#missionVariantDateButton")) return;
+    dateStep.querySelector("#missionVariantDateButton")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       openMicrotaskDateSelector();
     });
     timeStep.querySelector("#missionVariantAnytimeInput")?.addEventListener("change", (event) => {
