@@ -15589,6 +15589,51 @@ function syncMissionVariantsIntoMissionState(goalId, items) {
   renderActionsMissionsPanel();
 }
 
+function ensureMissionVariantsEditAllButton() {
+  const sortWrap = missionVariantSortButton?.closest(".mission-variant-sort-wrap");
+  if (!sortWrap) return null;
+  let button = document.getElementById("missionVariantEditAllButton");
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "missionVariantEditAllButton";
+    button.type = "button";
+    button.className = "history-mission-modal-close mission-variant-edit-all-button";
+    button.setAttribute("aria-label", "Editar todas as micro-tarefas da pasta");
+    button.title = "Editar tarefas da pasta";
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5V20h3.5L18 9.5 14.5 6 4 16.5Zm16.7-9.8a1 1 0 0 0 0-1.4l-2-2a1 1 0 0 0-1.4 0L15.5 5.1 19 8.6l1.7-1.9Z" fill="currentColor"/></svg>';
+    button.addEventListener("click", () => {
+      const goalId = String(state.missionVariants?.goalId || "").trim();
+      if (!goalId) return;
+      void openMissionVariantsModal(goalId, "edit", { items: [...(state.missionVariants?.items || [])] });
+    });
+    sortWrap.before(button);
+  }
+  return button;
+}
+
+function ensureMissionVariantsAddButton() {
+  const sortWrap = missionVariantSortButton?.closest(".mission-variant-sort-wrap");
+  if (!sortWrap) return null;
+  let button = document.getElementById("missionVariantAddFromDailyButton");
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "missionVariantAddFromDailyButton";
+    button.type = "button";
+    button.className = "history-mission-modal-close mission-variant-add-from-daily-button";
+    button.setAttribute("aria-label", "Adicionar micro-tarefa à pasta");
+    button.title = "Adicionar micro-tarefa";
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7V4Z" fill="currentColor"/></svg>';
+    button.addEventListener("click", () => {
+      const goalId = String(state.missionVariants?.goalId || "").trim();
+      if (!goalId) return;
+      void openMissionVariantsModal(goalId, "edit", { items: [...(state.missionVariants?.items || [])] })
+        .then(() => missionVariantAddButton?.click());
+    });
+    sortWrap.before(button);
+  }
+  return button;
+}
+
 function renderMissionVariants() {
   const editorOpen = Boolean(state.missionVariants.editorOpen);
   const chooseMode = state.missionVariants.mode === "choose" || state.missionVariants.mode === "cycle-choose";
@@ -15596,6 +15641,11 @@ function renderMissionVariants() {
   const cycleSelectionTarget = normalizeMissionRunCycleTarget(state.missionVariants.cycleSelectionTarget);
   const cycleSelections = Array.isArray(state.missionVariants.cycleSelections) ? state.missionVariants.cycleSelections : [];
   const manageMode = !chooseMode;
+  const currentFolder = getAvailableMissionById(state.missionVariants?.goalId);
+  const editAllButton = ensureMissionVariantsEditAllButton();
+  const addFromDailyButton = ensureMissionVariantsAddButton();
+  if (editAllButton) editAllButton.hidden = editorOpen || state.missionVariants.mode !== "choose" || !isMissionFolder(currentFolder);
+  if (addFromDailyButton) addFromDailyButton.hidden = editorOpen || state.missionVariants.mode !== "choose" || !isMissionFolder(currentFolder);
   if (missionVariantsKicker) missionVariantsKicker.textContent = manageMode ? "PASTA DE AÇÕES" : "";
   const missionVariantFolderName = String(getAvailableMissionById(state.missionVariants?.goalId)?.title || "Pasta de ações").trim();
   if (missionVariantsTitle) missionVariantsTitle.textContent = manageMode
