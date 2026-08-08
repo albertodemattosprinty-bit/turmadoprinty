@@ -15244,6 +15244,7 @@ body[data-background-theme="white"] .mission-weekday-list.is-avoidance button.is
 }
 .universal-schedule-modal.active { display:flex; align-items:center; justify-content:center; padding:14px; z-index:1300; }
 #dailyrepetitionModal.active { z-index:2500; }
+#dataselectModal.active { z-index:2600; }
 #repeatuntilModal.active { z-index:2600; }
 #usbAvoidFeedback { color:#f2c94c; font-weight:950; opacity:1; }
 .repeat-until-options button.active { border-color:var(--universal-schedule-accent); background:var(--universal-schedule-accent); color:#fff; box-shadow:inset 3px 0 0 rgba(255,255,255,.38); }
