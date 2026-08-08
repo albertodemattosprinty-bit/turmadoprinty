@@ -21491,7 +21491,8 @@ window.project200ProjectsContext = {
     dataSelectTarget = target;
     dataSelectCallback = callback;
     dataSelectOptions = options && typeof options === "object" ? options : {};
-    dataSelectDraft = parseDateSelectKey(readTargetSchedule(target).startsOn);
+    const schedule = window.project200MissionScheduleBridge?.read(target) || {};
+    dataSelectDraft = parseDateSelectKey(schedule.startsOn);
     const modal = ensureDataSelectModal();
     renderDataSelectModal();
     modal.classList.add("active");
@@ -21505,11 +21506,11 @@ window.project200ProjectsContext = {
     modal?.setAttribute("aria-hidden", "true");
   }
   function applyDataSelectModal() {
-    const target = dataSelectTarget || bridgeTarget;
-    const cfg = readTargetSchedule(target);
+    const target = dataSelectTarget || "mission-create";
+    const cfg = window.project200MissionScheduleBridge?.read(target) || {};
     cfg.startsOn = formatDateSelectKey(dataSelectDraft);
     syncSimpleScheduleFromStartDate(cfg);
-    saveTargetSchedule(cfg, target);
+    window.project200MissionScheduleBridge?.save(cfg, target);
     closeDataSelectModal();
     if (dataSelectOptions?.openRepetitionOnApply === false) {
       dataSelectCallback?.();
@@ -21760,6 +21761,10 @@ window.project200ProjectsContext = {
     }
     renderBridgeButtons();
   }
+  window.project200MissionScheduleBridge = {
+    read: readTargetSchedule,
+    save: saveTargetSchedule
+  };
   function labelForSchedule(schedule, options = {}) {
     const cfg = normalizeSchedule(schedule);
     const fallback = options.fallback || "Definir repeticao";
@@ -21854,7 +21859,7 @@ window.project200ProjectsContext = {
       button.addEventListener("click", (event) => {
         event.preventDefault();
         openDailyRepetitionModal("mission-create", () => {
-          if (missionCreateStatus) missionCreateStatus.textContent = "Repeticao definida.";
+          if (missionCreateStatus) missionCreateStatus.textContent = "Repetição definida.";
           renderMissionCreateStep();
         });
       });
@@ -22024,34 +22029,50 @@ window.project200ProjectsContext = {
   };
   ensureBridgeButtons();
 })();
-// PROJECT200_MICROTASK_FOUR_STEP_FLOW
-(function installProject200MicrotaskFourStepFlow() {
-  if (window.__project200MicrotaskFourStepFlowInstalled) return;
-  window.__project200MicrotaskFourStepFlowInstalled = true;
+// PROJECT200_MICROTASK_FIVE_STEP_FLOW
+(function installProject200MicrotaskFiveStepFlow() {
+  if (window.__project200MicrotaskFiveStepFlowInstalled) return;
+  window.__project200MicrotaskFiveStepFlowInstalled = true;
   const targetInput = document.getElementById("missionVariantTargetInput");
   const scheduleStage = document.getElementById("missionVariantScheduleMode");
   const durationStep = document.getElementById("missionVariantEditorStep2");
   const dateStep = document.getElementById("missionVariantEditorStep3");
-  const repeatStep = scheduleStage?.closest(".mission-variant-editor-step");
+  const timeStep = scheduleStage?.closest(".mission-variant-editor-step");
+  let repeatStep = document.getElementById("missionVariantEditorStep5");
 
   function ensureMicrotaskStages() {
-    if (!durationStep || !dateStep || !repeatStep || durationStep.dataset.microtaskStagesReady === "true") return;
+    if (!durationStep || !dateStep || !timeStep || durationStep.dataset.microtaskStagesReady === "true") return;
     durationStep.replaceChildren(...Array.from(dateStep.childNodes));
     dateStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Data</strong><span>Escolha a data em que essa micro-tarefa começa.</span></div><button class="mission-variant-repetition-button" type="button" id="missionVariantDateButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>DATA INICIAL</small><strong>Definir data</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
-    repeatStep.replaceChildren();
-    const copy = document.createElement("div");
-    copy.className = "mission-variant-stage-copy";
-    copy.innerHTML = "<strong>Quando?</strong><span>Defina a repetição desta micro-tarefa.</span>";
-    repeatStep.appendChild(copy);
+    timeStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Horário de início</strong><span>Defina quando esta micro-tarefa fica disponível.</span></div><label class="mission-variant-anytime"><input type="checkbox" id="missionVariantAnytimeInput" checked><span>A qualquer hora do dia</span></label><label class="mission-variant-clock" id="missionVariantClockField" hidden><span>Horário</span><input class="text-field options-text-field" type="time" id="missionVariantTimeInput" value="09:00"></label>';
+    repeatStep = document.createElement("div");
+    repeatStep.className = "mission-variant-editor-step";
+    repeatStep.id = "missionVariantEditorStep5";
+    repeatStep.hidden = true;
+    repeatStep.innerHTML = '<div class="mission-variant-stage-copy"><strong>Quando?</strong><span>Defina a repetição desta micro-tarefa.</span></div>';
+    timeStep.after(repeatStep);
     if (scheduleStage) repeatStep.appendChild(scheduleStage);
+
     dateStep.addEventListener("click", (event) => {
       if (!event.target.closest("#missionVariantDateButton")) return;
-      window.project200UniversalScheduleDataSelect?.open("microtask", () => {
-        state.missionVariants.editorStep = 4;
-        renderMissionVariants();
-      }, { openRepetitionOnApply: false });
+      openMicrotaskDateSelector();
+    });
+    timeStep.querySelector("#missionVariantAnytimeInput")?.addEventListener("change", (event) => {
+      state.missionVariants.timeAnytime = Boolean(event.currentTarget.checked);
+      renderMissionVariants();
+    });
+    timeStep.querySelector("#missionVariantTimeInput")?.addEventListener("input", (event) => {
+      state.missionVariants.timeValue = String(event.currentTarget.value || "09:00").slice(0, 5);
     });
     durationStep.dataset.microtaskStagesReady = "true";
+  }
+
+  function openMicrotaskDateSelector() {
+    window.project200UniversalScheduleDataSelect?.open("microtask", () => {
+      state.missionVariants.editorStep = 4;
+      if (missionVariantStatus) missionVariantStatus.textContent = "";
+      renderMissionVariants();
+    }, { openRepetitionOnApply: false });
   }
 
   function getMicrotaskRepeatLabel() {
@@ -22060,10 +22081,18 @@ window.project200ProjectsContext = {
     return labels[config.frequency] || "Todos os dias";
   }
 
-  function renderMicrotaskRepeatStep() {
-    const editorOpen = Boolean(state.missionVariants?.editorOpen);
-    const step = Math.max(1, Math.min(4, Number(state.missionVariants?.editorStep || 1)));
+  function openMicrotaskRepetition() {
+    window.project200DailyRepetitionModal?.open("microtask", () => {
+      state.missionVariants.repetitionConfirmed = true;
+      if (missionVariantStatus) missionVariantStatus.textContent = "Repetição definida.";
+      renderMissionVariants();
+    });
+  }
+
+  function renderMicrotaskFlow() {
     ensureMicrotaskStages();
+    const editorOpen = Boolean(state.missionVariants?.editorOpen);
+    const step = Math.max(1, Math.min(5, Number(state.missionVariants?.editorStep || 1)));
     const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {};
     const dateButton = document.getElementById("missionVariantDateButton");
     if (dateButton?.querySelector("strong")) {
@@ -22071,34 +22100,38 @@ window.project200ProjectsContext = {
         ? window.project200UniversalScheduleDataSelect?.formatLong(config.startsOn)
         : "Definir data";
     }
+    const anytimeInput = document.getElementById("missionVariantAnytimeInput");
+    const timeInput = document.getElementById("missionVariantTimeInput");
+    const clockField = document.getElementById("missionVariantClockField");
+    const anytime = state.missionVariants?.timeAnytime !== false;
+    if (anytimeInput) anytimeInput.checked = anytime;
+    if (timeInput) timeInput.value = String(state.missionVariants?.timeValue || "09:00").slice(0, 5);
+    if (clockField) clockField.hidden = anytime;
     if (targetInput) targetInput.value = "1";
-    if (!scheduleStage) return;
-    if (!editorOpen || step !== 4) {
-      scheduleStage.hidden = true;
-      scheduleStage.innerHTML = "";
-      return;
+
+    if (scheduleStage) {
+      if (!editorOpen || step !== 5) {
+        scheduleStage.hidden = true;
+        scheduleStage.innerHTML = "";
+      } else {
+        scheduleStage.hidden = false;
+        scheduleStage.className = "mission-variant-repeat-stage";
+        scheduleStage.innerHTML = '<button class="mission-variant-repetition-button" type="button" id="missionVariantUniversalScheduleButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>REPETIÇÃO</small><strong>' + getMicrotaskRepeatLabel() + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
+        scheduleStage.querySelector("#missionVariantUniversalScheduleButton")?.addEventListener("click", openMicrotaskRepetition);
+      }
     }
-    scheduleStage.hidden = false;
-    scheduleStage.className = "mission-variant-repeat-stage";
-    scheduleStage.innerHTML = '<button class="mission-variant-repetition-button" type="button" id="missionVariantUniversalScheduleButton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v3h6V2h2v3h3v17H4V5h3V2Zm11 8H6v10h12V10Z" fill="currentColor"/></svg><span><small>REPETIÇÃO</small><strong>' + getMicrotaskRepeatLabel() + '</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6L9 5Z" fill="currentColor"/></svg></button>';
-    scheduleStage.querySelector("#missionVariantUniversalScheduleButton")?.addEventListener("click", () => {
-      window.project200DailyRepetitionModal?.open("microtask", () => {
-        state.missionVariants.repetitionConfirmed = true;
-        if (missionVariantStatus) missionVariantStatus.textContent = "Repetição definida.";
-        renderMissionVariants();
-      });
-    });
   }
 
   const previousRenderMissionVariants = renderMissionVariants;
   renderMissionVariants = function() {
     previousRenderMissionVariants();
-    renderMicrotaskRepeatStep();
-    const step = Math.max(1, Math.min(4, Number(state.missionVariants?.editorStep || 1)));
+    renderMicrotaskFlow();
+    const step = Math.max(1, Math.min(5, Number(state.missionVariants?.editorStep || 1)));
     if (dateStep) dateStep.hidden = step !== 3;
-    if (repeatStep) repeatStep.hidden = step !== 4;
+    if (timeStep) timeStep.hidden = step !== 4;
+    if (repeatStep) repeatStep.hidden = step !== 5;
     if (missionVariantEditorCancel) missionVariantEditorCancel.textContent = step > 1 ? "Voltar" : "Cancelar";
-    if (missionVariantEditorSave) missionVariantEditorSave.textContent = step < 4 ? "Continuar" : "Salvar";
+    if (missionVariantEditorSave) missionVariantEditorSave.textContent = step < 5 ? "Continuar" : "Salvar";
   };
 
   missionVariantAddButton?.addEventListener("click", () => {
@@ -22123,25 +22156,46 @@ window.project200ProjectsContext = {
     event.preventDefault();
     event.stopImmediatePropagation();
     const title = String(missionVariantTitleInput?.value || "").trim();
-    const editorStep = Math.max(1, Math.min(4, Math.trunc(Number(state.missionVariants?.editorStep || 1) || 1)));
+    const editorStep = Math.max(1, Math.min(5, Math.trunc(Number(state.missionVariants?.editorStep || 1) || 1)));
     if (!title) {
       if (missionVariantStatus) missionVariantStatus.textContent = "Digite o nome da micro-tarefa.";
       return;
     }
     state.missionVariants.targetValue = 1;
+
     if (editorStep === 3) {
-      window.project200UniversalScheduleDataSelect?.open("microtask", () => {
-        state.missionVariants.editorStep = 4;
-        renderMissionVariants();
-      }, { openRepetitionOnApply: false });
+      const config = state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig;
+      if (!config?.startsOn) {
+        openMicrotaskDateSelector();
+        return;
+      }
+      state.missionVariants.editorStep = 4;
+      if (missionVariantStatus) missionVariantStatus.textContent = "";
+      renderMissionVariants();
       return;
     }
-    if (editorStep < 4) {
+    if (editorStep === 4) {
+      const anytime = document.getElementById("missionVariantAnytimeInput")?.checked !== false;
+      const time = String(document.getElementById("missionVariantTimeInput")?.value || state.missionVariants?.timeValue || "09:00").slice(0, 5);
+      if (!anytime && !/^[0-9]{2}:[0-9]{2}$/.test(time)) {
+        if (missionVariantStatus) missionVariantStatus.textContent = "Defina o horário de início.";
+        return;
+      }
+      state.missionVariants.timeAnytime = anytime;
+      state.missionVariants.timeValue = time;
+      state.missionVariants.editorStep = 5;
+      if (missionVariantStatus) missionVariantStatus.textContent = "";
+      renderMissionVariants();
+      openMicrotaskRepetition();
+      return;
+    }
+    if (editorStep < 5) {
       state.missionVariants.editorStep = editorStep + 1;
       if (missionVariantStatus) missionVariantStatus.textContent = "";
       renderMissionVariants();
       return;
     }
+
     const goalId = String(state.missionVariants?.goalId || "").trim();
     const editingId = String(state.missionVariants?.editingId || "").trim();
     if (!state.missionVariants?.scheduleConfig && !state.missionVariants?.repeatConfig) {
@@ -22150,14 +22204,15 @@ window.project200ProjectsContext = {
       return;
     }
     if (!state.missionVariants?.repetitionConfirmed) {
-      window.project200DailyRepetitionModal?.open("microtask", () => {
-        state.missionVariants.repetitionConfirmed = true;
-        renderMissionVariants();
-      });
+      openMicrotaskRepetition();
       return;
     }
     const scheduleMode = normalizeMissionVariantScheduleMode(state.missionVariants?.scheduleMode || "periodic");
-    const scheduleConfig = { ...(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {}), timeAnytime: true, time: "09:00" };
+    const scheduleConfig = {
+      ...(state.missionVariants?.scheduleConfig || state.missionVariants?.repeatConfig || {}),
+      timeAnytime: state.missionVariants?.timeAnytime !== false,
+      time: String(state.missionVariants?.timeValue || "09:00").slice(0, 5)
+    };
     const finishLoading = beginMissionActionLoading(missionVariantEditorSave);
     if (!finishLoading) return;
     try {
@@ -22191,8 +22246,7 @@ window.project200ProjectsContext = {
       finishLoading();
     }
   }, true);
-})();
-// PROJECT200_FOLDER_MANAGER_MODAL
+})();// PROJECT200_FOLDER_MANAGER_MODAL
 (function installProject200FolderManagerModal() {
   if (window.__project200FolderManagerModalInstalled) return;
   window.__project200FolderManagerModalInstalled = true;
