@@ -5547,6 +5547,28 @@ body[data-page="explorar"] #edit-chats-button.is-active {
   color: var(--text-muted);
 }
 
+.auth-form input.is-invalid {
+  border-color: #d92d20;
+  box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.12);
+}
+
+.auth-feedback {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(217, 45, 32, 0.28);
+  border-radius: 14px;
+  background: #fff1f0;
+  color: #b42318;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.auth-feedback[hidden] {
+  display: none;
+}
+
 .chat-composer textarea {
   min-height: 118px;
   padding: 16px 16px 64px;

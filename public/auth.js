@@ -11,9 +11,19 @@ const registerPassword = document.getElementById("register-password");
 const registerPasswordConfirm = document.getElementById("register-password-confirm");
 const loginUsername = document.getElementById("login-username");
 const loginPassword = document.getElementById("login-password");
+const loginFeedback = document.getElementById("login-feedback");
+const registerFeedback = document.getElementById("register-feedback");
 const meButton = document.getElementById("me-button");
-const authOutput = document.getElementById("auth-output");
 const returnLink = document.getElementById("return-link");
+const validUsernamePattern = /^[\p{L}\p{M}\p{N} ._-]{3,24}$/u;
+
+const friendlyAuthErrors = new Map([
+  ["Credenciais invalidas.", "Nome de usuário ou senha incorretos. Confira os dados e tente novamente."],
+  ["Esse nome de usuario ja esta em uso.", "Esse nome de usuário já está em uso. Escolha outro para continuar."],
+  ["Nome invalido.", "Digite seu nome com pelo menos 2 caracteres."],
+  ["A senha precisa ter pelo menos 6 caracteres.", "A senha precisa ter pelo menos 6 caracteres."],
+  ["Nome de usuario e senha sao obrigatorios.", "Digite seu nome de usuário e sua senha."]
+]);
 
 function getToken() {
   return window.localStorage.getItem(sessionStorageKey) || "";
@@ -40,18 +50,25 @@ function getNextPath() {
 }
 
 async function runAuthRequest(url, payload) {
-  const response = await fetch(getApiUrl(url), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
+  let response;
 
-  const data = await response.json();
+  try {
+    response = await fetch(getApiUrl(url), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    throw new Error("Não foi possível conectar ao servidor. Confira sua internet e tente novamente.");
+  }
+
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || "Falha na autenticacao.");
+    const serverMessage = data.error || "Não foi possível concluir o acesso. Tente novamente.";
+    throw new Error(friendlyAuthErrors.get(serverMessage) || serverMessage);
   }
 
   if (data.token) {
@@ -73,6 +90,9 @@ function setActiveAuthTab(tabId) {
     panel.classList.toggle("active", isActive);
     panel.hidden = !isActive;
   });
+
+  clearFormFeedback(loginFeedback, loginForm);
+  clearFormFeedback(registerFeedback, registerForm);
 }
 
 async function loadSessionState() {
@@ -112,55 +132,140 @@ function redirectAfterRegister() {
   redirectToNext();
 }
 
-function setAuthOutput(message) {
-  if (authOutput) {
-    authOutput.textContent = message;
+function showFormFeedback(feedback, message, invalidFields = []) {
+  if (feedback) {
+    feedback.textContent = message;
+    feedback.hidden = false;
   }
+
+  invalidFields.forEach((field) => {
+    field.classList.add("is-invalid");
+    field.setAttribute("aria-invalid", "true");
+    field.setAttribute("aria-describedby", feedback.id);
+  });
+
+  if (invalidFields[0]) {
+    invalidFields[0].focus();
+  }
+}
+
+function clearFormFeedback(feedback, form) {
+  if (feedback) {
+    feedback.textContent = "";
+    feedback.hidden = true;
+  }
+
+  form.querySelectorAll(".is-invalid").forEach((field) => {
+    field.classList.remove("is-invalid");
+    field.removeAttribute("aria-invalid");
+    field.removeAttribute("aria-describedby");
+  });
+}
+
+function validateRegistration() {
+  if (registerName.value.trim().length < 2) {
+    return { message: "Digite seu nome com pelo menos 2 caracteres.", fields: [registerName] };
+  }
+
+  if (!validUsernamePattern.test(registerUsername.value.trim())) {
+    return {
+      message: "O nome de usuário deve ter de 3 a 24 caracteres. Use apenas letras, números, espaços, ponto, tracinho ou underline.",
+      fields: [registerUsername]
+    };
+  }
+
+  if (registerPassword.value.length < 6) {
+    return { message: "A senha precisa ter pelo menos 6 caracteres.", fields: [registerPassword] };
+  }
+
+  if (registerPassword.value !== registerPasswordConfirm.value) {
+    return { message: "As senhas não coincidem. Digite a mesma senha nos dois campos.", fields: [registerPassword, registerPasswordConfirm] };
+  }
+
+  return null;
+}
+
+function validateLogin() {
+  if (!loginUsername.value.trim()) {
+    return { message: "Digite seu nome de usuário.", fields: [loginUsername] };
+  }
+
+  if (!validUsernamePattern.test(loginUsername.value.trim())) {
+    return {
+      message: "Confira o nome de usuário. Use de 3 a 24 caracteres: letras, números, espaços, ponto, tracinho ou underline.",
+      fields: [loginUsername]
+    };
+  }
+
+  if (!loginPassword.value) {
+    return { message: "Digite sua senha.", fields: [loginPassword] };
+  }
+
+  return null;
 }
 
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setAuthOutput("Criando conta...");
+  clearFormFeedback(registerFeedback, registerForm);
 
-  if (registerPassword.value !== registerPasswordConfirm.value) {
-    setAuthOutput("As senhas nao conferem.");
+  const validationError = validateRegistration();
+  if (validationError) {
+    showFormFeedback(registerFeedback, validationError.message, validationError.fields);
     return;
   }
 
   try {
-    const data = await runAuthRequest("/api/auth/register", {
+    await runAuthRequest("/api/auth/register", {
       name: registerName.value,
       username: registerUsername.value,
       password: registerPassword.value
     });
 
-    setAuthOutput(JSON.stringify(data, null, 2));
     redirectAfterRegister();
   } catch (error) {
-    setAuthOutput(error instanceof Error ? error.message : "Erro desconhecido");
+    showFormFeedback(
+      registerFeedback,
+      error instanceof Error ? error.message : "Não foi possível criar a conta. Tente novamente.",
+      error instanceof Error && error.message.includes("nome de usuário já está em uso") ? [registerUsername] : []
+    );
   }
 });
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  setAuthOutput("Entrando...");
+  clearFormFeedback(loginFeedback, loginForm);
+
+  const validationError = validateLogin();
+  if (validationError) {
+    showFormFeedback(loginFeedback, validationError.message, validationError.fields);
+    return;
+  }
 
   try {
-    const data = await runAuthRequest("/api/auth/login", {
+    await runAuthRequest("/api/auth/login", {
       username: loginUsername.value,
       password: loginPassword.value
     });
 
-    setAuthOutput(JSON.stringify(data, null, 2));
     redirectToNext();
   } catch (error) {
-    setAuthOutput(error instanceof Error ? error.message : "Erro desconhecido");
+    const message = error instanceof Error ? error.message : "Não foi possível entrar. Tente novamente.";
+    const invalidFields = message.startsWith("Nome de usuário ou senha incorretos")
+      ? [loginUsername, loginPassword]
+      : [];
+    showFormFeedback(loginFeedback, message, invalidFields);
   }
 });
 
-meButton?.addEventListener("click", async () => {
-  setAuthOutput("Validando sessao...");
+[registerName, registerUsername, registerPassword, registerPasswordConfirm].forEach((field) => {
+  field.addEventListener("input", () => clearFormFeedback(registerFeedback, registerForm));
+});
 
+[loginUsername, loginPassword].forEach((field) => {
+  field.addEventListener("input", () => clearFormFeedback(loginFeedback, loginForm));
+});
+
+meButton?.addEventListener("click", async () => {
   try {
     const response = await fetch(getApiUrl("/api/auth/me"), {
       headers: {
@@ -168,9 +273,11 @@ meButton?.addEventListener("click", async () => {
       }
     });
     const data = await response.json();
-    setAuthOutput(JSON.stringify(data, null, 2));
+    authStatus.textContent = response.ok
+      ? `Sessao ativa para @${data.user.username}.`
+      : data.error || "Sessao invalida.";
   } catch (error) {
-    setAuthOutput(error instanceof Error ? error.message : "Erro desconhecido");
+    authStatus.textContent = error instanceof Error ? error.message : "Erro desconhecido";
   }
 });
 
