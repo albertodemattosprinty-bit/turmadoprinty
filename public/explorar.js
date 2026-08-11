@@ -1,5 +1,12 @@
 import { initContentAdmin } from "./content-admin.js";
 import { getApiUrl } from "./api.js";
+import {
+  getAuthToken,
+  readLocalStorageValue,
+  removeLocalStorageValue,
+  setAuthToken,
+  writeLocalStorageValue
+} from "./auth-storage.js";
 import { syncAdminMessageNoticeForUser } from "./header.js";
 
 const capacitor = window.Capacitor;
@@ -25,7 +32,6 @@ function getExploreAuthLockMessage() {
     : "Entre para liberar a conversa.";
 }
 
-const sessionStorageKey = "turma_do_printy_token";
 const conversationStorageKey = "turma_do_printy_chat_conversations";
 const folderStorageKey = "turma_do_printy_chat_folders";
 const legacyHistoryStorageKey = "turma_do_printy_chat_history";
@@ -194,16 +200,11 @@ const chatModeMeta = {
 };
 
 function getToken() {
-  return window.localStorage.getItem(sessionStorageKey) || "";
+  return getAuthToken();
 }
 
 function setToken(token) {
-  if (token) {
-    window.localStorage.setItem(sessionStorageKey, token);
-    return;
-  }
-
-  window.localStorage.removeItem(sessionStorageKey);
+  return setAuthToken(token);
 }
 
 async function loadSiteConfig() {
@@ -240,7 +241,7 @@ async function runAuthRequest(url, payload) {
   }
 
   if (data.token) {
-    setToken(data.token);
+    data.sessionPersisted = setToken(data.token);
   }
 
   return data;
@@ -262,7 +263,7 @@ function createDefaultChatSettings() {
 
 function getChatSettingsStore() {
   try {
-    return JSON.parse(window.localStorage.getItem(chatSettingsStorageKey) || "{}");
+    return JSON.parse(readLocalStorageValue(chatSettingsStorageKey, "{}"));
   } catch {
     return {};
   }
@@ -282,7 +283,7 @@ function saveUserChatSettings(nextSettings) {
     ...createDefaultChatSettings(),
     ...nextSettings
   };
-  window.localStorage.setItem(chatSettingsStorageKey, JSON.stringify(store));
+  writeLocalStorageValue(chatSettingsStorageKey, JSON.stringify(store));
 }
 
 function populateVoiceOptions() {
@@ -328,7 +329,7 @@ function closeSettingsModal() {
 }
 
 function getChatMode() {
-  const stored = window.localStorage.getItem(chatModeStorageKey);
+  const stored = readLocalStorageValue(chatModeStorageKey);
   if (stored === "practical") {
     return "fast";
   }
@@ -386,7 +387,7 @@ function syncModeAvailability() {
 
   const currentMode = getChatMode();
   if (currentMode === "project" && accessState.planId !== "life") {
-    window.localStorage.setItem(chatModeStorageKey, "think");
+    writeLocalStorageValue(chatModeStorageKey, "think");
   }
 
   syncChatModeUi();
@@ -394,31 +395,31 @@ function syncModeAvailability() {
 
 function getConversationStore() {
   try {
-    return JSON.parse(window.localStorage.getItem(conversationStorageKey) || "{}");
+    return JSON.parse(readLocalStorageValue(conversationStorageKey, "{}"));
   } catch {
     return {};
   }
 }
 
 function setConversationStore(store) {
-  window.localStorage.setItem(conversationStorageKey, JSON.stringify(store));
+  writeLocalStorageValue(conversationStorageKey, JSON.stringify(store));
 }
 
 function getFolderStore() {
   try {
-    return JSON.parse(window.localStorage.getItem(folderStorageKey) || "{}");
+    return JSON.parse(readLocalStorageValue(folderStorageKey, "{}"));
   } catch {
     return {};
   }
 }
 
 function setFolderStore(store) {
-  window.localStorage.setItem(folderStorageKey, JSON.stringify(store));
+  writeLocalStorageValue(folderStorageKey, JSON.stringify(store));
 }
 
 function getLegacyHistory() {
   try {
-    return JSON.parse(window.localStorage.getItem(legacyHistoryStorageKey) || "[]");
+    return JSON.parse(readLocalStorageValue(legacyHistoryStorageKey, "[]"));
   } catch {
     return [];
   }
@@ -1333,7 +1334,7 @@ function migrateLegacyHistory() {
   const hasCurrentConversations = Array.isArray(store[userKey]) && store[userKey].length > 0;
 
   if (hasCurrentConversations) {
-    window.localStorage.removeItem(legacyHistoryStorageKey);
+    removeLocalStorageValue(legacyHistoryStorageKey);
     return;
   }
 
@@ -1349,7 +1350,7 @@ function migrateLegacyHistory() {
     }
   ];
   setConversationStore(store);
-  window.localStorage.removeItem(legacyHistoryStorageKey);
+  removeLocalStorageValue(legacyHistoryStorageKey);
 }
 
 function updateConversation(nextConversation) {
@@ -2625,14 +2626,14 @@ if (chatModeButton && chatModeMenu) {
       const nextMode = option.dataset.chatMode || "fast";
 
       if (nextMode === "project" && accessState.planId !== "life") {
-        window.localStorage.setItem(chatModeStorageKey, "think");
+        writeLocalStorageValue(chatModeStorageKey, "think");
         syncChatModeUi();
         closeChatModeMenu();
         window.location.href = "/planos.html?from=project-mode";
         return;
       }
 
-      window.localStorage.setItem(chatModeStorageKey, nextMode);
+      writeLocalStorageValue(chatModeStorageKey, nextMode);
       syncChatModeUi();
       closeChatModeMenu();
     });
@@ -2792,10 +2793,15 @@ loginForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    await runAuthRequest("/api/auth/login", {
+    const data = await runAuthRequest("/api/auth/login", {
       username: loginUsername.value,
       password: loginPassword.value
     });
+
+    if (data.token && data.sessionPersisted === false) {
+      showFormFeedback(loginFeedback, "Seus dados estão corretos, mas este navegador bloqueou a sessão. Abra turmadoprinty.com.br diretamente em uma nova aba e entre novamente.");
+      return;
+    }
 
     authStatus.textContent = "Login feito com sucesso.";
     redirectAfterLogin();
@@ -2819,11 +2825,16 @@ registerForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    await runAuthRequest("/api/auth/register", {
+    const data = await runAuthRequest("/api/auth/register", {
       name: registerName.value,
       username: registerUsername.value,
       password: registerPassword.value
     });
+
+    if (data.token && data.sessionPersisted === false) {
+      showFormFeedback(registerFeedback, "Sua conta foi criada, mas este navegador bloqueou a sessão. Abra turmadoprinty.com.br diretamente em uma nova aba e entre com os dados cadastrados.");
+      return;
+    }
 
     authStatus.textContent = "Conta criada com sucesso.";
     redirectAfterRegister();

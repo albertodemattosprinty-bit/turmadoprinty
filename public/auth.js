@@ -1,6 +1,5 @@
 import { getApiUrl } from "./api.js";
-
-const sessionStorageKey = "turma_do_printy_token";
+import { getAuthToken, setAuthToken } from "./auth-storage.js";
 
 const authStatus = document.getElementById("auth-status");
 const registerForm = document.getElementById("register-form");
@@ -26,16 +25,11 @@ const friendlyAuthErrors = new Map([
 ]);
 
 function getToken() {
-  return window.localStorage.getItem(sessionStorageKey) || "";
+  return getAuthToken();
 }
 
 function setToken(token) {
-  if (token) {
-    window.localStorage.setItem(sessionStorageKey, token);
-    return;
-  }
-
-  window.localStorage.removeItem(sessionStorageKey);
+  return setAuthToken(token);
 }
 
 function getNextPath() {
@@ -72,7 +66,7 @@ async function runAuthRequest(url, payload) {
   }
 
   if (data.token) {
-    setToken(data.token);
+    data.sessionPersisted = setToken(data.token);
   }
 
   return data;
@@ -215,11 +209,16 @@ registerForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    await runAuthRequest("/api/auth/register", {
+    const data = await runAuthRequest("/api/auth/register", {
       name: registerName.value,
       username: registerUsername.value,
       password: registerPassword.value
     });
+
+    if (data.token && data.sessionPersisted === false) {
+      showFormFeedback(registerFeedback, "Sua conta foi criada, mas este navegador bloqueou a sessão. Abra turmadoprinty.com.br diretamente em uma nova aba e entre com os dados cadastrados.");
+      return;
+    }
 
     redirectAfterRegister();
   } catch (error) {
@@ -242,10 +241,15 @@ loginForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    await runAuthRequest("/api/auth/login", {
+    const data = await runAuthRequest("/api/auth/login", {
       username: loginUsername.value,
       password: loginPassword.value
     });
+
+    if (data.token && data.sessionPersisted === false) {
+      showFormFeedback(loginFeedback, "Seus dados estão corretos, mas este navegador bloqueou a sessão. Abra turmadoprinty.com.br diretamente em uma nova aba e entre novamente.");
+      return;
+    }
 
     redirectToNext();
   } catch (error) {

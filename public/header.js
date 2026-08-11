@@ -1,6 +1,6 @@
 import { getApiUrl } from "./api.js";
+import { getAuthToken, setAuthToken } from "./auth-storage.js";
 
-const sessionStorageKey = "turma_do_printy_token";
 const adminMessagePollMs = 15000;
 
 function ensureAdminMessageNotice() {
@@ -281,7 +281,7 @@ export function syncAdminMessageNoticeForUser(user) {
 }
 
 export function getToken() {
-  return window.localStorage.getItem(sessionStorageKey) || "";
+  return getAuthToken();
 }
 
 export async function loadCurrentUser() {
@@ -386,7 +386,7 @@ export async function initSiteHeader() {
     const action = target.getAttribute("data-action");
 
     if (action === "logout") {
-      window.localStorage.removeItem(sessionStorageKey);
+      setAuthToken("");
       closeMenu();
       window.location.href = "/index.html";
       return;
