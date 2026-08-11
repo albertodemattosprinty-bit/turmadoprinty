@@ -71,6 +71,8 @@ const registerName = document.getElementById("register-name");
 const registerUsername = document.getElementById("register-username");
 const registerPassword = document.getElementById("register-password");
 const registerPasswordConfirm = document.getElementById("register-password-confirm");
+const loginFeedback = document.getElementById("login-feedback");
+const registerFeedback = document.getElementById("register-feedback");
 const settingsModal = document.getElementById("settings-modal");
 const settingsForm = document.getElementById("settings-form");
 const settingsCloseButton = document.getElementById("settings-close-button");
@@ -81,6 +83,14 @@ const settingsCallName = document.getElementById("settings-call-name");
 const settingsMinistryDream = document.getElementById("settings-ministry-dream");
 const settingsRoleSelect = document.getElementById("settings-role-select");
 const settingsStatus = document.getElementById("settings-status");
+const validUsernamePattern = /^[\p{L}\p{M}\p{N} ._-]{3,24}$/u;
+const friendlyAuthErrors = new Map([
+  ["Credenciais invalidas.", "Nome de usuário ou senha incorretos. Confira os dados e tente novamente."],
+  ["Esse nome de usuario ja esta em uso.", "Esse nome de usuário já está em uso. Escolha outro para continuar."],
+  ["Nome invalido.", "Digite seu nome com pelo menos 2 caracteres."],
+  ["A senha precisa ter pelo menos 6 caracteres.", "A senha precisa ter pelo menos 6 caracteres."],
+  ["Nome de usuario e senha sao obrigatorios.", "Digite seu nome de usuário e sua senha."]
+]);
 
 let currentController = null;
 let stopRequested = false;
@@ -208,18 +218,25 @@ async function loadSiteConfig() {
 }
 
 async function runAuthRequest(url, payload) {
-  const response = await fetch(getApiUrl(url), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
+  let response;
 
-  const data = await response.json();
+  try {
+    response = await fetch(getApiUrl(url), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    throw new Error("Não foi possível conectar ao servidor. Confira sua internet e tente novamente.");
+  }
+
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || "Falha na autenticacao.");
+    const serverMessage = data.error || "Não foi possível concluir o acesso. Tente novamente.";
+    throw new Error(friendlyAuthErrors.get(serverMessage) || serverMessage);
   }
 
   if (data.token) {
@@ -2679,6 +2696,75 @@ function setActiveAuthTab(tabId) {
     panel.classList.toggle("active", isActive);
     panel.hidden = !isActive;
   });
+
+  clearFormFeedback(loginFeedback, loginForm);
+  clearFormFeedback(registerFeedback, registerForm);
+}
+
+function showFormFeedback(feedback, message, invalidFields = []) {
+  feedback.textContent = message;
+  feedback.hidden = false;
+
+  invalidFields.forEach((field) => {
+    field.classList.add("is-invalid");
+    field.setAttribute("aria-invalid", "true");
+    field.setAttribute("aria-describedby", feedback.id);
+  });
+
+  invalidFields[0]?.focus();
+}
+
+function clearFormFeedback(feedback, form) {
+  feedback.textContent = "";
+  feedback.hidden = true;
+
+  form.querySelectorAll(".is-invalid").forEach((field) => {
+    field.classList.remove("is-invalid");
+    field.removeAttribute("aria-invalid");
+    field.removeAttribute("aria-describedby");
+  });
+}
+
+function validateRegistration() {
+  if (registerName.value.trim().length < 2) {
+    return { message: "Digite seu nome com pelo menos 2 caracteres.", fields: [registerName] };
+  }
+
+  if (!validUsernamePattern.test(registerUsername.value.trim())) {
+    return {
+      message: "O nome de usuário deve ter de 3 a 24 caracteres. Use apenas letras, números, espaços, ponto, tracinho ou underline.",
+      fields: [registerUsername]
+    };
+  }
+
+  if (registerPassword.value.length < 6) {
+    return { message: "A senha precisa ter pelo menos 6 caracteres.", fields: [registerPassword] };
+  }
+
+  if (registerPassword.value !== registerPasswordConfirm.value) {
+    return { message: "As senhas não coincidem. Digite a mesma senha nos dois campos.", fields: [registerPassword, registerPasswordConfirm] };
+  }
+
+  return null;
+}
+
+function validateLogin() {
+  if (!loginUsername.value.trim()) {
+    return { message: "Digite seu nome de usuário.", fields: [loginUsername] };
+  }
+
+  if (!validUsernamePattern.test(loginUsername.value.trim())) {
+    return {
+      message: "Confira o nome de usuário. Use de 3 a 24 caracteres: letras, números, espaços, ponto, tracinho ou underline.",
+      fields: [loginUsername]
+    };
+  }
+
+  if (!loginPassword.value) {
+    return { message: "Digite sua senha.", fields: [loginPassword] };
+  }
+
+  return null;
 }
 
 function redirectAfterRegister() {
@@ -2697,7 +2783,13 @@ document.querySelectorAll("[data-auth-tab]").forEach((button) => {
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  authStatus.textContent = "Entrando...";
+  clearFormFeedback(loginFeedback, loginForm);
+
+  const validationError = validateLogin();
+  if (validationError) {
+    showFormFeedback(loginFeedback, validationError.message, validationError.fields);
+    return;
+  }
 
   try {
     await runAuthRequest("/api/auth/login", {
@@ -2708,16 +2800,21 @@ loginForm.addEventListener("submit", async (event) => {
     authStatus.textContent = "Login feito com sucesso.";
     redirectAfterLogin();
   } catch (error) {
-    authStatus.textContent = error instanceof Error ? error.message : "Erro ao entrar.";
+    const message = error instanceof Error ? error.message : "Não foi possível entrar. Tente novamente.";
+    const invalidFields = message.startsWith("Nome de usuário ou senha incorretos")
+      ? [loginUsername, loginPassword]
+      : [];
+    showFormFeedback(loginFeedback, message, invalidFields);
   }
 });
 
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  authStatus.textContent = "Criando conta...";
+  clearFormFeedback(registerFeedback, registerForm);
 
-  if (registerPassword.value !== registerPasswordConfirm.value) {
-    authStatus.textContent = "As senhas nao conferem.";
+  const validationError = validateRegistration();
+  if (validationError) {
+    showFormFeedback(registerFeedback, validationError.message, validationError.fields);
     return;
   }
 
@@ -2731,8 +2828,18 @@ registerForm.addEventListener("submit", async (event) => {
     authStatus.textContent = "Conta criada com sucesso.";
     redirectAfterRegister();
   } catch (error) {
-    authStatus.textContent = error instanceof Error ? error.message : "Erro ao cadastrar.";
+    const message = error instanceof Error ? error.message : "Não foi possível criar a conta. Tente novamente.";
+    const invalidFields = message.includes("nome de usuário já está em uso") ? [registerUsername] : [];
+    showFormFeedback(registerFeedback, message, invalidFields);
   }
+});
+
+[registerName, registerUsername, registerPassword, registerPasswordConfirm].forEach((field) => {
+  field.addEventListener("input", () => clearFormFeedback(registerFeedback, registerForm));
+});
+
+[loginUsername, loginPassword].forEach((field) => {
+  field.addEventListener("input", () => clearFormFeedback(loginFeedback, loginForm));
 });
 
 window.addEventListener("beforeunload", () => {
