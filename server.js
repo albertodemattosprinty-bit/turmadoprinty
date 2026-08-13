@@ -54,7 +54,7 @@ import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getSched
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
-import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, recordProposalActivity, recordProposalVisit, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
+import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { confirmEventLodging, confirmEventPayment, ensureEventContractingSchema, getEventContractWorkflow, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
@@ -10383,6 +10383,19 @@ async function handleValidateEventCoupon(request, response) {
   }
 }
 
+async function handleEventPageResolve(response, slug) {
+  try {
+    const page = await resolveEventPage(slug);
+    if (!page) {
+      sendJson(response, 404, { error: "Pagina personalizada nao encontrada ou inativa." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, page });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar a pagina personalizada." });
+  }
+}
+
 async function handleContractorCouponUpdate(request, response) {
   const user = await requireAuth(request, response);
   if (!user) return;
@@ -10421,6 +10434,7 @@ async function handleAdminEvents(request, response) {
       ok: true,
       users: eventUsers,
       coupons,
+      pages: coupons,
       presentations: getEventPresentations()
     });
   } catch (error) {
@@ -10433,12 +10447,17 @@ async function handleAdminEventCouponCreate(request, response) {
   if (!admin) return;
   try {
     const body = await readJsonBody(request);
+    const pageSlug = normalizeEventPageSlug(body?.pageSlug ?? body?.code);
+    const conflictsWithPublicPage = pageSlug === "api"
+      || existsSync(path.join(publicDir, pageSlug))
+      || existsSync(path.join(publicDir, `${pageSlug}.html`));
+    if (conflictsWithPublicPage) throw new Error("Esse endereco ja esta sendo usado por outra pagina do site.");
     const coupon = await createEventCoupon(admin.id, body || {});
-    sendJson(response, 201, { ok: true, coupon });
+    sendJson(response, 201, { ok: true, coupon, page: coupon });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nao foi possivel criar o cupom.";
+    const message = error instanceof Error ? error.message : "Nao foi possivel criar a pagina personalizada.";
     const duplicate = String(error?.code || "") === "23505";
-    sendJson(response, 400, { error: duplicate ? "Ja existe um cupom com esse codigo." : message });
+    sendJson(response, 400, { error: duplicate ? "Ja existe uma pagina com esse endereco." : message });
   }
 }
 
@@ -10448,9 +10467,9 @@ async function handleAdminEventCouponUpdate(request, response, couponId) {
   try {
     const body = await readJsonBody(request);
     const coupon = await updateEventCoupon(couponId, body || {});
-    sendJson(response, 200, { ok: true, coupon });
+    sendJson(response, 200, { ok: true, coupon, page: coupon });
   } catch (error) {
-    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar o cupom." });
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar a pagina personalizada." });
   }
 }
 
@@ -13527,6 +13546,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname.match(/^\/api\/event-pages\/[^/]+$/)) {
+    const pageSlug = decodeURIComponent(pathname.replace(/^\/api\/event-pages\/([^/]+)$/, "$1"));
+    await handleEventPageResolve(response, pageSlug);
+    return;
+  }
+
   if (request.method === "PUT" && pathname === "/api/contractor-panel/coupon") {
     await handleContractorCouponUpdate(request, response);
     return;
@@ -14898,13 +14923,13 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && pathname === "/api/admin/eventos/coupons") {
+  if (request.method === "POST" && ["/api/admin/eventos/coupons", "/api/admin/eventos/pages"].includes(pathname)) {
     await handleAdminEventCouponCreate(request, response);
     return;
   }
 
-  if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/coupons\/[^/]+$/)) {
-    const couponId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/coupons\/([^/]+)$/, "$1"));
+  if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/(?:coupons|pages)\/[^/]+$/)) {
+    const couponId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/(?:coupons|pages)\/([^/]+)$/, "$1"));
     await handleAdminEventCouponUpdate(request, response, couponId);
     return;
   }
@@ -15078,6 +15103,18 @@ const server = http.createServer(async (request, response) => {
   if (existsSync(htmlResolvedPath) && htmlResolvedPath.startsWith(publicDir)) {
     await serveStatic(response, htmlResolvedPath);
     return;
+  }
+
+  if (request.method === "GET" && /^[a-z0-9][a-z0-9-]{2,39}$/i.test(requestedPath)) {
+    try {
+      const eventPage = await resolveEventPage(requestedPath);
+      if (eventPage) {
+        await serveStatic(response, path.join(publicDir, "termo.html"));
+        return;
+      }
+    } catch (error) {
+      console.error("Falha ao resolver pagina personalizada do evento:", error);
+    }
   }
 
   const fallbackPath = path.join(publicDir, "index.html");

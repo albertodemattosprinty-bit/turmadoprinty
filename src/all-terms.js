@@ -34,8 +34,8 @@ const QUESTION_ORDER = [
   { key: "eventCount", label: "Quantidade de eventos" },
   { key: "unitPrice", label: "Valor por evento" },
   { key: "basePrice", label: "Valor antes do desconto" },
-  { key: "couponCode", label: "Cupom aplicado" },
-  { key: "couponDiscount", label: "Desconto do cupom" },
+  { key: "couponCode", label: "Pagina personalizada" },
+  { key: "couponDiscount", label: "Desconto aplicado" },
   { key: "finalPrice", label: "Preco final" },
   { key: "freeTransport", label: "Transporte livre de cobranca" },
   { key: "transportAmount", label: "Valor definido para o transporte" },
@@ -186,7 +186,7 @@ async function buildCommercialAnswers(rawAnswers) {
       freeTransport: pricing.freeTransport ? "Sim" : "Nao",
       transportAmount: pricing.transportAmountCents ? formatEventMoney(pricing.transportAmountCents) : (pricing.freeTransport ? "Livre de cobranca" : "Nao definido"),
       transportRoute: pricing.transportCityA && pricing.transportCityB ? (pricing.transportTripType === "ROUND_TRIP" ? `${pricing.transportCityA} para ${pricing.transportCityB} e volta para ${pricing.transportCityA}` : `${pricing.transportCityA} para ${pricing.transportCityB}`) : "Nao definida",
-      transportDescription: pricing.transportDescription || "Transporte nao definido neste cupom",
+      transportDescription: pricing.transportDescription || (pricing.freeTransport ? "Transporte sem cobranca" : "Transporte nao definido"),
       freeLodging: pricing.freeLodging ? "Sim" : "Nao"
     }
   };

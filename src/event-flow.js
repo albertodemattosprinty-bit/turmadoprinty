@@ -27,6 +27,19 @@ function normalizeCouponCode(value) {
     .slice(0, 40);
 }
 
+export function normalizeEventPageSlug(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
 function resolvePresentation(key) {
   const normalizedKey = String(key || "").trim().toLowerCase();
   return EVENT_PRESENTATIONS.find((item) => item.key === normalizedKey) || null;
@@ -41,8 +54,9 @@ function normalizeEventCount(value) {
 }
 
 function normalizeTransport(input = {}) {
-  const freeTransport = Boolean(input.freeTransport);
-  const amountCents = freeTransport ? 0 : Math.max(0, Math.trunc(Number(input.transportAmountCents || 0) || 0));
+  const requestedAmountCents = Math.max(0, Math.trunc(Number(input.transportAmountCents || 0) || 0));
+  const freeTransport = Boolean(input.freeTransport) || requestedAmountCents === 0;
+  const amountCents = freeTransport ? 0 : requestedAmountCents;
   const tripType = String(input.transportTripType || "ONE_WAY").toUpperCase() === "ROUND_TRIP" ? "ROUND_TRIP" : "ONE_WAY";
   return { freeTransport, amountCents, tripType, cityA: String(input.transportCityA || "").trim().slice(0, 120), cityB: String(input.transportCityB || "").trim().slice(0, 120) };
 }
@@ -56,9 +70,12 @@ function transportDescription({ freeTransport, transportAmountCents, transportTr
 
 function mapCouponRow(row) {
   if (!row) return null;
+  const pageSlug = normalizeEventPageSlug(row.code);
   return {
     id: row.id,
     code: row.code,
+    pageSlug,
+    pagePath: pageSlug ? `/${pageSlug}` : "",
     discountCents: Number(row.discount_cents || 0),
     presentationKey: row.presentation_key,
     presentationName: resolvePresentation(row.presentation_key)?.name || row.presentation_key,
@@ -245,17 +262,48 @@ export async function listEventCoupons({ includeInactive = false } = {}) {
   return result.rows.map(mapCouponRow);
 }
 
+export async function getEventPageBySlug(slug, { includeInactive = false } = {}) {
+  await ensureEventFlowSchema();
+  const pageSlug = normalizeEventPageSlug(slug);
+  if (!pageSlug || pageSlug.length < 3) return null;
+  const result = await query(
+    `select id, code, discount_cents, presentation_key, event_count,
+            free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b,
+            free_lodging, active, created_at, updated_at
+       from event_discount_coupons
+      where code = $1 and ($2::boolean = true or active = true)
+      limit 1`,
+    [normalizeCouponCode(pageSlug), Boolean(includeInactive)]
+  );
+  return mapCouponRow(result.rows[0]);
+}
+
+export async function resolveEventPage(slug) {
+  const page = await getEventPageBySlug(slug);
+  if (!page) return null;
+  const pricing = await resolveEventPricing({
+    presentationKey: page.presentationKey,
+    eventCount: page.eventCount,
+    couponCode: page.code
+  });
+  return {
+    slug: page.pageSlug,
+    path: page.pagePath,
+    pricing
+  };
+}
+
 export async function createEventCoupon(adminUserId, input = {}) {
   await ensureEventFlowSchema();
-  const code = normalizeCouponCode(input.code);
+  const pageSlug = normalizeEventPageSlug(input.pageSlug ?? input.code);
+  const code = normalizeCouponCode(pageSlug);
   const discountCents = Math.max(0, Math.trunc(Number(input.discountCents || 0) || 0));
   const presentation = resolvePresentation(input.presentationKey);
   const eventCount = normalizeEventCount(input.eventCount);
   const transport = normalizeTransport(input);
-  if (!code || code.length < 3) throw new Error("O cupom precisa ter pelo menos 3 caracteres.");
-  if (!presentation) throw new Error("Escolha uma apresentacao valida para o cupom.");
+  if (!pageSlug || pageSlug.length < 3) throw new Error("O endereco da pagina precisa ter pelo menos 3 caracteres.");
+  if (!presentation) throw new Error("Escolha uma apresentacao valida para a pagina.");
   if (discountCents < 1) throw new Error("Informe um valor de desconto maior que zero.");
-  if (transport.amountCents > 0 && (!transport.cityA || !transport.cityB)) throw new Error("Informe a cidade A e a cidade B do transporte.");
 
   const result = await query(
     `insert into event_discount_coupons
@@ -275,8 +323,7 @@ export async function updateEventCoupon(couponId, input = {}) {
   const presentation = editing ? resolvePresentation(input.presentationKey) : null;
   const eventCount = editing ? normalizeEventCount(input.eventCount) : null;
   const discountCents = editing ? Math.max(0, Math.trunc(Number(input.discountCents || 0) || 0)) : null;
-  if (editing && (!presentation || discountCents < 1)) throw new Error("Confira os dados do cupom.");
-  if (editing && transport.amountCents > 0 && (!transport.cityA || !transport.cityB)) throw new Error("Informe a cidade A e a cidade B do transporte.");
+  if (editing && (!presentation || discountCents < 1)) throw new Error("Confira os dados da pagina personalizada.");
   const result = await query(
     `update event_discount_coupons
         set active = coalesce($2::boolean, active), discount_cents = coalesce($3::integer, discount_cents),
@@ -289,7 +336,7 @@ export async function updateEventCoupon(couponId, input = {}) {
                 free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b, free_lodging, active, created_at, updated_at`,
     [couponId, typeof input.active === "boolean" ? input.active : null, discountCents, presentation?.key || null, eventCount, transport?.freeTransport ?? null, transport?.amountCents ?? null, transport?.tripType || null, transport?.cityA ?? null, transport?.cityB ?? null, editing ? Boolean(input.freeLodging) : null]
   );
-  if (!result.rows[0]) throw new Error("Cupom nao encontrado.");
+  if (!result.rows[0]) throw new Error("Pagina personalizada nao encontrada.");
   return mapCouponRow(result.rows[0]);
 }
 
@@ -313,9 +360,9 @@ export async function resolveEventPricing(input = {}) {
       [couponCode]
     );
     coupon = mapCouponRow(couponResult.rows[0]);
-    if (!coupon) throw new Error("Cupom invalido ou inativo.");
+    if (!coupon) throw new Error("Pagina personalizada invalida ou inativa.");
     if (coupon.presentationKey !== presentation.key || coupon.eventCount !== eventCount) {
-      throw new Error(`Este cupom vale para ${coupon.presentationName}, em ${coupon.eventCount} evento${coupon.eventCount === 1 ? "" : "s"}.`);
+      throw new Error(`Esta pagina foi configurada para ${coupon.presentationName}, em ${coupon.eventCount} evento${coupon.eventCount === 1 ? "" : "s"}.`);
     }
   }
 
@@ -331,7 +378,7 @@ export async function resolveEventPricing(input = {}) {
     couponCode: coupon?.code || "",
     couponDiscountCents: discountCents,
     finalPriceCents,
-    freeTransport: Boolean(coupon?.freeTransport),
+    freeTransport: Boolean(coupon && (coupon.freeTransport || transportAmountCents === 0)),
     transportAmountCents,
     transportTripType: coupon?.transportTripType || "",
     transportCityA: coupon?.transportCityA || "",

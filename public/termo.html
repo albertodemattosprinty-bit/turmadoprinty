@@ -136,9 +136,6 @@
     .account-setup p { color:var(--text-soft); }
     .account-setup input { width:100%; min-height:48px; border:0; border-radius:12px; padding:11px 13px; color:var(--input-text); background:var(--input-bg); font:inherit; }
     .account-setup-feedback { min-height:20px; color:#ffd98b; text-align:center; }
-    @keyframes couponGradientMove { 0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%} }
-    .coupon-box { background:linear-gradient(120deg,rgba(18,112,255,.82),rgba(20,201,141,.7),rgba(30,105,236,.82))!important;background-size:240% 240%!important;animation:couponGradientMove 5s ease infinite;border-color:rgba(170,255,235,.62)!important;box-shadow:0 12px 32px rgba(21,145,210,.24); }
-    .coupon-box .coupon-feedback,.coupon-box .coupon-details { color:#fff; }
     .agreement-title {
       display: flex;
       align-items: center;
@@ -199,6 +196,7 @@
       text-align: center;
     }
     .presentation-card.active { border-color: #53e58c; background: rgba(33,203,99,.22); }
+    .presentation-card:disabled { opacity:1; cursor:default; }
     .presentation-card strong { font-size: 1.55rem; }
     .presentation-card span { color: var(--text-soft); }
     .presentation-badge {
@@ -212,7 +210,7 @@
       letter-spacing: .06em;
     }
     .payment-controls { display:grid; grid-template-columns: 1fr; gap:12px; margin-top:12px; }
-    .quantity-control,.coupon-box,.price-summary {
+    .quantity-control,.price-summary {
       border: 1px solid rgba(255,255,255,.18);
       border-radius: 15px;
       padding: 14px;
@@ -230,16 +228,13 @@
       font: inherit;
       text-align:center;
     }
-    .coupon-trigger { width:100%; display:flex; justify-content:space-between; padding:0; color:#fff; background:transparent; text-align:left; }
-    .coupon-trigger small { display:block; margin-top:3px; color:var(--text-soft); font-weight:300; }
-    .coupon-entry { display:flex; gap:8px; margin-top:12px; }
-    .coupon-entry input { min-width:0; flex:1; border:0; border-radius:10px; padding:10px 12px; color:var(--input-text); background:var(--input-bg); font:inherit; text-transform:uppercase; }
-    .coupon-entry button,.coupon-remove { border-radius:10px; padding:10px 13px; background:#fff; color:#0d4ea8; font-weight:600; }
-    .coupon-details { margin-top:10px; color:#bdf5d1; font-size:.88rem; line-height:1.45; }
-    .coupon-remove { margin-top:10px; background:rgba(255,255,255,.12); color:#fff; }
     .price-row { display:flex; justify-content:space-between; gap:12px; padding:4px 0; color:var(--text-soft); }
     .price-row.final { margin-top:5px; padding-top:9px; border-top:1px solid rgba(255,255,255,.15); color:#fff; font-size:1.08rem; }
-    .coupon-feedback { min-height:18px; margin-top:8px; color:#ffd98b; font-size:.82rem; }
+    .dynamic-page-note { margin:0 0 12px; padding:11px 13px; border:1px solid rgba(83,229,140,.42); border-radius:13px; color:#d9ffe7; background:rgba(33,203,99,.12); text-align:center; }
+    .price-special { display:grid; justify-items:center; gap:3px; padding:9px 0 14px; text-align:center; }
+    .price-special del { color:var(--text-soft); font-size:1.05rem; }
+    .price-special strong { color:#fff; font-size:clamp(2rem,8vw,3rem); line-height:1; }
+    .price-special span { color:#8ff0b5; font-size:.82rem; font-weight:600; letter-spacing:.04em; }
     @media (min-width:700px) {
       .presentation-card { flex-basis: 42%; }
       .payment-controls { grid-template-columns: .85fr 1.15fr; }
@@ -634,6 +629,10 @@
     const sessionStorageKey = "turma_do_printy_token";
     const termUrl = new URL(window.location.href);
     const termParams = termUrl.searchParams;
+    const termPathParts = termUrl.pathname.split("/").filter(Boolean);
+    const eventPageSlug = termPathParts.length === 1 && !["termo", "termo.html"].includes(termPathParts[0].toLowerCase())
+      ? termPathParts[0].toLowerCase()
+      : "";
     const authOverlay = document.getElementById("authOverlay");
     const authOverlayMessage = document.getElementById("authOverlayMessage");
     const authOverlayLink = document.getElementById("authOverlayLink");
@@ -662,7 +661,7 @@
       { key: "parques-arenas", label: "Parques e Arenas", priceLabel: "R$ 4.500,00", amountCents: 450000 },
       { key: "show-completo-2h", label: "Show Completo 2h", priceLabel: "R$ 6.000,00", amountCents: 600000 }
     ];
-    const eventFinanceAgreementText = "Escolha entre Teatro Fantoches (R$ 1.800,00), Teatro de Palco (R$ 2.600,00), Congresso Infantil (R$ 3.400,00), Parques e Arenas (R$ 4.500,00) e Show Completo 2h (R$ 6.000,00). O valor-base e multiplicado pela quantidade de eventos. Cupons validos reduzem um valor fixo e podem incluir transporte ou hospedagem livre de cobranca.";
+    const eventFinanceAgreementText = "Escolha entre Teatro Fantoches (R$ 1.800,00), Teatro de Palco (R$ 2.600,00), Congresso Infantil (R$ 3.400,00), Parques e Arenas (R$ 4.500,00) e Show Completo 2h (R$ 6.000,00). O valor-base e multiplicado pela quantidade de eventos. Condicoes especiais podem vir aplicadas automaticamente por uma pagina personalizada enviada pela Turma do Printy.";
     const termEditorModal = document.getElementById("termEditorModal");
     const termEditorText = document.getElementById("termEditorText");
     const termEditorFeedback = document.getElementById("termEditorFeedback");
@@ -677,6 +676,7 @@
     let termHoldStartX = 0;
     let termHoldStartY = 0;
     let termToastTimer = 0;
+    let activeEventPage = null;
 
     function getToken() {
       return window.localStorage.getItem(sessionStorageKey) || "";
@@ -858,7 +858,8 @@
       params.delete("payment");
       params.delete("session_id");
       const query = params.toString();
-      return query ? `/termo?${query}` : "/termo";
+      const basePath = eventPageSlug ? `/${eventPageSlug}` : "/termo";
+      return query ? `${basePath}?${query}` : basePath;
     }
 
     if (authOverlayLink) {
@@ -1010,7 +1011,6 @@
     let inPostQuestionAgreements = false;
     let paymentStage = 0;
     let countdownTimer = null;
-    let couponPanelOpen = false;
     let proposalVisitId = "";
     let proposalSessionId = "";
     let proposalHeartbeatTimer = 0;
@@ -1134,41 +1134,33 @@
       return { selected, eventCount, basePriceCents, couponDiscountCents, transportAmountCents, finalPriceCents: basePriceCents - couponDiscountCents + transportAmountCents };
     }
 
-    function removeAppliedCoupon(feedback = "") {
-      answers.couponCode = "";
-      answers.couponDiscountCents = "0";
-      answers.freeTransport = false;
-      answers.transportAmountCents = "0";
-      answers.transportTripType = "";
-      answers.transportCityA = "";
-      answers.transportCityB = "";
-      answers.transportDescription = "";
-      answers.freeLodging = false;
-      answers.couponFeedback = feedback;
+    function applyEventPagePricing(page) {
+      const pricing = page?.pricing;
+      if (!pricing) return;
+      activeEventPage = page;
+      answers.eventPagePath = page.path || `/${page.slug || eventPageSlug}`;
+      answers.presentationKey = pricing.presentationKey;
+      answers.eventCount = String(pricing.eventCount || 1);
+      answers.couponCode = pricing.couponCode || "";
+      answers.couponDiscountCents = String(pricing.couponDiscountCents || 0);
+      answers.freeTransport = Boolean(pricing.freeTransport);
+      answers.transportAmountCents = String(pricing.transportAmountCents || 0);
+      answers.transportTripType = pricing.transportTripType || "";
+      answers.transportCityA = pricing.transportCityA || "";
+      answers.transportCityB = pricing.transportCityB || "";
+      answers.transportDescription = pricing.transportDescription || "";
+      answers.freeLodging = Boolean(pricing.freeLodging);
       syncPricingPreview();
     }
 
-    async function applyCouponCode(code) {
-      const preview = syncPricingPreview();
-      const response = await fetch("/api/event-coupons/validate", {
-        method: "POST",
-        headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ presentationKey: preview.selected.key, eventCount: preview.eventCount, couponCode: code })
-      });
+    async function loadEventPagePricing() {
+      if (!eventPageSlug) return;
+      const response = await fetch(`/api/event-pages/${encodeURIComponent(eventPageSlug)}`);
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.pricing) throw new Error(data.error || "Cupom invalido.");
-      answers.couponCode = data.pricing.couponCode || "";
-      answers.couponDiscountCents = String(data.pricing.couponDiscountCents || 0);
-      answers.freeTransport = Boolean(data.pricing.freeTransport);
-      answers.transportAmountCents = String(data.pricing.transportAmountCents || 0);
-      answers.transportTripType = data.pricing.transportTripType || "";
-      answers.transportCityA = data.pricing.transportCityA || "";
-      answers.transportCityB = data.pricing.transportCityB || "";
-      answers.transportDescription = data.pricing.transportDescription || "";
-      answers.freeLodging = Boolean(data.pricing.freeLodging);
-      answers.couponFeedback = "Cupom aplicado no preco final.";
-      couponPanelOpen = true;
-      syncPricingPreview();
+      if (!response.ok || !data?.page?.pricing) {
+        throw new Error(data.error || "Esta pagina personalizada nao esta mais disponivel.");
+      }
+      applyEventPagePricing(data.page);
     }
 
     function renderPaymentStage() {
@@ -1179,77 +1171,52 @@
 
       if (paymentStage === 0) {
         paymentIcon.innerHTML = `<path d="M3 8h18v8H3z" stroke="white" stroke-width="1.8"/><path d="M3 12h18" stroke="white" stroke-width="1.8"/>`;
-        prepareTermTextElement(paymentH1, "payment.choice.title", "Escolha da apresentação");
+        prepareTermTextElement(paymentH1, activeEventPage ? "payment.dynamic.title" : "payment.choice.title", activeEventPage ? "Condição da apresentação" : "Escolha da apresentação");
         prepareTermTextElement(paymentH2, "payment.choice.copy", "");
         const pricing = syncPricingPreview();
-        const couponBenefits = [
+        const isDynamicPage = Boolean(activeEventPage);
+        const visiblePaymentOptions = isDynamicPage ? [pricing.selected] : paymentOptions;
+        const pageBenefits = [
           answers.transportDescription || (answers.freeTransport ? "Livre de transporte" : ""),
           answers.freeLodging ? "Livre de hospedagem" : ""
         ].filter(Boolean);
+        const originalPriceCents = pricing.basePriceCents + pricing.transportAmountCents;
         paymentBody.innerHTML = `
+          ${isDynamicPage ? `<p class="dynamic-page-note">Condição especial desta página já aplicada.</p>` : ""}
           <div class="presentation-carousel" id="presentationCarousel" aria-label="Apresentacoes disponiveis">
-            ${paymentOptions.map((opt) => `<button type="button" class="presentation-card ${answers.presentationKey === opt.key ? "active" : ""}" data-option="${opt.key}">${opt.featured ? '<span class="presentation-badge">MAIS CONTRATADO</span>' : ""}<strong>${opt.priceLabel}</strong><span>${opt.label}</span></button>`).join("")}
+            ${visiblePaymentOptions.map((opt) => `<button type="button" class="presentation-card ${answers.presentationKey === opt.key ? "active" : ""}" data-option="${opt.key}" ${isDynamicPage ? "disabled" : ""}>${opt.featured ? '<span class="presentation-badge">MAIS CONTRATADO</span>' : ""}<strong>${opt.priceLabel}</strong><span>${opt.label}</span></button>`).join("")}
           </div>
           <div class="payment-controls">
             <div class="quantity-control">
-              <label><span>Quantos eventos serao?</span><input id="eventCountInput" type="number" min="1" max="20" value="${pricing.eventCount}" inputmode="numeric"></label>
-            </div>
-            <div class="coupon-box">
-              <button class="coupon-trigger" id="couponTrigger" type="button"><span><strong>Voc&ecirc; tem um cupom de desconto</strong></span><span>${couponPanelOpen ? "&minus;" : "+"}</span></button>
-              ${couponPanelOpen ? `<div class="coupon-entry"><input id="couponInput" maxlength="40" placeholder="Digite o cupom" value="${escapeHtml(answers.couponCode || "")}"><button id="applyCouponBtn" type="button">Aplicar</button></div>` : ""}
-              ${answers.couponCode ? `<div class="coupon-details"><strong>${escapeHtml(answers.couponCode)}</strong> retirou ${formatEventMoney(pricing.couponDiscountCents)} do valor.${couponBenefits.length ? `<br>${couponBenefits.join(" + ")}` : ""}</div><button class="coupon-remove" id="removeCouponBtn" type="button">Remover cupom</button>` : ""}
-              <div class="coupon-feedback" id="couponFeedback">${escapeHtml(answers.couponFeedback || "")}</div>
+              <label><span>Quantos eventos serão?</span><input id="eventCountInput" type="number" min="1" max="20" value="${pricing.eventCount}" inputmode="numeric" ${isDynamicPage ? "disabled" : ""}></label>
             </div>
             <div class="price-summary">
+              ${isDynamicPage ? `<div class="price-special"><del>${formatEventMoney(originalPriceCents)}</del><strong>${formatEventMoney(pricing.finalPriceCents)}</strong><span>Desconto aplicado</span></div>` : `<div class="price-row final"><span>Valor total</span><strong>${formatEventMoney(pricing.finalPriceCents)}</strong></div>`}
               <div class="price-row"><span>${pricing.selected.label} x ${pricing.eventCount}</span><strong>${formatEventMoney(pricing.basePriceCents)}</strong></div>
-              ${pricing.couponDiscountCents ? `<div class="price-row"><span>Desconto ${escapeHtml(answers.couponCode)}</span><strong>- ${formatEventMoney(pricing.couponDiscountCents)}</strong></div>` : ""}
-              <div class="price-row final"><span>Preco final</span><strong>${formatEventMoney(pricing.finalPriceCents)}</strong></div>
-              ${pricing.transportAmountCents ? `<div class="price-row"><span>Transporte definido</span><strong>${formatEventMoney(pricing.transportAmountCents)}</strong></div>` : ""}
+              ${isDynamicPage ? `<div class="price-row"><span>Desconto aplicado</span><strong>- ${formatEventMoney(pricing.couponDiscountCents)}</strong></div><div class="price-row"><span>Transporte</span><strong>${pricing.transportAmountCents ? formatEventMoney(pricing.transportAmountCents) : "Sem cobrança"}</strong></div>${pageBenefits.length ? `<div class="price-row"><span>Condições</span><strong>${pageBenefits.map(escapeHtml).join(" + ")}</strong></div>` : ""}` : ""}
             </div>
           </div>
         `;
 
-        paymentBody.querySelectorAll("[data-option]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const key = btn.getAttribute("data-option");
-            if (!paymentOptions.some((item) => item.key === key)) return;
-            const hadCoupon = Boolean(answers.couponCode);
-            answers.presentationKey = key;
-            if (hadCoupon) removeAppliedCoupon("Cupom removido porque a apresentacao mudou.");
-            renderPaymentStage();
+        if (!isDynamicPage) {
+          paymentBody.querySelectorAll("[data-option]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const key = btn.getAttribute("data-option");
+              if (!paymentOptions.some((item) => item.key === key)) return;
+              answers.presentationKey = key;
+              renderPaymentStage();
+            });
           });
-        });
+        }
         const selectedCard = paymentBody.querySelector(".presentation-card.active");
         window.setTimeout(() => selectedCard?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }), 0);
-        document.getElementById("eventCountInput")?.addEventListener("change", (event) => {
-          const nextCount = Math.min(20, Math.max(1, Math.trunc(Number(event.target.value || 1))));
-          const hadCoupon = Boolean(answers.couponCode);
-          answers.eventCount = String(nextCount);
-          if (hadCoupon) removeAppliedCoupon("Cupom removido porque a quantidade de eventos mudou.");
-          renderPaymentStage();
-        });
-        document.getElementById("couponTrigger")?.addEventListener("click", () => {
-          couponPanelOpen = !couponPanelOpen;
-          renderPaymentStage();
-        });
-        document.getElementById("applyCouponBtn")?.addEventListener("click", async () => {
-          const button = document.getElementById("applyCouponBtn");
-          const code = document.getElementById("couponInput")?.value || "";
-          if (!code.trim()) { answers.couponFeedback = "Digite o codigo do cupom."; renderPaymentStage(); return; }
-          button.disabled = true;
-          answers.couponFeedback = "Validando...";
-          try {
-            await applyCouponCode(code);
-          } catch (error) {
-            removeAppliedCoupon(error instanceof Error ? error.message : "Cupom invalido.");
-            couponPanelOpen = true;
-          }
-          renderPaymentStage();
-        });
-        document.getElementById("removeCouponBtn")?.addEventListener("click", () => {
-          removeAppliedCoupon("Cupom removido. O valor normal foi restaurado.");
-          renderPaymentStage();
-        });
+        if (!isDynamicPage) {
+          document.getElementById("eventCountInput")?.addEventListener("change", (event) => {
+            const nextCount = Math.min(20, Math.max(1, Math.trunc(Number(event.target.value || 1))));
+            answers.eventCount = String(nextCount);
+            renderPaymentStage();
+          });
+        }
       }
 
       updateProgress();
@@ -1382,7 +1349,9 @@
         text: [
           `${pricing.selected.label}: ${formatEventMoney(pricing.selected.amountCents)} por evento.`,
           `Quantidade: ${pricing.eventCount} evento${pricing.eventCount === 1 ? "" : "s"}.`,
-          answers.couponCode ? `Cupom ${answers.couponCode}: desconto de ${formatEventMoney(pricing.couponDiscountCents)}.` : "Nenhum cupom aplicado.",
+          activeEventPage
+            ? `Pagina personalizada ${activeEventPage.path}: desconto de ${formatEventMoney(pricing.couponDiscountCents)} aplicado automaticamente.`
+            : "Valor sem desconto de pagina personalizada.",
           `Preco final: ${formatEventMoney(pricing.finalPriceCents)}.`,
           benefits.length ? benefits.join(". ") + "." : ""
         ].filter(Boolean).join("\n")
@@ -1617,6 +1586,14 @@
     });
 
     async function initializeTermPage() {
+      try {
+        await loadEventPagePricing();
+      } catch (error) {
+        authOverlayMessage.textContent = error instanceof Error ? error.message : "Esta pagina personalizada nao esta disponivel.";
+        authOverlayLink.hidden = true;
+        authOverlay.classList.remove("hidden");
+        return;
+      }
       await loadTermContentConfig();
       const user = await ensureAuthenticatedAccess();
       if (user) void startProposalTracking();
