@@ -6706,6 +6706,8 @@ function openModal(id) {
     return;
   }
 
+  const wasAlreadyActive = modal.classList.contains("active");
+
   if (modalNavigationStack[modalNavigationStack.length - 1] !== id) {
     modalNavigationStack.push(id);
   }
@@ -6732,6 +6734,9 @@ function openModal(id) {
   }
 
   if (id === "actionsModal") {
+    if (!wasAlreadyActive) {
+      state.uiAnchors.actionsCurrentCentered = false;
+    }
     void window.project200Projects?.load();
     const runningAction = getRunningActionForSelectedProfile();
     const latestDone = getLatestCompletedActionForSelectedProfile();
@@ -7644,7 +7649,7 @@ function renderActions() {
       suppressActionsAutoAnchorOnce = false;
     } else {
       window.requestAnimationFrame(() => {
-        anchorToCurrentAction();
+        anchorToCurrentActionOnce();
       });
     }
   }
