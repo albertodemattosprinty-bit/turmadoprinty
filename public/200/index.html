@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;500;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/200/project.css?v=0.87" />
+  <link rel="stylesheet" href="/200/project.css?v=0.89" />
   <link rel="stylesheet" href="/200/life-capture.css?v=20260802-gallery-inline-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
 </head>
@@ -1386,6 +1386,7 @@
       <div class="history-mission-modal-body mission-guide-body">
         <div class="mission-guide-slider" id="missionCreateSlider">
           <section class="mission-guide-step mission-guide-step-kind is-active" data-mission-create-step="0" aria-labelledby="missionCreateKindStep">
+            <span class="mission-immersive-step-icon mission-immersive-step-icon-blue" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="22" stroke="currentColor" stroke-width="5"/><circle cx="32" cy="32" r="12" stroke="currentColor" stroke-width="5"/><circle cx="32" cy="32" r="4" fill="currentColor"/></svg></span>
             <span class="mission-guide-kicker">Antes de começar</span>
             <h2 id="missionCreateKindStep">Meta ou Limite?</h2>
             <p>Meta é algo que você quer alcançar. Limite é algo que você quer manter sob controle e nunca soma pontos.</p>
@@ -1401,6 +1402,7 @@
             </div>
           </section>
           <section class="mission-guide-step mission-guide-step-structure" data-mission-create-step="1" aria-labelledby="missionCreateStructureStep">
+            <span class="mission-immersive-step-icon mission-immersive-step-icon-purple" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="15" y="13" width="34" height="43" rx="5" stroke="currentColor" stroke-width="4"/><path d="M25 13v-2.5A3.5 3.5 0 0 1 28.5 7h7a3.5 3.5 0 0 1 3.5 3.5V13M23 27l3 3 5-6m5 3h7M23 40l3 3 5-6m5 3h7" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <span class="mission-guide-number">1</span>
             <h2 id="missionCreateStructureStep">Como essa missão funciona?</h2>
             <div class="mission-structure-choice-list">
@@ -1415,18 +1417,21 @@
             </div>
           </section>
           <section class="mission-guide-step" data-mission-create-step="2" aria-labelledby="missionCreateNameStep">
+            <span class="mission-immersive-step-icon mission-immersive-step-icon-purple" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><path d="m15 45 3.2-13.2L42 8l14 14-23.8 23.8L19 49l-4-4Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="m35 15 14 14M18.5 32.5l13 13" stroke="currentColor" stroke-width="4"/></svg></span>
             <span class="mission-guide-number">1</span>
             <h2 id="missionCreateNameStep">Nome da missão</h2>
             <p id="missionCreateNameCopy" hidden></p>
             <input class="text-field options-text-field" type="text" id="missionTitleInput" maxlength="120" autocomplete="off" inputmode="text" placeholder="Digite o nome" />
           </section>
           <section class="mission-guide-step" data-mission-create-step="3" aria-labelledby="missionCreateTargetStep">
+            <span class="mission-immersive-step-icon mission-immersive-step-icon-blue" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><path d="M18 12h28v40H18z" stroke="currentColor" stroke-width="4"/><path d="M25 22h14M25 32h14M25 42h8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span>
             <span class="mission-guide-number">2</span>
             <h2 id="missionCreateTargetStep">Quantas vezes por dia?</h2>
             <p id="missionCreateTargetCopy" hidden></p>
             <input class="text-field options-text-field" type="text" id="missionTargetInput" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off" placeholder="Digite um número" />
           </section>
           <section class="mission-guide-step mission-limit-interval-step" data-mission-create-step="4" aria-labelledby="missionCreateFinalStepTitle">
+            <span class="mission-immersive-step-icon mission-immersive-step-icon-blue" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="34" r="22" stroke="currentColor" stroke-width="4"/><path d="M32 22v13l9 6M25 8h14" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span>
             <span class="mission-guide-number">3</span>
             <h2 id="missionCreateFinalStepTitle">Quanto tempo leva?</h2>
             <div id="missionCreateLimitIntervalPanel" hidden>
@@ -1454,6 +1459,7 @@
             </button>
           </section>
         <section class="mission-guide-step mission-repeat-step" data-mission-create-step="5" aria-labelledby="missionCreateRepeatStep">
+            <span class="mission-immersive-step-icon mission-immersive-step-icon-green" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="10" y="15" width="44" height="39" rx="6" stroke="currentColor" stroke-width="4"/><path d="M10 27h44M21 9v12M43 9v12M21 37h7M36 37h7M21 45h7" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span>
             <span class="mission-guide-number">4</span>
             <h2 id="missionCreateRepeatStep">Quando?</h2>
             <p>Toque nos dias em que essa missão se repete</p>
@@ -1534,7 +1540,7 @@
   <section class="workspace-modal simple-modal mission-variants-modal" id="missionVariantsModal" aria-hidden="true" aria-label="Micro-tarefas da missão">
     <div class="mission-variants-panel">
       <header class="mission-variants-head">
-        <div><div class="mission-variants-kicker" id="missionVariantsKicker">Micro-tarefas</div><div class="running-task-name mission-variants-title" id="missionVariantsTitle">Escolha uma micro-tarefa</div></div>
+        <div><span class="mission-variant-immersive-icon" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="15" y="13" width="34" height="43" rx="5" stroke="currentColor" stroke-width="4"/><path d="M25 13v-2.5A3.5 3.5 0 0 1 28.5 7h7a3.5 3.5 0 0 1 3.5 3.5V13M23 27l3 3 5-6m5 3h7M23 40l3 3 5-6m5 3h7" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="mission-variants-kicker" id="missionVariantsKicker">Micro-tarefas</div><div class="running-task-name mission-variants-title" id="missionVariantsTitle">Escolha uma micro-tarefa</div></div>
         <div class="mission-variants-head-actions">
           <div class="mission-variant-sort-wrap">
             <button class="history-mission-modal-close mission-variant-sort-button" type="button" id="missionVariantSortButton" aria-label="Ordenar micro-tarefas" aria-expanded="false" aria-controls="missionVariantSortMenu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11v2H4V7Zm0 4h8v2H4v-2Zm0 4h5v2H4v-2Zm13.6-5.4L20 12l2.4-2.4L24 11.2l-4 4-4-4 1.6-1.6Z" fill="currentColor"/></svg></button>
@@ -1551,6 +1557,7 @@
       <button class="primary-btn mission-variant-add" type="button" id="missionVariantAddButton" aria-label="Criar micro-tarefa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7V4Z" fill="currentColor"/></svg></button>
       <div class="mission-variant-editor" id="missionVariantEditor" hidden>
         <div class="mission-variant-editor-step" id="missionVariantEditorStep1">
+          <div class="mission-variant-stage-copy"><strong>Nome da micro-tarefa</strong><span>Dê um nome curto, concreto e fácil de reconhecer.</span></div>
           <input class="text-field options-text-field" type="text" id="missionVariantTitleInput" maxlength="120" autocomplete="off" placeholder="Nome da micro-tarefa" />
         </div>
                         <div class="mission-variant-editor-step" id="missionVariantEditorStep2" hidden>
@@ -1652,6 +1659,7 @@
   <section class="workspace-modal simple-modal" id="missionTimeModal" aria-hidden="true" aria-label="Definir tempo da missão">
     <div class="finance-content history-mission-modal-content history-mission-modal-shell">
       <div class="history-mission-modal-head">
+        <span class="mission-time-immersive-icon mission-immersive-step-icon mission-immersive-step-icon-blue" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="34" r="22" stroke="currentColor" stroke-width="4"/><path d="M32 22v13l9 6M25 8h14" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span>
         <div class="mission-modal-heading">
           <span class="mission-modal-eyebrow">Duração da atividade</span>
           <h1 class="mission-modal-title">Tempo por missão</h1>
@@ -1685,6 +1693,7 @@
         <button class="ghost-btn" type="button" id="missionTimeBackButton" hidden>Voltar</button>
         <button class="history-mission-footer-icon history-mission-footer-icon-green" type="button" id="missionTimeConfirmButton" aria-label="Continuar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.2 16.6-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4z" fill="currentColor"/></svg>
+          <span class="mission-time-confirm-label">Aplicar tempo</span>
         </button>
       </div>
     </div>
@@ -1972,7 +1981,7 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=0.88"></script>
+  <script type="module" src="/200/project.js?v=0.89"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260730-admin-texts-v1"></script>

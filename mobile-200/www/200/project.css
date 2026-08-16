@@ -12460,6 +12460,28 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-she
   grid-template-rows: 54px minmax(0, 1fr) auto;
   gap: 8px;
 }
+
+@media (max-width: 640px) {
+  #missionTimeModal.is-immersive-create .history-mission-modal-shell {
+    padding: max(14px, env(safe-area-inset-top, 0px)) 14px max(14px, env(safe-area-inset-bottom, 0px));
+  }
+  #missionTimeModal.is-immersive-create .history-mission-modal-head {
+    min-height: 160px;
+  }
+  #missionTimeModal.is-immersive-create .history-mission-modal-close {
+    width: 54px;
+    height: 54px;
+  }
+  #missionTimeModal.is-immersive-create h1.mission-modal-title {
+    font-size: clamp(1.75rem, 8vw, 2.35rem);
+  }
+}
+
+@media (max-height: 720px) {
+  #missionTimeModal.is-immersive-create .history-mission-modal-head {
+    min-height: 126px;
+  }
+}
 body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-body {
   padding-block: 0;
 }
@@ -15554,3 +15576,1108 @@ body[data-background-theme="white"] .marin-chat-more-button {
 .mission-folder-manager-footer { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:14px 18px 18px; border-top:1px solid rgba(255,255,255,.12); }
 .mission-folder-manager-footer .ghost-btn, .mission-folder-manager-footer .primary-btn { min-height:46px; }
 @media (max-width:520px) { .mission-folder-manager-modal { padding:12px; } .mission-folder-manager-head, .mission-folder-manager-body { padding-left:14px; padding-right:14px; } .mission-folder-manager-footer { padding:12px 14px 14px; } }
+/* Fullscreen immersive creation flows: task repetition, simple missions and micro-tasks. */
+#missionCreateModal,
+#missionTimeModal.is-immersive-create,
+#missionVariantsModal.is-immersive-editor,
+#universalScheduleModal,
+#dailyrepetitionModal,
+#repeatuntilModal,
+#dataselectModal[data-schedule-context="mission-create"],
+#dataselectModal[data-schedule-context="microtask"] {
+  --immersive-bg: #07101f;
+  --immersive-panel: #050d1b;
+  --immersive-card: rgba(10, 20, 38, .76);
+  --immersive-card-hover: rgba(17, 31, 56, .9);
+  --immersive-border: rgba(152, 170, 205, .22);
+  --immersive-text: #f5f7fb;
+  --immersive-muted: #b6bdca;
+  --immersive-blue: #4b9cff;
+  --immersive-purple: #a985ff;
+  --immersive-green: #20c763;
+}
+
+#missionCreateModal.active {
+  display: grid;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(41, 77, 132, .3), transparent 34%),
+    linear-gradient(180deg, #081323 0%, var(--immersive-bg) 100%) !important;
+}
+
+#missionCreateModal .mission-guide-shell {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  min-height: 100dvh;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    clamp(18px, 4vw, 46px)
+    max(18px, env(safe-area-inset-bottom, 0px));
+  border: 0;
+  border-radius: 0;
+  gap: clamp(12px, 2.5vh, 24px);
+  background:
+    radial-gradient(circle at 50% 3%, rgba(120, 64, 212, .11), transparent 30%),
+    linear-gradient(180deg, rgba(5, 15, 29, .99), rgba(4, 12, 23, .99)) !important;
+  color: var(--immersive-text);
+}
+
+#missionCreateModal .history-mission-modal-head,
+#missionCreateModal .mission-guide-body,
+#missionCreateModal .mission-guide-navigation {
+  width: min(100%, 760px);
+  justify-self: center;
+}
+
+#missionCreateModal .history-mission-modal-head {
+  min-height: 66px;
+}
+
+#missionCreateModal .history-mission-modal-close,
+#missionCreateModal .friend-assignment-button {
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(29, 39, 59, .82);
+}
+
+#missionCreateModal .mission-guide-body {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+#missionCreateModal .mission-guide-slider,
+#missionCreateModal.is-compact-stage .mission-guide-slider {
+  width: 100%;
+  height: 100% !important;
+  min-height: 0 !important;
+  align-self: stretch;
+}
+
+#missionCreateModal .mission-guide-slider .mission-guide-step,
+#missionCreateModal.is-compact-stage .mission-guide-step {
+  min-height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: clamp(10px, 1.8vh, 18px);
+  padding: clamp(12px, 2.5vw, 24px) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#missionCreateModal .mission-guide-number {
+  display: none;
+}
+
+.mission-immersive-step-icon,
+.mission-variant-immersive-icon,
+.universal-schedule-main-icon {
+  width: clamp(72px, 12vw, 92px);
+  height: clamp(72px, 12vw, 92px);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid currentColor;
+  border-radius: 24px;
+  box-shadow: inset 0 0 24px rgba(157, 92, 255, .12);
+}
+
+.mission-immersive-step-icon svg,
+.mission-variant-immersive-icon svg,
+.universal-schedule-main-icon svg {
+  width: 58%;
+  height: 58%;
+}
+
+.mission-immersive-step-icon-blue {
+  color: var(--immersive-blue);
+  border-color: rgba(75, 156, 255, .3);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(75, 156, 255, .3), transparent 58%),
+    rgba(45, 126, 235, .18);
+}
+
+.mission-immersive-step-icon-purple,
+.mission-variant-immersive-icon {
+  color: var(--immersive-purple);
+  border-color: rgba(169, 133, 255, .3);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(169, 133, 255, .3), transparent 58%),
+    rgba(132, 92, 224, .18);
+}
+
+.mission-immersive-step-icon-green,
+.universal-schedule-main-icon {
+  color: #49df84;
+  border-color: rgba(73, 223, 132, .3);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(73, 223, 132, .28), transparent 58%),
+    rgba(32, 199, 99, .16);
+}
+
+#missionCreateModal .mission-guide-kicker {
+  margin: 0;
+  color: var(--immersive-muted);
+  font-size: .76rem;
+  letter-spacing: .14em;
+}
+
+#missionCreateModal .mission-guide-step h2,
+#missionCreateModal.is-compact-stage .mission-guide-step h2 {
+  max-width: 680px;
+  color: var(--immersive-text);
+  font-size: clamp(2rem, 6vw, 3.15rem);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+
+#missionCreateModal .mission-guide-step p {
+  color: var(--immersive-muted);
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  line-height: 1.5;
+}
+
+#missionCreateModal .mission-guide-step .text-field.options-text-field,
+#missionVariantsModal.is-immersive-editor .mission-variant-editor-step .text-field.options-text-field {
+  width: min(100%, 680px);
+  min-height: 76px;
+  margin-top: 8px;
+  padding: 0 22px;
+  border: 1px solid var(--immersive-border);
+  border-radius: 17px;
+  background: rgba(13, 24, 43, .9);
+  color: var(--immersive-text);
+  text-align: left;
+  font-size: 1.18rem;
+  font-weight: 750;
+  box-shadow: none;
+}
+
+#missionCreateModal .mission-guide-step .text-field.options-text-field:focus,
+#missionVariantsModal.is-immersive-editor .mission-variant-editor-step .text-field.options-text-field:focus {
+  border-color: rgba(157, 92, 255, .82);
+  box-shadow: 0 0 0 3px rgba(157, 92, 255, .12);
+}
+
+#missionCreateModal .mission-guide-step .text-field.options-text-field::placeholder,
+#missionVariantsModal.is-immersive-editor .mission-variant-editor-step .text-field.options-text-field::placeholder {
+  color: #a9afba;
+  opacity: 1;
+}
+
+#missionCreateModal .mission-kind-choice-grid {
+  width: min(100%, 720px);
+  grid-template-columns: 1fr;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+#missionCreateModal .mission-kind-choice {
+  min-height: 118px;
+  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  justify-items: start;
+  align-items: center;
+  align-content: center;
+  gap: 4px 22px;
+  padding: 22px 26px;
+  border: 1px solid var(--immersive-border);
+  border-right-width: 1px;
+  border-radius: 24px;
+  background: var(--immersive-card);
+  box-shadow: none;
+  opacity: 1;
+  text-align: left;
+}
+
+#missionCreateModal .mission-kind-choice svg {
+  width: 72px;
+  height: 72px;
+  grid-row: 1 / 3;
+  padding: 14px;
+  border: 1px solid currentColor;
+  border-radius: 20px;
+  background: rgba(255,255,255,.06);
+}
+
+#missionCreateModal .mission-kind-choice strong {
+  align-self: end;
+  font-size: clamp(1.45rem, 4vw, 2rem);
+}
+
+#missionCreateModal .mission-kind-choice span {
+  align-self: start;
+  color: var(--immersive-muted);
+  font-size: 1rem;
+}
+
+#missionCreateModal .mission-kind-choice-goal { color: var(--immersive-blue); }
+#missionCreateModal .mission-kind-choice-limit { color: #ffad5b; }
+#missionCreateModal .mission-kind-choice:hover,
+#missionCreateModal .mission-kind-choice.is-selected {
+  transform: translateY(-2px);
+  border-color: currentColor;
+  background: var(--immersive-card-hover);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+#missionCreateModal .mission-structure-choice-list {
+  width: min(100%, 720px);
+  gap: 18px;
+}
+
+#missionCreateModal .mission-structure-choice {
+  min-height: 116px;
+  grid-template-columns: 92px minmax(0,1fr);
+  gap: 22px;
+  padding: 22px 26px;
+  border-color: var(--immersive-border);
+  border-radius: 24px;
+  background: var(--immersive-card);
+}
+
+#missionCreateModal .mission-structure-choice:hover,
+#missionCreateModal .mission-structure-choice.is-selected {
+  transform: translateY(-2px);
+  border-color: rgba(169, 133, 255, .8);
+  background: var(--immersive-card-hover);
+  box-shadow: 0 0 0 3px rgba(169, 133, 255, .11);
+}
+
+#missionCreateModal .mission-structure-choice-icon {
+  width: 88px;
+  height: 88px;
+  border: 1px solid rgba(169, 133, 255, .3);
+  border-radius: 24px;
+  color: var(--immersive-purple);
+  background: rgba(132, 92, 224, .18);
+}
+
+#missionCreateModal .mission-structure-choice-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+#missionCreateModal .mission-structure-choice strong {
+  color: var(--immersive-purple);
+  font-size: clamp(1.35rem, 4vw, 1.9rem);
+}
+
+#missionCreateModal .mission-structure-choice small {
+  color: var(--immersive-muted);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+#missionCreateModal .mission-create-time-panel,
+#missionCreateModal .mission-create-category-trigger,
+#missionCreateModal .mission-create-repetition-modal-button {
+  width: min(100%, 680px);
+}
+
+#missionCreateModal .mission-create-time-button,
+#missionCreateModal .mission-create-repetition-modal-button {
+  min-height: 92px;
+  border-radius: 20px;
+}
+
+#missionCreateModal .mission-guide-navigation {
+  margin: 0 auto;
+  padding: 0;
+  gap: 14px;
+}
+
+#missionCreateModal .mission-guide-navigation .mission-guide-submit,
+#missionCreateModal .mission-guide-navigation .mission-guide-back {
+  min-height: 72px;
+  border-radius: 17px;
+  font-size: 1.12rem;
+}
+
+#missionCreateModal .mission-guide-navigation .mission-guide-submit {
+  background: linear-gradient(180deg, #25cf69, #20c763);
+  box-shadow: 0 12px 30px rgba(32, 199, 99, .18);
+}
+
+.mission-time-immersive-icon,
+.mission-time-confirm-label {
+  display: none;
+}
+
+#missionTimeModal.is-immersive-create.active {
+  display: grid;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(41, 77, 132, .3), transparent 34%),
+    linear-gradient(180deg, #081323 0%, var(--immersive-bg) 100%) !important;
+}
+
+#missionTimeModal.is-immersive-create .history-mission-modal-shell {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  min-height: 100dvh;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    clamp(18px, 4vw, 46px)
+    max(18px, env(safe-area-inset-bottom, 0px));
+  gap: clamp(14px, 2.5vh, 26px);
+  background:
+    radial-gradient(circle at 50% 3%, rgba(75, 156, 255, .12), transparent 30%),
+    linear-gradient(180deg, rgba(5, 15, 29, .99), rgba(4, 12, 23, .99)) !important;
+}
+
+#missionTimeModal.is-immersive-create .history-mission-modal-head {
+  width: min(100%, 760px);
+  min-height: 190px;
+  justify-self: center;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 9px;
+}
+
+#missionTimeModal.is-immersive-create .mission-time-immersive-icon {
+  display: grid;
+}
+
+#missionTimeModal.is-immersive-create .mission-modal-heading {
+  padding: 0 64px;
+}
+
+#missionTimeModal.is-immersive-create .mission-modal-eyebrow {
+  color: var(--immersive-blue);
+  font-size: .74rem;
+  letter-spacing: .13em;
+}
+
+#missionTimeModal.is-immersive-create h1.mission-modal-title {
+  color: var(--immersive-text);
+  font-size: clamp(2rem, 5.4vw, 3.15rem);
+  letter-spacing: -.035em;
+}
+
+#missionTimeModal.is-immersive-create .history-mission-modal-close {
+  top: 0;
+  right: 0;
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(29, 39, 59, .82);
+}
+
+#missionTimeModal.is-immersive-create .history-mission-modal-body {
+  width: min(100%, 760px);
+  min-height: 0;
+  color: var(--immersive-text);
+  scrollbar-width: none;
+}
+
+#missionTimeModal.is-immersive-create .history-mission-modal-body::-webkit-scrollbar {
+  display: none;
+}
+
+#missionTimeModal.is-immersive-create .mission-modal-explainer h2 {
+  font-size: clamp(1.65rem, 4vw, 2.35rem);
+}
+
+#missionTimeModal.is-immersive-create .mission-modal-explainer p {
+  color: var(--immersive-muted);
+}
+
+#missionTimeModal.is-immersive-create .history-mission-adjust-stage {
+  width: min(100%, 680px);
+}
+
+#missionTimeModal.is-immersive-create .mission-time-footer {
+  width: min(100%, 760px);
+  justify-self: center;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+#missionTimeModal.is-immersive-create #missionTimeConfirmButton {
+  width: 100%;
+  height: auto;
+  min-height: 72px;
+  aspect-ratio: auto;
+  justify-self: stretch;
+  border-radius: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 1.08rem;
+  font-weight: 900;
+}
+
+#missionTimeModal.is-immersive-create #missionTimeConfirmButton svg {
+  width: 25px;
+  height: 25px;
+}
+
+#missionTimeModal.is-immersive-create .mission-time-confirm-label {
+  display: inline;
+}
+
+
+/* Micro-task creation becomes immersive only while the editor is open. */
+.mission-variant-immersive-icon {
+  display: none;
+}
+
+#missionVariantsModal.is-immersive-editor.active {
+  display: grid;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(73, 36, 132, .28), transparent 34%),
+    linear-gradient(180deg, #091524, var(--immersive-bg));
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variants-panel {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    clamp(18px, 4vw, 46px)
+    max(18px, env(safe-area-inset-bottom, 0px));
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(16px, 2.5vh, 28px);
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 4%, rgba(120, 64, 212, .12), transparent 30%),
+    linear-gradient(180deg, rgba(5, 15, 29, .99), rgba(4, 12, 23, .99));
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variants-head {
+  position: relative;
+  width: min(100%, 760px);
+  min-height: 176px;
+  justify-self: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variants-head > div:first-child {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-immersive-icon {
+  display: grid;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variants-kicker {
+  margin: 0;
+  color: var(--immersive-purple);
+  font-size: .74rem;
+  letter-spacing: .13em;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variants-title {
+  max-width: 680px;
+  font-size: clamp(2rem, 5.4vw, 3.15rem);
+  letter-spacing: -.035em;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variants-head-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variants-head-actions .history-mission-modal-close {
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(29, 39, 59, .82);
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-editor {
+  width: min(100%, 760px);
+  height: 100%;
+  min-height: 0;
+  justify-self: center;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  overflow: hidden;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-editor-step {
+  min-height: 0;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-stage-copy {
+  gap: 8px;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-stage-copy strong {
+  font-size: clamp(1.65rem, 4vw, 2.35rem);
+  letter-spacing: -.025em;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-stage-copy span {
+  color: var(--immersive-muted);
+  font-size: clamp(.95rem, 2.5vw, 1.12rem);
+  line-height: 1.45;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-deadline-selector,
+#missionVariantsModal.is-immersive-editor .mission-variant-repeat-stage,
+#missionVariantsModal.is-immersive-editor .mission-variant-repetition-button,
+#missionVariantsModal.is-immersive-editor .mission-variant-anytime,
+#missionVariantsModal.is-immersive-editor .mission-variant-clock {
+  width: min(100%, 680px);
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-anytime,
+#missionVariantsModal.is-immersive-editor .mission-variant-clock {
+  min-height: 76px;
+  padding: 17px 20px;
+  border: 1px solid var(--immersive-border);
+  border-radius: 17px;
+  background: var(--immersive-card);
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-repetition-button {
+  min-height: 96px;
+  border-radius: 20px;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-editor-actions {
+  gap: 14px;
+}
+
+#missionVariantsModal.is-immersive-editor .mission-variant-editor-actions button {
+  min-height: 72px;
+  border-radius: 17px;
+  font-size: 1.08rem;
+  font-weight: 900;
+}
+
+/* Fullscreen repetition surface for timed tasks and the mission/micro-task schedule flow. */
+#universalScheduleModal.active,
+#dailyrepetitionModal.active,
+#repeatuntilModal.active,
+#dataselectModal[data-schedule-context="mission-create"].active,
+#dataselectModal[data-schedule-context="microtask"].active {
+  display: grid;
+  place-items: stretch;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 7%, rgba(25, 53, 95, .32), transparent 36%),
+    linear-gradient(180deg, #081323 0%, var(--immersive-bg) 100%);
+}
+
+#universalScheduleModal .universal-schedule-panel,
+#dailyrepetitionModal .universal-schedule-panel,
+#repeatuntilModal .universal-schedule-panel,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-panel,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-panel {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 4%, rgba(48, 96, 150, .12), transparent 31%),
+    linear-gradient(180deg, rgba(5, 15, 29, .99), rgba(4, 12, 23, .99));
+  color: var(--immersive-text);
+  box-shadow: none;
+}
+
+#universalScheduleModal .universal-schedule-head,
+#dailyrepetitionModal .universal-schedule-head,
+#repeatuntilModal .universal-schedule-head,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-head,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-head {
+  width: min(100%, 760px);
+  min-height: 188px;
+  justify-self: center;
+  padding:
+    max(20px, env(safe-area-inset-top, 0px))
+    84px
+    18px;
+  border: 0;
+  color: var(--immersive-text);
+}
+
+.universal-schedule-heading {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  text-align: center;
+}
+
+.universal-schedule-eyebrow {
+  color: #62d98f;
+  font-size: .73rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+#universalScheduleModal .universal-schedule-title,
+#dailyrepetitionModal .universal-schedule-title,
+#repeatuntilModal .universal-schedule-title,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-title,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-title {
+  color: var(--immersive-text);
+  font-size: clamp(2rem, 5.4vw, 3.15rem);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+
+.universal-schedule-copy {
+  max-width: 620px;
+  margin: 0;
+  color: var(--immersive-muted);
+  font-size: clamp(.95rem, 2.4vw, 1.14rem);
+  line-height: 1.45;
+}
+
+#universalScheduleModal .universal-schedule-head .history-mission-modal-close,
+#dailyrepetitionModal .universal-schedule-head .history-mission-modal-close,
+#repeatuntilModal .universal-schedule-head .history-mission-modal-close,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-head .history-mission-modal-close,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-head .history-mission-modal-close {
+  top: max(20px, env(safe-area-inset-top, 0px));
+  right: 0;
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(29, 39, 59, .82);
+  color: #fff;
+  font-size: 0;
+}
+
+#universalScheduleModal .universal-schedule-body,
+#dailyrepetitionModal .universal-schedule-body,
+#repeatuntilModal .universal-schedule-body,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-body,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-body {
+  width: min(100%, 760px);
+  min-height: 0;
+  justify-self: center;
+  align-content: start;
+  gap: 16px;
+  padding: 18px 0;
+  overflow-y: auto;
+  background: transparent;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+#universalScheduleModal .universal-schedule-body::-webkit-scrollbar,
+#dailyrepetitionModal .universal-schedule-body::-webkit-scrollbar,
+#repeatuntilModal .universal-schedule-body::-webkit-scrollbar,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-body::-webkit-scrollbar,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-body::-webkit-scrollbar {
+  display: none;
+}
+
+#universalScheduleModal .universal-schedule-card,
+#dailyrepetitionModal .universal-schedule-card,
+#repeatuntilModal .universal-schedule-card,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-card,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-card {
+  gap: 13px;
+  padding: 20px;
+  border: 1px solid var(--immersive-border);
+  border-radius: 20px;
+  background: var(--immersive-card);
+  color: var(--immersive-text);
+}
+
+#universalScheduleModal .universal-schedule-card > label:first-child,
+#dailyrepetitionModal .universal-schedule-card > label:first-child,
+#repeatuntilModal .universal-schedule-card > label:first-child,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-card > label:first-child,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-card > label:first-child {
+  color: var(--immersive-muted);
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+#universalScheduleModal .universal-schedule-options,
+#dailyrepetitionModal .universal-schedule-options,
+#repeatuntilModal .universal-schedule-options {
+  gap: 10px;
+}
+
+#universalScheduleModal .universal-schedule-options button,
+#dailyrepetitionModal .universal-schedule-options button,
+#repeatuntilModal .universal-schedule-options button {
+  position: relative;
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 52px minmax(0,1fr);
+  align-items: center;
+  gap: 15px;
+  padding: 12px 18px;
+  border: 1px solid var(--immersive-border);
+  border-radius: 18px;
+  background: rgba(13, 24, 43, .84);
+  color: var(--immersive-text);
+  font-size: 1rem;
+}
+
+#universalScheduleModal .universal-schedule-options button::before,
+#dailyrepetitionModal .universal-schedule-options button::before,
+#repeatuntilModal .universal-schedule-options button::before {
+  content: "";
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(75, 156, 255, .28);
+  border-radius: 15px;
+  background:
+    linear-gradient(currentColor, currentColor) center 18px / 25px 3px no-repeat,
+    linear-gradient(currentColor, currentColor) center 31px / 25px 18px no-repeat,
+    rgba(45, 126, 235, .16);
+  color: var(--immersive-blue);
+  opacity: .95;
+}
+
+#universalScheduleModal .universal-schedule-options button:hover,
+#dailyrepetitionModal .universal-schedule-options button:hover,
+#repeatuntilModal .universal-schedule-options button:hover,
+#universalScheduleModal .universal-schedule-options button.active,
+#dailyrepetitionModal .universal-schedule-options button.active,
+#repeatuntilModal .universal-schedule-options button.active {
+  transform: translateY(-1px);
+  border-color: rgba(75, 156, 255, .78);
+  background: rgba(26, 72, 136, .72);
+  box-shadow: 0 0 0 3px rgba(75, 156, 255, .1);
+}
+
+#universalScheduleModal .universal-schedule-inline input,
+#universalScheduleModal .universal-schedule-inline select,
+#universalScheduleModal .universal-schedule-card > select,
+#universalScheduleModal .universal-schedule-card > input[type="date"],
+#dailyrepetitionModal .universal-schedule-inline input,
+#dailyrepetitionModal .universal-schedule-inline select,
+#dailyrepetitionModal .universal-schedule-card > select,
+#dailyrepetitionModal .universal-schedule-card > input[type="date"] {
+  min-height: 54px;
+  border-color: var(--immersive-border);
+  border-radius: 13px;
+  background: rgba(13, 24, 43, .9);
+  color: var(--immersive-text);
+}
+
+#universalScheduleModal .universal-schedule-card label,
+#dailyrepetitionModal .universal-schedule-card label,
+#repeatuntilModal .universal-schedule-card label {
+  color: var(--immersive-text);
+}
+
+#universalScheduleModal .dailyrepetition-feedback,
+#dailyrepetitionModal .dailyrepetition-feedback,
+#universalScheduleModal .universal-schedule-avoid small,
+#dailyrepetitionModal .universal-schedule-avoid small {
+  color: var(--immersive-muted);
+}
+
+#universalScheduleModal .dailyrepetition-date-button,
+#dailyrepetitionModal .dailyrepetition-date-button {
+  min-height: 64px;
+  border-color: var(--immersive-border);
+  border-radius: 16px;
+  background: rgba(13, 24, 43, .9);
+  color: var(--immersive-text);
+}
+
+#universalScheduleModal .universal-weekdays button,
+#dailyrepetitionModal .universal-weekdays button {
+  min-width: 42px;
+  border-color: var(--immersive-border);
+  background: rgba(13, 24, 43, .9);
+  color: var(--immersive-text);
+}
+
+#universalScheduleModal .universal-schedule-footer,
+#dailyrepetitionModal .universal-schedule-footer,
+#repeatuntilModal .universal-schedule-footer,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-footer,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-footer {
+  width: min(100%, 760px);
+  justify-self: center;
+  gap: 14px;
+  padding: 16px 0 max(20px, env(safe-area-inset-bottom, 0px));
+  border: 0;
+  background: transparent;
+}
+
+#universalScheduleModal .universal-schedule-footer button,
+#dailyrepetitionModal .universal-schedule-footer button,
+#repeatuntilModal .universal-schedule-footer button,
+#dataselectModal[data-schedule-context="mission-create"] .universal-schedule-footer button,
+#dataselectModal[data-schedule-context="microtask"] .universal-schedule-footer button {
+  min-height: 68px;
+  border-radius: 17px;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+#dataselectModal[data-schedule-context="mission-create"] .dataselect-card,
+#dataselectModal[data-schedule-context="microtask"] .dataselect-card {
+  align-self: center;
+}
+
+#dataselectModal[data-schedule-context="mission-create"] .dataselect-unit,
+#dataselectModal[data-schedule-context="microtask"] .dataselect-unit {
+  grid-template-rows: 48px minmax(58px, auto) 22px 48px;
+  border-color: var(--immersive-border);
+  border-radius: 18px;
+  background: rgba(13, 24, 43, .88);
+}
+
+#dataselectModal[data-schedule-context="mission-create"] .dataselect-unit button,
+#dataselectModal[data-schedule-context="microtask"] .dataselect-unit button {
+  width: 46px;
+  height: 46px;
+  border-color: var(--immersive-border);
+  background: rgba(255,255,255,.06);
+  color: var(--immersive-text);
+}
+
+#dataselectModal[data-schedule-context="mission-create"] :is(.dataselect-unit strong, .dataselect-feedback),
+#dataselectModal[data-schedule-context="microtask"] :is(.dataselect-unit strong, .dataselect-feedback) {
+  color: var(--immersive-text);
+}
+
+#dataselectModal[data-schedule-context="mission-create"] .dataselect-unit span,
+#dataselectModal[data-schedule-context="microtask"] .dataselect-unit span {
+  color: var(--immersive-muted);
+}
+
+@media (max-width: 640px) {
+  #missionCreateModal .mission-guide-shell,
+  #missionVariantsModal.is-immersive-editor .mission-variants-panel {
+    padding:
+      max(14px, env(safe-area-inset-top, 0px))
+      14px
+      max(14px, env(safe-area-inset-bottom, 0px));
+  }
+
+  #missionCreateModal .history-mission-modal-head {
+    min-height: 54px;
+  }
+
+  #missionCreateModal .history-mission-modal-close,
+  #missionCreateModal .friend-assignment-button,
+  #missionVariantsModal.is-immersive-editor .mission-variants-head-actions .history-mission-modal-close {
+    width: 54px;
+    height: 54px;
+  }
+
+  .mission-immersive-step-icon,
+  .mission-variant-immersive-icon,
+  .universal-schedule-main-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+  }
+
+  #missionCreateModal .mission-guide-step h2,
+  #missionCreateModal.is-compact-stage .mission-guide-step h2,
+  #missionVariantsModal.is-immersive-editor .mission-variants-title,
+  #universalScheduleModal .universal-schedule-title,
+  #dailyrepetitionModal .universal-schedule-title,
+  #repeatuntilModal .universal-schedule-title,
+  #dataselectModal[data-schedule-context="mission-create"] .universal-schedule-title,
+  #dataselectModal[data-schedule-context="microtask"] .universal-schedule-title {
+    font-size: clamp(1.75rem, 8vw, 2.35rem);
+  }
+
+  #missionCreateModal .mission-kind-choice {
+    min-height: 98px;
+    grid-template-columns: 70px minmax(0,1fr);
+    gap: 3px 15px;
+    padding: 17px 16px;
+    border-radius: 20px;
+  }
+
+  #missionCreateModal .mission-kind-choice svg {
+    width: 66px;
+    height: 66px;
+    padding: 13px;
+    border-radius: 18px;
+  }
+
+  #missionCreateModal .mission-kind-choice strong {
+    font-size: 1.35rem;
+  }
+
+  #missionCreateModal .mission-kind-choice span {
+    font-size: .86rem;
+  }
+
+  #missionCreateModal .mission-structure-choice {
+    min-height: 96px;
+    grid-template-columns: 70px minmax(0,1fr);
+    gap: 15px;
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  #missionCreateModal .mission-structure-choice-icon {
+    width: 68px;
+    height: 68px;
+    border-radius: 18px;
+  }
+
+  #missionCreateModal .mission-structure-choice-icon svg {
+    width: 38px;
+    height: 38px;
+  }
+
+  #missionCreateModal .mission-structure-choice small {
+    font-size: .84rem;
+  }
+
+  #missionCreateModal .mission-guide-step .text-field.options-text-field,
+  #missionVariantsModal.is-immersive-editor .mission-variant-editor-step .text-field.options-text-field {
+    min-height: 64px;
+    font-size: 1rem;
+  }
+
+  #missionCreateModal .mission-guide-navigation,
+  #missionVariantsModal.is-immersive-editor .mission-variant-editor-actions {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  #missionCreateModal .mission-guide-navigation .mission-guide-back,
+  #missionVariantsModal.is-immersive-editor .mission-variant-editor-actions .ghost-btn {
+    order: 2;
+  }
+
+  #missionCreateModal .mission-guide-navigation .mission-guide-submit,
+  #missionVariantsModal.is-immersive-editor .mission-variant-editor-actions .primary-btn {
+    order: 1;
+  }
+
+  #missionVariantsModal.is-immersive-editor .mission-variants-head {
+    min-height: 148px;
+    padding-inline: 54px;
+  }
+
+  #universalScheduleModal .universal-schedule-head,
+  #dailyrepetitionModal .universal-schedule-head,
+  #repeatuntilModal .universal-schedule-head,
+  #dataselectModal[data-schedule-context="mission-create"] .universal-schedule-head,
+  #dataselectModal[data-schedule-context="microtask"] .universal-schedule-head {
+    min-height: 160px;
+    padding:
+      max(14px, env(safe-area-inset-top, 0px))
+      62px
+      12px;
+  }
+
+  #universalScheduleModal .universal-schedule-head .history-mission-modal-close,
+  #dailyrepetitionModal .universal-schedule-head .history-mission-modal-close,
+  #repeatuntilModal .universal-schedule-head .history-mission-modal-close,
+  #dataselectModal[data-schedule-context="mission-create"] .universal-schedule-head .history-mission-modal-close,
+  #dataselectModal[data-schedule-context="microtask"] .universal-schedule-head .history-mission-modal-close {
+    top: max(14px, env(safe-area-inset-top, 0px));
+    width: 54px;
+    height: 54px;
+  }
+
+  #universalScheduleModal .universal-schedule-body,
+  #dailyrepetitionModal .universal-schedule-body,
+  #repeatuntilModal .universal-schedule-body,
+  #dataselectModal[data-schedule-context="mission-create"] .universal-schedule-body,
+  #dataselectModal[data-schedule-context="microtask"] .universal-schedule-body {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  #universalScheduleModal .universal-schedule-footer,
+  #dailyrepetitionModal .universal-schedule-footer,
+  #repeatuntilModal .universal-schedule-footer,
+  #dataselectModal[data-schedule-context="mission-create"] .universal-schedule-footer,
+  #dataselectModal[data-schedule-context="microtask"] .universal-schedule-footer {
+    grid-template-columns: 1fr;
+    padding: 12px 14px max(14px, env(safe-area-inset-bottom, 0px));
+  }
+
+  #universalScheduleModal .universal-schedule-options button,
+  #dailyrepetitionModal .universal-schedule-options button,
+  #repeatuntilModal .universal-schedule-options button {
+    min-height: 68px;
+    grid-template-columns: 46px minmax(0,1fr);
+    padding: 10px 14px;
+    border-radius: 16px;
+  }
+
+  #universalScheduleModal .universal-schedule-options button::before,
+  #dailyrepetitionModal .universal-schedule-options button::before,
+  #repeatuntilModal .universal-schedule-options button::before {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+  }
+}
+
+@media (max-height: 720px) {
+  .mission-immersive-step-icon,
+  .mission-variant-immersive-icon,
+  .universal-schedule-main-icon {
+    width: 62px;
+    height: 62px;
+  }
+
+  #missionVariantsModal.is-immersive-editor .mission-variants-head,
+  #universalScheduleModal .universal-schedule-head,
+  #dailyrepetitionModal .universal-schedule-head,
+  #repeatuntilModal .universal-schedule-head,
+  #dataselectModal[data-schedule-context="mission-create"] .universal-schedule-head,
+  #dataselectModal[data-schedule-context="microtask"] .universal-schedule-head {
+    min-height: 126px;
+  }
+
+  #missionCreateModal .mission-guide-slider .mission-guide-step {
+    gap: 8px;
+  }
+
+  #missionCreateModal .mission-kind-choice,
+  #missionCreateModal .mission-structure-choice {
+    min-height: 82px;
+  }
+}
+
+body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-shell {
+  background:
+    radial-gradient(circle at 50% 3%, rgba(120, 64, 212, .11), transparent 30%),
+    linear-gradient(180deg, rgba(5, 15, 29, .99), rgba(4, 12, 23, .99));
+}
