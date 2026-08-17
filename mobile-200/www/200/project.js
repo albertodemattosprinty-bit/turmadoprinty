@@ -586,6 +586,15 @@ const ilifeFinanceListInput = document.getElementById("ilifeFinanceListInput");
 const ilifeFinanceListSave = document.getElementById("ilifeFinanceListSave");
 const ilifeFinanceListItems = document.getElementById("ilifeFinanceListItems");
 const ilifeFinanceListStatus = document.getElementById("ilifeFinanceListStatus");
+const ilifeFinanceTransferModal = document.getElementById("ilifeFinanceTransferModal");
+const ilifeFinanceTransferForm = document.getElementById("ilifeFinanceTransferForm");
+const ilifeFinanceTransferClose = document.getElementById("ilifeFinanceTransferClose");
+const ilifeFinanceOwnLaxKey = document.getElementById("ilifeFinanceOwnLaxKey");
+const ilifeFinanceTransferKey = document.getElementById("ilifeFinanceTransferKey");
+const ilifeFinanceTransferAmount = document.getElementById("ilifeFinanceTransferAmount");
+const ilifeFinanceTransferAccount = document.getElementById("ilifeFinanceTransferAccount");
+const ilifeFinanceTransferStatus = document.getElementById("ilifeFinanceTransferStatus");
+const ilifeFinanceTransferSubmit = document.getElementById("ilifeFinanceTransferSubmit");
 const ilifeFinanceSettleModal = document.getElementById("ilifeFinanceSettleModal");
 const ilifeFinanceSettleForm = document.getElementById("ilifeFinanceSettleForm");
 const ilifeFinanceSettleClose = document.getElementById("ilifeFinanceSettleClose");
@@ -1357,7 +1366,8 @@ const state = {
     listModalType: "account",
     settleEntry: null,
     settleAmountCents: 0,
-    remainderDate: ""
+    remainderDate: "",
+    transferSaving: false
   },
   statsSummary: null,
   statsGoals: null,
@@ -6358,10 +6368,11 @@ function renderIlifeFinanceSummary() {
   const scheduledEntries = accountEntries.filter((entry) => entry.status === "SCHEDULED" && entry.settlementType === "FUTURE");
   const incomeEntries = scheduledEntries.filter((entry) => entry.kind === "INCOME");
   const expenseEntries = scheduledEntries.filter((entry) => entry.kind === "EXPENSE");
-  const balanceCents = accountTotals.balanceCents;
+  const storedAccountBalance = Number(summary.accountBalances?.[selectedAccount]);
+  const balanceCents = Number.isFinite(storedAccountBalance) ? storedAccountBalance : accountTotals.balanceCents;
   const incomeCents = accountTotals.incomeCents;
   const expenseCents = accountTotals.expenseCents;
-  const projectedCents = accountTotals.projectedCents;
+  const projectedCents = balanceCents + incomeCents - expenseCents;
   const monthName = getIlifeFinanceMonthName();
 
   const monthLabel = getIlifeFinanceEl("ilifeFinanceMonthLabel");
@@ -6429,6 +6440,13 @@ function renderIlifeFinanceSummary() {
           const canSettle = !settled && entry.settlementType === "FUTURE" && String(entry.dueOn || "") <= today;
           return `<article class="finance-nano-transaction ${expense ? "is-expense" : ""}"><div>${expense ? financeNanoIcons.expense : financeNanoIcons.income}</div><span><strong>${escapeHtml(entry.title || "Lan\u00e7amento")}</strong><small>${escapeHtml(formatIlifeFinanceDate(entry.dueOn))} &middot; ${settled ? "REALIZADO" : "PREVISTO"} &middot; ${escapeHtml(entry.category || "Outros")}</small></span><b>${expense ? "-" : "+"} ${escapeHtml(formatIlifeFinanceMoney(entry.amountCents || 0))}</b><nav class="finance-nano-transaction-actions">${canSettle ? `<button class="finance-nano-confirm-btn" type="button" data-ilife-finance-settle="${escapeHtml(entry.id)}" aria-label="Confirmar movimenta\u00e7\u00e3o">${financeNanoIcons.check}</button>` : ""}<button type="button" data-ilife-finance-edit="${escapeHtml(entry.itemId || entry.id)}" aria-label="Editar movimenta\u00e7\u00e3o">${financeNanoIcons.edit}</button><button type="button" data-ilife-finance-delete="${escapeHtml(entry.itemId || entry.id)}" aria-label="Excluir movimenta\u00e7\u00e3o">${financeNanoIcons.trash}</button></nav></article>`;
         }).join("");
+      [...accountEntries]
+        .sort((a, b) => String(b.dueOn || "").localeCompare(String(a.dueOn || "")))
+        .slice(0, 8)
+        .forEach((entry, index) => {
+          if (!entry.laxTransferId) return;
+          list.children[index]?.querySelectorAll("[data-ilife-finance-edit],[data-ilife-finance-delete]").forEach((button) => button.remove());
+        });
     }
   }
 }
@@ -6471,8 +6489,8 @@ function openIlifeFinanceWizard(kind) {
   if (titleInput) titleInput.value = "";
   if (amountInput) amountInput.value = "";
   if (dateInput) dateInput.value = getProjectTodayDateKey();
-  setIlifeFinanceExclusiveChoice("[data-ilife-finance-settlement]", "");
-  setIlifeFinanceExclusiveChoice("[data-ilife-finance-value-mode]", "");
+  const settlementSelect = getIlifeFinanceEl("ilifeFinanceSettlementSelect");
+  if (settlementSelect) settlementSelect.value = "FUTURE";
   if (recurring) recurring.checked = false;
   if (multiDate) multiDate.checked = false;
   state.ilifeFinance.customDates = [];
@@ -6498,6 +6516,77 @@ function closeIlifeFinanceWizard() {
   state.ilifeFinance.wizard = null;
 }
 
+function getOwnIlifeLaxKey() {
+  const serverKey = String(state.ilifeFinance.summary?.laxKey || "").trim();
+  if (serverKey) return serverKey;
+  const username = String(state.authUser?.username || "").normalize("NFC").trim().toLocaleLowerCase("pt-BR");
+  return username ? `${username}@lax.com` : "";
+}
+
+function openIlifeFinanceTransferModal() {
+  if (!getToken()) {
+    setIlifeFinanceToast("Entre na sua conta para usar transferências LAX.");
+    return;
+  }
+  if (ilifeFinanceOwnLaxKey) ilifeFinanceOwnLaxKey.textContent = getOwnIlifeLaxKey() || "Sua chave será criada ao entrar novamente";
+  if (ilifeFinanceTransferAccount) ilifeFinanceTransferAccount.textContent = state.ilifeFinance.selectedAccount || "Conta principal";
+  if (ilifeFinanceTransferKey) ilifeFinanceTransferKey.value = "";
+  if (ilifeFinanceTransferAmount) ilifeFinanceTransferAmount.value = "";
+  if (ilifeFinanceTransferStatus) ilifeFinanceTransferStatus.textContent = "";
+  if (ilifeFinanceTransferModal) {
+    ilifeFinanceTransferModal.hidden = false;
+    ilifeFinanceTransferModal.classList.add("is-open");
+    ilifeFinanceTransferModal.setAttribute("aria-hidden", "false");
+  }
+  window.setTimeout(() => ilifeFinanceTransferKey?.focus(), 80);
+}
+
+function closeIlifeFinanceTransferModal() {
+  if (!ilifeFinanceTransferModal) return;
+  ilifeFinanceTransferModal.classList.remove("is-open");
+  ilifeFinanceTransferModal.hidden = true;
+  ilifeFinanceTransferModal.setAttribute("aria-hidden", "true");
+}
+
+async function submitIlifeFinanceTransfer() {
+  if (state.ilifeFinance.transferSaving) return;
+  const laxKey = String(ilifeFinanceTransferKey?.value || "").normalize("NFC").trim().toLocaleLowerCase("pt-BR");
+  const amountCents = parseIlifeFinanceAmount(ilifeFinanceTransferAmount?.value);
+  if (!laxKey.endsWith("@lax.com")) {
+    if (ilifeFinanceTransferStatus) ilifeFinanceTransferStatus.textContent = "Digite uma chave LAX válida, como usuario@lax.com.";
+    return;
+  }
+  if (!amountCents) {
+    if (ilifeFinanceTransferStatus) ilifeFinanceTransferStatus.textContent = "Digite o valor da transferência.";
+    return;
+  }
+
+  state.ilifeFinance.transferSaving = true;
+  if (ilifeFinanceTransferSubmit) ilifeFinanceTransferSubmit.disabled = true;
+  if (ilifeFinanceTransferStatus) ilifeFinanceTransferStatus.textContent = "Transferindo...";
+  try {
+    const payload = await apiRequest("/api/200/finance/lax-transfer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ laxKey, amountCents, accountName: state.ilifeFinance.selectedAccount || "Conta principal" })
+    });
+    const transfer = payload?.transfer || {};
+    if (ilifeFinanceTransferStatus) {
+      ilifeFinanceTransferStatus.textContent = `Sucesso! ${formatMoney(transfer.amountCents || amountCents)} enviados para ${transfer.recipientLaxKey || laxKey}.`;
+    }
+    if (ilifeFinanceTransferKey) ilifeFinanceTransferKey.value = "";
+    if (ilifeFinanceTransferAmount) ilifeFinanceTransferAmount.value = "";
+    await loadIlifeFinanceLedger();
+  } catch (error) {
+    if (ilifeFinanceTransferStatus) {
+      ilifeFinanceTransferStatus.textContent = error instanceof Error ? error.message : "Não foi possível fazer a transferência LAX.";
+    }
+  } finally {
+    state.ilifeFinance.transferSaving = false;
+    if (ilifeFinanceTransferSubmit) ilifeFinanceTransferSubmit.disabled = false;
+  }
+}
+
 function renderIlifeFinanceWizard() {
   const wizard = state.ilifeFinance.wizard;
   if (!wizard) return;
@@ -6512,8 +6601,8 @@ function buildIlifeFinancePayload() {
   const wizard = state.ilifeFinance.wizard || buildIlifeFinanceWizard("INCOME");
   const settlementChoice = getCheckedIlifeFinanceChoice("[data-ilife-finance-settlement]");
   const valueModeChoice = getCheckedIlifeFinanceChoice("[data-ilife-finance-value-mode]");
-  const settlementType = String(settlementChoice?.ilifeFinanceSettlement || "").toUpperCase();
-  const valueMode = String(valueModeChoice?.ilifeFinanceValueMode || "").toUpperCase();
+  const settlementType = String(getIlifeFinanceEl("ilifeFinanceSettlementSelect")?.value || settlementChoice?.ilifeFinanceSettlement || "").toUpperCase();
+  const valueMode = String(valueModeChoice?.ilifeFinanceValueMode || "FIXED").toUpperCase();
   const selectedDates = [...new Set(Array.isArray(state.ilifeFinance.customDates) ? state.ilifeFinance.customDates : [])].sort();
   const multiDate = Boolean(getIlifeFinanceEl("ilifeFinanceMultiDate")?.checked);
   const startsOn = multiDate && selectedDates.length ? selectedDates[0] : (getIlifeFinanceEl("ilifeFinanceOnceDate")?.value || getProjectTodayDateKey());
@@ -6552,7 +6641,8 @@ function openIlifeFinanceEdit(itemId) {
   if (titleInput) titleInput.value = entry.title || "";
   if (amountInput) amountInput.value = String((Number(entry.amountCents || 0) / 100).toFixed(2)).replace(".", ",");
   if (dateInput) dateInput.value = entry.dueOn || getProjectTodayDateKey();
-  setIlifeFinanceExclusiveChoice("[data-ilife-finance-settlement]", entry.settlementType === "CASH" ? "CASH" : "FUTURE");
+  const settlementSelect = getIlifeFinanceEl("ilifeFinanceSettlementSelect");
+  if (settlementSelect) settlementSelect.value = entry.settlementType === "CASH" ? "CASH" : "FUTURE";
   setIlifeFinanceExclusiveChoice("[data-ilife-finance-value-mode]", entry.valueMode || entry.scheduleConfig?.valueMode || "FIXED");
   if (recurring) recurring.checked = false;
   state.ilifeFinance.customDates = Array.isArray(entry.scheduleConfig?.dates) ? entry.scheduleConfig.dates : [];
@@ -17546,7 +17636,10 @@ ilifeFinanceCustomDates?.addEventListener("click", (event) => {
   state.ilifeFinance.customDates = (state.ilifeFinance.customDates || []).filter((date) => date !== button.dataset.ilifeFinanceRemoveDate);
   renderIlifeFinanceCustomDates();
 });
-getIlifeFinanceEl("ilifeFinanceTransferAction")?.addEventListener("click", () => setIlifeFinanceToast("Transfer\u00eancias entram na pr\u00f3xima tela: origem, destino e valor."));
+getIlifeFinanceEl("ilifeFinanceTransferAction")?.addEventListener("click", openIlifeFinanceTransferModal);
+ilifeFinanceTransferClose?.addEventListener("click", closeIlifeFinanceTransferModal);
+ilifeFinanceTransferModal?.addEventListener("click", (event) => { if (event.target === ilifeFinanceTransferModal) closeIlifeFinanceTransferModal(); });
+ilifeFinanceTransferForm?.addEventListener("submit", (event) => { event.preventDefault(); void submitIlifeFinanceTransfer(); });
 getIlifeFinanceEl("ilifeFinanceAccountsAction")?.addEventListener("click", () => setIlifeFinanceToast("Aqui voc\u00ea conecta contas, carteira e reservas."));
 getIlifeFinanceEl("ilifeFinanceSummaryInfo")?.addEventListener("click", () => setIlifeFinanceToast("Saldo atual fica separado da previs\u00e3o, para n\u00e3o misturar dinheiro existente com o que ainda vai entrar."));
 getIlifeFinanceEl("ilifeFinanceAgendaButton")?.addEventListener("click", () => setIlifeFinanceToast("Agenda completa: vencidos, hoje, pr\u00f3ximos dias e restante do m\u00eas."));

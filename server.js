@@ -66,7 +66,7 @@ import { createProject200SystemEvent, createProject200TextEntry, ensureProject20
 import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
-import { createProject200FinanceItem, deleteProject200FinanceItem, settleProject200FinanceOccurrence, summarizeProject200FinanceLedgerMonth, updateProject200FinanceItem } from "./src/project200-finance-ledger.js";
+import { buildProject200LaxKey, createProject200FinanceItem, deleteProject200FinanceItem, settleProject200FinanceOccurrence, summarizeProject200FinanceLedgerMonth, transferProject200LaxBalance, updateProject200FinanceItem } from "./src/project200-finance-ledger.js";
 import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGoalVariant, deleteLatestExtraGoalProgressEvent, ensureExtraGoalsSchema, getExtraGoalById, getProject200ActiveTime, getProject200MissionInstallmentOrder, listExtraGoalProgressEvents, listExtraGoalsByScope, listExtraGoalVariants, summarizeExtraGoals, updateExtraGoal, updateExtraGoalProgress, updateExtraGoalVariant, updateLatestExtraGoalProgressEvent, updateProject200ActiveTime, updateProject200MissionInstallmentOrder } from "./src/extra-goals.js";
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
@@ -12729,10 +12729,29 @@ const server = http.createServer(async (request, response) => {
       const user = await requireAuth(request, response);
       if (!user) return;
       const summary = await summarizeProject200FinanceLedgerMonth(user.id, requestUrl.searchParams.get("month"));
-      sendJson(response, 200, { ok: true, summary });
+      sendJson(response, 200, {
+        ok: true,
+        summary: { ...summary, laxKey: buildProject200LaxKey(user.username) }
+      });
     } catch (error) {
       sendJson(response, 400, {
         error: error instanceof Error ? error.message : "Nao foi possivel carregar a carteira financeira."
+      });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/finance/lax-transfer") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const transfer = await transferProject200LaxBalance(user.id, body);
+      sendJson(response, 201, { ok: true, transfer });
+    } catch (error) {
+      sendJson(response, 400, {
+        error: error instanceof Error ? error.message : "Nao foi possivel fazer a transferencia LAX.",
+        code: String(error?.code || "LAX_TRANSFER_FAILED")
       });
     }
     return;

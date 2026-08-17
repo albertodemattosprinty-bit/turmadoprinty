@@ -13779,6 +13779,20 @@ body[data-background-theme="white"] .marin-message-audio-card.is-viewed {
 .finance-nano-advanced summary { padding: 12px; color: var(--finance-nano-brand-dark); font-size: 11px; font-weight: 900; list-style: none; }
 .finance-nano-advanced label { display: flex; align-items: center; gap: 9px; padding: 0 12px 12px; color: var(--finance-nano-muted); font-size: 11px; font-weight: 800; }
 .finance-nano-advanced input { accent-color: var(--finance-nano-brand); }
+.finance-nano-lax-own-key {
+  display: grid;
+  gap: 5px;
+  margin: 14px 0 8px;
+  padding: 13px 14px;
+  border: 1px solid #bfe8df;
+  border-radius: 14px;
+  background: var(--finance-nano-income-soft);
+}
+.finance-nano-lax-own-key span { color: var(--finance-nano-muted); font-size: 10px; font-weight: 900; text-transform: uppercase; }
+.finance-nano-lax-own-key strong { color: var(--finance-nano-brand-dark); font-size: 16px; overflow-wrap: anywhere; }
+.finance-nano-lax-account { margin: 0 0 14px; color: var(--finance-nano-muted); font-size: 11px; }
+.finance-nano-lax-account strong { color: var(--finance-nano-text); }
+.finance-nano-settle-sheet .finance-nano-field + .finance-nano-field { margin-top: 11px; }
 .finance-nano-dialog-status,
 .finance-nano-status {
   min-height: 1.3em;

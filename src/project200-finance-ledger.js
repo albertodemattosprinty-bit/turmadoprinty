@@ -1,11 +1,39 @@
 ﻿import { query } from "./db.js";
 
+import { db } from "./db.js";
+
 const ITEM_KINDS = new Set(["INCOME", "EXPENSE"]);
 const SETTLEMENT_TYPES = new Set(["CASH", "FUTURE"]);
 const SCHEDULE_MODES = new Set(["ONCE", "RECURRING", "FINITE"]);
 const SCHEDULE_FREQUENCIES = new Set(["NONE", "MONTHLY", "WEEKLY", "CUSTOM"]);
 const CUSTOM_MODES = new Set(["MONTHLY", "WEEKLY", "DAILY"]);
 const VALUE_MODES = new Set(["FIXED", "VARIABLE"]);
+const LAX_DOMAIN = "@lax.com";
+
+export function buildProject200LaxKey(username) {
+  const localPart = String(username || "")
+    .normalize("NFC")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+  return localPart ? `${localPart}${LAX_DOMAIN}` : "";
+}
+
+export function parseProject200LaxKey(value) {
+  const normalized = String(value || "")
+    .normalize("NFC")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+  if (!normalized.endsWith(LAX_DOMAIN)) return "";
+  const localPart = normalized.slice(0, -LAX_DOMAIN.length).trim();
+  if (!localPart || localPart.includes("@") || localPart.length > 120) return "";
+  return localPart;
+}
+
+function createLaxTransferError(message, code) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
 
 function normalizeEnum(value, allowed, label) {
   const normalized = String(value || "").trim().toUpperCase();
@@ -229,6 +257,22 @@ export async function ensureProject200FinanceLedgerSchema() {
     );
   `);
   await query("create index if not exists idx_project200_finance_occurrences_user_due on project200_finance_occurrences(user_id, due_on, kind);");
+  await query(`
+    create table if not exists project200_lax_transfers (
+      id uuid primary key default gen_random_uuid(),
+      sender_user_id uuid not null references users(id) on delete cascade,
+      recipient_user_id uuid not null references users(id) on delete cascade,
+      amount_cents bigint not null check (amount_cents > 0),
+      sender_account_name text not null default 'Conta principal',
+      recipient_account_name text not null default 'Conta principal',
+      sender_item_id uuid not null unique references project200_finance_items(id) on delete cascade,
+      recipient_item_id uuid not null unique references project200_finance_items(id) on delete cascade,
+      created_at timestamptz not null default now(),
+      check (sender_user_id <> recipient_user_id)
+    );
+  `);
+  await query("create index if not exists idx_project200_lax_transfers_sender_created on project200_lax_transfers(sender_user_id, created_at desc);");
+  await query("create index if not exists idx_project200_lax_transfers_recipient_created on project200_lax_transfers(recipient_user_id, created_at desc);");
 }
 
 async function insertOccurrence(userId, item, dueOn, status = "SCHEDULED") {
@@ -278,10 +322,24 @@ export async function createProject200FinanceItem(userId, payload) {
   return item;
 }
 
+async function assertProject200FinanceItemIsEditable(userId, itemId) {
+  const transfer = await query(`
+    select id
+      from project200_lax_transfers
+     where (sender_user_id = $1 and sender_item_id = $2)
+        or (recipient_user_id = $1 and recipient_item_id = $2)
+     limit 1
+  `, [userId, itemId]);
+  if (transfer.rowCount) {
+    throw createLaxTransferError("Transferencias LAX confirmadas nao podem ser editadas ou excluidas.", "LAX_TRANSFER_IMMUTABLE");
+  }
+}
+
 export async function updateProject200FinanceItem(userId, itemId, payload) {
   await ensureProject200FinanceLedgerSchema();
   const id = String(itemId || "").trim();
   if (!id) throw new Error("Lancamento invalido.");
+  await assertProject200FinanceItemIsEditable(userId, id);
   const kind = normalizeEnum(payload?.kind, ITEM_KINDS, "Natureza");
   const settlementType = normalizeEnum(payload?.settlementType, SETTLEMENT_TYPES, "Momento");
   const scheduleMode = settlementType === "CASH"
@@ -377,6 +435,7 @@ export async function deleteProject200FinanceItem(userId, itemId) {
   await ensureProject200FinanceLedgerSchema();
   const id = String(itemId || "").trim();
   if (!id) throw new Error("Lancamento invalido.");
+  await assertProject200FinanceItemIsEditable(userId, id);
   const result = await query(`
     update project200_finance_items
        set deleted_at = now(), updated_at = now()
@@ -416,9 +475,11 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
 
   const occurrencesResult = await query(`
     select o.id, o.item_id, i.title, i.account_name, i.category, o.kind, o.amount_cents, o.due_on, o.status,
-           i.settlement_type, i.schedule_mode, i.schedule_frequency, i.schedule_config, i.value_mode
+           i.settlement_type, i.schedule_mode, i.schedule_frequency, i.schedule_config, i.value_mode,
+           t.id as lax_transfer_id
     from project200_finance_occurrences o
     join project200_finance_items i on i.id = o.item_id
+    left join project200_lax_transfers t on i.id = t.sender_item_id or i.id = t.recipient_item_id
     where o.user_id = $1 and o.due_on between $2::date and $3::date and o.status <> 'CANCELLED'
     order by o.due_on asc, o.created_at asc
   `, [userId, rangeStart, rangeEnd]);
@@ -436,7 +497,8 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
     scheduleMode: row.schedule_mode,
     scheduleFrequency: row.schedule_frequency,
     scheduleConfig: row.schedule_config || {},
-    valueMode: row.value_mode || row.schedule_config?.valueMode || "FIXED"
+    valueMode: row.value_mode || row.schedule_config?.valueMode || "FIXED",
+    laxTransferId: row.lax_transfer_id || null
   }));
   const today = getProject200TodayKey();
   const attentionEnd = getProject200AttentionEndKey(today);
@@ -473,21 +535,128 @@ export async function summarizeProject200FinanceLedgerMonth(userId, month) {
   const forecastEntries = entries.filter((entry) => entry.settlementType === "FUTURE" && entry.status === "SCHEDULED");
   const incomeCents = forecastEntries.filter((entry) => entry.kind === "INCOME").reduce((sum, entry) => sum + entry.amountCents, 0);
   const expenseCents = forecastEntries.filter((entry) => entry.kind === "EXPENSE").reduce((sum, entry) => sum + entry.amountCents, 0);
-  const balanceResult = await query(`
-    select coalesce(sum(case when kind = 'INCOME' then amount_cents else -amount_cents end), 0)::bigint as balance_cents
-    from project200_finance_occurrences
-    where user_id = $1 and status = 'SETTLED'
+  const accountBalancesResult = await query(`
+    select i.account_name,
+           coalesce(sum(case when o.kind = 'INCOME' then o.amount_cents else -o.amount_cents end), 0)::bigint as balance_cents
+      from project200_finance_occurrences o
+      join project200_finance_items i on i.id = o.item_id
+     where o.user_id = $1 and o.status = 'SETTLED' and i.deleted_at is null
+     group by i.account_name
   `, [userId]);
+  const accountBalances = Object.fromEntries(accountBalancesResult.rows.map((row) => [
+    row.account_name || "Conta principal",
+    Number(row.balance_cents || 0)
+  ]));
   const countResult = await query("select count(*)::integer as total from project200_finance_items where user_id = $1 and deleted_at is null", [userId]);
   return {
     month: monthKey,
     incomeCents,
     expenseCents,
-    balanceCents: Number(balanceResult.rows[0]?.balance_cents || 0),
+    balanceCents: Object.values(accountBalances).reduce((sum, value) => sum + Number(value || 0), 0),
+    accountBalances,
     hasAny: Number(countResult.rows[0]?.total || 0) > 0,
     attentionEntries,
     todayEntries,
     entries
   };
+}
+
+export async function transferProject200LaxBalance(senderUserId, payload = {}) {
+  await ensureProject200FinanceLedgerSchema();
+  if (!db) throw new Error("DATABASE_URL nao configurada.");
+
+  const recipientUsername = parseProject200LaxKey(payload.laxKey);
+  if (!recipientUsername) {
+    throw createLaxTransferError("Digite uma chave LAX valida, como usuario@lax.com.", "INVALID_LAX_KEY");
+  }
+  const amountCents = normalizeAmountCents(payload.amountCents);
+  const senderAccountName = normalizeShortText(payload.accountName, "Conta principal", 80);
+  const recipientAccountName = "Conta principal";
+  const client = await db.connect();
+
+  try {
+    await client.query("begin");
+    const usersResult = await client.query(`
+      select id, username, name
+       from users
+       where id = $1
+          or username = $2
+       order by id
+       for update
+    `, [senderUserId, recipientUsername]);
+    const sender = usersResult.rows.find((row) => String(row.id) === String(senderUserId));
+    const recipient = usersResult.rows.find((row) => String(row.id) !== String(senderUserId)
+      && String(row.username || "").trim().toLocaleLowerCase("pt-BR") === recipientUsername);
+    if (!sender) throw createLaxTransferError("Conta de origem nao encontrada.", "LAX_SENDER_NOT_FOUND");
+    if (!recipient) {
+      if (buildProject200LaxKey(sender.username) === `${recipientUsername}${LAX_DOMAIN}`) {
+        throw createLaxTransferError("Voce nao pode transferir para a propria chave LAX.", "LAX_SELF_TRANSFER");
+      }
+      throw createLaxTransferError("Chave LAX nao encontrada.", "LAX_KEY_NOT_FOUND");
+    }
+
+    const balanceResult = await client.query(`
+      select coalesce(sum(case when o.kind = 'INCOME' then o.amount_cents else -o.amount_cents end), 0)::bigint as balance_cents
+        from project200_finance_occurrences o
+        join project200_finance_items i on i.id = o.item_id
+       where o.user_id = $1
+         and o.status = 'SETTLED'
+         and i.deleted_at is null
+         and i.account_name = $2
+    `, [senderUserId, senderAccountName]);
+    const balanceCents = Number(balanceResult.rows[0]?.balance_cents || 0);
+    if (balanceCents < amountCents) {
+      throw createLaxTransferError("Saldo insuficiente para esta transferencia.", "INSUFFICIENT_BALANCE");
+    }
+
+    const today = getProject200TodayKey();
+    const senderTitle = `Transferencia LAX para ${buildProject200LaxKey(recipient.username)}`.slice(0, 90);
+    const recipientTitle = `Transferencia LAX de ${buildProject200LaxKey(sender.username)}`.slice(0, 90);
+    const scheduleConfig = JSON.stringify({ valueMode: "FIXED", laxTransfer: true });
+    const senderItemResult = await client.query(`
+      insert into project200_finance_items (
+        user_id, title, kind, amount_cents, account_name, category, settlement_type, schedule_mode,
+        schedule_frequency, schedule_config, starts_on, value_mode
+      ) values ($1,$2,'EXPENSE',$3,$4,'Transferencias LAX','CASH','ONCE','NONE',$5::jsonb,$6::date,'FIXED')
+      returning id
+    `, [senderUserId, senderTitle, amountCents, senderAccountName, scheduleConfig, today]);
+    const recipientItemResult = await client.query(`
+      insert into project200_finance_items (
+        user_id, title, kind, amount_cents, account_name, category, settlement_type, schedule_mode,
+        schedule_frequency, schedule_config, starts_on, value_mode
+      ) values ($1,$2,'INCOME',$3,$4,'Transferencias LAX','CASH','ONCE','NONE',$5::jsonb,$6::date,'FIXED')
+      returning id
+    `, [recipient.id, recipientTitle, amountCents, recipientAccountName, scheduleConfig, today]);
+    const senderItemId = senderItemResult.rows[0].id;
+    const recipientItemId = recipientItemResult.rows[0].id;
+    await client.query(`
+      insert into project200_finance_occurrences (user_id, item_id, due_on, kind, amount_cents, status, settled_at)
+      values ($1,$2,$3::date,'EXPENSE',$4,'SETTLED',now()),
+             ($5,$6,$3::date,'INCOME',$4,'SETTLED',now())
+    `, [senderUserId, senderItemId, today, amountCents, recipient.id, recipientItemId]);
+    const transferResult = await client.query(`
+      insert into project200_lax_transfers (
+        sender_user_id, recipient_user_id, amount_cents, sender_account_name, recipient_account_name,
+        sender_item_id, recipient_item_id
+      ) values ($1,$2,$3,$4,$5,$6,$7)
+      returning id, created_at
+    `, [senderUserId, recipient.id, amountCents, senderAccountName, recipientAccountName, senderItemId, recipientItemId]);
+    await client.query("commit");
+
+    return {
+      id: transferResult.rows[0].id,
+      amountCents,
+      senderLaxKey: buildProject200LaxKey(sender.username),
+      recipientLaxKey: buildProject200LaxKey(recipient.username),
+      recipientName: recipient.name || recipient.username,
+      senderBalanceCents: balanceCents - amountCents,
+      createdAt: new Date(transferResult.rows[0].created_at).toISOString()
+    };
+  } catch (error) {
+    await client.query("rollback").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
