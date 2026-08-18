@@ -1,4 +1,4 @@
-﻿import { getApiUrl } from "../api.js";
+import { getApiUrl } from "../api.js";
 import { initializeProject200MarinUi } from "./marin.js?v=0.83-chat-history-v1";
 import { initializeProject200TutorsUi } from "./tutors-ui.js?v=0.83-chat-history-v1";
 import { initializeProject200OnboardingUi } from "./onboarding.js?v=20260722-onboarding-finish-v1";
@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "0.87";
+const project200AppVersion = "0.89";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -1077,6 +1077,8 @@ const toggleMessageNotificationSoundOptionButton = document.getElementById("togg
 const toggleMessageNotificationSoundHint = document.getElementById("toggleMessageNotificationSoundHint");
 const toggleBackgroundThemeOptionButton = document.getElementById("toggleBackgroundThemeOption");
 const toggleBackgroundThemeHint = document.getElementById("toggleBackgroundThemeHint");
+const defineGlobalMusicDefaultOptionButton = document.getElementById("defineGlobalMusicDefaultOption");
+const defineGlobalMusicDefaultHint = document.getElementById("defineGlobalMusicDefaultHint");
 const toggleStopMusicOnFinishOptionButton = document.getElementById("toggleStopMusicOnFinishOption");
 const toggleStopMusicOnFinishHint = document.getElementById("toggleStopMusicOnFinishHint");
 const logoutProject200Button = document.getElementById("logoutProject200Button");
@@ -1622,8 +1624,10 @@ const state = {
     favoriteTrackIds: new Set(),
     hiddenTrackUrls: new Set(),
     defaultPreferenceByTaskTitle: new Map(),
+    globalDefaultPreference: null,
     currentTaskTitle: "",
     configurationTaskTitle: "",
+    configurationScope: "task",
     configurationMode: false,
     defaultAppliedActionId: ""
   },
@@ -4479,6 +4483,7 @@ async function loadRunningMusicStations() {
   state.runningPlayer.favoriteTrackUrls = new Set();
   state.runningPlayer.favoriteTrackIds = new Set();
   state.runningPlayer.defaultPreferenceByTaskTitle = new Map();
+  state.runningPlayer.globalDefaultPreference = null;
   ensureRunningStationHasTracks(previousStationName);
   syncRunningMusicOrder({ preserveTrackUrl: previousTrackUrl });
   renderRunningMusicPlayer();
@@ -4529,6 +4534,7 @@ async function loadRunningMusicStations() {
     state.runningPlayer.favoriteTrackIds = new Set(Array.isArray(payload?.preferences?.favoriteTrackIds) ? payload.preferences.favoriteTrackIds : []);
       state.runningPlayer.favoriteTrackIds = new Set(Array.isArray(payload?.preferences?.favoriteTrackIds) ? payload.preferences.favoriteTrackIds : []);
       state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
+      state.runningPlayer.globalDefaultPreference = buildRunningGlobalDefaultPreference(payload?.preferences);
     ensureRunningAudioLoopState();
       const refreshedStationIndex = previousStationName
         ? state.runningPlayer.stations.findIndex((station) => String(station?.name || "").trim() === previousStationName)
@@ -4644,24 +4650,47 @@ function buildRunningDefaultPreferenceMap(preferences = {}) {
     .filter(Boolean));
 }
 
+function buildRunningGlobalDefaultPreference(preferences = {}) {
+  const item = preferences?.globalDefault;
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const mode = String(item.mode || "track").trim() === "station" ? "station" : "track";
+  const stationId = String(item.stationId || "").trim().toLowerCase();
+  const trackId = String(item.trackId || "").trim().toLowerCase();
+  const stationName = String(item.stationName || "").trim();
+  const trackName = String(item.trackName || "").trim();
+  const trackUrl = String(item.trackUrl || "").trim();
+  if (mode === "station" && !stationId && !stationName) {
+    return null;
+  }
+  if (mode === "track" && !trackId && !trackUrl && !trackName) {
+    return null;
+  }
+  return { mode, stationId, trackId, stationName, trackName, trackUrl };
+}
+
 function getRunningDefaultPreferenceForTaskTitle(taskTitle = "") {
   const safeTaskTitle = String(taskTitle || "").trim();
-  if (!safeTaskTitle) {
-    return null;
-  }
   const map = state.runningPlayer.defaultPreferenceByTaskTitle;
-  if (!(map instanceof Map)) {
-    return null;
-  }
-  return map.get(normalizeRunningMusicName(safeTaskTitle)) || map.get(safeTaskTitle) || null;
+  const individualPreference = safeTaskTitle && map instanceof Map
+    ? (map.get(normalizeRunningMusicName(safeTaskTitle)) || map.get(safeTaskTitle) || null)
+    : null;
+  return individualPreference || state.runningPlayer.globalDefaultPreference || null;
 }
 
 function getRunningDefaultPreferenceForCurrentTask() {
+  if (state.runningPlayer.configurationMode && state.runningPlayer.configurationScope === "global") {
+    return state.runningPlayer.globalDefaultPreference || null;
+  }
   return getRunningDefaultPreferenceForTaskTitle(getRunningMusicTargetTaskTitle());
 }
 
 function getRunningMusicTargetTaskTitle() {
   if (state.runningPlayer.configurationMode) {
+    if (state.runningPlayer.configurationScope === "global") {
+      return "todas as tarefas e microtarefas";
+    }
     return String(state.runningPlayer.configurationTaskTitle || "").trim();
   }
   return String(state.runningPlayer.currentTaskTitle || "").trim();
@@ -5341,6 +5370,8 @@ async function saveRunningTaskDefault(mode = "track") {
   const track = getCurrentRunningTrack();
   const station = getCurrentRunningStation();
   const taskTitle = getRunningMusicTargetTaskTitle();
+  const isGlobalDefault = state.runningPlayer.configurationMode
+    && state.runningPlayer.configurationScope === "global";
 
   if (!station?.name) {
     return;
@@ -5362,8 +5393,9 @@ async function saveRunningTaskDefault(mode = "track") {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        scope: isGlobalDefault ? "global" : "task",
         mode: safeMode,
-        taskTitle,
+        taskTitle: isGlobalDefault ? "" : taskTitle,
         stationId: getRunningStationId(station),
         trackId: safeMode === "track" ? getRunningTrackId(track) : "",
         stationName: station.name,
@@ -5373,6 +5405,7 @@ async function saveRunningTaskDefault(mode = "track") {
     });
 
     state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
+    state.runningPlayer.globalDefaultPreference = buildRunningGlobalDefaultPreference(payload?.preferences);
     if (state.runningPlayer.configurationMode && isTaskComposerMode()) renderTaskComposerModal();
     renderRunningMusicPlayer();
     renderRunningMusicList();
@@ -5381,7 +5414,10 @@ async function saveRunningTaskDefault(mode = "track") {
     closeModal("runningMusicDefaultChoiceModal");
     state.runningPlayer.configurationMode = false;
     state.runningPlayer.configurationTaskTitle = "";
-    showFloatingNotice(safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão.");
+    state.runningPlayer.configurationScope = "task";
+    showFloatingNotice(isGlobalDefault
+      ? (safeMode === "station" ? "Estação padrão aplicada às atividades sem som próprio." : "Música padrão aplicada às atividades sem som próprio.")
+      : (safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão."));
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
   }
@@ -8788,6 +8824,7 @@ function closeStartDecisionModalWith(value) {
   closeProjectNativeKeyboard({ commit: false, immediate: true });
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationScope = "task";
   closeModal(startDecisionModal);
   if (startDecisionContent) {
     startDecisionContent.id = "startDecisionContent";
@@ -18010,6 +18047,15 @@ toggleMissionActionsOptionButton?.classList.toggle("is-off", missionActionsMode 
   if (toggleBackgroundThemeHint) {
     toggleBackgroundThemeHint.textContent = getBackgroundThemeMode(state.options.backgroundTheme).label;
   }
+  if (defineGlobalMusicDefaultHint) {
+    const globalMusic = state.runningPlayer.globalDefaultPreference;
+    const globalMusicLabel = globalMusic?.mode === "station"
+      ? String(globalMusic.stationName || "Estação").trim()
+      : String(globalMusic?.trackName || "Música").trim();
+    defineGlobalMusicDefaultHint.textContent = globalMusic
+      ? "Atual: " + globalMusicLabel + " · sem substituir padrões individuais"
+      : "Tarefas e microtarefas sem padrão individual";
+  }
   if (toggleStopMusicOnFinishHint) {
     toggleStopMusicOnFinishHint.textContent = state.options.stopMusicOnFinish ? "Encerrar junto" : "Continuar tocando";
   }
@@ -20155,6 +20201,7 @@ runningPlayerList?.addEventListener("click", () => {
   state.startDecisionContext.actionId = "";
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationScope = "task";
   openRunningMusicListModal();
 });
 runningPlayerPrev?.addEventListener("click", () => {
@@ -20168,6 +20215,7 @@ runningMusicListBack?.addEventListener("click", () => {
   const wasConfiguration = state.runningPlayer.configurationMode;
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationScope = "task";
   if (!wasConfiguration && state.startDecisionContext.actionId && !startDecisionModal?.classList.contains("active") && !runningTaskModalElement?.classList.contains("active")) {
     reopenStartDecisionForAction(state.startDecisionContext.actionId);
   }
@@ -20330,6 +20378,13 @@ toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
   applyBackgroundTheme();
   saveOptionsConfig();
   renderOptionsModal();
+});
+defineGlobalMusicDefaultOptionButton?.addEventListener("click", () => {
+  closeModal("optionsModal");
+  state.runningPlayer.configurationMode = true;
+  state.runningPlayer.configurationScope = "global";
+  state.runningPlayer.configurationTaskTitle = "";
+  void openRunningMusicListModal();
 });
 toggleStopMusicOnFinishOptionButton?.addEventListener("click", () => {
   state.options.stopMusicOnFinish = !state.options.stopMusicOnFinish;
@@ -20813,6 +20868,7 @@ startDecisionMusicLabel?.addEventListener("click", () => {
     return;
   }
   state.runningPlayer.configurationMode = true;
+  state.runningPlayer.configurationScope = "task";
   state.runningPlayer.configurationTaskTitle = targetTitle;
   openRunningMusicListModal();
 });

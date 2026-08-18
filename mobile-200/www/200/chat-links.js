@@ -42,7 +42,7 @@ function getPrivateMediaApiOrigin() {
   const capacitor = window.Capacitor;
   const platform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
   const isNative = typeof capacitor?.isNativePlatform === "function" ? capacitor.isNativePlatform() : platform === "android" || platform === "ios";
-  if (isNative) return "https://www.turmadoprinty.com.br";
+  if (isNative) return "https://turmadoprinty.onrender.com";
   return window.location.origin.replace(/\/+$/, "");
 }
 

@@ -1,5 +1,7 @@
 import { query } from "./db.js";
 
+const PROJECT200_GLOBAL_MUSIC_TASK_TITLE = "__project200_global_default__";
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
@@ -76,7 +78,8 @@ export async function getProject200MusicPreferences(userId) {
       favoriteTrackUrls: [],
       favoriteTrackIds: [],
       favorites: [],
-      defaults: []
+      defaults: [],
+      globalDefault: null
     };
   }
 
@@ -107,19 +110,30 @@ export async function getProject200MusicPreferences(userId) {
     trackUrl: normalizeTrackUrl(row.track_url)
   }));
 
+  const normalizedDefaults = defaultsResult.rows.map((row) => ({
+    taskTitle: normalizeTaskTitle(row.task_title),
+    mode: normalizeDefaultMode(row.default_mode),
+    stationId: normalizeCatalogId(row.station_id),
+    trackId: normalizeCatalogId(row.track_id),
+    stationName: normalizeStationName(row.station_name),
+    trackName: normalizeText(row.track_name),
+    trackUrl: normalizeTrackUrl(row.track_url)
+  })).filter((row) => row.taskTitle && (row.mode === "station" ? (row.stationId || row.stationName) : (row.trackId || row.trackUrl)));
+  const globalDefaultRow = normalizedDefaults.find((row) => row.taskTitle === PROJECT200_GLOBAL_MUSIC_TASK_TITLE) || null;
+
   return {
     favoriteTrackUrls: favorites.map((row) => row.trackUrl).filter(Boolean),
     favoriteTrackIds: favorites.map((row) => row.trackId).filter(Boolean),
     favorites,
-    defaults: defaultsResult.rows.map((row) => ({
-      taskTitle: normalizeTaskTitle(row.task_title),
-      mode: normalizeDefaultMode(row.default_mode),
-      stationId: normalizeCatalogId(row.station_id),
-      trackId: normalizeCatalogId(row.track_id),
-      stationName: normalizeStationName(row.station_name),
-      trackName: normalizeText(row.track_name),
-      trackUrl: normalizeTrackUrl(row.track_url)
-    })).filter((row) => row.taskTitle && (row.mode === "station" ? (row.stationId || row.stationName) : (row.trackId || row.trackUrl)))
+    defaults: normalizedDefaults.filter((row) => row.taskTitle !== PROJECT200_GLOBAL_MUSIC_TASK_TITLE),
+    globalDefault: globalDefaultRow ? {
+      mode: globalDefaultRow.mode,
+      stationId: globalDefaultRow.stationId,
+      trackId: globalDefaultRow.trackId,
+      stationName: globalDefaultRow.stationName,
+      trackName: globalDefaultRow.trackName,
+      trackUrl: globalDefaultRow.trackUrl
+    } : null
   };
 }
 
@@ -262,8 +276,31 @@ export async function getProject200MusicStationsForUser({ userId = null, station
       trackUrl: normalizeTrackUrl(match.track?.url)
     } : preference;
   });
+  const resolvedGlobalDefault = preferences.globalDefault
+    ? (() => {
+        if (preferences.globalDefault.mode === "station") {
+          const station = findCatalogStation(normalizedStations, preferences.globalDefault);
+          return station ? {
+            ...preferences.globalDefault,
+            stationId: normalizeCatalogId(station?.id),
+            stationName: normalizeStationName(station?.name)
+          } : preferences.globalDefault;
+        }
+        const match = findCatalogTrack(normalizedStations, preferences.globalDefault);
+        return match ? {
+          ...preferences.globalDefault,
+          stationId: normalizeCatalogId(match.station?.id),
+          trackId: normalizeCatalogId(match.track?.id),
+          stationName: normalizeStationName(match.station?.name),
+          trackName: normalizeTrackName(match.track?.name),
+          trackUrl: normalizeTrackUrl(match.track?.url)
+        } : preferences.globalDefault;
+      })()
+    : null;
 
-  await backfillProject200MusicReferences(userId, resolvedFavorites, resolvedDefaults);
+  await backfillProject200MusicReferences(userId, resolvedFavorites, resolvedGlobalDefault
+    ? [...resolvedDefaults, { ...resolvedGlobalDefault, taskTitle: PROJECT200_GLOBAL_MUSIC_TASK_TITLE }]
+    : resolvedDefaults);
 
   const favoriteUrlSet = new Set(resolvedFavorites.map((item) => item.trackUrl).filter(Boolean));
   const favoriteIdSet = new Set(resolvedFavorites.map((item) => item.trackId).filter(Boolean));
@@ -302,6 +339,7 @@ export async function getProject200MusicStationsForUser({ userId = null, station
       favoriteTrackUrls: [...favoriteUrlSet],
       favoriteTrackIds: [...favoriteIdSet],
       defaults: resolvedDefaults,
+      globalDefault: resolvedGlobalDefault,
       defaultTrackByTaskTitle: Object.fromEntries(defaultTrackByTaskTitle.entries())
     }
   };
@@ -395,7 +433,22 @@ export async function setProject200MusicTaskDefault({ userId, taskTitle, mode, s
     ]
   );
 
+  const preferences = await getProject200MusicPreferences(userId);
   return {
-    defaults: (await getProject200MusicPreferences(userId)).defaults
+    defaults: preferences.defaults,
+    globalDefault: preferences.globalDefault
   };
+}
+
+export async function setProject200MusicGlobalDefault({ userId, mode, stationId, trackId, stationName, trackName, trackUrl }) {
+  return setProject200MusicTaskDefault({
+    userId,
+    taskTitle: PROJECT200_GLOBAL_MUSIC_TASK_TITLE,
+    mode,
+    stationId,
+    trackId,
+    stationName,
+    trackName,
+    trackUrl
+  });
 }

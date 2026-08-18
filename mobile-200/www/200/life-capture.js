@@ -100,8 +100,8 @@
   }
 
   function nextAudioTitle() {
-    const total = state.captures.filter((item) => item.kind === "audio" && /^Gravação\s+\d+/i.test(safeText(item.title))).length;
-    return `Gravação ${total + 1}`;
+    const total = state.captures.filter((item) => item.kind === "audio" && /^Gravaï¿½ï¿½o\s+\d+/i.test(safeText(item.title))).length;
+    return `Gravaï¿½ï¿½o ${total + 1}`;
   }
 
   function firstTextLine(value, limit = 20) {
@@ -178,7 +178,7 @@
     const capacitor = window.Capacitor;
     const platform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
     const isNative = typeof capacitor?.isNativePlatform === "function" ? capacitor.isNativePlatform() : platform === "android" || platform === "ios";
-    if (isNative) return "https://www.turmadoprinty.com.br";
+    if (isNative) return "https://turmadoprinty.onrender.com";
     return window.location.origin.replace(/\/+$/, "");
   }
 

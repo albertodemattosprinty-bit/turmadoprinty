@@ -1,4 +1,4 @@
-const nativeApiOrigin = "https://www.turmadoprinty.com.br";
+const nativeApiOrigin = "https://turmadoprinty.onrender.com";
 
 function getConfiguredApiOrigin() {
   const metaValue = document

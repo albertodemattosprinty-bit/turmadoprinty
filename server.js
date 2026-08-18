@@ -63,7 +63,7 @@ import { abortProject200SleepSession, getProject200SleepSession, startProject200
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
-import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
+import { ensureProject200MusicSchema, getProject200MusicStationsForUser, setProject200MusicGlobalDefault, setProject200MusicTaskDefault, toggleProject200MusicFavorite } from "./src/project200-music.js";
 import { exportProject200DataToUser } from "./src/project200-export.js";
 import { getProject200FinanceNotes, saveProject200FinanceNotes, summarizeProject200PersonalFinance } from "./src/project200-finance.js";
 import { buildProject200LaxKey, createProject200FinanceItem, deleteProject200FinanceItem, settleProject200FinanceOccurrence, summarizeProject200FinanceLedgerMonth, transferProject200LaxBalance, updateProject200FinanceItem } from "./src/project200-finance-ledger.js";
@@ -14158,24 +14158,29 @@ const server = http.createServer(async (request, response) => {
       }
 
       const body = await readJsonBody(request);
-      const result = await setProject200MusicTaskDefault({
+      const isGlobalDefault = String(body.scope || "").trim().toLowerCase() === "global";
+      const musicPayload = {
         userId: user.id,
-        taskTitle: body.taskTitle,
         mode: body.mode,
         stationId: body.stationId,
         trackId: body.trackId,
         stationName: body.stationName,
         trackName: body.trackName,
         trackUrl: body.trackUrl
-      });
-      await setActionMusicDefaultByTitle(user.id, body.taskTitle, {
-        mode: body.mode,
-        stationId: body.stationId,
-        trackId: body.trackId,
-        stationName: body.stationName,
-        trackName: body.trackName,
-        trackUrl: body.trackUrl
-      });
+      };
+      const result = isGlobalDefault
+        ? await setProject200MusicGlobalDefault(musicPayload)
+        : await setProject200MusicTaskDefault({ ...musicPayload, taskTitle: body.taskTitle });
+      if (!isGlobalDefault) {
+        await setActionMusicDefaultByTitle(user.id, body.taskTitle, {
+          mode: body.mode,
+          stationId: body.stationId,
+          trackId: body.trackId,
+          stationName: body.stationName,
+          trackName: body.trackName,
+          trackUrl: body.trackUrl
+        });
+      }
 
       const stations = await listProject200MusicStations();
       const personalized = await getProject200MusicStationsForUser({ userId: user.id, stations });
