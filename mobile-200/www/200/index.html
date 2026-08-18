@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/200/project.css?v=0.90" />
   <link rel="stylesheet" href="/200/life-capture.css?v=20260802-gallery-inline-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
+  <link rel="stylesheet" href="/200/books.css?v=20260818-apps-books-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -27,6 +28,8 @@
         }
         var raw = window.localStorage.getItem("project_200_options_v1");
         var parsed = raw ? JSON.parse(raw) : null;
+        var homeViewMode = String(parsed && parsed.homeViewMode || "apps").trim().toLowerCase() === "complete" ? "complete" : "apps";
+        document.body.setAttribute("data-home-view", homeViewMode);
         var theme = String(parsed && parsed.backgroundTheme || "").trim().toLowerCase();
         if (theme === "modern") theme = "black";
         var allowed = ["white", "black", "orange", "bluevivid", "pinkstrong", "bluedark", "brown", "edge", "light"];
@@ -165,6 +168,19 @@
           <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
         </button>
       </div>
+      <section class="apps-home" id="appsHome" aria-label="Aplicativos do iLife">
+        <time class="apps-home-clock" id="appsHomeClock">--:--</time>
+        <strong class="apps-home-profile" id="appsHomeProfileName">Usuário</strong>
+        <time class="apps-home-date" id="appsHomeDate">Carregando data</time>
+        <div class="apps-home-grid">
+          <button class="apps-home-item" type="button" data-open-modal="ilifeFinanceModal" aria-label="Abrir Finanças"><img src="/200/apps/financas.png" alt="" aria-hidden="true" /><span>Finanças</span></button>
+          <button class="apps-home-item" type="button" data-open-modal="booksModal" aria-label="Abrir Livros"><img src="/200/apps/livros.png" alt="" aria-hidden="true" /><span>Livros</span></button>
+          <button class="apps-home-item" type="button" data-open-modal="optionsModal" aria-label="Abrir Configurações"><img src="/200/apps/configuracoes.png" alt="" aria-hidden="true" /><span>Configurações</span></button>
+          <button class="apps-home-item" type="button" id="appsHomeMusicButton" aria-label="Abrir Música"><img src="/200/apps/musica.png" alt="" aria-hidden="true" /><span>Música</span></button>
+          <button class="apps-home-item" type="button" data-open-modal="actionsModal" aria-label="Abrir Ações"><img src="/200/apps/acoes.png" alt="" aria-hidden="true" /><span>Ações</span></button>
+          <button class="apps-home-item" type="button" id="appsHomeMemoriesButton" aria-label="Abrir Memórias"><img src="/200/apps/memorias.png" alt="" aria-hidden="true" /><span>Memórias</span></button>
+        </div>
+      </section>
       <div class="running-task-title-row">
         <img class="running-task-category-icon" id="runningTaskCategoryIcon" src="/200/aspect-icons/trabalho.svg" alt="Aspecto atual" hidden />
         <div class="running-task-name" id="runningTaskName"></div>
@@ -719,12 +735,35 @@
     </div>
   </section>
 
+  <section class="workspace-modal simple-modal books-modal" id="booksModal" aria-hidden="true" aria-label="Biblioteca de livros">
+    <div class="books-shell">
+      <header class="books-header"><button class="books-icon-button" type="button" data-close-modal aria-label="Voltar para a home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h1>Livros</h1><button class="books-icon-button" type="button" id="openBookCreate" aria-label="Criar livro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></header>
+      <main class="books-library"><div class="books-hero-copy"><strong>Biblioteca iLife</strong><span>Livros originais criados pela comunidade com Luna e publicados para todos lerem.</span></div><p class="books-status" id="booksStatus" aria-live="polite"></p><div class="books-grid" id="booksGrid"></div></main>
+      <section class="book-create-layer" id="bookCreateLayer" hidden aria-hidden="true" aria-label="Criar livro com Luna">
+        <header class="books-header"><button class="books-icon-button" type="button" id="closeBookCreate" aria-label="Voltar para a biblioteca"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h1>Novo livro</h1><span></span></header>
+        <form class="book-create-form" id="bookCreateForm">
+          <div class="book-create-intro"><h2>Escreva com Luna</h2><p>Você define a ideia. Luna planeja, cria de 1 a 200 páginas e publica o livro completo na biblioteca geral.</p></div>
+          <label class="book-field"><span>Título</span><input id="bookTitleInput" type="text" maxlength="140" autocomplete="off" placeholder="Título do livro" required /></label>
+          <div class="book-field"><span>Estilo literário</span><div class="book-style-grid" role="group" aria-label="Estilos literários">
+            <button class="book-style-chip is-selected" type="button" data-book-style="Romance">Romance</button><button class="book-style-chip" type="button" data-book-style="Fantasia">Fantasia</button><button class="book-style-chip" type="button" data-book-style="Ficção científica">Ficção científica</button><button class="book-style-chip" type="button" data-book-style="Suspense">Suspense</button><button class="book-style-chip" type="button" data-book-style="Terror">Terror</button><button class="book-style-chip" type="button" data-book-style="Aventura">Aventura</button><button class="book-style-chip" type="button" data-book-style="Drama">Drama</button><button class="book-style-chip" type="button" data-book-style="Comédia">Comédia</button><button class="book-style-chip" type="button" data-book-style="Poesia">Poesia</button><button class="book-style-chip" type="button" data-book-style="Biografia">Biografia</button><button class="book-style-chip" type="button" data-book-style="Autobiografia">Autobiografia</button><button class="book-style-chip" type="button" data-book-style="Desenvolvimento pessoal">Desenvolvimento pessoal</button><button class="book-style-chip" type="button" data-book-style="Filosofia">Filosofia</button><button class="book-style-chip" type="button" data-book-style="História">História</button><button class="book-style-chip" type="button" data-book-style="Infantil">Infantil</button><button class="book-style-chip" type="button" data-book-style="Crônica">Crônica</button>
+          </div></div>
+          <label class="book-field"><span>Estilo da capa</span><select id="bookCoverStyleSelect"><option>Editorial cinematográfica</option><option>Minimalista premium</option><option>Ilustração 3D</option><option>Aquarela artística</option><option>Fantasia épica</option><option>Fotográfica realista</option><option>Vintage clássica</option><option>Anime contemporâneo</option><option>Infantil colorida</option><option>Sombria e misteriosa</option></select></label>
+          <label class="book-field"><span>Quantidade de páginas</span><input id="bookPageCountInput" type="number" min="1" max="200" value="12" required /></label>
+          <label class="book-field"><span>Contexto para aperfeiçoar o livro</span><textarea id="bookContextInput" maxlength="12000" placeholder="Conte a premissa, personagens, época, tom, público, fatos importantes e tudo que Luna deve preservar..." required></textarea></label>
+          <div class="book-create-models"><span>Texto: Luna</span><span>•</span><span>Capa: GPT Image Mini</span><span>•</span><span>1500–1800 caracteres por página</span></div><p class="book-create-message" id="bookCreateMessage" aria-live="polite"></p><button class="book-create-submit" type="submit" id="bookCreateSubmit">Criar e publicar livro</button>
+        </form>
+      </section>
+      <section class="book-reader-layer" id="bookReaderLayer" hidden aria-hidden="true" aria-label="Leitor imersivo"><header class="books-header"><button class="books-icon-button" type="button" id="closeBookReader" aria-label="Voltar para a biblioteca"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h1>Leitura</h1><span></span></header><main class="book-reader-scroll" id="bookReaderScroll"></main></section>
+    </div>
+  </section>
+
   <section class="workspace-modal simple-modal" id="optionsModal" aria-hidden="true" aria-label="Opções do aplicativo">
     <div class="finance-content options-content">
       <div class="running-music-default-title">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.8A3.2 3.2 0 1 0 12 15.2 3.2 3.2 0 0 0 12 8.8Zm9 3.2-.9-.5a8.8 8.8 0 0 0-.3-1.2l.7-.8a1 1 0 0 0-.1-1.4l-1-1a1 1 0 0 0-1.4-.1l-.8.7q-.57-.18-1.2-.3L15 3a1 1 0 0 0-1-.8h-2a1 1 0 0 0-1 .8l-.5.9q-.62.12-1.2.3l-.8-.7a1 1 0 0 0-1.4.1l-1 1a1 1 0 0 0-.1 1.4l.7.8q-.18.57-.3 1.2L3 11a1 1 0 0 0-.8 1v2a1 1 0 0 0 .8 1l.9.5q.12.62.3 1.2l-.7.8a1 1 0 0 0 .1 1.4l1 1a1 1 0 0 0 1.4.1l.8-.7q.57.18 1.2.3l.5.9a1 1 0 0 0 1 .8h2a1 1 0 0 0 1-.8l.5-.9q.62-.12 1.2-.3l.8.7a1 1 0 0 0 1.4-.1l1-1a1 1 0 0 0 .1-1.4l-.7-.8q.18-.57.3-1.2l.9-.5a1 1 0 0 0 .8-1v-2A1 1 0 0 0 21 12Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
         <span>Opções</span>
       </div>
+      <button class="running-music-default-option" type="button" id="toggleHomeViewOption"><span class="running-music-default-top">Alternar entre a grade limpa de aplicativos e a experiência completa da home</span><strong>Visualização da home</strong><span class="running-music-default-bottom" id="toggleHomeViewHint">Apps</span></button>
       <button class="running-music-default-option options-toggle-btn" type="button" id="toggleAppKeyboardOption">
         <span class="running-music-default-top">Escolher o teclado usado em mensagens, missões, ações e outros campos</span>
         <strong>Teclado</strong>
@@ -2001,8 +2040,9 @@
   </button>
   <audio id="tutorNotificationAudio" src="/200/audio/ilife.mp3" preload="auto"></audio>
 
-  <script type="module" src="/200/project.js?v=0.92"></script>
+  <script type="module" src="/200/project.js?v=0.93"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
+  <script src="/200/books.js?v=20260818-apps-books-v1"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260730-admin-texts-v1"></script>
 </body>

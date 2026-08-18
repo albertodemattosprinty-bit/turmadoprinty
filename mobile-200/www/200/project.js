@@ -617,6 +617,8 @@ const constitutionTextView = document.getElementById("constitutionTextView");
 const constitutionMessage = document.getElementById("constitutionMessage");
 const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
+const toggleHomeViewOptionButton = document.getElementById("toggleHomeViewOption");
+const toggleHomeViewHint = document.getElementById("toggleHomeViewHint");
 const toggleAppKeyboardOptionButton = document.getElementById("toggleAppKeyboardOption");
 const toggleAppKeyboardHint = document.getElementById("toggleAppKeyboardHint");
 const toggleMissionActionsOptionButton = document.getElementById("toggleMissionActionsOption");
@@ -898,6 +900,11 @@ const runningConfirmPauseButton = document.getElementById("runningConfirmPauseBu
 const runningConfirmBackButton = document.getElementById("runningConfirmBackButton");
 const runningTaskActionsWrap = runningTaskModalElement?.querySelector(".running-task-actions");
 const runningIdleHub = document.getElementById("runningIdleHub");
+const appsHomeClock = document.getElementById("appsHomeClock");
+const appsHomeDate = document.getElementById("appsHomeDate");
+const appsHomeProfileName = document.getElementById("appsHomeProfileName");
+const appsHomeMusicButton = document.getElementById("appsHomeMusicButton");
+const appsHomeMemoriesButton = document.getElementById("appsHomeMemoriesButton");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
 const runningPlayerTitleButton = document.getElementById("runningPlayerTitleButton");
@@ -1566,6 +1573,7 @@ const state = {
   platformWizard: buildInitialPlatformWizardState(),
   wizard: buildInitialWizardState(),
   options: {
+    homeViewMode: "apps",
     missionActionsMode: "separate",
     completionBeepCycles: 0,
     minuteNotificationInterval: 1,
@@ -3279,8 +3287,38 @@ function setRunningIdleVisualState(isIdle) {
   runningTaskContent?.classList.toggle("is-idle-layout", isIdle);
 }
 
+function normalizeHomeViewMode(value) {
+  return String(value || "").trim().toLowerCase() === "complete" ? "complete" : "apps";
+}
+
+function applyHomeViewMode() {
+  const mode = normalizeHomeViewMode(state.options.homeViewMode);
+  state.options.homeViewMode = mode;
+  document.body.setAttribute("data-home-view", mode);
+  runningTaskContent?.setAttribute("data-home-view", mode);
+}
+
+function formatAppsHomeDate(date) {
+  const formatted = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric" }).format(date);
+  return formatted.replace(/ de ([a-záàâãéêíóôõúç])/i, (_, letter) => ` de ${letter.toLocaleUpperCase("pt-BR")}`);
+}
+
+function renderAppsHomeHeader(date = new Date(getServerNowMs())) {
+  if (appsHomeClock) {
+    appsHomeClock.textContent = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+    appsHomeClock.dateTime = date.toISOString();
+  }
+  if (appsHomeDate) {
+    appsHomeDate.textContent = formatAppsHomeDate(date);
+    appsHomeDate.dateTime = getProjectDateKey(date);
+  }
+  if (appsHomeProfileName) appsHomeProfileName.textContent = String(state.selectedProfile || getDefaultProfileName() || "Usuário").trim() || "Usuário";
+}
+
 function primeRunningIdleHomeShell() {
   const now = new Date(getServerNowMs());
+  applyHomeViewMode();
+  renderAppsHomeHeader(now);
   const dayElapsedPercent = getDayElapsedPercent(now);
   const showIdlePercent = state.runningIdleCenterMode === "percent";
   const homeCenterMarkup = showIdlePercent
@@ -4175,6 +4213,8 @@ function anchorToCurrentAction() {
 }
 
 function renderHomeRunningTask() {
+  applyHomeViewMode();
+  renderAppsHomeHeader(new Date(getServerNowMs()));
   const missionOwnsMinuteCueSchedule = isMissionRunModalOpen() && Boolean(state.missionRun?.goalId);
   const setHomeRunningSurfaceState = (isRunning) => {
     if (homeRunningSurfaceIcon) {
@@ -17794,6 +17834,7 @@ async function loadOptionsConfig() {
 
     try {
       const parsed = JSON.parse(raw || "{}");
+      state.options.homeViewMode = normalizeHomeViewMode(parsed.homeViewMode);
       state.options.missionActionsMode = normalizeMissionActionsMode(parsed.missionActionsMode);
       state.options.completionBeepCycles = taskBeepOptionCycles.includes(Number(parsed.completionBeepCycles))
         ? Number(parsed.completionBeepCycles)
@@ -17808,6 +17849,7 @@ async function loadOptionsConfig() {
       state.options.missionNotificationsEnabled = parsed.missionNotificationsEnabled === true;
       state.options.useAppKeyboard = parsed.useAppKeyboard === true;
     } catch {
+      state.options.homeViewMode = "apps";
       state.options.missionActionsMode = "separate";
       state.options.completionBeepCycles = 0;
       state.options.minuteNotificationInterval = 1;
@@ -17821,6 +17863,7 @@ async function loadOptionsConfig() {
       state.options.useAppKeyboard = false;
     }
     applyBackgroundTheme();
+    applyHomeViewMode();
     applyProjectKeyboardPreference();
   })();
   return optionsConfigLoadPromise;
@@ -17828,6 +17871,7 @@ async function loadOptionsConfig() {
 
 function saveOptionsConfig() {
   const serialized = JSON.stringify({
+    homeViewMode: normalizeHomeViewMode(state.options.homeViewMode),
     missionActionsMode: normalizeMissionActionsMode(state.options.missionActionsMode),
     completionBeepCycles: Number(state.options.completionBeepCycles || 0),
     minuteNotificationInterval: normalizeMinuteCueInterval(state.options.minuteNotificationInterval),
@@ -18008,6 +18052,7 @@ function registerScreenLockActivity() {
 function renderOptionsModal() {
   const optionsContent = document.querySelector("#optionsModal .options-content");
   const previousScrollTop = Number(optionsContent?.scrollTop || 0);
+  if (toggleHomeViewHint) toggleHomeViewHint.textContent = normalizeHomeViewMode(state.options.homeViewMode) === "apps" ? "Apps" : "Completo";
   if (toggleAppKeyboardHint) {
     toggleAppKeyboardHint.textContent = state.options.useAppKeyboard ? "Do iLife" : "Do aparelho";
   }
@@ -20174,6 +20219,16 @@ runningTaskMissionButton?.addEventListener("click", () => {
   void openRunningMissionQuickModal();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
+appsHomeMusicButton?.addEventListener("click", () => {
+  state.startDecisionContext.actionId = "";
+  state.runningPlayer.configurationMode = false;
+  state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationScope = "global";
+  void openRunningMusicListModal();
+});
+appsHomeMemoriesButton?.addEventListener("click", () => {
+  document.getElementById("lifeCaptureHomeButton")?.click();
+});
 homeRunningListButton?.addEventListener("click", () => {
   openModal("actionsModal");
 });
@@ -20313,6 +20368,14 @@ actionsMissionsList?.addEventListener("keydown", (event) => {
   event.preventDefault();
   document.body.classList.add("actions-mission-editor-open");
   openMissionEntryModal(String(card.dataset.actionsMissionGoalId || ""));
+});
+toggleHomeViewOptionButton?.addEventListener("click", () => {
+  state.options.homeViewMode = normalizeHomeViewMode(state.options.homeViewMode) === "apps" ? "complete" : "apps";
+  applyHomeViewMode();
+  renderAppsHomeHeader();
+  saveOptionsConfig();
+  renderOptionsModal();
+  renderHomeRunningTask();
 });
 toggleAppKeyboardOptionButton?.addEventListener("click", () => {
   state.options.useAppKeyboard = !state.options.useAppKeyboard;

@@ -79,6 +79,7 @@ import { canViewProject200LifeCapture, deleteProject200LifeCapture, getProject20
 import { listProject200FrontTexts, saveProject200FrontText } from "./src/project200-front-texts.js";
 import { addProject200Tutor, appendProject200TutorMessage, claimProject200TutorProposal, failProject200TutorProposal, finishProject200TutorProposal, listProject200TutorInbox, listProject200TutorMessages, listProject200Tutors, markProject200TutorMessagesRead } from "./src/project200-tutors.js";
 import { completeProject200Onboarding, ensureProject200OnboardingSchema, getProject200Onboarding, initializeProject200Onboarding, markProject200OnboardingAvatarComplete, restartProject200Onboarding, saveProject200OnboardingProgress } from "./src/project200-onboarding.js";
+import { createProject200BooksRuntime } from "./src/project200-books-runtime.js";
 import { getProject201AppUpdateConfig, saveProject201AppUpdateConfig } from "./src/project201-app-update.js";
 import { decryptUserBuffer, encryptUserBuffer } from "./src/privacy-crypto.js";
 
@@ -2109,6 +2110,8 @@ async function readJsonBody(request) {
     throw new Error("JSON invalido.");
   }
 }
+
+const project200BooksRuntime = createProject200BooksRuntime({ requireAuth, readJsonBody, sendJson });
 
 function sanitizeUser(user) {
   if (!user) {
@@ -12585,6 +12588,22 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/200/books") {
+    await project200BooksRuntime.handleList(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/books") {
+    await project200BooksRuntime.handleCreate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/200\/books\/[^/]+$/)) {
+    const bookId = decodeURIComponent(pathname.replace(/^\/api\/200\/books\/([^/]+)$/, "$1"));
+    await project200BooksRuntime.handleGet(request, response, bookId);
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/200/front-texts") {
     await handleProject200FrontTextsListRequest(request, response);
     return;
@@ -15155,6 +15174,7 @@ const server = http.createServer(async (request, response) => {
 });
 
 void bootstrapMiniCourseJobsQueue();
+void project200BooksRuntime.bootstrap();
 void ensureEscreverSchema().catch((error) => {
   console.error("Falha ao preparar a area /escrever:", error);
 });
