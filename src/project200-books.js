@@ -93,7 +93,7 @@ export async function createProject200Book(userId, payload = {}) {
   const title = String(payload.title || "").replace(/\s+/gu, " ").trim().slice(0, 140);
   const literaryStyle = String(payload.literaryStyle || "Romance").replace(/\s+/gu, " ").trim().slice(0, 80) || "Romance";
   const coverStyle = String(payload.coverStyle || "Editorial cinematografica").replace(/\s+/gu, " ").trim().slice(0, 120) || "Editorial cinematografica";
-  const contextPrompt = String(payload.contextPrompt || "").trim().slice(0, 12000);
+  const contextPrompt = String(payload.contextPrompt || "").trim().slice(0, 30000);
   const pageCount = Math.max(1, Math.min(200, Number(payload.pageCount || 12) || 12));
   if (title.length < 2) throw new Error("Dê um título para o livro.");
   if (contextPrompt.length < 20) throw new Error("Conte um pouco mais sobre o livro no contexto criativo.");
