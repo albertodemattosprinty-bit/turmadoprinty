@@ -21683,26 +21683,6 @@ window.project200ProjectsContext = {
   const ordinals = ["primeira", "segunda", "terceira", "quarta", "ultima"];
   const weekdayLong = ["domingo", "segunda-feira", "terca-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sabado"];
   const avoidDayNames = ["domingos", "segundas", "tercas", "quartas", "quintas", "sextas", "sabados"];
-  function decorateScheduleHeader(modal, { eyebrow = "AGENDAMENTO", title = "Quando se repete?", copy = "Escolha a frequência que combina com este compromisso." } = {}) {
-    const head = modal?.querySelector(".universal-schedule-head");
-    if (!head || head.dataset.immersiveReady === "true") return;
-    const closeButton = head.querySelector(".history-mission-modal-close");
-    head.replaceChildren();
-    const heading = document.createElement("div");
-    heading.className = "universal-schedule-heading";
-    heading.innerHTML = '<span class="universal-schedule-main-icon" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none"><rect x="10" y="15" width="44" height="39" rx="6" stroke="currentColor" stroke-width="4"/><path d="M10 27h44M21 9v12M43 9v12M21 37h7M36 37h7M21 45h7" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span><span class="universal-schedule-eyebrow"></span><h2 class="universal-schedule-title"></h2><p class="universal-schedule-copy"></p>';
-    heading.querySelector(".universal-schedule-eyebrow").textContent = eyebrow;
-    heading.querySelector(".universal-schedule-title").textContent = title;
-    heading.querySelector(".universal-schedule-copy").textContent = copy;
-    head.appendChild(heading);
-    if (closeButton) {
-      closeButton.textContent = "";
-      closeButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
-      head.appendChild(closeButton);
-    }
-    head.dataset.immersiveReady = "true";
-  }
-  window.project200DecorateScheduleHeader = decorateScheduleHeader;
   function normalizeAvoidDays(days, fallback = [0, 6]) {
     const clean = [...new Set((Array.isArray(days) ? days : fallback).map((day) => Math.trunc(Number(day))).filter((day) => day >= 0 && day <= 6))].sort((a, b) => a - b);
     return clean.slice(0, 6);
@@ -21847,8 +21827,6 @@ window.project200ProjectsContext = {
     const schedule = window.project200MissionScheduleBridge?.read(target) || {};
     dataSelectDraft = parseDateSelectKey(schedule.startsOn);
     const modal = ensureDataSelectModal();
-    modal.dataset.scheduleContext = String(target || "mission-create");
-    decorateScheduleHeader(modal, { eyebrow: "DATA DA ROTINA", title: "Data inicial", copy: "Defina quando esta rotina começa." });
     renderDataSelectModal();
     modal.classList.add("active");
     modal.setAttribute("aria-hidden", "false");
@@ -21947,7 +21925,7 @@ window.project200ProjectsContext = {
     modal.querySelector("#usWeekdays").innerHTML = weekdays.map((label, day) => '<button type="button" data-us-weekday="' + day + '" class="' + ((state.wizard.repeatDays || []).includes(day) ? 'active' : '') + '">' + label + '</button>').join('');
     modal.querySelector("#usMonthly").hidden = state.wizard.repeatIntervalUnit !== "month";
   }
-  function openModalLocal() { const modal = ensureModal(); modal.dataset.scheduleContext = "task"; decorateScheduleHeader(modal); modal.classList.add("active"); modal.setAttribute("aria-hidden", "false"); document.body.classList.add("modal-open"); renderModal(); }
+  function openModalLocal() { ensureModal().classList.add("active"); ensureModal().setAttribute("aria-hidden", "false"); document.body.classList.add("modal-open"); renderModal(); }
   function closeModalLocal() { const modal = document.getElementById("universalScheduleModal"); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden", "true"); }
   function applyModal() {
     const modal = ensureModal();
@@ -22168,7 +22146,7 @@ window.project200ProjectsContext = {
   function closeRepeatUntilModal() { const modal = document.getElementById("repeatuntilModal"); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden","true"); }
   function renderRepeatUntilModal() { const modal = document.getElementById("repeatuntilModal"); if (!modal || !repeatUntilDraft) return; const mode = ["never","count","date"].includes(repeatUntilDraft.mode) ? repeatUntilDraft.mode : "never"; modal.querySelectorAll("[data-rue-mode]").forEach((button) => button.classList.toggle("active",button.dataset.rueMode === mode)); modal.querySelector("[data-rue-count]").hidden = mode !== "count"; modal.querySelector("[data-rue-date]").hidden = mode !== "date"; modal.querySelector("#rueCount").value = repeatUntilDraft.count; modal.querySelector("#rueDate").value = repeatUntilDraft.endsOn; }
   function ensureRepeatUntilModal() { let modal = document.getElementById("repeatuntilModal"); if (modal) return modal; modal = document.createElement("section"); modal.id = "repeatuntilModal"; modal.dataset.modalName = "repeatuntil"; modal.className = "workspace-modal simple-modal universal-schedule-modal repeat-until-modal"; modal.setAttribute("aria-hidden","true"); modal.innerHTML = '<div class="universal-schedule-panel"><header class="universal-schedule-head"><h2 class="universal-schedule-title">Repete ate</h2><button class="history-mission-modal-close" type="button" data-rue-close aria-label="Fechar">x</button></header><div class="universal-schedule-body"><section class="universal-schedule-card"><label>Escolha quando a repeticao termina</label><div class="universal-schedule-options repeat-until-options"><button type="button" data-rue-mode="never">Para sempre</button><button type="button" data-rue-mode="count">Depois de X repeticoes</button><button type="button" data-rue-mode="date">Data</button></div></section><section class="universal-schedule-card" data-rue-count><label>Depois de quantas repeticoes?</label><input class="text-field options-text-field" type="number" min="1" max="999" id="rueCount"></section><section class="universal-schedule-card" data-rue-date><label>Data final</label><input class="text-field options-text-field" type="date" id="rueDate"></section></div><footer class="universal-schedule-footer"><button class="ghost-btn" type="button" data-rue-close>Cancelar</button><button class="primary-btn" type="button" id="rueApply">Aplicar</button></footer></div>'; document.body.appendChild(modal); modal.addEventListener("click",(event) => { if (event.target.closest("[data-rue-close]")) return closeRepeatUntilModal(); const option = event.target.closest("[data-rue-mode]"); if (!option || !repeatUntilDraft) return; repeatUntilDraft.mode = option.dataset.rueMode; renderRepeatUntilModal(); }); modal.querySelector("#rueApply")?.addEventListener("click",() => { if (!repeatUntilDraft) return; const cfg = readTargetSchedule(); cfg.endMode = repeatUntilDraft.mode; cfg.count = Math.max(1,Math.min(999,Math.trunc(Number(modal.querySelector("#rueCount").value || 1) || 1))); cfg.endsOn = String(modal.querySelector("#rueDate").value || "").slice(0,10); saveTargetSchedule(cfg); closeRepeatUntilModal(); renderBridgeModal(); }); return modal; }
-  function openRepeatUntilModal() { const cfg = readTargetSchedule(); repeatUntilDraft = { mode:cfg.endMode, count:cfg.count, endsOn:cfg.endsOn || cfg.startsOn }; const modal = ensureRepeatUntilModal(); modal.dataset.scheduleContext = String(bridgeTarget || "mission-create"); window.project200DecorateScheduleHeader?.(modal, { eyebrow: "REPETIÇÃO", title: "Repete até", copy: "Escolha quando esta repetição deve terminar." }); renderRepeatUntilModal(); modal.classList.add("active"); modal.setAttribute("aria-hidden","false"); }
+  function openRepeatUntilModal() { const cfg = readTargetSchedule(); repeatUntilDraft = { mode:cfg.endMode, count:cfg.count, endsOn:cfg.endsOn || cfg.startsOn }; const modal = ensureRepeatUntilModal(); renderRepeatUntilModal(); modal.classList.add("active"); modal.setAttribute("aria-hidden","false"); }
   function ensureModal() {
     let modal = document.getElementById("dailyrepetitionModal");
     if (modal) return modal;
@@ -22186,8 +22164,6 @@ window.project200ProjectsContext = {
     bridgeTarget = target;
     bridgeApplyCallback = callback;
     const modal = ensureModal();
-    modal.dataset.scheduleContext = String(target || "mission-create");
-    window.project200DecorateScheduleHeader?.(modal);
     renderBridgeModal();
     modal.classList.add("active");
     modal.setAttribute("aria-hidden", "false");
