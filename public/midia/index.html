@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b100d">
+  <meta name="description" content="Ouça, compartilhe e salve músicas em um lugar simples e aberto.">
+  <title>Mídia — Turma do Printy</title>
+  <link rel="stylesheet" href="/midia/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/midia" aria-label="Página inicial da Mídia">
+      <span class="brand-mark" aria-hidden="true">♪</span>
+      <span>/midia</span>
+    </a>
+    <button class="button button-primary" id="openUploadButton" type="button">
+      <span aria-hidden="true">＋</span>
+      Adicionar música
+    </button>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="pageTitle">
+      <p class="eyebrow">MÚSICAS COMPARTILHADAS</p>
+      <h1 id="pageTitle">Uma música<br><em>de cada vez.</em></h1>
+      <p class="hero-copy">Clique em qualquer parte de uma música para ouvir. Sem filas, sem reprodução automática.</p>
+      <div class="gesture-guide" aria-label="Como usar o player">
+        <span><b>1</b> clique para tocar</span>
+        <span><b>2</b> cliques para pausar</span>
+      </div>
+    </section>
+
+    <section class="upload-panel" id="uploadPanel" hidden aria-labelledby="uploadTitle">
+      <div class="upload-copy">
+        <p class="eyebrow">COMPARTILHE</p>
+        <h2 id="uploadTitle">Adicione uma música</h2>
+        <p>Ela ficará disponível para todos. Envie somente áudios que você tem permissão para compartilhar.</p>
+      </div>
+      <div class="upload-form">
+        <label class="field">
+          <span>Nome da música</span>
+          <input id="trackTitleInput" type="text" maxlength="120" placeholder="Ex.: Minha nova música" autocomplete="off">
+        </label>
+        <label class="file-picker" id="filePicker">
+          <input id="trackFileInput" type="file" accept=".mp3,.m4a,.aac,.wav,.ogg,.flac,audio/*">
+          <span class="file-picker-icon" aria-hidden="true">↑</span>
+          <span>
+            <strong id="filePickerTitle">Escolher arquivo de áudio</strong>
+            <small id="filePickerHint">MP3, M4A, AAC, WAV, OGG ou FLAC · até 150 MB</small>
+          </span>
+        </label>
+        <div class="upload-actions">
+          <button class="button button-ghost" id="cancelUploadButton" type="button">Cancelar</button>
+          <button class="button button-primary" id="submitUploadButton" type="button" disabled>Enviar música</button>
+        </div>
+        <div class="upload-progress" id="uploadProgress" hidden>
+          <span id="uploadProgressBar"></span>
+        </div>
+        <p class="form-status" id="uploadStatus" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section class="library" aria-labelledby="libraryTitle">
+      <div class="library-head">
+        <div>
+          <p class="eyebrow">BIBLIOTECA ABERTA</p>
+          <h2 id="libraryTitle">Músicas</h2>
+        </div>
+        <label class="search">
+          <span aria-hidden="true">⌕</span>
+          <span class="sr-only">Buscar música</span>
+          <input id="searchInput" type="search" placeholder="Buscar música" autocomplete="off">
+        </label>
+      </div>
+
+      <div class="library-status" id="libraryStatus" role="status" aria-live="polite">Carregando músicas…</div>
+      <div class="track-list" id="trackList"></div>
+      <div class="empty-state" id="emptyState" hidden>
+        <span aria-hidden="true">♫</span>
+        <h3>Nenhuma música por aqui</h3>
+        <p>Adicione a primeira música desta biblioteca.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Turma do Printy</span>
+    <span>Ouça com calma. Uma por vez.</span>
+  </footer>
+
+  <audio id="audioPlayer" preload="metadata"></audio>
+
+  <template id="trackTemplate">
+    <article class="track-card" tabindex="0" role="button">
+      <div class="track-number" aria-hidden="true"></div>
+      <div class="track-main">
+        <div class="track-title-row">
+          <span class="playing-dot" aria-hidden="true"></span>
+          <h3 class="track-title"></h3>
+        </div>
+        <div class="track-meta">
+          <span class="track-state">Clique para ouvir</span>
+          <span aria-hidden="true">·</span>
+          <span class="track-size"></span>
+        </div>
+        <div class="track-progress" aria-hidden="true"><span></span></div>
+      </div>
+      <div class="track-actions">
+        <a class="track-action pc-download" data-action href="#">
+          <span aria-hidden="true">↓</span>
+          Baixar para PC
+        </a>
+        <button class="track-action local-download" data-action type="button">
+          <span aria-hidden="true">◇</span>
+          <span class="local-label">Baixar local</span>
+        </button>
+      </div>
+    </article>
+  </template>
+
+  <script src="/midia/app.js" defer></script>
+</body>
+</html>

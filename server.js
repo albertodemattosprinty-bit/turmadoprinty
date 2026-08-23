@@ -134,6 +134,10 @@ const MINI_MEDIA_IMAGE_MODELS = [
 ];
 const MINI_MEDIA_IMAGE_EDIT_MODEL_IDS = new Set(["gpt-image-1", "gpt-image-1-mini"]);
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
+const MIDIA_AUDIO_PREFIX = "midia/audio/";
+const MAX_MIDIA_TRACK_BYTES = 150 * 1024 * 1024;
+const MIDIA_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
+const MAX_MIDIA_UPLOADS_PER_WINDOW = 12;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
@@ -151,6 +155,7 @@ let cachedContextPrompt = "";
 let r2Client = null;
 let r2PrivateClient = null;
 let miniMediaDatabaseBootstrapped = false;
+const midiaUploadActivityByIp = new Map();
 
 const eduDownloadFiles = {
   "abandona-no-lixao": {
@@ -302,6 +307,124 @@ async function listPublicR2AssetsByPrefix(prefix) {
   } while (continuationToken);
 
   return assets.sort((first, second) => first.key.localeCompare(second.key, "pt-BR"));
+}
+
+const midiaAudioFormats = new Map([
+  [".mp3", { contentType: "audio/mpeg", magic: (buffer) => (
+    buffer.subarray(0, 3).toString("ascii") === "ID3"
+    || (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0)
+  ) }],
+  [".wav", { contentType: "audio/wav", magic: (buffer) => (
+    buffer.subarray(0, 4).toString("ascii") === "RIFF"
+    && buffer.subarray(8, 12).toString("ascii") === "WAVE"
+  ) }],
+  [".ogg", { contentType: "audio/ogg", magic: (buffer) => buffer.subarray(0, 4).toString("ascii") === "OggS" }],
+  [".flac", { contentType: "audio/flac", magic: (buffer) => buffer.subarray(0, 4).toString("ascii") === "fLaC" }],
+  [".m4a", { contentType: "audio/mp4", magic: (buffer) => buffer.subarray(4, 8).toString("ascii") === "ftyp" }],
+  [".aac", { contentType: "audio/aac", magic: (buffer) => (
+    buffer[0] === 0xff && (buffer[1] & 0xf6) === 0xf0
+  ) }]
+]);
+
+function decodeMidiaHeader(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function normalizeMidiaTrackTitle(value, fallback = "Musica") {
+  const title = String(value || "")
+    .normalize("NFC")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return title || fallback;
+}
+
+function getMidiaAudioFormat(fileName) {
+  return midiaAudioFormats.get(path.extname(String(fileName || "")).toLowerCase()) || null;
+}
+
+function encodeMidiaTrackId(key) {
+  return Buffer.from(String(key || ""), "utf8").toString("base64url");
+}
+
+function decodeMidiaTrackId(value) {
+  try {
+    const key = Buffer.from(String(value || ""), "base64url").toString("utf8");
+    if (!key.startsWith(MIDIA_AUDIO_PREFIX) || key.includes("\0")) return "";
+    return key;
+  } catch {
+    return "";
+  }
+}
+
+function getMidiaTrackTitleFromKey(key) {
+  const fileName = path.posix.basename(String(key || ""));
+  const withoutPrefix = fileName.replace(/^\d{13}-[a-f0-9]{8}-/i, "");
+  return normalizeMidiaTrackTitle(withoutPrefix.replace(/\.[^.]+$/, ""), "Musica");
+}
+
+function buildMidiaTrackPayload(item) {
+  const key = String(item?.Key || item?.key || "");
+  const id = encodeMidiaTrackId(key);
+  const extension = path.posix.extname(key).toLowerCase();
+  return {
+    id,
+    title: getMidiaTrackTitleFromKey(key),
+    extension: extension.replace(/^\./, ""),
+    sizeBytes: Number(item?.Size ?? item?.sizeBytes ?? 0),
+    uploadedAt: item?.LastModified instanceof Date
+      ? item.LastModified.toISOString()
+      : String(item?.uploadedAt || ""),
+    streamUrl: `/api/midia/tracks/${id}/audio`,
+    downloadUrl: `/api/midia/tracks/${id}/download`
+  };
+}
+
+async function listMidiaTracks() {
+  const tracks = [];
+  let continuationToken;
+
+  do {
+    const result = await getR2Client().send(new ListObjectsV2Command({
+      Bucket: R2_BUCKET_NAME,
+      Prefix: MIDIA_AUDIO_PREFIX,
+      ContinuationToken: continuationToken
+    }));
+    for (const item of Array.isArray(result?.Contents) ? result.Contents : []) {
+      const key = String(item?.Key || "");
+      if (key && !key.endsWith("/") && getMidiaAudioFormat(key)) {
+        tracks.push(buildMidiaTrackPayload(item));
+      }
+    }
+    continuationToken = result?.IsTruncated ? result?.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return tracks.sort((first, second) => {
+    const dateDifference = Date.parse(first.uploadedAt || 0) - Date.parse(second.uploadedAt || 0);
+    return dateDifference || first.title.localeCompare(second.title, "pt-BR");
+  });
+}
+
+function getMidiaRequestIp(request) {
+  const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return forwarded || request.socket?.remoteAddress || "desconhecido";
+}
+
+function consumeMidiaUploadAllowance(request) {
+  const now = Date.now();
+  const ip = getMidiaRequestIp(request);
+  const recent = (midiaUploadActivityByIp.get(ip) || []).filter((timestamp) => now - timestamp < MIDIA_UPLOAD_WINDOW_MS);
+  if (recent.length >= MAX_MIDIA_UPLOADS_PER_WINDOW) return false;
+  recent.push(now);
+  midiaUploadActivityByIp.set(ip, recent);
+  return true;
 }
 
 function buildSafeDownloadBaseName(value, fallback = "arquivo") {
@@ -12363,6 +12486,141 @@ async function handleEduDownload(response, pathname) {
   createReadStream(filePath).pipe(response);
 }
 
+async function handleMidiaTracksList(response) {
+  try {
+    const tracks = await listMidiaTracks();
+    sendJson(response, 200, {
+      ok: true,
+      tracks,
+      total: tracks.length,
+      maxUploadBytes: MAX_MIDIA_TRACK_BYTES
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel carregar as musicas."
+    });
+  }
+}
+
+async function handleMidiaTrackUpload(request, response) {
+  const fileName = decodeMidiaHeader(request.headers["x-file-name"]);
+  const providedTitle = decodeMidiaHeader(request.headers["x-track-title"]);
+  const format = getMidiaAudioFormat(fileName);
+  const declaredBytes = Number(request.headers["content-length"] || 0);
+  const contentType = String(request.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+
+  if (!format) {
+    sendJson(response, 400, { error: "Use MP3, M4A, AAC, WAV, OGG ou FLAC." });
+    return;
+  }
+  if (!Number.isFinite(declaredBytes) || declaredBytes <= 0) {
+    sendJson(response, 411, { error: "Nao foi possivel identificar o tamanho do arquivo." });
+    return;
+  }
+  if (declaredBytes > MAX_MIDIA_TRACK_BYTES) {
+    sendJson(response, 413, { error: "Cada musica pode ter no maximo 150 MB." });
+    return;
+  }
+  if (contentType && contentType !== "application/octet-stream" && !contentType.startsWith("audio/")) {
+    sendJson(response, 400, { error: "O arquivo enviado nao foi reconhecido como audio." });
+    return;
+  }
+  if (!consumeMidiaUploadAllowance(request)) {
+    sendJson(response, 429, { error: "Muitos envios seguidos. Tente novamente mais tarde." });
+    return;
+  }
+
+  try {
+    const fileBuffer = await readBinaryBody(request, MAX_MIDIA_TRACK_BYTES);
+    if (!fileBuffer.length || !format.magic(fileBuffer)) {
+      sendJson(response, 400, { error: "O conteudo do arquivo nao corresponde a um audio valido." });
+      return;
+    }
+
+    const extension = path.extname(fileName).toLowerCase();
+    const fallbackTitle = path.basename(fileName, extension);
+    const title = normalizeMidiaTrackTitle(providedTitle, normalizeMidiaTrackTitle(fallbackTitle));
+    const key = `${MIDIA_AUDIO_PREFIX}${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${title}${extension}`;
+
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      Body: fileBuffer,
+      ContentLength: fileBuffer.length,
+      ContentType: format.contentType,
+      CacheControl: "public, max-age=31536000, immutable"
+    }));
+
+    sendJson(response, 201, {
+      ok: true,
+      track: buildMidiaTrackPayload({
+        Key: key,
+        Size: fileBuffer.length,
+        LastModified: new Date()
+      })
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Nao foi possivel enviar a musica.";
+    sendJson(response, message.includes("acima do limite") ? 413 : 500, { error: message });
+  }
+}
+
+async function handleMidiaTrackAsset(request, response, pathname, download = false) {
+  const suffix = download ? "/download" : "/audio";
+  const expression = download
+    ? /^\/api\/midia\/tracks\/([^/]+)\/download$/
+    : /^\/api\/midia\/tracks\/([^/]+)\/audio$/;
+  const match = pathname.match(expression);
+  const key = decodeMidiaTrackId(match?.[1]);
+  const format = getMidiaAudioFormat(key);
+
+  if (!key || !format) {
+    sendJson(response, 404, { error: "Musica nao encontrada." });
+    return;
+  }
+
+  try {
+    const requestedRange = download ? "" : String(request.headers.range || "");
+    const range = /^bytes=\d*-\d*$/i.test(requestedRange) ? requestedRange : "";
+    const result = await getR2Client().send(new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      ...(range ? { Range: range } : {})
+    }));
+    const title = getMidiaTrackTitleFromKey(key);
+    const extension = path.posix.extname(key).toLowerCase();
+    const headers = {
+      "Content-Type": String(result.ContentType || format.contentType),
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "public, max-age=3600",
+      ...(result.ContentLength != null ? { "Content-Length": String(result.ContentLength) } : {}),
+      ...(result.ContentRange ? { "Content-Range": String(result.ContentRange) } : {}),
+      ...(download ? { "Content-Disposition": buildContentDisposition(`${title}${extension}`) } : {})
+    };
+    response.writeHead(result.ContentRange ? 206 : 200, headers);
+
+    if (typeof result.Body?.pipe === "function") {
+      result.Body.on("error", () => response.destroy());
+      result.Body.pipe(response);
+      return;
+    }
+    if (typeof result.Body?.transformToWebStream === "function") {
+      Readable.fromWeb(result.Body.transformToWebStream()).pipe(response);
+      return;
+    }
+    response.end(await result.Body?.transformToByteArray?.());
+  } catch (error) {
+    const missing = String(error?.name || "").includes("NoSuchKey") || Number(error?.$metadata?.httpStatusCode) === 404;
+    if (!response.headersSent) {
+      sendJson(response, missing ? 404 : 500, {
+        error: missing ? "Musica nao encontrada." : "Nao foi possivel abrir esta musica."
+      });
+    } else {
+      response.destroy();
+    }
+  }
+}
+
 const server = http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   const { pathname } = requestUrl;
@@ -12372,6 +12630,26 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     response.writeHead(204);
     response.end();
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/midia/tracks") {
+    await handleMidiaTracksList(response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/midia/tracks") {
+    await handleMidiaTrackUpload(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && /^\/api\/midia\/tracks\/[^/]+\/audio$/.test(pathname)) {
+    await handleMidiaTrackAsset(request, response, pathname, false);
+    return;
+  }
+
+  if (request.method === "GET" && /^\/api\/midia\/tracks\/[^/]+\/download$/.test(pathname)) {
+    await handleMidiaTrackAsset(request, response, pathname, true);
     return;
   }
 
