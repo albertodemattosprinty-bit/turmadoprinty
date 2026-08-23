@@ -1637,6 +1637,7 @@ const state = {
     configurationTaskTitle: "",
     configurationScope: "task",
     configurationMode: false,
+    defaultSaving: false,
     defaultAppliedActionId: ""
   },
   runningMinuteCue: {
@@ -4719,18 +4720,65 @@ function getRunningDefaultPreferenceForTaskTitle(taskTitle = "") {
   return individualPreference || state.runningPlayer.globalDefaultPreference || null;
 }
 
+function getRunningIndividualPreferenceForAction(action) {
+  if (!action || typeof action !== "object") return null;
+  const mode = String(action.musicDefaultMode || "").trim().toLowerCase() === "station" ? "station" : "track";
+  const stationName = String(action.musicStationName || "").trim();
+  const trackName = String(action.musicTrackName || "").trim();
+  const trackUrl = String(action.musicTrackUrl || "").trim();
+  if (mode === "station" && stationName) {
+    return { mode, stationId: "", trackId: "", stationName, trackName: "", trackUrl: "" };
+  }
+  if (mode === "track" && (trackUrl || trackName)) {
+    return { mode, stationId: "", trackId: "", stationName, trackName, trackUrl };
+  }
+  return null;
+}
+
+function getRunningDefaultPreferenceForAction(action) {
+  return getRunningIndividualPreferenceForAction(action)
+    || getRunningDefaultPreferenceForTaskTitle(String(action?.title || "").trim());
+}
+
+function isRunningGlobalMusicConfiguration() {
+  return Boolean(
+    (state.runningPlayer.configurationMode && state.runningPlayer.configurationScope === "global")
+    || runningMusicListModal?.dataset.musicDefaultScope === "global"
+    || runningMusicDefaultModal?.dataset.musicDefaultScope === "global"
+    || runningMusicDefaultChoiceModal?.dataset.musicDefaultScope === "global"
+  );
+}
+
+function setRunningMusicConfiguration(scope = "task", taskTitle = "") {
+  const safeScope = scope === "global" ? "global" : "task";
+  state.runningPlayer.configurationMode = true;
+  state.runningPlayer.configurationScope = safeScope;
+  state.runningPlayer.configurationTaskTitle = safeScope === "global" ? "" : String(taskTitle || "").trim();
+  [runningMusicListModal, runningMusicDefaultModal, runningMusicDefaultChoiceModal].forEach((modal) => {
+    if (modal) modal.dataset.musicDefaultScope = safeScope;
+  });
+}
+
+function clearRunningMusicConfiguration() {
+  state.runningPlayer.configurationMode = false;
+  state.runningPlayer.configurationTaskTitle = "";
+  state.runningPlayer.configurationScope = "task";
+  [runningMusicListModal, runningMusicDefaultModal, runningMusicDefaultChoiceModal].forEach((modal) => {
+    if (modal) delete modal.dataset.musicDefaultScope;
+  });
+}
 function getRunningDefaultPreferenceForCurrentTask() {
-  if (state.runningPlayer.configurationMode && state.runningPlayer.configurationScope === "global") {
+  if (isRunningGlobalMusicConfiguration()) {
     return state.runningPlayer.globalDefaultPreference || null;
   }
   return getRunningDefaultPreferenceForTaskTitle(getRunningMusicTargetTaskTitle());
 }
 
 function getRunningMusicTargetTaskTitle() {
+  if (isRunningGlobalMusicConfiguration()) {
+    return "todas as tarefas, ações, missões e microtarefas";
+  }
   if (state.runningPlayer.configurationMode) {
-    if (state.runningPlayer.configurationScope === "global") {
-      return "todas as tarefas e microtarefas";
-    }
     return String(state.runningPlayer.configurationTaskTitle || "").trim();
   }
   return String(state.runningPlayer.currentTaskTitle || "").trim();
@@ -4738,7 +4786,7 @@ function getRunningMusicTargetTaskTitle() {
 
 function applyRunningTaskDefaultSelection(action = getRunningActionForSelectedProfile()) {
   const taskTitle = String(action?.title || state.runningPlayer.currentTaskTitle || "").trim();
-  const preference = getRunningDefaultPreferenceForTaskTitle(taskTitle);
+  const preference = getRunningDefaultPreferenceForAction(action);
   if (!preference || !Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) {
     return;
   }
@@ -5304,7 +5352,7 @@ function openRunningMusicDefaultModal() {
     return;
   }
 
-  if (!taskTitle) {
+  if (!isRunningGlobalMusicConfiguration() && !taskTitle) {
     showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
     return;
   }
@@ -5345,8 +5393,8 @@ function openRunningMusicDefaultChoiceModal() {
   openModal("runningMusicDefaultChoiceModal");
 }
 
-async function executeRunningTaskDefaultPreference() {
-  const preference = getRunningDefaultPreferenceForCurrentTask();
+async function executeRunningTaskDefaultPreference(preferenceOverride = null) {
+  const preference = preferenceOverride || getRunningDefaultPreferenceForCurrentTask();
   if (!preference) {
     openRunningMusicDefaultModal();
     return;
@@ -5396,28 +5444,29 @@ async function autoPlayRunningTaskDefaultPreference(action) {
     return;
   }
   state.runningPlayer.currentTaskTitle = taskTitle;
-  const preference = getRunningDefaultPreferenceForTaskTitle(taskTitle);
+  const preference = getRunningDefaultPreferenceForAction(action);
   if (!preference) {
     return;
   }
   if (!Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) {
     await loadRunningMusicStations();
   }
-  await executeRunningTaskDefaultPreference();
+  await executeRunningTaskDefaultPreference(preference);
 }
 
 async function saveRunningTaskDefault(mode = "track") {
+  if (state.runningPlayer.defaultSaving) return;
   const track = getCurrentRunningTrack();
   const station = getCurrentRunningStation();
   const taskTitle = getRunningMusicTargetTaskTitle();
-  const isGlobalDefault = state.runningPlayer.configurationMode
-    && state.runningPlayer.configurationScope === "global";
+  const isGlobalDefault = isRunningGlobalMusicConfiguration();
 
   if (!station?.name) {
+    showFloatingNotice("Escolha uma estação válida.");
     return;
   }
 
-  if (!taskTitle) {
+  if (!isGlobalDefault && !taskTitle) {
     showFloatingNotice("Abra uma tarefa em andamento para definir o padrão.");
     return;
   }
@@ -5428,8 +5477,14 @@ async function saveRunningTaskDefault(mode = "track") {
     return;
   }
 
+  state.runningPlayer.defaultSaving = true;
+  [runningMusicListDefaultButton, runningMusicDefaultStationButton, runningMusicDefaultTrackButton].forEach((button) => {
+    if (button) button.disabled = true;
+  });
+  showFloatingNotice("Salvando música padrão...");
+
   try {
-    const payload = await apiRequest("/api/200/music/default", {
+    const payload = await apiRequestWithTimeout("/api/200/music/default", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -5442,27 +5497,33 @@ async function saveRunningTaskDefault(mode = "track") {
         trackName: safeMode === "track" ? track?.name : "",
         trackUrl: safeMode === "track" ? track?.url : ""
       })
-    });
+    }, 20000);
 
     state.runningPlayer.defaultPreferenceByTaskTitle = buildRunningDefaultPreferenceMap(payload?.preferences);
     state.runningPlayer.globalDefaultPreference = buildRunningGlobalDefaultPreference(payload?.preferences);
+    if (isGlobalDefault && !state.runningPlayer.globalDefaultPreference) {
+      throw new Error("O servidor não confirmou o padrão global. Tente novamente.");
+    }
     if (state.runningPlayer.configurationMode && isTaskComposerMode()) renderTaskComposerModal();
     renderRunningMusicPlayer();
     renderRunningMusicList();
-    closeRunningMusicListModal();
     closeModal("runningMusicDefaultModal");
     closeModal("runningMusicDefaultChoiceModal");
-    state.runningPlayer.configurationMode = false;
-    state.runningPlayer.configurationTaskTitle = "";
-    state.runningPlayer.configurationScope = "task";
+    closeRunningMusicListModal();
+    clearRunningMusicConfiguration();
+    renderOptionsModal();
     showFloatingNotice(isGlobalDefault
-      ? (safeMode === "station" ? "Estação padrão aplicada às atividades sem som próprio." : "Música padrão aplicada às atividades sem som próprio.")
+      ? (safeMode === "station" ? "Estação padrão aplicada a ações, tarefas, missões e microtarefas sem som próprio." : "Música padrão aplicada a ações, tarefas, missões e microtarefas sem som próprio.")
       : (safeMode === "station" ? "Estação definida como padrão." : "Música definida como padrão."));
   } catch (error) {
     showFloatingNotice(error instanceof Error ? error.message : "Nao foi possivel salvar o padrão.");
+  } finally {
+    state.runningPlayer.defaultSaving = false;
+    [runningMusicListDefaultButton, runningMusicDefaultStationButton, runningMusicDefaultTrackButton].forEach((button) => {
+      if (button) button.disabled = false;
+    });
   }
 }
-
 function getActionStoredCompletionPercent(action) {
   const status = normalizeActionStatus(action?.status);
   if (status === actionStatuses.completed) return 100;
@@ -20268,9 +20329,7 @@ runningPlayerNext?.addEventListener("click", () => {
 runningMusicListBack?.addEventListener("click", () => {
   closeRunningMusicListModal();
   const wasConfiguration = state.runningPlayer.configurationMode;
-  state.runningPlayer.configurationMode = false;
-  state.runningPlayer.configurationTaskTitle = "";
-  state.runningPlayer.configurationScope = "task";
+  clearRunningMusicConfiguration();
   if (!wasConfiguration && state.startDecisionContext.actionId && !startDecisionModal?.classList.contains("active") && !runningTaskModalElement?.classList.contains("active")) {
     reopenStartDecisionForAction(state.startDecisionContext.actionId);
   }
@@ -20444,9 +20503,7 @@ toggleBackgroundThemeOptionButton?.addEventListener("click", () => {
 });
 defineGlobalMusicDefaultOptionButton?.addEventListener("click", () => {
   closeModal("optionsModal");
-  state.runningPlayer.configurationMode = true;
-  state.runningPlayer.configurationScope = "global";
-  state.runningPlayer.configurationTaskTitle = "";
+  setRunningMusicConfiguration("global");
   void openRunningMusicListModal();
 });
 toggleStopMusicOnFinishOptionButton?.addEventListener("click", () => {
@@ -20930,9 +20987,7 @@ startDecisionMusicLabel?.addEventListener("click", () => {
     window.alert("Defina primeiro o nome da tarefa.");
     return;
   }
-  state.runningPlayer.configurationMode = true;
-  state.runningPlayer.configurationScope = "task";
-  state.runningPlayer.configurationTaskTitle = targetTitle;
+  setRunningMusicConfiguration("task", targetTitle);
   openRunningMusicListModal();
 });
 startDecisionMicButton?.addEventListener("click", () => {
