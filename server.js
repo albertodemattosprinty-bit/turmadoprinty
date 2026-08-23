@@ -135,6 +135,7 @@ const MINI_MEDIA_IMAGE_MODELS = [
 const MINI_MEDIA_IMAGE_EDIT_MODEL_IDS = new Set(["gpt-image-1", "gpt-image-1-mini"]);
 const MAX_MINI_COURSE_COVER_BYTES = 15 * 1024 * 1024;
 const MIDIA_AUDIO_PREFIX = "midia/audio/";
+const MIDIA_ORDER_KEY = "midia/order.json";
 const MAX_MIDIA_TRACK_BYTES = 150 * 1024 * 1024;
 const MIDIA_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
 const MAX_MIDIA_UPLOADS_PER_WINDOW = 12;
@@ -406,10 +407,36 @@ async function listMidiaTracks() {
     continuationToken = result?.IsTruncated ? result?.NextContinuationToken : undefined;
   } while (continuationToken);
 
-  return tracks.sort((first, second) => {
+  const fallbackSortedTracks = tracks.sort((first, second) => {
     const dateDifference = Date.parse(first.uploadedAt || 0) - Date.parse(second.uploadedAt || 0);
     return dateDifference || first.title.localeCompare(second.title, "pt-BR");
   });
+
+  const orderedIds = await readMidiaTrackOrder();
+  if (!orderedIds.length) return fallbackSortedTracks;
+  const rankById = new Map(orderedIds.map((id, index) => [id, index]));
+  return fallbackSortedTracks.sort((first, second) => {
+    const firstRank = rankById.get(first.id);
+    const secondRank = rankById.get(second.id);
+    if (firstRank == null && secondRank == null) return 0;
+    if (firstRank == null) return 1;
+    if (secondRank == null) return -1;
+    return firstRank - secondRank;
+  });
+}
+
+async function readMidiaTrackOrder() {
+  const rawText = await readR2ObjectText(MIDIA_ORDER_KEY);
+  if (!rawText) return [];
+  try {
+    const payload = JSON.parse(rawText);
+    const seen = new Set();
+    return (Array.isArray(payload?.trackIds) ? payload.trackIds : [])
+      .map((id) => String(id || "").trim())
+      .filter((id) => id && decodeMidiaTrackId(id) && !seen.has(id) && seen.add(id));
+  } catch {
+    return [];
+  }
 }
 
 function getMidiaRequestIp(request) {
@@ -12486,6 +12513,56 @@ async function handleEduDownload(response, pathname) {
   createReadStream(filePath).pipe(response);
 }
 
+async function handleMidiaTrackOrderUpdate(request, response) {
+  try {
+    const body = await readJsonBody(request);
+    const requestedIds = Array.isArray(body?.trackIds)
+      ? body.trackIds.map((id) => String(id || "").trim()).filter(Boolean)
+      : null;
+    if (!requestedIds) {
+      sendJson(response, 400, { error: "Envie a ordem completa das musicas." });
+      return;
+    }
+    if (requestedIds.length > 5000) {
+      sendJson(response, 400, { error: "A lista de musicas ultrapassou o limite permitido." });
+      return;
+    }
+
+    const uniqueRequestedIds = Array.from(new Set(requestedIds));
+    const currentTracks = await listMidiaTracks();
+    const currentIds = currentTracks.map((track) => track.id);
+    const currentIdSet = new Set(currentIds);
+    const orderedIds = [
+      ...uniqueRequestedIds.filter((id) => currentIdSet.has(id) && decodeMidiaTrackId(id)),
+      ...currentIds.filter((id) => !uniqueRequestedIds.includes(id))
+    ];
+    const orderPayload = Buffer.from(JSON.stringify({
+      version: 1,
+      trackIds: orderedIds,
+      updatedAt: new Date().toISOString()
+    }, null, 2), "utf8");
+
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: MIDIA_ORDER_KEY,
+      Body: orderPayload,
+      ContentLength: orderPayload.length,
+      ContentType: "application/json; charset=utf-8",
+      CacheControl: "no-store"
+    }));
+
+    sendJson(response, 200, {
+      ok: true,
+      trackIds: orderedIds,
+      tracks: await listMidiaTracks()
+    });
+  } catch (error) {
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Nao foi possivel salvar a ordem das musicas."
+    });
+  }
+}
+
 async function handleMidiaTracksList(response) {
   try {
     const tracks = await listMidiaTracks();
@@ -12635,6 +12712,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/midia/tracks") {
     await handleMidiaTracksList(response);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname === "/api/midia/order") {
+    await handleMidiaTrackOrderUpdate(request, response);
     return;
   }
 

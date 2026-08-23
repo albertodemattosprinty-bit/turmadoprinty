@@ -3,6 +3,7 @@
 
   const MAX_UPLOAD_BYTES = 150 * 1024 * 1024;
   const DOUBLE_CLICK_WINDOW_MS = 1000;
+  const ORDER_IDLE_MS = 3000;
   const LOCAL_INDEX_KEY = "midia-local-tracks-v1";
   const LOCAL_DIRECTORY = "midia-audios";
   const LOCAL_CACHE = "midia-audios-v1";
@@ -34,6 +35,10 @@
     lastCardClickAt: 0,
     lastCardTrackId: "",
     playbackRequestId: 0,
+    orderSelectedTrackId: "",
+    orderIdleTimer: 0,
+    orderDirty: false,
+    orderSaveRevision: 0,
     currentObjectUrl: "",
     savedTrackIds: loadSavedTrackIds(),
     uploading: false
@@ -129,6 +134,7 @@
       const status = card.querySelector(".track-state");
       if (status) status.textContent = playing ? "Tocando agora · 2 cliques para pausar" : "Clique para ouvir";
     });
+    updateOrderSelectionVisuals();
   }
 
   function updateSavedVisuals() {
@@ -141,6 +147,112 @@
       if (button) button.title = saved ? "Esta música já está salva neste navegador" : "Salvar no armazenamento deste navegador";
     });
   }
+  function updateOrderSelectionVisuals() {
+    elements.trackList.querySelectorAll(".track-card").forEach((card) => {
+      const selected = card.dataset.trackId === state.orderSelectedTrackId;
+      card.classList.toggle("is-order-selected", selected);
+      if (selected) {
+        card.setAttribute("aria-current", "true");
+        const playing = card.dataset.trackId === state.activeTrackId && !elements.audioPlayer.paused;
+        const status = card.querySelector(".track-state");
+        if (status) status.textContent = playing
+          ? "Tocando e selecionada · use ↑ e ↓ para mover"
+          : "Selecionada · use ↑ e ↓ para mover";
+      } else {
+        card.removeAttribute("aria-current");
+      }
+    });
+  }
+
+  function clearOrderIdleTimer() {
+    if (state.orderIdleTimer) {
+      window.clearTimeout(state.orderIdleTimer);
+      state.orderIdleTimer = 0;
+    }
+  }
+
+  function armOrderFinalizeTimer() {
+    clearOrderIdleTimer();
+    if (!state.orderSelectedTrackId) return;
+    state.orderIdleTimer = window.setTimeout(() => {
+      void finalizeOrderSelection();
+    }, ORDER_IDLE_MS);
+  }
+
+  function selectTrackForOrder(track, card) {
+    if (state.orderSelectedTrackId === track.id) {
+      void finalizeOrderSelection();
+      return;
+    }
+    state.orderSelectedTrackId = track.id;
+    updateOrderSelectionVisuals();
+    card.focus({ preventScroll: true });
+    elements.libraryStatus.textContent = `“${track.title}” selecionada. Use ↑ e ↓; a ordem fixa em 3 segundos.`;
+    armOrderFinalizeTimer();
+  }
+
+  function moveSelectedTrack(direction) {
+    const selectedId = state.orderSelectedTrackId;
+    const currentIndex = state.tracks.findIndex((track) => track.id === selectedId);
+    if (currentIndex < 0) return;
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= state.tracks.length) {
+      const edge = targetIndex < 0 ? "primeira" : "última";
+      elements.libraryStatus.textContent = `Essa música já é a ${edge} da lista.`;
+      armOrderFinalizeTimer();
+      return;
+    }
+
+    const [movedTrack] = state.tracks.splice(currentIndex, 1);
+    state.tracks.splice(targetIndex, 0, movedTrack);
+    state.orderDirty = true;
+    renderTracks();
+    window.requestAnimationFrame(() => {
+      const selectedCard = elements.trackList.querySelector(`[data-track-id="${CSS.escape(selectedId)}"]`);
+      selectedCard?.focus({ preventScroll: true });
+    });
+    elements.libraryStatus.textContent = `“${movedTrack.title}” movida para a posição ${targetIndex + 1}. Fixa em 3 segundos.`;
+    armOrderFinalizeTimer();
+  }
+
+  async function finalizeOrderSelection({ silent = false } = {}) {
+    const selectedTrack = getTrackById(state.orderSelectedTrackId);
+    clearOrderIdleTimer();
+    state.orderSelectedTrackId = "";
+    updatePlayingVisuals();
+
+    if (!state.orderDirty) {
+      if (!silent && selectedTrack) elements.libraryStatus.textContent = "Ordem mantida.";
+      return;
+    }
+
+    state.orderDirty = false;
+    const revision = ++state.orderSaveRevision;
+    const trackIds = state.tracks.map((track) => track.id);
+    if (!silent) elements.libraryStatus.textContent = "Salvando a ordem para todo mundo…";
+
+    try {
+      const response = await fetch("/api/midia/order", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackIds }),
+        keepalive: silent
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Falha ao salvar a ordem.");
+      if (revision !== state.orderSaveRevision) return;
+      if (Array.isArray(payload.tracks) && !state.orderDirty && !state.orderSelectedTrackId) {
+        state.tracks = payload.tracks;
+        renderTracks();
+      }
+      if (!silent) elements.libraryStatus.textContent = "Ordem salva para todo mundo.";
+    } catch {
+      if (revision !== state.orderSaveRevision) return;
+      state.orderDirty = true;
+      if (!silent) elements.libraryStatus.textContent = "Não foi possível salvar a ordem. Tente mover novamente.";
+    }
+  }
+
 
   function renderTracks() {
     const term = elements.searchInput.value.trim().toLocaleLowerCase("pt-BR");
@@ -151,7 +263,7 @@
       const fragment = elements.trackTemplate.content.cloneNode(true);
       const card = fragment.querySelector(".track-card");
       card.dataset.trackId = track.id;
-      card.setAttribute("aria-label", `${track.title}. Clique para ouvir; dois cliques para pausar.`);
+      card.setAttribute("aria-label", `${track.title}. Clique para ouvir; dois cliques para pausar; clique direito para mudar a ordem.`);
       fragment.querySelector(".track-number").textContent = String(state.tracks.indexOf(track) + 1).padStart(2, "0");
       fragment.querySelector(".track-title").textContent = track.title;
       fragment.querySelector(".track-size").textContent = formatBytes(track.sizeBytes);
@@ -166,6 +278,11 @@
       localDownload.addEventListener("click", () => saveTrackLocally(track, localDownload));
 
       card.addEventListener("click", (event) => activateTrackCard(track, event));
+      card.addEventListener("contextmenu", (event) => {
+        if (event.target.closest("[data-action]")) return;
+        event.preventDefault();
+        selectTrackForOrder(track, card);
+      });
       card.addEventListener("dblclick", (event) => event.preventDefault());
       card.addEventListener("keydown", (event) => {
         if ((event.key === "Enter" || event.key === " ") && !event.target.closest("[data-action]")) {
@@ -412,7 +529,6 @@
       setUploadProgress(100, true);
       setUploadStatus("Música publicada para todo mundo.");
       if (payload.track) state.tracks.push(payload.track);
-      state.tracks.sort((first, second) => Date.parse(first.uploadedAt || 0) - Date.parse(second.uploadedAt || 0));
       renderTracks();
       window.setTimeout(() => resetUploadForm(true), 900);
     });
@@ -430,6 +546,20 @@
   elements.submitUploadButton.addEventListener("click", uploadSelectedTrack);
   elements.trackFileInput.addEventListener("change", () => selectFile(elements.trackFileInput.files?.[0]));
   elements.searchInput.addEventListener("input", renderTracks);
+  document.addEventListener("keydown", (event) => {
+    if (!state.orderSelectedTrackId) return;
+    const tagName = String(event.target?.tagName || "").toUpperCase();
+    if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") return;
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      moveSelectedTrack(event.key === "ArrowUp" ? -1 : 1);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      void finalizeOrderSelection();
+    }
+  });
   elements.filePicker.addEventListener("dragover", (event) => {
     event.preventDefault();
     elements.filePicker.classList.add("is-dragging");
@@ -465,6 +595,7 @@
     if (bar) bar.style.width = `${(elements.audioPlayer.currentTime / elements.audioPlayer.duration) * 100}%`;
   });
   window.addEventListener("beforeunload", releaseCurrentObjectUrl);
+  window.addEventListener("pagehide", () => void finalizeOrderSelection({ silent: true }));
 
   void loadTracks();
 })();
