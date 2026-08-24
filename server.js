@@ -55,7 +55,7 @@ import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugify
 import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
-import { confirmEventLodging, confirmEventPayment, ensureEventContractingSchema, getEventContractWorkflow, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
+import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
@@ -143,6 +143,7 @@ const MIDIA_PLAYBACK_HEARTBEAT_MS = 15 * 1000;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
+const MAX_EVENT_EXPENSE_NOTE_BYTES = 20 * 1024 * 1024;
 const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
 const MINI_DOC_KEY_ALL_DOCS = "all-docs";
 const MINI_DOC_TITLE_ALL_DOCS = "AllDocs";
@@ -235,7 +236,7 @@ function applyCorsHeaders(request, response) {
   response.setHeader("Access-Control-Allow-Origin", origin);
   response.setHeader("Vary", "Origin");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-File-Name, X-Track-Title, X-Track-Order, X-Page-Order, X-Model, X-Mini-Course-Catalog, X-Avatar-Style, X-Avatar-Instructions");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-File-Name, X-Track-Title, X-Track-Order, X-Page-Order, X-Model, X-Mini-Course-Catalog, X-Avatar-Style, X-Avatar-Instructions, X-Note-Title, X-Note-Amount-Cents, X-Note-Category, X-Note-Other-Label");
   response.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Type, Content-Disposition");
 }
 
@@ -10806,6 +10807,98 @@ async function handleAdminEventVideoUpload(request, response, userId) {
   }
 }
 
+async function handleAdminEventExpenseNoteCreate(request, response, userId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  const term = await getLatestTermByUserId(userId);
+  if (!term) {
+    sendJson(response, 404, { error: "Termo do evento nao encontrado." });
+    return;
+  }
+  const decodeHeader = (value) => {
+    try { return decodeURIComponent(String(value || "")); } catch { return String(value || ""); }
+  };
+  const fileName = decodeHeader(request.headers["x-file-name"] || "nota-de-consumo").trim().slice(0, 180);
+  const title = decodeHeader(request.headers["x-note-title"]).replace(/\s+/g, " ").trim().slice(0, 120);
+  const amountCents = Math.trunc(Number(request.headers["x-note-amount-cents"] || 0));
+  const category = String(request.headers["x-note-category"] || "").trim().toUpperCase();
+  const otherLabel = decodeHeader(request.headers["x-note-other-label"]).replace(/\s+/g, " ").trim().slice(0, 120);
+  const contentType = String(request.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"]);
+  if (!allowedTypes.has(contentType)) {
+    sendJson(response, 400, { error: "Envie uma foto JPG, PNG, WebP, HEIC ou um arquivo PDF." });
+    return;
+  }
+  if (title.length < 2 || !Number.isInteger(amountCents) || amountCents < 1) {
+    sendJson(response, 400, { error: "Informe um titulo unico e um valor valido para a nota." });
+    return;
+  }
+  if (!["LODGING", "FOOD", "FUEL", "TOLL", "OTHER"].includes(category) || (category === "OTHER" && !otherLabel)) {
+    sendJson(response, 400, { error: "Escolha a categoria e descreva Outros quando necessario." });
+    return;
+  }
+  let buffer;
+  try {
+    buffer = await readBinaryBody(request, MAX_EVENT_EXPENSE_NOTE_BYTES);
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel ler a nota." });
+    return;
+  }
+  if (!buffer?.length) {
+    sendJson(response, 400, { error: "O arquivo da nota esta vazio." });
+    return;
+  }
+  const extensionByType = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "application/pdf": "pdf" };
+  const key = `eventos/contratantes/${userId}/${term.id}/notas/${Date.now()}-${crypto.randomUUID()}.${extensionByType[contentType]}`;
+  let uploaded = false;
+  try {
+    await getProject200PrivateR2Client().send(new PutObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: key, Body: buffer, ContentType: contentType }));
+    uploaded = true;
+    const expenseNote = await createEventExpenseNote(admin.id, userId, term.id, { title, amountCents, category, otherLabel }, {
+      key, url: "", fileName, contentType, sizeBytes: buffer.length
+    });
+    sendJson(response, 201, { ok: true, expenseNote });
+  } catch (error) {
+    if (uploaded) {
+      try { await getProject200PrivateR2Client().send(new DeleteObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: key })); } catch { /* limpeza nao pode esconder o erro principal */ }
+    }
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel adicionar a nota." });
+  }
+}
+
+async function handleEventExpenseNoteFile(request, response, noteId) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const note = await getEventExpenseNoteFile(noteId);
+    if (!note || (!isAdminUser(user) && String(note.userId) !== String(user.id))) {
+      sendJson(response, 404, { error: "Nota nao encontrada." });
+      return;
+    }
+    const result = await getProject200PrivateR2Client().send(new GetObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: note.key }));
+    const headers = {
+      "Content-Type": String(result.ContentType || note.contentType),
+      "Content-Disposition": buildContentDisposition(note.fileName).replace(/^attachment/i, "inline"),
+      "Cache-Control": "private, no-store",
+      ...(result.ContentLength != null ? { "Content-Length": String(result.ContentLength) } : {})
+    };
+    response.writeHead(200, headers);
+    if (typeof result.Body?.pipe === "function") {
+      result.Body.on("error", () => response.destroy());
+      result.Body.pipe(response);
+      return;
+    }
+    if (typeof result.Body?.transformToWebStream === "function") {
+      Readable.fromWeb(result.Body.transformToWebStream()).pipe(response);
+      return;
+    }
+    response.end(await result.Body?.transformToByteArray?.());
+  } catch (error) {
+    const missing = String(error?.name || "").includes("NoSuchKey") || Number(error?.$metadata?.httpStatusCode) === 404;
+    if (!response.headersSent) sendJson(response, missing ? 404 : 500, { error: missing ? "Arquivo da nota nao encontrado." : "Nao foi possivel abrir a nota." });
+  }
+}
+
 async function handleTermStripeCheckout(request, response) {
   const user = await requireAuth(request, response);
   if (!user) return;
@@ -14077,6 +14170,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && pathname.match(/^\/api\/event-expense-notes\/[^/]+\/file$/)) {
+    const noteId = decodeURIComponent(pathname.replace(/^\/api\/event-expense-notes\/([^/]+)\/file$/, "$1"));
+    await handleEventExpenseNoteFile(request, response, noteId);
+    return;
+  }
+
   if (request.method === "PUT" && pathname === "/api/contractor-panel/coupon") {
     await handleContractorCouponUpdate(request, response);
     return;
@@ -15445,6 +15544,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PUT" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/video$/)) {
     const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/video$/, "$1"));
     await handleAdminEventVideoUpload(request, response, userId);
+    return;
+  }
+
+  if (request.method === "PUT" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/expense-notes$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/expense-notes$/, "$1"));
+    await handleAdminEventExpenseNoteCreate(request, response, userId);
     return;
   }
 

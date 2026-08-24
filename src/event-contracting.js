@@ -67,6 +67,23 @@ function mapAsset(row) {
   };
 }
 
+function mapExpenseNote(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title || "",
+    amountCents: Number(row.amount_cents || 0),
+    amount: money(row.amount_cents),
+    category: row.category || "OTHER",
+    otherLabel: row.other_label || "",
+    fileUrl: `/api/event-expense-notes/${encodeURIComponent(row.id)}/file`,
+    fileName: row.file_name || "nota-de-consumo",
+    contentType: row.content_type || "application/octet-stream",
+    sizeBytes: Number(row.size_bytes || 0),
+    createdAt: row.created_at || null
+  };
+}
+
 export async function ensureEventContractingSchema() {
   if (!schemaPromise) {
     schemaPromise = (async () => {
@@ -123,6 +140,27 @@ export async function ensureEventContractingSchema() {
         );
       `);
       await query(`create index if not exists idx_event_admin_updates_unread on event_admin_updates(user_id, created_at desc) where viewed_at is null;`);
+      await query(`
+        create table if not exists event_contract_expense_notes (
+          id uuid primary key default gen_random_uuid(),
+          term_id uuid not null references "all-terms"(id) on delete cascade,
+          user_id uuid not null references users(id) on delete cascade,
+          title text not null,
+          amount_cents integer not null check (amount_cents > 0),
+          category text not null check (category in ('LODGING', 'FOOD', 'FUEL', 'TOLL', 'OTHER')),
+          other_label text not null default '',
+          file_key text not null,
+          file_url text not null,
+          file_name text not null,
+          content_type text not null,
+          size_bytes bigint not null check (size_bytes > 0),
+          created_by_admin_user_id uuid references users(id) on delete set null,
+          created_at timestamptz not null default now(),
+          updated_at timestamptz not null default now()
+        );
+      `);
+      await query(`create unique index if not exists idx_event_expense_notes_unique_title on event_contract_expense_notes(term_id, lower(title));`);
+      await query(`create index if not exists idx_event_expense_notes_term on event_contract_expense_notes(term_id, created_at desc);`);
     })().catch((error) => { schemaPromise = null; throw error; });
   }
   return schemaPromise;
@@ -154,17 +192,19 @@ async function ensureRows(term) {
 export async function getEventContractWorkflow(term) {
   if (!term?.id || !term?.userId) return null;
   await ensureRows(term);
-  const [paymentResult, lodgingResult, assetResult] = await Promise.all([
+  const [paymentResult, lodgingResult, assetResult, expenseNoteResult] = await Promise.all([
     query(`select * from event_contract_payments where term_id = $1 order by payment_order`, [term.id]),
     query(`select * from event_contract_lodging where term_id = $1 limit 1`, [term.id]),
-    query(`select * from event_contract_assets where term_id = $1 limit 1`, [term.id])
+    query(`select * from event_contract_assets where term_id = $1 limit 1`, [term.id]),
+    query(`select * from event_contract_expense_notes where term_id = $1 order by created_at desc`, [term.id])
   ]);
   return {
     pixKey: "36.442.785/0001-00",
     pixLabel: "CNPJ",
     payments: paymentResult.rows.map(mapPayment),
     lodging: mapLodging(lodgingResult.rows[0]),
-    promoVideo: mapAsset(assetResult.rows[0])
+    promoVideo: mapAsset(assetResult.rows[0]),
+    expenseNotes: expenseNoteResult.rows.map(mapExpenseNote)
   };
 }
 
@@ -241,6 +281,56 @@ export async function saveEventPromoVideo(adminId, userId, termId, asset) {
     returning *
   `, [termId, userId, asset.key, asset.url, asset.fileName, asset.contentType, asset.sizeBytes, adminId]);
   return mapAsset(result.rows[0]);
+}
+
+export async function createEventExpenseNote(adminId, userId, termId, input = {}, asset = {}) {
+  await ensureEventContractingSchema();
+  const title = String(input.title || "").replace(/\s+/g, " ").trim().slice(0, 120);
+  const amountCents = Math.trunc(Number(input.amountCents || 0));
+  const category = String(input.category || "").trim().toUpperCase();
+  const allowedCategories = new Set(["LODGING", "FOOD", "FUEL", "TOLL", "OTHER"]);
+  const otherLabel = category === "OTHER"
+    ? String(input.otherLabel || "").replace(/\s+/g, " ").trim().slice(0, 120)
+    : "";
+  if (title.length < 2) throw new Error("Informe um titulo para a nota.");
+  if (!Number.isInteger(amountCents) || amountCents < 1) throw new Error("Informe um valor valido para a nota.");
+  if (!allowedCategories.has(category)) throw new Error("Escolha uma categoria valida.");
+  if (category === "OTHER" && !otherLabel) throw new Error("Explique o que e a categoria Outros.");
+  if (!asset.key || !asset.fileName || !asset.contentType || !Number(asset.sizeBytes)) {
+    throw new Error("Envie a foto ou o arquivo da nota.");
+  }
+  try {
+    const result = await query(`
+      insert into event_contract_expense_notes
+        (term_id, user_id, title, amount_cents, category, other_label, file_key, file_url, file_name, content_type, size_bytes, created_by_admin_user_id)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      returning *
+    `, [termId, userId, title, amountCents, category, otherLabel, asset.key, asset.url, asset.fileName, asset.contentType, asset.sizeBytes, adminId]);
+    return mapExpenseNote(result.rows[0]);
+  } catch (error) {
+    if (String(error?.code || "") === "23505") throw new Error("Ja existe uma nota com esse titulo neste evento.");
+    throw error;
+  }
+}
+
+export async function getEventExpenseNoteFile(noteId) {
+  await ensureEventContractingSchema();
+  const result = await query(`
+    select id, user_id, file_key, file_name, content_type, size_bytes
+      from event_contract_expense_notes
+     where id = $1
+     limit 1
+  `, [noteId]);
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    key: row.file_key,
+    fileName: row.file_name || "nota-de-consumo",
+    contentType: row.content_type || "application/octet-stream",
+    sizeBytes: Number(row.size_bytes || 0)
+  };
 }
 
 export async function listUnreadEventUserIds() {
