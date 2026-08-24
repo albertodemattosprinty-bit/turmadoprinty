@@ -139,6 +139,7 @@ const MIDIA_ORDER_KEY = "midia/order.json";
 const MAX_MIDIA_TRACK_BYTES = 150 * 1024 * 1024;
 const MIDIA_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
 const MAX_MIDIA_UPLOADS_PER_WINDOW = 12;
+const MIDIA_PLAYBACK_HEARTBEAT_MS = 15 * 1000;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
@@ -157,6 +158,15 @@ let r2Client = null;
 let r2PrivateClient = null;
 let miniMediaDatabaseBootstrapped = false;
 const midiaUploadActivityByIp = new Map();
+const midiaPlaybackClients = new Set();
+let midiaPlaybackState = {
+  revision: 0,
+  action: "pause",
+  trackId: "",
+  positionSeconds: 0,
+  changedAt: Date.now(),
+  changedBy: ""
+};
 
 const eduDownloadFiles = {
   "abandona-no-lixao": {
@@ -452,6 +462,58 @@ function consumeMidiaUploadAllowance(request) {
   recent.push(now);
   midiaUploadActivityByIp.set(ip, recent);
   return true;
+
+}
+function getMidiaPlaybackSnapshot(now = Date.now()) {
+  const elapsedSeconds = midiaPlaybackState.action === "play"
+    ? Math.max(0, (now - midiaPlaybackState.changedAt) / 1000)
+    : 0;
+  return {
+    revision: midiaPlaybackState.revision,
+    action: midiaPlaybackState.action,
+    trackId: midiaPlaybackState.trackId,
+    positionSeconds: Math.max(0, midiaPlaybackState.positionSeconds + elapsedSeconds),
+    changedAt: new Date(midiaPlaybackState.changedAt).toISOString(),
+    serverNow: now
+  };
+}
+
+function broadcastMidiaPlayback() {
+  const snapshot = getMidiaPlaybackSnapshot();
+  for (const client of midiaPlaybackClients) {
+    try {
+      sendSseEvent(client, "playback", snapshot);
+    } catch {
+      midiaPlaybackClients.delete(client);
+    }
+  }
+  return snapshot;
+}
+
+function handleMidiaPlaybackEvents(request, response) {
+  response.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-store, must-revalidate, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no"
+  });
+  response.flushHeaders?.();
+  response.write("retry: 1000\n\n");
+  midiaPlaybackClients.add(response);
+  sendSseEvent(response, "playback", getMidiaPlaybackSnapshot());
+
+  const heartbeat = setInterval(() => {
+    if (response.destroyed || response.writableEnded) return;
+    response.write(`: som-global ${Date.now()}\n\n`);
+  }, MIDIA_PLAYBACK_HEARTBEAT_MS);
+  heartbeat.unref?.();
+
+  const close = () => {
+    clearInterval(heartbeat);
+    midiaPlaybackClients.delete(response);
+  };
+  request.once("close", close);
+  response.once("close", close);
 }
 
 function buildSafeDownloadBaseName(value, fallback = "arquivo") {
@@ -2403,6 +2465,9 @@ function isProject200OnboardingRequestAllowed(request) {
   ).pathname;
 
   if (pathname === "/api/auth/me" || pathname === "/api/auth/logout") {
+    return true;
+  }
+  if (request.method === "POST" && pathname === "/api/midia/playback") {
     return true;
   }
   if (pathname === "/api/200/onboarding" || pathname === "/api/200/onboarding/start") {
@@ -12579,6 +12644,54 @@ async function handleMidiaTracksList(response) {
   }
 }
 
+async function handleMidiaPlaybackUpdate(request, response) {
+  const adminUser = await requireAdmin(request, response);
+  if (!adminUser) return;
+
+  try {
+    const body = await readJsonBody(request);
+    const action = String(body?.action || "").trim().toLowerCase();
+    const requestedTrackId = String(body?.trackId || "").trim();
+    const requestedPosition = Number(body?.positionSeconds);
+
+    if (action !== "play" && action !== "pause") {
+      sendJson(response, 400, { error: "Use play ou pause para controlar a musica." });
+      return;
+    }
+
+    const trackId = requestedTrackId || midiaPlaybackState.trackId;
+    if (!trackId || !decodeMidiaTrackId(trackId)) {
+      sendJson(response, 400, { error: "Musica invalida para o controle global." });
+      return;
+    }
+
+    let positionSeconds;
+    if (Number.isFinite(requestedPosition) && requestedPosition >= 0) {
+      positionSeconds = Math.min(requestedPosition, 24 * 60 * 60);
+    } else if (trackId === midiaPlaybackState.trackId) {
+      positionSeconds = getMidiaPlaybackSnapshot().positionSeconds;
+    } else {
+      positionSeconds = 0;
+    }
+
+    midiaPlaybackState = {
+      revision: midiaPlaybackState.revision + 1,
+      action,
+      trackId,
+      positionSeconds,
+      changedAt: Date.now(),
+      changedBy: String(adminUser.id || "")
+    };
+
+    const playback = broadcastMidiaPlayback();
+    sendJson(response, 200, { ok: true, playback });
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel controlar a musica global."
+    });
+  }
+}
+
 async function handleMidiaTrackUpload(request, response) {
   const fileName = decodeMidiaHeader(request.headers["x-file-name"]);
   const providedTitle = decodeMidiaHeader(request.headers["x-track-title"]);
@@ -12712,6 +12825,20 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && pathname === "/api/midia/tracks") {
     await handleMidiaTracksList(response);
+    return;
+  }
+  if (request.method === "GET" && pathname === "/api/midia/playback/events") {
+    handleMidiaPlaybackEvents(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/midia/playback") {
+    sendJson(response, 200, { ok: true, playback: getMidiaPlaybackSnapshot() });
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/midia/playback") {
+    await handleMidiaPlaybackUpdate(request, response);
     return;
   }
 

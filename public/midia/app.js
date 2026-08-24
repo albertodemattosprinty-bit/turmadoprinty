@@ -7,6 +7,7 @@
   const LOCAL_INDEX_KEY = "midia-local-tracks-v1";
   const LOCAL_DIRECTORY = "midia-audios";
   const LOCAL_CACHE = "midia-audios-v1";
+  const AUTH_TOKEN_KEY = "turma_do_printy_token";
 
   const elements = {
     openUploadButton: document.getElementById("openUploadButton"),
@@ -26,7 +27,8 @@
     trackList: document.getElementById("trackList"),
     emptyState: document.getElementById("emptyState"),
     trackTemplate: document.getElementById("trackTemplate"),
-    audioPlayer: document.getElementById("audioPlayer")
+    audioPlayer: document.getElementById("audioPlayer"),
+    globalAudioButton: document.getElementById("globalAudioButton")
   };
 
   const state = {
@@ -41,8 +43,29 @@
     orderSaveRevision: 0,
     currentObjectUrl: "",
     savedTrackIds: loadSavedTrackIds(),
-    uploading: false
+    uploading: false,
+    isAdmin: false,
+    globalPlaybackAction: "pause",
+    globalTrackId: "",
+    lastGlobalRevision: -1,
+    pendingGlobalPlayback: null,
+    globalPlaybackSource: null
   };
+
+  function getAuthToken() {
+    const stored = localStorage.getItem(AUTH_TOKEN_KEY) || "";
+    if (stored) return stored;
+    const match = document.cookie.match(/(?:^|;\s*)turma_do_printy_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  function getAuthHeaders(extra = {}) {
+    const token = getAuthToken();
+    return {
+      ...extra,
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  }
 
   function loadSavedTrackIds() {
     try {
@@ -129,10 +152,15 @@
   function updatePlayingVisuals() {
     elements.trackList.querySelectorAll(".track-card").forEach((card) => {
       const playing = card.dataset.trackId === state.activeTrackId && !elements.audioPlayer.paused;
+      const globalPlaying = playing
+        && state.globalPlaybackAction === "play"
+        && card.dataset.trackId === state.globalTrackId;
       card.classList.toggle("is-playing", playing);
       card.setAttribute("aria-pressed", String(playing));
       const status = card.querySelector(".track-state");
-      if (status) status.textContent = playing ? "Tocando agora · 2 cliques para pausar" : "Clique para ouvir";
+      if (status) status.textContent = playing
+        ? `${globalPlaying ? "Tocando para todos" : "Tocando agora"} · 2 cliques para pausar`
+        : "Clique para ouvir";
     });
     updateOrderSelectionVisuals();
   }
@@ -348,7 +376,38 @@
     }
   }
 
-  async function playTrack(track) {
+  function showGlobalAudioUnlock(command) {
+    state.pendingGlobalPlayback = command;
+    if (elements.globalAudioButton) elements.globalAudioButton.hidden = false;
+    elements.libraryStatus.textContent = "Toque em “Ativar som global” uma vez para receber as músicas disparadas.";
+  }
+
+  function hideGlobalAudioUnlock() {
+    state.pendingGlobalPlayback = null;
+    if (elements.globalAudioButton) elements.globalAudioButton.hidden = true;
+  }
+
+  function seekCurrentAudio(positionSeconds, requestId, receivedAt) {
+    if (!Number.isFinite(positionSeconds)) return;
+    const applyPosition = () => {
+      if (requestId !== state.playbackRequestId) return;
+      const elapsed = Number.isFinite(receivedAt)
+        ? Math.max(0, (performance.now() - receivedAt) / 1000)
+        : 0;
+      try {
+        elements.audioPlayer.currentTime = Math.max(0, positionSeconds + elapsed);
+      } catch {
+        // Alguns navegadores só permitem buscar depois que os metadados chegam.
+      }
+    };
+    if (elements.audioPlayer.readyState >= 1) {
+      applyPosition();
+      return;
+    }
+    elements.audioPlayer.addEventListener("loadedmetadata", applyPosition, { once: true });
+  }
+
+  async function playTrack(track, options = {}) {
     const requestId = ++state.playbackRequestId;
     try {
       if (elements.audioPlayer.dataset.trackId !== track.id) {
@@ -357,22 +416,30 @@
         const source = await resolveTrackSource(track);
         if (requestId !== state.playbackRequestId) {
           if (source.objectUrl) URL.revokeObjectURL(source.objectUrl);
-          return;
+          return false;
         }
         state.currentObjectUrl = source.objectUrl;
         elements.audioPlayer.src = source.url;
         elements.audioPlayer.dataset.trackId = track.id;
         elements.audioPlayer.load();
       }
-      if (requestId !== state.playbackRequestId) return;
+      if (requestId !== state.playbackRequestId) return false;
+      seekCurrentAudio(Number(options.positionSeconds), requestId, Number(options.receivedAt));
       state.activeTrackId = track.id;
       await elements.audioPlayer.play();
+      if (options.globalCommand) hideGlobalAudioUnlock();
       updatePlayingVisuals();
-    } catch {
-      if (requestId !== state.playbackRequestId) return;
+      return true;
+    } catch (error) {
+      if (requestId !== state.playbackRequestId) return false;
       state.activeTrackId = "";
       updatePlayingVisuals();
-      elements.libraryStatus.textContent = "Não foi possível tocar essa música agora.";
+      if (options.globalCommand && error?.name === "NotAllowedError") {
+        showGlobalAudioUnlock(options.globalCommand);
+      } else {
+        elements.libraryStatus.textContent = "Não foi possível tocar essa música agora.";
+      }
+      return false;
     }
   }
 
@@ -381,6 +448,68 @@
     state.playbackRequestId += 1;
     state.activeTrackId = "";
     updatePlayingVisuals();
+  }
+
+  async function applyGlobalPlayback(command, { force = false } = {}) {
+    const revision = Number(command?.revision);
+    if (!Number.isFinite(revision) || revision < state.lastGlobalRevision) return;
+    const isRepeatedRevision = revision === state.lastGlobalRevision;
+    const action = String(command?.action || "").toLowerCase();
+    const trackId = String(command?.trackId || "");
+    const positionSeconds = Math.max(0, Number(command?.positionSeconds) || 0);
+
+    state.lastGlobalRevision = revision;
+    state.globalPlaybackAction = action;
+    state.globalTrackId = trackId;
+
+    if (action === "pause") {
+      hideGlobalAudioUnlock();
+      if (elements.audioPlayer.dataset.trackId === trackId) {
+        try {
+          elements.audioPlayer.currentTime = positionSeconds;
+        } catch {
+          // A posição será mantida pelo navegador quando os metadados estiverem prontos.
+        }
+      }
+      pauseCurrentTrack();
+      return;
+    }
+    if (action !== "play") return;
+
+    const currentDrift = elements.audioPlayer.dataset.trackId === trackId
+      ? Math.abs(elements.audioPlayer.currentTime - positionSeconds)
+      : Number.POSITIVE_INFINITY;
+    if (isRepeatedRevision && !force && !elements.audioPlayer.paused && currentDrift < 0.75) return;
+
+    let track = getTrackById(trackId);
+    if (!track) {
+      await loadTracks();
+      track = getTrackById(trackId);
+    }
+    if (!track) return;
+
+    const receivedAt = performance.now();
+    const globalCommand = { ...command, positionSeconds, receivedAt };
+    state.pendingGlobalPlayback = globalCommand;
+    await playTrack(track, { positionSeconds, receivedAt, globalCommand });
+  }
+
+  async function broadcastGlobalPlayback(action, track, positionSeconds) {
+    if (!state.isAdmin || !track) return;
+    try {
+      const response = await fetch("/api/midia/playback", {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ action, trackId: track.id, positionSeconds })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Falha no controle global.");
+      if (payload.playback) await applyGlobalPlayback(payload.playback);
+    } catch (error) {
+      elements.libraryStatus.textContent = error instanceof Error
+        ? error.message
+        : "Não foi possível disparar a música para todos.";
+    }
   }
 
   function activateTrackCard(track, event) {
@@ -394,17 +523,29 @@
 
     if (isDoubleClick) {
       state.lastCardClickAt = now;
+      const positionSeconds = elements.audioPlayer.dataset.trackId === track.id
+        ? elements.audioPlayer.currentTime
+        : 0;
       pauseCurrentTrack();
+      void broadcastGlobalPlayback("pause", track, positionSeconds);
       return;
     }
     if (sameTrackIsPlaying) {
-      if (now - state.lastCardClickAt < DOUBLE_CLICK_WINDOW_MS) pauseCurrentTrack();
+      if (now - state.lastCardClickAt < DOUBLE_CLICK_WINDOW_MS) {
+        const positionSeconds = elements.audioPlayer.currentTime;
+        pauseCurrentTrack();
+        void broadcastGlobalPlayback("pause", track, positionSeconds);
+      }
       state.lastCardClickAt = now;
       return;
     }
 
     state.lastCardClickAt = now;
+    const positionSeconds = elements.audioPlayer.dataset.trackId === track.id
+      ? elements.audioPlayer.currentTime
+      : 0;
     void playTrack(track);
+    void broadcastGlobalPlayback("play", track, positionSeconds);
   }
 
   function updateLocalButtonProgress(button, loaded, total) {
@@ -490,6 +631,49 @@
       elements.emptyState.hidden = false;
     }
   }
+  async function loadAdminAccess() {
+    const token = getAuthToken();
+    if (!token) return;
+    try {
+      const response = await fetch("/api/auth/me", {
+        headers: getAuthHeaders(),
+        cache: "no-store"
+      });
+      const payload = await response.json().catch(() => ({}));
+      state.isAdmin = Boolean(response.ok && payload?.user?.isAdmin);
+      document.documentElement.classList.toggle("midia-admin", state.isAdmin);
+    } catch {
+      state.isAdmin = false;
+    }
+  }
+
+  function connectGlobalPlayback() {
+    state.globalPlaybackSource?.close();
+    const source = new EventSource("/api/midia/playback/events");
+    state.globalPlaybackSource = source;
+    source.addEventListener("playback", (event) => {
+      try {
+        void applyGlobalPlayback(JSON.parse(event.data || "{}"));
+      } catch {
+        // O EventSource reconecta sozinho e recebe o estado atual novamente.
+      }
+    });
+  }
+
+  async function enablePendingGlobalAudio() {
+    const command = state.pendingGlobalPlayback;
+    if (!command) {
+      if (elements.globalAudioButton) elements.globalAudioButton.hidden = true;
+      return;
+    }
+    const track = getTrackById(command.trackId);
+    if (!track) return;
+    await playTrack(track, {
+      positionSeconds: Number(command.positionSeconds) || 0,
+      receivedAt: Number(command.receivedAt) || performance.now(),
+      globalCommand: command
+    });
+  }
 
   function uploadSelectedTrack() {
     const file = elements.trackFileInput.files?.[0];
@@ -544,6 +728,7 @@
   elements.openUploadButton.addEventListener("click", openUploadPanel);
   elements.cancelUploadButton.addEventListener("click", () => resetUploadForm(true));
   elements.submitUploadButton.addEventListener("click", uploadSelectedTrack);
+  elements.globalAudioButton?.addEventListener("click", () => void enablePendingGlobalAudio());
   elements.trackFileInput.addEventListener("change", () => selectFile(elements.trackFileInput.files?.[0]));
   elements.searchInput.addEventListener("input", renderTracks);
   document.addEventListener("keydown", (event) => {
@@ -594,8 +779,16 @@
     const bar = card?.querySelector(".track-progress span");
     if (bar) bar.style.width = `${(elements.audioPlayer.currentTime / elements.audioPlayer.duration) * 100}%`;
   });
-  window.addEventListener("beforeunload", releaseCurrentObjectUrl);
+  window.addEventListener("beforeunload", () => {
+    state.globalPlaybackSource?.close();
+    releaseCurrentObjectUrl();
+  });
   window.addEventListener("pagehide", () => void finalizeOrderSelection({ silent: true }));
 
-  void loadTracks();
+  async function initialize() {
+    await Promise.all([loadTracks(), loadAdminAccess()]);
+    connectGlobalPlayback();
+  }
+
+  void initialize();
 })();

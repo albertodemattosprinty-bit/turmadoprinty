@@ -78,6 +78,16 @@ footer {
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
 }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.global-audio-button {
+  border-color: rgba(101, 220, 148, 0.42);
+  color: var(--green);
+}
 
 .brand {
   display: inline-flex;
@@ -673,6 +683,19 @@ footer {
     min-height: 42px;
     padding-inline: 14px;
     font-size: 0.8rem;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .global-audio-button {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 20;
+    background: var(--surface-raised);
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.42);
   }
 
   .hero {
