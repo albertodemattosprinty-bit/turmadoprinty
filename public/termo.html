@@ -132,6 +132,7 @@
     .intro-copy,
     .success-copy { text-align: center; margin-bottom: 24px; }
     .account-setup { display:grid; gap:12px; margin:0 auto 20px; max-width:420px; padding:18px; border:1px solid rgba(255,255,255,.22); border-radius:18px; background:rgba(4,20,40,.32); }
+    .account-setup[hidden] { display:none !important; }
     .account-setup h2,.account-setup p { margin:0; text-align:center; }
     .account-setup p { color:var(--text-soft); }
     .account-setup input { width:100%; min-height:48px; border:0; border-radius:12px; padding:11px 13px; color:var(--input-text); background:var(--input-bg); font:inherit; }
@@ -1412,6 +1413,14 @@
       const password = panelPassword.value;
       if (username.length < 3) { accountSetupFeedback.textContent = "Crie um nome com pelo menos 3 caracteres."; return; }
       if (password.length < 6) { accountSetupFeedback.textContent = "A senha precisa ter pelo menos 6 caracteres."; return; }
+      if (!currentTermId || !currentClaimToken) {
+        accountSetup.hidden = true;
+        accountSetupFeedback.textContent = "";
+        successCopy.textContent = "Este termo ja esta vinculado a uma conta. Abra o painel do contratante ou preencha um novo termo.";
+        contractorPanelBtn.style.display = "inline-flex";
+        restartBtn.style.display = "inline-flex";
+        return;
+      }
       createPanelAccountBtn.disabled = true;
       accountSetupFeedback.textContent = "Criando seu acesso...";
       try {
@@ -1456,6 +1465,8 @@
     restartBtn.addEventListener("click", () => {
       currentStep = -1;
       currentPdfUrl = "";
+      currentTermId = "";
+      currentClaimToken = "";
       agreementIndex = 0;
       inPostQuestionAgreements = false;
       paymentStage = 0;
@@ -1463,6 +1474,8 @@
       signatureCpf.value = "";
       signatureError.textContent = "";
       successCopy.textContent = getTermText("success.copy", "Seu formulário foi preenchido com sucesso.");
+      accountSetup.hidden = true;
+      accountSetupFeedback.textContent = "";
       downloadPdfBtn.style.display = "none";
       contractorPanelBtn.style.display = "inline-flex";
       showScreen("intro");
