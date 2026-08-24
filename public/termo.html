@@ -56,7 +56,14 @@
       pointer-events: none;
       transform: translateX(24px);
       transition: opacity 0.35s ease, transform 0.35s ease, visibility 0.35s ease;
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
     }
+
+    .screen::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    .screen > .card { flex: 0 0 auto; margin-block: auto; }
 
     .screen.active {
       opacity: 1;

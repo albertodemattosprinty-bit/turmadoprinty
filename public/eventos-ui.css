@@ -20,6 +20,29 @@
 
 html {
   scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.fullscreen-dialog::-webkit-scrollbar,
+.centered-dialog__card::-webkit-scrollbar,
+.room-nav::-webkit-scrollbar,
+.journey-nav::-webkit-scrollbar,
+.table-wrap::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.fullscreen-dialog,
+.centered-dialog__card,
+.room-nav,
+.journey-nav,
+.table-wrap {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 body {
@@ -1007,7 +1030,10 @@ textarea.field-control {
 .centered-dialog__card {
   width: min(590px, 100%);
   max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--events-line);
   border-radius: 24px;
   padding: 22px;

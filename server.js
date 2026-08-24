@@ -2481,6 +2481,23 @@ function isProject200OnboardingRequestAllowed(request) {
     && /^\/api\/200\/profiles\/[^/]+\/avatar\/(?:generate|upload)$/.test(pathname);
 }
 
+function isIndependentEventFlowRequest(request) {
+  const pathname = new URL(
+    request.url || "/",
+    "http://" + (request.headers.host || "localhost")
+  ).pathname;
+  const eventPrefixes = [
+    "/api/admin/eventos",
+    "/api/contractor-panel",
+    "/api/event-coupons",
+    "/api/event-expense-notes",
+    "/api/event-flow",
+    "/api/event-pages",
+    "/api/terms"
+  ];
+  return eventPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
+}
+
 async function requireAuth(request, response) {
   if (!hasDatabase()) {
     sendJson(response, 503, {
@@ -2504,7 +2521,9 @@ async function requireAuth(request, response) {
     return null;
   }
 
-  if (Boolean(user.project200_onboarding_required) && !isProject200OnboardingRequestAllowed(request)) {
+  if (Boolean(user.project200_onboarding_required)
+    && !isProject200OnboardingRequestAllowed(request)
+    && !isIndependentEventFlowRequest(request)) {
     try {
       const onboarding = await getProject200Onboarding(user.id);
       sendJson(response, 423, {

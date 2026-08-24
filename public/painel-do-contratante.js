@@ -242,7 +242,12 @@ async function load() {
     location.href = "/auth.html?next=/painel-do-contratante";
     return;
   }
-  if (!response.ok) throw new Error(data.error || "Não foi possível carregar o seu evento.");
+  if (!response.ok) {
+    const message = data.code === "PROJECT200_ONBOARDING_REQUIRED"
+      ? "Sua conta de evento está sendo preparada. Atualize a página para continuar."
+      : data.error || "Não foi possível carregar o seu evento.";
+    throw new Error(message);
+  }
   if (!data.panel?.hasTerm) {
     $("contractorLoading").classList.add("hidden");
     $("emptyState").classList.remove("hidden");
