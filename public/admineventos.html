@@ -1,43 +1,339 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin Eventos | Turma do Printy</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
-:root{color-scheme:dark;--bg:#07111f;--card:#0c1b2e;--card2:#10243c;--line:rgba(255,255,255,.11);--text:#f5f8ff;--soft:#96a9be;--purple:#8e6cff;--green:#31d67b;--blue:#4395ff;--yellow:#f4c85f}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 85% 0,#173a68 0,transparent 32%),var(--bg);color:var(--text);font-family:"Exo 2",sans-serif}button,input,select{font:inherit}.hidden{display:none!important}.shell{width:min(1180px,calc(100% - 28px));margin:auto;padding:32px 0 70px}.top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px}.eyebrow{margin:0 0 8px;color:#c2b3ff;text-transform:uppercase;letter-spacing:.12em;font-size:.72rem;font-weight:800}h1,h2,h3,p{margin-top:0}h1{margin-bottom:8px;font-size:clamp(2rem,5vw,3.6rem);line-height:1}.lead{margin:0;color:var(--soft);line-height:1.5}.button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border:0;border-radius:12px;padding:10px 15px;font-weight:800;cursor:pointer;text-decoration:none}.button.primary{background:var(--purple);color:#fff}.button.green{background:var(--green);color:#03180d}.button.secondary{border:1px solid var(--line);background:rgba(255,255,255,.06);color:#fff}.button:disabled{opacity:.5;cursor:not-allowed}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:22px 0}.metric,.panel{border:1px solid var(--line);border-radius:20px;background:rgba(12,27,46,.92);box-shadow:0 18px 55px rgba(0,0,0,.2)}.metric{padding:18px}.metric span{color:var(--soft);font-size:.82rem}.metric strong{display:block;margin-top:5px;font-size:1.7rem}.panel{padding:21px;margin-top:16px}.panel-head{display:flex;justify-content:space-between;gap:15px;align-items:flex-start}.panel h2{margin-bottom:4px}.panel-copy{color:var(--soft);font-size:.88rem}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:800px}th,td{padding:14px 11px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--soft);font-size:.7rem;text-transform:uppercase;letter-spacing:.09em}.user-row{cursor:pointer}.user-row:hover{background:rgba(255,255,255,.035)}td strong,.sub{display:block}.sub{margin-top:3px;color:var(--soft);font-size:.78rem}.status{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;font-size:.77rem;font-weight:800}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}.status.open,.status.review{color:#9fcaff;background:rgba(67,149,255,.13)}.status.scheduled,.status.confirmed{color:#91f2bc;background:rgba(49,214,123,.13)}.status.pending{color:#f8da8c;background:rgba(244,200,95,.12)}.new-dot{display:inline-block;width:9px;height:9px;margin-left:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(49,214,123,.15)}.coupon-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:11px;align-items:end}.field{display:grid;gap:7px;color:var(--soft);font-size:.78rem}.field input,.field select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:#071525;color:#fff}.checks{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}.check{display:flex;align-items:center;gap:8px;color:#dce7f5;font-size:.84rem}.check input{accent-color:var(--green)}.feedback{min-height:18px;margin:10px 0 0;color:#f7d784;font-size:.84rem}.coupon-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.coupon{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.03)}.coupon code{color:#d0c5ff;font-weight:800}.coupon p{margin:5px 0 0;color:var(--soft);font-size:.78rem}.coupon-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.page-link{display:inline-block;color:#9fcaff;font-weight:800;text-decoration:none}.page-link:hover{text-decoration:underline}.empty{text-align:center;color:var(--soft);padding:28px}
-.modal{position:fixed;inset:0;z-index:60;overflow:auto;background:var(--bg)}.modal-shell{width:min(1180px,calc(100% - 28px));margin:auto;padding:24px 0 70px}.modal-top{position:sticky;top:0;z-index:4;display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:16px;padding:14px 0;background:linear-gradient(var(--bg) 78%,transparent)}.modal-hero{border:1px solid var(--line);border-radius:25px;padding:23px;background:linear-gradient(135deg,rgba(142,108,255,.18),rgba(67,149,255,.08))}.modal-hero h2{margin-bottom:8px;font-size:clamp(1.7rem,4vw,3rem)}.modal-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:18px;margin-top:18px}.modal-nav{position:sticky;top:92px;align-self:start;display:grid;gap:6px;border:1px solid var(--line);border-radius:18px;padding:10px;background:var(--card)}.modal-nav a{padding:11px;border-radius:10px;color:var(--soft);text-decoration:none}.modal-section{scroll-margin-top:100px;border:1px solid var(--line);border-radius:21px;padding:20px;background:var(--card);margin-bottom:14px}.modal-section h3{margin-bottom:5px}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:15px}.task{display:grid;gap:13px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--card2)}.task-top{display:flex;justify-content:space-between;gap:10px}.task p{margin:0;color:var(--soft);font-size:.85rem}.task strong.price{font-size:1.35rem}.info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.info{padding:13px;border:1px solid var(--line);border-radius:13px;background:var(--card2)}.info small{display:block;color:var(--soft);margin-bottom:5px}.video-input{display:grid;gap:10px;margin-top:15px}.video-input input{padding:12px;border:1px dashed var(--line);border-radius:13px;background:#071525}.modal-content{min-width:0}@media(max-width:780px){.summary{grid-template-columns:1fr}.coupon-form{grid-template-columns:1fr 1fr}.coupon-list{grid-template-columns:1fr}.modal-layout{grid-template-columns:1fr}.modal-nav{position:static;display:flex;overflow:auto}.modal-nav a{white-space:nowrap}}@media(max-width:520px){.top{align-items:flex-start;flex-direction:column}.coupon-form,.cards,.info-grid{grid-template-columns:1fr}.panel{padding:16px}}
-.expense-flow{z-index:120;background:radial-gradient(circle at 50% -10%,rgba(49,214,123,.18),transparent 34%),var(--bg);overflow:auto}.expense-flow-shell{width:min(720px,calc(100% - 28px));min-height:100vh;margin:auto;display:grid;grid-template-rows:auto 1fr auto;padding:20px 0 28px}.expense-flow-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 0 20px}.expense-progress{display:flex;gap:7px}.expense-progress span{width:34px;height:5px;border-radius:99px;background:rgba(255,255,255,.12)}.expense-progress span.active{background:var(--green)}.expense-step{align-self:center}.expense-step h2{font-size:clamp(2rem,7vw,4rem);line-height:1;margin-bottom:10px}.expense-step-copy{color:var(--soft);font-size:1rem;line-height:1.55}.expense-upload{display:grid;place-items:center;min-height:280px;margin-top:25px;padding:28px;border:2px dashed rgba(49,214,123,.4);border-radius:26px;background:rgba(49,214,123,.06);text-align:center;cursor:pointer}.expense-upload input{position:absolute;width:1px;height:1px;opacity:0}.expense-upload-icon{display:grid;place-items:center;width:74px;height:74px;margin-bottom:15px;border-radius:24px;background:var(--green);color:#03180d;font-size:2rem;font-weight:900}.expense-selected{margin-top:12px;color:#baf5d2;font-weight:700}.expense-event-field{margin-bottom:16px}.expense-value{width:100%;border:0;border-bottom:2px solid rgba(255,255,255,.18);background:transparent;color:#fff;padding:14px 0;font-size:clamp(2.2rem,9vw,5rem);font-weight:800;outline:none}.expense-title{width:100%;min-height:58px;margin-top:24px;border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:#071525;color:#fff;font-size:1.05rem}.expense-categories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:25px}.expense-category{min-height:78px;border:1px solid var(--line);border-radius:18px;background:var(--card2);color:#fff;font-weight:800;cursor:pointer}.expense-category.selected{border-color:var(--green);background:rgba(49,214,123,.14);color:#aaf1c8}.expense-other{width:100%;min-height:54px;margin-top:14px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#071525;color:#fff}.expense-flow-actions{display:flex;gap:10px;justify-content:space-between;padding-top:25px}.expense-flow-actions .button{min-width:120px}.expense-note-card a{color:#9fcaff;text-decoration:none}.expense-note-card a:hover{text-decoration:underline}@media(max-width:520px){.expense-categories{grid-template-columns:1fr}.expense-flow-actions .button{flex:1}}
-</style></head><body><main class="shell"><header class="top"><div><p class="eyebrow">Acesso exclusivo do administrador</p><h1>Fluxo dos eventos</h1><p class="lead">Acompanhe propostas, movimentações, pagamentos e preparação de cada evento.</p></div><button class="button secondary" id="refreshBtn">Atualizar</button></header><section class="summary"><article class="metric"><span>Pessoas na proposta</span><strong id="peopleMetric">—</strong></article><article class="metric"><span>Acessos acumulados</span><strong id="accessMetric">—</strong></article><article class="metric"><span>Eventos agendados</span><strong id="scheduledMetric">—</strong></article></section><section class="panel"><div class="panel-head"><div><h2>Pessoas no fluxo</h2><p class="panel-copy">Toque em uma pessoa para abrir a administração completa do evento.</p></div></div><div class="table-wrap"><table><thead><tr><th>Nome</th><th>Usuário</th><th>Estágio</th><th>Preço final</th><th>Status</th></tr></thead><tbody id="usersBody"><tr><td colspan="5" class="empty">Carregando…</td></tr></tbody></table></div></section><section class="panel"><div class="panel-head"><div><h2>Criar página personalizada</h2><p class="panel-copy">Crie um endereço como /lem20 com a condição comercial já aplicada no termo.</p></div></div><form id="couponForm"><div class="coupon-form"><label class="field">Endereço da página<input id="couponCode" maxlength="40" placeholder="/lem20" required></label><label class="field">Desconto em reais<input id="discountValue" type="number" min=".01" step=".01" required></label><label class="field">Apresentação<select id="presentationSelect" required></select></label><label class="field">Nº de eventos<input id="eventCount" type="number" min="1" max="20" value="1" required></label><label class="field">Valor do transporte<input id="transportValue" type="number" min="0" step=".01" value="0" required><small>Use 0 para não cobrar transporte.</small></label></div><div class="checks"><label class="check"><input id="freeLodging" type="checkbox">Livre de hospedagem</label></div><button class="button green" type="submit">Criar página</button><p class="feedback" id="couponFeedback"></p></form><div class="coupon-list" id="couponList"></div></section></main>
-<div class="modal hidden" id="eventModal"><div class="modal-shell"><div class="modal-top"><span class="eyebrow">Administração do contratado</span><button class="button secondary" id="closeModal">Fechar</button></div><header class="modal-hero"><p class="eyebrow" id="modalUser">Evento</p><h2 id="modalTitle">Carregando…</h2><div><span class="status scheduled" id="modalStatus">Agendado</span> <span class="sub" id="modalMeta"></span></div></header><div class="modal-layout"><nav class="modal-nav"><a href="#adminMateriais">Materiais</a><a href="#adminNotas">Notas de consumo</a><a href="#adminPagamentos">Pagamentos</a><a href="#adminHotel">Hospedagem</a><a href="#adminTermo">Termo</a></nav><div class="modal-content"><section class="modal-section" id="adminMateriais"><h3>Materiais de divulgação</h3><p class="panel-copy">Envie o vídeo diretamente ao R2 para aparecer no painel do contratado.</p><div class="video-input"><input id="videoFile" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v"><button class="button primary" id="uploadVideo">Enviar vídeo de divulgação para o contratado</button><a class="button secondary hidden" id="currentVideo" target="_blank" rel="noopener">Ver vídeo atual</a><p class="feedback" id="videoFeedback"></p></div></section><section class="modal-section" id="adminNotas"><h3>Notas de consumo</h3><p class="panel-copy">Arquivos adicionados para o contratante consultar no painel dele.</p><div class="cards" id="adminExpenseNotes"></div></section><section class="modal-section" id="adminPagamentos"><h3>Pagamentos informados</h3><p class="panel-copy">A baixa é manual. O contratado fica verde somente depois da sua confirmação.</p><div class="cards" id="adminPayments"></div></section><section class="modal-section" id="adminHotel"><h3>Hospedagem</h3><p class="panel-copy">Dados preenchidos pelo contratado.</p><div class="info-grid" id="hotelInfo"></div><button class="button green hidden" id="confirmHotel">Confirmar hospedagem</button><p class="feedback" id="hotelAdminFeedback"></p></section><section class="modal-section" id="adminTermo"><h3>Termo de compromisso</h3><p class="panel-copy">Documento com todas as informações aceitas pelo contratado.</p><a class="button secondary" id="adminPdf" target="_blank">Abrir PDF do termo</a></section></div></div></div></div>
-<div class="modal expense-flow hidden" id="expenseFlow" role="dialog" aria-modal="true" aria-labelledby="expenseFlowTitle"><div class="expense-flow-shell"><header class="expense-flow-head"><div><p class="eyebrow">Adicionar Nota</p><div class="expense-progress" id="expenseProgress"><span class="active"></span><span></span><span></span></div></div><button class="button secondary" id="closeExpenseFlow" type="button">Fechar</button></header><div><section class="expense-step" data-expense-step="1"><h2 id="expenseFlowTitle">Enviar nota</h2><p class="expense-step-copy">Escolha a foto ou o arquivo que ficará disponível para o contratante.</p><label class="field expense-event-field">Evento do contratante<select id="expenseUser"></select></label><label class="expense-upload"><input id="expenseFile" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"><span class="expense-upload-icon">+</span><strong>Selecionar foto ou arquivo</strong><span class="expense-step-copy">JPG, PNG, WebP, HEIC ou PDF · até 20 MB</span><span class="expense-selected" id="expenseFileName">Nenhum arquivo selecionado</span></label></section><section class="expense-step hidden" data-expense-step="2"><h2>Título e valor</h2><p class="expense-step-copy">O título precisa ser único dentro deste evento.</p><input class="expense-title" id="expenseTitle" maxlength="120" placeholder="Ex.: Almoço da equipe · sábado"><input class="expense-value" id="expenseValue" type="text" inputmode="numeric" autocomplete="off" placeholder="0,00" aria-label="Valor da nota"></section><section class="expense-step hidden" data-expense-step="3"><h2>Categoria</h2><p class="expense-step-copy">Escolha onde esta nota entra no consumo do evento.</p><div class="expense-categories" id="expenseCategories"><button class="expense-category" type="button" data-category="LODGING">Hospedagem</button><button class="expense-category" type="button" data-category="FOOD">Alimentação</button><button class="expense-category" type="button" data-category="FUEL">Combustível</button><button class="expense-category" type="button" data-category="TOLL">Pedágio</button><button class="expense-category" type="button" data-category="OTHER">Outros</button></div><input class="expense-other hidden" id="expenseOther" maxlength="120" placeholder="O que é este Outros?"><p class="feedback" id="expenseFeedback"></p></section></div><footer class="expense-flow-actions"><button class="button secondary hidden" id="expenseBack" type="button">Voltar</button><button class="button green" id="expenseNext" type="button">Avançar</button></footer></div></div>
-<script type="module">import{getApiUrl}from"/api.js";const tokenKey="turma_do_printy_token",$=(id)=>document.getElementById(id);let state={users:[],pages:[],presentations:[]},activeUserId="",activeDetail=null,expenseStep=1,expenseDraft={page:null,userId:"",file:null,amountCents:0,category:""};const token=()=>localStorage.getItem(tokenKey)||"",auth=(extra={})=>({...extra,...(token()?{Authorization:`Bearer ${token()}`}:{})}),esc=(v)=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c])),money=(c)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(c||0)/100),date=(v)=>v?new Intl.DateTimeFormat("pt-BR").format(new Date(`${String(v).slice(0,10)}T12:00:00`)):"—",duration=(s)=>{const n=Math.max(0,Math.floor(Number(s||0)));return n<60?`${n}s`:n<3600?`${Math.floor(n/60)}min`:`${Math.floor(n/3600)}h${Math.floor(n%3600/60)?` ${Math.floor(n%3600/60)}min`:""}`},sm=(s)=>s==="CONFIRMED"?["confirmed","Confirmado"]:s==="REVIEW"?["review","Em análise"]:["pending","Pendente"],expenseCategory=(n)=>n?.category==="LODGING"?"Hospedagem":n?.category==="FOOD"?"Alimentação":n?.category==="FUEL"?"Combustível":n?.category==="TOLL"?"Pedágio":n?.otherLabel||"Outros";
-function render(){const users=state.users||[],pages=state.pages||state.coupons||[];state.pages=pages;$("peopleMetric").textContent=users.length;$("accessMetric").textContent=users.reduce((a,u)=>a+Number(u.accessCount||0),0);$("scheduledMetric").textContent=users.filter(u=>u.status==="scheduled").length;$("usersBody").innerHTML=users.length?users.map(u=>`<tr class="user-row" data-user="${u.userId}"><td><strong>${esc(u.name)}${u.hasUnreadUpdate?'<span class="new-dot" title="Nova movimentação"></span>':""}</strong><span class="sub">${u.eventCount?`${u.eventCount} evento${u.eventCount===1?"":"s"}`:"Termo não concluído"}</span></td><td>${esc(u.username)}</td><td><strong>${duration(u.activeSeconds)}</strong><span class="sub">${u.accessCount} acesso${u.accessCount===1?"":"s"}</span></td><td><strong>${u.finalPriceCents?money(u.finalPriceCents):"—"}</strong><span class="sub">${esc(u.presentationName||"Sem escolha")}</span></td><td><span class="status ${u.status}">${u.status==="scheduled"?"Agendado":"Aberto"}</span></td></tr>`).join(""):'<tr><td colspan="5" class="empty">Nenhuma pessoa no fluxo.</td></tr>';$("presentationSelect").innerHTML=(state.presentations||[]).map(p=>`<option value="${p.key}">${esc(p.name)} · ${money(p.unitPriceCents)}</option>`).join("");$("couponList").innerHTML=pages.map(page=>`<article class="coupon"><div><a class="page-link" href="${esc(page.pagePath||`/${String(page.code||"").toLowerCase()}`)}" target="_blank" rel="noopener">${esc(page.pagePath||`/${String(page.code||"").toLowerCase()}`)}</a><p>Desconto ${money(page.discountCents)} · ${esc(page.presentationName)} · ${page.eventCount} evento${page.eventCount===1?"":"s"} · transporte ${page.transportAmountCents?money(page.transportAmountCents):"sem cobrança"}${page.freeLodging?" · hospedagem livre":""}</p></div><div class="coupon-actions"><button class="button green" data-add-note="${page.id}">Add</button></div></article>`).join("")||'<p class="empty">Nenhuma página personalizada criada.</p>'}
-async function load(){const r=await fetch(getApiUrl("/api/admin/eventos"),{headers:auth()});const d=await r.json().catch(()=>({}));if(r.status===401){location.href="/auth.html?next=/admineventos";return}if(!r.ok)throw new Error(d.error||"Falha ao carregar eventos.");state=d;render()}
-async function openUser(userId){activeUserId=userId;$("eventModal").classList.remove("hidden");document.body.style.overflow="hidden";$("modalTitle").textContent="Carregando…";const r=await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(userId)}`),{headers:auth()});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Falha ao carregar o contratado.");activeDetail=d;const a=d.term.answers||{},w=d.workflow||{};$("modalUser").textContent=`${d.user.name||"Contratado"} · @${d.user.username||"usuário"}`;$("modalTitle").textContent=a.igreja||"Evento";$("modalMeta").textContent=`${date(d.term.eventDate)} · ${d.term.eventTime||"horário a definir"} · ${a.cidade||"cidade a definir"}`;$("adminPdf").href=d.term.pdfUrl;const video=w.promoVideo;$("currentVideo").classList.toggle("hidden",!video);if(video)$("currentVideo").href=video.url;$("adminExpenseNotes").innerHTML=(w.expenseNotes||[]).map(n=>`<article class="task expense-note-card"><div class="task-top"><div><strong>${esc(n.title)}</strong><p>${esc(expenseCategory(n))}</p></div><strong>${esc(n.amount)}</strong></div><button class="button secondary" type="button" data-expense-file="${esc(n.fileUrl)}">Abrir ${esc(n.fileName||"nota")}</button></article>`).join("")||'<p class="empty">Nenhuma nota adicionada.</p>';$("adminPayments").innerHTML=(w.payments||[]).map(p=>{const [cls,label]=sm(p.status),title=p.order===1?"Sinal do evento":"Pagamento final";return`<article class="task"><div class="task-top"><div><strong>${title}</strong><p>Prazo: ${date(p.dueDate)}</p></div><span class="status ${cls}">${label}</span></div><strong class="price">${esc(p.amount)}</strong>${p.status==="REVIEW"?`<button class="button green confirm-payment" data-payment="${p.id}">Dar baixa</button>`:p.status==="CONFIRMED"?'<button class="button green" disabled>Confirmado</button>':'<button class="button secondary" disabled>Ainda não informado</button>'}</article>`}).join("");const l=w.lodging||{},items=[["Hotel",l.hotelName],["Telefone",l.phone],["Endereço",l.address],["Check-in",date(l.checkIn)],["Check-out",date(l.checkOut)],["Observações",l.notes]];$("hotelInfo").innerHTML=items.map(([k,v])=>`<div class="info"><small>${k}</small><strong>${esc(v||"—")}</strong></div>`).join("");$("confirmHotel").classList.toggle("hidden",l.status!=="REVIEW");$("hotelAdminFeedback").textContent=l.status==="CONFIRMED"?"Hospedagem confirmada.":l.status==="REVIEW"?"Aguardando sua conferência.":"O contratado ainda não enviou os dados.";await load()}
-function closeModal(){$("eventModal").classList.add("hidden");document.body.style.overflow="";history.replaceState(null,"","/admineventos");activeUserId="";activeDetail=null}$("usersBody").addEventListener("click",e=>{const row=e.target.closest("[data-user]");if(row)openUser(row.dataset.user).catch(e=>alert(e.message))});$("closeModal").addEventListener("click",closeModal);$("refreshBtn").addEventListener("click",()=>load().catch(e=>alert(e.message)));
-async function openExpenseDocument(button){const preview=window.open("","_blank");button.disabled=true;try{const response=await fetch(getApiUrl(button.dataset.expenseFile),{headers:auth()});if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||"Falha ao abrir a nota.")}const url=URL.createObjectURL(await response.blob());if(preview)preview.location.href=url;else{const link=document.createElement("a");link.href=url;link.target="_blank";link.click()}window.setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(error){if(preview)preview.close();alert(error.message)}finally{button.disabled=false}}
-$("adminExpenseNotes").addEventListener("click",event=>{const button=event.target.closest("[data-expense-file]");if(button)openExpenseDocument(button)});
-$("adminPayments").addEventListener("click",async e=>{const b=e.target.closest("[data-payment]");if(!b)return;b.disabled=true;const r=await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(activeUserId)}/payments/${encodeURIComponent(b.dataset.payment)}`),{method:"PATCH",headers:auth()});const d=await r.json().catch(()=>({}));if(!r.ok){b.disabled=false;alert(d.error||"Falha ao dar baixa.");return}await openUser(activeUserId)});$("confirmHotel").addEventListener("click",async()=>{const r=await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(activeUserId)}/lodging`),{method:"PATCH",headers:auth()});const d=await r.json().catch(()=>({}));if(!r.ok){$("hotelAdminFeedback").textContent=d.error||"Falha ao confirmar.";return}await openUser(activeUserId)});
-$("uploadVideo").addEventListener("click",async()=>{const file=$("videoFile").files?.[0];if(!file){$("videoFeedback").textContent="Escolha um vídeo.";return}$("uploadVideo").disabled=true;$("videoFeedback").textContent="Enviando ao R2…";try{const r=await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(activeUserId)}/video`),{method:"PUT",headers:auth({"Content-Type":file.type||"video/mp4","X-File-Name":encodeURIComponent(file.name)}),body:file});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Falha no envio.");$("videoFeedback").textContent="Vídeo disponível para o contratado.";await openUser(activeUserId)}catch(e){$("videoFeedback").textContent=e.message}finally{$("uploadVideo").disabled=false}});
-$("couponForm").addEventListener("submit",async e=>{e.preventDefault();$("couponFeedback").textContent="Criando página…";const transportAmountCents=Math.round(Number($("transportValue").value||0)*100),body={pageSlug:$("couponCode").value,discountCents:Math.round(Number($("discountValue").value||0)*100),presentationKey:$("presentationSelect").value,eventCount:Number($("eventCount").value||1),freeTransport:transportAmountCents===0,transportAmountCents,freeLodging:$("freeLodging").checked};const r=await fetch(getApiUrl("/api/admin/eventos/pages"),{method:"POST",headers:auth({"Content-Type":"application/json"}),body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok){$("couponFeedback").textContent=d.error||"Falha ao criar a página.";return}e.target.reset();$("eventCount").value=1;$("transportValue").value=0;$("couponFeedback").textContent=`Página ${d.page?.pagePath||"personalizada"} criada.`;await load()});$("couponList").addEventListener("click",e=>{const button=e.target.closest("[data-add-note]");if(!button)return;const page=(state.pages||[]).find(item=>String(item.id)===String(button.dataset.addNote));if(page)openExpenseFlow(page)});load().then(()=>{const user=new URLSearchParams(location.search).get("user");if(user)openUser(user).catch(e=>alert(e.message))}).catch(e=>$("usersBody").innerHTML=`<tr><td colspan="5" class="empty">${esc(e.message)}</td></tr>`);
-function renderExpenseStep(){document.querySelectorAll("[data-expense-step]").forEach(section=>section.classList.toggle("hidden",Number(section.dataset.expenseStep)!==expenseStep));document.querySelectorAll("#expenseProgress span").forEach((dot,index)=>dot.classList.toggle("active",index<expenseStep));$("expenseBack").classList.toggle("hidden",expenseStep===1);$("expenseNext").textContent=expenseStep===3?"Adicionar Nota":"Avançar";$("expenseFeedback").textContent=""}
-function openExpenseFlow(page){const users=(state.users||[]).filter(user=>user.termId),code=String(page.code||"").toUpperCase(),matched=users.filter(user=>String(user.couponCode||"").toUpperCase()===code),choices=matched.length?matched:users;expenseDraft={page,userId:matched.length===1?matched[0].userId:"",file:null,amountCents:0,category:""};expenseStep=1;$("expenseUser").innerHTML=`<option value="">${choices.length?"Escolha o evento":"Nenhum evento disponível"}</option>`+choices.map(user=>`<option value="${esc(user.userId)}">${esc(user.name)} · @${esc(user.username)}</option>`).join("");$("expenseUser").value=expenseDraft.userId;$("expenseFile").value="";$("expenseFileName").textContent="Nenhum arquivo selecionado";$("expenseTitle").value="";$("expenseValue").value="";$("expenseOther").value="";$("expenseOther").classList.add("hidden");document.querySelectorAll(".expense-category").forEach(button=>button.classList.remove("selected"));renderExpenseStep();$("expenseFlow").classList.remove("hidden");document.body.style.overflow="hidden"}
-function closeExpenseFlow(){$("expenseFlow").classList.add("hidden");document.body.style.overflow=""}
-$("closeExpenseFlow").addEventListener("click",closeExpenseFlow);
-$("expenseUser").addEventListener("change",event=>expenseDraft.userId=event.target.value);
-$("expenseFile").addEventListener("change",event=>{expenseDraft.file=event.target.files?.[0]||null;$("expenseFileName").textContent=expenseDraft.file?expenseDraft.file.name:"Nenhum arquivo selecionado"});
-$("expenseValue").addEventListener("input",event=>{const digits=event.target.value.replace(/\D/g,"").slice(0,11);expenseDraft.amountCents=Number(digits||0);event.target.value=digits?new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}).format(expenseDraft.amountCents/100):""});
-$("expenseCategories").addEventListener("click",event=>{const button=event.target.closest("[data-category]");if(!button)return;expenseDraft.category=button.dataset.category;document.querySelectorAll(".expense-category").forEach(item=>item.classList.toggle("selected",item===button));$("expenseOther").classList.toggle("hidden",expenseDraft.category!=="OTHER");if(expenseDraft.category==="OTHER")$("expenseOther").focus()});
-$("expenseBack").addEventListener("click",()=>{if(expenseStep>1){expenseStep-=1;renderExpenseStep()}});
-$("expenseNext").addEventListener("click",async()=>{if(expenseStep===1){expenseDraft.userId=$("expenseUser").value;if(!expenseDraft.userId){alert("Escolha o evento do contratante.");return}if(!expenseDraft.file){alert("Escolha a foto ou o arquivo da nota.");return}if(expenseDraft.file.size>20*1024*1024){alert("O arquivo precisa ter no máximo 20 MB.");return}expenseStep=2;renderExpenseStep();$("expenseTitle").focus();return}if(expenseStep===2){const title=$("expenseTitle").value.replace(/\s+/g," ").trim();if(title.length<2){alert("Escreva um título único para a nota.");return}if(expenseDraft.amountCents<1){alert("Informe o valor da nota.");return}expenseStep=3;renderExpenseStep();return}const otherLabel=$("expenseOther").value.replace(/\s+/g," ").trim();if(!expenseDraft.category){$("expenseFeedback").textContent="Escolha uma categoria.";return}if(expenseDraft.category==="OTHER"&&!otherLabel){$("expenseFeedback").textContent="Conte o que é este Outros.";$("expenseOther").focus();return}const button=$("expenseNext"),file=expenseDraft.file;button.disabled=true;$("expenseFeedback").textContent="Enviando nota…";try{const contentType=file.type||(/\.pdf$/i.test(file.name)?"application/pdf":"image/jpeg"),response=await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(expenseDraft.userId)}/expense-notes`),{method:"PUT",headers:auth({"Content-Type":contentType,"X-File-Name":encodeURIComponent(file.name),"X-Note-Title":encodeURIComponent($("expenseTitle").value.trim()),"X-Note-Amount-Cents":String(expenseDraft.amountCents),"X-Note-Category":expenseDraft.category,"X-Note-Other-Label":encodeURIComponent(otherLabel)}),body:file}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Falha ao adicionar a nota.");$("expenseFeedback").textContent="Nota adicionada e liberada para o contratante.";await load();window.setTimeout(closeExpenseFlow,650)}catch(error){$("expenseFeedback").textContent=error.message}finally{button.disabled=false}});
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Central de Eventos | Turma do Printy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/eventos-ui.css">
+</head>
+<body>
+  <div class="page-loader" id="adminLoading">
+    <div>
+      <div class="loader-mark"></div>
+      <strong>Preparando a central de eventos</strong>
+    </div>
+  </div>
 
-const transportEditor=document.createElement("div");
-transportEditor.className="modal hidden";
-transportEditor.style.zIndex="90";
-transportEditor.innerHTML=`<div class="modal-shell"><div class="modal-top"><span class="eyebrow">Editar página personalizada</span><button class="button secondary" id="closeTransportEditor">Fechar</button></div><section class="modal-section"><h2 id="transportEditorTitle">Condição comercial</h2><p class="panel-copy">O valor 0 deixa o transporte sem cobrança. A rota é opcional.</p><form id="transportEditorForm"><div class="coupon-form" style="margin-top:16px"><label class="field">Desconto em reais<input id="editDiscount" type="number" min=".01" step=".01" required></label><label class="field">Apresentação<select id="editPresentation" required></select></label><label class="field">Nº de eventos<input id="editEventCount" type="number" min="1" max="20" required></label><label class="field">Valor do transporte<input id="editTransportAmount" type="number" min="0" step=".01" required></label></div><div class="checks"><label class="check"><input id="editFreeLodging" type="checkbox">Livre de hospedagem</label></div><div class="coupon-form" id="routeEditor"><label class="field">Tipo do transporte<select id="editTripType"><option value="ONE_WAY">Trecho</option><option value="ROUND_TRIP">Ida e volta</option></select></label><label class="field">Cidade A<input id="editCityA" maxlength="120"></label><label class="field">Cidade B<input id="editCityB" maxlength="120"></label></div><button class="button green" style="margin-top:16px" type="submit">Salvar página</button><p class="feedback" id="transportEditorFeedback"></p></form></section></div>`;
-document.body.appendChild(transportEditor);
-let editingTransportCoupon=null;
-function openTransportEditor(page){editingTransportCoupon=page;document.getElementById("transportEditorTitle").textContent=`Página ${page.pagePath||`/${String(page.code||"").toLowerCase()}`}`;document.getElementById("editPresentation").innerHTML=(state.presentations||[]).map(p=>`<option value="${p.key}">${p.name}</option>`).join("");document.getElementById("editDiscount").value=(Number(page.discountCents||0)/100).toFixed(2);document.getElementById("editPresentation").value=page.presentationKey;document.getElementById("editEventCount").value=page.eventCount;document.getElementById("editTransportAmount").value=(Number(page.transportAmountCents||0)/100).toFixed(2);document.getElementById("editTripType").value=page.transportTripType||"ONE_WAY";document.getElementById("editCityA").value=page.transportCityA||"";document.getElementById("editCityB").value=page.transportCityB||"";document.getElementById("editFreeLodging").checked=Boolean(page.freeLodging);document.getElementById("transportEditorFeedback").textContent=page.transportDescription||"";transportEditor.classList.remove("hidden")}
-function decorateCouponPencils(){document.querySelectorAll("#couponList .coupon").forEach((card,index)=>{if(card.querySelector(".transport-pencil"))return;const page=state.pages[index];if(!page)return;const pencil=document.createElement("button");pencil.type="button";pencil.className="button secondary transport-pencil";pencil.textContent="Editar";pencil.title="Editar condição comercial e transporte";pencil.addEventListener("click",()=>openTransportEditor(page));card.querySelector(".coupon-actions")?.appendChild(pencil)})}
-new MutationObserver(decorateCouponPencils).observe(document.getElementById("couponList"),{childList:true});
-document.getElementById("closeTransportEditor").addEventListener("click",()=>transportEditor.classList.add("hidden"));
-document.getElementById("transportEditorForm").addEventListener("submit",async event=>{event.preventDefault();if(!editingTransportCoupon)return;const feedback=document.getElementById("transportEditorFeedback");feedback.textContent="Salvando…";const transportAmountCents=Math.round(Number(document.getElementById("editTransportAmount").value||0)*100),body={discountCents:Math.round(Number(document.getElementById("editDiscount").value||0)*100),presentationKey:document.getElementById("editPresentation").value,eventCount:Number(document.getElementById("editEventCount").value||1),freeTransport:transportAmountCents===0,transportAmountCents,transportTripType:document.getElementById("editTripType").value,transportCityA:document.getElementById("editCityA").value,transportCityB:document.getElementById("editCityB").value,freeLodging:document.getElementById("editFreeLodging").checked};const response=await fetch(getApiUrl(`/api/admin/eventos/pages/${editingTransportCoupon.id}`),{method:"PATCH",headers:auth({"Content-Type":"application/json"}),body:JSON.stringify(body)});const data=await response.json().catch(()=>({}));if(!response.ok){feedback.textContent=data.error||"Falha ao salvar a página.";return}transportEditor.classList.add("hidden");await load();decorateCouponPencils()});
-window.setTimeout(decorateCouponPencils,500);
-function decorateAdminPaymentAmounts(){const payments=activeDetail?.workflow?.payments||[];document.querySelectorAll("#adminPayments .task").forEach((card,index)=>{card.querySelector(".admin-payment-progress")?.remove();const payment=payments[index];if(!payment)return;const info=document.createElement("p");info.className="admin-payment-progress";info.style.color="#dce8f7";info.textContent=payment.status==="REVIEW"?`Informado agora: ${payment.reportedAmount}`:`Pago: ${payment.paid} ? Saldo: ${payment.remaining}`;const button=card.querySelector("button");if(button)card.insertBefore(info,button);else card.appendChild(info)})}
-new MutationObserver(decorateAdminPaymentAmounts).observe(document.getElementById("adminPayments"),{childList:true});
-</script></body></html>
+  <div class="hidden" id="adminApp">
+    <header class="app-topbar">
+      <div class="app-shell app-topbar__inner">
+        <a class="brand" href="/admineventos" aria-label="Central de eventos">
+          <span class="brand__mark">TP</span>
+          <span class="brand__copy">
+            <strong>Turma do Printy</strong>
+            <span>Operação de eventos</span>
+          </span>
+        </a>
+        <div class="topbar-actions">
+          <button class="button button--secondary" id="refreshBtn" type="button">
+            <span>Atualizar dados</span>
+            <b aria-hidden="true">↻</b>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-shell page-main">
+      <section class="page-heading" aria-labelledby="adminPageTitle">
+        <div class="page-heading__copy">
+          <p class="eyebrow">Central operacional</p>
+          <h1 class="page-title" id="adminPageTitle">Eventos sob controle.</h1>
+          <p class="page-description">Acompanhe oportunidades, resolva pendências e entre na sala de cada evento sem perder o contexto.</p>
+        </div>
+        <a class="button button--primary" href="#paginas-comerciais">Criar página comercial</a>
+      </section>
+
+      <section class="metrics-grid" aria-label="Visão geral da operação">
+        <article class="metric-card">
+          <div class="metric-card__top"><span>Pessoas no fluxo</span><span class="metric-card__icon">◎</span></div>
+          <strong id="metricPeople">—</strong>
+          <small>com acesso à proposta ou termo</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-card__top"><span>Acessos acumulados</span><span class="metric-card__icon">↗</span></div>
+          <strong id="metricAccesses">—</strong>
+          <small>aberturas das páginas comerciais</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-card__top"><span>Eventos confirmados</span><span class="metric-card__icon">✓</span></div>
+          <strong id="metricScheduled">—</strong>
+          <small>contratantes que chegaram ao painel</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-card__top"><span>Exigem atenção</span><span class="metric-card__icon">!</span></div>
+          <strong id="metricAttention">—</strong>
+          <small>novas movimentações dos contratantes</small>
+        </article>
+      </section>
+
+      <section class="surface" id="eventos">
+        <header class="surface__header">
+          <div>
+            <p class="section-kicker">Operação</p>
+            <h2>Eventos e oportunidades</h2>
+            <p>Abra uma linha para acessar pagamentos, documentos, despesas, materiais e logística.</p>
+          </div>
+        </header>
+        <div class="surface__body">
+          <div class="toolbar">
+            <label class="search-box">
+              <span class="hidden">Buscar evento</span>
+              <input id="eventSearch" type="search" placeholder="Buscar igreja, contratante ou usuário">
+            </label>
+            <div class="segmented" id="eventFilters" aria-label="Filtrar eventos">
+              <button class="active" type="button" data-filter="all">Todos</button>
+              <button type="button" data-filter="attention">Atenção</button>
+              <button type="button" data-filter="scheduled">Confirmados</button>
+              <button type="button" data-filter="open">Em negociação</button>
+            </div>
+          </div>
+          <div class="table-wrap" style="margin-top: 14px">
+            <table class="event-table">
+              <thead>
+                <tr>
+                  <th>Evento</th>
+                  <th>Etapa atual</th>
+                  <th>Condição comercial</th>
+                  <th>Última atividade</th>
+                  <th>Situação</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="usersBody">
+                <tr><td colspan="6"><div class="empty-state">Carregando eventos…</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state hidden" id="eventsEmpty">Nenhum evento corresponde a esta busca.</div>
+        </div>
+      </section>
+
+      <section class="surface" id="paginas-comerciais">
+        <header class="surface__header">
+          <div>
+            <p class="section-kicker">Aquisição e proposta</p>
+            <h2>Páginas comerciais</h2>
+            <p>Endereços personalizados levam apresentação, quantidade, desconto e logística diretamente para o termo.</p>
+          </div>
+        </header>
+        <div class="surface__body commercial-layout">
+          <form class="commercial-form" id="couponForm">
+            <h3 class="form-title">Nova página personalizada</h3>
+            <p class="form-copy">Defina a condição uma vez. O contratante recebe tudo pronto ao abrir o endereço.</p>
+            <div class="form-grid">
+              <label class="field full">Endereço da página
+                <input class="field-control" id="couponCode" maxlength="40" placeholder="/nome-do-evento" required>
+              </label>
+              <label class="field">Apresentação
+                <select class="field-control" id="presentationSelect" required></select>
+              </label>
+              <label class="field">Número de eventos
+                <input class="field-control" id="eventCount" type="number" min="1" max="20" value="1" required>
+              </label>
+              <label class="field">Desconto em reais
+                <input class="field-control" id="discountValue" type="number" min=".01" step=".01" required>
+              </label>
+              <label class="field">Transporte
+                <input class="field-control" id="transportValue" type="number" min="0" step=".01" value="0" required>
+                <small>Use zero quando não houver cobrança.</small>
+              </label>
+            </div>
+            <label class="checkbox-field"><input id="freeLodging" type="checkbox"> Hospedagem sem cobrança</label>
+            <button class="button button--success button--wide" type="submit">Criar página comercial</button>
+            <p class="feedback" id="couponFeedback"></p>
+          </form>
+
+          <div>
+            <div class="commercial-list" id="commercialList"></div>
+            <div class="empty-state hidden" id="commercialEmpty">Nenhuma página comercial criada.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <section class="fullscreen-dialog hidden" id="eventRoom" role="dialog" aria-modal="true" aria-labelledby="roomTitle">
+    <div class="dialog-shell">
+      <header class="dialog-topbar">
+        <div class="dialog-title-group">
+          <p class="eyebrow">Sala do evento</p>
+          <h1 id="roomAccount">Carregando contratante…</h1>
+        </div>
+        <button class="button button--secondary" id="closeEventRoom" type="button">Fechar sala</button>
+      </header>
+
+      <section class="room-hero">
+        <div class="room-hero__grid">
+          <div>
+            <p class="section-kicker">Evento contratado</p>
+            <h2 id="roomTitle">Carregando…</h2>
+            <div class="meta-row" id="roomMeta"></div>
+          </div>
+          <div class="action-cluster"><span class="status-pill status-pill--scheduled" id="roomStatus">Confirmado</span><button class="button button--success" id="roomAddExpense" type="button">Adicionar nota</button></div>
+        </div>
+      </section>
+
+      <div class="room-layout">
+        <nav class="room-nav" aria-label="Áreas da sala do evento">
+          <a href="#roomOverview">Visão geral</a>
+          <a href="#roomPayments">Financeiro</a>
+          <a href="#roomExpenses">Notas de consumo</a>
+          <a href="#roomMaterials">Materiais</a>
+          <a href="#roomLogistics">Logística</a>
+          <a href="#roomDocuments">Documentos</a>
+        </nav>
+
+        <div>
+          <section class="content-section" id="roomOverview">
+            <header class="content-section__header">
+              <div><h2>Visão geral</h2><p>As informações essenciais para tomar decisões rapidamente.</p></div>
+            </header>
+            <div class="info-grid">
+              <article class="info-card"><small>Contratante</small><strong id="overviewUser">—</strong></article>
+              <article class="info-card"><small>Apresentação</small><strong id="overviewPresentation">—</strong></article>
+              <article class="info-card"><small>Valor contratado</small><strong id="overviewPrice">—</strong></article>
+              <article class="info-card"><small>Acessos à proposta</small><strong id="overviewAccess">—</strong></article>
+              <article class="info-card"><small>Tempo de interesse</small><strong id="overviewTime">—</strong></article>
+              <article class="info-card"><small>Página de origem</small><strong id="overviewPage">—</strong></article>
+            </div>
+          </section>
+
+          <section class="content-section" id="roomPayments">
+            <header class="content-section__header">
+              <div><h2>Financeiro do evento</h2><p>Confira valores informados e dê baixa apenas depois de validar o recebimento.</p></div>
+            </header>
+            <div class="card-grid" id="adminPayments"></div>
+          </section>
+
+          <section class="content-section" id="roomExpenses">
+            <header class="content-section__header">
+              <div><h2>Notas de consumo</h2><p>Documentos de hospedagem, alimentação, combustível, pedágio e outros consumos.</p></div>
+            </header>
+            <div class="card-grid" id="adminExpenseNotes"></div>
+          </section>
+
+          <section class="content-section" id="roomMaterials">
+            <header class="content-section__header">
+              <div><h2>Materiais para divulgação</h2><p>O vídeo enviado aqui aparece imediatamente no painel do contratante.</p></div>
+            </header>
+            <div class="upload-box">
+              <input id="videoFile" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v">
+              <div class="action-cluster" style="justify-content: flex-start">
+                <button class="button button--primary" id="uploadVideo" type="button">Enviar vídeo</button>
+                <a class="button button--secondary hidden" id="currentVideo" target="_blank" rel="noopener">Abrir vídeo atual</a>
+              </div>
+              <p class="feedback" id="videoFeedback"></p>
+            </div>
+          </section>
+
+          <section class="content-section" id="roomLogistics">
+            <header class="content-section__header">
+              <div><h2>Hospedagem e logística</h2><p>Dados enviados pelo contratante para conferência da equipe.</p></div>
+              <span class="status-pill status-pill--pending" id="adminLodgingStatus">Pendente</span>
+            </header>
+            <div class="info-grid" id="hotelInfo"></div>
+            <button class="button button--success hidden" id="confirmHotel" type="button" style="margin-top: 14px">Confirmar hospedagem</button>
+            <p class="feedback" id="hotelAdminFeedback"></p>
+          </section>
+
+          <section class="content-section" id="roomDocuments">
+            <header class="content-section__header">
+              <div><h2>Documentos do contrato</h2><p>Registro integral das condições e informações aceitas pelo contratante.</p></div>
+            </header>
+            <a class="button button--secondary" id="adminPdf" target="_blank">Abrir termo em PDF</a>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fullscreen-dialog expense-flow hidden" id="expenseFlow" role="dialog" aria-modal="true" aria-labelledby="expenseFlowTitle">
+    <div class="expense-flow__shell">
+      <header class="dialog-topbar">
+        <div>
+          <p class="eyebrow">Adicionar nota</p>
+          <div class="step-progress" id="expenseProgress"><span class="active"></span><span></span><span></span></div>
+        </div>
+        <button class="button button--secondary" id="closeExpenseFlow" type="button">Fechar</button>
+      </header>
+
+      <div>
+        <section class="expense-step" data-expense-step="1">
+          <h2 id="expenseFlowTitle">Envie o comprovante.</h2>
+          <p>Escolha o evento correto e adicione uma foto ou PDF. O arquivo ficará disponível no painel do contratante.</p>
+          <div class="inline-notice" id="expenseEventName" style="margin-bottom: 16px">Evento selecionado</div>
+          <label class="file-picker">
+            <input id="expenseFile" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf">
+            <span>
+              <span class="file-picker__icon">+</span>
+              <strong>Selecionar foto ou arquivo</strong>
+              <small>JPG, PNG, WebP, HEIC ou PDF · até 20 MB</small>
+              <span class="file-picker__name" id="expenseFileName">Nenhum arquivo selecionado</span>
+            </span>
+          </label>
+        </section>
+
+        <section class="expense-step hidden" data-expense-step="2">
+          <h2>Dê nome e valor.</h2>
+          <p>Use um título que identifique esta nota sem dúvida. Ele não poderá se repetir no mesmo evento.</p>
+          <label class="field title-input">Título único
+            <input class="field-control" id="expenseTitle" maxlength="120" placeholder="Ex.: Almoço da equipe · sábado">
+          </label>
+          <label class="field">Valor da nota
+            <input class="money-input" id="expenseValue" type="text" inputmode="numeric" autocomplete="off" placeholder="0,00">
+          </label>
+        </section>
+
+        <section class="expense-step hidden" data-expense-step="3">
+          <h2>Classifique o consumo.</h2>
+          <p>A categoria organiza a leitura administrativa e ajuda o contratante a entender o lançamento.</p>
+          <div class="category-grid" id="expenseCategories">
+            <button class="category-option" type="button" data-category="LODGING">Hospedagem</button>
+            <button class="category-option" type="button" data-category="FOOD">Alimentação</button>
+            <button class="category-option" type="button" data-category="FUEL">Combustível</button>
+            <button class="category-option" type="button" data-category="TOLL">Pedágio</button>
+            <button class="category-option" type="button" data-category="OTHER">Outros</button>
+          </div>
+          <label class="field hidden" id="expenseOtherField" style="margin-top: 14px">O que é este “Outros”?
+            <input class="field-control" id="expenseOther" maxlength="120" placeholder="Descreva o tipo de consumo">
+          </label>
+          <p class="feedback" id="expenseFeedback"></p>
+        </section>
+      </div>
+
+      <footer class="dialog-actions">
+        <button class="button button--secondary hidden" id="expenseBack" type="button">Voltar</button>
+        <button class="button button--success" id="expenseNext" type="button">Avançar</button>
+      </footer>
+    </div>
+  </section>
+
+  <section class="centered-dialog hidden" id="commercialEditor" role="dialog" aria-modal="true" aria-labelledby="commercialEditorTitle">
+    <div class="centered-dialog__card">
+      <header class="centered-dialog__header">
+        <div><p class="eyebrow">Condição comercial</p><h2 id="commercialEditorTitle">Editar página</h2></div>
+        <button class="icon-button" id="closeCommercialEditor" type="button" aria-label="Fechar">×</button>
+      </header>
+      <form id="commercialEditorForm">
+        <div class="form-grid">
+          <label class="field">Desconto em reais<input class="field-control" id="editDiscount" type="number" min=".01" step=".01" required></label>
+          <label class="field">Apresentação<select class="field-control" id="editPresentation" required></select></label>
+          <label class="field">Número de eventos<input class="field-control" id="editEventCount" type="number" min="1" max="20" required></label>
+          <label class="field">Valor do transporte<input class="field-control" id="editTransportAmount" type="number" min="0" step=".01" required></label>
+          <label class="field">Tipo de trajeto<select class="field-control" id="editTripType"><option value="ONE_WAY">Somente ida</option><option value="ROUND_TRIP">Ida e volta</option></select></label>
+          <label class="field">Cidade de origem<input class="field-control" id="editCityA" maxlength="120"></label>
+          <label class="field full">Cidade de destino<input class="field-control" id="editCityB" maxlength="120"></label>
+        </div>
+        <label class="checkbox-field"><input id="editFreeLodging" type="checkbox"> Hospedagem sem cobrança</label>
+        <button class="button button--success button--wide" type="submit">Salvar condição</button>
+        <p class="feedback" id="commercialEditorFeedback"></p>
+      </form>
+    </div>
+  </section>
+
+  <script type="module" src="/admineventos.js"></script>
+</body>
+</html>
