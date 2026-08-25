@@ -413,12 +413,14 @@ $("generatePromoVideo").addEventListener("click", async () => {
   const feedback = $("promoVideoFeedback");
   button.disabled = true;
   button.textContent = "Gerando seu vídeo…";
-  feedback.textContent = "Criando a locução Marin e montando o vídeo. Isso pode levar alguns segundos…";
+  feedback.textContent = "Criando a locução com nossa voz oficial e montando o vídeo. Isso pode levar alguns segundos…";
   try {
     const response = await fetch(getApiUrl("/api/contractor-panel/promo-video/generate"), { method: "POST", headers: auth() });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Não foi possível gerar o vídeo agora.");
-    feedback.textContent = "Vídeo pronto! Você já pode assistir e compartilhar.";
+    feedback.textContent = data.voiceProvider === "elevenlabs"
+      ? "Vídeo pronto com nossa voz oficial! Você já pode assistir e compartilhar."
+      : "Vídeo pronto com a voz de segurança. Você já pode assistir e compartilhar.";
     await load();
   } catch (error) {
     feedback.textContent = error.message;

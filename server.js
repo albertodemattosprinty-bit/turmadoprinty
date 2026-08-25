@@ -93,6 +93,8 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-nano";
 const OPENAI_INSTANT_MODEL = process.env.OPENAI_INSTANT_MODEL || "gpt-4.1-nano";
 const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
+const ELEVENLABS_VOICE_ID = String(process.env.ELEVENLABS_VOICE_ID || "SOYHLrjzK2X1ezoPC6cr").trim();
+const ELEVENLABS_MODEL_ID = String(process.env.ELEVENLABS_MODEL_ID || "eleven_v3").trim();
 const PROJECT200_MARIN_MODEL_LUNA = process.env.PROJECT200_MARIN_MODEL_LUNA || "gpt-5.6-luna";
 const OPENAI_TTS_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "cedar", "marin"]);
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
@@ -10431,7 +10433,8 @@ async function handleContractorPromoVideoGenerate(request, response) {
   if (!authUser) return;
 
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
-  if (!apiKey) {
+  const elevenLabsApiKey = String(process.env.ELEVENLABS_API_KEY || "").trim();
+  if (!elevenLabsApiKey && !apiKey) {
     sendJson(response, 503, { error: "A geração automática de vídeo está temporariamente indisponível." });
     return;
   }
@@ -10452,8 +10455,14 @@ async function handleContractorPromoVideoGenerate(request, response) {
   let uploadedKey = "";
   try {
     const narrationText = buildEventPromoNarration(term);
-    const narrationWav = await synthesizeEventPromoNarration({ apiKey, text: narrationText });
-    const videoBuffer = await composeEventPromoVideo(narrationWav);
+    const narration = await synthesizeEventPromoNarration({
+      apiKey,
+      elevenLabsApiKey,
+      elevenLabsVoiceId: ELEVENLABS_VOICE_ID,
+      elevenLabsModelId: ELEVENLABS_MODEL_ID,
+      text: narrationText
+    });
+    const videoBuffer = await composeEventPromoVideo(narration.audioBuffer);
     if (videoBuffer.length > MAX_EVENT_PROMO_VIDEO_BYTES) {
       throw new Error("O vídeo gerado ultrapassou o limite permitido.");
     }
@@ -10481,7 +10490,12 @@ async function handleContractorPromoVideoGenerate(request, response) {
       ok: true,
       promoVideo,
       narrationText,
-      aiDisclosure: "A locução deste vídeo foi gerada por inteligência artificial com a voz sintética Marin."
+      voiceProvider: narration.provider,
+      voiceId: narration.voiceId,
+      voiceModel: narration.modelId,
+      aiDisclosure: narration.provider === "elevenlabs"
+        ? "A locução deste vídeo foi gerada por inteligência artificial com a voz oficial da Turma do Printy."
+        : "A locução deste vídeo foi gerada por inteligência artificial com a voz sintética de segurança Marin."
     });
   } catch (error) {
     if (uploadedKey) {

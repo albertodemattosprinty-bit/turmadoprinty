@@ -124,8 +124,37 @@ export function buildEventPromoNarration(term) {
   return `Vai ser na ${church}, dia ${day} de ${month}, ${weekdayCopy}, às ${time}.`;
 }
 
-export async function synthesizeEventPromoNarration({ apiKey, text, fetchImpl = fetch }) {
-  if (!apiKey) throw new Error("OPENAI_API_KEY nao configurada para gerar a locucao.");
+async function requestElevenLabsNarration({ apiKey, voiceId, modelId, text, fetchImpl }) {
+  const response = await fetchImpl(
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+        "xi-api-key": apiKey
+      },
+      body: JSON.stringify({
+        text,
+        model_id: modelId,
+        language_code: "pt"
+      }),
+      signal: AbortSignal.timeout(90000)
+    }
+  );
+  if (!response.ok) {
+    const details = await response.text().catch(() => "");
+    throw new Error(details || "A ElevenLabs não conseguiu gerar a locução oficial.");
+  }
+  return {
+    audioBuffer: Buffer.from(await response.arrayBuffer()),
+    provider: "elevenlabs",
+    voiceId,
+    modelId
+  };
+}
+
+async function requestOpenAiNarration({ apiKey, text, fetchImpl }) {
   const response = await fetchImpl("https://api.openai.com/v1/audio/speech", {
     method: "POST",
     headers: {
@@ -143,9 +172,42 @@ export async function synthesizeEventPromoNarration({ apiKey, text, fetchImpl = 
   });
   if (!response.ok) {
     const details = await response.text().catch(() => "");
-    throw new Error(details || "A OpenAI nao conseguiu gerar a locucao Marin.");
+    throw new Error(details || "A OpenAI não conseguiu gerar a locução de segurança.");
   }
-  return Buffer.from(await response.arrayBuffer());
+  return {
+    audioBuffer: Buffer.from(await response.arrayBuffer()),
+    provider: "openai",
+    voiceId: "marin",
+    modelId: "gpt-4o-mini-tts"
+  };
+}
+
+export async function synthesizeEventPromoNarration({
+  apiKey,
+  elevenLabsApiKey,
+  elevenLabsVoiceId = "SOYHLrjzK2X1ezoPC6cr",
+  elevenLabsModelId = "eleven_v3",
+  text,
+  fetchImpl = fetch
+}) {
+  const officialApiKey = String(elevenLabsApiKey || "").trim();
+  const fallbackApiKey = String(apiKey || "").trim();
+  if (officialApiKey) {
+    try {
+      return await requestElevenLabsNarration({
+        apiKey: officialApiKey,
+        voiceId: elevenLabsVoiceId,
+        modelId: elevenLabsModelId,
+        text,
+        fetchImpl
+      });
+    } catch (error) {
+      if (!fallbackApiKey) throw error;
+      console.warn("ElevenLabs indisponível; usando a voz de segurança Marin.", error instanceof Error ? error.message : error);
+    }
+  }
+  if (fallbackApiKey) return requestOpenAiNarration({ apiKey: fallbackApiKey, text, fetchImpl });
+  throw new Error("Configure ELEVENLABS_API_KEY ou OPENAI_API_KEY para gerar a locução.");
 }
 
 function runFfmpeg(args) {
@@ -169,21 +231,21 @@ function runFfmpeg(args) {
   });
 }
 
-export async function composeEventPromoVideo(narrationWav) {
-  if (!Buffer.isBuffer(narrationWav) || narrationWav.length < 44) {
-    throw new Error("A locucao Marin recebida esta vazia.");
+export async function composeEventPromoVideo(narrationAudio) {
+  if (!Buffer.isBuffer(narrationAudio) || narrationAudio.length < 44) {
+    throw new Error("A locucao recebida esta vazia.");
   }
   const workDirectory = await mkdtemp(path.join(tmpdir(), "printy-event-video-"));
-  const narrationPath = path.join(workDirectory, "marin.wav");
+  const narrationPath = path.join(workDirectory, "narration-audio");
   const outputPath = path.join(workDirectory, "video-divulgacao.mp4");
   try {
-    await writeFile(narrationPath, narrationWav);
+    await writeFile(narrationPath, narrationAudio);
     const filter = [
       "[1:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=0.18[music]",
       "[2:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[intro]",
-      "[3:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[marin]",
+      "[3:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[narration]",
       "[4:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[outro]",
-      "[intro][marin][outro]concat=n=3:v=0:a=1[voice]",
+      "[intro][narration][outro]concat=n=3:v=0:a=1[voice]",
       "[music][voice]amix=inputs=2:duration=longest:dropout_transition=0:weights=1 1:normalize=0,alimiter=limit=0.95[audio]"
     ].join(";");
     await runFfmpeg([

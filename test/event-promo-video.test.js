@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildEventPromoNarration, formatEventTimeForSpeech } from "../src/event-promo-video.js";
+import { buildEventPromoNarration, formatEventTimeForSpeech, synthesizeEventPromoNarration } from "../src/event-promo-video.js";
 
 test("converte os horarios do evento para fala natural em 12 horas", () => {
   assert.equal(formatEventTimeForSpeech("6h00am"), "seis da manhã");
@@ -39,4 +39,35 @@ test("aceita data brasileira e usa os campos do termo como fallback", () => {
     eventTime: "6h00am",
     answers: { igreja: "Igreja Batista", dia: "2", mes: "dezembro", ano: "2026" }
   }), expected);
+});
+
+test("usa a voz oficial no ElevenLabs v3 quando a chave está configurada", async () => {
+  let receivedUrl = "";
+  let receivedOptions = null;
+  const result = await synthesizeEventPromoNarration({
+    apiKey: "openai-fallback",
+    elevenLabsApiKey: "eleven-secret",
+    elevenLabsVoiceId: "SOYHLrjzK2X1ezoPC6cr",
+    elevenLabsModelId: "eleven_v3",
+    text: "Vai ser na Igreja Batista.",
+    fetchImpl: async (url, options) => {
+      receivedUrl = url;
+      receivedOptions = options;
+      return {
+        ok: true,
+        arrayBuffer: async () => Uint8Array.from([1, 2, 3, 4]).buffer
+      };
+    }
+  });
+
+  assert.equal(result.provider, "elevenlabs");
+  assert.equal(result.voiceId, "SOYHLrjzK2X1ezoPC6cr");
+  assert.match(receivedUrl, /SOYHLrjzK2X1ezoPC6cr/);
+  assert.match(receivedUrl, /output_format=mp3_44100_128/);
+  assert.equal(receivedOptions.headers["xi-api-key"], "eleven-secret");
+  assert.deepEqual(JSON.parse(receivedOptions.body), {
+    text: "Vai ser na Igreja Batista.",
+    model_id: "eleven_v3",
+    language_code: "pt"
+  });
 });
