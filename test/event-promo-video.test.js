@@ -66,7 +66,7 @@ test("usa a voz oficial no ElevenLabs v3 quando a chave está configurada", asyn
   assert.match(receivedUrl, /output_format=mp3_44100_128/);
   assert.equal(receivedOptions.headers["xi-api-key"], "eleven-secret");
   assert.deepEqual(JSON.parse(receivedOptions.body), {
-    text: "Vai ser na Igreja Batista.",
+    text: "[brazilian accent] [thoughtful] Vai ser na Igreja Batista.",
     model_id: "eleven_v3",
     language_code: "pt"
   });

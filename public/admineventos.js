@@ -567,6 +567,31 @@ $("confirmHotel").addEventListener("click", async () => {
   }
 });
 
+$("generateAdminVideo").addEventListener("click", async () => {
+  if (!activeUserId) return;
+  const button = $("generateAdminVideo");
+  button.disabled = true;
+  button.textContent = "Gerando vídeo…";
+  $("videoFeedback").textContent = "Criando a locução oficial e montando o vídeo. Isso pode levar alguns segundos…";
+  try {
+    const response = await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(activeUserId)}/video/generate`), {
+      method: "POST",
+      headers: auth()
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Não foi possível gerar o vídeo.");
+    await openEventRoom(activeUserId);
+    $("videoFeedback").textContent = data.voiceProvider === "elevenlabs"
+      ? "Vídeo gerado com a voz oficial da Turma do Printy."
+      : "Vídeo gerado com a voz de segurança.";
+  } catch (error) {
+    $("videoFeedback").textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Gerar automaticamente";
+  }
+});
+
 $("uploadVideo").addEventListener("click", async () => {
   const file = $("videoFile").files?.[0];
   if (!file) {

@@ -10949,6 +10949,91 @@ async function handleAdminEventLodgingConfirm(request, response, userId) {
   }
 }
 
+async function handleAdminEventPromoVideoGenerate(request, response, userId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  const elevenLabsApiKey = String(process.env.ELEVENLABS_API_KEY || "").trim();
+  if (!elevenLabsApiKey && !apiKey) {
+    sendJson(response, 503, { error: "A geração automática de vídeo está temporariamente indisponível." });
+    return;
+  }
+
+  const term = await getLatestTermByUserId(userId);
+  if (!term) {
+    sendJson(response, 404, { error: "Termo do evento não encontrado para este contratante." });
+    return;
+  }
+
+  const generationKey = String(term.id);
+  if (eventPromoVideoGenerationJobs.has(generationKey)) {
+    sendJson(response, 409, { error: "Este vídeo já está sendo gerado. Aguarde só mais um momento." });
+    return;
+  }
+
+  eventPromoVideoGenerationJobs.add(generationKey);
+  let uploadedKey = "";
+  try {
+    const narrationText = buildEventPromoNarration(term);
+    const narration = await synthesizeEventPromoNarration({
+      apiKey,
+      elevenLabsApiKey,
+      elevenLabsVoiceId: ELEVENLABS_VOICE_ID,
+      elevenLabsModelId: ELEVENLABS_MODEL_ID,
+      text: narrationText
+    });
+    const videoBuffer = await composeEventPromoVideo(narration.audioBuffer);
+    if (videoBuffer.length > MAX_EVENT_PROMO_VIDEO_BYTES) {
+      throw new Error("O vídeo gerado ultrapassou o limite permitido.");
+    }
+
+    uploadedKey = ["eventos", "contratantes", userId, term.id, "video-automatico-admin-" + Date.now() + ".mp4"].join("/");
+    await getProject200PrivateR2Client().send(new PutObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: uploadedKey,
+      Body: videoBuffer,
+      ContentType: "video/mp4",
+      CacheControl: "private, no-store"
+    }));
+
+    const promoVideo = await saveEventPromoVideo(admin.id, userId, term.id, {
+      key: uploadedKey,
+      url: "/api/event-promo-videos/" + encodeURIComponent(term.id),
+      fileName: "video-divulgacao-automatico.mp4",
+      contentType: "video/mp4",
+      sizeBytes: videoBuffer.length
+    });
+    void recordNarrationUsage(userId, estimateNarrationDurationSeconds(narrationText)).catch(() => {});
+
+    sendJson(response, 201, {
+      ok: true,
+      promoVideo,
+      narrationText,
+      voiceProvider: narration.provider,
+      voiceId: narration.voiceId,
+      voiceModel: narration.modelId,
+      aiDisclosure: narration.provider === "elevenlabs"
+        ? "A locução deste vídeo foi gerada por inteligência artificial com a voz oficial da Turma do Printy."
+        : "A locução deste vídeo foi gerada por inteligência artificial com a voz sintética de segurança Marin."
+    });
+  } catch (error) {
+    if (uploadedKey) {
+      try {
+        await getProject200PrivateR2Client().send(new DeleteObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: uploadedKey }));
+      } catch {
+        // A limpeza não deve esconder o erro principal.
+      }
+    }
+    console.error("Falha ao gerar vídeo automático do evento pelo admin:", error);
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Não foi possível gerar o vídeo agora."
+    });
+  } finally {
+    eventPromoVideoGenerationJobs.delete(generationKey);
+  }
+}
+
 async function handleAdminEventVideoUpload(request, response, userId) {
   const admin = await requireAdmin(request, response);
   if (!admin) return;
@@ -15756,6 +15841,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/lodging$/)) {
     const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/lodging$/, "$1"));
     await handleAdminEventLodgingConfirm(request, response, userId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/video\/generate$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/video\/generate$/, "$1"));
+    await handleAdminEventPromoVideoGenerate(request, response, userId);
     return;
   }
 

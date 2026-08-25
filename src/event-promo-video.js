@@ -135,7 +135,7 @@ async function requestElevenLabsNarration({ apiKey, voiceId, modelId, text, fetc
         "xi-api-key": apiKey
       },
       body: JSON.stringify({
-        text,
+        text: modelId === "eleven_v3" ? `[brazilian accent] [thoughtful] ${text}` : text,
         model_id: modelId,
         language_code: "pt"
       }),
