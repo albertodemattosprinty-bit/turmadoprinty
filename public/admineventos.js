@@ -8,6 +8,7 @@ let activeUserId = "";
 let activeDetail = null;
 let activeFilter = "all";
 let editingPage = null;
+let adminChurchArtworkObjectUrl = "";
 let expenseStep = 1;
 let expenseDraft = { userId: "", file: null, amountCents: 0, category: "" };
 
@@ -194,10 +195,57 @@ function setStatus(element, status) {
   element.textContent = label;
 }
 
+async function renderAdminChurchArtworkPreview(artwork) {
+  const wrap = $("adminChurchArtworkPreviewWrap");
+  const image = $("adminChurchArtworkPreview");
+  if (adminChurchArtworkObjectUrl) {
+    URL.revokeObjectURL(adminChurchArtworkObjectUrl);
+    adminChurchArtworkObjectUrl = "";
+  }
+  wrap.classList.add("hidden");
+  image.removeAttribute("src");
+  if (!artwork?.url) return;
+  try {
+    const response = await fetch(getApiUrl(artwork.url), { headers: auth() });
+    if (!response.ok) throw new Error();
+    adminChurchArtworkObjectUrl = URL.createObjectURL(await response.blob());
+    image.src = adminChurchArtworkObjectUrl;
+    wrap.classList.remove("hidden");
+  } catch {
+    $("adminChurchArtworkFeedback").textContent = "A fachada existe, mas a pr‚via nÆo p“de ser aberta agora.";
+    $("adminChurchArtworkFeedback").textContent = "A fachada existe, mas a pr\u00e9via n\u00e3o p\u00f4de ser aberta agora.";
+  }
+}
+
+function renderAdminChurchArtwork(workflow) {
+  const artwork = workflow.churchArtwork;
+  $("generateAdminChurchArtwork").textContent = artwork ? "Criar uma nova versÆo" : "Criar fachada com IA";
+  $("adminChurchArtworkFeedback").textContent = artwork
+    ? "Fachada pronta. O pr¢ximo v¡deo usar  esta arte durante a locu‡Æo."
+    : "Nenhuma fachada cinematogr fica criada.";
+  void renderAdminChurchArtworkPreview(artwork);
+  $("generateAdminChurchArtwork").textContent = artwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
+  $("adminChurchArtworkFeedback").textContent = artwork
+    ? "Fachada pronta. O pr\u00f3ximo v\u00eddeo usar\u00e1 esta arte durante a locu\u00e7\u00e3o."
+    : "Nenhuma fachada cinematogr\u00e1fica criada.";
+}
+
+
+function normalizeAdminChurchArtworkStaticCopy() {
+  const box = document.querySelector(".church-artwork-box");
+  if (!box) return;
+  box.querySelector("h3").textContent = "Fachada cinematogr\u00e1fica da igreja";
+  box.querySelector("div > p").textContent = "Envie a foto frontal. A arte 16:9 ser\u00e1 usada automaticamente durante a locu\u00e7\u00e3o da ElevenLabs.";
+  $("adminChurchArtworkPreview").alt = "Fachada cinematogr\u00e1fica gerada para o evento";
+  box.querySelector(".ai-disclosure").textContent = "Estimativa por gera\u00e7\u00e3o: US$ 0,04 a US$ 0,08.";
+}
+normalizeAdminChurchArtworkStaticCopy();
+
 function renderEventRoom(data) {
   const summary = getUser(activeUserId) || {};
   const answers = data.term.answers || {};
   const workflow = data.workflow || {};
+  renderAdminChurchArtwork(workflow);
 
   $("roomAccount").textContent = `${data.user.name || "Contratante"} Â· @${data.user.username || "usuÃ¡rio"}`;
   $("roomTitle").textContent = answers.igreja || summary.name || "Evento";
@@ -566,7 +614,72 @@ $("confirmHotel").addEventListener("click", async () => {
     $("confirmHotel").disabled = false;
   }
 });
+$("generateAdminChurchArtwork").addEventListener("click", async () => {
+  if (!activeUserId) return;
+  const file = $("adminChurchPhotoFile").files?.[0];
+  const button = $("generateAdminChurchArtwork");
+  const feedback = $("adminChurchArtworkFeedback");
+  if (!file) {
+    feedback.textContent = "Escolha primeiro uma foto da frente da igreja.";
+    return;
+  }
+  if (file.size > 15 * 1024 * 1024) {
+    feedback.textContent = "A foto precisa ter no m ximo 15 MB.";
+    feedback.textContent = "A foto precisa ter no m\u00e1ximo 15 MB.";
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Criando fachada.";
+  /*
+    feedback.textContent = "A foto precisa ter no m\u00e1ximo 15 MB.";
+  */
+  feedback.textContent = "Gerando a arte 16:9 conforme o hor rio do evento. Isso pode levar at‚ dois minutos.";
+  feedback.textContent = "Gerando a arte 16:9 conforme o hor\u00e1rio do evento. Isso pode levar at\u00e9 dois minutos.";
+  try {
+    const response = await fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(activeUserId)}/church-artwork/generate`), {
+      method: "POST",
+      headers: auth({
+        /*
+  feedback.textContent = "Gerando a arte 16:9 conforme o hor\u00e1rio do evento. Isso pode levar at\u00e9 dois minutos.";
+        */
+        "Content-Type": file.type || "image/jpeg",
+        "X-File-Name": encodeURIComponent(file.name)
+      }),
+      body: file
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "N\u00e3o foi poss\u00edvel criar a fachada.");
+    if (!response.ok) throw new Error(data.error || "NÆo foi poss¡vel criar a fachada.");
+    await openEventRoom(activeUserId);
+    feedback.textContent = "Fachada criada! O pr¢ximo v¡deo mostrar  a arte durante a locu‡Æo da ElevenLabs.";
+    feedback.textContent = "Fachada criada! O pr\u00f3ximo v\u00eddeo mostrar\u00e1 a arte durante a locu\u00e7\u00e3o da ElevenLabs.";
+  } catch (error) {
+    /*
+    feedback.textContent = "Fachada criada! O pr\u00f3ximo v\u00eddeo mostrar\u00e1 a arte durante a locu\u00e7\u00e3o da ElevenLabs.";
+    */
+    /*
+    if (!response.ok) throw new Error(data.error || "N\u00e3o foi poss\u00edvel criar a fachada.");
+    */
+    feedback.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    /*
+    */
+    /*
+    feedback.textContent = "Fachada criada! O pr\u00f3ximo v\u00eddeo mostrar\u00e1 a arte durante a locu\u00e7\u00e3o da ElevenLabs.";
+    */
+    button.textContent = activeDetail?.workflow?.churchArtwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
+    button.textContent = activeDetail?.workflow?.churchArtwork ? "Criar uma nova versÆo" : "Criar fachada com IA";
+    button.textContent = activeDetail?.workflow?.churchArtwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
+  }
+});
 
+/*
+
+*/
+/*
+    button.textContent = activeDetail?.workflow?.churchArtwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
+*/
 $("generateAdminVideo").addEventListener("click", async () => {
   if (!activeUserId) return;
   const button = $("generateAdminVideo");

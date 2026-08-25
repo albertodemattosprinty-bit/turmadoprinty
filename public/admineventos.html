@@ -219,6 +219,22 @@
             <header class="content-section__header">
               <div><h2>Materiais para divulga√ß√£o</h2><p>O v√≠deo enviado aqui aparece imediatamente no painel do contratante.</p></div>
             </header>
+            <div class="upload-box church-artwork-box">
+              <div>
+                <h3>Fachada cinematogr†fica da igreja</h3>
+                <p>Envie a foto frontal. A arte 16:9 ser† usada automaticamente durante a locuá∆o da ElevenLabs.</p>
+              </div>
+              <input id="adminChurchPhotoFile" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
+              <div class="action-cluster" style="justify-content: flex-start">
+                <button class="button button--primary" id="generateAdminChurchArtwork" type="button">Criar fachada com IA</button>
+              </div>
+              <div class="church-artwork-preview hidden" id="adminChurchArtworkPreviewWrap">
+                <img id="adminChurchArtworkPreview" alt="Fachada cinematogr†fica gerada para o evento">
+              </div>
+              <p class="feedback" id="adminChurchArtworkFeedback"></p>
+              <small class="ai-disclosure">Estimativa por geraá∆o: US$ 0,04 a US$ 0,08.</small>
+            </div>
+
             <div class="upload-box">
               <input id="videoFile" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v">
               <div class="action-cluster" style="justify-content: flex-start">

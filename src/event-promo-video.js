@@ -135,7 +135,7 @@ async function requestElevenLabsNarration({ apiKey, voiceId, modelId, text, fetc
         "xi-api-key": apiKey
       },
       body: JSON.stringify({
-        text: modelId === "eleven_v3" ? `[brazilian accent] [thoughtful] ${text}` : text,
+        text: modelId === "eleven_v3" ? `[brasil] Anota aí. ${text}` : text,
         model_id: modelId,
         language_code: "pt"
       }),
@@ -231,7 +231,7 @@ function runFfmpeg(args) {
   });
 }
 
-export async function composeEventPromoVideo(narrationAudio) {
+async function composeEventPromoVideoLegacy(narrationAudio) {
   if (!Buffer.isBuffer(narrationAudio) || narrationAudio.length < 44) {
     throw new Error("A locucao recebida esta vazia.");
   }
@@ -267,6 +267,98 @@ export async function composeEventPromoVideo(narrationAudio) {
   }
 }
 
+
+function probeMediaDuration(filePath) {
+  if (!ffmpegPath) return Promise.reject(new Error("FFmpeg nao esta disponivel neste servidor."));
+  return new Promise((resolve, reject) => {
+    const child = spawn(ffmpegPath, ["-hide_banner", "-i", filePath], { windowsHide: true });
+    let stderr = "";
+    const timeout = setTimeout(() => child.kill("SIGKILL"), 30000);
+    child.stderr.on("data", (chunk) => {
+      stderr = `${stderr}${chunk}`.slice(-16000);
+    });
+    child.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.once("close", () => {
+      clearTimeout(timeout);
+      const match = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+      if (!match) {
+        reject(new Error("Nao foi possivel medir a duracao do audio do video."));
+        return;
+      }
+      resolve((Number(match[1]) * 3600) + (Number(match[2]) * 60) + Number(match[3]));
+    });
+  });
+}
+
+export async function composeEventPromoVideo(narrationAudio, { churchArtwork = null } = {}) {
+  if (!Buffer.isBuffer(narrationAudio) || narrationAudio.length < 44) {
+    throw new Error("A locucao recebida esta vazia.");
+  }
+  if (churchArtwork != null && (!Buffer.isBuffer(churchArtwork) || churchArtwork.length < 100)) {
+    throw new Error("A imagem da igreja recebida esta vazia.");
+  }
+  const workDirectory = await mkdtemp(path.join(tmpdir(), "printy-event-video-"));
+  const narrationPath = path.join(workDirectory, "narration-audio");
+  const artworkPath = path.join(workDirectory, "church-artwork.jpg");
+  const outputPath = path.join(workDirectory, "video-divulgacao.mp4");
+  try {
+    await writeFile(narrationPath, narrationAudio);
+    if (churchArtwork) await writeFile(artworkPath, churchArtwork);
+    const filter = [
+      "[1:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=0.18[music]",
+      "[2:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[intro]",
+      "[3:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[narration]",
+      "[4:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[outro]",
+      "[intro][narration][outro]concat=n=3:v=0:a=1[voice]",
+      "[music][voice]amix=inputs=2:duration=longest:dropout_transition=0:weights=1 1:normalize=0,alimiter=limit=0.95[audio]"
+    ];
+    const ffmpegArgs = [
+      "-hide_banner", "-loglevel", "warning", "-y",
+      "-i", EVENT_PROMO_ASSETS.background,
+      "-stream_loop", "-1", "-i", EVENT_PROMO_ASSETS.music,
+      "-i", EVENT_PROMO_ASSETS.intro,
+      "-i", narrationPath,
+      "-i", EVENT_PROMO_ASSETS.outro
+    ];
+    let videoMap = "0:v:0";
+    let videoCodecArgs = ["-c:v", "copy"];
+    let outputDuration = null;
+    if (churchArtwork) {
+      const [introDuration, narrationDuration, outroDuration] = await Promise.all([
+        probeMediaDuration(EVENT_PROMO_ASSETS.intro),
+        probeMediaDuration(narrationPath),
+        probeMediaDuration(EVENT_PROMO_ASSETS.outro)
+      ]);
+      const frameCount = Math.max(2, Math.ceil(narrationDuration * 30));
+      const fadeDuration = Math.min(0.35, narrationDuration / 4);
+      outputDuration = introDuration + narrationDuration + outroDuration;
+      const fadeOutStart = Math.max(0, narrationDuration - fadeDuration);
+      ffmpegArgs.push("-loop", "1", "-framerate", "30", "-t", narrationDuration.toFixed(3), "-i", artworkPath);
+      filter.push(
+        "[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1[base]",
+        `[5:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,zoompan=z='min(1+on*0.15/${frameCount - 1},1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1280x720:fps=30,trim=duration=${narrationDuration.toFixed(3)},setpts=PTS-STARTPTS,format=rgba,fade=t=in:st=0:d=${fadeDuration.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)}:alpha=1,setpts=PTS+${introDuration.toFixed(3)}/TB[art]`,
+        "[base][art]overlay=eof_action=pass:repeatlast=0:shortest=0[video]"
+      );
+      videoMap = "[video]";
+      videoCodecArgs = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"];
+    }
+    ffmpegArgs.push(
+      "-filter_complex", filter.join(";"),
+      "-map", videoMap, "-map", "[audio]",
+      ...videoCodecArgs, "-c:a", "aac", "-b:a", "192k",
+      ...(outputDuration ? ["-t", outputDuration.toFixed(3)] : []),
+      "-map_metadata", "-1", "-movflags", "+faststart", "-shortest",
+      outputPath
+    );
+    await runFfmpeg(ffmpegArgs);
+    return await readFile(outputPath);
+  } finally {
+    await rm(workDirectory, { recursive: true, force: true });
+  }
+}
 export function getEventPromoAssetPaths() {
   return { ...EVENT_PROMO_ASSETS };
 }

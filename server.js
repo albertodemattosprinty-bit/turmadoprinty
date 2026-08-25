@@ -57,6 +57,8 @@ import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { archiveAdminEventFlow, createEventCoupon, deleteEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, getEventPromoVideoFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
 import { buildEventPromoNarration, composeEventPromoVideo, synthesizeEventPromoNarration } from "./src/event-promo-video.js";
+import { EVENT_CHURCH_IMAGE_DEFAULTS, generateEventChurchArtwork } from "./src/event-church-artwork.js";
+import { getEventChurchArtworkFile, saveEventChurchArtwork } from "./src/event-church-artwork-store.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
@@ -146,6 +148,7 @@ const MIDIA_PLAYBACK_HEARTBEAT_MS = 15 * 1000;
 const MAX_MINI_MEDIA_COVER_BYTES = 15 * 1024 * 1024;
 const MAX_MINI_MEDIA_TRACK_BYTES = 40 * 1024 * 1024;
 const MAX_EVENT_PROMO_VIDEO_BYTES = 250 * 1024 * 1024;
+const MAX_EVENT_CHURCH_PHOTO_BYTES = 15 * 1024 * 1024;
 const MAX_EVENT_EXPENSE_NOTE_BYTES = 20 * 1024 * 1024;
 const MAX_MINI_MEDIA_SCORE_BYTES = 30 * 1024 * 1024;
 const MINI_DOC_KEY_ALL_DOCS = "all-docs";
@@ -164,6 +167,7 @@ let miniMediaDatabaseBootstrapped = false;
 const midiaUploadActivityByIp = new Map();
 const midiaPlaybackClients = new Set();
 const eventPromoVideoGenerationJobs = new Set();
+const eventChurchArtworkGenerationJobs = new Set();
 let midiaPlaybackState = {
   revision: 0,
   action: "pause",
@@ -10400,7 +10404,10 @@ async function handleGetContractorPanel(request, response) {
   try {
     const term = await getLatestTermByUserId(authUser.id);
     if (term) await markContractorPanelReached(authUser.id);
-    const workflow = term ? await getEventContractWorkflow(term) : null;
+    const workflow = term ? {
+      ...await getEventContractWorkflow(term),
+      churchArtwork: toPublicEventChurchArtwork(await getEventChurchArtworkFile(term.id))
+    } : null;
 
     sendJson(response, 200, {
       ok: true,
@@ -10428,6 +10435,194 @@ async function handleGetContractorPanel(request, response) {
   }
 }
 
+
+const EVENT_CHURCH_PHOTO_CONTENT_TYPES = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"
+]);
+
+function toPublicEventChurchArtwork(artwork) {
+  if (!artwork) return null;
+  const { key, ...publicArtwork } = artwork;
+  void key;
+  return publicArtwork;
+}
+
+async function loadEventChurchArtworkBuffer(termId) {
+  const artwork = await getEventChurchArtworkFile(termId);
+  if (!artwork?.key) return null;
+  try {
+    return await readProject200PrivateR2ObjectBuffer(artwork.key);
+  } catch (error) {
+    console.warn("Nao foi possivel carregar a fachada do evento para o video:", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+async function generateAndStoreEventChurchArtwork({ request, actorId, userId, term, generatedByContractor = false }) {
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey) throw new Error("A geracao da fachada esta temporariamente indisponivel.");
+
+  const contentType = String(request.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+  if (!EVENT_CHURCH_PHOTO_CONTENT_TYPES.has(contentType)) {
+    throw new Error("Envie uma foto JPG, PNG, WebP, HEIC ou HEIF da frente da igreja.");
+  }
+  const sourceBuffer = await readBinaryBody(request, MAX_EVENT_CHURCH_PHOTO_BYTES);
+  if (!sourceBuffer?.length) throw new Error("A foto da fachada esta vazia.");
+
+  const generationKey = String(term.id);
+  if (eventChurchArtworkGenerationJobs.has(generationKey)) {
+    const error = new Error("Esta fachada ja esta sendo criada. Aguarde so mais um momento.");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  eventChurchArtworkGenerationJobs.add(generationKey);
+  let uploadedKey = "";
+  try {
+    const previousArtwork = await getEventChurchArtworkFile(term.id);
+    const generated = await generateEventChurchArtwork({
+      apiKey,
+      term,
+      sourceBuffer,
+      model: String(process.env.EVENT_CHURCH_IMAGE_MODEL || EVENT_CHURCH_IMAGE_DEFAULTS.model).trim(),
+      quality: String(process.env.EVENT_CHURCH_IMAGE_QUALITY || EVENT_CHURCH_IMAGE_DEFAULTS.quality).trim(),
+      size: String(process.env.EVENT_CHURCH_IMAGE_SIZE || EVENT_CHURCH_IMAGE_DEFAULTS.size).trim()
+    });
+    uploadedKey = ["eventos", "contratantes", userId, term.id, "fachada-ia-" + Date.now() + ".jpg"].join("/");
+    await getProject200PrivateR2Client().send(new PutObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: uploadedKey,
+      Body: generated.imageBuffer,
+      ContentType: generated.contentType,
+      CacheControl: "private, no-store"
+    }));
+
+    const artwork = await saveEventChurchArtwork(actorId, userId, term.id, {
+      key: uploadedKey,
+      fileName: generated.fileName,
+      contentType: generated.contentType,
+      sizeBytes: generated.imageBuffer.length,
+      period: generated.period,
+      model: generated.model,
+      quality: generated.quality,
+      generatedByContractor
+    });
+    if (previousArtwork?.key && previousArtwork.key !== uploadedKey) {
+      try {
+        await getProject200PrivateR2Client().send(new DeleteObjectCommand({
+          Bucket: R2_PRIVATE_BUCKET,
+          Key: previousArtwork.key
+        }));
+      } catch {
+        // A troca ja foi concluida; a limpeza antiga pode ser tentada depois.
+      }
+    }
+    return {
+      artwork: toPublicEventChurchArtwork(artwork),
+      image: {
+        period: generated.period,
+        model: generated.model,
+        quality: generated.quality,
+        size: generated.size,
+        estimatedTotalCostUsd: generated.estimatedTotalCostUsd
+      }
+    };
+  } catch (error) {
+    if (uploadedKey) {
+      try {
+        await getProject200PrivateR2Client().send(new DeleteObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: uploadedKey }));
+      } catch {
+        // A limpeza nao deve esconder o erro principal.
+      }
+    }
+    throw error;
+  } finally {
+    eventChurchArtworkGenerationJobs.delete(generationKey);
+  }
+}
+
+async function handleContractorChurchArtworkGenerate(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const term = await getLatestTermByUserId(user.id);
+    if (!term) {
+      sendJson(response, 404, { error: "Os dados do seu evento ainda nao foram encontrados. Revise o termo do evento." });
+      return;
+    }
+    const result = await generateAndStoreEventChurchArtwork({
+      request,
+      actorId: user.id,
+      userId: user.id,
+      term,
+      generatedByContractor: true
+    });
+    sendJson(response, 201, { ok: true, ...result });
+  } catch (error) {
+    console.error("Falha ao criar fachada do evento:", error);
+    sendJson(response, Number(error?.statusCode) || 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel criar a fachada agora."
+    });
+  }
+}
+
+async function handleAdminEventChurchArtworkGenerate(request, response, userId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const term = await getLatestTermByUserId(userId);
+    if (!term) {
+      sendJson(response, 404, { error: "Termo do evento nao encontrado para este contratante." });
+      return;
+    }
+    const result = await generateAndStoreEventChurchArtwork({
+      request,
+      actorId: admin.id,
+      userId,
+      term
+    });
+    sendJson(response, 201, { ok: true, ...result });
+  } catch (error) {
+    console.error("Falha ao criar fachada do evento pelo admin:", error);
+    sendJson(response, Number(error?.statusCode) || 400, {
+      error: error instanceof Error ? error.message : "Nao foi possivel criar a fachada agora."
+    });
+  }
+}
+
+async function handleEventChurchArtworkFile(request, response, termId) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const artwork = await getEventChurchArtworkFile(termId);
+    if (!artwork || (!isAdminUser(user) && String(artwork.userId) !== String(user.id))) {
+      sendJson(response, 404, { error: "Fachada nao encontrada." });
+      return;
+    }
+    const result = await getProject200PrivateR2Client().send(new GetObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: artwork.key
+    }));
+    response.writeHead(200, {
+      "Content-Type": String(result.ContentType || artwork.contentType || "image/jpeg"),
+      "Content-Disposition": buildContentDisposition(artwork.fileName).replace(/^attachment/i, "inline"),
+      "Cache-Control": "private, no-store",
+      ...(result.ContentLength != null ? { "Content-Length": String(result.ContentLength) } : {})
+    });
+    if (typeof result.Body?.pipe === "function") {
+      result.Body.on("error", () => response.destroy());
+      result.Body.pipe(response);
+      return;
+    }
+    if (typeof result.Body?.transformToWebStream === "function") {
+      Readable.fromWeb(result.Body.transformToWebStream()).pipe(response);
+      return;
+    }
+    response.end(await result.Body?.transformToByteArray?.());
+  } catch (error) {
+    if (!response.headersSent) sendJson(response, 500, { error: "Nao foi possivel abrir a fachada." });
+  }
+}
 async function handleContractorPromoVideoGenerate(request, response) {
   const authUser = await requireAuth(request, response);
   if (!authUser) return;
@@ -10462,7 +10657,8 @@ async function handleContractorPromoVideoGenerate(request, response) {
       elevenLabsModelId: ELEVENLABS_MODEL_ID,
       text: narrationText
     });
-    const videoBuffer = await composeEventPromoVideo(narration.audioBuffer);
+    const churchArtwork = await loadEventChurchArtworkBuffer(term.id);
+    const videoBuffer = await composeEventPromoVideo(narration.audioBuffer, { churchArtwork });
     if (videoBuffer.length > MAX_EVENT_PROMO_VIDEO_BYTES) {
       throw new Error("O vídeo gerado ultrapassou o limite permitido.");
     }
@@ -10910,7 +11106,10 @@ async function handleAdminEventUserDetail(request, response, userId) {
       sendJson(response, 404, { error: "Esse usuario ainda nao concluiu o termo." });
       return;
     }
-    const workflow = await getEventContractWorkflow(term);
+    const workflow = {
+      ...await getEventContractWorkflow(term),
+      churchArtwork: toPublicEventChurchArtwork(await getEventChurchArtworkFile(term.id))
+    };
     const list = await listAdminEventFlow();
     const summary = list.find((item) => item.userId === userId) || null;
     await markEventUpdatesViewed(userId);
@@ -10983,7 +11182,8 @@ async function handleAdminEventPromoVideoGenerate(request, response, userId) {
       elevenLabsModelId: ELEVENLABS_MODEL_ID,
       text: narrationText
     });
-    const videoBuffer = await composeEventPromoVideo(narration.audioBuffer);
+    const churchArtwork = await loadEventChurchArtworkBuffer(term.id);
+    const videoBuffer = await composeEventPromoVideo(narration.audioBuffer, { churchArtwork });
     if (videoBuffer.length > MAX_EVENT_PROMO_VIDEO_BYTES) {
       throw new Error("O vídeo gerado ultrapassou o limite permitido.");
     }
@@ -14490,8 +14690,19 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/contractor-panel/church-artwork/generate") {
+    await handleContractorChurchArtworkGenerate(request, response);
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/contractor-panel/promo-video/generate") {
     await handleContractorPromoVideoGenerate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/event-church-artworks\/[^/]+$/)) {
+    const termId = decodeURIComponent(pathname.replace(/^\/api\/event-church-artworks\/([^/]+)$/, "$1"));
+    await handleEventChurchArtworkFile(request, response, termId);
     return;
   }
 
@@ -15841,6 +16052,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/lodging$/)) {
     const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/lodging$/, "$1"));
     await handleAdminEventLodgingConfirm(request, response, userId);
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/church-artwork\/generate$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)\/church-artwork\/generate$/, "$1"));
+    await handleAdminEventChurchArtworkGenerate(request, response, userId);
     return;
   }
 

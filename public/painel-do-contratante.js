@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 let term = null;
 let activePayment = null;
 let selectedPaymentAmountCents = 0;
+let churchArtworkObjectUrl = "";
 
 const token = () => localStorage.getItem(TOKEN_KEY) || "";
 const auth = (extra = {}) => ({
@@ -121,7 +122,52 @@ function renderExpenses(workflow) {
   `).join("") || '<div class="empty-state">Ainda n√£o h√° notas de consumo vinculadas ao evento.</div>';
 }
 
+async function renderChurchArtworkPreview(artwork) {
+  const wrap = $("churchArtworkPreviewWrap");
+  const image = $("churchArtworkPreview");
+  if (churchArtworkObjectUrl) {
+    URL.revokeObjectURL(churchArtworkObjectUrl);
+    churchArtworkObjectUrl = "";
+  }
+  wrap.classList.add("hidden");
+  image.removeAttribute("src");
+  if (!artwork?.url) return;
+  try {
+    const response = await fetch(getApiUrl(artwork.url), { headers: auth() });
+    if (!response.ok) throw new Error();
+    churchArtworkObjectUrl = URL.createObjectURL(await response.blob());
+    image.src = churchArtworkObjectUrl;
+    wrap.classList.remove("hidden");
+  } catch {
+    $("churchArtworkFeedback").textContent = "A fachada foi criada, mas a prÇvia n∆o pìde ser aberta agora.";
+    $("churchArtworkFeedback").textContent = "A fachada foi criada, mas a pr\u00e9via n\u00e3o p\u00f4de ser aberta agora.";
+  }
+}
+
+function renderChurchArtwork(workflow) {
+  const artwork = workflow.churchArtwork;
+  $("generateChurchArtwork").textContent = artwork ? "Criar uma nova vers∆o" : "Criar fachada com IA";
+  if (artwork) $("churchArtworkFeedback").textContent = "Fachada pronta. Ela ser† usada durante a locuá∆o do pr¢ximo v°deo.";
+  $("generateChurchArtwork").textContent = artwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
+  if (artwork) $("churchArtworkFeedback").textContent = "Fachada pronta. Ela ser\u00e1 usada durante a locu\u00e7\u00e3o do pr\u00f3ximo v\u00eddeo.";
+  void renderChurchArtworkPreview(artwork);
+}
+
+
+function normalizeChurchArtworkStaticCopy() {
+  const card = document.querySelector(".church-artwork-card");
+  if (!card) return;
+  card.querySelector("h3").textContent = "Fachada cinematogr\u00e1fica da igreja";
+  card.querySelector("div > p").textContent = "Envie uma foto da frente da igreja. A IA cria uma vers\u00e3o 16:9, de dia ou \u00e0 noite conforme o hor\u00e1rio do evento.";
+  card.querySelector(".church-photo-picker strong").textContent = "Escolher foto da fachada";
+  $("churchPhotoName").textContent = "JPG, PNG, WebP ou HEIC - at\u00e9 15 MB";
+  $("churchArtworkPreview").alt = "Fachada cinematogr\u00e1fica gerada para o evento";
+  card.querySelector(".ai-disclosure").textContent = "Gera\u00e7\u00e3o separada e confirmada pelo bot\u00e3o. Custo estimado entre US$ 0,04 e US$ 0,08.";
+}
+normalizeChurchArtworkStaticCopy();
+
 function renderMaterials(workflow) {
+  renderChurchArtwork(workflow);
   const video = workflow.promoVideo;
   const videoUrl = video?.url || "";
   $("generatePromoVideo").textContent = video ? "Gerar novamente" : "Gerar v√≠deo automaticamente";
@@ -407,6 +453,64 @@ $("videoLink").addEventListener("click", (event) => {
     void openPromoVideo(link.dataset.videoFile, link);
   }
 });
+$("churchPhotoFile").addEventListener("change", () => {
+  const file = $("churchPhotoFile").files?.[0];
+  $("churchPhotoName").textContent = file ? file.name : "JPG, PNG, WebP ou HEIC ˙ atÇ 15 MB";
+  $("churchPhotoName").textContent = file ? file.name : "JPG, PNG, WebP ou HEIC - at\u00e9 15 MB";
+});
+/*
+  $("churchPhotoName").textContent = file ? file.name : "JPG, PNG, WebP ou HEIC - at\u00e9 15 MB";
+*/
+
+$("generateChurchArtwork").addEventListener("click", async () => {
+  const file = $("churchPhotoFile").files?.[0];
+  const button = $("generateChurchArtwork");
+  const feedback = $("churchArtworkFeedback");
+  if (!file) {
+    feedback.textContent = "Escolha primeiro uma foto da frente da igreja.";
+    return;
+  }
+  if (file.size > 15 * 1024 * 1024) {
+    /*
+    feedback.textContent = "A foto precisa ter no m†ximo 15 MB.";
+    return;
+    */
+    feedback.textContent = "A foto precisa ter no m\u00e1ximo 15 MB.";
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Criando fachada.";
+  feedback.textContent = "Embelezando a igreja em 16:9 conforme o hor†rio do evento. Isso pode levar atÇ dois minutos.";
+  try {
+  feedback.textContent = "Embelezando a igreja em 16:9 conforme o hor\u00e1rio do evento. Isso pode levar at\u00e9 dois minutos.";
+    const response = await fetch(getApiUrl("/api/contractor-panel/church-artwork/generate"), {
+      method: "POST",
+      headers: auth({
+        "Content-Type": file.type || "image/jpeg",
+        "X-File-Name": encodeURIComponent(file.name)
+      }),
+      body: file
+    });
+    const data = await response.json().catch(() => ({}));
+    /*
+    if (!response.ok) throw new Error(data.error || "N∆o foi poss°vel criar a fachada agora.");
+    */
+    if (!response.ok) throw new Error(data.error || "N\u00e3o foi poss\u00edvel criar a fachada agora.");
+    /*
+    feedback.textContent = "Fachada criada! Agora o pr¢ximo v°deo mostrar† essa arte durante a locuá∆o.";
+    */
+    feedback.textContent = "Fachada criada! Agora o pr\u00f3ximo v\u00eddeo mostrar\u00e1 essa arte durante a locu\u00e7\u00e3o.";
+    await load();
+    feedback.textContent = "Fachada criada! Agora o pr\u00f3ximo v\u00eddeo mostrar\u00e1 essa arte durante a locu\u00e7\u00e3o.";
+  } catch (error) {
+    feedback.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = term?.workflow?.churchArtwork ? "Criar uma nova vers∆o" : "Criar fachada com IA";
+  }
+    button.textContent = term?.workflow?.churchArtwork ? "Criar uma nova vers\u00e3o" : "Criar fachada com IA";
+});
+
 
 $("generatePromoVideo").addEventListener("click", async () => {
   const button = $("generatePromoVideo");

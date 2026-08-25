@@ -112,6 +112,19 @@
               </div>
             </header>
             <div class="card-grid">
+              <article class="item-card church-artwork-card">
+                <div><h3>Fachada cinematogr†fica da igreja</h3><p>Envie uma foto da frente da igreja. A IA cria uma vers∆o 16:9, de dia ou Ö noite conforme o hor†rio do evento.</p></div>
+                <label class="file-picker church-photo-picker">
+                  <input id="churchPhotoFile" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
+                  <span><strong>Escolher foto da fachada</strong><small id="churchPhotoName">JPG, PNG, WebP ou HEIC ˙ atÇ 15 MB</small></span>
+                </label>
+                <button class="button button--primary button--wide" id="generateChurchArtwork" type="button">Criar fachada com IA</button>
+                <div class="church-artwork-preview hidden" id="churchArtworkPreviewWrap">
+                  <img id="churchArtworkPreview" alt="Fachada cinematogr†fica gerada para o evento">
+                </div>
+                <p class="feedback" id="churchArtworkFeedback" role="status" aria-live="polite"></p>
+                <small class="ai-disclosure">Geraá∆o separada e confirmada pelo bot∆o. Custo estimado entre US$ 0,04 e US$ 0,08.</small>
+              </article>
               <article class="item-card promo-video-card">
                 <div><h3>V√≠deo de divulga√ß√£o</h3><p id="videoHint">Gere automaticamente o v√≠deo personalizado do seu evento.</p></div>
                 <button class="button button--primary button--wide" id="generatePromoVideo" type="button">Gerar v√≠deo automaticamente</button>
