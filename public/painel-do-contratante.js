@@ -181,16 +181,24 @@ function renderMaterials(workflow) {
   renderChurchArtwork(workflow);
   const video = workflow.promoVideo;
   const videoUrl = video?.url || "";
-  $("generatePromoVideo").textContent = video ? "Gerar novamente" : "Gerar vídeo automaticamente";
-  $("videoLink").setAttribute("aria-disabled", video ? "false" : "true");
-  $("videoLink").textContent = video ? "Assistir ao vídeo" : "Vídeo ainda não gerado";
-  $("videoHint").textContent = video
+  const videoReady = Boolean(videoUrl);
+  $("generatePromoVideo").textContent = videoReady ? "Gerar novamente" : "Gerar vídeo automaticamente";
+  $("videoLink").disabled = !videoReady;
+  $("videoLink").textContent = videoReady ? "Assistir ao vídeo" : "Vídeo ainda não gerado";
+  $("videoHint").textContent = videoReady
     ? video.fileName || "Seu vídeo personalizado está pronto."
     : "Use o botão abaixo para criar automaticamente o vídeo personalizado do evento.";
   $("videoLink").dataset.videoFile = videoUrl;
-  $("videoLink").href = videoUrl && !videoUrl.startsWith("/api/") ? videoUrl : "#";
-  $("videoLink").removeAttribute("target");
   $("pdfLink").href = term.pdfUrl || "/termo";
+}
+
+function applyGeneratedPromoVideo(video) {
+  if (!video?.url || !term) return false;
+  const workflow = { ...(term.workflow || {}), promoVideo: video };
+  term = { ...term, workflow };
+  renderMaterials(workflow);
+  renderReadiness(term.answers || {}, workflow);
+  return true;
 }
 
 function renderLogistics(answers, workflow) {
@@ -627,10 +635,9 @@ $("expenseNotes").addEventListener("click", (event) => {
   if (button) openExpenseDocument(button);
 });
 
-$("videoLink").addEventListener("click", (event) => {
+$("videoLink").addEventListener("click", () => {
   const link = $("videoLink");
-  if (link.getAttribute("aria-disabled") === "true") { event.preventDefault(); return; }
-  event.preventDefault();
+  if (link.disabled) return;
   void openPromoVideo(link.dataset.videoFile, link);
 });
 $("churchPhotoFile").addEventListener("change", () => {
@@ -699,13 +706,14 @@ $("generatePromoVideo").addEventListener("click", async () => {
   button.textContent = "Gerando seu vídeo…";
   feedback.textContent = "Criando a locução com nossa voz oficial e montando o vídeo. Isso pode levar alguns segundos…";
   try {
-    const response = await fetch(getApiUrl("/api/contractor-panel/promo-video/generate"), { method: "POST", headers: auth() });
+    const generationPath = `/api/contractor-panel/promo-video/generate${term?.id ? `?termId=${encodeURIComponent(term.id)}` : ""}`;
+    const response = await fetch(getApiUrl(generationPath), { method: "POST", headers: auth() });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Não foi possível gerar o vídeo agora.");
+    if (!applyGeneratedPromoVideo(data.promoVideo)) throw new Error("O vídeo foi gerado, mas não pôde ser liberado na tela.");
     feedback.textContent = data.voiceProvider === "elevenlabs"
       ? "Vídeo pronto com nossa voz oficial! Você já pode assistir e compartilhar."
       : "Vídeo pronto com a voz de segurança. Você já pode assistir e compartilhar.";
-    await load();
   } catch (error) {
     feedback.textContent = error.message;
   } finally {

@@ -10638,7 +10638,18 @@ async function handleContractorPromoVideoGenerate(request, response) {
     return;
   }
 
-  const term = await getLatestTermByUserId(authUser.id);
+  const requestUrl = new URL(request.url || "/api/contractor-panel/promo-video/generate", `http://${request.headers.host || "localhost"}`);
+  const requestedTermId = String(requestUrl.searchParams.get("termId") || "").trim();
+  let term = null;
+  if (requestedTermId) {
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedTermId)) {
+      const candidate = await getAllTermById(requestedTermId);
+      if (candidate && String(candidate.userId) === String(authUser.id)) term = candidate;
+    }
+  } else {
+    term = await getLatestTermByUserId(authUser.id);
+  }
+
   if (!term) {
     sendJson(response, 404, { error: "Os dados do seu evento ainda não foram encontrados. Revise o termo do evento." });
     return;
