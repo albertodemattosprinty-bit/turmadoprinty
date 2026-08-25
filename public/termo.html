@@ -1158,6 +1158,7 @@
       answers.transportCityB = pricing.transportCityB || "";
       answers.transportDescription = pricing.transportDescription || "";
       answers.freeLodging = Boolean(pricing.freeLodging);
+      contractorPanelBtn.href = page.path || `/${page.slug || eventPageSlug}`;
       syncPricingPreview();
     }
 
@@ -1397,6 +1398,11 @@
         restartBtn.style.display = needsAccount ? "none" : "inline-flex";
         if (needsAccount) panelUsername.focus();
 
+        if (!needsAccount && activeEventPage?.path) {
+          window.location.replace(activeEventPage.path);
+          return;
+        }
+
 
         showScreen("success");
         currentStep = steps.length + 1;
@@ -1441,10 +1447,15 @@
         localStorage.setItem(sessionStorageKey, data.token);
         currentClaimToken = "";
         accountSetup.hidden = true;
-        successCopy.textContent = "Acesso criado. Agora voce pode baixar o PDF ou abrir o painel do contratante.";
+        successCopy.textContent = activeEventPage?.path
+          ? "Acesso criado. Abrindo a sala do seu evento..."
+          : "Acesso criado. Agora voce pode baixar o PDF ou abrir o painel do contratante.";
         downloadPdfBtn.style.display = currentPdfUrl ? "inline-block" : "none";
         contractorPanelBtn.style.display = "inline-flex";
         restartBtn.style.display = "inline-flex";
+        if (activeEventPage?.path) {
+          window.location.replace(activeEventPage.path);
+        }
       } catch (error) {
         accountSetupFeedback.textContent = error instanceof Error ? error.message : "Falha ao criar o acesso.";
       } finally {

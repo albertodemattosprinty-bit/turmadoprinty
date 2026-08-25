@@ -2,6 +2,14 @@ import { getApiUrl } from "/api.js";
 
 const TOKEN_KEY = "turma_do_printy_token";
 const $ = (id) => document.getElementById(id);
+const panelPathParts = window.location.pathname.split("/").filter(Boolean);
+const dynamicEventPageSlug = panelPathParts.length === 1
+  && !["painel-do-contratante", "painel-do-contratante.html"].includes(panelPathParts[0].toLowerCase())
+  && /^[a-z0-9][a-z0-9-]{2,39}$/i.test(panelPathParts[0])
+  ? panelPathParts[0].toLowerCase()
+  : "";
+const contractorPagePath = dynamicEventPageSlug ? `/${dynamicEventPageSlug}` : "/painel-do-contratante";
+
 
 let term = null;
 let activePayment = null;
@@ -284,15 +292,19 @@ function render(data) {
 }
 
 async function load() {
+  $("contractorHomeLink").href = contractorPagePath;
   if (!token()) {
-    location.href = "/auth.html?next=/painel-do-contratante";
+    location.href = `/auth.html?next=${encodeURIComponent(contractorPagePath)}`;
     return;
   }
-  const response = await fetch(getApiUrl("/api/contractor-panel"), { headers: auth() });
+  const panelApiPath = dynamicEventPageSlug
+    ? `/api/contractor-panel?eventPageSlug=${encodeURIComponent(dynamicEventPageSlug)}`
+    : "/api/contractor-panel";
+  const response = await fetch(getApiUrl(panelApiPath), { headers: auth() });
   const data = await response.json().catch(() => ({}));
   if (response.status === 401) {
     localStorage.removeItem(TOKEN_KEY);
-    location.href = "/auth.html?next=/painel-do-contratante";
+    location.href = `/auth.html?next=${encodeURIComponent(contractorPagePath)}`;
     return;
   }
   if (!response.ok) {
@@ -302,6 +314,13 @@ async function load() {
     throw new Error(message);
   }
   if (!data.panel?.hasTerm) {
+    if (dynamicEventPageSlug) {
+      $("emptyStateTitle").textContent = "Este acesso não está vinculado a este evento.";
+      $("emptyStateCopy").textContent = "Entre com o nome e a senha criados ao finalizar este termo.";
+      $("emptyStateAction").textContent = "Entrar com o acesso do evento";
+      $("emptyStateAction").href = `/auth.html?next=${encodeURIComponent(contractorPagePath)}`;
+      $("emptyStateAction").addEventListener("click", () => localStorage.removeItem(TOKEN_KEY), { once: true });
+    }
     $("contractorLoading").classList.add("hidden");
     $("emptyState").classList.remove("hidden");
     return;

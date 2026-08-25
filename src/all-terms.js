@@ -196,6 +196,10 @@ export async function createAllTermEntry(rawAnswers, userId = null, rawAcceptedT
   await ensureAllTermsSchema();
   const commercial = await buildCommercialAnswers(rawAnswers);
   const answers = sanitizeTermAnswers({ ...rawAnswers, ...commercial.values });
+  const eventPagePath = String(rawAnswers?.eventPagePath || "").trim().toLowerCase();
+  if (/^\/[a-z0-9][a-z0-9-]{2,39}$/.test(eventPagePath)) {
+    answers.eventPagePath = eventPagePath;
+  }
   answers.presentationKey = commercial.pricing.presentationKey;
   answers.unitPriceCents = String(commercial.pricing.unitPriceCents);
   answers.basePriceCents = String(commercial.pricing.basePriceCents);
@@ -327,6 +331,40 @@ export async function getLatestTermByUserId(userId) {
   return {
     id: row.id,
     userId: row.user_id || null,
+    answers: row.answers || {},
+    acceptedTerms: row.accepted_terms || [],
+    eventDate: row.event_date,
+    eventTime: row.event_time,
+    createdAt: row.created_at
+  };
+}
+
+export async function getTermByEventPageSlug(slug, { userId = null } = {}) {
+  const normalizedSlug = String(slug || "").trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{2,39}$/.test(normalizedSlug)) return null;
+
+  await ensureAllTermsSchema();
+  const result = await query(
+    `
+      select id, user_id, answers, accepted_terms, event_date, event_time, created_at
+      from "all-terms"
+      where user_id is not null
+        and (
+          lower(coalesce(answers->>'eventPagePath', '')) = $1
+          or upper(coalesce(answers->>'couponCode', '')) = $2
+        )
+        and ($3::uuid is null or user_id = $3::uuid)
+      order by created_at desc
+      limit 1;
+    `,
+    [`/${normalizedSlug}`, normalizedSlug.toUpperCase(), userId || null]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
     answers: row.answers || {},
     acceptedTerms: row.accepted_terms || [],
     eventDate: row.event_date,

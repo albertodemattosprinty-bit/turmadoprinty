@@ -22,9 +22,9 @@
       <div class="empty-state">
         <div>
           <p class="eyebrow">Painel do contratante</p>
-          <h1>Seu evento ainda não foi configurado.</h1>
-          <p>Conclua o termo para liberar pagamentos, documentos, materiais e logística.</p>
-          <a class="button button--primary" href="/termo">Preencher termo</a>
+          <h1 id="emptyStateTitle">Seu evento ainda não foi configurado.</h1>
+          <p id="emptyStateCopy">Conclua o termo para liberar pagamentos, documentos, materiais e logística.</p>
+          <a class="button button--primary" id="emptyStateAction" href="/termo">Preencher termo</a>
         </div>
       </div>
     </section>
@@ -33,7 +33,7 @@
   <div class="hidden" id="contractorApp">
     <header class="app-topbar">
       <div class="app-shell app-topbar__inner">
-        <a class="brand" href="/painel-do-contratante" aria-label="Meu evento">
+        <a class="brand" id="contractorHomeLink" href="/painel-do-contratante" aria-label="Meu evento">
           <span class="brand__mark">TP</span>
           <span class="brand__copy">
             <strong>Turma do Printy</strong>

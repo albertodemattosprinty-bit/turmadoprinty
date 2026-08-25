@@ -52,7 +52,7 @@ import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscripti
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
 import { createScheduleEntry, deleteScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
-import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
+import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermByEventPageSlug, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
 import { archiveAdminEventFlow, createEventCoupon, deleteEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
 import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, getEventPromoVideoFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
@@ -10402,7 +10402,11 @@ async function handleGetContractorPanel(request, response) {
   }
 
   try {
-    const term = await getLatestTermByUserId(authUser.id);
+    const requestUrl = new URL(request.url || "/api/contractor-panel", `http://${request.headers.host || "localhost"}`);
+    const eventPageSlug = normalizeEventPageSlug(requestUrl.searchParams.get("eventPageSlug"));
+    const term = eventPageSlug
+      ? await getTermByEventPageSlug(eventPageSlug, { userId: authUser.id })
+      : await getLatestTermByUserId(authUser.id);
     if (term) await markContractorPanelReached(authUser.id);
     const workflow = term ? {
       ...await getEventContractWorkflow(term),
@@ -16280,6 +16284,11 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "GET" && /^[a-z0-9][a-z0-9-]{2,39}$/i.test(requestedPath)) {
     try {
+      const linkedTerm = await getTermByEventPageSlug(requestedPath);
+      if (linkedTerm) {
+        await serveStatic(response, path.join(publicDir, "painel-do-contratante.html"));
+        return;
+      }
       const eventPage = await resolveEventPage(requestedPath);
       if (eventPage) {
         await serveStatic(response, path.join(publicDir, "termo.html"));
