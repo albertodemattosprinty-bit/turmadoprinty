@@ -220,6 +220,27 @@
     </div>
   </section>
 
+  <section class="centered-dialog hidden" id="promoVideoDialog" role="dialog" aria-modal="true" aria-labelledby="promoVideoDialogTitle">
+    <div class="centered-dialog__card promo-video-dialog__card">
+      <header class="centered-dialog__header">
+        <div>
+          <p class="eyebrow">Material do evento</p>
+          <h2 id="promoVideoDialogTitle">V&iacute;deo de divulga&ccedil;&atilde;o</h2>
+        </div>
+        <button class="icon-button" id="closePromoVideoDialog" type="button" aria-label="Fechar">&times;</button>
+      </header>
+      <video class="promo-video-player" id="promoVideoPlayer" controls playsinline preload="metadata"></video>
+      <p class="feedback" id="promoVideoDialogFeedback" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <a class="button button--primary" id="downloadPromoVideo" href="#" download="video-divulgacao.mp4">Baixar v&iacute;deo</a>
+        <button class="button button--primary" id="sharePromoVideo" type="button">Compartilhar (WhatsApp / Instagram)</button>
+        <a class="button button--secondary hidden" id="sharePromoVideoWhatsApp" href="#" target="_blank" rel="noopener">Compartilhar no WhatsApp</a>
+        <button class="button button--secondary hidden" id="copyPromoVideoLink" type="button">Copiar link</button>
+        <button class="button button--secondary" id="closePromoVideoDialogFooter" type="button">Fechar</button>
+      </div>
+    </div>
+  </section>
+
   <script type="module" src="/painel-do-contratante.js"></script>
 </body>
 </html>

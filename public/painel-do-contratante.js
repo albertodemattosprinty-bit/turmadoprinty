@@ -7,6 +7,9 @@ let term = null;
 let activePayment = null;
 let selectedPaymentAmountCents = 0;
 let churchArtworkObjectUrl = "";
+let promoVideoObjectUrl = "";
+let promoVideoBlob = null;
+let promoVideoPublicUrl = "";
 
 const token = () => localStorage.getItem(TOKEN_KEY) || "";
 const auth = (extra = {}) => ({
@@ -178,6 +181,7 @@ function renderMaterials(workflow) {
     : "Use o botão abaixo para criar automaticamente o vídeo personalizado do evento.";
   $("videoLink").dataset.videoFile = videoUrl;
   $("videoLink").href = videoUrl && !videoUrl.startsWith("/api/") ? videoUrl : "#";
+  $("videoLink").removeAttribute("target");
   $("pdfLink").href = term.pdfUrl || "/termo";
 }
 
@@ -353,7 +357,7 @@ async function openExpenseDocument(button) {
   }
 }
 
-async function openPromoVideo(fileUrl, trigger) {
+async function openPromoVideoLegacy(fileUrl, trigger) {
   if (!fileUrl) return;
   if (!fileUrl.startsWith("/api/")) {
     window.open(fileUrl, "_blank", "noopener");
@@ -378,6 +382,165 @@ async function openPromoVideo(fileUrl, trigger) {
     trigger?.removeAttribute("aria-busy");
   }
 }
+
+function syncContractorDialogLock() {
+  const paymentOpen = !$("paymentDialog").classList.contains("hidden");
+  const videoOpen = !$("promoVideoDialog").classList.contains("hidden");
+  document.body.classList.toggle("dialog-open", paymentOpen || videoOpen);
+}
+
+function releasePromoVideoObjectUrl() {
+  if (!promoVideoObjectUrl) return;
+  URL.revokeObjectURL(promoVideoObjectUrl);
+  promoVideoObjectUrl = "";
+}
+
+function closePromoVideoDialog() {
+  const player = $("promoVideoPlayer");
+  player.pause();
+  player.removeAttribute("src");
+  player.load();
+  $("promoVideoDialog").classList.add("hidden");
+  $("downloadPromoVideo").removeAttribute("href");
+  $("promoVideoDialogFeedback").textContent = "";
+  releasePromoVideoObjectUrl();
+  promoVideoBlob = null;
+  promoVideoPublicUrl = "";
+  syncContractorDialogLock();
+}
+
+async function openPromoVideo(fileUrl, trigger) {
+  if (!fileUrl) return;
+  const dialog = $("promoVideoDialog");
+  const player = $("promoVideoPlayer");
+  const download = $("downloadPromoVideo");
+  const feedback = $("promoVideoDialogFeedback");
+  releasePromoVideoObjectUrl();
+  promoVideoBlob = null;
+  promoVideoPublicUrl = window.location.href;
+  configurePromoVideoShareControls();
+  player.pause();
+  player.removeAttribute("src");
+  player.load();
+  download.removeAttribute("href");
+  feedback.textContent = "Carregando o v\u00eddeo...";
+  dialog.classList.remove("hidden");
+  syncContractorDialogLock();
+  trigger?.setAttribute("aria-busy", "true");
+  try {
+    let playbackUrl = fileUrl;
+    if (fileUrl.startsWith("/api/")) {
+      const response = await fetch(getApiUrl(fileUrl), { headers: auth() });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "N\u00e3o foi poss\u00edvel carregar o v\u00eddeo.");
+      }
+      promoVideoBlob = await response.blob();
+      promoVideoObjectUrl = URL.createObjectURL(promoVideoBlob);
+      playbackUrl = promoVideoObjectUrl;
+    }
+    player.src = playbackUrl;
+    player.load();
+    download.href = playbackUrl;
+    download.download = "video-divulgacao.mp4";
+    feedback.textContent = "V\u00eddeo pronto. No celular, Compartilhar abre WhatsApp, Instagram e outros apps instalados.";
+  } catch (error) {
+    feedback.textContent = error.message;
+  } finally {
+    trigger?.removeAttribute("aria-busy");
+  }
+}
+
+
+function promoVideoShareCopy() {
+  return {
+    title: document.title || "Turma do Printy",
+    text: "Confira o v\u00eddeo de divulga\u00e7\u00e3o do nosso evento.",
+    url: promoVideoPublicUrl || window.location.href
+  };
+}
+
+function showPromoVideoShareFallbacks() {
+  $("sharePromoVideo").classList.add("hidden");
+  $("sharePromoVideoWhatsApp").classList.remove("hidden");
+  $("copyPromoVideoLink").classList.remove("hidden");
+}
+
+function configurePromoVideoShareControls() {
+  const data = promoVideoShareCopy();
+  const hasNativeShare = typeof navigator.share === "function";
+  $("sharePromoVideo").classList.toggle("hidden", !hasNativeShare);
+  $("sharePromoVideoWhatsApp").classList.toggle("hidden", hasNativeShare);
+  $("copyPromoVideoLink").classList.toggle("hidden", hasNativeShare);
+  $("sharePromoVideoWhatsApp").href = `https://wa.me/?text=${encodeURIComponent(`${data.text}\n${data.url}`)}`;
+}
+
+async function sharePromoVideo() {
+  const button = $("sharePromoVideo");
+  const feedback = $("promoVideoDialogFeedback");
+  const baseData = promoVideoShareCopy();
+  if (typeof navigator.share !== "function") {
+    showPromoVideoShareFallbacks();
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    let shareData = baseData;
+    if (promoVideoBlob && typeof File === "function" && typeof navigator.canShare === "function") {
+      const videoFile = new File([promoVideoBlob], "video-divulgacao.mp4", {
+        type: promoVideoBlob.type || "video/mp4"
+      });
+      if (navigator.canShare({ files: [videoFile] })) {
+        shareData = { ...baseData, files: [videoFile] };
+      }
+    }
+    try {
+      await navigator.share(shareData);
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      if (!shareData.files) throw error;
+      await navigator.share(baseData);
+    }
+    feedback.textContent = "Compartilhamento aberto no seu aparelho.";
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    showPromoVideoShareFallbacks();
+    feedback.textContent = "Use o WhatsApp ou copie o link para compartilhar.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function copyPromoVideoLink() {
+  const value = promoVideoShareCopy().url;
+  const feedback = $("promoVideoDialogFeedback");
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = value;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    feedback.textContent = "Link copiado.";
+  } catch {
+    feedback.textContent = "N\u00e3o foi poss\u00edvel copiar. Selecione o endere\u00e7o do navegador.";
+  }
+}
+
+$("sharePromoVideo").addEventListener("click", sharePromoVideo);
+$("copyPromoVideoLink").addEventListener("click", copyPromoVideoLink);
+$("closePromoVideoDialog").addEventListener("click", closePromoVideoDialog);
+$("closePromoVideoDialogFooter").addEventListener("click", closePromoVideoDialog);
+$("promoVideoDialog").addEventListener("click", (event) => {
+  if (event.target === $("promoVideoDialog")) closePromoVideoDialog();
+});
 
 $("reloadPanel").addEventListener("click", async () => {
   $("reloadPanel").disabled = true;
@@ -448,10 +611,8 @@ $("expenseNotes").addEventListener("click", (event) => {
 $("videoLink").addEventListener("click", (event) => {
   const link = $("videoLink");
   if (link.getAttribute("aria-disabled") === "true") { event.preventDefault(); return; }
-  if (link.dataset.videoFile?.startsWith("/api/")) {
-    event.preventDefault();
-    void openPromoVideo(link.dataset.videoFile, link);
-  }
+  event.preventDefault();
+  void openPromoVideo(link.dataset.videoFile, link);
 });
 $("churchPhotoFile").addEventListener("change", () => {
   const file = $("churchPhotoFile").files?.[0];

@@ -1585,3 +1585,24 @@ svg {
 }
 
 .church-photo-picker {
+
+.promo-video-dialog__card {
+  width: min(780px, calc(100vw - 24px));
+}
+
+.promo-video-player {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 16px;
+  background: #000;
+}
+
+@media (max-width: 560px) {
+  .promo-video-dialog__card {
+    width: calc(100vw - 16px);
+    padding: 14px;
+  }
+}
