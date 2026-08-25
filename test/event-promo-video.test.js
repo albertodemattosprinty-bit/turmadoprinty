@@ -19,3 +19,24 @@ test("monta a locucao com igreja, data, dia da semana e horario", () => {
     answers: { igreja: "Igreja Batista Central" }
   }), "Vai ser na Igreja Batista Central, dia 24 de agosto, na segunda-feira, às quatro e meia da tarde.");
 });
+
+test("aceita a data do Postgres como objeto Date", () => {
+  assert.equal(buildEventPromoNarration({
+    eventDate: new Date("2026-12-02T00:00:00.000Z"),
+    eventTime: "6h00am",
+    answers: { igreja: "Igreja Batista" }
+  }), "Vai ser na Igreja Batista, dia 2 de dezembro, na quarta-feira, às seis da manhã.");
+});
+
+test("aceita data brasileira e usa os campos do termo como fallback", () => {
+  const expected = "Vai ser na Igreja Batista, dia 2 de dezembro, na quarta-feira, às seis da manhã.";
+  assert.equal(buildEventPromoNarration({
+    eventDate: "02/12/2026",
+    eventTime: "6h00am",
+    answers: { igreja: "Igreja Batista" }
+  }), expected);
+  assert.equal(buildEventPromoNarration({
+    eventTime: "6h00am",
+    answers: { igreja: "Igreja Batista", dia: "2", mes: "dezembro", ano: "2026" }
+  }), expected);
+});

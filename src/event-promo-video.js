@@ -54,6 +54,43 @@ function minuteCopy(minute) {
   return ` e ${String(minute).padStart(2, "0")} minutos`;
 }
 
+function validEventDate(year, month, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date;
+}
+
+function monthNumber(value) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+  const byName = MONTHS_PT.findIndex((month) => (
+    month.normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalized
+  ));
+  if (byName >= 0) return byName + 1;
+  const numeric = Number(normalized);
+  return Number.isInteger(numeric) && numeric >= 1 && numeric <= 12 ? numeric : null;
+}
+
+function resolveEventDate(term) {
+  const value = term?.eventDate;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return validEventDate(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+  }
+
+  const raw = String(value || "").trim();
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return validEventDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const brazilian = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brazilian) return validEventDate(Number(brazilian[3]), Number(brazilian[2]), Number(brazilian[1]));
+
+  const answers = term?.answers || {};
+  return validEventDate(Number(answers.ano), monthNumber(answers.mes), Number(answers.dia));
+}
+
 export function formatEventTimeForSpeech(value) {
   const clock = parseClock(value);
   if (!clock) throw new Error("Horario do evento invalido para a locucao.");
@@ -74,10 +111,9 @@ export function formatEventTimeForSpeech(value) {
 export function buildEventPromoNarration(term) {
   const answers = term?.answers || {};
   const church = String(answers.igreja || "").replace(/\s+/g, " ").trim();
-  const eventDate = String(term?.eventDate || "").slice(0, 10);
-  const date = new Date(`${eventDate}T12:00:00Z`);
+  const date = resolveEventDate(term);
   if (!church) throw new Error("Nome da igreja nao encontrado no termo.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || Number.isNaN(date.getTime())) {
+  if (!date) {
     throw new Error("Data do evento nao encontrada no termo.");
   }
   const day = date.getUTCDate();
