@@ -307,6 +307,12 @@ export async function composeEventPromoVideo(narrationAudio, { churchArtwork = n
   try {
     await writeFile(narrationPath, narrationAudio);
     if (churchArtwork) await writeFile(artworkPath, churchArtwork);
+    const [introDuration, narrationDuration, outroDuration] = await Promise.all([
+      probeMediaDuration(EVENT_PROMO_ASSETS.intro),
+      probeMediaDuration(narrationPath),
+      probeMediaDuration(EVENT_PROMO_ASSETS.outro)
+    ]);
+    const outputDuration = introDuration + narrationDuration + outroDuration;
     const filter = [
       "[1:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=0.18[music]",
       "[2:a:0]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[intro]",
@@ -323,36 +329,32 @@ export async function composeEventPromoVideo(narrationAudio, { churchArtwork = n
       "-i", narrationPath,
       "-i", EVENT_PROMO_ASSETS.outro
     ];
-    let videoMap = "0:v:0";
-    let videoCodecArgs = ["-c:v", "copy"];
-    let outputDuration = null;
+    let videoMap = "[base]";
+    const videoCodecArgs = ["-c:v", "libx264", "-preset", "superfast", "-crf", "20", "-pix_fmt", "yuv420p"];
     if (churchArtwork) {
-      const [introDuration, narrationDuration, outroDuration] = await Promise.all([
-        probeMediaDuration(EVENT_PROMO_ASSETS.intro),
-        probeMediaDuration(narrationPath),
-        probeMediaDuration(EVENT_PROMO_ASSETS.outro)
-      ]);
       const artworkDelay = 1;
       const artworkDuration = Math.max(0.1, narrationDuration - artworkDelay);
       const fadeDuration = Math.min(0.25, artworkDuration / 4);
-      const growthFrames = (4 * 30) - 1;
-      outputDuration = introDuration + narrationDuration + outroDuration;
+      const growthFrames = (2.5 * 30) - 1;
       const fadeOutStart = Math.max(0, artworkDuration - fadeDuration);
       ffmpegArgs.push("-loop", "1", "-framerate", "30", "-t", artworkDuration.toFixed(3), "-i", artworkPath);
       filter.push(
-        "[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1[base]",
+        `[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${outputDuration.toFixed(3)}[base]`,
         `[5:v:0]scale=2560:1440:force_original_aspect_ratio=increase,crop=2560:1440,setsar=1,zoompan=z='min(1+on*0.15/${growthFrames},1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1280x720:fps=30,trim=duration=${artworkDuration.toFixed(3)},setpts=PTS-STARTPTS,format=rgba,fade=t=in:st=0:d=${fadeDuration.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)}:alpha=1,setpts=PTS+${(introDuration + artworkDelay).toFixed(3)}/TB[art]`,
         "[base][art]overlay=eof_action=pass:repeatlast=0:shortest=0[video]"
       );
       videoMap = "[video]";
-      videoCodecArgs = ["-c:v", "libx264", "-preset", "superfast", "-crf", "20", "-pix_fmt", "yuv420p"];
+    } else {
+      filter.push(
+        `[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${outputDuration.toFixed(3)}[base]`
+      );
     }
     ffmpegArgs.push(
       "-filter_complex", filter.join(";"),
       "-map", videoMap, "-map", "[audio]",
       ...videoCodecArgs, "-c:a", "aac", "-b:a", "192k",
-      ...(outputDuration ? ["-t", outputDuration.toFixed(3)] : []),
-      "-map_metadata", "-1", "-movflags", "+faststart", "-shortest",
+      "-t", outputDuration.toFixed(3),
+      "-map_metadata", "-1", "-movflags", "+faststart",
       outputPath
     );
     await runFfmpeg(ffmpegArgs);
