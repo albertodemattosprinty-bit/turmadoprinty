@@ -23,6 +23,7 @@ export async function ensureAdminUsersSchema() {
   `);
   await query("create index if not exists idx_agenda_events_sort_order on agenda_events(sort_order);");
   await query("alter table agenda_events add column if not exists contractor_user_id uuid references users(id) on delete set null;");
+  await query("alter table agenda_events add column if not exists deleted_at timestamptz;");
   await query("create index if not exists idx_agenda_events_contractor_user_id on agenda_events(contractor_user_id);");
 
   await query(`
@@ -162,7 +163,7 @@ export async function listUsersWithAdminData(planPrices = {}) {
       left join user_usage_counters usage on usage.user_id = u.id
       left join admin_user_notes notes on notes.user_id = u.id
       left join user_plan_overrides override on override.user_id = u.id
-      left join agenda_events event on event.id = notes.contractor_event_id
+      left join agenda_events event on event.id = notes.contractor_event_id and event.deleted_at is null
       left join lateral (
         select
           id as active_message_id,
@@ -268,7 +269,7 @@ export async function setUserContractorStatus({ userId, isContractor, contractor
       `
         select contractor_user_id
         from agenda_events
-        where id = $1
+        where id = $1 and deleted_at is null
         limit 1
       `,
       [contractorEventId]
@@ -318,7 +319,7 @@ export async function setUserContractorStatus({ userId, isContractor, contractor
     `
       update agenda_events
       set contractor_user_id = $2
-      where id = $1
+      where id = $1 and deleted_at is null
     `,
     [contractorEventId, userId]
   );

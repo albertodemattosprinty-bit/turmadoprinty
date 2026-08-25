@@ -144,6 +144,8 @@ export async function ensureEventFlowSchema() {
           updated_at timestamptz not null default now()
         );
       `);
+      await query(`alter table event_flow_state add column if not exists deleted_at timestamptz;`);
+      await query(`create index if not exists idx_event_flow_state_deleted_at on event_flow_state(deleted_at);`);
       await query(`create index if not exists idx_event_discount_coupons_active on event_discount_coupons(active, updated_at desc);`);
       await query(`alter table event_discount_coupons add column if not exists transport_amount_cents integer not null default 0 check (transport_amount_cents >= 0);`);
       await query(`alter table event_discount_coupons add column if not exists transport_trip_type text not null default 'ONE_WAY' check (transport_trip_type in ('ONE_WAY', 'ROUND_TRIP'));`);
@@ -172,7 +174,7 @@ export async function recordProposalVisit(userId) {
     `insert into event_flow_state (user_id)
      values ($1)
      on conflict (user_id) do update
-       set last_term_at = now(), updated_at = now()`,
+       set last_term_at = now(), deleted_at = null, updated_at = now()`,
     [userId]
   );
   return {
@@ -243,6 +245,7 @@ export async function markContractorPanelReached(userId) {
      values ($1, now())
      on conflict (user_id) do update
        set contractor_panel_at = coalesce(event_flow_state.contractor_panel_at, now()),
+           deleted_at = null,
            updated_at = now()`,
     [userId]
   );
@@ -340,6 +343,37 @@ export async function updateEventCoupon(couponId, input = {}) {
   return mapCouponRow(result.rows[0]);
 }
 
+export async function deleteEventCoupon(couponId) {
+  await ensureEventFlowSchema();
+  const result = await query(
+    `delete from event_discount_coupons
+      where id = $1
+      returning id, code, discount_cents, presentation_key, event_count,
+                free_transport, transport_amount_cents, transport_trip_type, transport_city_a, transport_city_b,
+                free_lodging, active, created_at, updated_at`,
+    [String(couponId || "").trim()]
+  );
+  if (!result.rows[0]) throw new Error("Pagina personalizada nao encontrada.");
+  return mapCouponRow(result.rows[0]);
+}
+
+export async function archiveAdminEventFlow(userId) {
+  await ensureEventFlowSchema();
+  const safeUserId = String(userId || "").trim();
+  const result = await query(
+    `insert into event_flow_state (user_id, deleted_at, updated_at)
+     values ($1, now(), now())
+     on conflict (user_id) do update
+       set deleted_at = now(), updated_at = now()
+     returning user_id, deleted_at`,
+    [safeUserId]
+  );
+  return {
+    userId: result.rows[0]?.user_id || safeUserId,
+    deletedAt: result.rows[0]?.deleted_at || null
+  };
+}
+
 export async function resolveEventPricing(input = {}) {
   await ensureEventFlowSchema();
   const presentation = resolvePresentation(input.presentationKey || "congresso-infantil");
@@ -426,6 +460,7 @@ export async function listAdminEventFlow() {
          order by created_at desc
          limit 1
       ) latest_term on true
+     where efs.deleted_at is null
      order by coalesce(vs.last_access_at, latest_term.created_at) desc nulls last, lower(coalesce(u.name, u.username, '')) asc
   `);
 

@@ -1019,15 +1019,18 @@ async function loadSchedule(siteConfig, user) {
     scheduleItems.forEach((item, index) => {
       const card = document.createElement("article");
       card.className = `schedule-card schedule-color-${(index % 5) + 1}`;
-      const canEditEvent = Boolean(user && item.contractorUserId === user.id);
+      const canManageEvent = Boolean(user?.isAdmin);
+      const canEditEvent = Boolean(user && (canManageEvent || item.contractorUserId === user.id));
       card.innerHTML = `
         <div class="schedule-card-head">
           <p class="schedule-day" data-field="dateLabel">${item.dateLabel}</p>
           ${
             canEditEvent
-              ? `<button class="schedule-edit-button" type="button" aria-label="Editar evento" title="Editar evento">
+              ? `<div class="schedule-card-actions"><button class="schedule-edit-button" type="button" aria-label="Editar evento" title="Editar evento">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.2V20h2.8l9.86-9.87-2.8-2.8zM18.71 8.04a1 1 0 0 0 0-1.41l-1.34-1.34a1 1 0 0 0-1.41 0l-1.17 1.17 2.8 2.8z"/></svg>
-                </button>`
+                </button>${canManageEvent ? `<button class="schedule-delete-button" type="button" aria-label="Excluir evento" title="Excluir evento">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21a2 2 0 0 1-2-2V6h14v13a2 2 0 0 1-2 2H7Zm10-15H7v13h10V6Zm-8 11h2V8H9v9Zm4 0h2V8h-2v9ZM8 5V3h8v2h5v2H3V5h5Z"/></svg>
+                </button>` : ""}</div>`
               : ""
           }
         </div>
@@ -1038,6 +1041,7 @@ async function loadSchedule(siteConfig, user) {
 
       if (canEditEvent) {
         const button = card.querySelector(".schedule-edit-button");
+        const deleteButton = card.querySelector(".schedule-delete-button");
         let editing = false;
 
         const setEditing = (nextEditing) => {
@@ -1094,6 +1098,24 @@ async function loadSchedule(siteConfig, user) {
             alert(error instanceof Error ? error.message : "Erro ao salvar evento.");
           } finally {
             button.disabled = false;
+          }
+        });
+
+        deleteButton?.addEventListener("click", async () => {
+          const label = [item.dateLabel, item.place, item.city].filter(Boolean).join(" - ");
+          if (!window.confirm(`Excluir este evento da agenda?\n\n${label}\n\nEle deixara de aparecer no site, mas o registro sera preservado.`)) return;
+          deleteButton.disabled = true;
+          try {
+            const response = await fetch(getApiUrl(`/api/admin/schedule/${encodeURIComponent(item.id)}`), {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${getToken()}` }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || "Falha ao excluir evento da agenda.");
+            await refreshSchedule();
+          } catch (error) {
+            alert(error instanceof Error ? error.message : "Erro ao excluir evento da agenda.");
+            deleteButton.disabled = false;
           }
         });
       }

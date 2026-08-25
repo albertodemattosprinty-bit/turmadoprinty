@@ -125,7 +125,7 @@ function renderEvents() {
         <td><strong>${user.finalPriceCents ? money(user.finalPriceCents) : "A definir"}</strong><span class="cell-detail">${esc(user.presentationName || "Apresentação não escolhida")}</span></td>
         <td><strong>${dateTime(user.lastAccessAt || user.termCreatedAt)}</strong><span class="cell-detail">${duration(user.activeSeconds)} de interesse · ${Number(user.accessCount || 0)} acessos</span></td>
         <td>${status}</td>
-        <td><div class="action-cluster">${noteButton}${roomButton}</div></td>
+        <td><div class="action-cluster">${noteButton}${roomButton}<button class="button button--danger" type="button" data-delete-event="${esc(user.userId)}">Excluir</button></div></td>
       </tr>
     `;
   }).join("");
@@ -150,6 +150,7 @@ function renderCommercialPages() {
         <div class="action-cluster">
           <button class="button button--secondary" type="button" data-edit-page="${esc(page.id)}">Editar</button>
           <button class="button button--secondary" type="button" data-toggle-page="${esc(page.id)}">${page.active ? "Desativar" : "Reativar"}</button>
+          <button class="button button--danger" type="button" data-delete-page="${esc(page.id)}">Excluir</button>
         </div>
       </article>
     `;
@@ -249,7 +250,13 @@ function renderEventRoom(data) {
 
   const video = workflow.promoVideo;
   $("currentVideo").classList.toggle("hidden", !video);
-  if (video) $("currentVideo").href = video.url;
+  if (video) {
+    $("currentVideo").dataset.videoFile = video.url;
+    $("currentVideo").href = video.url.startsWith("/api/") ? "#" : video.url;
+  } else {
+    $("currentVideo").dataset.videoFile = "";
+    $("currentVideo").removeAttribute("href");
+  }
   $("videoFeedback").textContent = video ? `Material atual: ${video.fileName || "vídeo de divulgação"}` : "Nenhum vídeo enviado.";
 
   const lodging = workflow.lodging || {};
@@ -319,6 +326,32 @@ async function openExpenseDocument(button) {
     alert(error.message);
   } finally {
     button.disabled = false;
+  }
+}
+
+async function openPromoVideo(fileUrl, trigger) {
+  if (!fileUrl) return;
+  if (!fileUrl.startsWith("/api/")) {
+    window.open(fileUrl, "_blank", "noopener");
+    return;
+  }
+  const preview = window.open("", "_blank");
+  trigger?.setAttribute("aria-busy", "true");
+  try {
+    const response = await fetch(getApiUrl(fileUrl), { headers: auth() });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Não foi possível abrir o vídeo.");
+    }
+    const url = URL.createObjectURL(await response.blob());
+    if (preview) preview.location.href = url;
+    else window.open(url, "_blank", "noopener");
+    window.setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (error) {
+    preview?.close();
+    alert(error.message);
+  } finally {
+    trigger?.removeAttribute("aria-busy");
   }
 }
 
@@ -447,6 +480,27 @@ $("eventFilters").addEventListener("click", (event) => {
 });
 
 $("usersBody").addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-delete-event]");
+  if (deleteButton) {
+    event.stopPropagation();
+    const user = state.users.find((item) => String(item.userId) === String(deleteButton.dataset.deleteEvent));
+    if (!user) return;
+    const confirmed = window.confirm(`Excluir este evento de ${user.name || user.username || "este usuario"}?\n\nEle saira do painel e da agenda publica. A conta, o termo, os pagamentos e o historico serao preservados.`);
+    if (!confirmed) return;
+    deleteButton.disabled = true;
+    fetch(getApiUrl(`/api/admin/eventos/users/${encodeURIComponent(user.userId)}`), {
+      method: "DELETE",
+      headers: auth()
+    }).then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Nao foi possivel excluir o evento.");
+      await load();
+    }).catch((error) => {
+      alert(error.message);
+      deleteButton.disabled = false;
+    });
+    return;
+  }
   const expenseButton = event.target.closest("[data-add-expense]");
   if (expenseButton) {
     event.stopPropagation();
@@ -485,6 +539,14 @@ $("adminPayments").addEventListener("click", async (event) => {
 $("adminExpenseNotes").addEventListener("click", (event) => {
   const button = event.target.closest("[data-expense-file]");
   if (button) openExpenseDocument(button);
+});
+
+$("currentVideo").addEventListener("click", (event) => {
+  const link = $("currentVideo");
+  if (link.dataset.videoFile?.startsWith("/api/")) {
+    event.preventDefault();
+    void openPromoVideo(link.dataset.videoFile, link);
+  }
 });
 
 $("confirmHotel").addEventListener("click", async () => {
@@ -568,6 +630,27 @@ $("commercialList").addEventListener("click", async (event) => {
   if (editButton) {
     const page = state.pages.find((item) => String(item.id) === String(editButton.dataset.editPage));
     if (page) openCommercialEditor(page);
+    return;
+  }
+  const deleteButton = event.target.closest("[data-delete-page]");
+  if (deleteButton) {
+    const page = state.pages.find((item) => String(item.id) === String(deleteButton.dataset.deletePage));
+    if (!page) return;
+    const pagePath = page.pagePath || `/${String(page.code || "").toLowerCase()}`;
+    if (!window.confirm(`Excluir definitivamente o cupom e a pagina ${pagePath}?\n\nEsse endereco deixara de funcionar imediatamente.`)) return;
+    deleteButton.disabled = true;
+    try {
+      const response = await fetch(getApiUrl(`/api/admin/eventos/pages/${encodeURIComponent(page.id)}`), {
+        method: "DELETE",
+        headers: auth()
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Nao foi possivel excluir a pagina.");
+      await load();
+    } catch (error) {
+      alert(error.message);
+      deleteButton.disabled = false;
+    }
     return;
   }
   const toggleButton = event.target.closest("[data-toggle-page]");

@@ -280,7 +280,26 @@ export async function saveEventPromoVideo(adminId, userId, termId, asset) {
       promo_video_size=excluded.promo_video_size, uploaded_by_user_id=excluded.uploaded_by_user_id, updated_at=now()
     returning *
   `, [termId, userId, asset.key, asset.url, asset.fileName, asset.contentType, asset.sizeBytes, adminId]);
-  return mapAsset(result.rows[0]);
+  const video = mapAsset(result.rows[0]);
+  if (asset.generatedByContractor) {
+    await addUpdate(termId, userId, "PROMO_VIDEO_GENERATED", { fileName: video?.fileName || asset.fileName });
+  }
+  return video;
+}
+
+export async function getEventPromoVideoFile(termId) {
+  await ensureEventContractingSchema();
+  const result = await query("select term_id, user_id, promo_video_key, promo_video_name, promo_video_content_type, promo_video_size from event_contract_assets where term_id = $1 and promo_video_key is not null limit 1", [termId]);
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    termId: row.term_id,
+    userId: row.user_id,
+    key: row.promo_video_key,
+    fileName: row.promo_video_name || "video-divulgacao.mp4",
+    contentType: row.promo_video_content_type || "video/mp4",
+    sizeBytes: Number(row.promo_video_size || 0)
+  };
 }
 
 export async function createEventExpenseNote(adminId, userId, termId, input = {}, asset = {}) {

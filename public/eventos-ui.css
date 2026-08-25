@@ -233,6 +233,17 @@ a {
   color: #fff;
 }
 
+.button--danger {
+  border: 1px solid rgba(255, 123, 139, 0.38);
+  background: rgba(255, 77, 99, 0.12);
+  color: #ffabb5;
+}
+
+.button--danger:hover:not(:disabled) {
+  border-color: rgba(255, 123, 139, 0.72);
+  background: rgba(255, 77, 99, 0.2);
+}
+
 .button--ghost {
   background: transparent;
   color: var(--events-muted);
@@ -846,6 +857,15 @@ textarea.field-control {
 .item-card small {
   color: var(--events-muted);
   font-size: 0.79rem;
+}
+
+.ai-disclosure {
+  display: block;
+  line-height: 1.45;
+}
+
+.promo-video-card .feedback:empty {
+  display: none;
 }
 
 .item-card__value {

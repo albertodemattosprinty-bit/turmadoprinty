@@ -123,12 +123,15 @@ function renderExpenses(workflow) {
 
 function renderMaterials(workflow) {
   const video = workflow.promoVideo;
+  const videoUrl = video?.url || "";
+  $("generatePromoVideo").textContent = video ? "Gerar novamente" : "Gerar vídeo automaticamente";
   $("videoLink").setAttribute("aria-disabled", video ? "false" : "true");
-  $("videoLink").textContent = video ? "Assistir ao vídeo" : "Aguardando envio";
+  $("videoLink").textContent = video ? "Assistir ao vídeo" : "Vídeo ainda não gerado";
   $("videoHint").textContent = video
-    ? video.fileName || "Material enviado pela equipe."
-    : "A equipe ainda está preparando este material.";
-  $("videoLink").href = video?.url || "#";
+    ? video.fileName || "Seu vídeo personalizado está pronto."
+    : "Use o botão abaixo para criar automaticamente o vídeo personalizado do evento.";
+  $("videoLink").dataset.videoFile = videoUrl;
+  $("videoLink").href = videoUrl && !videoUrl.startsWith("/api/") ? videoUrl : "#";
   $("pdfLink").href = term.pdfUrl || "/termo";
 }
 
@@ -190,10 +193,10 @@ function renderReadiness(answers, workflow) {
     $("nextActionLink").href = paymentInReview ? "#financeiro" : "#logistica";
     $("nextActionLink").textContent = "Acompanhar situação";
   } else if (!workflow.promoVideo) {
-    $("nextActionTitle").textContent = "Acompanhe o material de divulgação";
-    $("nextActionText").textContent = "A equipe está preparando o vídeo. Ele aparecerá aqui assim que estiver disponível.";
+    $("nextActionTitle").textContent = "Gere seu vídeo de divulgação";
+    $("nextActionText").textContent = "Crie agora o vídeo personalizado com os dados do seu evento.";
     $("nextActionLink").href = "#materiais";
-    $("nextActionLink").textContent = "Ver materiais";
+    $("nextActionLink").textContent = "Gerar vídeo";
   } else {
     $("nextActionTitle").textContent = "Seu evento está preparado";
     $("nextActionText").textContent = "Os principais pontos estão confirmados. Continue acompanhando este painel até a data do evento.";
@@ -304,6 +307,32 @@ async function openExpenseDocument(button) {
   }
 }
 
+async function openPromoVideo(fileUrl, trigger) {
+  if (!fileUrl) return;
+  if (!fileUrl.startsWith("/api/")) {
+    window.open(fileUrl, "_blank", "noopener");
+    return;
+  }
+  const preview = window.open("", "_blank");
+  trigger?.setAttribute("aria-busy", "true");
+  try {
+    const response = await fetch(getApiUrl(fileUrl), { headers: auth() });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Não foi possível abrir o vídeo.");
+    }
+    const url = URL.createObjectURL(await response.blob());
+    if (preview) preview.location.href = url;
+    else window.open(url, "_blank", "noopener");
+    window.setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (error) {
+    preview?.close();
+    alert(error.message);
+  } finally {
+    trigger?.removeAttribute("aria-busy");
+  }
+}
+
 $("reloadPanel").addEventListener("click", async () => {
   $("reloadPanel").disabled = true;
   try { await load(); } catch (error) { alert(error.message); }
@@ -371,7 +400,32 @@ $("expenseNotes").addEventListener("click", (event) => {
 });
 
 $("videoLink").addEventListener("click", (event) => {
-  if ($("videoLink").getAttribute("aria-disabled") === "true") event.preventDefault();
+  const link = $("videoLink");
+  if (link.getAttribute("aria-disabled") === "true") { event.preventDefault(); return; }
+  if (link.dataset.videoFile?.startsWith("/api/")) {
+    event.preventDefault();
+    void openPromoVideo(link.dataset.videoFile, link);
+  }
+});
+
+$("generatePromoVideo").addEventListener("click", async () => {
+  const button = $("generatePromoVideo");
+  const feedback = $("promoVideoFeedback");
+  button.disabled = true;
+  button.textContent = "Gerando seu vídeo…";
+  feedback.textContent = "Criando a locução Marin e montando o vídeo. Isso pode levar alguns segundos…";
+  try {
+    const response = await fetch(getApiUrl("/api/contractor-panel/promo-video/generate"), { method: "POST", headers: auth() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Não foi possível gerar o vídeo agora.");
+    feedback.textContent = "Vídeo pronto! Você já pode assistir e compartilhar.";
+    await load();
+  } catch (error) {
+    feedback.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = term?.workflow?.promoVideo ? "Gerar novamente" : "Gerar vídeo automaticamente";
+  }
 });
 
 $("lodgingForm").addEventListener("submit", async (event) => {

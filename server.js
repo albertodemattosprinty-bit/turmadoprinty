@@ -50,12 +50,13 @@ import { createEscreverParagraph, deleteEscreverParagraph, ensureEscreverSchema,
 import { buildMiniSystemPrompt, MINI_MINISTRY_CONTEXT } from "./src/mini-prompts.js";
 import { assignAlbumGrantToUser, createAlbumPurchaseRecord, createPlanSubscriptionRecord, ensurePaymentSchema, getAlbumRehearsalCodeForOwner, getUserAccessState, isActivePaymentStatus, isActiveSubscriptionStatus, isInactiveSubscriptionStatus, markAlbumPurchaseStatus, markPlanSubscriptionStatus, recordPaymentWebhookEvent, redeemAlbumRehearsalCode } from "./src/payments.js";
 import { buildSubscriptionPlans, findSubscriptionPlanById } from "./src/plans.js";
-import { createScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
+import { createScheduleEntry, deleteScheduleEntry, ensureSiteConfigSchema, getAlbumZipLinks, getScheduleEntries, getSiteContentSettings, getSitePricingSettings, saveAlbumZipLink, saveSiteContentSettings, saveSitePricingSettings, updateScheduleEntry } from "./src/site-config.js";
 import { buildStoreProducts, findStoreProductById, formatPriceFromCents, slugifyAlbumName } from "./src/store.js";
 import { claimAllTerm, createAllTermEntry, deleteAllTerms, deleteTermById, ensureAllTermsSchema, getAllTermById, getLatestTermByUserId, getTermQuestionOrder, listAllTermDates, listAllTermsByDate } from "./src/all-terms.js";
 import { updateLatestTermCouponByUserId } from "./src/all-terms.js";
-import { createEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
-import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
+import { archiveAdminEventFlow, createEventCoupon, deleteEventCoupon, ensureEventFlowSchema, getEventPresentations, listAdminEventFlow, listEventCoupons, markContractorPanelReached, normalizeEventPageSlug, recordProposalActivity, recordProposalVisit, resolveEventPage, resolveEventPricing, updateEventCoupon } from "./src/event-flow.js";
+import { confirmEventLodging, confirmEventPayment, createEventExpenseNote, ensureEventContractingSchema, getEventContractWorkflow, getEventExpenseNoteFile, getEventPromoVideoFile, listUnreadEventUserIds, markEventUpdatesViewed, reportEventPayment, saveEventLodging, saveEventPromoVideo } from "./src/event-contracting.js";
+import { buildEventPromoNarration, composeEventPromoVideo, synthesizeEventPromoNarration } from "./src/event-promo-video.js";
 import { createQuickUserAction, createUserAction, deleteUserAction, ensureActionsSchema, extendQuickUserAction, getProject200RuntimeState, getUserActionById, listUserActions, setActionMusicDefaultByTitle, updateUserAction, updateUserActionStatus, updateUserActionStatusManual } from "./src/actions.js";
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
@@ -160,6 +161,7 @@ let r2PrivateClient = null;
 let miniMediaDatabaseBootstrapped = false;
 const midiaUploadActivityByIp = new Map();
 const midiaPlaybackClients = new Set();
+const eventPromoVideoGenerationJobs = new Set();
 let midiaPlaybackState = {
   revision: 0,
   action: "pause",
@@ -2493,6 +2495,7 @@ function isIndependentEventFlowRequest(request) {
     "/api/event-expense-notes",
     "/api/event-flow",
     "/api/event-pages",
+    "/api/event-promo-videos",
     "/api/terms"
   ];
   return eventPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
@@ -10357,7 +10360,7 @@ async function handleClaimTermAccount(request, response, termId) {
       const visit = await query(`insert into event_proposal_visits (user_id, opened_at, last_seen_at) values ($1, now() - ($2 * interval '1 second'), now()) returning id`, [user.id, activeSeconds]);
       await query(`insert into event_proposal_activity_sessions (visit_id, user_id, started_at, last_seen_at, ended_at) values ($1, $2, now() - ($3 * interval '1 second'), now(), now())`, [visit.rows[0].id, user.id, activeSeconds]);
     }
-    await query(`insert into event_flow_state (user_id) values ($1) on conflict (user_id) do update set last_term_at = now(), updated_at = now()`, [user.id]);
+    await query(`insert into event_flow_state (user_id) values ($1) on conflict (user_id) do update set last_term_at = now(), deleted_at = null, updated_at = now()`, [user.id]);
     const session = await createSession(user.id);
     sendJson(response, 201, { ok: true, token: session.token, expiresAt: session.expiresAt.toISOString(), user: sanitizeUser(user), termId: term.id, pdfUrl: `/api/terms/${term.id}/pdf` });
   } catch (error) {
@@ -10420,6 +10423,120 @@ async function handleGetContractorPanel(request, response) {
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Nao foi possivel carregar o painel do contratante."
     });
+  }
+}
+
+async function handleContractorPromoVideoGenerate(request, response) {
+  const authUser = await requireAuth(request, response);
+  if (!authUser) return;
+
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey) {
+    sendJson(response, 503, { error: "A geração automática de vídeo está temporariamente indisponível." });
+    return;
+  }
+
+  const term = await getLatestTermByUserId(authUser.id);
+  if (!term) {
+    sendJson(response, 404, { error: "Os dados do seu evento ainda não foram encontrados. Revise o termo do evento." });
+    return;
+  }
+
+  const generationKey = String(term.id);
+  if (eventPromoVideoGenerationJobs.has(generationKey)) {
+    sendJson(response, 409, { error: "Seu vídeo já está sendo gerado. Aguarde só mais um momento." });
+    return;
+  }
+
+  eventPromoVideoGenerationJobs.add(generationKey);
+  let uploadedKey = "";
+  try {
+    const narrationText = buildEventPromoNarration(term);
+    const narrationWav = await synthesizeEventPromoNarration({ apiKey, text: narrationText });
+    const videoBuffer = await composeEventPromoVideo(narrationWav);
+    if (videoBuffer.length > MAX_EVENT_PROMO_VIDEO_BYTES) {
+      throw new Error("O vídeo gerado ultrapassou o limite permitido.");
+    }
+
+    uploadedKey = ["eventos", "contratantes", authUser.id, term.id, "video-automatico-" + Date.now() + ".mp4"].join("/");
+    await getProject200PrivateR2Client().send(new PutObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: uploadedKey,
+      Body: videoBuffer,
+      ContentType: "video/mp4",
+      CacheControl: "private, no-store"
+    }));
+
+    const promoVideo = await saveEventPromoVideo(authUser.id, authUser.id, term.id, {
+      key: uploadedKey,
+      url: "/api/event-promo-videos/" + encodeURIComponent(term.id),
+      fileName: "video-divulgacao-automatico.mp4",
+      contentType: "video/mp4",
+      sizeBytes: videoBuffer.length,
+      generatedByContractor: true
+    });
+    void recordNarrationUsage(authUser.id, estimateNarrationDurationSeconds(narrationText)).catch(() => {});
+
+    sendJson(response, 201, {
+      ok: true,
+      promoVideo,
+      narrationText,
+      aiDisclosure: "A locução deste vídeo foi gerada por inteligência artificial com a voz sintética Marin."
+    });
+  } catch (error) {
+    if (uploadedKey) {
+      try {
+        await getProject200PrivateR2Client().send(new DeleteObjectCommand({ Bucket: R2_PRIVATE_BUCKET, Key: uploadedKey }));
+      } catch {
+        // A limpeza não deve esconder o erro principal.
+      }
+    }
+    console.error("Falha ao gerar vídeo automático do evento:", error);
+    sendJson(response, 500, {
+      error: error instanceof Error ? error.message : "Não foi possível gerar o vídeo agora."
+    });
+  } finally {
+    eventPromoVideoGenerationJobs.delete(generationKey);
+  }
+}
+
+async function handleEventPromoVideoFile(request, response, termId) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const video = await getEventPromoVideoFile(termId);
+    if (!video || (!isAdminUser(user) && String(video.userId) !== String(user.id))) {
+      sendJson(response, 404, { error: "Vídeo não encontrado." });
+      return;
+    }
+
+    const result = await getProject200PrivateR2Client().send(new GetObjectCommand({
+      Bucket: R2_PRIVATE_BUCKET,
+      Key: video.key
+    }));
+    response.writeHead(200, {
+      "Content-Type": String(result.ContentType || video.contentType || "video/mp4"),
+      "Content-Disposition": buildContentDisposition(video.fileName).replace(/^attachment/i, "inline"),
+      "Cache-Control": "private, no-store",
+      ...(result.ContentLength != null ? { "Content-Length": String(result.ContentLength) } : {})
+    });
+    if (typeof result.Body?.pipe === "function") {
+      result.Body.on("error", () => response.destroy());
+      result.Body.pipe(response);
+      return;
+    }
+    if (typeof result.Body?.transformToWebStream === "function") {
+      Readable.fromWeb(result.Body.transformToWebStream()).pipe(response);
+      return;
+    }
+    response.end(await result.Body?.transformToByteArray?.());
+  } catch (error) {
+    const missing = String(error?.name || "").includes("NoSuchKey") || Number(error?.$metadata?.httpStatusCode) === 404;
+    if (!response.headersSent) {
+      sendJson(response, missing ? 404 : 500, {
+        error: missing ? "Vídeo não encontrado." : "Não foi possível abrir o vídeo."
+      });
+    }
   }
 }
 
@@ -10708,6 +10825,38 @@ async function handleAdminEventCouponUpdate(request, response, couponId) {
     sendJson(response, 200, { ok: true, coupon, page: coupon });
   } catch (error) {
     sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel atualizar a pagina personalizada." });
+  }
+}
+
+async function handleAdminEventCouponDelete(request, response, couponId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const coupon = await deleteEventCoupon(couponId);
+    sendJson(response, 200, { ok: true, coupon, page: coupon });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Nao foi possivel excluir a pagina personalizada.";
+    sendJson(response, message === "Pagina personalizada nao encontrada." ? 404 : 400, { error: message });
+  }
+}
+
+async function handleAdminEventDelete(request, response, userId) {
+  const admin = await requireAdmin(request, response);
+  if (!admin) return;
+  try {
+    const eventUsers = await listAdminEventFlow();
+    if (!eventUsers.some((item) => item.userId === userId)) {
+      sendJson(response, 404, { error: "Evento nao encontrado." });
+      return;
+    }
+    const schedule = await getScheduleEntries();
+    const linkedEntries = schedule.filter((item) => item.contractorUserId === userId);
+    await archiveAdminEventFlow(userId);
+    for (const entry of linkedEntries) await deleteScheduleEntry(entry.id);
+    await setUserContractorStatus({ userId, isContractor: false, contractorEventId: null });
+    sendJson(response, 200, { ok: true, archived: { userId, scheduleCount: linkedEntries.length } });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel excluir o evento." });
   }
 }
 
@@ -11555,6 +11704,25 @@ async function handleAdminScheduleCreate(request, response) {
     sendJson(response, 500, {
       error: error instanceof Error ? error.message : "Erro ao salvar agenda."
     });
+  }
+}
+
+async function handleAdminScheduleDelete(request, response, eventId) {
+  if (!await ensurePaymentsReady(response)) return;
+  const user = await requireAdmin(request, response);
+  if (!user) return;
+  try {
+    const entry = await deleteScheduleEntry(eventId);
+    if (!entry) {
+      sendJson(response, 404, { error: "Evento da agenda nao encontrado." });
+      return;
+    }
+    if (entry.contractorUserId) {
+      await setUserContractorStatus({ userId: entry.contractorUserId, isContractor: false, contractorEventId: null });
+    }
+    sendJson(response, 200, { ok: true, entry });
+  } catch (error) {
+    sendJson(response, 500, { error: error instanceof Error ? error.message : "Erro ao excluir evento da agenda." });
   }
 }
 
@@ -14223,6 +14391,17 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/contractor-panel/promo-video/generate") {
+    await handleContractorPromoVideoGenerate(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/event-promo-videos\/[^/]+$/)) {
+    const termId = decodeURIComponent(pathname.replace(/^\/api\/event-promo-videos\/([^/]+)$/, "$1"));
+    await handleEventPromoVideoFile(request, response, termId);
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/contractor-panel") {
     await handleGetContractorPanel(request, response);
     return;
@@ -15548,6 +15727,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "DELETE" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+$/)) {
+    const userId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/users\/([^/]+)$/, "$1"));
+    await handleAdminEventDelete(request, response, userId);
+    return;
+  }
+
   if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/users\/[^/]+\/payments\/[^/]+$/)) {
     const match = pathname.match(/^\/api\/admin\/eventos\/users\/([^/]+)\/payments\/([^/]+)$/);
     await handleAdminEventPaymentConfirm(request, response, decodeURIComponent(match[1]), decodeURIComponent(match[2]));
@@ -15585,6 +15770,12 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "PATCH" && pathname.match(/^\/api\/admin\/eventos\/(?:coupons|pages)\/[^/]+$/)) {
     const couponId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/(?:coupons|pages)\/([^/]+)$/, "$1"));
     await handleAdminEventCouponUpdate(request, response, couponId);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/admin\/eventos\/(?:coupons|pages)\/[^/]+$/)) {
+    const couponId = decodeURIComponent(pathname.replace(/^\/api\/admin\/eventos\/(?:coupons|pages)\/([^/]+)$/, "$1"));
+    await handleAdminEventCouponDelete(request, response, couponId);
     return;
   }
 
@@ -15651,6 +15842,12 @@ const server = http.createServer(async (request, response) => {
 
   if (request.method === "POST" && pathname === "/api/admin/schedule") {
     await handleAdminScheduleCreate(request, response);
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.match(/^\/api\/admin\/schedule\/[^/]+$/)) {
+    const eventId = decodeURIComponent(pathname.replace(/^\/api\/admin\/schedule\/([^/]+)$/, "$1"));
+    await handleAdminScheduleDelete(request, response, eventId);
     return;
   }
 

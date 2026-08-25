@@ -181,6 +181,8 @@ export async function ensureSiteConfigSchema() {
 
       await query("create index if not exists idx_agenda_events_sort_order on agenda_events(sort_order);");
       await query("alter table agenda_events add column if not exists contractor_user_id uuid references users(id) on delete set null;");
+      await query("alter table agenda_events add column if not exists deleted_at timestamptz;");
+      await query("create index if not exists idx_agenda_events_deleted_at on agenda_events(deleted_at);");
       await query("create index if not exists idx_agenda_events_contractor_user_id on agenda_events(contractor_user_id);");
 
       await query(
@@ -378,6 +380,7 @@ export async function getScheduleEntries() {
       select id, month_label, date_label, place, city, time_label, sort_order
       , contractor_user_id
       from agenda_events
+      where deleted_at is null
       order by sort_order asc, created_at asc
     `
   );
@@ -438,7 +441,7 @@ export async function updateScheduleEntry({ eventId, dateLabel, place, city, tim
           place = $3,
           city = $4,
           time_label = $5
-      where id = $1
+      where id = $1 and deleted_at is null
       returning id, month_label, date_label, place, city, time_label, sort_order, contractor_user_id
     `,
     [
@@ -455,6 +458,31 @@ export async function updateScheduleEntry({ eventId, dateLabel, place, city, tim
   if (!row) {
     return null;
   }
+
+  return {
+    id: row.id,
+    monthLabel: row.month_label,
+    dateLabel: row.date_label,
+    place: row.place,
+    city: row.city,
+    time: row.time_label,
+    sortOrder: row.sort_order,
+    contractorUserId: row.contractor_user_id || null
+  };
+}
+
+export async function deleteScheduleEntry(eventId) {
+  await ensureSiteConfigSchema();
+  const result = await query(
+    `update agenda_events
+        set deleted_at = now()
+      where id = $1 and deleted_at is null
+      returning id, month_label, date_label, place, city, time_label, sort_order, contractor_user_id`,
+    [String(eventId || "").trim()]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
 
   return {
     id: row.id,
