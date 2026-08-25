@@ -341,11 +341,11 @@ export async function composeEventPromoVideo(narrationAudio, { churchArtwork = n
       ffmpegArgs.push("-loop", "1", "-framerate", "30", "-t", artworkDuration.toFixed(3), "-i", artworkPath);
       filter.push(
         "[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1[base]",
-        `[5:v:0]scale=7680:4320:force_original_aspect_ratio=increase,crop=7680:4320,setsar=1,zoompan=z='min(1+on*0.15/${growthFrames},1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1280x720:fps=30,trim=duration=${artworkDuration.toFixed(3)},setpts=PTS-STARTPTS,format=rgba,fade=t=in:st=0:d=${fadeDuration.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)}:alpha=1,setpts=PTS+${(introDuration + artworkDelay).toFixed(3)}/TB[art]`,
+        `[5:v:0]scale=2560:1440:force_original_aspect_ratio=increase,crop=2560:1440,setsar=1,zoompan=z='min(1+on*0.15/${growthFrames},1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1280x720:fps=30,trim=duration=${artworkDuration.toFixed(3)},setpts=PTS-STARTPTS,format=rgba,fade=t=in:st=0:d=${fadeDuration.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)}:alpha=1,setpts=PTS+${(introDuration + artworkDelay).toFixed(3)}/TB[art]`,
         "[base][art]overlay=eof_action=pass:repeatlast=0:shortest=0[video]"
       );
       videoMap = "[video]";
-      videoCodecArgs = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"];
+      videoCodecArgs = ["-c:v", "libx264", "-preset", "superfast", "-crf", "20", "-pix_fmt", "yuv420p"];
     }
     ffmpegArgs.push(
       "-filter_complex", filter.join(";"),
