@@ -25,6 +25,14 @@ const EVENT_PROMO_ASSETS = Object.freeze({
   intro: path.join(assetDirectory, "intro.mp3"),
   outro: path.join(assetDirectory, "outro.mp3")
 });
+const configuredFfmpegTimeoutMs = Number.parseInt(
+  String(process.env.EVENT_PROMO_FFMPEG_TIMEOUT_MS || ""),
+  10
+);
+const EVENT_PROMO_FFMPEG_TIMEOUT_MS = Number.isFinite(configuredFfmpegTimeoutMs)
+  && configuredFfmpegTimeoutMs >= 120000
+  ? configuredFfmpegTimeoutMs
+  : 360000;
 
 function parseClock(value) {
   const normalized = String(value || "")
@@ -215,7 +223,11 @@ function runFfmpeg(args) {
   return new Promise((resolve, reject) => {
     const child = spawn(ffmpegPath, args, { windowsHide: true });
     let stderr = "";
-    const timeout = setTimeout(() => child.kill("SIGKILL"), 120000);
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, EVENT_PROMO_FFMPEG_TIMEOUT_MS);
     child.stderr.on("data", (chunk) => {
       stderr = `${stderr}${chunk}`.slice(-16000);
     });
@@ -226,6 +238,9 @@ function runFfmpeg(args) {
     child.once("close", (code, signal) => {
       clearTimeout(timeout);
       if (code === 0) resolve();
+      else if (timedOut) reject(new Error(
+        `A montagem do vídeo ultrapassou ${Math.round(EVENT_PROMO_FFMPEG_TIMEOUT_MS / 60000)} minutos. Tente gerar novamente.`
+      ));
       else reject(new Error(`FFmpeg encerrou com codigo ${code ?? signal}. ${stderr}`.trim()));
     });
   });
@@ -323,6 +338,7 @@ export async function composeEventPromoVideo(narrationAudio, { churchArtwork = n
     ];
     const ffmpegArgs = [
       "-hide_banner", "-loglevel", "warning", "-y",
+      "-filter_threads", "1", "-filter_complex_threads", "1",
       "-i", EVENT_PROMO_ASSETS.background,
       "-stream_loop", "-1", "-i", EVENT_PROMO_ASSETS.music,
       "-i", EVENT_PROMO_ASSETS.intro,
@@ -330,7 +346,7 @@ export async function composeEventPromoVideo(narrationAudio, { churchArtwork = n
       "-i", EVENT_PROMO_ASSETS.outro
     ];
     let videoMap = "[base]";
-    const videoCodecArgs = ["-c:v", "libx264", "-preset", "superfast", "-crf", "20", "-pix_fmt", "yuv420p"];
+    const videoCodecArgs = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "21", "-pix_fmt", "yuv420p", "-threads", "1"];
     if (churchArtwork) {
       const artworkDelay = 1;
       const artworkDuration = Math.max(0.1, narrationDuration - artworkDelay);
@@ -339,14 +355,14 @@ export async function composeEventPromoVideo(narrationAudio, { churchArtwork = n
       const fadeOutStart = Math.max(0, artworkDuration - fadeDuration);
       ffmpegArgs.push("-loop", "1", "-framerate", "30", "-t", artworkDuration.toFixed(3), "-i", artworkPath);
       filter.push(
-        `[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${outputDuration.toFixed(3)}[base]`,
-        `[5:v:0]scale=2560:1440:force_original_aspect_ratio=increase,crop=2560:1440,setsar=1,zoompan=z='min(1+on*0.15/${growthFrames},1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1280x720:fps=30,trim=duration=${artworkDuration.toFixed(3)},setpts=PTS-STARTPTS,format=rgba,fade=t=in:st=0:d=${fadeDuration.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)}:alpha=1,setpts=PTS+${(introDuration + artworkDelay).toFixed(3)}/TB[art]`,
+        `[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,fps=30,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${outputDuration.toFixed(3)}[base]`,
+        `[5:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,zoompan=z='min(1+on*0.15/${growthFrames},1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=1280x720:fps=30,trim=duration=${artworkDuration.toFixed(3)},setpts=PTS-STARTPTS,format=rgba,fade=t=in:st=0:d=${fadeDuration.toFixed(3)}:alpha=1,fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)}:alpha=1,setpts=PTS+${(introDuration + artworkDelay).toFixed(3)}/TB[art]`,
         "[base][art]overlay=eof_action=pass:repeatlast=0:shortest=0[video]"
       );
       videoMap = "[video]";
     } else {
       filter.push(
-        `[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${outputDuration.toFixed(3)}[base]`
+        `[0:v:0]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,setsar=1,fps=30,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${outputDuration.toFixed(3)}[base]`
       );
     }
     ffmpegArgs.push(
