@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "0.94";
+const project200AppVersion = "0.95";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -617,8 +617,6 @@ const constitutionTextView = document.getElementById("constitutionTextView");
 const constitutionMessage = document.getElementById("constitutionMessage");
 const constitutionAvatars = document.getElementById("constitutionAvatars");
 const openConstitutionEditButton = document.getElementById("openConstitutionEdit");
-const toggleHomeViewOptionButton = document.getElementById("toggleHomeViewOption");
-const toggleHomeViewHint = document.getElementById("toggleHomeViewHint");
 const toggleAppKeyboardOptionButton = document.getElementById("toggleAppKeyboardOption");
 const toggleAppKeyboardHint = document.getElementById("toggleAppKeyboardHint");
 const toggleMissionActionsOptionButton = document.getElementById("toggleMissionActionsOption");
@@ -3304,6 +3302,82 @@ function applyHomeViewMode() {
   document.body.setAttribute("data-home-view", mode);
   runningTaskContent?.setAttribute("data-home-view", mode);
 }
+let homeViewSwipeAnimationTimer = 0;
+
+function selectHomeViewMode(mode, { animate = false, direction = "" } = {}) {
+  const nextMode = normalizeHomeViewMode(mode);
+  const changed = normalizeHomeViewMode(state.options.homeViewMode) !== nextMode;
+  state.options.homeViewMode = nextMode;
+  applyHomeViewMode();
+  renderAppsHomeHeader();
+  saveOptionsConfig();
+  renderOptionsModal();
+  renderHomeRunningTask();
+  if (!animate || !changed || !runningTaskContent) return;
+  runningTaskContent.dataset.homeSwipeDirection = direction === "right" ? "right" : "left";
+  runningTaskContent.classList.remove("home-view-swipe-transition");
+  void runningTaskContent.offsetWidth;
+  runningTaskContent.classList.add("home-view-swipe-transition");
+  window.clearTimeout(homeViewSwipeAnimationTimer);
+  homeViewSwipeAnimationTimer = window.setTimeout(() => {
+    runningTaskContent.classList.remove("home-view-swipe-transition");
+    delete runningTaskContent.dataset.homeSwipeDirection;
+  }, 320);
+}
+
+const homeViewSwipeState = {
+  active: false,
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  suppressClick: false,
+  suppressTimer: 0
+};
+
+function resetHomeViewSwipe() {
+  homeViewSwipeState.active = false;
+  homeViewSwipeState.pointerId = null;
+  homeViewSwipeState.startX = 0;
+  homeViewSwipeState.startY = 0;
+}
+
+runningTaskContent?.addEventListener("pointerdown", (event) => {
+  if (!runningTaskContent.classList.contains("is-idle-layout")) return;
+  if (event.isPrimary === false || (event.pointerType === "mouse" && Number(event.button) !== 0)) return;
+  if (event.target.closest("input, textarea, select, [contenteditable='true']")) return;
+  homeViewSwipeState.active = true;
+  homeViewSwipeState.pointerId = event.pointerId;
+  homeViewSwipeState.startX = Number(event.clientX || 0);
+  homeViewSwipeState.startY = Number(event.clientY || 0);
+});
+
+runningTaskContent?.addEventListener("pointerup", (event) => {
+  if (!homeViewSwipeState.active || homeViewSwipeState.pointerId !== event.pointerId) return;
+  const deltaX = Number(event.clientX || 0) - homeViewSwipeState.startX;
+  const deltaY = Math.abs(Number(event.clientY || 0) - homeViewSwipeState.startY);
+  resetHomeViewSwipe();
+  if (Math.abs(deltaX) < 72 || deltaY > 52) return;
+  const nextMode = deltaX < 0 ? "apps" : "complete";
+  if (normalizeHomeViewMode(state.options.homeViewMode) === nextMode) return;
+  event.preventDefault();
+  homeViewSwipeState.suppressClick = true;
+  window.clearTimeout(homeViewSwipeState.suppressTimer);
+  homeViewSwipeState.suppressTimer = window.setTimeout(() => {
+    homeViewSwipeState.suppressClick = false;
+  }, 320);
+  selectHomeViewMode(nextMode, { animate: true, direction: deltaX < 0 ? "left" : "right" });
+});
+
+["pointercancel", "pointerleave"].forEach((eventName) => {
+  runningTaskContent?.addEventListener(eventName, resetHomeViewSwipe);
+});
+
+runningTaskContent?.addEventListener("click", (event) => {
+  if (!homeViewSwipeState.suppressClick) return;
+  homeViewSwipeState.suppressClick = false;
+  event.preventDefault();
+  event.stopPropagation();
+}, true);
 
 function formatAppsHomeDate(date) {
   const formatted = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric" }).format(date);
@@ -18219,7 +18293,6 @@ function registerScreenLockActivity() {
 function renderOptionsModal() {
   const optionsContent = document.querySelector("#optionsModal .options-content");
   const previousScrollTop = Number(optionsContent?.scrollTop || 0);
-  if (toggleHomeViewHint) toggleHomeViewHint.textContent = normalizeHomeViewMode(state.options.homeViewMode) === "apps" ? "Apps" : "Completo";
   if (toggleAppKeyboardHint) {
     toggleAppKeyboardHint.textContent = state.options.useAppKeyboard ? "Do iLife" : "Do aparelho";
   }
@@ -20533,14 +20606,6 @@ actionsMissionsList?.addEventListener("keydown", (event) => {
   event.preventDefault();
   document.body.classList.add("actions-mission-editor-open");
   openMissionEntryModal(String(card.dataset.actionsMissionGoalId || ""));
-});
-toggleHomeViewOptionButton?.addEventListener("click", () => {
-  state.options.homeViewMode = normalizeHomeViewMode(state.options.homeViewMode) === "apps" ? "complete" : "apps";
-  applyHomeViewMode();
-  renderAppsHomeHeader();
-  saveOptionsConfig();
-  renderOptionsModal();
-  renderHomeRunningTask();
 });
 toggleAppKeyboardOptionButton?.addEventListener("click", () => {
   state.options.useAppKeyboard = !state.options.useAppKeyboard;

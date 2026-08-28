@@ -23,7 +23,7 @@ const fatLossExercises = [
   ["water-aerobics","Hidroginástica","minutes","Piscina","Use a resistência da água com movimentos amplos e controlados."],
   ["spinning","Spinning","minutes","Bicicleta de spinning","Ajuste banco e guidão, mantenha cadência estável e resistência segura."],
   ["battle-rope","Corda naval","minutes","Corda naval","Base firme, abdômen ativo e ondas alternadas produzidas pelos braços." ]
-].map(([id,name,tracking,equipment,cue]) => ({ id,name,tracking,equipment,cue,category:"fat_loss" }));
+].map(([id,name,tracking,equipment,cue]) => ({ id,name,tracking,equipment,cue,category:"aerobic" }));
 
 const strengthExercises = [
   ["squat","Agachamento livre","Natural","Pés na largura dos ombros; quadril para trás e joelhos acompanhando os pés."],
@@ -68,7 +68,55 @@ const strengthExercises = [
   ["abductor","Cadeira abdutora","Máquina abdutora","Abra os joelhos contra a resistência sem inclinar o tronco." ]
 ].map(([id,name,equipment,cue]) => ({ id,name,equipment,cue,tracking:"series",category:"strength" }));
 
-const EXERCISES = [...fatLossExercises, ...strengthExercises];
+const calisthenicsExercises = [
+  ["cal-bodyweight-squat","Agachamento com peso corporal","Pés na largura dos ombros, quadril para trás e peito aberto durante toda a descida."],
+  ["cal-sumo-squat","Agachamento sumô","Abra bem os pés, aponte os joelhos para fora e desça mantendo a coluna neutra."],
+  ["cal-jump-squat","Agachamento com salto","Desça com controle, salte verticalmente e aterrisse suavemente com joelhos flexionados."],
+  ["cal-pistol-squat","Agachamento pistol","Estenda uma perna à frente, desça na outra e mantenha o tronco firme sem perder o equilíbrio."],
+  ["cal-shrimp-squat","Agachamento camarão","Dobre uma perna atrás do corpo e agache na perna de apoio com movimento lento."],
+  ["cal-forward-lunge","Afundo alternado","Dê um passo à frente, desça os dois joelhos e retorne empurrando o chão."],
+  ["cal-reverse-lunge","Afundo reverso","Leve um pé para trás, desça com controle e volte usando a força da perna da frente."],
+  ["cal-side-lunge","Afundo lateral","Dê um passo amplo para o lado, leve o quadril para trás e mantenha a outra perna estendida."],
+  ["cal-curtsy-lunge","Afundo cruzado","Cruze uma perna atrás da outra e desça mantendo o joelho da frente alinhado."],
+  ["cal-cossack-squat","Agachamento cossaco","Transfira o peso para um lado, flexione uma perna e mantenha a outra estendida."],
+  ["cal-single-calf","Panturrilha unilateral","Apoie todo o peso em um pé, eleve o calcanhar e desça lentamente."],
+  ["cal-single-glute-bridge","Ponte unilateral","Mantenha um pé no chão, estenda a outra perna e eleve o quadril sem girar."],
+  ["cal-frog-pump","Frog pump","Una as plantas dos pés, abra os joelhos e eleve o quadril contraindo os glúteos."],
+  ["cal-donkey-kick","Coice de glúteo","Em quatro apoios, empurre um pé para cima sem arquear a lombar."],
+  ["cal-fire-hydrant","Abdução em quatro apoios","Eleve um joelho para o lado mantendo quadril e tronco estáveis."],
+  ["cal-push-up","Flexão tradicional","Corpo alinhado, mãos sob os ombros e peito descendo junto até perto do chão."],
+  ["cal-knee-push-up","Flexão com joelhos","Apoie os joelhos, mantenha quadril e ombros alinhados e flexione os cotovelos."],
+  ["cal-diamond-push-up","Flexão diamante","Aproxime as mãos abaixo do peito e mantenha os cotovelos próximos do corpo."],
+  ["cal-wide-push-up","Flexão aberta","Posicione as mãos além dos ombros e desça o peito de forma controlada."],
+  ["cal-archer-push-up","Flexão arqueiro","Desça em direção a uma mão enquanto o braço oposto permanece estendido."],
+  ["cal-pike-push-up","Flexão pike","Eleve o quadril e leve o topo da cabeça em direção ao chão entre as mãos."],
+  ["cal-hindu-push-up","Flexão hindu","Passe o peito próximo ao chão em um arco contínuo e retorne elevando o quadril."],
+  ["cal-pseudo-planche","Flexão pseudo-planche","Gire levemente as mãos, incline os ombros à frente e desça com o corpo rígido."],
+  ["cal-triceps-push-up","Flexão de tríceps","Mantenha mãos próximas e cotovelos apontados para trás durante o movimento."],
+  ["cal-shoulder-tap","Prancha com toque no ombro","Em prancha alta, toque o ombro oposto sem deixar o quadril balançar."],
+  ["cal-plank-up-down","Prancha sobe e desce","Alterne entre antebraços e mãos mantendo abdômen e quadril firmes."],
+  ["cal-plank-jack","Prancha com abertura de pernas","Em prancha alta, abra e feche os pés sem elevar o quadril."],
+  ["cal-cross-climber","Escalador cruzado","Leve cada joelho em direção ao cotovelo oposto mantendo os ombros sobre as mãos."],
+  ["cal-bicycle-crunch","Abdominal bicicleta","Alterne cotovelo e joelho opostos sem puxar a cabeça com as mãos."],
+  ["cal-reverse-crunch","Abdominal reverso","Traga os joelhos ao peito e retire suavemente o quadril do chão."],
+  ["cal-v-up","Abdominal canivete","Eleve pernas e tronco ao mesmo tempo tentando aproximar mãos e pés."],
+  ["cal-hollow-rock","Balanço hollow body","Pressione a lombar no chão e balance o corpo mantendo braços e pernas elevados."],
+  ["cal-flutter-kick","Tesoura de pernas","Mantenha a lombar apoiada e alterne pequenos movimentos das pernas estendidas."],
+  ["cal-heel-touch","Toque nos calcanhares","Com ombros elevados, incline o tronco alternadamente para tocar cada calcanhar."],
+  ["cal-superman","Superman","De bruços, eleve braços e pernas sem forçar o pescoço ou comprimir a lombar."],
+  ["cal-bird-dog","Bird dog","Em quatro apoios, estenda braço e perna opostos sem girar o quadril."],
+  ["cal-dead-bug","Dead bug","Mantenha a lombar apoiada e estenda braço e perna opostos lentamente."],
+  ["cal-inchworm","Caminhada das mãos","Incline o tronco, caminhe com as mãos até a prancha e retorne aos pés."],
+  ["cal-bear-crawl","Caminhada do urso","Mantenha joelhos perto do chão e avance com mão e pé opostos."],
+  ["cal-crab-walk","Caminhada do caranguejo","Com quadril elevado e barriga para cima, avance alternando mãos e pés."]
+].map(([id,name,cue]) => ({ id,name,cue,equipment:"Nenhum equipamento",tracking:"series",category:"calisthenics" }));
+
+const EXERCISE_CATEGORIES = [
+  { id:"strength", label:"Musculação" },
+  { id:"aerobic", label:"Aeróbico" },
+  { id:"calisthenics", label:"Calistenia" }
+];
+const EXERCISES = [...strengthExercises, ...fatLossExercises, ...calisthenicsExercises];
 
 const byId = (id) => document.getElementById(id);
 const modal = byId("wellnessModal");
@@ -76,7 +124,7 @@ const elements = {
   title:byId("wellnessTitle"), headerIcon:byId("wellnessHeaderIcon"), calories:byId("wellnessCaloriesToday"), quality:byId("wellnessQualityToday"),
   qualityFill:byId("wellnessQualityFill"), mealCount:byId("wellnessMealCount"), lunaMessage:byId("wellnessLunaMessage"), foodForm:byId("wellnessFoodForm"),
   foodInput:byId("wellnessFoodInput"), timeQuestion:byId("wellnessTimeQuestion"), foodTime:byId("wellnessFoodTime"), foodSend:byId("wellnessFoodSend"),
-  nutritionStatus:byId("wellnessNutritionStatus"), mealList:byId("wellnessMealList"), exerciseGrid:byId("wellnessExerciseGrid"), workoutHistory:byId("wellnessWorkoutHistory"),
+  nutritionStatus:byId("wellnessNutritionStatus"), mealList:byId("wellnessMealList"), exerciseGrid:byId("wellnessExerciseGrid"), exerciseCategoryName:byId("wellnessExerciseCategoryName"), workoutHistory:byId("wellnessWorkoutHistory"),
   activeWorkout:byId("wellnessActiveWorkout"), workoutName:byId("wellnessWorkoutName"), workoutCounter:byId("wellnessWorkoutCounter"), workoutDetail:byId("wellnessWorkoutDetail"),
   detail:byId("wellnessExerciseDetail"), detailCategory:byId("wellnessExerciseCategory"), detailName:byId("wellnessExerciseName"), detailEquipment:byId("wellnessExerciseEquipment"),
   detailInstructions:byId("wellnessExerciseInstructions"), detailStart:byId("wellnessExerciseStart"), goalLayer:byId("wellnessGoalLayer"), goalForm:byId("wellnessGoalForm"), goalTitle:byId("wellnessGoalTitle"),
@@ -91,7 +139,7 @@ const elements = {
   heightInput:byId("wellnessHeightInput"), weightInput:byId("wellnessWeightInput"), weightHistory:byId("wellnessWeightHistory")
 };
 const phaseLayers = [elements.detail,elements.goalLayer,elements.workoutLayer,elements.repsLayer,elements.finishLayer,elements.weightLayer].filter(Boolean);
-const state = { tab:"nutrition", filter:"all", dashboard:null, selectedExercise:null, workout:null, steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, pendingMeal:"" };
+const state = { tab:"nutrition", filter:"strength", dashboard:null, selectedExercise:null, workout:null, steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, pendingMeal:"" };
 
 function profileName(){ return String(window.localStorage.getItem(PROFILE_KEY)||document.body.dataset.profile||"Usuario").trim()||"Usuario"; }
 async function apiRequest(path,options={}){ const headers={...(options.headers||{})}; const token=String(window.localStorage.getItem(TOKEN_KEY)||"").trim(); if(token)headers.Authorization=`Bearer ${token}`; const response=await fetch(getApiUrl(path),{...options,headers}); const payload=await response.json().catch(()=>({})); if(!response.ok)throw new Error(payload?.error||"Nao foi possivel concluir."); return payload; }
@@ -101,9 +149,12 @@ function setTab(tab){ state.tab=tab==="exercises"?"exercises":"nutrition"; docum
 function openWellness(tab){ setTab(tab); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); void loadDashboard(); }
 function closeWellness(){ hideLayers(); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden","true"); if(!document.querySelector(".workspace-modal.active"))document.body.classList.remove("modal-open"); }
 
-function exerciseInstructions(exercise){ if(exercise.tracking==="series")return [`Prepare ${exercise.equipment.toLowerCase()} com uma carga confortável.`,exercise.cue,"Mantenha o movimento controlado e pare se sentir dor aguda."]; if(exercise.tracking==="steps")return ["Leve o celular com você para acompanhar os passos.",exercise.cue,"Ao finalizar, informe a distância total em metros."]; return [`Prepare ${exercise.equipment.toLowerCase()} e comece leve.`,exercise.cue,"Ao finalizar, informe a distância percorrida em metros."]; }
-function renderExerciseGrid(){ const visible=state.filter==="all"?EXERCISES:EXERCISES.filter((item)=>item.category===state.filter); elements.exerciseGrid.innerHTML=visible.map((exercise)=>{ const number=EXERCISES.indexOf(exercise)+1; const type=exercise.tracking==="series"?"Séries e movimentos":exercise.tracking==="steps"?"Passos e metros":"Minutos e metros"; return `<button class="wellness-exercise-item" type="button" data-exercise-id="${exercise.id}"><span class="wellness-exercise-number">${String(number).padStart(2,"0")}</span><span class="wellness-exercise-copy"><strong>${exercise.name}</strong><small>${exercise.equipment} · ${type}</small></span><span class="wellness-exercise-chevron">›</span></button>`; }).join(""); }
-function openExerciseDetail(exercise){ if(state.workout){ showLayer(elements.workoutLayer); renderWorkout(); return; } state.selectedExercise=exercise; elements.detailCategory.textContent=exercise.category==="strength"?"Musculação":"Condicionamento e perda de gordura"; elements.detailName.textContent=exercise.name; elements.detailEquipment.textContent=`Equipamento: ${exercise.equipment}`; elements.detailInstructions.innerHTML=""; exerciseInstructions(exercise).forEach((text)=>{ const li=document.createElement("li"); li.textContent=text; elements.detailInstructions.appendChild(li); }); elements.detailStart.textContent=exercise.tracking==="series"?"Iniciar série":"Iniciar exercício"; showLayer(elements.detail); }
+function exerciseInstructions(exercise){ if(exercise.category==="calisthenics")return ["Escolha um espaço firme e livre ao seu redor.",exercise.cue,"Use apenas o peso do corpo, controle cada repetição e pare se sentir dor aguda."]; if(exercise.tracking==="series")return [`Prepare ${exercise.equipment.toLowerCase()} com uma carga confortável.`,exercise.cue,"Mantenha o movimento controlado e pare se sentir dor aguda."]; if(exercise.tracking==="steps")return ["Leve o celular com você para acompanhar os passos.",exercise.cue,"Ao finalizar, informe a distância total em metros."]; return [`Prepare ${exercise.equipment.toLowerCase()} e comece leve.`,exercise.cue,"Ao finalizar, informe a distância percorrida em metros."]; }
+function currentExerciseCategory(){ return EXERCISE_CATEGORIES.find((item)=>item.id===state.filter)||EXERCISE_CATEGORIES[0]; }
+function setExerciseCategory(categoryId){ state.filter=EXERCISE_CATEGORIES.some((item)=>item.id===categoryId)?categoryId:EXERCISE_CATEGORIES[0].id; renderExerciseGrid(); }
+function cycleExerciseCategory(direction){ const currentIndex=Math.max(0,EXERCISE_CATEGORIES.findIndex((item)=>item.id===state.filter)); const nextIndex=(currentIndex+direction+EXERCISE_CATEGORIES.length)%EXERCISE_CATEGORIES.length; setExerciseCategory(EXERCISE_CATEGORIES[nextIndex].id); }
+function renderExerciseGrid(){ const category=currentExerciseCategory(); const visible=EXERCISES.filter((item)=>item.category===category.id); if(elements.exerciseCategoryName)elements.exerciseCategoryName.textContent=category.label; elements.exerciseGrid.innerHTML=visible.map((exercise,index)=>{ const type=exercise.tracking==="series"?"Séries e movimentos":exercise.tracking==="steps"?"Passos e metros":"Minutos e metros"; return `<button class="wellness-exercise-item" type="button" data-exercise-id="${exercise.id}"><span class="wellness-exercise-number">${String(index+1).padStart(2,"0")}</span><span class="wellness-exercise-copy"><strong>${exercise.name}</strong><small>${exercise.equipment} · ${type}</small></span><span class="wellness-exercise-chevron">›</span></button>`; }).join(""); }
+function openExerciseDetail(exercise){ if(state.workout){ showLayer(elements.workoutLayer); renderWorkout(); return; } state.selectedExercise=exercise; elements.detailCategory.textContent=EXERCISE_CATEGORIES.find((item)=>item.id===exercise.category)?.label||"Exercício"; elements.detailName.textContent=exercise.name; elements.detailEquipment.textContent=exercise.category==="calisthenics"?"Sem equipamento":`Equipamento: ${exercise.equipment}`; elements.detailInstructions.innerHTML=""; exerciseInstructions(exercise).forEach((text)=>{ const li=document.createElement("li"); li.textContent=text; elements.detailInstructions.appendChild(li); }); elements.detailStart.textContent=exercise.tracking==="series"?"Iniciar série":"Iniciar exercício"; showLayer(elements.detail); }
 function openGoal(){ const isSeries=state.selectedExercise?.tracking==="series"; elements.goalTitle.textContent=isSeries?"Defina séries e movimentos":"Quantos minutos?"; elements.seriesGoalFields.hidden=!isSeries; elements.minutesGoalFields.hidden=isSeries; showLayer(elements.goalLayer); }
 
 function renderMeals(){ const dashboard=state.dashboard||{}; const today=dashboard.today||{}; elements.calories.textContent=String(Math.round(Number(today.calories||0))); elements.quality.textContent=String(Math.round(Number(today.qualityScore||0))); elements.qualityFill.style.width=`${Math.max(0,Math.min(100,Number(today.qualityScore||0)))}%`; const count=Number(today.mealCount||0); elements.mealCount.textContent=count?`${count} ${count===1?"registro":"registros"} hoje`:"Nenhum alimento registrado"; elements.mealList.innerHTML=""; const meals=Array.isArray(dashboard.meals)?dashboard.meals:[]; if(!meals.length){ const empty=document.createElement("div"); empty.className="wellness-meal-empty"; empty.textContent="Sua tabela de hoje começa quando você contar para Luna o que comeu."; elements.mealList.appendChild(empty); return; } meals.forEach((meal)=>{ const article=document.createElement("article"); article.className="wellness-meal-item"; article.innerHTML=`<div><strong></strong><small></small><time></time></div><div class="wellness-meal-score"><b>${Math.round(Number(meal.calories||0))} kcal</b><span>${Math.round(Number(meal.qualityScore||0))}% qualidade</span></div>`; article.querySelector("strong").textContent=meal.description||"Alimento"; article.querySelector("small").textContent=meal.feedback||"Estimativa registrada por Luna."; article.querySelector("time").textContent=new Date(meal.consumedAt).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); elements.mealList.appendChild(article); }); }
@@ -136,19 +187,23 @@ byId("appsHomeExercisesButton")?.addEventListener("click",()=>openWellness("exer
 byId("appsHomeNutritionButton")?.addEventListener("click",()=>openWellness("nutrition"));
 byId("wellnessCloseButton")?.addEventListener("click",closeWellness);
 document.querySelectorAll("[data-wellness-tab]").forEach((button)=>button.addEventListener("click",()=>setTab(button.dataset.wellnessTab)));
-document.querySelectorAll("[data-exercise-filter]").forEach((button)=>button.addEventListener("click",()=>{ state.filter=button.dataset.exerciseFilter||"all"; document.querySelectorAll("[data-exercise-filter]").forEach((item)=>item.classList.toggle("active",item===button)); renderExerciseGrid(); }));
+byId("wellnessExerciseCategoryPrevious")?.addEventListener("click",()=>cycleExerciseCategory(-1));
+byId("wellnessExerciseCategoryNext")?.addEventListener("click",()=>cycleExerciseCategory(1));
 elements.exerciseGrid?.addEventListener("click",(event)=>{ const exercise=EXERCISES.find((item)=>item.id===event.target.closest("[data-exercise-id]")?.dataset.exerciseId); if(exercise)openExerciseDetail(exercise); });
 byId("wellnessExerciseDetailClose")?.addEventListener("click",hideLayers);
 elements.detailStart?.addEventListener("click",openGoal);
 byId("wellnessGoalClose")?.addEventListener("click",()=>showLayer(elements.detail));
 elements.goalForm?.addEventListener("submit",startExercise);
 byId("wellnessWorkoutResume")?.addEventListener("click",()=>{ renderWorkout(); showLayer(elements.workoutLayer); });
+byId("wellnessWorkoutBack")?.addEventListener("click",hideLayers);
 elements.workoutPrimary?.addEventListener("click",()=>void handleWorkoutPrimary());
 elements.workoutFinish?.addEventListener("click",openFinish);
 elements.repsForm?.addEventListener("submit",saveSeries);
 byId("wellnessRepsCancel")?.addEventListener("click",()=>showLayer(elements.workoutLayer));
+byId("wellnessRepsBack")?.addEventListener("click",()=>showLayer(elements.workoutLayer));
 elements.finishForm?.addEventListener("submit",finishWorkout);
 byId("wellnessFinishCancel")?.addEventListener("click",()=>showLayer(elements.workoutLayer));
+byId("wellnessFinishBack")?.addEventListener("click",()=>showLayer(elements.workoutLayer));
 elements.distanceInput?.addEventListener("input",()=>{ if(state.workout)elements.finishQuestion.textContent=`Deseja adicionar ${String(state.workout.exerciseName||"atividade").toLowerCase()} de ${Math.max(0,Math.trunc(Number(elements.distanceInput.value||0)||0))} metros?`; });
 elements.weightCard?.addEventListener("click",()=>{ renderWeight(); showLayer(elements.weightLayer); });
 byId("wellnessWeightClose")?.addEventListener("click",hideLayers);

@@ -1,4 +1,9 @@
 .apps-home{display:none}
+#runningTaskModal .running-task-content.is-idle-layout{touch-action:pan-y;overscroll-behavior-x:contain}
+#runningTaskModal .running-task-content.is-idle-layout.home-view-swipe-transition[data-home-swipe-direction="left"]{animation:home-view-from-right .28s ease-out}
+#runningTaskModal .running-task-content.is-idle-layout.home-view-swipe-transition[data-home-swipe-direction="right"]{animation:home-view-from-left .28s ease-out}
+@keyframes home-view-from-right{from{opacity:.45;transform:translateX(10%)}to{opacity:1;transform:translateX(0)}}
+@keyframes home-view-from-left{from{opacity:.45;transform:translateX(-10%)}to{opacity:1;transform:translateX(0)}}
 #runningTaskModal .running-task-content.is-idle-layout[data-home-view="apps"]{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;padding:max(22px,env(safe-area-inset-top,0px)) max(18px,env(safe-area-inset-right,0px)) max(20px,env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));overflow:auto}
 #runningTaskModal .running-task-content.is-idle-layout[data-home-view="apps"]>:not(.apps-home){display:none!important}
 #runningTaskModal .running-task-content.is-idle-layout[data-home-view="apps"] .apps-home{width:min(100%,720px);min-height:100%;display:flex;flex-direction:column;align-items:center;color:#fff}
