@@ -2,7 +2,7 @@ import { query } from "./db.js";
 import { normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME } from "./project200-profiles.js";
 
 const PROJECT200_TIME_ZONE = process.env.PROJECT200_TIME_ZONE || "America/Sao_Paulo";
-const TRACKING_TYPES = new Set(["steps", "minutes", "series"]);
+const TRACKING_TYPES = new Set(["steps", "minutes", "series", "gps"]);
 
 function normalizeProfileName(value) {
   return normalizeStoredProject200ProfileName(value || PROJECT200_DEFAULT_PROFILE_NAME);
@@ -220,9 +220,10 @@ export async function updateProject200ExerciseProgress(userId, sessionId, payloa
   await ensureProject200WellnessSchema();
   const result = await query(
     `update project200_exercise_sessions
-     set steps = greatest(steps, $3), duration_minutes = greatest(duration_minutes, $4), updated_at = now()
+     set steps = greatest(steps, $3), duration_minutes = greatest(duration_minutes, $4),
+       distance_meters = greatest(distance_meters, $5), updated_at = now()
      where id = $1 and user_id = $2 and status = 'active' returning *`,
-    [sessionId, userId, clampInteger(payload.steps, 0, 200000), Math.max(0, Math.min(1440, Number(payload.durationMinutes || 0) || 0))]
+    [sessionId, userId, clampInteger(payload.steps, 0, 200000), Math.max(0, Math.min(1440, Number(payload.durationMinutes || 0) || 0)), clampInteger(payload.distanceMeters, 0, 10000000)]
   );
   if (!result.rows[0]) throw new Error("Treino ativo nao encontrado.");
   return normalizeWorkoutRow(await getActiveWorkoutRow(userId, result.rows[0].assigned_profile));
@@ -253,7 +254,7 @@ export async function finishProject200ExerciseSession(userId, sessionId, payload
   const result = await query(
     `update project200_exercise_sessions
      set status = 'completed', completed_at = now(), steps = greatest(steps, $3), distance_meters = greatest(distance_meters, $4),
-       duration_minutes = greatest(duration_minutes, case when tracking_type in ('minutes', 'steps') then greatest(0, extract(epoch from (now() - started_at)) / 60) else duration_minutes end),
+       duration_minutes = greatest(duration_minutes, case when tracking_type in ('minutes', 'steps', 'gps') then greatest(0, extract(epoch from (now() - started_at)) / 60) else duration_minutes end),
        updated_at = now()
      where id = $1 and user_id = $2 and status = 'active' returning *`,
     [sessionId, userId, clampInteger(payload.steps, 0, 200000), clampInteger(payload.distanceMeters, 0, 10000000)]
@@ -263,6 +264,21 @@ export async function finishProject200ExerciseSession(userId, sessionId, payload
   return normalizeWorkoutRow({ ...result.rows[0], series_count: countResult.rows[0]?.series_count || 0 });
 }
 
+export async function discardProject200ExerciseSession(userId, sessionId) {
+  await ensureProject200WellnessSchema();
+  const result = await query(
+    `delete from project200_exercise_sessions
+     where id = $1 and user_id = $2 and status = 'active'
+     returning id, exercise_name, assigned_profile`,
+    [sessionId, userId]
+  );
+  if (!result.rows[0]) throw new Error("Treino ativo nao encontrado.");
+  return {
+    id: String(result.rows[0].id),
+    exerciseName: String(result.rows[0].exercise_name || "Treino"),
+    profileName: normalizeProfileName(result.rows[0].assigned_profile)
+  };
+}
 export async function updateProject200WellnessPreferences(userId, payload = {}) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(payload.profileName);

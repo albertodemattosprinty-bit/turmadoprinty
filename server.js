@@ -63,7 +63,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, createProject200NutritionEntry, createProject200WeightEntry, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, createProject200NutritionEntry, createProject200WeightEntry, discardProject200ExerciseSession, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -15768,6 +15768,18 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "DELETE" && pathname.match(/^\/api\/200\/exercises\/[^/]+$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)$/, "$1"));
+      const discarded = await discardProject200ExerciseSession(user.id, sessionId);
+      sendJson(response, 200, { ok: true, discarded });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel excluir o treino." });
+    }
+    return;
+  }
   if (request.method === "GET" && pathname === "/api/200/sleep-history") {
     try {
       const user = await requireAuth(request, response);
