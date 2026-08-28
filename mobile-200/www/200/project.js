@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "0.95";
+const project200AppVersion = "0.96";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -3302,9 +3302,24 @@ function applyHomeViewMode() {
   document.body.setAttribute("data-home-view", mode);
   runningTaskContent?.setAttribute("data-home-view", mode);
 }
++function syncRunningPlayerSelectionToAudio() {
+  const audioUrl = normalizeRunningTrackUrl(runningAudio?.currentSrc || runningAudio?.src || "");
+  if (!audioUrl || !Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) return false;
+  const match = findRunningTrackByUrl(audioUrl);
+  if (!match?.station || !match?.track) return false;
+  const stationIndex = state.runningPlayer.stations.indexOf(match.station);
+  if (stationIndex < 0) return false;
+  state.runningPlayer.stationIndex = stationIndex;
+  state.runningPlayer.playOrderUrls = buildRunningPlayOrder(match.station);
+  const trackIndex = state.runningPlayer.playOrderUrls.findIndex((url) => normalizeRunningTrackUrl(url) === audioUrl);
+  state.runningPlayer.playOrderIndex = trackIndex >= 0 ? trackIndex : 0;
+  state.runningPlayer.isPlaying = Boolean(runningAudio && !runningAudio.paused);
+  return true;
+}
 let homeViewSwipeAnimationTimer = 0;
 
 function selectHomeViewMode(mode, { animate = false, direction = "" } = {}) {
+  const hadSynchronizedPlayback = syncRunningPlayerSelectionToAudio();
   const nextMode = normalizeHomeViewMode(mode);
   const changed = normalizeHomeViewMode(state.options.homeViewMode) !== nextMode;
   state.options.homeViewMode = nextMode;
@@ -3313,6 +3328,10 @@ function selectHomeViewMode(mode, { animate = false, direction = "" } = {}) {
   saveOptionsConfig();
   renderOptionsModal();
   renderHomeRunningTask();
+  if (hadSynchronizedPlayback) {
+    syncRunningPlayerSelectionToAudio();
+    renderRunningMusicPlayer();
+  }
   if (!animate || !changed || !runningTaskContent) return;
   runningTaskContent.dataset.homeSwipeDirection = direction === "right" ? "right" : "left";
   runningTaskContent.classList.remove("home-view-swipe-transition");
@@ -4375,7 +4394,7 @@ function renderHomeRunningTask() {
   state.runningPlayer.currentTaskTitle = String(action?.title || "").trim();
   const runningActionId = String(action?.id || "").trim();
   if (runningActionId && state.runningPlayer.defaultAppliedActionId !== runningActionId) {
-    applyRunningTaskDefaultSelection(action);
+    if (!syncRunningPlayerSelectionToAudio()) applyRunningTaskDefaultSelection(action);
     state.runningPlayer.defaultAppliedActionId = runningActionId;
   }
   const hasRunning = Boolean(action);
@@ -4560,8 +4579,9 @@ function loadRunningMusicStations() {
 }
 
 async function loadRunningMusicStationsNow() {
-  const previousTrackUrl = String(getCurrentRunningTrack()?.url || "").trim();
-  const previousStationName = String(getCurrentRunningStation()?.name || "").trim();
+  const previousPlayback = getRunningPlaybackState();
+  const previousTrackUrl = String(runningAudio?.currentSrc || runningAudio?.src || previousPlayback.track?.url || "").trim();
+  const previousStationName = String(previousPlayback.station?.name || getCurrentRunningStation()?.name || "").trim();
   const fallbackStations = Object.entries(runningMusicStationSeeds).map(([name, files]) => {
     if (name === "Ambience") {
       return {
@@ -4685,8 +4705,8 @@ async function loadRunningMusicStationsNow() {
     // keep local/fallback stations
   }
 
+  if (!syncRunningPlayerSelectionToAudio()) applyRunningTaskDefaultSelection();
   renderRunningMusicPlayer();
-  applyRunningTaskDefaultSelection();
   primeRunningTrackBuffer();
 }
 
@@ -20459,13 +20479,16 @@ runningTaskMissionButton?.addEventListener("click", () => {
   void openRunningMissionQuickModal();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
-appsHomeMusicButton?.addEventListener("click", () => {
++function openSynchronizedRunningMusicList() {
+  syncRunningPlayerSelectionToAudio();
   state.startDecisionContext.actionId = "";
   state.runningPlayer.configurationMode = false;
   state.runningPlayer.configurationTaskTitle = "";
-  state.runningPlayer.configurationScope = "global";
+  state.runningPlayer.configurationScope = "task";
+  renderRunningMusicPlayer();
   void openRunningMusicListModal();
-});
+}
+appsHomeMusicButton?.addEventListener("click", openSynchronizedRunningMusicList);
 appsHomeMemoriesButton?.addEventListener("click", () => {
   document.getElementById("lifeCaptureHomeButton")?.click();
 });
@@ -20492,13 +20515,7 @@ homeRunningMusicButton?.addEventListener("click", toggleRunningPlayPause);
 homeRunningMissionButton?.addEventListener("click", () => {
   void openRunningMissionQuickModal();
 });
-runningPlayerList?.addEventListener("click", () => {
-  state.startDecisionContext.actionId = "";
-  state.runningPlayer.configurationMode = false;
-  state.runningPlayer.configurationTaskTitle = "";
-  state.runningPlayer.configurationScope = "task";
-  openRunningMusicListModal();
-});
+runningPlayerList?.addEventListener("click", openSynchronizedRunningMusicList);
 runningPlayerPrev?.addEventListener("click", () => {
   void moveRunningTrack(-1);
 });
