@@ -63,6 +63,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
+import { addProject200ExerciseSeries, createProject200NutritionEntry, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -4443,6 +4444,100 @@ async function requestProject200MarinReply({ apiKey, user, profileName, personaK
     route,
     latencyMs: Date.now() - startedAt
   };
+}
+
+const PROJECT200_NUTRITION_ANALYSIS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["description", "calories", "qualityScore", "feedback", "components"],
+  properties: {
+    description: { type: "string" },
+    calories: { type: "number", minimum: 0, maximum: 20000 },
+    qualityScore: { type: "integer", minimum: 0, maximum: 100 },
+    feedback: { type: "string" },
+    components: {
+      type: "array",
+      maxItems: 12,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "calories"],
+        properties: {
+          name: { type: "string" },
+          calories: { type: "number", minimum: 0, maximum: 10000 }
+        }
+      }
+    }
+  }
+};
+
+async function analyzeProject200NutritionWithLuna(apiKey, description) {
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: PROJECT200_MARIN_MODEL_LUNA,
+      instructions: [
+        "Voce e Luna, nutricionista virtual do iLife. Estime calorias com a maior precisao razoavel a partir das porcoes informadas.",
+        "Se a quantidade nao foi dada, use uma porcao brasileira comum e deixe claro no feedback que se trata de uma estimativa.",
+        "A nota qualityScore mede qualidade alimentar de 0 a 100, sem moralizar a pessoa.",
+        "Doces e refrigerantes comuns ficam proximos de 0. Coxinha fica por volta de 20 pelo frango. Misto quente fica por volta de 40 pelo pao e mussarela.",
+        "Alimentos naturais, pouco processados, variados e equilibrados puxam a nota para 100.",
+        "Considere preparo, acucar, fritura, fibra, proteina, frutas, legumes, verduras e nivel de processamento.",
+        "O feedback deve ter no maximo 260 caracteres, ser direto e util. Nao faca diagnostico nem prescricao medica. Responda em portugues do Brasil."
+      ].join("\n"),
+      input: String(description || "").trim().slice(0, 500),
+      reasoning: { effort: "medium" },
+      text: {
+        verbosity: "low",
+        format: {
+          type: "json_schema",
+          name: "project200_nutrition_analysis",
+          strict: true,
+          schema: PROJECT200_NUTRITION_ANALYSIS_SCHEMA
+        }
+      },
+      max_output_tokens: 900,
+      store: false
+    })
+  });
+  const parsed = await readApiResponse(openAiResponse);
+  if (!openAiResponse.ok) throw new Error("Luna nao conseguiu analisar essa refeicao agora.");
+  return parseProject200MarinReply(parsed.data);
+}
+
+async function handleProject200NutritionAnalyzeRequest(request, response) {
+  const user = await requireAuth(request, response);
+  if (!user) return;
+  try {
+    const body = await readJsonBody(request);
+    const description = String(body?.description || "").trim().slice(0, 500);
+    if (description.length < 2) throw new Error("Diga para Luna o que voce comeu.");
+    const consumedAt = new Date(body?.consumedAt || "");
+    if (Number.isNaN(consumedAt.getTime())) {
+      sendJson(response, 200, { ok: true, needsTime: true, question: "Que horas voce comeu isso?" });
+      return;
+    }
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      sendJson(response, 503, { error: "OPENAI_API_KEY nao configurada no backend." });
+      return;
+    }
+    const analysis = await analyzeProject200NutritionWithLuna(apiKey, description);
+    const entry = await createProject200NutritionEntry(user.id, {
+      profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME,
+      description: String(analysis?.description || description).trim() || description,
+      calories: analysis?.calories,
+      qualityScore: analysis?.qualityScore,
+      feedback: analysis?.feedback,
+      components: analysis?.components,
+      consumedAt
+    });
+    const dashboard = await getProject200WellnessDashboard(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME);
+    sendJson(response, 201, { ok: true, needsTime: false, entry, dashboard });
+  } catch (error) {
+    sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel registrar a refeicao." });
+  }
 }
 
 async function handleProject200MarinBootstrapRequest(request, response) {
@@ -15559,6 +15654,86 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/200/nutrition/analyze") {
+    await handleProject200NutritionAnalyzeRequest(request, response);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/200/wellness") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const profile = requestUrl.searchParams.get("profile") || PROJECT200_DEFAULT_PROFILE_NAME;
+      const dashboard = await getProject200WellnessDashboard(user.id, profile);
+      sendJson(response, 200, { ok: true, dashboard });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar saude e exercicios." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/exercises/start") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const workout = await startProject200ExerciseSession(user.id, {
+        profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME,
+        exerciseId: body?.exerciseId,
+        exerciseName: body?.exerciseName,
+        category: body?.category,
+        trackingType: body?.trackingType,
+        equipment: body?.equipment
+      });
+      sendJson(response, 201, { ok: true, workout });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel iniciar o treino." });
+    }
+    return;
+  }
+
+  if (request.method === "PATCH" && pathname.match(/^\/api\/200\/exercises\/[^/]+\/progress$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)\/progress$/, "$1"));
+      const workout = await updateProject200ExerciseProgress(user.id, sessionId, body || {});
+      sendJson(response, 200, { ok: true, workout });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar o progresso." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/exercises\/[^/]+\/series$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)\/series$/, "$1"));
+      const result = await addProject200ExerciseSeries(user.id, sessionId, body?.repetitions);
+      sendJson(response, 201, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar a serie." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/exercises\/[^/]+\/finish$/)) {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)\/finish$/, "$1"));
+      const workout = await finishProject200ExerciseSession(user.id, sessionId, body || {});
+      sendJson(response, 200, { ok: true, workout });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel encerrar o treino." });
+    }
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/200/sleep-history") {
     try {
       const user = await requireAuth(request, response);
@@ -16330,6 +16505,9 @@ void ensureEscreverSchema().catch((error) => {
 });
 void ensureProject200OnboardingSchema().catch((error) => {
   console.error("Falha ao preparar o onboarding do /200:", error);
+});
+void ensureProject200WellnessSchema().catch((error) => {
+  console.error("Falha ao preparar nutricao e exercicios do /200:", error);
 });
 
 

@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/200/life-capture.css?v=20260802-gallery-inline-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/books.css?v=20260818-apps-books-v1" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260828-wellness-v1" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -162,7 +163,7 @@
         </button>
       </div>
       <div class="running-home-brand">
-        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" data-app-version="0.89" aria-label="Baixar atualização mais recente do iLife, versão atual 0.89" title="Baixar atualização do iLife · versão 0.89" />
+        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" data-app-version="0.92" aria-label="Baixar atualização mais recente do iLife, versão atual 0.92" title="Baixar atualização do iLife · versão 0.92" />
         <button class="marin-home-entry" type="button" id="marinHomeEntryButton" aria-label="Conversar com Marin">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
@@ -179,6 +180,9 @@
           <button class="apps-home-item" type="button" id="appsHomeMusicButton" aria-label="Abrir Música"><img src="/200/apps/musica.png" alt="" aria-hidden="true" /><span>Música</span></button>
           <button class="apps-home-item" type="button" data-open-modal="actionsModal" aria-label="Abrir Ações"><img src="/200/apps/acoes.png" alt="" aria-hidden="true" /><span>Ações</span></button>
           <button class="apps-home-item" type="button" id="appsHomeMemoriesButton" aria-label="Abrir Memórias"><img src="/200/apps/memorias.png" alt="" aria-hidden="true" /><span>Memórias</span></button>
+          <button class="apps-home-item" type="button" id="appsHomeExercisesButton" aria-label="Abrir Exercícios"><img src="/200/apps/exercicios.png" alt="" aria-hidden="true" /><span>Exercícios</span></button>
+          <button class="apps-home-item" type="button" id="appsHomeConversationsButton" aria-label="Abrir Conversas"><img src="/200/apps/conversas.png" alt="" aria-hidden="true" /><span>Conversas</span></button>
+          <button class="apps-home-item" type="button" id="appsHomeNutritionButton" aria-label="Abrir Nutrição"><img src="/200/apps/nutricao.png" alt="" aria-hidden="true" /><span>Nutrição</span></button>
         </div>
       </section>
       <div class="running-task-title-row">
@@ -2031,6 +2035,69 @@
     </div>
   </section>
 
+  <section class="workspace-modal wellness-modal" id="wellnessModal" aria-hidden="true" aria-label="Nutrição e exercícios">
+    <div class="wellness-shell">
+      <header class="wellness-header">
+        <button class="wellness-round-button" type="button" id="wellnessCloseButton" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+        </button>
+        <div><span>iLife</span><h1 id="wellnessTitle">Nutrição</h1></div>
+        <img class="wellness-header-icon" id="wellnessHeaderIcon" src="/200/apps/nutricao.png" alt="" aria-hidden="true" />
+      </header>
+      <nav class="wellness-tabs" aria-label="Saúde">
+        <button type="button" class="active" data-wellness-tab="nutrition">Nutrição</button>
+        <button type="button" data-wellness-tab="exercises">Exercícios</button>
+      </nav>
+      <main class="wellness-main">
+        <section class="wellness-pane active" data-wellness-pane="nutrition">
+          <div class="wellness-summary-grid">
+            <article class="wellness-summary-card wellness-calories-card"><span>Calorias hoje</span><strong><b id="wellnessCaloriesToday">0</b> kcal</strong><small id="wellnessMealCount">Nenhum alimento registrado</small></article>
+            <article class="wellness-summary-card wellness-quality-card"><span>Qualidade da alimentação</span><strong><b id="wellnessQualityToday">0</b>%</strong><div class="wellness-quality-track"><i id="wellnessQualityFill"></i></div></article>
+          </div>
+          <section class="wellness-luna-card">
+            <div class="wellness-luna-head"><span class="wellness-luna-avatar">L</span><div><strong>Luna Nutrição</strong><small>Calorias aproximadas e qualidade alimentar</small></div></div>
+            <div class="wellness-luna-message" id="wellnessLunaMessage">Me conte o que você comeu e a quantidade. Se não disser o horário, eu pergunto antes de guardar.</div>
+            <form class="wellness-food-form" id="wellnessFoodForm">
+              <textarea id="wellnessFoodInput" rows="2" maxlength="500" placeholder="Ex.: comi uma coxinha e tomei uma lata de refrigerante às 15h"></textarea>
+              <div class="wellness-time-question" id="wellnessTimeQuestion" hidden>
+                <label>Que horas você comeu isso?<input type="time" id="wellnessFoodTime" /></label>
+              </div>
+              <button type="submit" id="wellnessFoodSend">Analisar e guardar</button>
+            </form>
+            <p class="wellness-status" id="wellnessNutritionStatus" aria-live="polite"></p>
+          </section>
+          <section class="wellness-list-section"><header><div><span>Hoje</span><h2>Sua alimentação</h2></div></header><div class="wellness-meal-list" id="wellnessMealList"></div></section>
+        </section>
+        <section class="wellness-pane" data-wellness-pane="exercises">
+          <section class="wellness-exercise-hero"><img src="/200/apps/exercicios.png" alt="Tênis, garrafa e peso representando exercícios" /><div><span>Movimente seu dia</span><h2>60 exercícios populares</h2><p>40 para musculação e 20 para condicionamento e perda de gordura.</p></div></section>
+          <section class="wellness-active-workout" id="wellnessActiveWorkout" hidden>
+            <span>Treino em andamento</span><h2 id="wellnessWorkoutName">Caminhar</h2>
+            <div class="wellness-workout-counter" id="wellnessWorkoutCounter">00:00</div>
+            <small id="wellnessWorkoutDetail">Progresso salvo no seu perfil</small>
+            <div class="wellness-workout-actions">
+              <button type="button" class="primary" id="wellnessWorkoutPrimary">Finalizar série</button>
+              <button type="button" id="wellnessWorkoutFinish">Encerrar treino</button>
+            </div>
+          </section>
+          <div class="wellness-exercise-filters"><button type="button" class="active" data-exercise-filter="all">Todos</button><button type="button" data-exercise-filter="strength">Musculação · 40</button><button type="button" data-exercise-filter="fat_loss">Perder gordura · 20</button></div>
+          <div class="wellness-exercise-grid" id="wellnessExerciseGrid"></div>
+        </section>
+      </main>
+      <div class="wellness-detail-layer" id="wellnessExerciseDetail" hidden>
+        <article class="wellness-detail-card">
+          <button class="wellness-detail-close" type="button" id="wellnessExerciseDetailClose" aria-label="Fechar">×</button>
+          <img src="/200/apps/exercicios.png" alt="" aria-hidden="true" />
+          <span id="wellnessExerciseCategory">Musculação</span><h2 id="wellnessExerciseName">Agachamento</h2>
+          <p id="wellnessExerciseEquipment"></p><ol id="wellnessExerciseInstructions"></ol>
+          <button class="wellness-start-button" type="button" id="wellnessExerciseStart">Iniciar série</button>
+        </article>
+      </div>
+      <div class="wellness-reps-layer" id="wellnessRepsLayer" hidden>
+        <form class="wellness-reps-card" id="wellnessRepsForm"><span>Série concluída</span><h2>Quantos movimentos você fez?</h2><input type="number" id="wellnessRepsInput" min="1" max="10000" inputmode="numeric" placeholder="12" /><div><button type="button" id="wellnessRepsCancel">Voltar</button><button type="submit">Guardar série</button></div></form>
+      </div>
+    </div>
+  </section>
+
   <button class="tutor-unread-alert" type="button" id="tutorUnreadAlert" aria-label="Abrir novas mensagens" hidden>
     <span class="tutor-unread-avatar-frame">
       <img id="tutorUnreadAvatar" alt="" hidden />
@@ -2043,6 +2110,7 @@
   <script type="module" src="/200/project.js?v=0.95"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
   <script src="/200/books.js?v=20260818-apps-books-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260828-wellness-v1"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260730-admin-texts-v1"></script>
 </body>
