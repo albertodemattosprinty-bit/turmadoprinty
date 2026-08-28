@@ -39,3 +39,72 @@
 .wellness-reps-layer{place-items:center}.wellness-reps-card{max-width:420px;text-align:center;border-radius:26px}.wellness-reps-card h2{font:800 1.25rem/1.35 "Sora",sans-serif}.wellness-reps-card input{width:100%;height:76px;margin:12px 0;border:1px solid rgba(148,163,184,.2);border-radius:18px;background:#07111f;color:#fff;text-align:center;font:800 2rem "Sora",sans-serif}.wellness-reps-card>div{display:grid;grid-template-columns:1fr 1fr;gap:9px}.wellness-reps-card button{min-height:46px;border:0;border-radius:14px;background:#334155;color:#fff;font-weight:900}.wellness-reps-card button[type=submit]{background:#10b981;color:#032b2a}
 @media(max-width:620px){.wellness-header{height:70px;padding-left:14px;padding-right:14px}.wellness-tabs,.wellness-pane{padding-left:12px;padding-right:12px}.wellness-summary-card{min-height:116px;padding:14px;border-radius:20px}.wellness-summary-card strong b{font-size:1.9rem}.wellness-exercise-grid{grid-template-columns:1fr}.wellness-exercise-hero{padding:14px;gap:12px}.wellness-exercise-hero img{width:78px;height:78px}.wellness-exercise-hero h2{font-size:1.05rem}.wellness-workout-actions{grid-template-columns:1fr}.wellness-detail-layer{padding:10px}.wellness-detail-card{padding:22px 18px}}
 @media(max-width:370px){.wellness-summary-grid{grid-template-columns:1fr}.wellness-summary-card{min-height:100px}.wellness-exercise-hero p{display:none}}
+
+/* O wellness acompanha as mesmas cores e o mesmo fundo escolhidos no tema do /200. */
+.wellness-modal{
+  --wellness-text:#fff;
+  --wellness-soft:rgba(255,255,255,.86);
+  --wellness-muted:rgba(255,255,255,.7);
+  --wellness-line:rgba(255,255,255,.22);
+  --wellness-surface:rgba(7,17,31,.72);
+  --wellness-surface-strong:rgba(7,17,31,.82);
+  --wellness-surface-soft:rgba(255,255,255,.08);
+  --wellness-field:rgba(3,10,24,.54);
+  --wellness-button:rgba(255,255,255,.11);
+  --wellness-backdrop:rgba(2,6,23,.62);
+  --wellness-sticky:rgba(7,17,31,.92);
+  --wellness-shell-tint:linear-gradient(180deg,rgba(0,0,0,.02),rgba(0,0,0,.16));
+  color:var(--wellness-text);
+  text-shadow:0 1px 3px rgba(0,0,0,.42);
+  background:radial-gradient(circle at top,rgba(120,126,153,.18),transparent 36%),linear-gradient(145deg,#05070f 0%,#101729 45%,#070b15 100%);
+}
+body[data-background-theme="black"] .wellness-modal{background:radial-gradient(circle at top,rgba(120,126,153,.18),transparent 36%),linear-gradient(145deg,#05070f 0%,#101729 45%,#070b15 100%);--wellness-surface:rgba(16,23,41,.88);--wellness-surface-strong:rgba(7,11,21,.96);--wellness-field:rgba(3,7,16,.86);--wellness-sticky:rgba(7,11,21,.96)}
+body[data-background-theme="orange"] .wellness-modal{background:radial-gradient(circle at top left,rgba(255,233,151,.3),transparent 34%),linear-gradient(145deg,#ff7a18 0%,#ff4d2d 46%,#c21807 100%);--wellness-surface:rgba(104,28,8,.78);--wellness-surface-strong:rgba(82,20,6,.94);--wellness-field:rgba(76,18,5,.86);--wellness-sticky:rgba(126,29,7,.96)}
+body[data-background-theme="bluevivid"] .wellness-modal{background:radial-gradient(circle at top left,rgba(149,234,255,.3),transparent 34%),linear-gradient(145deg,#16a3ff 0%,#0b63ff 52%,#0037c4 100%);--wellness-surface:rgba(4,48,124,.8);--wellness-surface-strong:rgba(2,35,96,.94);--wellness-field:rgba(2,32,90,.88);--wellness-sticky:rgba(0,55,196,.96)}
+body[data-background-theme="pinkstrong"] .wellness-modal{background:radial-gradient(circle at top left,rgba(255,190,216,.28),transparent 36%),linear-gradient(145deg,#ff2f92 0%,#ff1660 48%,#b10c53 100%);--wellness-surface:rgba(102,8,53,.8);--wellness-surface-strong:rgba(78,6,40,.94);--wellness-field:rgba(74,5,38,.88);--wellness-sticky:rgba(139,9,66,.96)}
+body[data-background-theme="bluedark"] .wellness-modal{background:radial-gradient(circle at top left,rgba(125,187,255,.22),transparent 36%),linear-gradient(145deg,#0d2d8f 0%,#09206b 44%,#020d37 100%);--wellness-surface:rgba(5,16,58,.86);--wellness-surface-strong:rgba(2,10,42,.96);--wellness-field:rgba(2,9,39,.9);--wellness-sticky:rgba(2,13,55,.97)}
+body[data-background-theme="brown"] .wellness-modal{background:radial-gradient(circle at top left,rgba(244,197,139,.24),transparent 34%),linear-gradient(145deg,#9e5a2d 0%,#6b321b 48%,#31140b 100%);--wellness-surface:rgba(73,33,18,.84);--wellness-surface-strong:rgba(48,19,10,.95);--wellness-field:rgba(43,17,9,.9);--wellness-sticky:rgba(49,20,11,.97)}
+body[data-background-theme="edge"] .wellness-modal{background:radial-gradient(circle at top left,rgba(173,252,246,.28),transparent 34%),linear-gradient(145deg,#00b7ff 0%,#0c88f2 28%,#12b5c9 58%,#23d1a1 100%);--wellness-surface:rgba(7,48,95,.78);--wellness-surface-strong:rgba(5,36,76,.94);--wellness-field:rgba(4,32,69,.88);--wellness-sticky:rgba(7,87,142,.96)}
+body[data-background-theme="light"] .wellness-modal{background:url("/200/background-light.png") center center/cover no-repeat;--wellness-surface:rgba(9,43,102,.82);--wellness-surface-strong:rgba(7,35,84,.95);--wellness-field:rgba(5,29,72,.9);--wellness-shell-tint:linear-gradient(180deg,rgba(5,28,70,.5),rgba(5,28,70,.72));--wellness-sticky:rgba(8,53,116,.97)}
+body[data-background-theme="white"] .wellness-modal{
+  --wellness-text:#2f3640;
+  --wellness-soft:rgba(47,54,64,.84);
+  --wellness-muted:rgba(47,54,64,.66);
+  --wellness-line:rgba(47,54,64,.18);
+  --wellness-surface:rgba(255,255,255,.58);
+  --wellness-surface-strong:rgba(255,255,255,.82);
+  --wellness-surface-soft:rgba(47,54,64,.07);
+  --wellness-field:rgba(255,255,255,.76);
+  --wellness-button:rgba(47,54,64,.09);
+  --wellness-backdrop:rgba(47,54,64,.18);
+  --wellness-sticky:rgba(242,242,237,.94);
+  --wellness-shell-tint:linear-gradient(180deg,rgba(255,255,255,.05),rgba(47,54,64,.03));
+  text-shadow:none;
+  background:radial-gradient(circle at top left,rgba(255,255,255,.92),transparent 38%),linear-gradient(145deg,#f8f8f5 0%,#f2f2ed 48%,#ecece7 100%);
+}
+.wellness-shell{background:var(--wellness-shell-tint);color:var(--wellness-text)}
+.wellness-header{border-color:var(--wellness-line);background:var(--wellness-surface-soft);backdrop-filter:blur(16px)}
+.wellness-header h1,.wellness-summary-card strong,.wellness-summary-card strong b,.wellness-luna-head strong,.wellness-list-section header h2,.wellness-meal-item strong,.wellness-exercise-hero h2,.wellness-exercise-copy strong,.wellness-active-workout h2,.wellness-detail-card h2,.wellness-reps-card h2{color:var(--wellness-text)}
+.wellness-round-button{border-color:var(--wellness-line);background:var(--wellness-button);color:var(--wellness-text)}
+.wellness-tabs{background:var(--wellness-surface-soft)}
+.wellness-tabs button{background:var(--wellness-button);color:var(--wellness-muted)}
+.wellness-summary-card,.wellness-luna-card,.wellness-list-section,.wellness-exercise-item{border-color:var(--wellness-line);background:var(--wellness-surface);color:var(--wellness-text);backdrop-filter:blur(16px)}
+.wellness-calories-card{background:linear-gradient(145deg,rgba(16,185,129,.2),var(--wellness-surface-strong))}
+.wellness-quality-card{background:linear-gradient(145deg,rgba(34,211,238,.18),var(--wellness-surface-strong))}
+.wellness-summary-card>span,.wellness-summary-card small,.wellness-luna-head small,.wellness-meal-empty,.wellness-meal-item small,.wellness-meal-item time,.wellness-meal-score span,.wellness-exercise-copy small,.wellness-exercise-chevron,.wellness-active-workout small,.wellness-detail-card>p{color:var(--wellness-muted)}
+.wellness-luna-message,.wellness-meal-item{background:var(--wellness-surface-soft);color:var(--wellness-soft)}
+.wellness-food-form textarea,.wellness-time-question input,.wellness-reps-card input{border-color:var(--wellness-line);background:var(--wellness-field);color:var(--wellness-text)}
+.wellness-food-form textarea::placeholder,.wellness-reps-card input::placeholder{color:var(--wellness-muted)}
+.wellness-time-question{color:var(--wellness-text);background:rgba(245,158,11,.14)}
+.wellness-exercise-hero{border-color:var(--wellness-line);background:linear-gradient(135deg,rgba(16,185,129,.2),rgba(34,211,238,.12),var(--wellness-surface-strong));color:var(--wellness-text);backdrop-filter:blur(16px)}
+.wellness-exercise-hero p{color:var(--wellness-soft)}
+.wellness-exercise-filters{background:var(--wellness-sticky);backdrop-filter:blur(16px)}
+.wellness-exercise-filters button{border-color:var(--wellness-line);background:var(--wellness-button);color:var(--wellness-soft)}
+.wellness-exercise-item{color:var(--wellness-text)}
+.wellness-active-workout{border-color:var(--wellness-line);background:radial-gradient(circle at 80% 0,rgba(34,211,238,.16),transparent 38%),var(--wellness-surface-strong);color:var(--wellness-text);backdrop-filter:blur(16px)}
+.wellness-workout-actions button,.wellness-reps-card button{border-color:var(--wellness-line);background:var(--wellness-button);color:var(--wellness-text)}
+.wellness-detail-layer,.wellness-reps-layer{background:var(--wellness-backdrop)}
+.wellness-detail-card,.wellness-reps-card{border-color:var(--wellness-line);background:var(--wellness-surface-strong);color:var(--wellness-text)}
+.wellness-detail-card li{color:var(--wellness-soft)}
+.wellness-detail-close{background:var(--wellness-button);color:var(--wellness-text)}
+.wellness-tabs button.active,.wellness-food-form>button,.wellness-start-button,.wellness-workout-actions button.primary,.wellness-reps-card button[type=submit],.wellness-luna-avatar{text-shadow:none}
