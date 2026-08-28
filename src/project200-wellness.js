@@ -31,8 +31,22 @@ function normalizeWorkoutRow(row) {
     equipment: String(row.equipment || ""), status: String(row.status || "active"),
     startedAt: new Date(row.started_at).toISOString(), completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
     durationMinutes: Math.max(0, Number(row.duration_minutes || 0)), steps: Math.max(0, Math.trunc(Number(row.steps || 0) || 0)),
-    totalReps: Math.max(0, Math.trunc(Number(row.total_reps || 0) || 0)), seriesCount: Math.max(0, Math.trunc(Number(row.series_count || 0) || 0))
+    distanceMeters: Math.max(0, Math.trunc(Number(row.distance_meters || 0) || 0)),
+    targetSeries: Math.max(0, Math.trunc(Number(row.target_series || 0) || 0)),
+    targetReps: Math.max(0, Math.trunc(Number(row.target_reps || 0) || 0)),
+    targetMinutes: Math.max(0, Number(row.target_minutes || 0)),
+    totalReps: Math.max(0, Math.trunc(Number(row.total_reps || 0) || 0)), seriesCount: Math.max(0, Math.trunc(Number(row.series_count || 0) || 0)),
+    series: (Array.isArray(row.series_items) ? row.series_items : []).map((item) => ({
+      seriesNumber: Math.max(1, Math.trunc(Number(item?.seriesNumber || item?.series_number || 1))),
+      repetitions: Math.max(0, Math.trunc(Number(item?.repetitions || 0))),
+      targetRepetitions: Math.max(0, Math.trunc(Number(item?.targetRepetitions || item?.target_repetitions || 0)))
+    }))
   };
+}
+
+function normalizeWeightRow(row) {
+  if (!row?.id) return null;
+  return { id: String(row.id), weightKg: Number(row.weight_kg || 0), measuredAt: new Date(row.measured_at).toISOString() };
 }
 
 export async function ensureProject200WellnessSchema() {
@@ -52,22 +66,45 @@ export async function ensureProject200WellnessSchema() {
     duration_minutes numeric(10,2) not null default 0, steps integer not null default 0, total_reps integer not null default 0,
     created_at timestamptz not null default now(), updated_at timestamptz not null default now()
   )`);
+  await query(`alter table project200_exercise_sessions add column if not exists target_series integer not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists target_reps integer not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists target_minutes numeric(10,2) not null default 0`);
+  await query(`alter table project200_exercise_sessions add column if not exists distance_meters integer not null default 0`);
   await query(`create index if not exists idx_project200_exercise_user_profile_date on project200_exercise_sessions(user_id, assigned_profile, started_at desc)`);
   await query(`create unique index if not exists idx_project200_exercise_active on project200_exercise_sessions(user_id, assigned_profile) where status = 'active'`);
   await query(`create table if not exists project200_exercise_series (
     id uuid primary key default gen_random_uuid(), session_id uuid not null references project200_exercise_sessions(id) on delete cascade,
     user_id uuid not null references users(id) on delete cascade, series_number integer not null,
-    repetitions integer not null default 0, completed_at timestamptz not null default now(), unique (session_id, series_number)
+    repetitions integer not null default 0, target_repetitions integer not null default 0,
+    completed_at timestamptz not null default now(), unique (session_id, series_number)
   )`);
   await query(`create index if not exists idx_project200_exercise_series_session on project200_exercise_series(session_id, series_number)`);
+  await query(`alter table project200_exercise_series add column if not exists target_repetitions integer not null default 0`);
+  await query(`create table if not exists project200_wellness_preferences (
+    user_id uuid not null references users(id) on delete cascade, assigned_profile text not null default 'Usuario',
+    height_cm numeric(6,2) null, askagain1 text not null default 'yes' check (askagain1 in ('yes','no')),
+    created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+    primary key (user_id, assigned_profile)
+  )`);
+  await query(`create table if not exists project200_weight_entries (
+    id uuid primary key default gen_random_uuid(), user_id uuid not null references users(id) on delete cascade,
+    assigned_profile text not null default 'Usuario', weight_kg numeric(6,2) not null check (weight_kg between 1 and 500),
+    measured_at timestamptz not null default now(), created_at timestamptz not null default now()
+  )`);
+  await query(`create index if not exists idx_project200_weight_user_profile_date on project200_weight_entries(user_id, assigned_profile, measured_at desc)`);
+
 }
 
 async function getActiveWorkoutRow(userId, profileName) {
   const result = await query(
-    `select session.*, coalesce(series.series_count, 0)::integer as series_count
+    `select session.*, coalesce(series.series_count, 0)::integer as series_count,
+       coalesce(series.series_items, '[]'::jsonb) as series_items
      from project200_exercise_sessions session
      left join lateral (
-       select count(*)::integer as series_count from project200_exercise_series item where item.session_id = session.id
+       select count(*)::integer as series_count,
+         jsonb_agg(jsonb_build_object('seriesNumber', item.series_number, 'repetitions', item.repetitions,
+           'targetRepetitions', item.target_repetitions) order by item.series_number) as series_items
+       from project200_exercise_series item where item.session_id = session.id
      ) series on true
      where session.user_id = $1 and session.assigned_profile = $2 and session.status = 'active'
      order by session.started_at desc limit 1`,
@@ -79,7 +116,7 @@ async function getActiveWorkoutRow(userId, profileName) {
 export async function getProject200WellnessDashboard(userId, profileName = PROJECT200_DEFAULT_PROFILE_NAME) {
   await ensureProject200WellnessSchema();
   const profile = normalizeProfileName(profileName);
-  const [mealResult, summaryResult, workoutResult, recentWorkoutResult] = await Promise.all([
+  const [mealResult, summaryResult, workoutResult, recentWorkoutResult, preferencesResult, weightResult] = await Promise.all([
     query(
       `select * from project200_nutrition_entries
        where user_id = $1 and assigned_profile = $2
@@ -106,9 +143,16 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
        where session.user_id = $1 and session.assigned_profile = $2 and session.status = 'completed'
        order by session.completed_at desc limit 8`,
       [userId, profile]
-    )
+    ),
+    query(`select height_cm, askagain1 from project200_wellness_preferences where user_id = $1 and assigned_profile = $2 limit 1`, [userId, profile]),
+    query(`select * from project200_weight_entries where user_id = $1 and assigned_profile = $2 order by measured_at desc limit 30`, [userId, profile])
   ]);
   const summary = summaryResult.rows[0] || {};
+  const preference = preferencesResult.rows[0] || {};
+  const weights = weightResult.rows.map(normalizeWeightRow);
+  const heightCm = preference.height_cm ? Number(preference.height_cm) : null;
+  const currentWeight = weights[0] || null;
+  const bmi = currentWeight && heightCm ? currentWeight.weightKg / ((heightCm / 100) ** 2) : null;
   return {
     profileName: profile,
     today: {
@@ -118,7 +162,13 @@ export async function getProject200WellnessDashboard(userId, profileName = PROJE
     },
     meals: mealResult.rows.map(normalizeMealRow),
     activeWorkout: normalizeWorkoutRow(workoutResult),
-    recentWorkouts: recentWorkoutResult.rows.map(normalizeWorkoutRow)
+    recentWorkouts: recentWorkoutResult.rows.map(normalizeWorkoutRow),
+    wellness: {
+      preferences: { heightCm, askagain1: preference.askagain1 === "no" ? "no" : "yes" },
+      currentWeight,
+      bmi: bmi && Number.isFinite(bmi) ? Math.round(bmi * 10) / 10 : null,
+      weightHistory: weights
+    }
   };
 }
 
@@ -153,12 +203,15 @@ export async function startProject200ExerciseSession(userId, payload = {}) {
   const exerciseId = String(payload.exerciseId || "").trim().slice(0, 80);
   const exerciseName = String(payload.exerciseName || "").trim().slice(0, 120);
   const trackingType = TRACKING_TYPES.has(payload.trackingType) ? payload.trackingType : "minutes";
+  const targetSeries = trackingType === "series" ? clampInteger(payload.targetSeries, 1, 100) : 0;
+  const targetReps = trackingType === "series" ? clampInteger(payload.targetReps, 1, 10000) : 0;
+  const targetMinutes = trackingType !== "series" ? Math.max(1, Math.min(1440, Number(payload.targetMinutes || 1) || 1)) : 0;
   if (!exerciseId || exerciseName.length < 2) throw new Error("Escolha um exercicio valido.");
   const result = await query(
     `insert into project200_exercise_sessions (
-       user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment
-     ) values ($1, $2, $3, $4, $5, $6, $7) returning *, 0::integer as series_count`,
-    [userId, profile, exerciseId, exerciseName, payload.category === "fat_loss" ? "fat_loss" : "strength", trackingType, String(payload.equipment || "").trim().slice(0, 120)]
+       user_id, assigned_profile, exercise_id, exercise_name, category, tracking_type, equipment, target_series, target_reps, target_minutes
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *, 0::integer as series_count`,
+    [userId, profile, exerciseId, exerciseName, payload.category === "fat_loss" ? "fat_loss" : "strength", trackingType, String(payload.equipment || "").trim().slice(0, 120), targetSeries, targetReps, targetMinutes]
   );
   return normalizeWorkoutRow(result.rows[0]);
 }
@@ -175,9 +228,10 @@ export async function updateProject200ExerciseProgress(userId, sessionId, payloa
   return normalizeWorkoutRow(await getActiveWorkoutRow(userId, result.rows[0].assigned_profile));
 }
 
-export async function addProject200ExerciseSeries(userId, sessionId, repetitions) {
+export async function addProject200ExerciseSeries(userId, sessionId, repetitions, targetRepetitions = 0) {
   await ensureProject200WellnessSchema();
   const reps = clampInteger(repetitions, 1, 10000);
+  const target = clampInteger(targetRepetitions, 0, 10000);
   const sessionResult = await query(
     `select * from project200_exercise_sessions where id = $1 and user_id = $2 and status = 'active' and tracking_type = 'series' limit 1`,
     [sessionId, userId]
@@ -187,24 +241,55 @@ export async function addProject200ExerciseSeries(userId, sessionId, repetitions
   const numberResult = await query(`select coalesce(max(series_number), 0) + 1 as next_number from project200_exercise_series where session_id = $1`, [sessionId]);
   const seriesNumber = Math.max(1, Math.trunc(Number(numberResult.rows[0]?.next_number || 1)));
   await query(
-    `insert into project200_exercise_series (session_id, user_id, series_number, repetitions) values ($1, $2, $3, $4)`,
-    [sessionId, userId, seriesNumber, reps]
+    `insert into project200_exercise_series (session_id, user_id, series_number, repetitions, target_repetitions) values ($1, $2, $3, $4, $5)`,
+    [sessionId, userId, seriesNumber, reps, target]
   );
   await query(`update project200_exercise_sessions set total_reps = total_reps + $3, updated_at = now() where id = $1 and user_id = $2`, [sessionId, userId, reps]);
-  return { seriesNumber, repetitions: reps, workout: normalizeWorkoutRow(await getActiveWorkoutRow(userId, session.assigned_profile)) };
+  return { seriesNumber, repetitions: reps, targetRepetitions: target, workout: normalizeWorkoutRow(await getActiveWorkoutRow(userId, session.assigned_profile)) };
 }
 
 export async function finishProject200ExerciseSession(userId, sessionId, payload = {}) {
   await ensureProject200WellnessSchema();
   const result = await query(
     `update project200_exercise_sessions
-     set status = 'completed', completed_at = now(), steps = greatest(steps, $3),
+     set status = 'completed', completed_at = now(), steps = greatest(steps, $3), distance_meters = greatest(distance_meters, $4),
        duration_minutes = greatest(duration_minutes, case when tracking_type in ('minutes', 'steps') then greatest(0, extract(epoch from (now() - started_at)) / 60) else duration_minutes end),
        updated_at = now()
      where id = $1 and user_id = $2 and status = 'active' returning *`,
-    [sessionId, userId, clampInteger(payload.steps, 0, 200000)]
+    [sessionId, userId, clampInteger(payload.steps, 0, 200000), clampInteger(payload.distanceMeters, 0, 10000000)]
   );
   if (!result.rows[0]) throw new Error("Treino ativo nao encontrado.");
   const countResult = await query(`select count(*)::integer as series_count from project200_exercise_series where session_id = $1`, [sessionId]);
   return normalizeWorkoutRow({ ...result.rows[0], series_count: countResult.rows[0]?.series_count || 0 });
+}
+
+export async function updateProject200WellnessPreferences(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const heightValue = Number(payload.heightCm);
+  const heightCm = Number.isFinite(heightValue) && heightValue >= 80 && heightValue <= 260 ? Math.round(heightValue * 10) / 10 : null;
+  const askagain1 = payload.askagain1 === "no" ? "no" : "yes";
+  const result = await query(
+    `insert into project200_wellness_preferences (user_id, assigned_profile, height_cm, askagain1)
+     values ($1, $2, $3, $4) on conflict (user_id, assigned_profile) do update
+     set height_cm = coalesce(excluded.height_cm, project200_wellness_preferences.height_cm), askagain1 = excluded.askagain1, updated_at = now()
+     returning height_cm, askagain1`,
+    [userId, profile, heightCm, askagain1]
+  );
+  return { heightCm: result.rows[0]?.height_cm ? Number(result.rows[0].height_cm) : null, askagain1: result.rows[0]?.askagain1 === "no" ? "no" : "yes" };
+}
+
+export async function createProject200WeightEntry(userId, payload = {}) {
+  await ensureProject200WellnessSchema();
+  const profile = normalizeProfileName(payload.profileName);
+  const weightKg = Math.round(Number(payload.weightKg || 0) * 100) / 100;
+  if (!Number.isFinite(weightKg) || weightKg < 1 || weightKg > 500) throw new Error("Informe um peso valido entre 1 e 500 kg.");
+  const measuredAt = new Date(payload.measuredAt || Date.now());
+  if (Number.isNaN(measuredAt.getTime())) throw new Error("Data de pesagem invalida.");
+  const result = await query(
+    `insert into project200_weight_entries (user_id, assigned_profile, weight_kg, measured_at)
+     values ($1, $2, $3, $4) returning *`,
+    [userId, profile, weightKg, measuredAt.toISOString()]
+  );
+  return normalizeWeightRow(result.rows[0]);
 }

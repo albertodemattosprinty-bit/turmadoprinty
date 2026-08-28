@@ -73,355 +73,87 @@ const EXERCISES = [...fatLossExercises, ...strengthExercises];
 const byId = (id) => document.getElementById(id);
 const modal = byId("wellnessModal");
 const elements = {
-  title: byId("wellnessTitle"), headerIcon: byId("wellnessHeaderIcon"), calories: byId("wellnessCaloriesToday"),
-  quality: byId("wellnessQualityToday"), qualityFill: byId("wellnessQualityFill"), mealCount: byId("wellnessMealCount"),
-  lunaMessage: byId("wellnessLunaMessage"), foodForm: byId("wellnessFoodForm"), foodInput: byId("wellnessFoodInput"),
-  timeQuestion: byId("wellnessTimeQuestion"), foodTime: byId("wellnessFoodTime"), foodSend: byId("wellnessFoodSend"),
-  nutritionStatus: byId("wellnessNutritionStatus"), mealList: byId("wellnessMealList"), exerciseGrid: byId("wellnessExerciseGrid"),
-  activeWorkout: byId("wellnessActiveWorkout"), workoutName: byId("wellnessWorkoutName"), workoutCounter: byId("wellnessWorkoutCounter"),
-  workoutDetail: byId("wellnessWorkoutDetail"), workoutPrimary: byId("wellnessWorkoutPrimary"), workoutFinish: byId("wellnessWorkoutFinish"),
-  detail: byId("wellnessExerciseDetail"), detailCategory: byId("wellnessExerciseCategory"), detailName: byId("wellnessExerciseName"),
-  detailEquipment: byId("wellnessExerciseEquipment"), detailInstructions: byId("wellnessExerciseInstructions"), detailStart: byId("wellnessExerciseStart"),
-  repsLayer: byId("wellnessRepsLayer"), repsForm: byId("wellnessRepsForm"), repsInput: byId("wellnessRepsInput")
+  title:byId("wellnessTitle"), headerIcon:byId("wellnessHeaderIcon"), calories:byId("wellnessCaloriesToday"), quality:byId("wellnessQualityToday"),
+  qualityFill:byId("wellnessQualityFill"), mealCount:byId("wellnessMealCount"), lunaMessage:byId("wellnessLunaMessage"), foodForm:byId("wellnessFoodForm"),
+  foodInput:byId("wellnessFoodInput"), timeQuestion:byId("wellnessTimeQuestion"), foodTime:byId("wellnessFoodTime"), foodSend:byId("wellnessFoodSend"),
+  nutritionStatus:byId("wellnessNutritionStatus"), mealList:byId("wellnessMealList"), exerciseGrid:byId("wellnessExerciseGrid"), workoutHistory:byId("wellnessWorkoutHistory"),
+  activeWorkout:byId("wellnessActiveWorkout"), workoutName:byId("wellnessWorkoutName"), workoutCounter:byId("wellnessWorkoutCounter"), workoutDetail:byId("wellnessWorkoutDetail"),
+  detail:byId("wellnessExerciseDetail"), detailCategory:byId("wellnessExerciseCategory"), detailName:byId("wellnessExerciseName"), detailEquipment:byId("wellnessExerciseEquipment"),
+  detailInstructions:byId("wellnessExerciseInstructions"), detailStart:byId("wellnessExerciseStart"), goalLayer:byId("wellnessGoalLayer"), goalForm:byId("wellnessGoalForm"), goalTitle:byId("wellnessGoalTitle"),
+  seriesGoalFields:byId("wellnessSeriesGoalFields"), minutesGoalFields:byId("wellnessMinutesGoalFields"), targetSeries:byId("wellnessTargetSeries"), targetReps:byId("wellnessTargetReps"),
+  targetMinutes:byId("wellnessTargetMinutes"), workoutLayer:byId("wellnessWorkoutLayer"), phaseLabel:byId("wellnessPhaseLabel"), phaseName:byId("wellnessPhaseExerciseName"),
+  phaseNumber:byId("wellnessPhaseNumber"), phaseUnit:byId("wellnessPhaseUnit"), phaseProgress:byId("wellnessPhaseProgressFill"), workoutPrimary:byId("wellnessWorkoutPrimary"),
+  workoutFinish:byId("wellnessWorkoutFinish"), repsLayer:byId("wellnessRepsLayer"), repsForm:byId("wellnessRepsForm"), repsInput:byId("wellnessRepsInput"),
+  repsQuestion:byId("wellnessRepsQuestion"), askAgainOff:byId("wellnessAskAgainOff"), finishLayer:byId("wellnessFinishLayer"), finishForm:byId("wellnessFinishForm"),
+  finishQuestion:byId("wellnessFinishQuestion"), distanceField:byId("wellnessDistanceField"), distanceInput:byId("wellnessDistanceInput"), weightCard:byId("wellnessWeightCard"),
+  weightCurrent:byId("wellnessWeightCurrent"), bmiSummary:byId("wellnessBmiSummary"), bmiMarker:byId("wellnessBmiMarker"), weightLayer:byId("wellnessWeightLayer"),
+  weightModalCurrent:byId("wellnessWeightModalCurrent"), bmiValue:byId("wellnessBmiValue"), bmiModalMarker:byId("wellnessBmiModalMarker"), weightForm:byId("wellnessWeightForm"),
+  heightInput:byId("wellnessHeightInput"), weightInput:byId("wellnessWeightInput"), weightHistory:byId("wellnessWeightHistory")
 };
+const phaseLayers = [elements.detail,elements.goalLayer,elements.workoutLayer,elements.repsLayer,elements.finishLayer,elements.weightLayer].filter(Boolean);
+const state = { tab:"nutrition", filter:"all", dashboard:null, selectedExercise:null, workout:null, steps:0, lastStepAt:0, motionListening:false, saveTimer:null, ticker:null, pendingMeal:"" };
 
-const state = {
-  tab: "nutrition", filter: "all", dashboard: null, selectedExercise: null, workout: null,
-  seriesInProgress: false, steps: 0, lastStepAt: 0, motionListening: false, saveTimer: null, ticker: null,
-  pendingMeal: ""
-};
+function profileName(){ return String(window.localStorage.getItem(PROFILE_KEY)||document.body.dataset.profile||"Usuario").trim()||"Usuario"; }
+async function apiRequest(path,options={}){ const headers={...(options.headers||{})}; const token=String(window.localStorage.getItem(TOKEN_KEY)||"").trim(); if(token)headers.Authorization=`Bearer ${token}`; const response=await fetch(getApiUrl(path),{...options,headers}); const payload=await response.json().catch(()=>({})); if(!response.ok)throw new Error(payload?.error||"Nao foi possivel concluir."); return payload; }
+function showLayer(layer){ phaseLayers.forEach((item)=>{ item.hidden=item!==layer; }); }
+function hideLayers(){ phaseLayers.forEach((item)=>{ item.hidden=true; }); }
+function setTab(tab){ state.tab=tab==="exercises"?"exercises":"nutrition"; document.querySelectorAll("[data-wellness-tab]").forEach((button)=>button.classList.toggle("active",button.dataset.wellnessTab===state.tab)); document.querySelectorAll("[data-wellness-pane]").forEach((pane)=>pane.classList.toggle("active",pane.dataset.wellnessPane===state.tab)); const exercising=state.tab==="exercises"; elements.title.textContent=exercising?"Exercícios":"Nutrição"; elements.headerIcon.src=exercising?"/200/apps/exercicios.png":"/200/apps/nutricao.png"; }
+function openWellness(tab){ setTab(tab); modal?.classList.add("active"); modal?.setAttribute("aria-hidden","false"); document.body.classList.add("modal-open"); hideLayers(); void loadDashboard(); }
+function closeWellness(){ hideLayers(); modal?.classList.remove("active"); modal?.setAttribute("aria-hidden","true"); if(!document.querySelector(".workspace-modal.active"))document.body.classList.remove("modal-open"); }
 
-function profileName() {
-  return String(window.localStorage.getItem(PROFILE_KEY) || document.body.dataset.profile || "Usuario").trim() || "Usuario";
-}
+function exerciseInstructions(exercise){ if(exercise.tracking==="series")return [`Prepare ${exercise.equipment.toLowerCase()} com uma carga confortável.`,exercise.cue,"Mantenha o movimento controlado e pare se sentir dor aguda."]; if(exercise.tracking==="steps")return ["Leve o celular com você para acompanhar os passos.",exercise.cue,"Ao finalizar, informe a distância total em metros."]; return [`Prepare ${exercise.equipment.toLowerCase()} e comece leve.`,exercise.cue,"Ao finalizar, informe a distância percorrida em metros."]; }
+function renderExerciseGrid(){ const visible=state.filter==="all"?EXERCISES:EXERCISES.filter((item)=>item.category===state.filter); elements.exerciseGrid.innerHTML=visible.map((exercise)=>{ const number=EXERCISES.indexOf(exercise)+1; const type=exercise.tracking==="series"?"Séries e movimentos":exercise.tracking==="steps"?"Passos e metros":"Minutos e metros"; return `<button class="wellness-exercise-item" type="button" data-exercise-id="${exercise.id}"><span class="wellness-exercise-number">${String(number).padStart(2,"0")}</span><span class="wellness-exercise-copy"><strong>${exercise.name}</strong><small>${exercise.equipment} · ${type}</small></span><span class="wellness-exercise-chevron">›</span></button>`; }).join(""); }
+function openExerciseDetail(exercise){ if(state.workout){ showLayer(elements.workoutLayer); renderWorkout(); return; } state.selectedExercise=exercise; elements.detailCategory.textContent=exercise.category==="strength"?"Musculação":"Condicionamento e perda de gordura"; elements.detailName.textContent=exercise.name; elements.detailEquipment.textContent=`Equipamento: ${exercise.equipment}`; elements.detailInstructions.innerHTML=""; exerciseInstructions(exercise).forEach((text)=>{ const li=document.createElement("li"); li.textContent=text; elements.detailInstructions.appendChild(li); }); elements.detailStart.textContent=exercise.tracking==="series"?"Iniciar série":"Iniciar exercício"; showLayer(elements.detail); }
+function openGoal(){ const isSeries=state.selectedExercise?.tracking==="series"; elements.goalTitle.textContent=isSeries?"Defina séries e movimentos":"Quantos minutos?"; elements.seriesGoalFields.hidden=!isSeries; elements.minutesGoalFields.hidden=isSeries; showLayer(elements.goalLayer); }
 
-async function apiRequest(path, options = {}) {
-  const headers = { ...(options.headers || {}) };
-  const token = String(window.localStorage.getItem(TOKEN_KEY) || "").trim();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(getApiUrl(path), { ...options, headers });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error || "Nao foi possivel concluir.");
-  return payload;
-}
-
-function setTab(tab) {
-  state.tab = tab === "exercises" ? "exercises" : "nutrition";
-  document.querySelectorAll("[data-wellness-tab]").forEach((button) => button.classList.toggle("active", button.dataset.wellnessTab === state.tab));
-  document.querySelectorAll("[data-wellness-pane]").forEach((pane) => pane.classList.toggle("active", pane.dataset.wellnessPane === state.tab));
-  const exercising = state.tab === "exercises";
-  if (elements.title) elements.title.textContent = exercising ? "Exercícios" : "Nutrição";
-  if (elements.headerIcon) elements.headerIcon.src = exercising ? "/200/apps/exercicios.png" : "/200/apps/nutricao.png";
-}
-
-function openWellness(tab) {
-  setTab(tab);
-  modal?.classList.add("active");
-  modal?.setAttribute("aria-hidden", "false");
-  document.body.classList.add("modal-open");
-  void loadDashboard();
-}
-
-function closeWellness() {
-  modal?.classList.remove("active");
-  modal?.setAttribute("aria-hidden", "true");
-  elements.detail.hidden = true;
-  elements.repsLayer.hidden = true;
-  if (!document.querySelector(".workspace-modal.active")) document.body.classList.remove("modal-open");
-}
-
-function exerciseInstructions(exercise) {
-  if (exercise.tracking === "series") return [
-    `Prepare ${exercise.equipment.toLowerCase()} com uma carga que permita movimento controlado.`,
-    exercise.cue,
-    "Faça a série sem prender a respiração. Pare se sentir dor aguda e informe quantos movimentos concluiu."
-  ];
-  if (exercise.tracking === "steps") return [
-    "Leve o celular com você para o contador acompanhar seus passos.", exercise.cue,
-    "Toque em Encerrar treino quando terminar; os passos e minutos serão guardados."
-  ];
-  return [
-    `Prepare ${exercise.equipment.toLowerCase()} e comece em intensidade leve.`, exercise.cue,
-    "Mantenha o ritmo pelo tempo desejado e toque em Encerrar treino ao finalizar."
-  ];
-}
-
-function renderExerciseGrid() {
-  if (!elements.exerciseGrid) return;
-  const visible = state.filter === "all" ? EXERCISES : EXERCISES.filter((item) => item.category === state.filter);
-  elements.exerciseGrid.innerHTML = visible.map((exercise) => {
-    const number = EXERCISES.indexOf(exercise) + 1;
-    const type = exercise.tracking === "series" ? "Séries e movimentos" : exercise.tracking === "steps" ? "Passos e minutos" : "Minutos";
-    return `<button class="wellness-exercise-item" type="button" data-exercise-id="${exercise.id}"><span class="wellness-exercise-number">${String(number).padStart(2,"0")}</span><span class="wellness-exercise-copy"><strong>${exercise.name}</strong><small>${exercise.equipment} · ${type}</small></span><span class="wellness-exercise-chevron">›</span></button>`;
-  }).join("");
-}
-
-function openExerciseDetail(exercise) {
-  state.selectedExercise = exercise;
-  elements.detailCategory.textContent = exercise.category === "strength" ? "Musculação" : "Condicionamento e perda de gordura";
-  elements.detailName.textContent = exercise.name;
-  elements.detailEquipment.textContent = `Equipamento: ${exercise.equipment}`;
-  elements.detailInstructions.innerHTML = "";
-  exerciseInstructions(exercise).forEach((instruction) => {
-    const item = document.createElement("li"); item.textContent = instruction; elements.detailInstructions.appendChild(item);
-  });
-  elements.detailStart.textContent = exercise.tracking === "series" ? "Iniciar série" : "Iniciar exercício";
-  elements.detail.hidden = false;
-}
+function renderMeals(){ const dashboard=state.dashboard||{}; const today=dashboard.today||{}; elements.calories.textContent=String(Math.round(Number(today.calories||0))); elements.quality.textContent=String(Math.round(Number(today.qualityScore||0))); elements.qualityFill.style.width=`${Math.max(0,Math.min(100,Number(today.qualityScore||0)))}%`; const count=Number(today.mealCount||0); elements.mealCount.textContent=count?`${count} ${count===1?"registro":"registros"} hoje`:"Nenhum alimento registrado"; elements.mealList.innerHTML=""; const meals=Array.isArray(dashboard.meals)?dashboard.meals:[]; if(!meals.length){ const empty=document.createElement("div"); empty.className="wellness-meal-empty"; empty.textContent="Sua tabela de hoje começa quando você contar para Luna o que comeu."; elements.mealList.appendChild(empty); return; } meals.forEach((meal)=>{ const article=document.createElement("article"); article.className="wellness-meal-item"; article.innerHTML=`<div><strong></strong><small></small><time></time></div><div class="wellness-meal-score"><b>${Math.round(Number(meal.calories||0))} kcal</b><span>${Math.round(Number(meal.qualityScore||0))}% qualidade</span></div>`; article.querySelector("strong").textContent=meal.description||"Alimento"; article.querySelector("small").textContent=meal.feedback||"Estimativa registrada por Luna."; article.querySelector("time").textContent=new Date(meal.consumedAt).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); elements.mealList.appendChild(article); }); }
+function bmiPosition(bmi){ if(!Number.isFinite(bmi))return 50; const points=[[12,4],[18.5,24],[22,50],[24.9,63],[30,86],[45,96]]; for(let i=1;i<points.length;i+=1){ if(bmi<=points[i][0]){ const [a,pa]=points[i-1], [b,pb]=points[i]; return pa+((bmi-a)/(b-a))*(pb-pa); } } return 96; }
+function renderWeight(){ const wellness=state.dashboard?.wellness||{}; const current=wellness.currentWeight; const bmi=Number(wellness.bmi); const hasBmi=Number.isFinite(bmi)&&bmi>0; const weight=current?Number(current.weightKg):null; const label=weight?weight.toFixed(weight%1?1:0):"--"; elements.weightCurrent.textContent=label; elements.weightModalCurrent.textContent=label; const summary=hasBmi?`IMC ${bmi.toFixed(1)} · toque para ver histórico`:(weight?"Adicione sua altura para calcular o IMC":"Toque para adicionar peso e altura"); elements.bmiSummary.textContent=summary; elements.bmiValue.textContent=hasBmi?`IMC ${bmi.toFixed(1)}`:"Informe sua altura"; const position=`${bmiPosition(bmi)}%`; elements.bmiMarker.style.left=position; elements.bmiModalMarker.style.left=position; elements.heightInput.value=wellness.preferences?.heightCm||""; elements.weightInput.value=""; elements.weightHistory.innerHTML=""; const history=Array.isArray(wellness.weightHistory)?wellness.weightHistory:[]; if(!history.length){ elements.weightHistory.textContent="Nenhuma pesagem registrada."; return; } history.forEach((entry)=>{ const row=document.createElement("div"); row.className="wellness-weight-history-entry"; row.innerHTML=`<strong>${Number(entry.weightKg).toFixed(1)} kg</strong><span>${new Date(entry.measuredAt).toLocaleDateString("pt-BR")}</span>`; elements.weightHistory.appendChild(row); }); }
+function elapsedSeconds(workout=state.workout){ const started=new Date(workout?.startedAt||"").getTime(); return Number.isFinite(started)?Math.max(0,Math.floor((Date.now()-started)/1000)):0; }
+function formatTimer(seconds){ const total=Math.max(0,Math.trunc(seconds||0)), hours=Math.floor(total/3600), minutes=Math.floor((total%3600)/60), secs=total%60; return hours?`${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`:`${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`; }
+function renderWorkoutHistory(){ if(!elements.workoutHistory)return; const workouts=Array.isArray(state.dashboard?.recentWorkouts)?state.dashboard.recentWorkouts:[]; elements.workoutHistory.innerHTML=""; if(!workouts.length){ elements.workoutHistory.innerHTML="<div class=\"wellness-meal-empty\">Nenhum treino concluído.</div>"; return; } workouts.forEach((workout)=>{ const row=document.createElement("div"); row.className="wellness-workout-history-entry"; const result=workout.trackingType==="series"?`${Number(workout.seriesCount||0)} séries · ${Number(workout.totalReps||0)} movimentos`:`${Number(workout.distanceMeters||0)} metros · ${Math.round(Number(workout.durationMinutes||0))} min`; row.innerHTML=`<div><strong></strong><small>${result}</small></div><time>${new Date(workout.completedAt||workout.startedAt).toLocaleDateString("pt-BR")}</time>`; row.querySelector("strong").textContent=workout.exerciseName||"Treino"; elements.workoutHistory.appendChild(row); }); }
+function renderWorkout(){ const workout=state.workout; elements.activeWorkout.hidden=!workout; if(!workout)return; const isSeries=workout.trackingType==="series", isSteps=workout.trackingType==="steps"; elements.workoutName.textContent=workout.exerciseName||"Treino"; elements.workoutCounter.textContent=isSeries?`${Number(workout.seriesCount||0)} de ${Number(workout.targetSeries||0)} séries`:isSteps?`${state.steps||Number(workout.steps||0)} passos`:formatTimer(elapsedSeconds(workout)); elements.workoutDetail.textContent="Meta e progresso guardados no seu perfil"; elements.phaseName.textContent=workout.exerciseName||"Treino"; if(isSeries){ const done=Number(workout.seriesCount||0), target=Math.max(1,Number(workout.targetSeries||1)), reps=Math.max(1,Number(workout.targetReps||1)); elements.phaseLabel.textContent=done>=target?"Meta concluída · série extra":`Série ${done+1} de ${target}`; elements.phaseNumber.textContent=String(reps); elements.phaseUnit.textContent="movimentos nesta série"; elements.workoutPrimary.textContent=`Adicionar série de ${reps} movimentos`; elements.phaseProgress.style.width=`${Math.min(100,(done/target)*100)}%`; } else { const elapsed=elapsedSeconds(workout), targetSeconds=Math.max(60,Number(workout.targetMinutes||1)*60); elements.phaseLabel.textContent=`Meta de ${Math.round(Number(workout.targetMinutes||0))} minutos`; elements.phaseNumber.textContent=isSteps?String(state.steps||Number(workout.steps||0)):formatTimer(elapsed); elements.phaseUnit.textContent=isSteps?`${formatTimer(elapsed)} · passos registrados`:"tempo de atividade"; elements.workoutPrimary.textContent="Salvar progresso"; elements.phaseProgress.style.width=`${Math.min(100,(elapsed/targetSeconds)*100)}%`; } }
+async function loadDashboard(){ try{ const payload=await apiRequest(`/api/200/wellness?profile=${encodeURIComponent(profileName())}`,{cache:"no-store"}); state.dashboard=payload?.dashboard||{}; state.workout=state.dashboard.activeWorkout||null; state.steps=Number(state.workout?.steps||0); renderMeals(); renderWeight(); renderWorkoutHistory(); renderWorkout(); if(state.workout?.trackingType==="steps")void startStepCounter(false); }catch(error){ elements.nutritionStatus.textContent=error instanceof Error?error.message:"Nao foi possivel carregar."; } }
+async function startExercise(event){ event.preventDefault(); const exercise=state.selectedExercise; if(!exercise||state.workout)return; const isSeries=exercise.tracking==="series"; const targetSeries=Math.max(1,Math.trunc(Number(elements.targetSeries.value||0)||0)); const targetReps=Math.max(1,Math.trunc(Number(elements.targetReps.value||0)||0)); const targetMinutes=Math.max(1,Number(elements.targetMinutes.value||0)||0); const submit=elements.goalForm.querySelector("button[type=submit]"); submit.disabled=true; try{ const payload=await apiRequest("/api/200/exercises/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),exerciseId:exercise.id,exerciseName:exercise.name,category:exercise.category,trackingType:exercise.tracking,equipment:exercise.equipment,targetSeries:isSeries?targetSeries:0,targetReps:isSeries?targetReps:0,targetMinutes:isSeries?0:targetMinutes})}); state.workout=payload.workout; state.steps=Number(state.workout?.steps||0); if(exercise.tracking==="steps")await startStepCounter(true); renderWorkout(); showLayer(elements.workoutLayer); }catch(error){ elements.goalForm.querySelector("p").textContent=error instanceof Error?error.message:"Nao foi possivel iniciar."; }finally{ submit.disabled=false; } }
+async function saveWorkoutProgress(){ if(!state.workout||state.workout.trackingType==="series")return; const payload=await apiRequest(`/api/200/exercises/${encodeURIComponent(state.workout.id)}/progress`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({steps:state.steps,durationMinutes:elapsedSeconds(state.workout)/60})}); state.workout=payload.workout||state.workout; }
+function seriesSummary(workout){ const series=Array.isArray(workout?.series)?workout.series:[]; const reps=series.map((item)=>Number(item.repetitions||0)); if(!reps.length)return "este treino sem séries"; const homogeneous=reps.every((value)=>value===reps[0]); if(reps.length===1)return `${reps[0]} movimentos`; if(homogeneous)return `${reps.length} séries de ${reps[0]} movimentos`; const tail=reps.length>1?`${reps.slice(0,-1).join(", ")} e ${reps.at(-1)}`:String(reps[0]); return `${reps.length} séries de ${tail} movimentos`; }
+function openRepsConfirmation(){ const reps=Math.max(1,Number(state.workout?.targetReps||1)); elements.repsInput.value=String(reps); elements.repsQuestion.textContent=`Deseja adicionar ${reps} movimentos?`; elements.askAgainOff.checked=false; showLayer(elements.repsLayer); }
+async function addSeries(repetitions){ const payload=await apiRequest(`/api/200/exercises/${encodeURIComponent(state.workout.id)}/series`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({repetitions,targetRepetitions:state.workout.targetReps})}); state.workout=payload.workout||state.workout; renderWorkout(); showLayer(elements.workoutLayer); }
+async function handleWorkoutPrimary(){ if(!state.workout)return; if(state.workout.trackingType!=="series"){ await saveWorkoutProgress(); renderWorkout(); return; } const askagain=state.dashboard?.wellness?.preferences?.askagain1||"yes"; const reps=Math.max(1,Number(state.workout.targetReps||1)); if(askagain==="no"){ try{ await addSeries(reps); }catch(error){ elements.phaseUnit.textContent=error.message; } return; } openRepsConfirmation(); }
+async function saveSeries(event){ event.preventDefault(); if(!state.workout)return; const reps=Math.max(1,Math.trunc(Number(elements.repsInput.value||0)||0)); const submit=elements.repsForm.querySelector("button[type=submit]"); submit.disabled=true; try{ if(elements.askAgainOff.checked){ const currentHeight=state.dashboard?.wellness?.preferences?.heightCm||null; await apiRequest("/api/200/wellness/preferences",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),heightCm:currentHeight,askagain1:"no"})}); state.dashboard.wellness.preferences.askagain1="no"; } await addSeries(reps); }catch(error){ elements.repsQuestion.textContent=error instanceof Error?error.message:"Nao foi possivel guardar."; }finally{ submit.disabled=false; } }
+function openFinish(){ if(!state.workout)return; const isSeries=state.workout.trackingType==="series"; elements.distanceField.hidden=isSeries; if(isSeries){ elements.finishQuestion.textContent=`Deseja adicionar ${seriesSummary(state.workout)}?`; }else{ const meters=Math.max(0,Math.trunc(Number(elements.distanceInput.value||state.workout.distanceMeters||0))); elements.distanceInput.value=meters?String(meters):""; elements.finishQuestion.textContent=`Deseja adicionar ${String(state.workout.exerciseName||"atividade").toLowerCase()} de ${meters||"X"} metros?`; } showLayer(elements.finishLayer); }
+async function finishWorkout(event){ event.preventDefault(); if(!state.workout)return; const submit=elements.finishForm.querySelector("button[type=submit]"); submit.disabled=true; try{ await saveWorkoutProgress(); const distanceMeters=state.workout.trackingType==="series"?0:Math.max(0,Math.trunc(Number(elements.distanceInput.value||0)||0)); await apiRequest(`/api/200/exercises/${encodeURIComponent(state.workout.id)}/finish`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({steps:state.steps,distanceMeters})}); stopStepCounter(); state.workout=null; state.steps=0; hideLayers(); await loadDashboard(); }catch(error){ elements.finishQuestion.textContent=error instanceof Error?error.message:"Nao foi possivel encerrar."; }finally{ submit.disabled=false; } }
+function onDeviceMotion(event){ if(!state.workout||state.workout.trackingType!=="steps")return; const acceleration=event.accelerationIncludingGravity||event.acceleration; if(!acceleration)return; const magnitude=Math.sqrt((acceleration.x||0)**2+(acceleration.y||0)**2+(acceleration.z||0)**2), now=Date.now(); if(magnitude>12.2&&magnitude<24&&now-state.lastStepAt>280){ state.lastStepAt=now; state.steps+=1; renderWorkout(); if(state.steps%10===0)void saveWorkoutProgress().catch(()=>{}); } }
+async function startStepCounter(requestPermission){ if(state.motionListening||!window.DeviceMotionEvent)return; try{ if(requestPermission&&typeof DeviceMotionEvent.requestPermission==="function"){ const permission=await DeviceMotionEvent.requestPermission(); if(permission!=="granted"){ elements.phaseUnit.textContent="Permita o sensor de movimento para contar os passos."; return; } } window.addEventListener("devicemotion",onDeviceMotion,{passive:true}); state.motionListening=true; state.saveTimer=window.setInterval(()=>void saveWorkoutProgress().catch(()=>{}),20000); }catch{ elements.phaseUnit.textContent="O contador automático não está disponível neste aparelho."; } }
+function stopStepCounter(){ if(state.motionListening)window.removeEventListener("devicemotion",onDeviceMotion); state.motionListening=false; if(state.saveTimer)window.clearInterval(state.saveTimer); state.saveTimer=null; }
+async function saveWeight(event){ event.preventDefault(); const heightCm=Number(elements.heightInput.value||0), weightKg=Number(String(elements.weightInput.value||"").replace(",",".")); if(!heightCm&&!weightKg)return; const submit=elements.weightForm.querySelector("button[type=submit]"); submit.disabled=true; try{ const askagain1=state.dashboard?.wellness?.preferences?.askagain1||"yes"; if(heightCm)await apiRequest("/api/200/wellness/preferences",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),heightCm,askagain1})}); if(weightKg){ const payload=await apiRequest("/api/200/wellness/weight",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),weightKg})}); state.dashboard=payload.dashboard||state.dashboard; }else await loadDashboard(); renderWeight(); }catch(error){ elements.bmiValue.textContent=error instanceof Error?error.message:"Nao foi possivel atualizar."; }finally{ submit.disabled=false; } }
+function extractMealTime(text){ const match=String(text||"").toLowerCase().match(/(?:\b(?:as|às)\s*)?([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?/i); return match?`${String(Number(match[1])).padStart(2,"0")}:${String(Number(match[2]||0)).padStart(2,"0")}`:""; }
+function mealDateAt(time){ if(!/^\d{2}:\d{2}$/.test(time||""))return null; const [hours,minutes]=time.split(":").map(Number),date=new Date(); date.setHours(hours,minutes,0,0); return date.toISOString(); }
+async function submitFood(event){ event.preventDefault(); const description=String(state.pendingMeal||elements.foodInput.value||"").trim(); if(description.length<2){ elements.nutritionStatus.textContent="Conte para Luna o que você comeu."; return; } const time=elements.foodTime.value||extractMealTime(description); if(!time){ state.pendingMeal=description; elements.timeQuestion.hidden=false; elements.lunaMessage.textContent="Que horas você comeu isso? Preciso do horário antes de guardar."; elements.foodTime.focus(); return; } elements.foodSend.disabled=true; elements.nutritionStatus.textContent="Luna está estimando calorias e qualidade..."; try{ const payload=await apiRequest("/api/200/nutrition/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:profileName(),description,consumedAt:mealDateAt(time)})}); state.dashboard=payload.dashboard||state.dashboard; elements.lunaMessage.textContent=payload.entry?.feedback||"Registro salvo."; elements.foodInput.value=""; elements.foodTime.value=""; state.pendingMeal=""; elements.timeQuestion.hidden=true; elements.nutritionStatus.textContent="Alimento guardado."; renderMeals(); renderWeight(); }catch(error){ elements.nutritionStatus.textContent=error instanceof Error?error.message:"Nao foi possivel analisar."; }finally{ elements.foodSend.disabled=false; } }
 
 renderExerciseGrid();
-
-function renderMeals() {
-  const dashboard = state.dashboard || {};
-  const today = dashboard.today || {};
-  elements.calories.textContent = String(Math.round(Number(today.calories || 0)));
-  elements.quality.textContent = String(Math.round(Number(today.qualityScore || 0)));
-  elements.qualityFill.style.width = `${Math.max(0, Math.min(100, Number(today.qualityScore || 0)))}%`;
-  const count = Number(today.mealCount || 0);
-  elements.mealCount.textContent = count ? `${count} ${count === 1 ? "registro" : "registros"} hoje` : "Nenhum alimento registrado";
-  elements.mealList.innerHTML = "";
-  const meals = Array.isArray(dashboard.meals) ? dashboard.meals : [];
-  if (!meals.length) {
-    const empty = document.createElement("div"); empty.className = "wellness-meal-empty"; empty.textContent = "Sua tabela de hoje começa quando você contar para Luna o que comeu."; elements.mealList.appendChild(empty); return;
-  }
-  meals.forEach((meal) => {
-    const article = document.createElement("article"); article.className = "wellness-meal-item";
-    const copy = document.createElement("div");
-    const title = document.createElement("strong"); title.textContent = meal.description || "Alimento";
-    const feedback = document.createElement("small"); feedback.textContent = meal.feedback || "Estimativa registrada por Luna.";
-    const time = document.createElement("time"); time.textContent = new Date(meal.consumedAt).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
-    copy.append(title, feedback, time);
-    const score = document.createElement("div"); score.className = "wellness-meal-score";
-    const calories = document.createElement("b"); calories.textContent = `${Math.round(Number(meal.calories || 0))} kcal`;
-    const quality = document.createElement("span"); quality.textContent = `${Math.round(Number(meal.qualityScore || 0))}% qualidade`;
-    score.append(calories, quality); article.append(copy, score); elements.mealList.appendChild(article);
-  });
-}
-
-function elapsedSeconds(workout = state.workout) {
-  const started = new Date(workout?.startedAt || "").getTime();
-  return Number.isFinite(started) ? Math.max(0, Math.floor((Date.now() - started) / 1000)) : 0;
-}
-
-function formatTimer(seconds) {
-  const total = Math.max(0, Math.trunc(seconds || 0));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  return hours ? `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}` : `${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
-}
-
-function renderWorkout() {
-  const workout = state.workout;
-  elements.activeWorkout.hidden = !workout;
-  if (!workout) return;
-  elements.workoutName.textContent = workout.exerciseName || "Treino";
-  const isSeries = workout.trackingType === "series";
-  const isSteps = workout.trackingType === "steps";
-  elements.workoutCounter.textContent = isSeries
-    ? `${Number(workout.seriesCount || 0)} séries · ${Number(workout.totalReps || 0)} movimentos`
-    : isSteps ? `${state.steps || Number(workout.steps || 0)} passos` : formatTimer(elapsedSeconds(workout));
-  elements.workoutDetail.textContent = isSeries
-    ? (state.seriesInProgress ? "Série em andamento. Ao terminar, informe os movimentos." : "Progresso salvo. Você pode iniciar uma nova série.")
-    : `${formatTimer(elapsedSeconds(workout))} de atividade · progresso salvo no seu perfil`;
-  elements.workoutPrimary.hidden = !isSeries;
-  if (isSeries) elements.workoutPrimary.textContent = state.seriesInProgress ? "Finalizar série" : "Começar nova série";
-}
-
-async function loadDashboard() {
-  try {
-    const payload = await apiRequest(`/api/200/wellness?profile=${encodeURIComponent(profileName())}`, { cache:"no-store" });
-    state.dashboard = payload?.dashboard || {};
-    state.workout = state.dashboard.activeWorkout || null;
-    state.steps = Number(state.workout?.steps || 0);
-    renderMeals(); renderWorkout();
-    if (state.workout?.trackingType === "steps") void startStepCounter(false);
-  } catch (error) {
-    elements.nutritionStatus.textContent = error instanceof Error ? error.message : "Nao foi possivel carregar.";
-  }
-}
-
-async function startExercise() {
-  const exercise = state.selectedExercise;
-  if (!exercise || state.workout) return;
-  elements.detailStart.disabled = true;
-  try {
-    const payload = await apiRequest("/api/200/exercises/start", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ profile:profileName(), exerciseId:exercise.id, exerciseName:exercise.name, category:exercise.category, trackingType:exercise.tracking, equipment:exercise.equipment })
-    });
-    state.workout = payload.workout;
-    state.steps = Number(state.workout?.steps || 0);
-    state.seriesInProgress = exercise.tracking === "series";
-    elements.detail.hidden = true;
-    if (exercise.tracking === "steps") await startStepCounter(true);
-    renderWorkout();
-  } catch (error) {
-    elements.detailEquipment.textContent = error instanceof Error ? error.message : "Nao foi possivel iniciar.";
-  } finally { elements.detailStart.disabled = false; }
-}
-
-async function finishWorkout() {
-  if (!state.workout) return;
-  elements.workoutFinish.disabled = true;
-  try {
-    await saveWorkoutProgress();
-    await apiRequest(`/api/200/exercises/${encodeURIComponent(state.workout.id)}/finish`, {
-      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ steps:state.steps })
-    });
-    stopStepCounter(); state.workout = null; state.seriesInProgress = false; renderWorkout(); await loadDashboard();
-  } catch (error) {
-    elements.workoutDetail.textContent = error instanceof Error ? error.message : "Nao foi possivel encerrar.";
-  } finally { elements.workoutFinish.disabled = false; }
-}
-
-async function saveWorkoutProgress() {
-  if (!state.workout || state.workout.trackingType === "series") return;
-  const payload = await apiRequest(`/api/200/exercises/${encodeURIComponent(state.workout.id)}/progress`, {
-    method:"PATCH", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ steps:state.steps, durationMinutes:elapsedSeconds(state.workout) / 60 })
-  });
-  state.workout = payload.workout || state.workout;
-}
-
-function onDeviceMotion(event) {
-  if (!state.workout || state.workout.trackingType !== "steps") return;
-  const acceleration = event.accelerationIncludingGravity || event.acceleration;
-  if (!acceleration) return;
-  const magnitude = Math.sqrt((acceleration.x || 0) ** 2 + (acceleration.y || 0) ** 2 + (acceleration.z || 0) ** 2);
-  const now = Date.now();
-  if (magnitude > 12.2 && magnitude < 24 && now - state.lastStepAt > 280) {
-    state.lastStepAt = now; state.steps += 1; renderWorkout();
-    if (state.steps % 10 === 0) void saveWorkoutProgress().catch(() => {});
-  }
-}
-
-async function startStepCounter(requestPermission) {
-  if (state.motionListening || !window.DeviceMotionEvent) return;
-  try {
-    if (requestPermission && typeof DeviceMotionEvent.requestPermission === "function") {
-      const permission = await DeviceMotionEvent.requestPermission();
-      if (permission !== "granted") {
-        elements.workoutDetail.textContent = "Permita o sensor de movimento para contar os passos automaticamente."; return;
-      }
-    }
-    window.addEventListener("devicemotion", onDeviceMotion, { passive:true });
-    state.motionListening = true;
-    state.saveTimer = window.setInterval(() => void saveWorkoutProgress().catch(() => {}), 20000);
-  } catch {
-    elements.workoutDetail.textContent = "O contador automático de passos não está disponível neste aparelho.";
-  }
-}
-
-function stopStepCounter() {
-  if (state.motionListening) window.removeEventListener("devicemotion", onDeviceMotion);
-  state.motionListening = false;
-  if (state.saveTimer) window.clearInterval(state.saveTimer);
-  state.saveTimer = null;
-}
-
-function handleSeriesPrimary() {
-  if (!state.workout || state.workout.trackingType !== "series") return;
-  if (!state.seriesInProgress) { state.seriesInProgress = true; renderWorkout(); return; }
-  elements.repsLayer.hidden = false;
-  elements.repsInput.value = "";
-  window.setTimeout(() => elements.repsInput.focus(), 50);
-}
-
-async function saveSeries(event) {
-  event.preventDefault();
-  if (!state.workout) return;
-  const repetitions = Math.max(1, Math.trunc(Number(elements.repsInput.value || 0) || 0));
-  if (!repetitions) return;
-  const submit = elements.repsForm.querySelector("button[type=submit]"); submit.disabled = true;
-  try {
-    const payload = await apiRequest(`/api/200/exercises/${encodeURIComponent(state.workout.id)}/series`, {
-      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ repetitions })
-    });
-    state.workout = payload.workout || state.workout;
-    state.seriesInProgress = false; elements.repsLayer.hidden = true; renderWorkout();
-  } catch (error) {
-    elements.workoutDetail.textContent = error instanceof Error ? error.message : "Nao foi possivel salvar a serie.";
-  } finally { submit.disabled = false; }
-}
-
-function extractMealTime(text) {
-  const match = String(text || "").toLowerCase().match(/(?:\b(?:as|às)\s*)?([01]?\d|2[0-3])\s*(?:h|:)\s*([0-5]\d)?/i);
-  if (!match) return "";
-  return `${String(Number(match[1])).padStart(2,"0")}:${String(Number(match[2] || 0)).padStart(2,"0")}`;
-}
-
-function mealDateAt(time) {
-  if (!/^\d{2}:\d{2}$/.test(time || "")) return null;
-  const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return date.toISOString();
-}
-
-async function submitFood(event) {
-  event.preventDefault();
-  const description = String(state.pendingMeal || elements.foodInput.value || "").trim();
-  if (description.length < 2) { elements.nutritionStatus.textContent = "Conte para Luna o que você comeu."; return; }
-  const time = elements.foodTime.value || extractMealTime(description);
-  if (!time) {
-    state.pendingMeal = description;
-    elements.timeQuestion.hidden = false;
-    elements.lunaMessage.textContent = "Que horas você comeu isso? Preciso do horário antes de guardar na sua tabela.";
-    window.setTimeout(() => elements.foodTime.focus(), 30);
-    return;
-  }
-  elements.foodSend.disabled = true;
-  elements.nutritionStatus.textContent = "Luna está estimando calorias e qualidade...";
-  try {
-    const payload = await apiRequest("/api/200/nutrition/analyze", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ profile:profileName(), description, consumedAt:mealDateAt(time) })
-    });
-    if (payload.needsTime) {
-      elements.timeQuestion.hidden = false;
-      elements.lunaMessage.textContent = payload.question || "Que horas você comeu isso?";
-      return;
-    }
-    state.dashboard = payload.dashboard || state.dashboard;
-    elements.lunaMessage.textContent = payload.entry?.feedback || "Registro salvo na sua tabela de hoje.";
-    elements.foodInput.value = "";
-    elements.foodTime.value = "";
-    state.pendingMeal = "";
-    elements.timeQuestion.hidden = true;
-    elements.nutritionStatus.textContent = "Alimento guardado.";
-    renderMeals();
-  } catch (error) {
-    elements.nutritionStatus.textContent = error instanceof Error ? error.message : "Nao foi possivel analisar.";
-  } finally {
-    elements.foodSend.disabled = false;
-  }
-}
-
-byId("appsHomeExercisesButton")?.addEventListener("click", () => openWellness("exercises"));
-byId("appsHomeNutritionButton")?.addEventListener("click", () => openWellness("nutrition"));
-byId("wellnessCloseButton")?.addEventListener("click", closeWellness);
-document.querySelectorAll("[data-wellness-tab]").forEach((button) => button.addEventListener("click", () => setTab(button.dataset.wellnessTab)));
-document.querySelectorAll("[data-exercise-filter]").forEach((button) => button.addEventListener("click", () => {
-  state.filter = button.dataset.exerciseFilter || "all";
-  document.querySelectorAll("[data-exercise-filter]").forEach((item) => item.classList.toggle("active", item === button));
-  renderExerciseGrid();
-}));
-elements.exerciseGrid?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-exercise-id]");
-  const exercise = EXERCISES.find((item) => item.id === button?.dataset.exerciseId);
-  if (exercise) openExerciseDetail(exercise);
-});
-byId("wellnessExerciseDetailClose")?.addEventListener("click", () => { elements.detail.hidden = true; });
-elements.detail?.addEventListener("click", (event) => { if (event.target === elements.detail) elements.detail.hidden = true; });
-elements.detailStart?.addEventListener("click", () => void startExercise());
-elements.workoutPrimary?.addEventListener("click", handleSeriesPrimary);
-elements.workoutFinish?.addEventListener("click", () => void finishWorkout());
-elements.repsForm?.addEventListener("submit", saveSeries);
-byId("wellnessRepsCancel")?.addEventListener("click", () => { elements.repsLayer.hidden = true; });
-elements.foodForm?.addEventListener("submit", submitFood);
-
-state.ticker = window.setInterval(() => { if (state.workout) renderWorkout(); }, 1000);
-window.addEventListener("pagehide", () => { if (state.workout) void saveWorkoutProgress().catch(() => {}); });
-window.project200Wellness = { open:openWellness, close:closeWellness, exercises:EXERCISES };
+byId("appsHomeExercisesButton")?.addEventListener("click",()=>openWellness("exercises"));
+byId("appsHomeNutritionButton")?.addEventListener("click",()=>openWellness("nutrition"));
+byId("wellnessCloseButton")?.addEventListener("click",closeWellness);
+document.querySelectorAll("[data-wellness-tab]").forEach((button)=>button.addEventListener("click",()=>setTab(button.dataset.wellnessTab)));
+document.querySelectorAll("[data-exercise-filter]").forEach((button)=>button.addEventListener("click",()=>{ state.filter=button.dataset.exerciseFilter||"all"; document.querySelectorAll("[data-exercise-filter]").forEach((item)=>item.classList.toggle("active",item===button)); renderExerciseGrid(); }));
+elements.exerciseGrid?.addEventListener("click",(event)=>{ const exercise=EXERCISES.find((item)=>item.id===event.target.closest("[data-exercise-id]")?.dataset.exerciseId); if(exercise)openExerciseDetail(exercise); });
+byId("wellnessExerciseDetailClose")?.addEventListener("click",hideLayers);
+elements.detailStart?.addEventListener("click",openGoal);
+byId("wellnessGoalClose")?.addEventListener("click",()=>showLayer(elements.detail));
+elements.goalForm?.addEventListener("submit",startExercise);
+byId("wellnessWorkoutResume")?.addEventListener("click",()=>{ renderWorkout(); showLayer(elements.workoutLayer); });
+elements.workoutPrimary?.addEventListener("click",()=>void handleWorkoutPrimary());
+elements.workoutFinish?.addEventListener("click",openFinish);
+elements.repsForm?.addEventListener("submit",saveSeries);
+byId("wellnessRepsCancel")?.addEventListener("click",()=>showLayer(elements.workoutLayer));
+elements.finishForm?.addEventListener("submit",finishWorkout);
+byId("wellnessFinishCancel")?.addEventListener("click",()=>showLayer(elements.workoutLayer));
+elements.distanceInput?.addEventListener("input",()=>{ if(state.workout)elements.finishQuestion.textContent=`Deseja adicionar ${String(state.workout.exerciseName||"atividade").toLowerCase()} de ${Math.max(0,Math.trunc(Number(elements.distanceInput.value||0)||0))} metros?`; });
+elements.weightCard?.addEventListener("click",()=>{ renderWeight(); showLayer(elements.weightLayer); });
+byId("wellnessWeightClose")?.addEventListener("click",hideLayers);
+elements.weightForm?.addEventListener("submit",saveWeight);
+elements.foodForm?.addEventListener("submit",submitFood);
+state.ticker=window.setInterval(()=>{ if(state.workout)renderWorkout(); },1000);
+window.addEventListener("pagehide",()=>{ if(state.workout)void saveWorkoutProgress().catch(()=>{}); });
+window.project200Wellness={open:openWellness,close:closeWellness,exercises:EXERCISES};

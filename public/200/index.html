@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/200/life-capture.css?v=20260802-gallery-inline-v1" />
   <link rel="stylesheet" href="/200/onboarding.css?v=20260801-privacy-v1" />
   <link rel="stylesheet" href="/200/books.css?v=20260818-apps-books-v1" />
-  <link rel="stylesheet" href="/200/wellness.css?v=20260828-wellness-theme-v3" />
+  <link rel="stylesheet" href="/200/wellness.css?v=20260828-wellness-flow-v4" />
 </head>
 <body data-background-theme="edge">
   <script>
@@ -163,7 +163,7 @@
         </button>
       </div>
       <div class="running-home-brand">
-        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" data-app-version="0.93" aria-label="Baixar atualização mais recente do iLife, versão atual 0.93" title="Baixar atualização do iLife · versão 0.93" />
+        <img class="running-home-logo" id="runningHomeLogoButton" src="/200/images/ilife-mindsetplan-home.png" alt="iLife MindsetPlan" role="button" tabindex="0" data-app-version="0.94" aria-label="Baixar atualização mais recente do iLife, versão atual 0.94" title="Baixar atualização do iLife · versão 0.94" />
         <button class="marin-home-entry" type="button" id="marinHomeEntryButton" aria-label="Conversar com Marin">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.8 3.8 0 0 0 3.8-3.8V6.2a3.8 3.8 0 1 0-7.6 0v5.4a3.8 3.8 0 0 0 3.8 3.8Zm-6-4.1a6 6 0 0 0 12 0M12 17.4V22m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span>Conversar com <strong id="marinHomePersonaName">Marin</strong></span>
@@ -1103,7 +1103,8 @@
               <label class="finance-nano-field"><span>Data</span><input type="date" id="ilifeFinanceOnceDate" /></label>
               <label class="finance-nano-field"><span>Conta</span><div class="finance-nano-select-action"><select id="ilifeFinanceAccountSelect"></select><button type="button" id="ilifeFinanceCreateAccountButton" aria-label="Criar nova conta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div></label>
               <div class="finance-nano-chip-row" id="ilifeFinanceAccountChips" aria-label="Contas cadastradas"></div>
-              <label class="finance-nano-field"><span>Categoria</span><div class="finance-nano-select-action"><select id="ilifeFinanceCategorySelect"></select><button type="button" id="ilifeFinanceCreateCategoryButton" aria-label="Criar nova categoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div></label>
+              <label class="finance-nano-field"><span>Categoria</span><div class="finance-nano-select-action"><select id="ilifeFinanceCategorySelect"></select><button type="button" id="ilifeFinanceCreateCategoryButton" aria-label="Criar nova categoria"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button></div></label>
+
             </div>
 
             <details class="finance-nano-advanced">
@@ -2055,6 +2056,11 @@
             <article class="wellness-summary-card wellness-quality-card"><span>Qualidade da alimentação</span><strong><b id="wellnessQualityToday">0</b>%</strong><div class="wellness-quality-track"><i id="wellnessQualityFill"></i></div></article>
           </div>
           <section class="wellness-luna-card">
+          <button class="wellness-weight-card" type="button" id="wellnessWeightCard">
+            <span>Peso atual</span><strong><b id="wellnessWeightCurrent">--</b> kg</strong>
+            <small id="wellnessBmiSummary">Toque para adicionar peso e altura</small>
+            <span class="wellness-bmi-track wellness-bmi-track--compact"><i id="wellnessBmiMarker"></i></span>
+          </button>
             <div class="wellness-luna-head"><span class="wellness-luna-avatar">L</span><div><strong>Luna Nutrição</strong><small>Calorias aproximadas e qualidade alimentar</small></div></div>
             <div class="wellness-luna-message" id="wellnessLunaMessage">Me conte o que você comeu e a quantidade. Se não disser o horário, eu pergunto antes de guardar.</div>
             <form class="wellness-food-form" id="wellnessFoodForm">
@@ -2074,26 +2080,84 @@
             <span>Treino em andamento</span><h2 id="wellnessWorkoutName">Caminhar</h2>
             <div class="wellness-workout-counter" id="wellnessWorkoutCounter">00:00</div>
             <small id="wellnessWorkoutDetail">Progresso salvo no seu perfil</small>
-            <div class="wellness-workout-actions">
-              <button type="button" class="primary" id="wellnessWorkoutPrimary">Finalizar série</button>
-              <button type="button" id="wellnessWorkoutFinish">Encerrar treino</button>
-            </div>
+            <button type="button" class="wellness-start-button" id="wellnessWorkoutResume">Retomar em tela cheia</button>
           </section>
           <div class="wellness-exercise-filters"><button type="button" class="active" data-exercise-filter="all">Todos</button><button type="button" data-exercise-filter="strength">Musculação · 40</button><button type="button" data-exercise-filter="fat_loss">Perder gordura · 20</button></div>
           <div class="wellness-exercise-grid" id="wellnessExerciseGrid"></div>
+          <section class="wellness-list-section wellness-workout-history-section"><header><div><span>Sua tabela</span><h2>Treinos recentes</h2></div></header><div class="wellness-workout-history" id="wellnessWorkoutHistory"></div></section>
         </section>
       </main>
-      <div class="wellness-detail-layer" id="wellnessExerciseDetail" hidden>
-        <article class="wellness-detail-card">
-          <button class="wellness-detail-close" type="button" id="wellnessExerciseDetailClose" aria-label="Fechar">×</button>
-          <img src="/200/apps/exercicios.png" alt="" aria-hidden="true" />
-          <span id="wellnessExerciseCategory">Musculação</span><h2 id="wellnessExerciseName">Agachamento</h2>
-          <p id="wellnessExerciseEquipment"></p><ol id="wellnessExerciseInstructions"></ol>
-          <button class="wellness-start-button" type="button" id="wellnessExerciseStart">Iniciar série</button>
+
+      <div class="wellness-phase-layer" id="wellnessExerciseDetail" hidden>
+        <article class="wellness-phase-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessExerciseDetailClose" aria-label="Fechar">×</button>
+          <img class="wellness-phase-icon" src="/200/apps/exercicios.png" alt="" aria-hidden="true" />
+          <span class="wellness-phase-kicker" id="wellnessExerciseCategory">Musculação</span>
+          <h2 id="wellnessExerciseName">Agachamento</h2>
+          <p id="wellnessExerciseEquipment"></p><ol class="wellness-instruction-list" id="wellnessExerciseInstructions"></ol>
+          <button class="wellness-phase-primary" type="button" id="wellnessExerciseStart">Definir meta</button>
         </article>
       </div>
-      <div class="wellness-reps-layer" id="wellnessRepsLayer" hidden>
-        <form class="wellness-reps-card" id="wellnessRepsForm"><span>Série concluída</span><h2>Quantos movimentos você fez?</h2><input type="number" id="wellnessRepsInput" min="1" max="10000" inputmode="numeric" placeholder="12" /><div><button type="button" id="wellnessRepsCancel">Voltar</button><button type="submit">Guardar série</button></div></form>
+
+      <div class="wellness-phase-layer" id="wellnessGoalLayer" hidden>
+        <form class="wellness-phase-screen wellness-goal-screen" id="wellnessGoalForm">
+          <button class="wellness-phase-close" type="button" id="wellnessGoalClose" aria-label="Voltar">×</button>
+          <span class="wellness-phase-kicker">Sua meta</span><h2 id="wellnessGoalTitle">Quantas séries?</h2>
+          <div class="wellness-goal-fields" id="wellnessSeriesGoalFields">
+            <label><span>Séries</span><input type="number" id="wellnessTargetSeries" min="1" max="100" inputmode="numeric" value="3" /></label>
+            <label><span>Movimentos por série</span><input type="number" id="wellnessTargetReps" min="1" max="10000" inputmode="numeric" value="12" /></label>
+          </div>
+          <div class="wellness-goal-fields" id="wellnessMinutesGoalFields" hidden>
+            <label><span>Minutos</span><input type="number" id="wellnessTargetMinutes" min="1" max="1440" inputmode="numeric" value="30" /></label>
+          </div>
+          <p>Você pode encerrar antes da meta. O realizado sempre ficará marcado na sua tabela.</p>
+          <button class="wellness-phase-primary" type="submit" id="wellnessGoalStart">Iniciar treino</button>
+        </form>
+      </div>
+
+      <div class="wellness-phase-layer" id="wellnessWorkoutLayer" hidden>
+        <article class="wellness-phase-screen wellness-workout-screen">
+          <span class="wellness-phase-kicker" id="wellnessPhaseLabel">Série 1 de 3</span><h2 id="wellnessPhaseExerciseName">Agachamento</h2>
+          <div class="wellness-phase-number" id="wellnessPhaseNumber">12</div><p id="wellnessPhaseUnit">movimentos nesta série</p>
+          <div class="wellness-phase-progress"><i id="wellnessPhaseProgressFill"></i></div>
+          <button class="wellness-phase-primary" type="button" id="wellnessWorkoutPrimary">Adicionar 12 movimentos</button>
+          <button class="wellness-phase-secondary" type="button" id="wellnessWorkoutFinish">Encerrar treino</button>
+        </article>
+      </div>
+
+      <div class="wellness-phase-layer" id="wellnessRepsLayer" hidden>
+        <form class="wellness-phase-screen wellness-confirm-screen" id="wellnessRepsForm">
+          <span class="wellness-phase-kicker">Confirmar série</span><h2 id="wellnessRepsQuestion">Deseja adicionar 12 movimentos?</h2>
+          <input class="wellness-big-input" type="number" id="wellnessRepsInput" min="1" max="10000" inputmode="numeric" value="12" />
+          <button class="wellness-phase-primary" type="submit">Adicionar movimentos</button>
+          <button class="wellness-phase-secondary" type="button" id="wellnessRepsCancel">Voltar</button>
+          <label class="wellness-askagain"><input type="checkbox" id="wellnessAskAgainOff" /> Não perguntar novamente</label>
+        </form>
+      </div>
+
+      <div class="wellness-phase-layer" id="wellnessFinishLayer" hidden>
+        <form class="wellness-phase-screen wellness-confirm-screen" id="wellnessFinishForm">
+          <span class="wellness-phase-kicker">Finalizar treino</span><h2 id="wellnessFinishQuestion">Deseja adicionar este treino?</h2>
+          <div id="wellnessDistanceField" hidden><label class="wellness-distance-label">Distância em metros<input class="wellness-big-input" type="number" id="wellnessDistanceInput" min="0" max="10000000" inputmode="numeric" placeholder="0" /></label></div>
+          <button class="wellness-phase-primary" type="submit">Adicionar à tabela</button>
+          <button class="wellness-phase-secondary" type="button" id="wellnessFinishCancel">Continuar treino</button>
+        </form>
+      </div>
+
+      <div class="wellness-phase-layer" id="wellnessWeightLayer" hidden>
+        <article class="wellness-phase-screen wellness-weight-screen">
+          <button class="wellness-phase-close" type="button" id="wellnessWeightClose" aria-label="Fechar">×</button>
+          <span class="wellness-phase-kicker">Corpo e equilíbrio</span><h2>Peso e IMC</h2>
+          <div class="wellness-weight-highlight"><strong><b id="wellnessWeightModalCurrent">--</b> kg</strong><span id="wellnessBmiValue">Informe sua altura</span></div>
+          <div class="wellness-bmi-track"><i id="wellnessBmiModalMarker"></i></div>
+          <div class="wellness-bmi-labels"><span>Abaixo</span><span>Equilíbrio</span><span>Acima</span></div>
+          <form class="wellness-weight-form" id="wellnessWeightForm">
+            <label>Altura em centímetros<input type="number" id="wellnessHeightInput" min="80" max="260" step="0.1" inputmode="decimal" placeholder="170" /></label>
+            <label>Peso em kg<input type="number" id="wellnessWeightInput" min="1" max="500" step="0.01" inputmode="decimal" placeholder="56.7" /></label>
+            <button class="wellness-phase-primary" type="submit">Atualizar peso</button>
+          </form>
+          <section class="wellness-weight-history"><h3>Histórico</h3><div id="wellnessWeightHistory"></div></section>
+        </article>
       </div>
     </div>
   </section>
@@ -2109,8 +2173,8 @@
 
   <script type="module" src="/200/project.js?v=0.95"></script>
   <script type="module" src="/200/projects.js?v=0.7.0"></script>
-  <script src="/200/books.js?v=20260818-apps-books-v1"></script>
-  <script type="module" src="/200/wellness.js?v=20260828-wellness-v1"></script>
+  <script type="module" src="/200/wellness.js?v=20260828-wellness-flow-v3"></script>
+  <script type="module" src="/200/wellness.js?v=20260828-wellness-flow-v2"></script>
   <script src="/200/life-capture.js?v=0.81-gallery-inline-v1"></script>
   <script src="/200/front-texts.js?v=20260730-admin-texts-v1"></script>
 </body>

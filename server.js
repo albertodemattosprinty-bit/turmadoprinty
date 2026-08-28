@@ -63,7 +63,7 @@ import { createQuickUserAction, createUserAction, deleteUserAction, ensureAction
 import { clearProject200CurrentTaskState, getProject200CurrentTaskState, saveProject200CurrentTaskState } from "./src/project200-current-task-state.js";
 import { addPlatformBalance, createPlatformFinanceEntry, deletePlatformFinanceEntry, deletePlatformOccurrence, deletePlatformOccurrencesByFilter, ensurePlatformFinanceSchema, listPlatformFinanceByRange, payPlatformOccurrence, summarizePlatformFinanceMonth } from "./src/platform-finance.js";
 import { abortProject200SleepSession, getProject200SleepSession, startProject200SleepSession, finishProject200SleepSession, listProject200SleepHistory, updateProject200SleepHistoryEntry } from "./src/project200-sleep.js";
-import { addProject200ExerciseSeries, createProject200NutritionEntry, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress } from "./src/project200-wellness.js";
+import { addProject200ExerciseSeries, createProject200NutritionEntry, createProject200WeightEntry, ensureProject200WellnessSchema, finishProject200ExerciseSession, getProject200WellnessDashboard, startProject200ExerciseSession, updateProject200ExerciseProgress, updateProject200WellnessPreferences } from "./src/project200-wellness.js";
 import { ensureStatsSchema, getProject200StatsAspectConfig, getStatsGoals, getStatsSummary, updateProject200StatsAspectConfig, updateStatsGoals } from "./src/stats.js";
 import { approveConstitutionVersion, createConstitutionVersion, ensureConstitutionSchema, listConstitutionVersions } from "./src/constitution.js";
 import { createProject200SystemEvent, createProject200TextEntry, ensureProject200HistorySchema, getProject200HistorySpan, listProject200History } from "./src/project200-history.js";
@@ -15672,6 +15672,37 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "PATCH" && pathname === "/api/200/wellness/preferences") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const preferences = await updateProject200WellnessPreferences(user.id, {
+        profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, heightCm: body?.heightCm, askagain1: body?.askagain1
+      });
+      sendJson(response, 200, { ok: true, preferences });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar as preferencias." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/200/wellness/weight") {
+    try {
+      const user = await requireAuth(request, response);
+      if (!user) return;
+      const body = await readJsonBody(request);
+      const entry = await createProject200WeightEntry(user.id, {
+        profileName: body?.profile || PROJECT200_DEFAULT_PROFILE_NAME, weightKg: body?.weightKg, measuredAt: body?.measuredAt
+      });
+      const dashboard = await getProject200WellnessDashboard(user.id, body?.profile || PROJECT200_DEFAULT_PROFILE_NAME);
+      sendJson(response, 201, { ok: true, entry, dashboard });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar o peso." });
+    }
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/200/exercises/start") {
     try {
       const user = await requireAuth(request, response);
@@ -15683,7 +15714,10 @@ const server = http.createServer(async (request, response) => {
         exerciseName: body?.exerciseName,
         category: body?.category,
         trackingType: body?.trackingType,
-        equipment: body?.equipment
+        equipment: body?.equipment,
+        targetSeries: body?.targetSeries,
+        targetReps: body?.targetReps,
+        targetMinutes: body?.targetMinutes
       });
       sendJson(response, 201, { ok: true, workout });
     } catch (error) {
@@ -15712,7 +15746,7 @@ const server = http.createServer(async (request, response) => {
       if (!user) return;
       const body = await readJsonBody(request);
       const sessionId = decodeURIComponent(pathname.replace(/^\/api\/200\/exercises\/([^/]+)\/series$/, "$1"));
-      const result = await addProject200ExerciseSeries(user.id, sessionId, body?.repetitions);
+      const result = await addProject200ExerciseSeries(user.id, sessionId, body?.repetitions, body?.targetRepetitions);
       sendJson(response, 201, { ok: true, ...result });
     } catch (error) {
       sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel salvar a serie." });
