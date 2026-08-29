@@ -1441,7 +1441,7 @@ const state = {
     incomingInvites: [],
     friends: []
   },
-  sharedTasks: { friend: null, payload: null, items: [], candidates: null, mode: "", loading: false, days: 1 },
+  sharedTasks: { friend: null, payload: null, items: [], candidates: null, directItem: null, mode: "", loading: false, days: 1 },
   friendAssignment: {
     mode: "",
     action: null,
@@ -9568,7 +9568,14 @@ function renderTaskComposerModal() {
     });
     startDecisionActions.appendChild(secondary);
 
-    if (mode === "edit") {
+        if (mode === "edit") {
+      const action = findActionById(state.startDecisionContext.actionId);
+      if (action && String(action.repeatRule || "none") !== "none") {
+        const shareButton = document.createElement("button");
+        shareButton.type = "button"; shareButton.className = "decision-btn decision-btn-edit"; shareButton.innerHTML = "<span>Compartilhar</span>";
+        shareButton.addEventListener("click", () => openDirectSharedItemPicker({ type: "scheduled_task", key: action.id, label: action.title }));
+        startDecisionActions.appendChild(shareButton);
+      }
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "decision-btn decision-btn-remove";
@@ -14202,6 +14209,24 @@ async function openSharedItemsPicker() {
   catch (error) { if (sharedTasksStatus) sharedTasksStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar seus itens."; }
   finally { state.sharedTasks.loading = false; renderSharedTasksModal(); }
 }
+function openDirectSharedItemPicker(item = {}) {
+  const type = String(item.type || "").trim(), key = String(item.key || "").trim();
+  if (!type || !key) return;
+  state.sharedTasks.directItem = { type, key, label: String(item.label || "item") };
+  closeModal("startDecisionModal"); closeModal("missionAdjustModal"); closeModal("missionVariantsModal"); closeModal("wellnessModal");
+  openModal("socialModal");
+  if (socialModalStatus) socialModalStatus.textContent = "Escolha o amigo com quem quer compartilhar “" + state.sharedTasks.directItem.label + "”.";
+}
+async function shareDirectItemWithFriend(friend) {
+  const item = state.sharedTasks.directItem;
+  if (!item || !friend?.userId) return;
+  state.sharedTasks.friend = friend; state.sharedTasks.payload = null; state.sharedTasks.days = 1;
+  closeModal("socialModal"); openModal("sharedTasksModal");
+  await sendSharedItem(item.type, item.key);
+  state.sharedTasks.directItem = null;
+}
+window.addEventListener("project200:share-item", (event) => openDirectSharedItemPicker(event?.detail || {}));
+
 async function sendSharedItem(type, key) {
   const friendId = String(state.sharedTasks?.friend?.userId || "").trim();
   if (!friendId || !type || !key) return;
@@ -15325,6 +15350,8 @@ function renderMissionAdjustState() {
   if (adjustStage) adjustStage.hidden = folder;
   if (openMissionAdjustTimeButton) openMissionAdjustTimeButton.hidden = limit || folder;
   if (missionAdjustConfirmButton) missionAdjustConfirmButton.hidden = folder;
+  const missionShareButton = document.getElementById("missionAdjustShareButton");
+  if (missionShareButton) missionShareButton.hidden = limit;
   if (missionLimitSleepOption) missionLimitSleepOption.hidden = !limit;
   if (missionLimitCountSleepTime) missionLimitCountSleepTime.checked = state.missionAdjust?.countSleepTime !== false;
 
@@ -16344,7 +16371,7 @@ function renderMissionVariants() {
     const variantDuration = normalizeMissionDurationOption(variant.unitDurationSeconds || getMissionUnitDurationSeconds(getMissionRunGoalById(state.missionVariants.goalId)) || DEFAULT_MISSION_DURATION_SECONDS);
     return `<article class="mission-variant-card${timing.completedCycle ? " is-completed" : ""}${timing.overdueMs > 0 ? " is-overdue" : ""}" data-mission-variant-id="${escapeHtml(variant.id)}">
       <button class="mission-variant-main" type="button"><span><strong>${escapeHtml(variant.title)}</strong><small>${scheduleLabel} &middot; Tempo: ${formatMissionDurationValue(variantDuration)} &middot; ${formatMissionVariantRemaining(timing)}</small></span>${chooseMode ? `<span class="mission-variant-play">${cycleChooseMode ? "Escolher" : "Iniciar"}</span>` : ""}</button>
-      ${chooseMode ? "" : `<button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
+      ${chooseMode ? "" : `<button class="mission-variant-share" type="button" data-mission-variant-share="${escapeHtml(variant.id)}" aria-label="Compartilhar ${escapeHtml(variant.title)}">↗</button><button class="mission-variant-delete" type="button" data-mission-variant-delete="${escapeHtml(variant.id)}" aria-label="Excluir ${escapeHtml(variant.title)}">×</button>`}
       <div class="mission-variant-bar"><span class="${tone}" style="width:${barPercent.toFixed(2)}%"></span></div>
     </article>`;
   }).join("") : `<div class="empty-state">${chooseMode ? "Nenhuma ação desta pasta está programada para hoje." : "Crie sua primeira tarefa."}</div>`;
@@ -20047,6 +20074,10 @@ missionCreateCloseButton?.addEventListener("click", () => {
   }
   closeModal("missionCreateModal");
 });
+document.getElementById("missionAdjustShareButton")?.addEventListener("click", () => {
+  const goal = getAvailableMissionById(state.missionAdjust?.goalId);
+  if (goal) openDirectSharedItemPicker({ type: isMissionFolder(goal) ? "compound_mission" : "simple_mission", key: goal.id, label: goal.title });
+});
 missionAdjustCloseButton?.addEventListener("click", () => {
   closeModal("missionAdjustModal");
 });
@@ -20297,11 +20328,13 @@ missionVariantEditorSave?.addEventListener("click", async () => {
 });
 missionVariantsList?.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-mission-variant-delete]");
+  const shareButton = event.target.closest("[data-mission-variant-share]");
   const card = event.target.closest("[data-mission-variant-id]");
   if (!card) return;
   const id = String(card.dataset.missionVariantId || "");
   const variant = (state.missionVariants.items || []).find((item) => String(item.id) === id);
   if (!variant) return;
+  if (shareButton) { openDirectSharedItemPicker({ type: "microtask", key: variant.id, label: variant.title }); return; }
   if (deleteButton) {
     openRunningConfirmModal("delete", variant, () => {
       void (async () => {
@@ -21161,6 +21194,7 @@ socialModalList?.addEventListener("click", (event) => {
     return;
   }
   const friend = getVisibleSocialRankedUsers().find((entry) => String(entry?.userId || "") === userId);
+  if (friend && !friend.isSelf && state.sharedTasks?.directItem) { void shareDirectItemWithFriend(friend); return; }
   if (friend && !friend.isSelf) { void openSharedTasksForFriend(userId); return; }
   if (friend) showSocialToast(`${String(friend.name || "Amigo")}: ${new Intl.NumberFormat("pt-BR").format(Math.max(0, Number(friend.points || 0)))} pontos`);
 });

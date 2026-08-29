@@ -25,12 +25,12 @@ function normalizeStatus(value) {
 }
 function normalizeType(value) {
   const type = String(value || "").trim();
-  return new Set(["scheduled_task", "simple_mission", "compound_mission", "series_exercise", "walking", "bicycle", "weight", "nutrition_quality"]).has(type) ? type : "";
+  return new Set(["scheduled_task", "simple_mission", "compound_mission", "series_exercise", "walking", "bicycle", "weight", "nutrition_quality", "microtask"]).has(type) ? type : "";
 }
 function labelForType(type) {
   return {
     scheduled_task: "tarefa com horário", simple_mission: "missão simples", compound_mission: "missão composta",
-    series_exercise: "exercício de séries", walking: "caminhada", bicycle: "bicicleta", weight: "peso", nutrition_quality: "qualidade da alimentação"
+    series_exercise: "exercício de séries", walking: "caminhada", bicycle: "bicicleta", weight: "peso", nutrition_quality: "qualidade da alimentação", microtask: "microtarefa"
   }[type] || "item";
 }
 async function ensureSchema() {
@@ -74,16 +74,18 @@ function typeForExercise(row) {
 }
 async function listItems(userId) {
   await ensureSchema();
-  const [actions, goals, library, weight, nutrition] = await Promise.all([
-    query("select id, title from actions where user_id = $1 and start_at is not null order by start_at asc", [userId]),
+  const [actions, goals, variants, library, weight, nutrition] = await Promise.all([
+    query("select id, title from actions where user_id = $1 and start_at is not null and coalesce(repeat_rule, 'none') <> 'none' order by start_at asc", [userId]),
     query("select id, title, is_folder from extra_goals where user_id = $1 and coalesce(goal_kind, 'goal') <> 'limit' order by created_at asc", [userId]),
+    query("select id, title from extra_goal_variants where user_id = $1 order by created_at asc", [userId]),
     query("select exercise_id, exercise_name, tracking_type from project200_exercise_library where user_id = $1 order by created_at asc", [userId]),
     query("select 1 from project200_weight_entries where user_id = $1 limit 1", [userId]),
     query("select 1 from project200_nutrition_entries where user_id = $1 limit 1", [userId])
   ]);
   const items = [
     ...actions.rows.map((row) => ({ type: "scheduled_task", key: String(row.id), label: String(row.title || "Tarefa com horário") })),
-    ...goals.rows.map((row) => ({ type: row.is_folder ? "compound_mission" : "simple_mission", key: String(row.id), label: String(row.title || (row.is_folder ? "Missão composta" : "Missão")) }))
+    ...goals.rows.map((row) => ({ type: row.is_folder ? "compound_mission" : "simple_mission", key: String(row.id), label: String(row.title || (row.is_folder ? "Missão composta" : "Missão")) })),
+    ...variants.rows.map((row) => ({ type: "microtask", key: String(row.id), label: String(row.title || "Microtarefa") }))
   ];
   const seenSpecial = new Set();
   for (const row of library.rows) {
@@ -152,6 +154,10 @@ async function metricForItem(userId, item, startDate, endDate) {
   if (item.type === "simple_mission" || item.type === "compound_mission") {
     const result = await query("select coalesce(sum(progress_value),0)::integer as total from extra_goal_progress_history where user_id=$1 and goal_id=$2::uuid and scope_date between $3::date and $4::date", [userId, item.key, startDate, endDate]);
     return { value: Number(result.rows[0]?.total || 0), unit: item.type === "compound_mission" ? "progresso do pack" : "progresso" };
+  }
+  if (item.type === "microtask") {
+    const result = await query("select count(*)::integer as total from extra_goal_variants where user_id=$1 and id=$2::uuid and last_completed_at::date between $3::date and $4::date", [userId, item.key, startDate, endDate]);
+    return { value: Number(result.rows[0]?.total || 0), unit: "conclusões" };
   }
   if (item.type === "series_exercise") {
     const result = await query("select coalesce(sum(session.total_reps),0)::integer as movements, coalesce(sum((select count(*) from project200_exercise_series item where item.session_id=session.id)),0)::integer as series from project200_exercise_sessions session where session.user_id=$1 and session.exercise_id=$2 and session.status='completed' and coalesce(session.completed_at,session.started_at)::date between $3::date and $4::date", [userId, item.key, startDate, endDate]);

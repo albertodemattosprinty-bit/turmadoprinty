@@ -1,6 +1,7 @@
 import { query } from "./db.js";
 
 const CONFIG_KEY = "project200_android_update";
+const REQUIRED_MINIMUM_VERSION = "1.02";
 
 export const PROJECT201_DEFAULT_UPDATE_CONFIG = {
   currentVersion: "1.02",
@@ -14,6 +15,12 @@ export const PROJECT201_DEFAULT_UPDATE_CONFIG = {
 function normalizeVersion(value, fallback) {
   const normalized = String(value || "").trim().replace(",", ".");
   return /^\d+(?:\.\d+){0,3}$/.test(normalized) ? normalized : fallback;
+}
+
+function compareVersions(left, right) {
+  const a = String(left || "").split(".").map((item) => Number(item) || 0), b = String(right || "").split(".").map((item) => Number(item) || 0);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) { if ((a[index] || 0) !== (b[index] || 0)) return (a[index] || 0) - (b[index] || 0); }
+  return 0;
 }
 
 function normalizeUrl(value, fallback) {
@@ -32,9 +39,13 @@ function normalizeText(value, fallback, maxLength) {
 }
 
 export function normalizeProject201UpdateConfig(input = {}) {
+  const minimumVersion = normalizeVersion(input.minimumVersion, PROJECT201_DEFAULT_UPDATE_CONFIG.minimumVersion);
+  const currentVersion = normalizeVersion(input.currentVersion, PROJECT201_DEFAULT_UPDATE_CONFIG.currentVersion);
+  const enforcedMinimumVersion = compareVersions(minimumVersion, REQUIRED_MINIMUM_VERSION) < 0 ? REQUIRED_MINIMUM_VERSION : minimumVersion;
+  const enforcedCurrentVersion = compareVersions(currentVersion, enforcedMinimumVersion) < 0 ? enforcedMinimumVersion : currentVersion;
   return {
-    currentVersion: normalizeVersion(input.currentVersion, PROJECT201_DEFAULT_UPDATE_CONFIG.currentVersion),
-    minimumVersion: normalizeVersion(input.minimumVersion, PROJECT201_DEFAULT_UPDATE_CONFIG.minimumVersion),
+    currentVersion: enforcedCurrentVersion,
+    minimumVersion: enforcedMinimumVersion,
     downloadUrl: normalizeUrl(input.downloadUrl, PROJECT201_DEFAULT_UPDATE_CONFIG.downloadUrl),
     title: normalizeText(input.title, PROJECT201_DEFAULT_UPDATE_CONFIG.title, 90),
     message: normalizeText(input.message, PROJECT201_DEFAULT_UPDATE_CONFIG.message, 700),

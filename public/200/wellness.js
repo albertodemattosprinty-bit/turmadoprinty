@@ -128,7 +128,7 @@ const elements = {
   catalogLayer:byId("wellnessCatalogLayer"), catalogGrid:byId("wellnessCatalogGrid"), catalogTitle:byId("wellnessCatalogTitle"), openCatalog:byId("wellnessOpenCatalog"),
   activeWorkout:byId("wellnessActiveWorkout"), workoutName:byId("wellnessWorkoutName"), workoutCounter:byId("wellnessWorkoutCounter"), workoutDetail:byId("wellnessWorkoutDetail"),
   detail:byId("wellnessExerciseDetail"), detailCategory:byId("wellnessExerciseCategory"), detailName:byId("wellnessExerciseName"), detailEquipment:byId("wellnessExerciseEquipment"),
-  detailInstructions:byId("wellnessExerciseInstructions"), detailStart:byId("wellnessExerciseStart"), detailProgress:byId("wellnessExerciseProgress"), detailProgressText:byId("wellnessExerciseProgressText"),
+  detailInstructions:byId("wellnessExerciseInstructions"), detailStart:byId("wellnessExerciseStart"), detailShare:byId("wellnessExerciseShare"), detailProgress:byId("wellnessExerciseProgress"), detailProgressText:byId("wellnessExerciseProgressText"),
   detailProgressFill:byId("wellnessExerciseProgressFill"), detailTotal:byId("wellnessExerciseTotal"), goalLayer:byId("wellnessGoalLayer"), goalForm:byId("wellnessGoalForm"), goalTitle:byId("wellnessGoalTitle"),
   seriesGoalFields:byId("wellnessSeriesGoalFields"), minutesGoalFields:byId("wellnessMinutesGoalFields"), distanceGoalFields:byId("wellnessDistanceGoalFields"),
   targetSeries:byId("wellnessTargetSeries"), targetReps:byId("wellnessTargetReps"), targetMinutes:byId("wellnessTargetMinutes"), targetDistanceKm:byId("wellnessTargetDistanceKm"),
@@ -198,8 +198,16 @@ function openExerciseDetail(exercise,mode="selected"){
   elements.detailCategory.textContent=EXERCISE_CATEGORIES.find((item)=>item.id===exercise.category)?.label||"Exercício";
   elements.detailName.textContent=exercise.name; elements.detailEquipment.textContent=exercise.category==="calisthenics"?"Sem equipamento":`Equipamento: ${exercise.equipment}`;
   elements.detailInstructions.innerHTML=""; exerciseInstructions(exercise).forEach((instruction)=>{ const li=document.createElement("li"); li.textContent=instruction; elements.detailInstructions.appendChild(li); });
-  elements.detailStart.textContent=mode==="catalog"?"Adicionar exercício":exercise.tracking==="series"?"Iniciar série":exercise.tracking==="gps"?"Iniciar caminhada":"Iniciar exercício";
+  elements.detailStart.textContent=mode==="catalog"?"Adicionar exercício":exercise.tracking==="series"?"Iniciar série":exercise.tracking==="gps"?"Iniciar caminhada":"Iniciar exercício"; if(elements.detailShare){ const text=`${exercise.id||""} ${exercise.name||""}`.toLowerCase(); elements.detailShare.hidden=mode!=="selected"||!(exercise.tracking==="series"||exercise.tracking==="gps"); elements.detailShare.textContent=text.includes("bicic")||text.includes("bike")?"Compartilhar bicicleta":exercise.tracking==="gps"?"Compartilhar caminhada":"Compartilhar exercício"; }
   updateExerciseProgressDetail(); showLayer(elements.detail);
+}
+function shareSelectedExercise(){
+  const exercise=state.selectedExercise;
+  if(!exercise||state.detailMode!=="selected")return;
+  const text=`${exercise.id||""} ${exercise.name||""}`.toLowerCase();
+  const type=exercise.tracking==="series"?"series_exercise":exercise.tracking==="gps"?(text.includes("bicic")||text.includes("bike")?"bicycle":"walking"):"";
+  if(!type)return;
+  window.dispatchEvent(new CustomEvent("project200:share-item",{detail:{type,key:type==="series_exercise"?exercise.id:type,label:exercise.name}}));
 }
 async function addSelectedExercise(){
   const exercise=state.selectedExercise; if(!exercise)return;
@@ -288,6 +296,7 @@ elements.catalogGrid?.addEventListener("click",(event)=>{ const exercise=EXERCIS
 byId("wellnessCatalogClose")?.addEventListener("click",hideLayers);
 byId("wellnessExerciseDetailClose")?.addEventListener("click",()=>{ if(state.detailMode==="catalog")openCatalog(); else hideLayers(); });
 elements.detailStart?.addEventListener("click",()=>{ if(state.detailMode==="catalog")void addSelectedExercise(); else openGoal(); });
+elements.detailShare?.addEventListener("click",shareSelectedExercise);
 byId("wellnessGoalClose")?.addEventListener("click",()=>showLayer(elements.detail));
 elements.goalForm?.addEventListener("submit",startExercise);
 byId("wellnessWorkoutResume")?.addEventListener("click",()=>{ renderWorkout(); showLayer(elements.workoutLayer); });
