@@ -16695,3 +16695,43 @@ body.project-native-keyboard-mission-open #missionCreateModal .mission-guide-she
     radial-gradient(circle at 50% 3%, rgba(120, 64, 212, .11), transparent 30%),
     linear-gradient(180deg, rgba(5, 15, 29, .99), rgba(4, 12, 23, .99));
 }
+
+/* Tarefas compartilhadas */
+.shared-tasks-modal-workspace{padding:0;background:transparent}
+.shared-tasks-shell{position:relative;width:min(100%,760px);height:100dvh;min-height:100%;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;color:var(--social-ink,#0b1f3a);background:var(--surface-1,#f7fbff);border-radius:28px;box-shadow:0 24px 70px rgba(5,32,70,.2)}
+.shared-tasks-topbar{display:flex;align-items:center;gap:12px;padding:max(16px,env(safe-area-inset-top,0px)) 18px 14px;border-bottom:1px solid var(--social-line,#dce8f5);background:color-mix(in srgb,var(--surface-1,#f7fbff) 92%,transparent);z-index:2}
+.shared-tasks-heading{min-width:0;flex:1;text-align:center}
+.shared-tasks-heading span{display:block;color:var(--social-blue-700,#0b57d0);font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}
+.shared-tasks-heading h1{margin:2px 0 0;font-size:21px;line-height:1.1}
+.shared-tasks-heading p{margin:5px 0 0;color:var(--social-muted,#62738a);font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shared-tasks-lock{width:36px;text-align:center;color:var(--social-muted,#62738a);font-size:22px}
+.shared-tasks-status{min-height:22px;padding:10px 18px 0;color:var(--social-muted,#62738a);font-size:12px;font-weight:700;text-align:center}
+.shared-tasks-content{flex:1;overflow:auto;padding:10px 16px 112px}
+.shared-tasks-card{margin:9px 0;padding:15px;border:1px solid var(--social-line,#dce8f5);border-radius:20px;background:var(--surface-2,#fff);box-shadow:0 8px 24px rgba(17,61,112,.07)}
+.shared-tasks-card h2{margin:0 0 10px;font-size:15px}
+.shared-tasks-card p{margin:0;color:var(--social-muted,#62738a);font-size:13px;line-height:1.45}
+.shared-tasks-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.shared-tasks-person{padding:12px;border-radius:15px;background:color-mix(in srgb,var(--social-blue-100,#eaf3ff) 60%,transparent)}
+.shared-tasks-person strong{display:block;font-size:13px}
+.shared-tasks-person b{display:block;margin-top:5px;font-size:22px;color:var(--social-blue-700,#0b57d0)}
+.shared-tasks-person small{display:block;color:var(--social-muted,#62738a);font-size:11px}
+.shared-tasks-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.shared-tasks-metric{padding:10px 11px;border-radius:14px;background:var(--surface-3,#f1f6fb)}
+.shared-tasks-metric span{display:block;color:var(--social-muted,#62738a);font-size:10px;font-weight:800;text-transform:uppercase}
+.shared-tasks-metric strong{display:block;margin-top:3px;font-size:17px}
+.shared-tasks-list{display:grid;gap:7px;margin-top:8px}
+.shared-tasks-list-item{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:12px;background:var(--surface-3,#f1f6fb);font-size:12px}
+.shared-tasks-list-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shared-tasks-list-item b{color:var(--social-blue-700,#0b57d0);white-space:nowrap}
+.shared-tasks-action{display:inline-flex;align-items:center;justify-content:center;min-height:42px;width:100%;padding:10px 15px;border:0;border-radius:14px;color:#fff;background:linear-gradient(145deg,var(--social-blue-600,#2f7df2),var(--social-blue-800,#0b3f98));font-weight:900;cursor:pointer}
+.shared-tasks-action.secondary{color:var(--social-blue-700,#0b57d0);background:var(--social-blue-100,#eaf3ff)}
+.shared-tasks-periods{display:flex;gap:6px;overflow:auto;padding:8px 14px max(12px,env(safe-area-inset-bottom,0px));border-top:1px solid var(--social-line,#dce8f5);background:var(--surface-1,#f7fbff)}
+.shared-tasks-periods button{flex:0 0 auto;min-width:52px;border:1px solid var(--social-line,#dce8f5);border-radius:999px;padding:8px 12px;color:var(--social-muted,#62738a);background:var(--surface-2,#fff);font-size:11px;font-weight:900}
+.shared-tasks-periods button.active{color:#fff;border-color:var(--social-blue-700,#0b57d0);background:var(--social-blue-700,#0b57d0)}
+.shared-tasks-fab{position:absolute;right:20px;bottom:82px;z-index:4;width:58px;height:58px;border:0;border-radius:50%;display:grid;place-items:center;color:#fff;background:linear-gradient(145deg,#3185ff,#0b57d0);box-shadow:0 14px 28px rgba(11,87,208,.32);cursor:pointer}
+.shared-tasks-fab svg{width:26px;height:26px}
+.shared-tasks-empty{padding:26px 12px;text-align:center;color:var(--social-muted,#62738a);font-size:13px}
+@media(max-width:560px){.shared-tasks-shell{width:100%;border-radius:0}.shared-tasks-content{padding-left:12px;padding-right:12px}}
+body[data-background-theme="dark"] .shared-tasks-shell,body[data-background-theme="black"] .shared-tasks-shell{color:#eef6ff;background:#0c1422}
+body[data-background-theme="dark"] .shared-tasks-card,body[data-background-theme="black"] .shared-tasks-card{background:#131f31;border-color:#263b56}
+body[data-background-theme="dark"] .shared-tasks-metric,body[data-background-theme="black"] .shared-tasks-metric,body[data-background-theme="dark"] .shared-tasks-list-item,body[data-background-theme="black"] .shared-tasks-list-item{background:#1a2a40}

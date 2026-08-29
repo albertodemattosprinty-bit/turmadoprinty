@@ -63,6 +63,12 @@
   const byId = (id) => document.getElementById(id);
   const safeText = (value, fallback = "") => String(value ?? fallback);
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  function isNativeCapacitorApp() {
+    const capacitor = window.Capacitor;
+    if (typeof capacitor?.isNativePlatform === "function") return Boolean(capacitor.isNativePlatform());
+    const platform = typeof capacitor?.getPlatform === "function" ? capacitor.getPlatform() : "web";
+    return platform === "android" || platform === "ios";
+  }
   function currentQuality() {
     return QUALITY_LEVELS.find((item) => item.key === state.qualityKey) || QUALITY_LEVELS[0];
   }
@@ -100,8 +106,8 @@
   }
 
   function nextAudioTitle() {
-    const total = state.captures.filter((item) => item.kind === "audio" && /^Gravação\s+\d+/i.test(safeText(item.title))).length;
-    return `Gravação ${total + 1}`;
+    const total = state.captures.filter((item) => item.kind === "audio" && /^Gravaï¿½ï¿½o\s+\d+/i.test(safeText(item.title))).length;
+    return `Gravaï¿½ï¿½o ${total + 1}`;
   }
 
   function firstTextLine(value, limit = 20) {
@@ -210,7 +216,7 @@
                 <svg viewBox="0 0 24 24"><path d="M6 7h2.2l1.5-2h8.6l1.5 2H22a1 1 0 0 1 1 1v10a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V8a1 1 0 0 1 1-1Zm6 3.2a4.8 4.8 0 1 0 4.8 4.8 4.8 4.8 0 0 0-4.8-4.8Z" fill="currentColor"/></svg>
               </div>
               <video id="lifeCapturePreview" autoplay playsinline muted></video>
-              <canvas id="lifeCaptureCanvas" width="720" height="720" hidden></canvas>
+              <canvas id="lifeCaptureCanvas" width="720" height="720" hidden></canvas><input id="lifeCaptureNativeInput" type="file" accept="image/*" capture="environment" hidden />
             </div>
           </div>
           <p class="life-capture-status" id="lifeCaptureStatus">Abrindo camera...</p>
@@ -948,6 +954,27 @@
     setTimeout(() => input?.focus(), 40);
   }
 
+  function openNativeCapture() {
+    const input = byId("lifeCaptureNativeInput");
+    if (!input) return;
+    input.accept = state.mode === "video" ? "video/*" : "image/*";
+    input.setAttribute("capture", state.facingMode === "user" ? "user" : "environment");
+    input.value = "";
+    setStatus(`Abrindo cÃ¢mera nativa Â· ${state.mode === "video" ? "vÃ­deo" : "foto"}...`);
+    window.setTimeout(() => input.click(), 80);
+  }
+
+  async function handleNativeCaptureFile(file) {
+    if (!file || !file.size) return;
+    const mimeType = normalizeMimeType(file.type) || (state.mode === "video" ? "video/mp4" : "image/jpeg");
+    const kind = mimeType.startsWith("video/") ? "video" : "photo";
+    const mediaBlob = new Blob([file], { type: mimeType });
+    const previewDataUrl = kind === "photo" ? await blobToDataUrl(mediaBlob) : await videoPreviewFromBlob(mediaBlob);
+    prepareSave({
+      id: `life-${Date.now()}`, kind, createdAt: new Date().toISOString(), mimeType, mediaBlob, previewDataUrl,
+      durationMs: kind === "video" ? 0 : undefined, noteText: "", metadata: { source: "native-camera", facingMode: state.facingMode }
+    });
+  }
   async function capturePhoto() {
     setStatus("Capturando foto...");
     const mediaBlob = await canvasBlob();
@@ -1217,6 +1244,7 @@
   function closeViewer() {
     pauseViewerVideos();
     hide("lifeCaptureViewerOverlay");
+    if (isNativeCapacitorApp()) { hide("lifeCaptureOverlay"); return; }
     show("lifeCaptureOverlay");
     startPreview().catch((error) => {
       setStatus(error instanceof Error ? error.message : "Falha ao reabrir a camera.");
@@ -1900,6 +1928,7 @@
         renderViewer();
       });
     });
+    if (isNativeCapacitorApp()) { hide("lifeCaptureOverlay"); return; }
     show("lifeCaptureOverlay");
     await startPreview();
   }
@@ -1942,9 +1971,14 @@
     inject();
     bindSwipe();
     setModeUi();
-    show("lifeCaptureOverlay");
     await refreshCaptures();
     queuePendingUploads();
+    if (isNativeCapacitorApp()) {
+      show("lifeCaptureOverlay");
+      openNativeCapture();
+      return;
+    }
+    show("lifeCaptureOverlay");
     try {
       await startPreview();
     } catch (error) {
@@ -1952,6 +1986,11 @@
     }
   }
 
+  document.addEventListener("change", (event) => {
+    if (event.target?.id !== "lifeCaptureNativeInput") return;
+    const file = event.target.files?.[0];
+    if (file) void handleNativeCaptureFile(file).catch((error) => setStatus(error instanceof Error ? error.message : "Falha ao importar a captura."));
+  });
   document.addEventListener("click", async (event) => {
     const button = event.target.closest("button");
     if (!button) return;

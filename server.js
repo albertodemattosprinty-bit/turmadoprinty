@@ -75,6 +75,7 @@ import { createExtraGoal, createExtraGoalVariant, deleteExtraGoal, deleteExtraGo
 import { createProject200Profile, deleteProject200Profile, listProject200ProfileNames, listProject200Profiles, normalizeStoredProject200ProfileName, PROJECT200_DEFAULT_PROFILE_NAME, resolveProject200ProfileName, reassignProject200ProfileTasks, updateProject200ProfileAvatar, updateProject200ProfileName, updateProject200ProfileSvgIcon } from "./src/project200-profiles.js";
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, recordProject200MissionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
+import { createProject200SharedTaskInvite, getProject200SharedTaskComparison, respondProject200SharedTaskInvite } from "./src/project200-shared-tasks.js";
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { createProject200Project, deleteProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
@@ -14993,6 +14994,45 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/friends\/[^/]+\/shared-tasks\/invite$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const friendId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/shared-tasks\/invite$/, "$1"));
+      const result = await createProject200SharedTaskInvite(authUser.id, friendId);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel enviar a solicitacao." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/200\/friends\/[^/]+\/shared-tasks$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const friendId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/shared-tasks$/, "$1"));
+      const days = requestUrl.searchParams.get("days") || "1";
+      const result = await getProject200SharedTaskComparison(authUser.id, friendId, days);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel carregar a comparacao." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/shared-tasks\/[^/]+\/(accept|reject)$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const match = pathname.match(/^\/api\/200\/shared-tasks\/([^/]+)\/(accept|reject)$/);
+      const result = await respondProject200SharedTaskInvite(authUser.id, decodeURIComponent(match?.[1] || ""), match?.[2]);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Nao foi possivel responder a solicitacao." });
+    }
+    return;
+  }
   if (request.method === "POST" && pathname.match(/^\/api\/200\/friends\/[^/]+\/accept$/)) {
     try {
       const authUser = await requireAuth(request, response);

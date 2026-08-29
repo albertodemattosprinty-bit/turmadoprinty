@@ -1059,6 +1059,13 @@ const socialSummaryNote = document.getElementById("socialSummaryNote");
 const socialPeriodLabel = document.getElementById("socialPeriodLabel");
 const socialDateCaption = document.getElementById("socialDateCaption");
 const socialToast = document.getElementById("socialToast");
+const sharedTasksModal = document.getElementById("sharedTasksModal");
+const sharedTasksCloseButton = document.getElementById("sharedTasksCloseButton");
+const sharedTasksFriendName = document.getElementById("sharedTasksFriendName");
+const sharedTasksStatus = document.getElementById("sharedTasksStatus");
+const sharedTasksContent = document.getElementById("sharedTasksContent");
+const sharedTasksShareButton = document.getElementById("sharedTasksShareButton");
+const sharedTasksPeriods = document.getElementById("sharedTasksPeriods");
 const pointsUpdateModal = document.getElementById("pointsUpdateModal");
 const pointsUpdateTotal = document.getElementById("pointsUpdateTotal");
 const pointsUpdateDelta = document.getElementById("pointsUpdateDelta");
@@ -1434,6 +1441,7 @@ const state = {
     incomingInvites: [],
     friends: []
   },
+  sharedTasks: { friend: null, payload: null, loading: false, days: 1 },
   friendAssignment: {
     mode: "",
     action: null,
@@ -3302,7 +3310,7 @@ function applyHomeViewMode() {
   document.body.setAttribute("data-home-view", mode);
   runningTaskContent?.setAttribute("data-home-view", mode);
 }
-+function syncRunningPlayerSelectionToAudio() {
+function syncRunningPlayerSelectionToAudio() {
   const audioUrl = normalizeRunningTrackUrl(runningAudio?.currentSrc || runningAudio?.src || "");
   if (!audioUrl || !Array.isArray(state.runningPlayer.stations) || !state.runningPlayer.stations.length) return false;
   const match = findRunningTrackByUrl(audioUrl);
@@ -3376,7 +3384,7 @@ runningTaskContent?.addEventListener("pointerup", (event) => {
   const deltaY = Math.abs(Number(event.clientY || 0) - homeViewSwipeState.startY);
   resetHomeViewSwipe();
   if (Math.abs(deltaX) < 72 || deltaY > 52) return;
-  const nextMode = deltaX < 0 ? "apps" : "complete";
+  const nextMode = deltaX < 0 ? "complete" : "apps";
   if (normalizeHomeViewMode(state.options.homeViewMode) === nextMode) return;
   event.preventDefault();
   homeViewSwipeState.suppressClick = true;
@@ -14118,6 +14126,109 @@ async function openSocialFriendChat(userId) {
   }
 }
 
+
+function sharedTasksNumber(value, fractionDigits = 0) {
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: fractionDigits }).format(Math.max(0, Number(value || 0)));
+}
+
+function renderSharedTasksPeriods(periods = []) {
+  if (!sharedTasksPeriods) return;
+  const values = Array.isArray(periods) && periods.length ? periods : [1, 3];
+  sharedTasksPeriods.hidden = false;
+  sharedTasksPeriods.innerHTML = values.map((days) => `<button type="button" class="${Number(days) === Number(state.sharedTasks.days) ? "active" : ""}" data-shared-tasks-days="${Number(days)}">${Number(days) === 1 ? "Hoje" : Number(days) + " dias"}</button>`).join("");
+}
+
+function renderSharedTasksData(label, data = {}, compareData = null) {
+  const metrics = data.metrics || {};
+  const compareMetrics = compareData?.metrics || {};
+  const metric = (name, value, otherValue, suffix = "") => `<div class="shared-tasks-metric"><span>${name}</span><strong>${sharedTasksNumber(value, name.includes("km") || name.includes("velocidade") ? 1 : 0)}${suffix}</strong>${compareData ? `<small>${sharedTasksNumber(otherValue, name.includes("km") || name.includes("velocidade") ? 1 : 0)}${suffix} · ${escapeHtml(compareData._label || "amigo")}</small>` : ""}</div>`;
+  const list = (title, items = []) => `<div class="shared-tasks-card"><h2>${title}</h2><div class="shared-tasks-list">${items.length ? items.map((item) => `<div class="shared-tasks-list-item"><span>${escapeHtml(item.title || item.name || "Item")}</span><b>Concluída</b></div>`).join("") : '<p>Nenhum item concluído neste período.</p>'}</div></div>`;
+  const exercises = data.exercises?.selected || [];
+  return `<section class="shared-tasks-card"><h2>${escapeHtml(label)}</h2><div class="shared-tasks-metrics">${metric("Movimentos", metrics.movements, compareMetrics.movements)}${metric("Séries", metrics.series, compareMetrics.series)}${metric("Minutos", metrics.minutes, compareMetrics.minutes)}${metric("Quilômetros", metrics.kilometers, compareMetrics.kilometers, " km")}</div></section>
+    <section class="shared-tasks-card"><h2>Caminhada</h2><div class="shared-tasks-metrics">${metric("Km caminhada", metrics.walking?.kilometers, compareMetrics.walking?.kilometers, " km")}${metric("Minutos", metrics.walking?.minutes, compareMetrics.walking?.minutes)}${metric("Velocidade média", metrics.walking?.averageKmh, compareMetrics.walking?.averageKmh, " km/h")}</div></section>
+    <section class="shared-tasks-card"><h2>Bicicleta</h2><div class="shared-tasks-metrics">${metric("Km bicicleta", metrics.bicycle?.kilometers, compareMetrics.bicycle?.kilometers, " km")}${metric("Minutos", metrics.bicycle?.minutes, compareMetrics.bicycle?.minutes)}${metric("Velocidade média", metrics.bicycle?.averageKmh, compareMetrics.bicycle?.averageKmh, " km/h")}</div></section>
+    ${list("Ações concluídas", data.actions || [])}${list("Tarefas concluídas", data.tasks || [])}
+    <section class="shared-tasks-card"><h2>Exercícios</h2><p>Pacote com ${exercises.length} exercício(s) escolhido(s).</p><div class="shared-tasks-list">${exercises.length ? exercises.map((item) => `<div class="shared-tasks-list-item"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(item.trackingType === "series" ? "séries" : item.trackingType === "gps" ? "km" : "min")}</b></div>`).join("") : "<p>Nenhum exercício escolhido.</p>"}</div></section>`;
+}
+
+function renderSharedTasksModal() {
+  const stateData = state.sharedTasks?.payload || {};
+  const friend = state.sharedTasks?.friend || stateData.friend || {};
+  if (sharedTasksFriendName) sharedTasksFriendName.textContent = friend.name ? `Comparando com ${friend.name}` : "Comparativo privado";
+  if (sharedTasksStatus) sharedTasksStatus.textContent = state.sharedTasks?.loading ? "Carregando seus dados..." : "";
+  const sharedPeriods = Array.isArray(stateData.periods) && stateData.periods.length ? stateData.periods : (stateData.preview?.self?.availableDays ? [1, 3] : []);
+  renderSharedTasksPeriods(sharedPeriods);
+  if (!sharedTasksContent) return;
+  if (state.sharedTasks?.loading) {
+    sharedTasksContent.innerHTML = '<div class="shared-tasks-empty">Carregando comparativo...</div>';
+    return;
+  }
+  const access = stateData.access || { status: "not_requested" };
+  if (access.status !== "accepted") {
+    const preview = stateData.preview?.self || { actions: [], tasks: [], exercises: { selected: [] }, metrics: {} };
+    const pendingRecipient = access.status === "pending" && access.isRequester === false;
+    sharedTasksContent.innerHTML = `<section class="shared-tasks-card"><h2>${pendingRecipient ? "Solicitação recebida" : "Compartilhar com este amigo"}</h2><p>${pendingRecipient ? "Este amigo quer comparar tarefas e exercícios com você. Aceite para liberar os números dos dois." : "Veja sua prévia e envie uma solicitação. O amigo precisa aceitar antes de qualquer número ser compartilhado."}</p>${pendingRecipient ? '<div class="shared-tasks-compare"><button class="shared-tasks-action" type="button" data-shared-tasks-response="accept">Aceitar</button><button class="shared-tasks-action secondary" type="button" data-shared-tasks-response="reject">Recusar</button></div>' : '<button class="shared-tasks-action" type="button" data-shared-tasks-send>Enviar solicitação</button>'}</section>${renderSharedTasksData("Sua prévia", preview)}`;
+    if (sharedTasksPeriods) sharedTasksPeriods.hidden = true;
+    return;
+  }
+  const comparison = stateData.comparison || {};
+  const selfData = comparison.self || {};
+  const friendData = comparison.friend || {};
+  friendData._label = friend.name || "amigo";
+  sharedTasksContent.innerHTML = `<section class="shared-tasks-card"><h2>Comparativo · ${escapeHtml(stateData.period === 1 ? "Hoje" : stateData.period + " dias")}</h2><div class="shared-tasks-compare"><div class="shared-tasks-person"><strong>Você</strong><b>${sharedTasksNumber(selfData.metrics?.movements)}</b><small>movimentos totais</small></div><div class="shared-tasks-person"><strong>${escapeHtml(friend.name || "Amigo")}</strong><b>${sharedTasksNumber(friendData.metrics?.movements)}</b><small>movimentos totais</small></div></div></section>${renderSharedTasksData("Seus números", selfData, friendData)}`;
+}
+
+async function loadSharedTasksComparison(days = state.sharedTasks.days) {
+  const friendId = String(state.sharedTasks?.friend?.userId || "").trim();
+  if (!friendId) return;
+  state.sharedTasks.days = Number(days || 1);
+  state.sharedTasks.loading = true;
+  renderSharedTasksModal();
+  try {
+    state.sharedTasks.payload = await apiRequest(`/api/200/friends/${encodeURIComponent(friendId)}/shared-tasks?days=${encodeURIComponent(state.sharedTasks.days)}`, { skipGlobalLoading: true });
+  } catch (error) {
+    state.sharedTasks.payload = { access: { status: "not_requested" }, friend: state.sharedTasks.friend };
+    if (sharedTasksStatus) sharedTasksStatus.textContent = error instanceof Error ? error.message : "Não foi possível carregar o comparativo.";
+  } finally {
+    state.sharedTasks.loading = false;
+    renderSharedTasksModal();
+  }
+}
+
+async function openSharedTasksForFriend(userId) {
+  const friend = (Array.isArray(state.social?.friends) ? state.social.friends : []).find((entry) => String(entry?.userId || "") === String(userId || ""));
+  if (!friend) return;
+  state.sharedTasks.friend = friend;
+  state.sharedTasks.payload = null;
+  state.sharedTasks.days = 1;
+  openModal("sharedTasksModal");
+  await loadSharedTasksComparison(1);
+}
+
+async function sendSharedTasksInvite() {
+  const friendId = String(state.sharedTasks?.friend?.userId || "").trim();
+  if (!friendId) return;
+  try {
+    if (sharedTasksStatus) sharedTasksStatus.textContent = "Enviando solicitação...";
+    await apiRequest(`/api/200/friends/${encodeURIComponent(friendId)}/shared-tasks/invite`, { method: "POST", skipGlobalLoading: true });
+    await loadSharedTasksComparison(state.sharedTasks.days);
+  } catch (error) {
+    if (sharedTasksStatus) sharedTasksStatus.textContent = error instanceof Error ? error.message : "Não foi possível enviar a solicitação.";
+  }
+}
+
+async function respondSharedTasksInvite(action) {
+  const accessId = String(state.sharedTasks?.payload?.access?.id || "").trim();
+  if (!accessId) return;
+  try {
+    if (sharedTasksStatus) sharedTasksStatus.textContent = action === "accept" ? "Aceitando..." : "Recusando...";
+    await apiRequest(`/api/200/shared-tasks/${encodeURIComponent(accessId)}/${action}`, { method: "POST", skipGlobalLoading: true });
+    await loadSharedTasksComparison(state.sharedTasks.days);
+  } catch (error) {
+    if (sharedTasksStatus) sharedTasksStatus.textContent = error instanceof Error ? error.message : "Não foi possível responder.";
+  }
+}
+
 async function startSleepSessionFlow() {
   if (!getToken()) {
     return;
@@ -20479,7 +20590,7 @@ runningTaskMissionButton?.addEventListener("click", () => {
   void openRunningMissionQuickModal();
 });
 runningTaskMusicButton?.addEventListener("click", toggleRunningPlayPause);
-+function openSynchronizedRunningMusicList() {
+function openSynchronizedRunningMusicList() {
   syncRunningPlayerSelectionToAudio();
   state.startDecisionContext.actionId = "";
   state.runningPlayer.configurationMode = false;
@@ -20978,6 +21089,18 @@ runningHomeSleepButton?.addEventListener("click", () => {
   void openSleepModal();
 });
 socialCloseButton?.addEventListener("click", () => closeModal("socialModal"));
+sharedTasksCloseButton?.addEventListener("click", () => { closeModal("sharedTasksModal"); openModal("socialModal"); });
+sharedTasksShareButton?.addEventListener("click", () => { void sendSharedTasksInvite(); });
+sharedTasksContent?.addEventListener("click", (event) => {
+  const sendButton = event.target.closest("[data-shared-tasks-send]");
+  if (sendButton) { void sendSharedTasksInvite(); return; }
+  const responseButton = event.target.closest("[data-shared-tasks-response]");
+  if (responseButton) { void respondSharedTasksInvite(String(responseButton.dataset.sharedTasksResponse || "")); }
+});
+sharedTasksPeriods?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-shared-tasks-days]");
+  if (button) void loadSharedTasksComparison(Number(button.dataset.sharedTasksDays || 1));
+});
 socialSearchButton?.addEventListener("click", () => {
   state.social.searchOpen = !state.social.searchOpen;
   renderSocialModal();
@@ -21041,6 +21164,7 @@ socialModalList?.addEventListener("click", (event) => {
     return;
   }
   const friend = getVisibleSocialRankedUsers().find((entry) => String(entry?.userId || "") === userId);
+  if (friend && !friend.isSelf) { void openSharedTasksForFriend(userId); return; }
   if (friend) showSocialToast(`${String(friend.name || "Amigo")}: ${new Intl.NumberFormat("pt-BR").format(Math.max(0, Number(friend.points || 0)))} pontos`);
 });
 socialModalList?.addEventListener("dblclick", (event) => {
