@@ -76,6 +76,7 @@ import { createProject200Profile, deleteProject200Profile, listProject200Profile
 import { buildProject200SvgSearchPrompt, findProject200SvgById, findProject200SvgCandidates } from "./src/project200-svg-icons.js";
 import { acceptProject200FriendInvite, createProject200FriendInvite, ensureProject200FriendsSchema, getProject200FriendsSnapshot, getProject200UserPointTotals, recordProject200ActionPoints, recordProject200MissionPoints, rejectProject200FriendInvite, removeProject200ActionPoints, resolveProject200FriendAssignmentUser } from "./src/project200-friends.js";
 import { createProject200SharedTaskInvite, getProject200SharedTaskComparison, respondProject200SharedTaskInvite } from "./src/project200-shared-tasks.js";
+import { assertProject200SharedTaskFriendship, createProject200SharedTaskLink, getProject200SharedTaskCandidates, getProject200SharedTaskLinks, listProject200SharedTaskItems, respondProject200SharedTaskLink } from "./src/project200-shared-task-links.js";
 import { recordProject200FirstPointOrigin } from "./src/project200-metric-origin.js";
 import { createProject200Project, deleteProject200Project, listProject200Projects, recordProject200DailyProgress, replaceProject200ProjectItems, toggleProject200Step } from "./src/project200-projects.js";
 import { appendProject200MarinMessage, claimProject200MarinProposal, ensureProject200MarinSchema, failProject200MarinProposal, finishProject200MarinProposal, getOrCreateProject200MarinConversation, getProject200MarinMessage, getProject200MarinPrompts, getProject200MarinSetting, listProject200MarinMessages, PROJECT200_MARIN_PERSONAS, recordProject200MarinRun, setProject200MarinPersona, updateProject200MarinPrompt } from "./src/project200-marin.js";
@@ -14994,6 +14995,71 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+
+  if (request.method === "GET" && pathname.match(/^\/api\/200\/friends\/[^/]+\/shared-items$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const friendId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/shared-items$/, "$1"));
+      await assertProject200SharedTaskFriendship(authUser.id, friendId);
+      sendJson(response, 200, { ok: true, items: await listProject200SharedTaskItems(authUser.id) });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível carregar seus itens." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/friends\/[^/]+\/shared-items$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const friendId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/shared-items$/, "$1"));
+      const body = await readJsonBody(request);
+      const result = await createProject200SharedTaskLink(authUser.id, friendId, body);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível enviar a solicitação." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/200\/friends\/[^/]+\/shared-links$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const friendId = decodeURIComponent(pathname.replace(/^\/api\/200\/friends\/([^/]+)\/shared-links$/, "$1"));
+      sendJson(response, 200, { ok: true, ...(await getProject200SharedTaskLinks(authUser.id, friendId, requestUrl.searchParams.get("days") || "1")) });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível carregar as tarefas compartilhadas." });
+    }
+    return;
+  }
+
+  if (request.method === "GET" && pathname.match(/^\/api\/200\/shared-task-links\/[^/]+\/candidates$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const linkId = decodeURIComponent(pathname.replace(/^\/api\/200\/shared-task-links\/([^/]+)\/candidates$/, "$1"));
+      sendJson(response, 200, { ok: true, ...(await getProject200SharedTaskCandidates(authUser.id, linkId)) });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível carregar os itens compatíveis." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname.match(/^\/api\/200\/shared-task-links\/[^/]+\/(accept|reject)$/)) {
+    try {
+      const authUser = await requireAuth(request, response);
+      if (!authUser) return;
+      const match = pathname.match(/^\/api\/200\/shared-task-links\/([^/]+)\/(accept|reject)$/);
+      const body = await readJsonBody(request);
+      const result = await respondProject200SharedTaskLink(authUser.id, decodeURIComponent(match?.[1] || ""), match?.[2], body);
+      sendJson(response, 200, { ok: true, ...result });
+    } catch (error) {
+      sendJson(response, 400, { error: error instanceof Error ? error.message : "Não foi possível responder à solicitação." });
+    }
+    return;
+  }
   if (request.method === "POST" && pathname.match(/^\/api\/200\/friends\/[^/]+\/shared-tasks\/invite$/)) {
     try {
       const authUser = await requireAuth(request, response);
