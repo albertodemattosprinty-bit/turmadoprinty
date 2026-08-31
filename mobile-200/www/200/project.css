@@ -5790,7 +5790,6 @@ body[data-background-theme="white"] .hub-icon-image {
 
 body[data-background-theme="white"] .task-row,
 body[data-background-theme="white"] .task-row.task-in-progress,
-body[data-background-theme="white"] .task-row.task-completed,
 body[data-background-theme="white"] .task-row.task-gave-up,
 body[data-background-theme="white"] .task-row.task-delay-soft,
 body[data-background-theme="white"] .task-row.task-delay-yellow,
@@ -5814,6 +5813,16 @@ body[data-background-theme="white"] .task-row.task-paused {
     rgba(28, 103, 215, 0.24) var(--task-pause-progress, 0%),
     rgba(28, 103, 215, 0.24) 100%
   ) !important;
+}
+
+body[data-background-theme="white"] .task-row.task-completed {
+  background: linear-gradient(90deg, rgba(25, 153, 85, 0.96) 0%, rgba(25, 153, 85, 0.96) 50%, rgba(25, 153, 85, 0) 100%) !important;
+  border-color: rgba(19, 131, 71, 0.32);
+  box-shadow: 0 10px 22px rgba(19, 131, 71, 0.18);
+}
+
+body[data-background-theme="white"] .task-row.task-completed :is(.task-title, .task-assignee, .task-duration, .task-time) {
+  color: #fff !important;
 }
 
 body[data-background-theme="white"] .task-row .task-avatar {

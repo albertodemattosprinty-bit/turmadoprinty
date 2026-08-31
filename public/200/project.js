@@ -12,7 +12,7 @@ import {
 } from "./minute-cues.js?v=20260717-ptbr-natural-combo-cues";
 
 const tokenKey = "turma_do_printy_token";
-const project200AppVersion = "1.03";
+const project200AppVersion = "1.04";
 const project200LatestDebugApkUrl = "https://pub-3f5e3a74474b4527bc44ecf90f75585a.r2.dev/project200/app/latest/iLife-Mindset-debug.apk";
 const projectProfileKey = "project_200_profile_v1";
 
@@ -904,6 +904,8 @@ const appsHomeProfileName = document.getElementById("appsHomeProfileName");
 const appsHomeMusicButton = document.getElementById("appsHomeMusicButton");
 const appsHomeMemoriesButton = document.getElementById("appsHomeMemoriesButton");
 const appsHomeConversationsButton = document.getElementById("appsHomeConversationsButton");
+const appsHomeFriendsButton = document.getElementById("appsHomeFriendsButton");
+const appsHomeSleepButton = document.getElementById("appsHomeSleepButton");
 const runningPlayerStation = document.getElementById("runningPlayerStation");
 const runningPlayerTrack = document.getElementById("runningPlayerTrack");
 const runningPlayerTitleButton = document.getElementById("runningPlayerTitleButton");
@@ -21438,7 +21440,6 @@ if (runningAudio) {
   });
 }
 handleSwipe(runningPlayerTrack, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
-handleSwipe(runningTaskModalElement, (amount) => void moveRunningStation(amount > 0 ? -1 : 1));
 
 const project200MarinUi = initializeProject200MarinUi({
   apiRequest,
@@ -21462,6 +21463,13 @@ project200TutorsUi = initializeProject200TutorsUi({
 });
 appsHomeConversationsButton?.addEventListener("click", () => {
   void project200MarinUi.openPersonaPicker();
+});
+appsHomeFriendsButton?.addEventListener("click", () => {
+  void openSocialModal();
+});
+appsHomeSleepButton?.addEventListener("click", () => {
+  if (sleepModalFeedback) sleepModalFeedback.textContent = "";
+  void openSleepModal();
 });
 initializeProjectNativeChatKeyboard();
 initializeProjectNativeMissionKeyboard();

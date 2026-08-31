@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Amigos">
+  <defs>
+    <linearGradient id="friends-bg" x1="18" y1="10" x2="112" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2d8cff"/><stop offset="1" stop-color="#7258ff"/>
+    </linearGradient>
+    <linearGradient id="friends-skin" x1="42" y1="34" x2="89" y2="93" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffdda9"/><stop offset="1" stop-color="#f3a56d"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="31" fill="url(#friends-bg)"/>
+  <circle cx="47" cy="52" r="17" fill="url(#friends-skin)"/><circle cx="81" cy="49" r="17" fill="url(#friends-skin)"/>
+  <path d="M22 104c2-20 13-31 30-31s28 11 30 31H22Z" fill="#fff" fill-opacity=".93"/>
+  <path d="M50 104c2-19 12-29 28-29 16 0 26 10 28 29H50Z" fill="#dce6ff"/>
+  <path d="M30 44c2-15 10-24 22-24 9 0 17 5 21 14-6-4-12-5-18-3-10 2-15 9-18 18-4 0-6-2-7-5Z" fill="#263a9b"/>
+  <path d="M65 42c2-15 10-24 22-24 10 0 18 6 21 16-8-4-14-4-20-1-9 3-14 9-16 17-4-1-6-4-7-8Z" fill="#18205c"/>
+  <circle cx="42" cy="54" r="2.4" fill="#503129"/><circle cx="53" cy="54" r="2.4" fill="#503129"/>
+  <circle cx="76" cy="51" r="2.4" fill="#503129"/><circle cx="87" cy="51" r="2.4" fill="#503129"/>
+</svg>
